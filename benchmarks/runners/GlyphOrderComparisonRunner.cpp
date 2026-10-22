@@ -4,9 +4,10 @@
 //   IntrinsicGlyphOrderComparison --self-test
 //   IntrinsicGlyphOrderComparison <empty or new out dir> <mesh.obj>... [--budget-seconds S]
 //
-// Per mesh and element domain (vertices, edge midpoints, face centers) every method orders the
-// anchors as the feature will: count = min(N, 65536), sample elimination's radius from the true
-// area; the vector-field slider draws prefixes of that order. Quality is measured on the surface:
+// Per mesh and element domain (vertices, edge midpoints, face centers) every method orders
+// count = min(N, 65536) anchors, as the feature does; the vector-field slider draws prefixes of that
+// order. Unlike the Appearance combo (PointSamplingConfig defaults), sample elimination here uses
+// ManifoldDimension 2 and its radius from the true area, and two Poisson variants are extra rows. Quality is measured on the surface:
 // each triangle's area goes 1/2 to its centroid and 1/6 to each corner (exact for linear
 // functions), and every such reference point belongs to its nearest sample (3-D Euclidean). Per
 // prefix of k samples: coverage = largest distance of a reference point to its sample, packing =
@@ -771,13 +772,16 @@ int main(int argc, char** argv)
                     const PS::Result full =
                         OrderFor(m, m.Seeded ? 1u : 0u, vertices, ref.Area, vertices.Anchors.size());
                     const PS::Result capped = OrderFor(m, m.Seeded ? 1u : 0u, vertices, ref.Area, 4096u);
-                    return std::vector<std::uint32_t>{full.Succeeded() && capped.Succeeded() &&
-                        full.Order.size() >= capped.Order.size() &&
+                    // 1 = prefix, 0 = not a prefix, 2 = an order failed.
+                    if (!full.Succeeded() || !capped.Succeeded())
+                        return std::vector<std::uint32_t>{2u};
+                    return std::vector<std::uint32_t>{full.Order.size() >= capped.Order.size() &&
                         std::equal(capped.Order.begin(), capped.Order.end(), full.Order.begin())};
                 });
+            const bool failed = stable.Words && !stable.Words->empty() && stable.Words->front() == 2u;
             cells << "{\"kind\": \"prefix_stability\", \"method\": \"" << m.Name << "\", \"stable\": "
                   << (stable.Words && !stable.Words->empty() && stable.Words->front() == 1u ? "true" : "false")
-                  << ", \"status\": \"" << stable.Status << "\"}\n";
+                  << ", \"status\": \"" << (failed ? std::string{"failed"} : stable.Status) << "\"}\n";
             cells.flush();
         }
     }

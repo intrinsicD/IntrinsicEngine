@@ -46,7 +46,12 @@ METHODS = ["random", "farthest_point", "coupled_sieve_eta095", "flat_greedy_beta
 NON_CANDIDATES = {"stride", "random"}
 REFINED = ["farthest_point", "sample_elimination"]  # the methods the runner measures on the refined reference
 METRICS = [("coverage", "coverage / d_hex (lower is better)"), ("packing", "packing / d_hex (higher is better)"),
-           ("cell_cv", "Voronoi cell area CV (lower is more even)")]
+           ("cell_cv", "Voronoi cell area CV (equal areas; blind to stripes)")]
+# How each row relates to the Appearance "Arrow order method" combo (PointSamplingConfig defaults).
+COMBO = {"random": "yes", "farthest_point": "yes (default)", "coupled_sieve_eta095": "yes",
+         "flat_greedy_beta110": "yes", "lazy_greedy_beta110": "yes", "progressive_poisson_hapds": "yes",
+         "progressive_poisson_fast": "no", "progressive_poisson_balanced": "no",
+         "sample_elimination": "other parameters", "tournament": "yes", "stride": "fallback (every n-th)"}
 PALETTE = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
            "#ff7f0e", "#000000"]
 
@@ -159,7 +164,8 @@ def decide(cells, summary, broken, means, budget_ms, tie, full_margin):
 
     refinement = [abs(c["coverage_refined"] - c["coverage"]) / c["coverage"]
                   for c in cells if c["kind"] == "refinement" and c["coverage"] > 0 and c["coverage_refined"] > 0]
-    decision = {"budget_ms": budget_ms, "tie": tie, "full_margin": full_margin, "scores": score, "packing": pack,
+    decision = {"exploratory": True, "applied": False,
+                "budget_ms": budget_ms, "tie": tie, "full_margin": full_margin, "scores": score, "packing": pack,
                 "short_orders": short, "prefix_stable": stable, "problems": problems[:50],
                 "problem_count": len(problems), "max_refinement_change": max(refinement) if refinement else None,
                 "timing_ms": {m: {f"{d}/{k}": v for (d, k), v in t.items()} for m, t in timing.items()},
@@ -249,13 +255,25 @@ def report(run, budget_ms, tie, full_margin):
              "frozen v2 rule would have chosen. Two v2 review findings stay open and limit it: the refinement "
              "probe compares two reference resolutions and does not bound the error to the continuous surface, "
              "and the prefix-stability probe uses one 65k-vertex grid, not the larger domains.</p>",
+             "<p><b>Is the Voronoi area spread the right test?</b> Not on its own: equal cell areas also hold for "
+             "samples in lines or stripes (the runner's self-test: today's stride on a row-major grid draws one "
+             "column, cell CV 0.09, coverage 7.5 d). So the largest hole (coverage) ranks the methods, and the "
+             "cell-area spread is shown beside it.</p>",
+             "<p><b>Rows vs. the Appearance combo:</b> sample_elimination here uses ManifoldDimension 2 and its "
+             "radius from the true surface area; the combo's Sample elimination uses the defaults "
+             "(ManifoldDimension 3, bounding-box radius), so this row does not describe what the combo runs. "
+             "progressive_poisson_fast and _balanced are not combo entries; the other rows match the combo's "
+             "parameters (the combo uses seed 0, the default).</p>",
              f"<p>Run status: <b>{html.escape(str(summary.get('status')))}</b>, commit "
              f"{html.escape(str(summary.get('commit')))}, {len(cells)} raw cells, peak RSS "
-             f"{html.escape(str(summary.get('peak_rss_kib')))} KiB. Planned-cell problems: {decision['problem_count']}.</p>"]
+             f"{html.escape(str(summary.get('peak_rss_kib')))} KiB (largest child "
+             f"{html.escape(str(summary.get('peak_child_rss_kib')))} KiB). "
+             f"Planned-cell problems: {decision['problem_count']}.</p>"]
     if decision["problem_count"]:
         parts.append("<ul>" + "".join(f"<li class='bad'>{html.escape(p)}</li>" for p in decision["problems"]) + "</ul>")
-    parts.append("<h2>Frozen decision</h2><table><tr><th>method</th><th>median coverage/d</th><th>median packing/d</th>"
-                 "<th>eligible</th><th>prefix-stable</th><th>timing median ms vertices/edges/faces: full | cap</th></tr>")
+    parts.append("<h2>What the v2 rule would choose (not applied)</h2><table><tr><th>method</th><th>in the combo</th>"
+                 "<th>median coverage/d</th><th>median packing/d</th><th>eligible</th><th>prefix-stable</th>"
+                 "<th>timing median ms on the 1M-vertex grid, vertices/edges/faces: full | cap</th></tr>")
     for m in sorted(decision["scores"], key=lambda m: decision["scores"][m]):
         t = decision["timing_ms"].get(m, {})
 
@@ -267,7 +285,8 @@ def report(run, budget_ms, tie, full_margin):
         tt = " / ".join(fmt(f"{d}/full") for d in DOMAINS) + " | " + " / ".join(fmt(f"{d}/cap") for d in DOMAINS)
         mark = "winner" if m == decision.get("winner") else ("yes" if m in decision["eligible"] else
                                                               ("short order" if m in decision["short_orders"] else ""))
-        parts.append(f"<tr><td style='text-align:left'>{html.escape(m)}</td><td>{decision['scores'][m]:.4f}</td>"
+        parts.append(f"<tr><td style='text-align:left'>{html.escape(m)}</td><td>{html.escape(COMBO.get(m, ''))}</td>"
+                     f"<td>{decision['scores'][m]:.4f}</td>"
                      f"<td>{decision['packing'][m]:.4f}</td><td>{mark}</td>"
                      f"<td>{html.escape(str(decision['prefix_stable'].get(m, '')))}</td><td>{tt}</td></tr>")
     parts.append("</table>")
@@ -276,9 +295,12 @@ def report(run, budget_ms, tie, full_margin):
                  f"<b>{html.escape(str(decision.get('winner')))}</b>; tied: {html.escape(str(decision.get('tied')))}; "
                  f"verdict: <b>{html.escape(decision['verdict'])}</b>. Largest coverage change with the refined reference: "
                  f"{decision['max_refinement_change']}; largest seed spread (sd/mean) of an eligible candidate's "
-                 f"coverage: {decision.get('candidate_seed_spread_max')} (tie band {tie:.0%}).</p>"
+                 f"coverage: {decision.get('candidate_seed_spread_max')} (tie band {tie:.0%}; farthest_point, "
+                 "coupled_sieve, sample_elimination and tournament are deterministic and have no seed spread; "
+                 "not computed for an incomplete run).</p>"
                  "<p>Positive reference: on regular_grid_256 an even order reaches coverage/d near the square-subgrid "
-                 "value 0.66, the hexagonal 0.58 at best. Limitations: nearest samples are found by straight-line "
+                 "value 0.66, the hexagonal 0.58 at best on the continuous plane; the finite reference (spacing "
+                 "about 0.47 d at N/4) can measure slightly below it. Limitations: nearest samples are found by straight-line "
                  "(Euclidean) distance, which can mix thin parts of child.obj (the same for every method); "
                  "sample_elimination is measured as implemented, its weight limit dMin is derived once from k/n "
                  "(Geometry.PointSampling.Approximate.cpp), so it is 0 at count = N, not yet checked against cyCodeBase.</p><ul>")
