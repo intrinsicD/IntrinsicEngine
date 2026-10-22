@@ -17,7 +17,7 @@
 // Prefix sizes k = N / r at sqrt(2) steps, r = 4 .. 256, so prefixes fall between the levels of
 // hierarchical methods too. Every order runs in a forked child with a deadline (quality: 60 s,
 // timing: 6 s = 3x the operator's 2 s budget); a missed deadline is recorded as "timeout", a
-// measured "too slow", never a silent gap. Probes: the same coverage on a 1-to-4 refined reference
+// measured "too slow", a dead child as "crashed" (a failure), never a silent gap. Probes: the same coverage on a 1-to-4 refined reference
 // (FPS and sample elimination), and whether each method's capped order is a prefix of its full
 // order. Timing on a 1M-vertex grid keeps every repeat; the capped count runs first and the full
 // count only while the capped median is within the budget. Writes cells.jsonl (one flushed line per cell) and summary.json; a watchdog
@@ -28,6 +28,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -46,6 +47,7 @@
 
 #include <csignal>
 #include <poll.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -68,19 +70,34 @@ namespace
     constexpr double kQualityDeadlineS = 60.0;
     constexpr double kTimingDeadlineS = 6.0;
 
-    // Runs `work` in a forked child that writes its result words to a pipe; nullopt when the child
-    // misses the deadline (it is killed) or fails. The parent's watchdog thread is not in the child.
-    [[nodiscard]] std::optional<std::vector<std::uint32_t>> InChild(
+    // Outcome of one forked order: Words only for "ok"; "timeout" = killed at the deadline, "crashed" =
+    // signal, non-zero exit, torn output or a fork/pipe error (a failure, never "too slow").
+    struct ChildResult
+    {
+        std::string Status;
+        std::optional<std::vector<std::uint32_t>> Words;
+    };
+
+    // Runs `work` in a forked child that writes its result words to a pipe. The parent's watchdog
+    // thread is not in the child; the child dies with the parent (watchdog exit included).
+    [[nodiscard]] ChildResult InChild(
         const double deadlineSeconds, const std::function<std::vector<std::uint32_t>()>& work)
     {
         int fds[2];
         if (pipe(fds) != 0)
-            return std::nullopt;
+            return {"crashed", std::nullopt};
+        const pid_t parent = getpid();
         const pid_t pid = fork();
         if (pid < 0)
-            return std::nullopt;
+        {
+            close(fds[0]);
+            close(fds[1]);
+            return {"crashed", std::nullopt};
+        }
         if (pid == 0)
         {
+            if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != parent)
+                _exit(1);
             close(fds[0]);
             const std::vector<std::uint32_t> words = work();
             const std::uint64_t size = words.size();
@@ -115,6 +132,8 @@ namespace
             pollfd fd{fds[0], POLLIN, 0};
             if (poll(&fd, 1, int(std::min(left, 1000.0))) < 0)
             {
+                if (errno == EINTR)
+                    continue;
                 timedOut = true;
                 break;
             }
@@ -131,15 +150,17 @@ namespace
             kill(pid, SIGKILL);
         int status = 0;
         waitpid(pid, &status, 0);
-        if (timedOut || !WIFEXITED(status) || WEXITSTATUS(status) != 0 || bytes.size() < sizeof(std::uint64_t))
-            return std::nullopt;
+        if (timedOut)
+            return {"timeout", std::nullopt};
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0 || bytes.size() < sizeof(std::uint64_t))
+            return {"crashed", std::nullopt};
         std::uint64_t size = 0;
         std::memcpy(&size, bytes.data(), sizeof(size));
         if (bytes.size() != sizeof(size) + size * sizeof(std::uint32_t))
-            return std::nullopt;
+            return {"crashed", std::nullopt};
         std::vector<std::uint32_t> words(size);
         std::memcpy(words.data(), bytes.data() + sizeof(size), size * sizeof(std::uint32_t));
-        return words;
+        return {"ok", std::move(words)};
     }
 
     // The k = N / r prefix sizes at sqrt(2) steps from r = 4 to r = 256 (13 ratios).
@@ -435,6 +456,34 @@ namespace
             std::cout << (ok ? "ok   " : "FAIL ") << what << " = " << value << '\n';
             failures += ok ? 0 : 1;
         };
+        // Child outcomes: a missed deadline is "timeout"; a signal or non-zero exit is "crashed".
+        const ChildResult fine = InChild(5.0,
+            []
+            {
+                return std::vector<std::uint32_t>{7u};
+            });
+        check(fine.Status == "ok" && fine.Words == std::vector<std::uint32_t>{7u}, "child ok", 0.0);
+        const ChildResult slow = InChild(0.2,
+            []
+            {
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                return std::vector<std::uint32_t>{};
+            });
+        check(slow.Status == "timeout" && !slow.Words, "child past its deadline is a timeout", 0.0);
+        const ChildResult killed = InChild(5.0,
+            []
+            {
+                kill(getpid(), SIGKILL);
+                return std::vector<std::uint32_t>{};
+            });
+        check(killed.Status == "crashed" && !killed.Words, "killed child is a crash, not a timeout", 0.0);
+        const ChildResult exited = InChild(5.0,
+            []
+            {
+                std::_Exit(9);
+                return std::vector<std::uint32_t>{};
+            });
+        check(exited.Status == "crashed", "non-zero exit is a crash", 0.0);
         // 65 x 65 grid, spacing h = 1/64; the subgrid every 4th row and column (17 x 17).
         const Surface grid = Grid("self_grid", 65u, false);
         const Reference ref = MakeReference(grid);
@@ -629,7 +678,7 @@ int main(int argc, char** argv)
                 {
                     const auto t0 = Clock::now();
                     // Words: 1 + order on success, {0} when the method reports a failure.
-                    const auto child = InChild(kQualityDeadlineS,
+                    const ChildResult child = InChild(kQualityDeadlineS,
                         [&]
                         {
                             const PS::Result r = OrderFor(m, seed, domain, ref.Area, count);
@@ -639,19 +688,20 @@ int main(int argc, char** argv)
                             return words;
                         });
                     const double orderMs = Ms(t0);
-                    if (!child || child->empty() || child->front() != 1u)
+                    if (!child.Words || child.Words->empty() || child.Words->front() != 1u)
                     {
-                        cells << CellHead(child ? "failure" : "timeout", surface, domain, ref, m.Name, seed)
+                        const std::string kind = child.Words ? "failure" : child.Status;
+                        cells << CellHead(kind, surface, domain, ref, m.Name, seed)
                               << ", \"deadline_s\": " << kQualityDeadlineS << "}\n";
                         cells.flush();
                         std::cerr << surface.Name << '/' << domain.Name << ' ' << m.Name << " seed " << seed << ": "
-                                  << (child ? "failed" : "timeout") << '\n';
+                                  << kind << '\n';
                         continue;
                     }
                     struct
                     {
                         std::vector<std::uint32_t> Order;
-                    } order{{child->begin() + 1, child->end()}};
+                    } order{{child.Words->begin() + 1, child.Words->end()}};
                     for (const double ratio : ratios)
                     {
                         const std::size_t k = std::size_t(double(n) / ratio);
@@ -715,7 +765,7 @@ int main(int argc, char** argv)
         const Domain vertices = Domains(grid)[0];
         for (const MethodCase& m : methods)
         {
-            const auto stable = InChild(kQualityDeadlineS,
+            const ChildResult stable = InChild(kQualityDeadlineS,
                 [&]
                 {
                     const PS::Result full =
@@ -725,9 +775,9 @@ int main(int argc, char** argv)
                         full.Order.size() >= capped.Order.size() &&
                         std::equal(capped.Order.begin(), capped.Order.end(), full.Order.begin())};
                 });
-            cells << "{\"kind\": \"prefix_stability\", \"method\": \"" << m.Name
-                  << "\", \"stable\": " << (stable && !stable->empty() && stable->front() == 1u ? "true" : "false")
-                  << ", \"status\": \"" << (stable ? "ok" : "timeout") << "\"}\n";
+            cells << "{\"kind\": \"prefix_stability\", \"method\": \"" << m.Name << "\", \"stable\": "
+                  << (stable.Words && !stable.Words->empty() && stable.Words->front() == 1u ? "true" : "false")
+                  << ", \"status\": \"" << stable.Status << "\"}\n";
             cells.flush();
         }
     }
@@ -750,7 +800,7 @@ int main(int argc, char** argv)
                     status = "skipped";
                 for (int r = 0; r < 3 && status == "ok"; ++r)
                 {
-                    const auto words = InChild(kTimingDeadlineS,
+                    const ChildResult words = InChild(kTimingDeadlineS,
                         [&]
                         {
                             const auto t0 = Clock::now();
@@ -758,16 +808,19 @@ int main(int argc, char** argv)
                             const float ms = float(Ms(t0));
                             std::uint32_t bits = 0;
                             std::memcpy(&bits, &ms, sizeof(bits));
-                            return std::vector<std::uint32_t>{order.Succeeded() ? 1u : 0u, bits};
+                            return std::vector<std::uint32_t>{
+                                order.Succeeded() ? 1u : 0u, bits, std::uint32_t(order.Order.size())};
                         });
-                    if (!words || words->size() != 2u)
-                        status = "timeout";
-                    else if ((*words)[0] != 1u)
+                    if (!words.Words || words.Words->size() != 3u)
+                        status = words.Words ? "crashed" : words.Status;
+                    else if ((*words.Words)[0] != 1u)
                         status = "failed";
+                    else if ((*words.Words)[2] < count)
+                        status = "short"; // fewer samples than timed for, never a valid time
                     else
                     {
                         float ms = 0.0f;
-                        std::memcpy(&ms, &(*words)[1], sizeof(ms));
+                        std::memcpy(&ms, &(*words.Words)[1], sizeof(ms));
                         times.push_back(double(ms));
                     }
                 }
@@ -796,6 +849,8 @@ int main(int argc, char** argv)
     watchdog.join();
     rusage usage{};
     getrusage(RUSAGE_SELF, &usage);
+    rusage children{};
+    getrusage(RUSAGE_CHILDREN, &children); // ru_maxrss of the largest child, where the orders run
     const char* commit = std::getenv("INTRINSIC_SOURCE_COMMIT");
     std::ofstream summary(outDir / "summary.json", std::ios::trunc);
     summary
@@ -803,6 +858,6 @@ int main(int argc, char** argv)
         << "  \"backend\": \"cpu_reference\",\n  \"commit\": \"" << (commit ? commit : "local-dev") << "\",\n"
         << "  \"status\": \"complete\",\n  \"seconds\": "
         << std::chrono::duration<double>(Clock::now() - started).count() << ",\n  \"peak_rss_kib\": " << usage.ru_maxrss
-        << "\n}\n";
+        << ",\n  \"peak_child_rss_kib\": " << children.ru_maxrss << "\n}\n";
     return summary.good() && cells.good() ? 0 : 1;
 }

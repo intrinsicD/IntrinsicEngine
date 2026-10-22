@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """UI-081: HTML report and frozen decision for IntrinsicGlyphOrderComparison output.
 
+Exploratory (operator decision 2026-10-22): the feature's default is farthest point on claim C116;
+no decision rests on this report. The "verdict" below shows what the v2 rule would have chosen.
+
     python3 benchmarks/runners/glyph_order_report.py <run dir> [--budget-ms 2000] [--tie 0.02] [--full-margin 0.9]
 
 Reads <run dir>/cells.jsonl (raw cells) and writes <run dir>/report.html and decision.json.
 Decision rule (frozen in the UI-081 pre-flight packet), applied only to a complete run:
 - The planned inventory must be present: every fixture x domain x method x seed x ratio quality
   cell, the stride and random controls, and every timing cell. Anything missing, a failed order,
-  a failed measurement or an incomplete summary stops the decision ("incomplete").
+  a failed measurement, a crashed child (order, probe or timing), a missing or failed refinement
+  probe or an incomplete summary stops the decision ("incomplete").
 - Candidates are the orders (not stride, not random). A candidate with any "short" quality cell
   (fewer samples than the prefix asks for) cannot serve the slider and is ineligible; so is one
   whose order missed the runner's deadline anywhere ("timeout": measured too slow).
@@ -40,6 +44,7 @@ METHODS = ["random", "farthest_point", "coupled_sieve_eta095", "flat_greedy_beta
            "progressive_poisson_hapds", "progressive_poisson_fast", "progressive_poisson_balanced",
            "sample_elimination", "tournament"]
 NON_CANDIDATES = {"stride", "random"}
+REFINED = ["farthest_point", "sample_elimination"]  # the methods the runner measures on the refined reference
 METRICS = [("coverage", "coverage / d_hex (lower is better)"), ("packing", "packing / d_hex (higher is better)"),
            ("cell_cv", "Voronoi cell area CV (lower is more even)")]
 PALETTE = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
@@ -70,7 +75,8 @@ def inventory(cells, summary, broken):
     quality = {(c["fixture"], c["domain"], c["method"], c["seed"], round(c["ratio"], 4)): c
                for c in cells if c["kind"] == "quality"}
     elements = {(c["fixture"], c["domain"]): c["elements"] for c in cells if c["kind"] == "quality"}
-    timeouts = {(c["fixture"], c["domain"], c["method"], c["seed"]) for c in cells if c["kind"] == "timeout"}
+    timeouts = {(c["fixture"], c["domain"], c["method"], c["seed"])
+                for c in cells if c["kind"] in ("timeout", "crashed", "failure")}
     for fixture in FIXTURES:
         for domain in DOMAINS:
             if (fixture, domain) not in elements:
@@ -89,9 +95,23 @@ def inventory(cells, summary, broken):
                             problems.append(f"missing {fixture}/{domain}/{method}/seed {seed}/N/{r}")
                         elif cell["status"] == "measure_failed":
                             problems.append(f"measurement failed {fixture}/{domain}/{method}/seed {seed}/N/{r}")
+    refinement = {(c["fixture"], c["domain"], c["method"], round(c["ratio"], 4)): c
+                  for c in cells if c["kind"] == "refinement"}
+    for (fixture, domain), n in elements.items():
+        for method in REFINED:
+            if (fixture, domain, method, 0) in timeouts:
+                continue
+            for r in [r for r in RATIOS if int(n / r) >= 8]:
+                probe = refinement.get((fixture, domain, method, r))
+                if probe is None:
+                    problems.append(f"missing refinement {fixture}/{domain}/{method}/N/{r}")
+                elif probe["coverage"] <= 0 or probe["coverage_refined"] <= 0:
+                    problems.append(f"refinement measurement failed {fixture}/{domain}/{method}/N/{r}")
     for c in cells:
-        if c["kind"] == "failure":
-            problems.append(f"order failed {c['fixture']}/{c['domain']}/{c['method']}/seed {c['seed']}")
+        if c["kind"] in ("failure", "crashed"):
+            problems.append(f"order {c['kind']} {c['fixture']}/{c['domain']}/{c['method']}/seed {c['seed']}")
+        elif c["kind"] in ("timing", "prefix_stability") and c["status"] in ("crashed", "failed"):
+            problems.append(f"{c['kind']} {c['status']} {c['method']}/{c.get('domain', '')}")
     timing = {(c["method"], c["domain"], c["count"] == c["elements"]) for c in cells if c["kind"] == "timing"}
     for method in METHODS:
         for domain in DOMAINS:
@@ -125,11 +145,13 @@ def decide(cells, summary, broken, means, budget_ms, tie, full_margin):
     short = sorted({c["method"] for c in cells if c["kind"] == "quality" and c["status"] == "short"} |
                    {c["method"] for c in cells if c["kind"] == "timeout"})
     stable = {c["method"]: c["stable"] and c.get("status", "ok") == "ok" for c in cells if c["kind"] == "prefix_stability"}
-    timing = defaultdict(dict)
+    timing, timing_status = defaultdict(dict), defaultdict(dict)
     for c in cells:
         if c["kind"] == "timing":
             ms = statistics.median(c["ms"]) if c["status"] == "ok" and c["ms"] else None
-            timing[c["method"]][(c["domain"], "full" if c["count"] == c["elements"] else "cap")] = ms
+            key = (c["domain"], "full" if c["count"] == c["elements"] else "cap")
+            timing[c["method"]][key] = ms
+            timing_status[c["method"]][f"{key[0]}/{key[1]}"] = c["status"]
 
     def within(m, mode, limit):
         t = timing.get(m, {})
@@ -140,7 +162,8 @@ def decide(cells, summary, broken, means, budget_ms, tie, full_margin):
     decision = {"budget_ms": budget_ms, "tie": tie, "full_margin": full_margin, "scores": score, "packing": pack,
                 "short_orders": short, "prefix_stable": stable, "problems": problems[:50],
                 "problem_count": len(problems), "max_refinement_change": max(refinement) if refinement else None,
-                "timing_ms": {m: {f"{d}/{k}": v for (d, k), v in t.items()} for m, t in timing.items()}}
+                "timing_ms": {m: {f"{d}/{k}": v for (d, k), v in t.items()} for m, t in timing.items()},
+                "timing_status": timing_status}
     if problems:
         decision.update({"winner": None, "mode": None, "eligible": [],
                          "verdict": "incomplete: the planned cells are not all present (unevaluated, no decision)"})
@@ -152,6 +175,9 @@ def decide(cells, summary, broken, means, budget_ms, tie, full_margin):
         return decision
     best = min(score[m] for m in pool)
     tied = [m for m in pool if score[m] <= best * (1.0 + tie)]
+    spread = [v["coverage_sd"] / v["coverage"] for k, v in means.items()
+              if k[2] in pool and v["seeds"] > 1 and v["coverage"] > 0]
+    decision["candidate_seed_spread_max"] = max(spread) if spread else None
     winner = max(tied, key=lambda m: (pack[m], -score[m]))
     full = stable.get(winner, False) and within(winner, "full", full_margin * budget_ms)
     gates = {"random_worse_by_10pct": score["random"] > score[winner] * 1.10}
@@ -218,6 +244,11 @@ def report(run, budget_ms, tie, full_margin):
              "figure{display:inline-block;margin:4px}table{border-collapse:collapse}",
              "td,th{border:1px solid #ccc;padding:3px 6px;text-align:right}.ok{color:#2a7a2a}.bad{color:#b00020}</style>",
              "<h1>UI-081 glyph order comparison</h1>",
+             "<p><b>Exploratory report.</b> By operator decision (2026-10-22) the feature's default order is "
+             "farthest point (claim C116); no decision rests on this run. The verdict below only shows what the "
+             "frozen v2 rule would have chosen. Two v2 review findings stay open and limit it: the refinement "
+             "probe compares two reference resolutions and does not bound the error to the continuous surface, "
+             "and the prefix-stability probe uses one 65k-vertex grid, not the larger domains.</p>",
              f"<p>Run status: <b>{html.escape(str(summary.get('status')))}</b>, commit "
              f"{html.escape(str(summary.get('commit')))}, {len(cells)} raw cells, peak RSS "
              f"{html.escape(str(summary.get('peak_rss_kib')))} KiB. Planned-cell problems: {decision['problem_count']}.</p>"]
@@ -228,9 +259,12 @@ def report(run, budget_ms, tie, full_margin):
     for m in sorted(decision["scores"], key=lambda m: decision["scores"][m]):
         t = decision["timing_ms"].get(m, {})
 
-        def fmt(v):
-            return "fail" if v is None else f"{v:.0f}"
-        tt = " / ".join(fmt(t.get(f"{d}/full")) for d in DOMAINS) + " | " + " / ".join(fmt(t.get(f"{d}/cap")) for d in DOMAINS)
+        st = decision["timing_status"].get(m, {})
+
+        def fmt(key):
+            v = t.get(key)
+            return st.get(key, "missing") if v is None else f"{v:.0f}"
+        tt = " / ".join(fmt(f"{d}/full") for d in DOMAINS) + " | " + " / ".join(fmt(f"{d}/cap") for d in DOMAINS)
         mark = "winner" if m == decision.get("winner") else ("yes" if m in decision["eligible"] else
                                                               ("short order" if m in decision["short_orders"] else ""))
         parts.append(f"<tr><td style='text-align:left'>{html.escape(m)}</td><td>{decision['scores'][m]:.4f}</td>"
@@ -241,7 +275,13 @@ def report(run, budget_ms, tie, full_margin):
                  f"dropped at {full_margin:.0%} of it for a prefix-stable winner; tie {tie:.0%}). Winner: "
                  f"<b>{html.escape(str(decision.get('winner')))}</b>; tied: {html.escape(str(decision.get('tied')))}; "
                  f"verdict: <b>{html.escape(decision['verdict'])}</b>. Largest coverage change with the refined reference: "
-                 f"{decision['max_refinement_change']}.</p><ul>")
+                 f"{decision['max_refinement_change']}; largest seed spread (sd/mean) of an eligible candidate's "
+                 f"coverage: {decision.get('candidate_seed_spread_max')} (tie band {tie:.0%}).</p>"
+                 "<p>Positive reference: on regular_grid_256 an even order reaches coverage/d near the square-subgrid "
+                 "value 0.66, the hexagonal 0.58 at best. Limitations: nearest samples are found by straight-line "
+                 "(Euclidean) distance, which can mix thin parts of child.obj (the same for every method); "
+                 "sample_elimination is measured as implemented, its weight limit dMin is derived once from k/n "
+                 "(Geometry.PointSampling.Approximate.cpp), so it is 0 at count = N, not yet checked against cyCodeBase.</p><ul>")
     for g, ok in decision.get("gates", {}).items():
         parts.append(f"<li class='{'ok' if ok else 'bad'}'>{html.escape(g)}: {ok}</li>")
     parts.append("</ul><h2>Before / after: graded plane (density x16 left to right), vertices, N/64</h2>")
@@ -258,17 +298,14 @@ def report(run, budget_ms, tie, full_margin):
                     series[k[2]].append((k[3], v[metric]))
             parts.append(svg_lines(series, f"{fixture} {domain}: {metric}", label))
         parts.append("</div>")
-    spread = [(k, v["coverage_sd"] / v["coverage"]) for k, v in means.items() if v["seeds"] > 1 and v["coverage"] > 0]
-    if spread:
-        worst = max(spread, key=lambda kv: kv[1])
-        parts.append(f"<p>Largest seed spread of coverage (sd/mean): {worst[1]:.3f} at {html.escape(str(worst[0]))}.</p>")
     (run / "report.html").write_text("".join(parts))
     return decision
 
 
 def self_test():
     """Asserts decide() on synthetic complete and incomplete runs; returns 0 on success."""
-    def cells_for(coverage, timing_ms, drop=None, stride_cov=None, timeout=None):
+    def cells_for(coverage, timing_ms, drop=None, stride_cov=None, timeout=None, drop_refinement=None,
+                  refined_cov=1.005):
         out = []
         for f in FIXTURES:
             for d in DOMAINS:
@@ -290,8 +327,13 @@ def self_test():
                 for full in (True, False):
                     out.append({"kind": "timing", "domain": d, "elements": 1000000, "method": m,
                                 "count": 1000000 if full else 65536, "status": "ok", "ms": [timing_ms.get(m, 100.0)] * 3})
-            if m in ("farthest_point", "sample_elimination"):
-                out.append({"kind": "refinement", "coverage": 1.0, "coverage_refined": 1.005})
+        for f in FIXTURES:
+            for d in DOMAINS:
+                for m in REFINED:
+                    for r in RATIOS:
+                        if (f, d, m, r) != drop_refinement:
+                            out.append({"kind": "refinement", "fixture": f, "domain": d, "method": m, "seed": 0,
+                                        "ratio": r, "coverage": 1.0, "coverage_refined": refined_cov})
         return out
     coverage = {m: 1.0 for m in METHODS}
     coverage.update({"random": 2.0, "farthest_point": 0.70, "coupled_sieve_eta095": 0.705, "sample_elimination": 0.8})
@@ -314,6 +356,18 @@ def self_test():
     check(d["winner"] is None, "an incomplete summary blocks the decision")
     d = run(cells_for(coverage, {}, timeout=("farthest_point", "child", "edges")))
     check(d["verdict"] == "decided" and d["winner"] == "coupled_sieve_eta095", "a timed-out candidate is ineligible")
+    crashed = [dict(c, kind="crashed") if c["kind"] == "timeout" else c
+               for c in cells_for(coverage, {}, timeout=("farthest_point", "child", "edges"))]
+    d = run(crashed)
+    check(d["winner"] is None and d["verdict"].startswith("incomplete"), "a crashed order blocks the decision")
+    d = run(cells_for(coverage, {}, drop_refinement=("sculpt", "faces", "sample_elimination", RATIOS[5])))
+    check(d["winner"] is None, "a missing refinement probe blocks the decision")
+    d = run(cells_for(coverage, {}, refined_cov=-1.0))
+    check(d["winner"] is None, "a failed refinement measurement blocks the decision")
+    timing = [dict(c, status="crashed", ms=[]) if c["kind"] == "timing" and c["method"] == "tournament" else c
+              for c in cells_for(coverage, {})]
+    d = run(timing)
+    check(d["winner"] is None, "a crashed timing child blocks the decision")
     # Stride beats the winner only on graded edges: the per-domain gate must see it.
     stride = {("edges", r): 0.5 for r in RATIOS}
     d = run(cells_for(coverage, {}, stride_cov=stride))
