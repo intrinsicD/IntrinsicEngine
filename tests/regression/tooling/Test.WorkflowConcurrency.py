@@ -41,7 +41,7 @@ WORKFLOWS = {
     ),
     "ci-source-coverage.yml": (
         "ci-gate-timing-ci-source-coverage",
-        1,
+        2,
         True,
     ),
 }
