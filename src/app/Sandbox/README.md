@@ -365,7 +365,7 @@ entity's element-domain data, not its provenance (`UI-051`): the runtime-owned
 `ResolveGeometryDomainReading` lets a mesh read as a point set (Vertices) or a
 graph (Vertices and Edges), `EditorDomainWindowModel::DomainUsable` carries the
 result, and the window header states what it reads (for example "Reading: Mesh
-Vertices as a point set"). The Selection element-domain list is limited to the elements of the reading (point set: vertices; graph: vertices and edges); Properties stays exhaustive. An entity that lacks the data, such as a point cloud in
+Vertices as a point set"). The Selection element-domain list is limited to the elements of the reading (point set: vertices; graph: vertices and edges); Properties stays exhaustive. It has one collapsible section per element domain with a property combo and a values combo listing every element; the picked element is shared by all properties of that domain and by the three Properties windows, and a viewport pick moves it. **Select in viewport** adds that element to the domain's primitive selection (highlighted in the viewport) and keeps the other selected elements; unticking removes only it. An entity that lacks the data, such as a point cloud in
 a Graph window, keeps the runtime's `UnsupportedGeometryDomain` reason. The Mesh
 windows stay exact because faces are semantic. No alias or conversion entity is
 created. The one Appearance window (`UI-075`) reuses the same predicate

@@ -25,6 +25,8 @@ namespace Extrinsic::Sandbox::Editor
         std::size_t QueriedOffset{};
         bool QueriedCompare{}, QueriedValues{}, Valid{};
     };
+    // Components of one copied value row, comma-separated.
+    [[nodiscard]] std::string PropertyValueRowText(const Runtime::EditorPropertyValueRow&);
     void DrawPropertyInspectorContents(const SandboxEditorContext&, PropertyInspectorUiState&);
     void DrawPropertyInspectorWindow(bool& open, const SandboxEditorContext&, PropertyInspectorUiState&);
 }

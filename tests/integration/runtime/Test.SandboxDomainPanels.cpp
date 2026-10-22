@@ -45,6 +45,8 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SceneInteractionModule;
@@ -748,9 +750,15 @@ namespace
 
     struct DomainWindowProbe
     {
-        bool PropertyTable{false};
+        bool PropertyCombo{false};
         bool ElementDomainCombo{false};
     };
+
+    // Seed of a Properties window's per-domain section (the domain's catalog name).
+    [[nodiscard]] ImGuiID PropertySection(const ImGuiWindow& window, const char* domain)
+    {
+        return ImHashStr(domain, 0, window.ID);
+    }
 
     [[nodiscard]] DomainWindowProbe ProbeDomainWindow(const ProbeEntity kind,
                                                       const char* windowId,
@@ -812,16 +820,21 @@ namespace
                 kernel.RequestExit();
                 return;
             }
+            const bool propertiesWindow = std::string_view(windowId).ends_with(".properties");
             if (frame == 4)
             {
-                probe.PropertyTable =
-                    ImGui::TableFindByID(window->GetID("PropertyCatalog")) != nullptr;
+                const char* firstDomain = kind == ProbeEntity::Mesh ? "MeshVertices"
+                    : kind == ProbeEntity::Graph                    ? "GraphVertices"
+                                                                    : "PointCloudPoints";
                 ImGui::FocusWindow(window);
-                ImGui::ActivateItemByID(window->GetID("Element domain"));
+                ImGui::ActivateItemByID(propertiesWindow
+                        ? ImHashStr("Property", 0, PropertySection(*window, firstDomain))
+                        : window->GetID("Element domain"));
             }
             if (frame == 6)
             {
-                probe.ElementDomainCombo = !ImGui::GetCurrentContext()->OpenPopupStack.empty();
+                const bool opened = !ImGui::GetCurrentContext()->OpenPopupStack.empty();
+                (propertiesWindow ? probe.PropertyCombo : probe.ElementDomainCombo) = opened;
                 kernel.RequestExit();
             }
         };
@@ -838,22 +851,173 @@ TEST(SandboxDomainPanels, MeshSelectionIsUsableInThePointCloudAndGraphProperties
     const auto properties = [](const char* id, const char* title) {
         return ProbeDomainWindow(ProbeEntity::Mesh, id, title);
     };
-    EXPECT_TRUE(properties("pointcloud.properties", "PointCloud / Properties").PropertyTable);
-    EXPECT_TRUE(properties("graph.properties", "Graph / Properties").PropertyTable);
+    EXPECT_TRUE(properties("pointcloud.properties", "PointCloud / Properties").PropertyCombo);
+    EXPECT_TRUE(properties("graph.properties", "Graph / Properties").PropertyCombo);
     EXPECT_TRUE(properties("pointcloud.selection", "PointCloud / Selection").ElementDomainCombo);
     EXPECT_TRUE(properties("graph.selection", "Graph / Selection").ElementDomainCombo);
 }
 
 TEST(SandboxDomainPanels, PointCloudIsRefusedWhereItLacksEdgesAndStillServedWhereItHasVertices)
 {
-    EXPECT_FALSE(ProbeDomainWindow(ProbeEntity::PointCloud, "graph.properties",
-                                   "Graph / Properties").PropertyTable);
+    EXPECT_FALSE(ProbeDomainWindow(ProbeEntity::PointCloud, "graph.properties", "Graph / Properties").PropertyCombo);
     EXPECT_FALSE(ProbeDomainWindow(ProbeEntity::PointCloud, "graph.selection",
                                    "Graph / Selection").ElementDomainCombo);
-    EXPECT_TRUE(ProbeDomainWindow(ProbeEntity::PointCloud, "pointcloud.properties",
-                                  "PointCloud / Properties").PropertyTable);
+    EXPECT_TRUE(
+        ProbeDomainWindow(ProbeEntity::PointCloud, "pointcloud.properties", "PointCloud / Properties").PropertyCombo);
     EXPECT_TRUE(ProbeDomainWindow(ProbeEntity::Graph, "pointcloud.selection",
                                   "PointCloud / Selection").ElementDomainCombo);
+}
+
+// Properties lists each domain's properties in a combo; the picked element is
+// shared by every property of the domain and can be selected in the viewport.
+TEST(SandboxDomainPanels, PropertyValuePickIsSharedAcrossTheDomainAndSelectsTheElement)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::PointCloud::Cloud cloud;
+    for (float x : {0.0f, 1.0f, 2.0f})
+        (void)cloud.AddPoint({x, 0.0f, 0.0f});
+    GS::PopulateFromCloud(raw, entity, cloud);
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<float>("p:value", 0.5f);
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    // A selection made elsewhere (a method's pins) must survive the checkbox.
+    const std::uint32_t kept = 0u;
+    ASSERT_TRUE(selection
+            ->EditPrimitives(scene,
+                Runtime::SelectionController::ToStableEntityId(entity),
+                Runtime::GeometryElementDomain::PointCloudPoint,
+                Runtime::PrimitiveSelectionEdit::Add,
+                std::span{&kept, 1u})
+            .Usable());
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("pointcloud.properties", true));
+
+    const auto selectedPoints = [&]
+    {
+        for (const auto& snapshot : selection->PrimitiveSnapshots(scene))
+            if (snapshot.Domain == Runtime::GeometryElementDomain::PointCloudPoint)
+                return snapshot.Indices;
+        return std::vector<std::uint32_t>{};
+    };
+    const auto selectInPopup = [](const char* label)
+    {
+        const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+        if (popups.empty() || popups.back().Window == nullptr)
+            return false;
+        ImGui::ActivateItemByID(popups.back().Window->GetID(label));
+        return true;
+    };
+    // The headless renderer reads nothing back: answer the pending click as a hit on
+    // `point`. Sequences the module does not track are ignored, so cover the first few.
+    const auto answerClick = [&](const std::uint32_t point)
+    {
+        EXPECT_EQ(selection->InFlightPickCount(), 1u);
+        for (std::uint64_t sequence = 1u; sequence <= 8u; ++sequence)
+            engine.GetRenderer().GetSelectionSystem().PublishPickResult({
+                .EncodedId =
+                    Extrinsic::Graphics::EncodeSelectionId(Extrinsic::Graphics::SelectionPrimitiveDomain::Point, point),
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
+                .Hit = true,
+                .Sequence = sequence,
+            });
+    };
+    // A combo closes once an existing entry is activated; a missing label leaves it open.
+    const auto picked = []
+    {
+        return ImGui::GetCurrentContext()->OpenPopupStack.empty();
+    };
+
+    int frame = 0;
+    int step = 0;
+    driver->OnFrame = [&](Runtime::Engine& kernel)
+    {
+        // An activation takes effect two frames later; act on every other frame.
+        if (++frame < 4 || frame % 2 != 0)
+            return;
+        auto* window = ImGui::FindWindowByName("PointCloud / Properties");
+        if (window == nullptr)
+        {
+            ADD_FAILURE() << "PointCloud / Properties did not open";
+            kernel.RequestExit();
+            return;
+        }
+        const ImGuiID section = PropertySection(*window, "PointCloudPoints");
+        const auto activate = [&](const char* label)
+        {
+            ImGui::ActivateItemByID(ImHashStr(label, 0, section));
+        };
+        switch (step)
+        {
+        // Focus once: refocusing later would close the combo popups.
+        case 0: ImGui::FocusWindow(window); break;
+        case 1: activate("Property"); break;
+        case 2: EXPECT_TRUE(selectInPopup("v:position")) << "Property dropdown did not open"; break;
+        case 3:
+            EXPECT_TRUE(picked());
+            activate("Values");
+            break;
+        case 4: EXPECT_TRUE(selectInPopup("###2")) << "Values dropdown did not open"; break;
+        case 5:
+            EXPECT_TRUE(picked());
+            activate("Property");
+            break;
+        case 6: EXPECT_TRUE(selectInPopup("p:value")) << "Property dropdown did not open"; break;
+        case 7:
+            EXPECT_TRUE(picked());
+            EXPECT_EQ(selectedPoints(), std::vector<std::uint32_t>{0u}) << "picking a value alone must not select";
+            activate("Select in viewport");
+            break;
+        case 8:
+            EXPECT_EQ(selectedPoints(), (std::vector<std::uint32_t>{0u, 2u}))
+                << "the element picked under v:position is the one p:value selects";
+            activate("Values");
+            break;
+        case 9: EXPECT_TRUE(selectInPopup("###1")) << "Values dropdown did not open"; break;
+        case 10:
+            EXPECT_TRUE(picked());
+            EXPECT_EQ(selectedPoints(), (std::vector<std::uint32_t>{0u, 1u})) << "the selection follows the pick";
+            activate("Select in viewport");
+            break;
+        case 11:
+            EXPECT_EQ(selectedPoints(), std::vector<std::uint32_t>{0u}) << "unticking removes only the element";
+            selection->RequestClickPick(5u, 5u);
+            break;
+        case 12: answerClick(2u); break;
+        case 13: activate("Select in viewport"); break;
+        case 14:
+            EXPECT_EQ(selectedPoints(), (std::vector<std::uint32_t>{0u, 2u}))
+                << "a viewport pick moves the domain's element";
+            selection->RequestClickPick(5u, 5u);
+            break;
+        case 15: answerClick(1u); break;
+        case 16:
+            EXPECT_EQ(selectedPoints(), (std::vector<std::uint32_t>{0u, 1u}))
+                << "while ticked, a viewport pick moves the selected element";
+            kernel.RequestExit();
+            break;
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 17);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
 }
 
 // UI-075: the one Appearance window offers a lane per element domain the

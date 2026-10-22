@@ -117,6 +117,17 @@ namespace Extrinsic::Sandbox::Editor
             }, value);
         }
     }
+    extern "C++" std::string PropertyValueRowText(const EditorPropertyValueRow& row)
+    {
+        std::string text;
+        for (const auto& cell : row.Components)
+        {
+            if (!text.empty())
+                text += ", ";
+            text += ValueText(cell);
+        }
+        return text;
+    }
     extern "C++" void DrawPropertyInspectorContents(const SandboxEditorContext& context, PropertyInspectorUiState& state)
     {
         const auto workspace = BuildProcessingInputWorkspace(context);
@@ -255,9 +266,7 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::Text("%zu", row.Index);
                         ImGui::TableNextColumn(); ImGui::TextUnformatted(row.Deleted ? "yes" : "no");
                         ImGui::TableNextColumn();
-                        std::string text;
-                        for (const auto& cell : row.Components) { if (!text.empty()) text += ", "; text += ValueText(cell); }
-                        ImGui::TextUnformatted(text.c_str());
+                        ImGui::TextUnformatted(PropertyValueRowText(row).c_str());
                     }
                     ImGui::EndTable();
                 }

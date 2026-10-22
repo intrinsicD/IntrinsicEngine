@@ -81,75 +81,198 @@ namespace Extrinsic::Sandbox::Editor
             return model.HasSelectedEntity && model.VisualizationTargetAvailable;
         }
 
-        void DrawPropertyCatalogRows(const EditorPropertyCatalogModel& catalog)
+        // One element index per element domain, shared by every property of that
+        // domain and by the three Properties windows (framework24's picker ids).
+        struct PropertyBrowserState
         {
-            ImGui::Text("Properties: %zu", catalog.Rows.size());
-            if (catalog.Rows.empty())
-            {
-                ImGui::TextDisabled("No geometry properties.");
+            static constexpr std::size_t kDomains =
+                static_cast<std::size_t>(GeometryElementDomain::PointCloudPoint) + 1u;
+            std::uint32_t Entity{0u};
+            std::array<std::string, kDomains> Property{};
+            std::array<std::size_t, kDomains> Element{};
+            std::array<bool, kDomains> SelectInViewport{};
+            std::array<std::optional<std::size_t>, kDomains> SeenPick{};
+            std::array<std::string, kDomains> Message{};
+        };
+
+        [[nodiscard]] std::string PropertyValueLabel(const EditorPropertyValueRow& row)
+        {
+            std::string label = "[" + std::to_string(row.Index) + "] " + PropertyValueRowText(row);
+            if (row.Deleted)
+                label += " (deleted)";
+            return label;
+        }
+
+        void DrawPropertyRowInfo(const EditorPropertyCatalogRow& row)
+        {
+            std::string tags{};
+            if (row.Bindable)
+                tags += " bindable";
+            if (row.Internal)
+                tags += " internal";
+            if (row.Connectivity)
+                tags += " connectivity";
+            if (row.Generated)
+                tags += " generated";
+            ImGui::TextDisabled("%s/%u, %zu elements%s",
+                DebugNameForGeometryPropertyValueKind(row.ValueKind),
+                row.ComponentCount,
+                row.ElementCount,
+                tags.c_str());
+            if (!row.UnsupportedReason.empty())
+                ImGui::TextDisabled("%s", row.UnsupportedReason.c_str());
+        }
+
+        // The preview is the value at `element`; the popup lists every element and
+        // reads only the rows the clipper shows; a click sets `element`.
+        void DrawPropertyValuesCombo(const SandboxEditorContext& context,
+            const std::uint32_t entity,
+            const EditorPropertyCatalogRow& row,
+            std::size_t& element)
+        {
+            if (!row.Supported)
+                return; // the info line states the reason
+            const EditorPropertyValuesResult current =
+                ReadEditorPropertyValues(context.Processing, entity, row.Descriptor, element, 1u);
+            DrawDiagnostics(current.Diagnostics);
+            if (!current.Success || current.Rows.empty())
                 return;
-            }
-
-            constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp;
-            if (ImGui::BeginTable("PropertyCatalog", 7, tableFlags))
+            if (ImGui::BeginCombo("Values", PropertyValueLabel(current.Rows.front()).c_str()))
             {
-                ImGui::TableSetupColumn("Domain");
-                ImGui::TableSetupColumn("Name");
-                ImGui::TableSetupColumn("Kind");
-                ImGui::TableSetupColumn("Count");
-                ImGui::TableSetupColumn("Tags");
-                ImGui::TableSetupColumn("Preview");
-                ImGui::TableSetupColumn("Reason");
-                ImGui::TableHeadersRow();
-
-                for (const EditorPropertyCatalogRow& row : catalog.Rows)
+                ImGuiListClipper clipper;
+                clipper.Begin(
+                    static_cast<int>(std::min<std::size_t>(current.TotalCount, std::numeric_limits<int>::max())));
+                clipper.IncludeItemByIndex(static_cast<int>(element));
+                while (clipper.Step())
                 {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::TextUnformatted(DebugNameForEditorPropertyCatalogDomain(row.Domain));
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::TextUnformatted(row.Name.c_str());
-                    ImGui::TableSetColumnIndex(2);
-                    ImGui::Text("%s/%u", DebugNameForGeometryPropertyValueKind(row.ValueKind), row.ComponentCount);
-                    ImGui::TableSetColumnIndex(3);
-                    ImGui::Text("%zu", row.ElementCount);
-                    ImGui::TableSetColumnIndex(4);
-                    std::string tags{};
-                    if (row.Bindable)
-                        tags += "bindable ";
-                    if (row.Internal)
-                        tags += "internal ";
-                    if (row.Connectivity)
-                        tags += "connectivity ";
-                    if (row.Generated)
-                        tags += "generated ";
-                    ImGui::TextUnformatted(tags.empty() ? "-" : tags.c_str());
-                    ImGui::TableSetColumnIndex(5);
-                    if (row.Preview.HasValue)
+                    const auto first = static_cast<std::size_t>(clipper.DisplayStart);
+                    const EditorPropertyValuesResult page = ReadEditorPropertyValues(context.Processing,
+                        entity,
+                        row.Descriptor,
+                        first,
+                        static_cast<std::size_t>(clipper.DisplayEnd - clipper.DisplayStart));
+                    for (std::size_t index = first; index < static_cast<std::size_t>(clipper.DisplayEnd); ++index)
                     {
-                        ImGui::Text("[%zu] %s", row.Preview.ElementIndex, row.Preview.Text.c_str());
+                        const std::string id = "###" + std::to_string(index);
+                        if (index - first >= page.Rows.size())
+                        {
+                            ImGui::TextDisabled("[%zu] -", index);
+                            continue;
+                        }
+                        const bool selected = index == element;
+                        if (ImGui::Selectable((PropertyValueLabel(page.Rows[index - first]) + id).c_str(), selected))
+                            element = index;
+                        if (selected)
+                            ImGui::SetItemDefaultFocus();
                     }
-                    else
-                    {
-                        ImGui::TextDisabled("-");
-                    }
-                    ImGui::TableSetColumnIndex(6);
-                    ImGui::TextDisabled("%s", row.UnsupportedReason.empty() ? "-" : row.UnsupportedReason.c_str());
                 }
-                ImGui::EndTable();
+                ImGui::EndCombo();
             }
         }
 
+        void DrawPropertyDomainSection(std::span<const EditorPropertyCatalogRow> rows,
+            const SandboxEditorContext& context,
+            const std::uint32_t entity,
+            PropertyBrowserState& state)
+        {
+            const EditorPropertyCatalogRow& first = rows.front();
+            const char* name = DebugNameForEditorPropertyCatalogDomain(first.Domain);
+            const std::string header = std::string(name) + " (" + std::to_string(first.ElementCount) + ")###" + name;
+            if (!ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+                return;
+            ImGui::PushID(name);
+            const GeometryElementDomain domain = first.Descriptor.Domain;
+            const auto slot = static_cast<std::size_t>(domain);
+            auto selected = std::ranges::find(rows, state.Property[slot], &EditorPropertyCatalogRow::Name);
+            if (selected == rows.end())
+                selected = rows.begin();
+            if (ImGui::BeginCombo("Property", selected->Name.c_str()))
+            {
+                for (auto row = rows.begin(); row != rows.end(); ++row)
+                {
+                    if (ImGui::Selectable(row->Name.c_str(), row == selected))
+                        selected = row;
+                    if (row == selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            state.Property[slot] = selected->Name;
+            DrawPropertyRowInfo(*selected);
+            if (selected->ElementCount == 0u)
+            {
+                ImGui::PopID();
+                return;
+            }
+
+            std::size_t& element = state.Element[slot];
+            const auto previous = static_cast<std::uint32_t>(element);
+            // A new viewport pick moves the domain's element, as framework24's picker does.
+            const auto pick = std::ranges::find_if(rows,
+                [](const EditorPropertyCatalogRow& row)
+                {
+                    return row.Preview.HasValue;
+                });
+            const auto viewportPick = pick == rows.end() ? std::nullopt : std::optional{pick->Preview.ElementIndex};
+            if (viewportPick != state.SeenPick[slot])
+            {
+                state.SeenPick[slot] = viewportPick;
+                if (viewportPick)
+                    element = *viewportPick;
+            }
+            if (element >= selected->ElementCount)
+                element = 0u;
+            DrawPropertyValuesCombo(context, entity, *selected, element);
+            bool& selectInViewport = state.SelectInViewport[slot];
+            const bool toggled = ImGui::Checkbox("Select in viewport", &selectInViewport);
+            // Only this element is added or removed, so the domain's other selected
+            // elements (method pins, sources) stay unless the box's element is one of them.
+            const auto edit = [&](const PrimitiveSelectionEdit operation, const std::uint32_t index)
+            {
+                const PrimitiveSelectionSnapshot result =
+                    ApplyEditorPrimitiveSelection(context.Processing, entity, domain, operation, std::span{&index, 1u});
+                state.Message[slot] = result.Usable() ? std::string{} : result.Message;
+                if (!result.Usable())
+                    selectInViewport = false;
+            };
+            const auto current = static_cast<std::uint32_t>(element);
+            if (toggled)
+                edit(selectInViewport ? PrimitiveSelectionEdit::Add : PrimitiveSelectionEdit::Remove, current);
+            else if (selectInViewport && current != previous) // a combo or viewport pick
+            {
+                edit(PrimitiveSelectionEdit::Remove, previous);
+                if (selectInViewport) // a failed Remove unticks the box
+                    edit(PrimitiveSelectionEdit::Add, current);
+            }
+            if (!state.Message[slot].empty())
+                ImGui::TextWrapped("%s", state.Message[slot].c_str());
+            ImGui::PopID();
+        }
+
 // Properties is an exhaustive explorer: internal, connectivity, and generated
-// rows remain visible, with unsupported actions diagnosed rather than hidden.
+// rows remain listed, with unsupported actions diagnosed rather than hidden.
 // Render, binding, and bake controls belong to Appearance.
-        void DrawDomainPropertyWindow(const EditorDomainWindowModel& model)
+        void DrawDomainPropertyWindow(
+            const EditorDomainWindowModel& model, const SandboxEditorContext& context, PropertyBrowserState& state)
         {
             DrawDomainWindowHeader(model);
             if (!DomainWindowReady(model))
                 return;
-            DrawPropertyCatalogRows(model.PropertyCatalog);
+            if (state.Entity != model.SelectedStableId)
+                state = PropertyBrowserState{.Entity = model.SelectedStableId};
+            const std::vector<EditorPropertyCatalogRow>& rows = model.PropertyCatalog.Rows;
+            if (rows.empty())
+                ImGui::TextDisabled("No geometry properties.");
+            // Rows arrive grouped by domain.
+            for (std::size_t begin = 0u; begin < rows.size();)
+            {
+                std::size_t end = begin + 1u;
+                while (end < rows.size() && rows[end].Domain == rows[begin].Domain)
+                    ++end;
+                DrawPropertyDomainSection(
+                    std::span{rows}.subspan(begin, end - begin), context, model.SelectedStableId, state);
+                begin = end;
+            }
             DrawDiagnostics(model.PropertyCatalog.Diagnostics);
         }
 
@@ -973,6 +1096,7 @@ namespace Extrinsic::Sandbox::Editor
     struct DomainPanels::Impl
     {
         PropertyInspectorUiState PropertyInspector{};
+        PropertyBrowserState PropertyBrowser{};
         VectorFieldUiState VectorFieldState{};
         AttributeSourceUiState AttributeSourceState{};
         std::array<EditorCommandStatus, 3> AppearanceStatuses{
@@ -1078,6 +1202,7 @@ namespace Extrinsic::Sandbox::Editor
         LastUvExtentAdoption.reset();
         MeshPropertyPlotState.SelectedProperty.clear();
         PropertyInspector = {};
+        PropertyBrowser = {};
     }
 
     void DomainPanels::Impl::RegisterWindow(std::string id,
@@ -1225,7 +1350,7 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorDomainWindowModel& model = GetDomainWindowModel(context, kind);
             switch (section)
             {
-            case Section::Properties: DrawDomainPropertyWindow(model); break;
+            case Section::Properties: DrawDomainPropertyWindow(model, context, PropertyBrowser); break;
             case Section::Selection:
                 DrawDomainSelectionWindow(
                     model, context, SelectionElementIndex, SelectionDomainIndex, SelectionMessage);
