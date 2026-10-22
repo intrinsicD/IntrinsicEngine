@@ -56,6 +56,15 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   displayed positions, S2 old Stride>1 layers jump to all arrows, minor: 2^24 domains, slider
   max, stale message, docs). All addressed in the feature commit; recursion protection enforced
   (Read/Grep/Glob only). Packet and answer: tasks/evidence/UI-081/code-review/.
+- 2026-10-22: final review of the fixes, same session, object baac01a55 (delta from the reviewed
+  tree, digest dc29fbaebc53…49da): verdict "approve", no new correctness issue. Open nits: the
+  slider re-implements the drawn-row count (OrderedDrawRowCount), the UI test does not assert the
+  displayed legacy count, the 2^24 refusal runs after the anchor copy, a type clash shows "stale".
+  Freeze time at the cap for methods other than farthest point is unmeasured.
+- 2026-10-22: comparison v3 light pre-flight (fresh Claude, session in
+  tasks/evidence/UI-081/preflight/glyph-order-v3/reviews/): round 1 at 78040b951 REVISE (report
+  rows vs. the combo, Q2 answer); round 2, packet r2 sha256 96501d90…15711b815 at cfc746caa: PASS
+  with one mechanical start-gate fix (create the run directory first), applied to the packet.
 - Open: Geometry.PointSampling sample elimination derives its weight limit dMin once from k/n
   (Geometry.PointSampling.Approximate.cpp:269), so it is 0 for every progressive stage at count = N;
   check against the cyCodeBase reference before relying on it.
