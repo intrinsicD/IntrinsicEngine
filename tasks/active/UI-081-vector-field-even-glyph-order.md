@@ -65,6 +65,14 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   tasks/evidence/UI-081/preflight/glyph-order-v3/reviews/): round 1 at 78040b951 REVISE (report
   rows vs. the combo, Q2 answer); round 2, packet r2 sha256 96501d90…15711b815 at cfc746caa: PASS
   with one mechanical start-gate fix (create the run directory first), applied to the packet.
+- 2026-10-22: comparison v3 ran (exploratory, report only): complete, 1983 s, 0 inventory problems;
+  report, decision.json and referee audit in tasks/evidence/UI-081/runs/glyph-order-v3/. Farthest
+  point = coupled sieve lead (median coverage 0.808 d; greedy +0.4-0.8%, sample elimination +18%,
+  Poisson >= +29%, tournament +65%, stride +105%, random +141%). The refinement gate fails at dense
+  prefixes (up to 26% at N/4); the ranking from N/32 on is unchanged. Q2: on the regular grid the
+  every-n-th stride has the lowest cell-area CV, so area spread alone is not the right test.
+  Farthest point at the cap: 0.3-0.7 s on 1M-element domains. Flat/lazy greedy and sample
+  elimination take > 6 s there, so selecting them in the combo can freeze the UI beyond 2 s.
 - Open: Geometry.PointSampling sample elimination derives its weight limit dMin once from k/n
   (Geometry.PointSampling.Approximate.cpp:269), so it is 0 for every progressive stage at count = N;
   check against the cyCodeBase reference before relying on it.
