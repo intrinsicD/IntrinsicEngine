@@ -377,3 +377,12 @@ target_compile_features(IntrinsicPointSamplingComparison PRIVATE cxx_std_23)
 target_compile_options(IntrinsicPointSamplingComparison PRIVATE ${INTRINSIC_COMPILE_FLAGS})
 target_link_options(IntrinsicPointSamplingComparison PRIVATE ${INTRINSIC_LINK_FLAGS})
 target_link_libraries(IntrinsicPointSamplingComparison PRIVATE ExtrinsicCore IntrinsicGeometry)
+
+# UI-081 opt-in comparison of point-sampling orders as vector-field glyph anchors on mesh
+# element domains (geometry.glyph_order.comparison); run on a Release build.
+add_executable(IntrinsicGlyphOrderComparison runners/GlyphOrderComparisonRunner.cpp)
+set_target_properties(IntrinsicGlyphOrderComparison PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_compile_features(IntrinsicGlyphOrderComparison PRIVATE cxx_std_23)
+target_compile_options(IntrinsicGlyphOrderComparison PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicGlyphOrderComparison PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicGlyphOrderComparison PRIVATE ExtrinsicCore IntrinsicGeometry)

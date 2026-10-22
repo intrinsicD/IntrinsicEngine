@@ -1,0 +1,29 @@
+# UI-081 — point-sampling orders as vector-field glyph anchors on mesh element domains
+# (opt-in, Release).
+#
+# IntrinsicGlyphOrderComparison on the ci-release preset; not a default CTest. Every method
+# orders all anchors of a domain (vertices, edge midpoints, face centers) once; quality is
+# measured on prefixes N/4 .. N/256 against an area-weighted surface reference (coverage and
+# packing over the hexagonal spacing, Voronoi cell CV). Timings are same-host evidence on a
+# 1000 x 1000 grid (full order and first 65536). benchmarks/runners/glyph_order_report.py
+# applies the frozen UI-081 decision rule and writes the HTML report.
+benchmark_id: geometry.glyph_order.comparison
+method: geometry.point_sampling
+dataset: builtin.glyph_order_meshes.v1
+params:
+  intent: method_comparison
+  runner: IntrinsicGlyphOrderComparison
+  build_preset: ci-release
+  meshes: [tests/data/sculpt.obj, assets/models/child.obj, regular grid 256, graded grid 256 (x16 column density)]
+  domains: [vertices, edge midpoints, face centers]
+  ratios: [4, 16, 64, 256]
+  seeds: [1, 2, 3, 4, 5]
+  methods: [stride (baseline set), random, farthest_point, coupled_sieve eta 0.95 cap 32, flat_greedy beta 1.1, lazy_greedy beta 1.1, progressive_poisson hapds/fast/spatially balanced, sample_elimination (2-D, area radius), tournament]
+  timing_grid: 1000 x 1000
+  measured_iterations: 3
+  timing_statistic: median_wall_clock
+metrics: [runtime_ms, sample_count]
+# coverage, packing and cell_cv per cell are diagnostics in cells.jsonl.
+thresholds:
+  budget_ms_per_domain: 2000
+  tie_relative: 0.02
