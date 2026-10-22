@@ -81,6 +81,13 @@ namespace Extrinsic::Sandbox::Editor
             return model.HasSelectedEntity && model.VisualizationTargetAvailable;
         }
 
+        // A scalar field or a color buffer colors the lane (not its default or a uniform color).
+        [[nodiscard]] bool ColoredByProperty(const EditorVisualizationConfigModel& visualization) noexcept
+        {
+            return visualization.HasConfig &&
+                (visualization.Source == kScalarFieldSource || static_cast<int>(visualization.Source) >= 3);
+        }
+
         // One element index per element domain, shared by every property of that
         // domain and by the three Properties windows (framework24's picker ids).
         struct PropertyBrowserState
@@ -446,6 +453,37 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
+// The uniform color, shown on a Color row while it is on Default. Editing it
+// makes that color the overlay lane's Default, which unbinding a property later
+// restores; a lane colored by a property keeps its mapping, so no field is offered there.
+        void DrawUniformColorField(const std::string& label,
+            const EditorDomainWindowModel& lane,
+            const SandboxEditorContext& context,
+            EditorCommandStatus& status)
+        {
+            const auto& visualization = lane.Visualization.Visualization;
+            if (ColoredByProperty(visualization))
+                return;
+            ImGui::SeparatorText(label.c_str());
+            glm::vec4 color = visualization.Color;
+            ImGui::BeginDisabled(!context.SceneAvailable || !lane.VisualizationControlsAvailable);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            const bool changed = ImGui::ColorEdit4("##Uniform color", &color.x);
+            if (visualization.Source != kUniformColorSource)
+            {
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::TextDisabled("Drawn with its default color until you pick one.");
+                ImGui::PopTextWrapPos();
+            }
+            ImGui::EndDisabled();
+            if (changed)
+            {
+                status = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands,
+                    MakeUniformVisualizationConfigCommandFromModel(
+                        lane.SelectedStableId, visualization, lane.VisualizationTarget, color));
+            }
+        }
+
         void DrawGraphRenderHintControls(
             const EditorDomainWindowModel& model, const SandboxEditorContext& context, const bool canEditRenderHints)
         {
@@ -468,11 +506,13 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Selectable(
                     "Material / default", !visualization.HasConfig || visualization.Source == kMaterialSource))
             {
+                // Keeps the lane's chosen color for a later "Uniform color".
                 lastStatus = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands,
                     EditorVisualizationConfigCommand{.StableEntityId = model.SelectedStableId,
                         .Target = model.VisualizationTarget,
                         .EnableConfig = true,
-                        .Source = kMaterialSource});
+                        .Source = kMaterialSource,
+                        .Color = visualization.Color});
             }
             if (ImGui::Selectable("Uniform color", visualization.Source == kUniformColorSource))
             {
@@ -824,19 +864,25 @@ namespace Extrinsic::Sandbox::Editor
             }
             if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
                 ImGui::TextWrapped("Appearance change failed: %s", DebugNameForEditorCommandStatus(status));
-  // A bound size or width is drawn from its source (the row's selector); the
-  // uniform field shows only while the row is on Default.
+  // A bound color, size or width is drawn from its source (the row's selector);
+  // the uniform field shows only while the row is on Default.
             const auto rowDetails = [&](const EditorAttributeBindingRow& row, const std::string& label)
             {
                 switch (row.Attribute)
                 {
                 case RenderAttribute::Color:
-                    if (row.Bound && row.OverlayTarget.has_value())
+                    if (row.OverlayTarget.has_value())
                     {
                         if (const EditorDomainWindowModel* lane = FindLaneForTarget(draw, *row.OverlayTarget))
                         {
-                            ImGui::SeparatorText(label.c_str());
-                            DrawColorRowControls(*lane, context, draw.Statuses[static_cast<std::size_t>(lane->Kind)]);
+                            EditorCommandStatus& laneStatus = draw.Statuses[static_cast<std::size_t>(lane->Kind)];
+                            if (!row.Bound)
+                                DrawUniformColorField(label, *lane, context, laneStatus);
+                            else
+                            {
+                                ImGui::SeparatorText(label.c_str());
+                                DrawColorRowControls(*lane, context, laneStatus);
+                            }
                         }
                     }
                     break;
@@ -935,8 +981,7 @@ namespace Extrinsic::Sandbox::Editor
             if (model.Kind == EditorDomainWindowKind::Mesh && ImGui::CollapsingHeader("Texture baking"))
             {
                 bool baked = visualization.UseBakedTexture;
-                const bool hasProperty = visualization.HasConfig &&
-                    (visualization.Source == kScalarFieldSource || static_cast<int>(visualization.Source) >= 3);
+                const bool hasProperty = ColoredByProperty(visualization);
                 const bool canEnable = hasProperty && model.TextureBake.CanBake;
                 ImGui::BeginDisabled(!baked && !canEnable);
                 if (ImGui::Checkbox("Use baked texture", &baked))

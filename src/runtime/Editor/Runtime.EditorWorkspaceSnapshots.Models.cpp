@@ -137,6 +137,7 @@ namespace {
                 .HasConfig = true,
                 .Source = config.Source,
                 .Color = config.Color,
+                .UniformByDefault = config.UniformByDefault,
                 .ScalarFieldName = config.ScalarFieldName,
                 .ScalarDomain = config.ScalarDomain,
                 .ColorBufferName = config.ColorBufferName,
@@ -1554,6 +1555,7 @@ namespace {
             MixSignature(signature,
                          static_cast<std::uint64_t>(config->Source));
             AppendVec4Signature(signature, config->Color);
+            MixSignature(signature, config->UniformByDefault ? 1u : 0u);
             MixSignatureString(signature, config->ScalarFieldName);
             MixSignature(signature,
                          static_cast<std::uint64_t>(config->Scalar.Map));

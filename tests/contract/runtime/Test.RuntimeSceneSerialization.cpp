@@ -232,6 +232,7 @@ namespace
         overrides.Points = visualization;
         overrides.Points->Source = G::VisualizationConfig::ColorSource::UniformColor;
         overrides.Points->Color = glm::vec4{0.0f, 0.75f, 0.25f, 1.0f};
+        overrides.Points->UniformByDefault = true;
         raw.emplace<G::VisualizationLaneOverrides>(entity, std::move(overrides));
         raw.emplace<G::VisualizationConfig>(entity, std::move(visualization));
         return entity;
@@ -402,7 +403,9 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
               G::VisualizationConfig::ColorSource::UniformColor);
     EXPECT_EQ(overrides.Points->Color,
               glm::vec4(0.0f, 0.75f, 0.25f, 1.0f));
+    EXPECT_TRUE(overrides.Points->UniformByDefault);
     ASSERT_TRUE(overrides.Surface.has_value());
+    EXPECT_FALSE(overrides.Surface->UniformByDefault);
     EXPECT_TRUE(overrides.Surface->UseBakedTexture);
     EXPECT_EQ(overrides.Surface->Interpretation, decltype(visualization.Interpretation)::NormalDirection);
     EXPECT_FALSE(overrides.Points->UseBakedTexture);

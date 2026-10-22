@@ -412,6 +412,7 @@ export namespace Extrinsic::Runtime
         Graphics::Components::VisualizationConfig::ColorSource Source{
             Graphics::Components::VisualizationConfig::ColorSource::Material};
         glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
+        bool UniformByDefault{false};
         std::string ScalarFieldName{};
         Graphics::Components::VisualizationConfig::Domain ScalarDomain{
             Graphics::Components::VisualizationConfig::Domain::Vertex};
@@ -496,6 +497,7 @@ export namespace Extrinsic::Runtime
         Graphics::Components::VisualizationConfig::ColorSource Source{
             Graphics::Components::VisualizationConfig::ColorSource::UniformColor};
         glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
+        bool UniformByDefault{false};
         std::string ScalarFieldName{};
         Graphics::Components::VisualizationConfig::Domain ScalarDomain{
             Graphics::Components::VisualizationConfig::Domain::Vertex};

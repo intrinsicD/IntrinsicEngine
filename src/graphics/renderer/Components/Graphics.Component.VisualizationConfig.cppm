@@ -78,6 +78,9 @@ export namespace Extrinsic::Graphics::Components
         // ----- UniformColor -------------------------------------------------
         /// RGBA colour used when Source == UniformColor.
         glm::vec4 Color{1.f, 0.6f, 0.f, 1.f};
+        /// Editor intent, not read by graphics: with no property bound the lane
+        /// draws Color instead of the material, so unbinding a property restores it.
+        bool UniformByDefault{false};
 
         // ----- ScalarField --------------------------------------------------
         /// Key in GpuSceneSlot::Buffers identifying the float scalar buffer.

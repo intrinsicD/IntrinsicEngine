@@ -825,29 +825,34 @@ namespace Extrinsic::Runtime
             return json{
                 {"source", VisualizationColorSourceToString(config.Source)},
                 {"color", Vec4ToJson(config.Color)},
+                {"uniformByDefault", config.UniformByDefault},
                 {"scalarFieldName", config.ScalarFieldName},
                 {"scalarDomain", VisualizationDomainToString(config.ScalarDomain)},
                 {"colorBufferName", config.ColorBufferName},
-                {"colorInterpretation", config.Interpretation == G::VisualizationConfig::ColorInterpretation::NormalDirection ? "normal_direction" : "components"},
+                {"colorInterpretation",
+                    config.Interpretation == G::VisualizationConfig::ColorInterpretation::NormalDirection
+                        ? "normal_direction"
+                        : "components"},
                 {"useBakedTexture", config.UseBakedTexture},
-                {"scalar", json{
-                    {"map", ColormapToString(config.Scalar.Map)},
-                    {"autoRange", config.Scalar.AutoRange},
-                    {"rangeMin", config.Scalar.RangeMin},
-                    {"rangeMax", config.Scalar.RangeMax},
-                    {"binCount", config.Scalar.BinCount},
-                    {"isolines", json{
-                        {"num", config.Scalar.Isolines.Num},
-                        {"color", Vec4ToJson(config.Scalar.Isolines.Color)},
-                        {"width", config.Scalar.Isolines.Width},
-                        {"values", json(std::vector<float>(
-                            config.Scalar.Isolines.Values.begin(),
-                            config.Scalar.Isolines.Values.begin() +
-                                std::min<std::size_t>(
-                                    config.Scalar.Isolines.ValueCount,
-                                    config.Scalar.Isolines.Values.size())))},
+                {"scalar",
+                    json{
+                        {"map", ColormapToString(config.Scalar.Map)},
+                        {"autoRange", config.Scalar.AutoRange},
+                        {"rangeMin", config.Scalar.RangeMin},
+                        {"rangeMax", config.Scalar.RangeMax},
+                        {"binCount", config.Scalar.BinCount},
+                        {"isolines",
+                            json{
+                                {"num", config.Scalar.Isolines.Num},
+                                {"color", Vec4ToJson(config.Scalar.Isolines.Color)},
+                                {"width", config.Scalar.Isolines.Width},
+                                {"values",
+                                    json(std::vector<float>(config.Scalar.Isolines.Values.begin(),
+                                        config.Scalar.Isolines.Values.begin() +
+                                            std::min<std::size_t>(config.Scalar.Isolines.ValueCount,
+                                                config.Scalar.Isolines.Values.size())))},
+                            }},
                     }},
-                }},
             };
         }
 
@@ -870,6 +875,13 @@ namespace Extrinsic::Runtime
 
             if (value.contains("color") && !TryReadVec4(value["color"], config.Color))
                 return false;
+
+            if (value.contains("uniformByDefault"))
+            {
+                if (!value["uniformByDefault"].is_boolean())
+                    return false;
+                config.UniformByDefault = value["uniformByDefault"].get<bool>();
+            }
 
             if (value.contains("colorInterpretation"))
             {

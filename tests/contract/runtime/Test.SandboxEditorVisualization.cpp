@@ -161,6 +161,103 @@ void SetFloatProperty(Geometry::PropertySet& properties,
         return config;
     }
 }
+// A lane's Default is its last chosen uniform color: binding a property through
+// any path and unbinding it at the Color row brings that color back.
+TEST(SandboxEditorUi, UnbindingAColorPropertyRestoresTheLanesChosenUniformColor)
+{
+    using Source = G::VisualizationConfig::ColorSource;
+    using Target = Runtime::EditorVisualizationTarget;
+    const glm::vec4 chosen{0.0f, 0.8f, 0.2f, 1.0f};
+    for (const bool entityLevel : {false, true})
+    {
+        SCOPED_TRACE(entityLevel ? "bound at entity level, unflagged uniform" : "bound on the lane");
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        const ECS::EntityHandle mesh = MakeSelectable(registry, "DefaultColorMesh");
+        AddTriangleMeshSource(registry, mesh);
+        (void)registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:value", 0.5f);
+        ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+        const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+        context.VisualizationCommandsAvailable = true;
+
+        // Imports carry an entity-level config: Material for meshes, an unflagged
+        // uniform color for graphs and point clouds (and older scenes).
+        G::VisualizationConfig entity{};
+        if (entityLevel)
+        {
+            entity.Source = Source::UniformColor;
+            entity.Color = chosen;
+        }
+        registry.Raw().emplace<G::VisualizationConfig>(mesh, entity);
+        if (!entityLevel)
+        {
+            ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context,
+                          Runtime::EditorVisualizationConfigCommand{.StableEntityId = stableId,
+                              .Target = Target::Surface,
+                              .Source = Source::UniformColor,
+                              .Color = chosen,
+                              .UniformByDefault = true}),
+                Runtime::EditorCommandStatus::Applied);
+        }
+        ASSERT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(context,
+                      Runtime::EditorVisualizationPropertyCommand{.StableEntityId = stableId,
+                          .Target = entityLevel ? Target::Entity : Target::Surface,
+                          .Domain = Runtime::EditorVisualizationPropertyDomain::MeshVertices,
+                          .Preset = Runtime::EditorVisualizationPropertyPreset::Scalar,
+                          .PropertyName = "v:value"}),
+            Runtime::EditorCommandStatus::Applied);
+        ASSERT_EQ(Runtime::ApplyEditorAttributeBindingCommand(context,
+                      Runtime::EditorAttributeBindingCommand{.StableEntityId = stableId,
+                          .Attribute = Runtime::RenderAttribute::Color,
+                          .Domain = Runtime::GeometryElementDomain::MeshVertex}),
+            Runtime::EditorCommandStatus::Applied);
+        const auto* lanes = registry.Raw().try_get<G::VisualizationLaneOverrides>(mesh);
+        ASSERT_NE(lanes, nullptr);
+        ASSERT_TRUE(lanes->Surface.has_value());
+        EXPECT_EQ(lanes->Surface->Source, Source::UniformColor);
+        EXPECT_EQ(lanes->Surface->Color, chosen);
+        EXPECT_TRUE(lanes->Surface->UniformByDefault);
+    }
+}
+
+TEST(SandboxEditorUi, SwitchingTheSurfaceDomainKeepsTheLanesChosenUniformColor)
+{
+    using Source = G::VisualizationConfig::ColorSource;
+    const glm::vec4 chosen{0.0f, 0.8f, 0.2f, 1.0f};
+    for (const bool uniform : {true, false})
+    {
+        SCOPED_TRACE(uniform ? "uniform default" : "material, color kept for later");
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        const ECS::EntityHandle mesh = MakeSelectable(registry, "SurfaceDomainMesh");
+        AddTriangleMeshSource(registry, mesh);
+        (void)registry.Raw().get_or_emplace<G::RenderSurface>(mesh);
+        ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+        const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+        context.VisualizationCommandsAvailable = true;
+        ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context,
+                      Runtime::EditorVisualizationConfigCommand{.StableEntityId = stableId,
+                          .Target = Runtime::EditorVisualizationTarget::Surface,
+                          .Source = uniform ? Source::UniformColor : Source::Material,
+                          .Color = chosen,
+                          .UniformByDefault = uniform}),
+            Runtime::EditorCommandStatus::Applied);
+        ASSERT_EQ(Runtime::ApplyEditorRenderHintCommand(context,
+                      Runtime::EditorRenderHintCommand{.StableEntityId = stableId,
+                          .SetSurface = true,
+                          .EnableSurface = true,
+                          .SurfaceDomain = G::RenderSurface::SourceDomain::Face}),
+            Runtime::EditorCommandStatus::Applied);
+        const auto* lanes = registry.Raw().try_get<G::VisualizationLaneOverrides>(mesh);
+        ASSERT_TRUE(lanes != nullptr && lanes->Surface.has_value());
+        EXPECT_EQ(lanes->Surface->Source, uniform ? Source::UniformColor : Source::Material);
+        EXPECT_EQ(lanes->Surface->Color, chosen);
+        EXPECT_EQ(lanes->Surface->UniformByDefault, uniform);
+    }
+}
+
 TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
 {
     using Domain = Runtime::EditorVisualizationPropertyDomain;

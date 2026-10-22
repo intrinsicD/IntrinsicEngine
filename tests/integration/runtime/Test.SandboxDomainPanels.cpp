@@ -260,6 +260,7 @@ TEST(SandboxDomainPanels, UniformColorCommandsDisableBakingAndRetainScalarStyle)
     model.IsolineValues = {-1.0f, 0.5f, 2.0f};
     model.IsolineValueCount = 3u;
     model.UseBakedTexture = true;
+    model.Interpretation = decltype(model.Interpretation)::NormalDirection;
 
     const auto base = Editor::MakeVisualizationConfigCommandFromModel(
         42u, model, Runtime::EditorVisualizationTarget::Surface);
@@ -273,6 +274,9 @@ TEST(SandboxDomainPanels, UniformColorCommandsDisableBakingAndRetainScalarStyle)
     EXPECT_EQ(uniform.Source, decltype(model.Source)::UniformColor);
     EXPECT_EQ(uniform.Color, replacement);
     EXPECT_FALSE(uniform.UseBakedTexture);
+    EXPECT_EQ(base.Interpretation, decltype(model.Interpretation)::NormalDirection);
+    EXPECT_EQ(uniform.Interpretation, decltype(model.Interpretation)::Components)
+        << "a direction interpretation is only valid on a color buffer";
     for (const auto* command : {&base, &uniform})
     {
         EXPECT_EQ(command->StableEntityId, 42u);
@@ -535,8 +539,12 @@ TEST(SandboxDomainPanels, AppearanceCheckboxesCanEnableAndReenableEverySupported
             (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
             GS::PopulateFromCloud(raw, entity, cloud);
         }
-        raw.emplace<G::VisualizationConfig>(entity).Source =
-            G::VisualizationConfig::ColorSource::UniformColor;
+        // Colored as directions: "Material / default" must not carry that interpretation over.
+        (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:dir", glm::vec3{0.0f, 0.0f, 1.0f});
+        auto& colored = raw.emplace<G::VisualizationConfig>(entity);
+        colored.Source = G::VisualizationConfig::ColorSource::PerVertexBuffer;
+        colored.ColorBufferName = "v:dir";
+        colored.Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection;
         auto* selection = engine.Services().Find<Runtime::SelectionController>();
         ASSERT_NE(selection, nullptr);
         ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
@@ -1883,6 +1891,22 @@ namespace
             scene, Runtime::SelectionController::ToStableEntityId(entity));
         const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color, testCase.Domain);
         ASSERT_GE(colorRow, 0);
+        // A Color row of another domain that colors the same lane (mesh vertices and
+        // faces, graph nodes and edges): once this row binds a property it stays Default.
+        int twinRow = -1;
+        for (std::size_t i = 0u; i < bindings.Rows.size(); ++i)
+        {
+            const auto& row = bindings.Rows[i];
+            if (row.Attribute == Runtime::RenderAttribute::Color && row.Domain != testCase.Domain &&
+                row.OverlayTarget == bindings.Rows[static_cast<std::size_t>(colorRow)].OverlayTarget)
+                twinRow = static_cast<int>(i);
+        }
+        const auto twinDomain = twinRow < 0 ? D::Unknown : bindings.Rows[static_cast<std::size_t>(twinRow)].Domain;
+        const bool twinOnVertices = twinDomain == D::MeshVertex || twinDomain == D::GraphNode;
+        const auto twinKind = twinOnVertices ? Runtime::EditorDomainWindowKind::PointCloud
+            : twinDomain == D::MeshFace      ? Runtime::EditorDomainWindowKind::Mesh
+                                             : Runtime::EditorDomainWindowKind::Graph;
+        const char* twinTitle = twinOnVertices ? "Vertices" : twinDomain == D::MeshFace ? "Faces" : "Edges";
         std::string candidate;
         for (const auto& c : bindings.Rows[static_cast<std::size_t>(colorRow)].Candidates)
         {
@@ -1913,6 +1937,19 @@ namespace
             return config.has_value() &&
                    config->Interpretation == G::VisualizationConfig::ColorInterpretation::NormalDirection;
         };
+        // Red channel of the lane's uniform color, when the lane draws one.
+        const auto uniformRed = [&](const ColorLane lane) -> std::optional<float>
+        {
+            const auto* overrides = raw.try_get<G::VisualizationLaneOverrides>(entity);
+            if (overrides == nullptr)
+                return std::nullopt;
+            const auto& config = lane == ColorLane::Surface ? overrides->Surface
+                : lane == ColorLane::Edges                  ? overrides->Edges
+                                                            : overrides->Points;
+            if (!config.has_value() || config->Source != G::VisualizationConfig::ColorSource::UniformColor)
+                return std::nullopt;
+            return config->Color.x;
+        };
         int frame = 0;
         int step = 0;
         driver->OnFrame = [&](Runtime::Engine& kernel) {
@@ -1931,21 +1968,60 @@ namespace
                 return;
             const ImGuiID source = RowItemId(
                 AppearanceTableId(window, testCase.SectionKind, testCase.SectionTitle), colorRow, "##Source");
-            const ImGuiID interpretation = RowItemId(
-                AppearanceSectionId(window, testCase.SectionKind, testCase.SectionTitle),
-                colorRow, "Color interpretation");
+            const ImGuiID section = AppearanceSectionId(window, testCase.SectionKind, testCase.SectionTitle);
+            const ImGuiID interpretation = RowItemId(section, colorRow, "Color interpretation");
+            // Opens the uniform color's red channel as a text field, as a Ctrl-click does.
+            const ImGuiID red = ImHashStr("##X", 0, RowItemId(section, colorRow, "##Uniform color"));
+            const auto editRed = [&]
+            {
+                ImGui::ActivateItemByID(red);
+                ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+            };
             switch (step)
             {
-            case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(source); break;
-            case 1: EXPECT_TRUE(selectInPopup(candidate)); break;
-            case 2: ImGui::ActivateItemByID(interpretation); break;
-            case 3: EXPECT_TRUE(selectInPopup("Normal direction")); break;
-            case 4:
+            case 0:
+                ImGui::FocusWindow(window);
+                editRed();
+                break;
+            case 1: ImGui::GetIO().AddInputCharactersUTF8("0"); break;
+            case 2: ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true); break;
+            case 3:
+                ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+                for (const ColorLane lane : {ColorLane::Surface, ColorLane::Edges, ColorLane::Points})
+                {
+                    EXPECT_EQ(uniformRed(lane), lane == testCase.ExpectedLane ? std::optional{0.0f} : std::nullopt)
+                        << "the Default row's color edits the overlay lane " << static_cast<int>(lane);
+                }
+                ImGui::ActivateItemByID(source);
+                break;
+            case 4: EXPECT_TRUE(selectInPopup(candidate)); break;
+            case 5: ImGui::ActivateItemByID(interpretation); break;
+            case 6: EXPECT_TRUE(selectInPopup("Normal direction")); break;
+            case 7:
                 for (const ColorLane lane : {ColorLane::Surface, ColorLane::Edges, ColorLane::Points})
                 {
                     EXPECT_EQ(normalDirection(lane), lane == testCase.ExpectedLane)
                         << "lane " << static_cast<int>(lane);
                 }
+                editRed(); // a bound row offers no uniform color
+                break;
+            case 8:
+                EXPECT_NE(ImGui::GetCurrentContext()->ActiveId, red) << "a bound row offers no uniform color";
+                if (twinRow >= 0)
+                    ImGui::ActivateItemByID(ImHashStr("##X",
+                        0,
+                        RowItemId(AppearanceSectionId(window, twinKind, twinTitle), twinRow, "##Uniform color")));
+                break;
+            case 9:
+                if (twinRow >= 0)
+                    EXPECT_EQ(ImGui::GetCurrentContext()->ActiveId, 0u)
+                        << "a Default row whose lane a property colors offers no uniform color";
+                ImGui::ActivateItemByID(source);
+                break;
+            case 10: EXPECT_TRUE(selectInPopup("Default")); break;
+            case 11:
+                EXPECT_EQ(uniformRed(testCase.ExpectedLane), std::optional{0.0f})
+                    << "unbinding the property brings the chosen color back";
                 kernel.RequestExit();
                 break;
             default: break;
@@ -1953,7 +2029,7 @@ namespace
             ++step;
         };
         engine.Run();
-        EXPECT_EQ(step, 5);
+        EXPECT_EQ(step, 12);
         panels.Unregister();
         shell.Detach();
         engine.Shutdown();

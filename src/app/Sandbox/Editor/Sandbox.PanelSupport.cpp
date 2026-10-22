@@ -1780,6 +1780,7 @@ namespace Extrinsic::Sandbox::Editor
             .EnableConfig = true,
             .Source = model.Source,
             .Color = model.Color,
+            .UniformByDefault = model.UniformByDefault,
             .ScalarFieldName = model.ScalarFieldName,
             .ScalarDomain = model.ScalarDomain,
             .ColorBufferName = model.ColorBufferName,
@@ -1808,6 +1809,8 @@ namespace Extrinsic::Sandbox::Editor
         auto command = MakeVisualizationConfigCommandFromModel(stableEntityId, model, target);
         command.Source = kUniformColorSource;
         command.Color = color;
+        command.UniformByDefault = true;
+        command.Interpretation = {}; // a direction interpretation needs a color buffer
         command.UseBakedTexture = false;
         return command;
     }

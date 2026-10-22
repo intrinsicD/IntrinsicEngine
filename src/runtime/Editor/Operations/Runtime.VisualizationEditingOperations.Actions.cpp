@@ -83,6 +83,7 @@ namespace {
             G::VisualizationConfig config{};
             config.Source = command.Source;
             config.Color = command.Color;
+            config.UniformByDefault = command.UniformByDefault;
             config.ScalarFieldName = command.ScalarFieldName;
             config.ScalarDomain = command.ScalarDomain;
             config.ColorBufferName = command.ColorBufferName;
@@ -175,22 +176,32 @@ namespace {
                 if (lhs.Scalar.Isolines.Values[i] != rhs.Scalar.Isolines.Values[i])
                     return false;
             }
-            return lhs.Source == rhs.Source && lhs.Color.x == rhs.Color.x &&
-                   lhs.Color.y == rhs.Color.y && lhs.Color.z == rhs.Color.z &&
-                   lhs.Color.w == rhs.Color.w &&
-                   lhs.ScalarFieldName == rhs.ScalarFieldName &&
-                   lhs.ScalarDomain == rhs.ScalarDomain &&
-                   lhs.ColorBufferName == rhs.ColorBufferName &&
-                   lhs.Interpretation == rhs.Interpretation &&
-                   lhs.UseBakedTexture == rhs.UseBakedTexture &&
-                   lhs.Scalar.Map == rhs.Scalar.Map &&
-                   lhs.Scalar.AutoRange == rhs.Scalar.AutoRange &&
-                   lhs.Scalar.RangeMin == rhs.Scalar.RangeMin &&
-                   lhs.Scalar.RangeMax == rhs.Scalar.RangeMax &&
-                   lhs.Scalar.BinCount == rhs.Scalar.BinCount &&
-                   lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num &&
-                   lhs.Scalar.Isolines.Width == rhs.Scalar.Isolines.Width &&
-                   lhs.Scalar.Isolines.Color == rhs.Scalar.Isolines.Color;
+            return lhs.Source == rhs.Source && lhs.Color.x == rhs.Color.x && lhs.Color.y == rhs.Color.y &&
+                lhs.Color.z == rhs.Color.z && lhs.Color.w == rhs.Color.w &&
+                lhs.UniformByDefault == rhs.UniformByDefault && lhs.ScalarFieldName == rhs.ScalarFieldName &&
+                lhs.ScalarDomain == rhs.ScalarDomain && lhs.ColorBufferName == rhs.ColorBufferName &&
+                lhs.Interpretation == rhs.Interpretation && lhs.UseBakedTexture == rhs.UseBakedTexture &&
+                lhs.Scalar.Map == rhs.Scalar.Map && lhs.Scalar.AutoRange == rhs.Scalar.AutoRange &&
+                lhs.Scalar.RangeMin == rhs.Scalar.RangeMin && lhs.Scalar.RangeMax == rhs.Scalar.RangeMax &&
+                lhs.Scalar.BinCount == rhs.Scalar.BinCount && lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num &&
+                lhs.Scalar.Isolines.Width == rhs.Scalar.Isolines.Width &&
+                lhs.Scalar.Isolines.Color == rhs.Scalar.Isolines.Color;
+        }
+
+        // A lane's Default is its last chosen uniform color (unflagged uniform configs from
+        // imports or older scenes count too): binding a property, unbinding it and switching
+        // the surface domain of a lane-stored config keep it; a uniform color inherited from
+        // the entity-level config is masked by the domain switch.
+        [[nodiscard]] bool DrawsUniformDefault(const G::VisualizationConfig& config) noexcept
+        {
+            return config.UniformByDefault || config.Source == G::VisualizationConfig::ColorSource::UniformColor;
+        }
+
+        void KeepUniformDefault(
+            EditorVisualizationConfigCommand& command, const G::VisualizationConfig& existing) noexcept
+        {
+            command.Color = existing.Color;
+            command.UniformByDefault = DrawsUniformDefault(existing);
         }
 
         [[nodiscard]] bool SameOptionalVisualizationConfig(
@@ -583,7 +594,19 @@ namespace {
                     G::RenderSurface surface =
                         state.Components.Surface.value_or(G::RenderSurface{});
                     if (surface.Domain != command.SurfaceDomain)
-                        state.SurfaceVisualization = G::VisualizationConfig{};
+                    {
+                        G::VisualizationConfig reset{};
+                        if (state.SurfaceVisualization)
+                        {
+                            reset.Color = state.SurfaceVisualization->Color; // kept for a later uniform color
+                            if (DrawsUniformDefault(*state.SurfaceVisualization))
+                            {
+                                reset.Source = G::VisualizationConfig::ColorSource::UniformColor;
+                                reset.UniformByDefault = true;
+                            }
+                        }
+                        state.SurfaceVisualization = reset;
+                    }
                     surface.Domain = command.SurfaceDomain;
                     state.Components.Surface = surface;
                 }
@@ -1596,6 +1619,7 @@ ApplyEditorRenderHintCommand(
                 EffectiveVisualizationConfigForTarget(raw, entity, command.Target);
             existing.has_value())
         {
+            KeepUniformDefault(configCommand, *existing);
             configCommand.ScalarColormap = existing->Scalar.Map;
             configCommand.IsolineWidth = existing->Scalar.Isolines.Width;
             configCommand.IsolineColor = existing->Scalar.Isolines.Color;
@@ -1700,6 +1724,7 @@ ApplyEditorRenderHintCommand(
                         const bool hadLaneConfig = existing.has_value();
                         if (existing)
                         {
+                            KeepUniformDefault(config, *existing);
                             config.UseBakedTexture = existing->UseBakedTexture;
                             config.ScalarColormap = existing->Scalar.Map;
                             config.ScalarBinCount = existing->Scalar.BinCount;
@@ -1878,6 +1903,19 @@ ApplyEditorRenderHintCommand(
                 return EditorCommandStatus::NoChange;
             const EditorVisualizationTarget lane =
                 EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
+            // A lane whose Default is a chosen uniform color returns to that color.
+            if (const auto stored = EffectiveVisualizationConfigForTarget(raw, entity, lane);
+                stored.has_value() && stored->UniformByDefault)
+            {
+                return ApplyEditorVisualizationConfigCommand(context,
+                    EditorVisualizationConfigCommand{
+                        .StableEntityId = command.StableEntityId,
+                        .Target = lane,
+                        .Source = G::VisualizationConfig::ColorSource::UniformColor,
+                        .Color = stored->Color,
+                        .UniformByDefault = true,
+                    });
+            }
             // Without an entity-level overlay the lane override is removed;
             // with one, this lane is masked to the material so the overlay is
             // neither re-inherited here nor cleared on the other lanes.

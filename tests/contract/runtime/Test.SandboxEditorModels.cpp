@@ -1832,6 +1832,35 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnConfigSignature)
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
+
+TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesWhenOnlyTheUniformDefaultFlagChanges)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+
+    G::VisualizationConfig config{};
+    config.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
+    const auto first = Runtime::BuildEditorWorkspaceSnapshot(context, MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_TRUE(first.Visualization.Visualization.HasConfig);
+    EXPECT_FALSE(first.Visualization.Visualization.UniformByDefault);
+    const auto cached = Runtime::BuildEditorWorkspaceSnapshot(context, MakeOnlyVisualizationModelBuildRequest());
+    ASSERT_EQ(cached.ModelBuildStats.VisualizationModelCacheHits, 1u) << "the unchanged state is cached";
+
+    // An out-of-band write that changes nothing but the flag (no command, same history revision).
+    registry.Raw().get<G::VisualizationConfig>(mesh).UniformByDefault = true;
+    const auto changed = Runtime::BuildEditorWorkspaceSnapshot(context, MakeOnlyVisualizationModelBuildRequest());
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheMisses, 1u);
+    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
+    EXPECT_TRUE(changed.Visualization.Visualization.UniformByDefault);
+}
 TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnLaneOverrideSignature)
 {
     ECS::Scene::Registry registry;
