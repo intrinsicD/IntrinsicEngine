@@ -25,5 +25,6 @@ params:
 metrics: [runtime_ms, sample_count]
 # coverage, packing and cell_cv per cell are diagnostics in cells.jsonl.
 thresholds:
-  budget_ms_per_domain: 2000
+  budget_ms_per_domain_capped_order: 2000
+  full_order_margin: 0.9
   tie_relative: 0.02

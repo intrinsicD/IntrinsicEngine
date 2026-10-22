@@ -6,10 +6,11 @@
 Reads <run dir>/cells.jsonl (raw cells) and writes <run dir>/report.html and decision.json.
 Decision rule (frozen in the UI-081 pre-flight packet): candidates are the orders (not stride,
 not random). Score = median over fixture x domain x ratio of the seed-mean coverage / d_hex.
-A candidate is eligible when its full order of every domain of the 1000 x 1000 timing grid
-takes at most --budget-ms; if none is, eligibility uses the first 65536 instead (the cap).
-The lowest score wins; candidates within --tie (relative) of it are tied and the tie goes to
-the highest median packing. Gates: random's score must exceed the winner's by more than 10%
+A candidate is eligible when its first 65536 (the cap) of every domain of the 1000 x 1000
+timing grid take at most --budget-ms. The lowest eligible score wins; candidates within --tie
+(relative) of it are tied and the tie goes to the highest median packing. The cap is dropped
+(mode "full") only when the winner's full order of every domain takes at most
+--full-margin x --budget-ms. Gates: random's score must exceed the winner's by more than 10%
 and the winner must beat stride on the graded fixture's coverage at every ratio.
 """
 import argparse
@@ -49,7 +50,7 @@ def seed_means(cells):
     return out
 
 
-def decide(cells, means, budget_ms, tie):
+def decide(cells, means, budget_ms, tie, full_margin):
     methods = sorted({k[2] for k in means})
     score = {m: statistics.median(v["coverage"] for k, v in means.items() if k[2] == m) for m in methods}
     pack = {m: statistics.median(v["packing"] for k, v in means.items() if k[2] == m) for m in methods}
@@ -59,23 +60,21 @@ def decide(cells, means, budget_ms, tie):
             timing[c["method"]][(c["domain"], "full" if c["count"] == c["elements"] else "cap")] = c["ms"]
     domains = {"vertices", "edges", "faces"}
 
-    def eligible(m, mode):
+    def eligible(m, mode, limit):
         t = timing.get(m, {})
-        return all((d, mode) in t and 0.0 <= t[(d, mode)] <= budget_ms for d in domains)
+        return all((d, mode) in t and 0.0 <= t[(d, mode)] <= limit for d in domains)
 
     candidates = [m for m in methods if m not in NON_CANDIDATES]
-    full = [m for m in candidates if eligible(m, "full")]
-    mode = "full" if full else "cap"
-    pool = full or [m for m in candidates if eligible(m, "cap")]
-    decision = {"budget_ms": budget_ms, "tie": tie, "mode": mode, "scores": score, "packing": pack,
+    pool = [m for m in candidates if eligible(m, "cap", budget_ms)]
+    decision = {"budget_ms": budget_ms, "tie": tie, "full_margin": full_margin, "scores": score, "packing": pack,
                 "eligible": pool, "timing_ms": {m: {f"{d}/{k}": v for (d, k), v in t.items()} for m, t in timing.items()}}
     if not pool:
-        decision["winner"] = None
-        decision["verdict"] = "no candidate within the time budget"
+        decision.update({"winner": None, "mode": None, "verdict": "no candidate within the time budget"})
         return decision
     best = min(score[m] for m in pool)
     tied = [m for m in pool if score[m] <= best * (1.0 + tie)]
     winner = max(tied, key=lambda m: (pack[m], -score[m]))
+    decision["mode"] = "full" if eligible(winner, "full", full_margin * budget_ms) else "cap"
     gates = {}
     if "random" in score:
         gates["random_worse_by_10pct"] = score["random"] > score[winner] * 1.10
@@ -124,10 +123,10 @@ def svg_points(name, points, size=220):
             f'{dots}</svg><figcaption>{html.escape(name)} ({len(points)})</figcaption></figure>')
 
 
-def report(run, budget_ms, tie):
+def report(run, budget_ms, tie, full_margin):
     cells, summary = load(run)
     means = seed_means(cells)
-    decision = decide(cells, means, budget_ms, tie)
+    decision = decide(cells, means, budget_ms, tie, full_margin)
     (run / "decision.json").write_text(json.dumps(decision, indent=2))
     parts = ["<!doctype html><meta charset='utf-8'><title>Glyph order comparison</title><style>",
              "body{font:14px system-ui,sans-serif;margin:24px;max-width:1400px;color:#111;background:#fff}",
@@ -149,7 +148,8 @@ def report(run, budget_ms, tie):
                      f"<td>{decision['packing'][m]:.4f}</td><td>{mark}</td><td>{tt}</td></tr>")
     parts.append("</table>")
     gates = decision.get("gates", {})
-    parts.append(f"<p>Mode: <b>{decision['mode']}</b> (budget {budget_ms:.0f} ms per domain, tie {tie:.0%}). Winner: "
+    parts.append(f"<p>Mode: <b>{decision['mode']}</b> (budget {budget_ms:.0f} ms per domain for the capped order, "
+                 f"full order dropped the cap at {decision['full_margin']:.0%} of it; tie {tie:.0%}). Winner: "
                  f"<b>{html.escape(str(decision.get('winner')))}</b>; tied: {html.escape(str(decision.get('tied')))}; verdict: "
                  f"<b>{html.escape(decision['verdict'])}</b>.</p><ul>")
     for g, ok in gates.items():
@@ -185,8 +185,9 @@ def main():
     parser.add_argument("run", type=Path)
     parser.add_argument("--budget-ms", type=float, default=2000.0)
     parser.add_argument("--tie", type=float, default=0.02)
+    parser.add_argument("--full-margin", type=float, default=0.9)
     args = parser.parse_args()
-    decision = report(args.run, args.budget_ms, args.tie)
+    decision = report(args.run, args.budget_ms, args.tie, args.full_margin)
     print(json.dumps({k: decision.get(k) for k in ("mode", "winner", "tied", "gates", "verdict")}, indent=2))
 
 
