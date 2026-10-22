@@ -31,6 +31,7 @@ import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommon;
@@ -587,6 +588,11 @@ namespace Extrinsic::Sandbox::Editor
         {
             std::size_t DomainIndex{0u};
             EditorCommandStatus LastStatus{EditorCommandStatus::NoChange};
+            PointSamplingMethod OrderMethod{PointSamplingMethod::FarthestPoint};
+            std::string OrderMessage{};
+            // The entity and domain the message is about; it is hidden after a switch.
+            std::uint32_t OrderMessageEntity{0u};
+            GeometryElementDomain OrderMessageDomain{GeometryElementDomain::Unknown};
         };
 
         [[nodiscard]] EditorCommandStatus ApplyVectorFieldLayer(const SandboxEditorContext& context,
@@ -601,6 +607,7 @@ namespace Extrinsic::Sandbox::Editor
 
 // Edits one active field; every change goes through the validated command.
         void DrawVectorFieldLayer(const EditorVectorFieldLayerRow& row,
+            const EditorVectorFieldDomainOption* domain,
             const SandboxEditorContext& context,
             const std::uint32_t stableId,
             VectorFieldUiState& state)
@@ -648,20 +655,41 @@ namespace Extrinsic::Sandbox::Editor
                 ImGuiSliderFlags_AlwaysClamp);
             changed |= ImGui::ColorEdit4("Color", &layer.Color.x);
 
-            int stride = static_cast<int>(
-                std::min<std::uint32_t>(layer.Stride, static_cast<std::uint32_t>(std::numeric_limits<int>::max())));
-            if (ImGui::InputInt("Every Nth element", &stride))
+            // With a valid arrow order the slider draws its first N live elements (MaxGlyphs, 0 = all;
+            // an older layer's stride shows as the count it draws); without one the layer keeps every
+            // n-th element.
+            if (domain != nullptr && domain->OrderRows > 0u)
             {
-                layer.Stride =
-                    static_cast<std::uint32_t>(std::clamp(stride, 1, static_cast<int>(kMaxGeometryVectorFieldStride)));
-                changed = true;
+                const int all = static_cast<int>(std::min<std::uint32_t>(
+                    domain->OrderRows, static_cast<std::uint32_t>(std::numeric_limits<int>::max())));
+                const std::uint32_t strided = (domain->OrderRows + layer.Stride - 1u) / std::max(layer.Stride, 1u);
+                const std::uint32_t drawn = layer.MaxGlyphs > 0u ? std::min(strided, layer.MaxGlyphs) : strided;
+                int arrows = static_cast<int>(std::min<std::uint32_t>(drawn, static_cast<std::uint32_t>(all)));
+                if (ImGui::SliderInt(
+                        "Arrows", &arrows, 1, all, "%d", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp))
+                {
+                    layer.Stride = 1u;
+                    layer.MaxGlyphs = arrows >= all ? 0u : static_cast<std::uint32_t>(arrows);
+                    changed = true;
+                }
             }
-            int maxGlyphs = static_cast<int>(
-                std::min<std::uint32_t>(layer.MaxGlyphs, static_cast<std::uint32_t>(std::numeric_limits<int>::max())));
-            if (ImGui::InputInt("Max arrows (0 = all)", &maxGlyphs))
+            else
             {
-                layer.MaxGlyphs = static_cast<std::uint32_t>(std::max(maxGlyphs, 0));
-                changed = true;
+                int stride = static_cast<int>(
+                    std::min<std::uint32_t>(layer.Stride, static_cast<std::uint32_t>(std::numeric_limits<int>::max())));
+                if (ImGui::InputInt("Every Nth element", &stride))
+                {
+                    layer.Stride = static_cast<std::uint32_t>(
+                        std::clamp(stride, 1, static_cast<int>(kMaxGeometryVectorFieldStride)));
+                    changed = true;
+                }
+                int maxGlyphs = static_cast<int>(std::min<std::uint32_t>(
+                    layer.MaxGlyphs, static_cast<std::uint32_t>(std::numeric_limits<int>::max())));
+                if (ImGui::InputInt("Max arrows (0 = all)", &maxGlyphs))
+                {
+                    layer.MaxGlyphs = static_cast<std::uint32_t>(std::max(maxGlyphs, 0));
+                    changed = true;
+                }
             }
             if (changed)
                 state.LastStatus = ApplyVectorFieldLayer(context, stableId, EditorVectorFieldOperation::Update, layer);
@@ -695,6 +723,40 @@ namespace Extrinsic::Sandbox::Editor
                         state.DomainIndex = i;
                 }
                 ImGui::EndCombo();
+            }
+
+            // One arrow order per domain, shared by its layers until recomputed (UI-081).
+            if (ImGui::BeginCombo("Arrow order method", std::string(DisplayName(state.OrderMethod)).c_str()))
+            {
+                for (int m = 0; m <= static_cast<int>(PointSamplingMethod::Tournament); ++m)
+                {
+                    const auto method = static_cast<PointSamplingMethod>(m);
+                    if (ImGui::Selectable(std::string(DisplayName(method)).c_str(), method == state.OrderMethod))
+                        state.OrderMethod = method;
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::Button("Compute arrow order"))
+            {
+                const EditorGlyphOrderResult result = ApplyEditorGlyphOrderCommand(context.Processing,
+                    EditorGlyphOrderCommand{.StableEntityId = model.SelectedStableId,
+                        .Domain = domain.Domain,
+                        .Method = state.OrderMethod});
+                state.OrderMessage = result.Message;
+                state.OrderMessageEntity = model.SelectedStableId;
+                state.OrderMessageDomain = domain.Domain;
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s",
+                domain.OrderRows > 0u     ? "even spacing ready"
+                    : domain.OrderPresent ? "stale: elements changed, recompute"
+                                          : "every n-th element");
+            if (!state.OrderMessage.empty() && state.OrderMessageEntity == model.SelectedStableId &&
+                state.OrderMessageDomain == domain.Domain)
+            {
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::TextDisabled("%s", state.OrderMessage.c_str());
+                ImGui::PopTextWrapPos();
             }
 
             if (domain.Properties.empty())
@@ -735,8 +797,11 @@ namespace Extrinsic::Sandbox::Editor
 
             for (const EditorVectorFieldLayerRow& row : fields.Layers)
             {
+                const auto option =
+                    std::ranges::find(fields.Domains, row.Layer.Vector.Domain, &EditorVectorFieldDomainOption::Domain);
                 ImGui::PushID((row.DomainLabel + row.Layer.Vector.Name).c_str());
-                DrawVectorFieldLayer(row, context, model.SelectedStableId, state);
+                DrawVectorFieldLayer(
+                    row, option == fields.Domains.end() ? nullptr : &*option, context, model.SelectedStableId, state);
                 ImGui::PopID();
             }
             if (state.LastStatus != EditorCommandStatus::Applied && state.LastStatus != EditorCommandStatus::NoChange)

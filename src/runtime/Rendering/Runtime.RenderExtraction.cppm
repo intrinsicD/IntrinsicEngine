@@ -275,6 +275,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t VectorFieldLayerCount{0};
         std::uint32_t VectorFieldPacketCount{0};
         std::uint32_t VectorFieldUnavailableCount{0};
+        // Layers drawn from their domain's glyph order (UI-081) instead of a stride.
+        std::uint32_t VectorFieldOrderedLayerCount{0};
         std::uint32_t VectorFieldAnchorCacheBuilds{0};
         std::uint32_t VectorFieldAnchorCacheReuses{0};
         std::uint32_t VectorFieldPayloadCacheBuilds{0};

@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -535,6 +536,95 @@ namespace Extrinsic::Runtime
                 return &layer;
         }
         return nullptr;
+    }
+
+    std::string_view GeometryGlyphOrderPropertyName(const GeometryElementDomain domain) noexcept
+    {
+        switch (domain)
+        {
+        case GeometryElementDomain::MeshEdge:
+        case GeometryElementDomain::GraphEdge: return "e:glyph_rank";
+        case GeometryElementDomain::MeshFace:  return "f:glyph_rank";
+        default:                               return "v:glyph_rank";
+        }
+    }
+
+    namespace
+    {
+        [[nodiscard]] std::string_view GlyphOrderDeletedName(const GeometryElementDomain domain) noexcept
+        {
+            return domain == GeometryElementDomain::MeshFace                                              ? "f:deleted"
+                : domain == GeometryElementDomain::MeshEdge || domain == GeometryElementDomain::GraphEdge ? "e:deleted"
+                                                                                                          : "v:deleted";
+        }
+    }
+
+    std::optional<std::vector<std::uint32_t>> SortGeometryGlyphOrderRows(
+        const Geometry::PropertySet& properties, const GeometryElementDomain domain)
+    {
+        const auto ranks = properties.Get<float>(GeometryGlyphOrderPropertyName(domain));
+        if (!ranks || ranks.Size() != properties.Size() || properties.Size() >= kGeometryGlyphOrderRowLimit)
+            return std::nullopt;
+        const auto deleted = properties.Get<bool>(GlyphOrderDeletedName(domain));
+        const auto live = [&](const std::size_t row)
+        {
+            return !deleted || row >= deleted.Size() || !deleted[row];
+        };
+        std::size_t liveCount = 0u;
+        for (std::size_t row = 0u; row < properties.Size(); ++row)
+            liveCount += live(row) ? 1u : 0u;
+        constexpr std::uint32_t kUnset = std::numeric_limits<std::uint32_t>::max();
+        std::vector<std::uint32_t> byRank(liveCount, kUnset);
+        for (std::size_t row = 0u; row < properties.Size(); ++row)
+        {
+            if (!live(row))
+                continue;
+            const float rank = ranks[row];
+            if (!(rank >= 0.0f) || rank >= float(liveCount) || rank != std::floor(rank))
+                return std::nullopt;
+            std::uint32_t& slot = byRank[std::size_t(rank)];
+            if (slot != kUnset)
+                return std::nullopt;
+            slot = std::uint32_t(row);
+        }
+        return byRank;
+    }
+
+    std::uint32_t CountGeometryGlyphOrderRows(
+        const Geometry::PropertySet& properties, const GeometryElementDomain domain)
+    {
+        // Revisions are global and never reused, so an equal key means equal rank and deletion
+        // content; revision 0 (never modified) has no identity and is always rescanned.
+        struct Entry
+        {
+            GeometryElementDomain Domain{};
+            Geometry::PropertyRevision Rank{0u};
+            Geometry::PropertyRevision Deleted{0u};
+            std::size_t Size{0u};
+            std::uint32_t Rows{0u};
+        };
+        thread_local std::vector<Entry> memo;
+        const Geometry::PropertyRevision rank =
+            properties.FindPropertyRevision(GeometryGlyphOrderPropertyName(domain)).value_or(0u);
+        const Geometry::PropertyRevision deleted =
+            properties.FindPropertyRevision(GlyphOrderDeletedName(domain)).value_or(0u);
+        const auto hit = std::ranges::find_if(memo,
+            [&](const Entry& entry)
+            {
+                return entry.Domain == domain && entry.Rank == rank && entry.Deleted == deleted &&
+                    entry.Size == properties.Size();
+            });
+        if (rank != 0u && hit != memo.end())
+            return hit->Rows;
+        const auto sorted = SortGeometryGlyphOrderRows(properties, domain);
+        const std::uint32_t rows = sorted ? static_cast<std::uint32_t>(sorted->size()) : 0u;
+        if (rank != 0u)
+        {
+            if (memo.size() >= 64u)
+                memo.erase(memo.begin());
+            memo.push_back({domain, rank, deleted, properties.Size(), rows});
+        }
+        return rows;
     }
 
     GeometryGeneratedOutputPolicy DefaultGeometryGeneratedOutputPolicyFor(

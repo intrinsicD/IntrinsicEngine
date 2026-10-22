@@ -1063,3 +1063,41 @@ TEST(VisualizationRecipes, VectorFieldPacketChecksUnverifiedRowsOnly)
     ASSERT_EQ(R::AppendVectorFieldPacket(batch, inputs, &diagnostics), R::VisualizationRecipeStatus::Encoded);
     EXPECT_EQ(diagnostics.VectorRowIndexCheckCount, 0u);
 }
+
+// UI-081: an ordered prefix draws the first DrawRowCount rows at stride 1 while the whole row
+// buffer is uploaded, so a changed count reuses it.
+TEST(VisualizationRecipes, VectorFieldPacketDrawsAPrefixOfItsRows)
+{
+    const std::array<glm::vec3, 4> anchors{{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}}};
+    const std::array<glm::vec3, 4> vectors{{{0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}}};
+    const std::array<std::uint32_t, 4> sorted{{2u, 0u, 3u, 1u}};
+    R::VectorFieldPacketInputs inputs{
+        .Name = "field",
+        .ElementCount = 4u,
+        .AnchorKey = "anchors",
+        .Anchors = anchors,
+        .VectorKey = "vectors",
+        .Vectors = vectors,
+        .RowKey = "order",
+        .Rows = sorted,
+        .Stride = 3u,
+        .MaxGlyphs = 1u,
+        .DrawRowCount = 2u,
+        .CopyPayloads = false,
+    };
+    R::VisualizationEncodingBatch batch{};
+    ASSERT_EQ(R::AppendVectorFieldPacket(batch, inputs, nullptr), R::VisualizationRecipeStatus::Encoded);
+    const auto& packet = batch.VectorFields.front();
+    EXPECT_EQ(packet.RowCount, 2u);
+    EXPECT_EQ(packet.RowStride, 1u) << "a prefix ignores stride and max glyphs";
+    EXPECT_EQ(Extrinsic::Graphics::VectorFieldGlyphCount(packet), 2u);
+    const auto rowBuffer = std::ranges::find(batch.PropertyBuffers,
+        std::string{"order"},
+        &Extrinsic::Graphics::VisualizationPropertyBufferUploadDescriptor::SourceKey);
+    ASSERT_NE(rowBuffer, batch.PropertyBuffers.end());
+    EXPECT_EQ(rowBuffer->ElementCount, 4u) << "the whole order is uploaded";
+    inputs.DrawRowCount = 9u;
+    R::VisualizationEncodingBatch more{};
+    ASSERT_EQ(R::AppendVectorFieldPacket(more, inputs, nullptr), R::VisualizationRecipeStatus::Encoded);
+    EXPECT_EQ(more.VectorFields.front().RowCount, 4u) << "clamped to the rows";
+}

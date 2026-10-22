@@ -30,21 +30,39 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
 ## Decisions (operator, 2026-10-22)
 - Domains: mesh vertices, graph nodes, point-cloud points, mesh/graph edges, mesh faces.
 - Slider: absolute arrow count (logarithmic); every-n-th stays only as the fallback without a valid order.
-- Default method: the most uniform one within the time budget; the other methods stay selectable.
+- Default method: farthest point (see Log); the other methods stay selectable in the Appearance combo.
 - The order is stored as a per-domain rank property (saved with the scene, visible in Properties).
 - A stale order (cardinality/topology change) shows a hint and falls back to every-n-th; no automatic recompute.
 - Edges and faces use their anchors (edge midpoints, face centers), as the renderer already does.
 
 ## Acceptance criteria
-- [ ] Comparison harness, packet and two PASS pre-flight reviews (fresh Claude, fresh Codex) before any results-bearing run.
-- [ ] Comparison run, HTML report from raw outputs, referee audit, method decision recorded here.
-- [ ] Button computes the order per entity domain (job, undoable rank publication); status ready / missing / stale.
+- [ ] Mesh comparison of the ordering methods as an exploratory report (operator decision 2026-10-22:
+      report only, light pre-flight tier, no decision rests on it); HTML report from raw outputs.
+- [x] Default method: farthest point, by operator decision 2026-10-22 on claim C116 (best coverage of
+      the compared methods on point clouds); the comparison does not set it.
+- [ ] Button computes the order per entity domain (undoable rank publication); status ready / missing / stale.
 - [ ] Vector-field layers on a domain with a valid order draw the first N rows of it (slider); fallback stride otherwise.
 - [ ] Tests fail without the change (order prefix rows, stale fallback, UI slider/button path); docs updated.
+
+## Log
+- 2026-10-22: two pre-flight rounds on the comparison (v1 digest 6601e5b5: Codex BLOCK, Claude REVISE;
+  v2 digest ee491b0a: Codex BLOCK, Claude REVISE) found real harness defects (seed wiring, gates,
+  inventory, per-call deadlines). The operator then chose farthest point as the default on C116 and
+  the comparison as a report only. Packets and verbatim reviews: tasks/evidence/UI-081/preflight/.
+- 2026-10-22: feature code review, Claude → fresh Claude (claude-opus-5-5, effort max, reported
+  claude-opus-5-5), session 9b81f9d1-9c44-46e6-8ad2-98fdf289b905, object HEAD 1f6bd5a6f + the
+  feature diff and new TU, digest 560545166b34323b7714b968326681165f5f26f1e7e14b9592c91928fb2bd42c,
+  verdict "revise required" (R1 non-float rank crash, R2 O(N) model scan per frame, S1 canonical vs
+  displayed positions, S2 old Stride>1 layers jump to all arrows, minor: 2^24 domains, slider
+  max, stale message, docs). All addressed in the feature commit; recursion protection enforced
+  (Read/Grep/Glob only). Packet and answer: tasks/evidence/UI-081/code-review/.
+- Open: Geometry.PointSampling sample elimination derives its weight limit dMin once from k/n
+  (Geometry.PointSampling.Approximate.cpp:269), so it is 0 for every progressive stage at count = N;
+  check against the cyCodeBase reference before relying on it.
 
 ## Verification
 ```bash
 cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SandboxDomainPanels|VisualizationRecipes|RuntimeRenderExtraction)\.'
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SandboxDomainPanels|PointSamplingOperations|VisualizationRecipes|RuntimeVectorFieldExtraction|VisualizationOverlayPass)\.'
 python3 tools/agents/check_task_policy.py --root . --strict
 ```

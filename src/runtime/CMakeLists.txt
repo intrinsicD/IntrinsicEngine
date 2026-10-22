@@ -218,6 +218,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.NormalOperations.cpp
         Editor/Operations/Runtime.RegistrationOperations.cpp
         Editor/Operations/Runtime.PointSamplingOperations.cpp
+        Editor/Operations/Runtime.PointSamplingOperations.GlyphOrder.cpp
         Editor/Operations/Runtime.MeshFieldOperations.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.cpp
     Editor/Operations/Runtime.PointFieldOperations.Frame.cpp

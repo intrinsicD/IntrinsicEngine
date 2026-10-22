@@ -108,7 +108,8 @@ export namespace Extrinsic::Graphics
 
     // One instanced arrow per sampled live source row. Anchor and vector
     // buffers hold one object-space vec3 per source element; the optional row
-    // buffer lists live element indices (empty key = every element is live).
+    // buffer lists live element indices (empty key = every element is live) and
+    // may be longer than RowCount, which then draws its prefix (UI-081 glyph order).
     // Instance `i` draws live row `i * RowStride`. The glyph tip is
     // `anchor + Scale * (NormalizeLength ? normalize(v) : v)` in object space,
     // then both endpoints are transformed by `ObjectToWorld`.

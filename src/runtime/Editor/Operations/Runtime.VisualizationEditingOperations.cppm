@@ -601,6 +601,10 @@ export namespace Extrinsic::Runtime
         std::string Label{};
         std::size_t ElementCount{0u};
         std::vector<EditorVectorFieldPropertyOption> Properties{};
+        // UI-081 glyph order: present (the rank property exists) and its live row count L when
+        // valid (live ranks exactly 0..L-1); present with 0 rows means stale after an element change.
+        bool OrderPresent{false};
+        std::uint32_t OrderRows{0u};
     };
 
     struct EditorVectorFieldLayerRow

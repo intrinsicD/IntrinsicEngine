@@ -48,4 +48,30 @@ export namespace Extrinsic::Runtime
                                                                                const PointSamplingOperationConfig&,
                                                                                std::string sourceId = {});
     [[nodiscard]] std::optional<PointSamplingOperationConfig> GetEditorPointSamplingConfig(const EditorProcessingCommands&);
+
+    // UI-081 Compute arrow order: orders one element domain's live anchors (vertex/node/point
+    // positions, edge midpoints, face centers; object space) with `Method` and publishes the
+    // undoable rank GeometryGlyphOrderPropertyName(domain): the first min(L, cap) by the method,
+    // the other live rows after them in row order, -1 on deleted rows. CPU, synchronous.
+    inline constexpr std::uint32_t kEditorGlyphOrderCap = 65536u;
+    struct EditorGlyphOrderCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        PointSamplingMethod Method{PointSamplingMethod::FarthestPoint};
+    };
+    struct EditorGlyphOrderResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        std::uint32_t LiveCount{0u};
+        std::uint32_t OrderedCount{0u};
+        double Milliseconds{0.0};
+        std::string Message{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == EditorCommandStatus::Applied;
+        }
+    };
+    [[nodiscard]] EditorGlyphOrderResult ApplyEditorGlyphOrderCommand(
+        const EditorProcessingCommands&, const EditorGlyphOrderCommand&);
 }

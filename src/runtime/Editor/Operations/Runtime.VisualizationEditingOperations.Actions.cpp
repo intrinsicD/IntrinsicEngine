@@ -2304,6 +2304,8 @@ ApplyEditorRenderHintCommand(
                 .Domain = domain,
                 .Label = DebugNameForEditorVectorFieldDomain(domain),
                 .ElementCount = ResolveGeometryElementCount(availability, domain),
+                .OrderPresent = properties->Exists(GeometryGlyphOrderPropertyName(domain)),
+                .OrderRows = CountGeometryGlyphOrderRows(*properties, domain),
             };
             for (const std::string& name : properties->Properties())
             {

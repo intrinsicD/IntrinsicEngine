@@ -184,7 +184,9 @@ export namespace Extrinsic::Runtime
         glm::vec4 Color{1.0f, 0.5f, 0.0f, 1.0f};
         bool DepthTested{true};
         // Draw every `Stride`-th live element; `MaxGlyphs` > 0 widens the
-        // stride further so at most that many glyphs are drawn.
+        // stride further so at most that many glyphs are drawn. With a valid
+        // UI-081 glyph order the layer draws the first ceil(L / Stride) rows
+        // of the order instead, at most MaxGlyphs.
         std::uint32_t Stride{1u};
         std::uint32_t MaxGlyphs{0u};
         bool Enabled{true};
@@ -382,6 +384,21 @@ export namespace Extrinsic::Runtime
         const GeometryPresentationRecipe& recipe,
         GeometryElementDomain domain,
         std::string_view propertyName) noexcept;
+
+    // UI-081 progressive arrow order of an element domain: a float rank property ("v:", "e:" or
+    // "f:glyph_rank") that Compute arrow order publishes, ranks 0..L-1 over the live rows and -1
+    // on deleted ones. Vector-field layers on the domain draw a prefix of it.
+    [[nodiscard]] std::string_view GeometryGlyphOrderPropertyName(GeometryElementDomain domain) noexcept;
+    // shortcut: float ranks are exact only below 2^24 rows, so larger domains get no order.
+    inline constexpr std::size_t kGeometryGlyphOrderRowLimit = std::size_t{1} << 24u;
+    // The live rows sorted by rank when their ranks are exactly 0..L-1, each once; nullopt when the
+    // order is missing or stale (an element was added or deleted since it was computed).
+    [[nodiscard]] std::optional<std::vector<std::uint32_t>> SortGeometryGlyphOrderRows(
+        const Geometry::PropertySet& properties, GeometryElementDomain domain);
+    // L for a valid order, 0 for none or a stale one; memoized on the rank and deletion revisions
+    // so a per-frame editor model does not rescan the domain.
+    [[nodiscard]] std::uint32_t CountGeometryGlyphOrderRows(
+        const Geometry::PropertySet& properties, GeometryElementDomain domain);
 
     [[nodiscard]] GeometryGeneratedOutputPolicy
     DefaultGeometryGeneratedOutputPolicyFor(

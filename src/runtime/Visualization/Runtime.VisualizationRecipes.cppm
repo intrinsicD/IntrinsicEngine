@@ -273,6 +273,9 @@ export namespace Extrinsic::Runtime
         bool RowsPrevalidated{false};
         std::uint32_t Stride{1u};
         std::uint32_t MaxGlyphs{0u};
+        // Draw only the first DrawRowCount rows (0: all), stride 1; Rows stay the whole buffer so
+        // a changed count reuses the uploaded rows (UI-081 glyph order prefixes).
+        std::uint32_t DrawRowCount{0u};
         glm::mat4 ObjectToWorld{1.0f};
         float Scale{1.0f};
         bool NormalizeLength{true};

@@ -2275,7 +2275,8 @@ namespace Extrinsic::Graphics
                                         {
                                             return candidate == VisualizationValueType::LabelUint32;
                                         });
-                        if (address != nullptr && address->ElementCount == packet.RowCount)
+                        // A prefix of a longer row buffer is valid: the pass reads only RowCount rows.
+                        if (address != nullptr && address->ElementCount >= packet.RowCount)
                         {
                             packet.RowBufferBDA = address->BufferBDA;
                         }

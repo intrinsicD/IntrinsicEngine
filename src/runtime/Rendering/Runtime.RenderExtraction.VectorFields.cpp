@@ -3,6 +3,7 @@
 // Explicit `VectorFieldVisualizationRecipe`s keep the copying recipe encoder.
 module;
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
@@ -72,6 +73,15 @@ namespace Extrinsic::Runtime
             return domain == GeometryElementDomain::MeshVertex ||
                    domain == GeometryElementDomain::GraphNode ||
                    domain == GeometryElementDomain::PointCloudPoint;
+        }
+
+        // Rows of a glyph order a layer draws (0: all).
+        [[nodiscard]] std::uint32_t OrderedDrawRowCount(
+            const std::size_t rows, const std::uint32_t stride, const std::uint32_t maxGlyphs) noexcept
+        {
+            const std::size_t strided = stride > 1u ? (rows + stride - 1u) / stride : rows;
+            const std::size_t count = maxGlyphs > 0u ? std::min<std::size_t>(strided, maxGlyphs) : strided;
+            return count >= rows ? 0u : static_cast<std::uint32_t>(count);
         }
 
         [[nodiscard]] GeometryElementDomain PositionDomainFor(
@@ -443,6 +453,68 @@ namespace Extrinsic::Runtime
         }
     }
 
+    namespace
+    {
+        // The domain's glyph order (UI-081) restricted to the anchor cache's live rows; nullptr when
+        // the domain has no valid order (the layer falls back to its stride).
+        template <typename EntityCache>
+        [[nodiscard]] const typename decltype(EntityCache::Orders)::value_type* EnsureOrderCache(
+            EntityCache& entityCache,
+            const Geometry::PropertySet& properties,
+            const GeometryElementDomain domain,
+            const std::uint64_t anchorStamp,
+            const std::span<const std::uint32_t> liveRows,
+            const bool allLive,
+            const std::uint64_t frame)
+        {
+            using OrderCache = typename decltype(entityCache.Orders)::value_type;
+            // No rank property, no cache: a domain without an order costs nothing.
+            if (!properties.Exists(GeometryGlyphOrderPropertyName(domain)))
+                return nullptr;
+            // The anchor stamp already moves with the element count and the deletion mask.
+            const Geometry::PropertyRevision revision = RevisionOf(&properties, GeometryGlyphOrderPropertyName(domain));
+            OrderCache* cache = nullptr;
+            for (OrderCache& candidate : entityCache.Orders)
+            {
+                if (candidate.Domain == domain)
+                    cache = &candidate;
+            }
+            // Revision 0 is an unmodified or absent property: no identity to key on, so rebuild.
+            if (cache != nullptr && revision != 0u && cache->Revision == revision && cache->AnchorStamp == anchorStamp)
+            {
+                cache->LastUsedFrame = frame;
+                return cache->Rows.empty() ? nullptr : cache;
+            }
+            if (cache == nullptr)
+            {
+                entityCache.Orders.push_back(OrderCache{.Domain = domain});
+                cache = &entityCache.Orders.back();
+            }
+            cache->Revision = revision;
+            cache->AnchorStamp = anchorStamp;
+            cache->LastUsedFrame = frame;
+            cache->Rows.clear();
+            if (std::optional<std::vector<std::uint32_t>> sorted = SortGeometryGlyphOrderRows(properties, domain))
+            {
+                cache->Rows = std::move(*sorted);
+                // Anchors without a finite position (face centers of degenerate faces) draw nothing.
+                if (!allLive)
+                {
+                    std::vector<bool> drawable(properties.Size(), false);
+                    for (const std::uint32_t row : liveRows)
+                        drawable[row] = true;
+                    std::erase_if(cache->Rows,
+                        [&](const std::uint32_t row)
+                        {
+                            return !drawable[row];
+                        });
+                }
+            }
+            cache->Stamp = NextVectorFieldCacheStamp();
+            return cache->Rows.empty() ? nullptr : cache;
+        }
+    }
+
     void RenderExtractionCache::State::AppendVectorFieldLayers(
         entt::registry& registry,
         const entt::entity entity,
@@ -523,9 +595,16 @@ namespace Extrinsic::Runtime
                 ? properties->Get<glm::vec3>(request.Property).Span()
                 : std::span<const glm::vec3>{payload->Sanitized};
 
+            // A valid glyph order draws a prefix instead of every n-th row: as many rows as the
+            // stride would (ceil(L / Stride), so older layers keep their count), at most MaxGlyphs.
+            const auto* order = EnsureOrderCache(
+                entityCache, *properties, request.Domain, anchors->Stamp, anchors->LiveRows, anchors->AllLive, frame);
+            const bool ordered = order != nullptr;
+            if (ordered)
+                ++stats.VectorFieldOrderedLayerCount;
+
             VisualizationEncodingDiagnostics appendDiagnostics{};
-            const VisualizationRecipeStatus status = AppendVectorFieldPacket(
-                m_VisualizationState.Batch,
+            const VisualizationRecipeStatus status = AppendVectorFieldPacket(m_VisualizationState.Batch,
                 VectorFieldPacketInputs{
                     .Name = BuildKey(stableId, "vector", request.Domain, request.Name),
                     .Domain = ToAttributeDomain(request.Domain),
@@ -536,17 +615,19 @@ namespace Extrinsic::Runtime
                     .VectorKey = BuildKey(stableId, "vector.value", request.Domain, request.Property),
                     .Vectors = vectorValues,
                     .VectorStamp = payload->Stamp,
-                    .RowKey = anchors->AllLive
-                        ? std::string{}
-                        : BuildKey(stableId, "vector.rows", request.Domain, {}),
-                    .Rows = anchors->AllLive
-                        ? std::span<const std::uint32_t>{}
-                        : std::span<const std::uint32_t>{anchors->LiveRows},
-                    .RowStamp = anchors->Stamp,
+                    .RowKey = ordered      ? BuildKey(stableId, "vector.order", request.Domain, {})
+                        : anchors->AllLive ? std::string{}
+                                           : BuildKey(stableId, "vector.rows", request.Domain, {}),
+                    .Rows = ordered        ? std::span<const std::uint32_t>{order->Rows}
+                        : anchors->AllLive ? std::span<const std::uint32_t>{}
+                                           : std::span<const std::uint32_t>{anchors->LiveRows},
+                    .RowStamp = ordered ? order->Stamp : anchors->Stamp,
                     // Cache rows are produced from the element range at build.
                     .RowsPrevalidated = true,
-                    .Stride = request.Stride,
-                    .MaxGlyphs = request.MaxGlyphs,
+                    .Stride = ordered ? 1u : request.Stride,
+                    .MaxGlyphs = ordered ? 0u : request.MaxGlyphs,
+                    .DrawRowCount =
+                        ordered ? OrderedDrawRowCount(order->Rows.size(), request.Stride, request.MaxGlyphs) : 0u,
                     .ObjectToWorld = worldMatrix,
                     .Scale = request.Scale,
                     .NormalizeLength = request.Normalize,
@@ -573,8 +654,8 @@ namespace Extrinsic::Runtime
             VectorFieldEntityCache& cache = it->second;
             if (cache.LastUsedFrame != frame)
             {
-                stats.VectorFieldCacheReleases += static_cast<std::uint32_t>(
-                    cache.Anchors.size() + cache.Payloads.size());
+                stats.VectorFieldCacheReleases +=
+                    static_cast<std::uint32_t>(cache.Anchors.size() + cache.Payloads.size() + cache.Orders.size());
                 it = m_VectorFieldCaches.erase(it);
                 continue;
             }
@@ -588,6 +669,13 @@ namespace Extrinsic::Runtime
                 stats.VectorFieldCacheReleases += unused ? 1u : 0u;
                 return unused;
             });
+            std::erase_if(cache.Orders,
+                [&](const VectorFieldOrderCache& order)
+                {
+                    const bool unused = order.LastUsedFrame != frame;
+                    stats.VectorFieldCacheReleases += unused ? 1u : 0u;
+                    return unused;
+                });
             ++it;
         }
         ++m_VectorFieldFrame;

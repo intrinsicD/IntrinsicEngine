@@ -514,3 +514,57 @@ TEST(RuntimeVectorFieldExtraction, AnchorsFollowABoundPositionSource)
     EXPECT_EQ(fixture.Read<glm::vec3>(vertex->PositionBufferBDA), canonical);
     EXPECT_EQ(fixture.Read<glm::vec3>(face->PositionBufferBDA)[0], (glm::vec3{0.5f, 0.5f, 0.0f}));
 }
+
+// UI-081: a valid glyph rank on the domain makes its layers draw the first MaxGlyphs rows of the
+// rank-sorted order; an invalid rank falls back to the stride.
+TEST(RuntimeVectorFieldExtraction, AValidGlyphOrderDrawsARankSortedPrefix)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    auto& vertices = fixture.Scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<float>("v:glyph_rank").Vector() = {3.0f, 0.0f, 4.0f, 1.0f, 2.0f};
+    auto layer = Layer(D::MeshVertex, "v:dir");
+    layer.MaxGlyphs = 2u;
+    Recipe(fixture.Scene, entity).VectorFields = {layer};
+
+    const auto ordered = fixture.Extract();
+    EXPECT_EQ(ordered.Stats.VectorFieldOrderedLayerCount, 1u);
+    const auto* packet = FindPacket(ordered.World, ":v:dir");
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(packet->RowCount, 2u);
+    EXPECT_EQ(packet->RowStride, 1u);
+    EXPECT_EQ(Graphics::VectorFieldGlyphCount(*packet), 2u);
+    EXPECT_EQ(fixture.Read<std::uint32_t>(packet->RowBufferBDA), (std::vector<std::uint32_t>{1u, 3u, 4u, 0u, 2u}));
+
+    vertices.Get<float>("v:glyph_rank").Vector()[0] = 0.0f; // duplicate rank: stale order
+    const auto strided = fixture.Extract();
+    EXPECT_EQ(strided.Stats.VectorFieldOrderedLayerCount, 0u);
+    packet = FindPacket(strided.World, ":v:dir");
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(packet->RowStride, 3u) << "5 rows capped at 2 glyphs widen the stride again";
+
+    // An older layer's stride keeps its arrow count on the order: ceil(5 / 2) = 3 rows.
+    vertices.Get<float>("v:glyph_rank").Vector()[0] = 3.0f;
+    layer.Stride = 2u;
+    layer.MaxGlyphs = 0u;
+    Recipe(fixture.Scene, entity).VectorFields = {layer};
+    const auto legacy = fixture.Extract();
+    EXPECT_EQ(legacy.Stats.VectorFieldOrderedLayerCount, 1u);
+    packet = FindPacket(legacy.World, ":v:dir");
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(packet->RowCount, 3u);
+    EXPECT_EQ(packet->RowStride, 1u);
+
+    // An anchor without a finite position (rank 0's row) leaves the order and draws nothing.
+    vertices.Get<glm::vec3>(GS::PropertyNames::kPosition).Vector()[1] =
+        glm::vec3{std::numeric_limits<float>::quiet_NaN()};
+    layer.Stride = 1u;
+    layer.MaxGlyphs = 2u;
+    Recipe(fixture.Scene, entity).VectorFields = {layer};
+    const auto nonFinite = fixture.Extract();
+    EXPECT_EQ(nonFinite.Stats.VectorFieldOrderedLayerCount, 1u);
+    packet = FindPacket(nonFinite.World, ":v:dir");
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(packet->RowCount, 2u);
+    EXPECT_EQ(fixture.Read<std::uint32_t>(packet->RowBufferBDA), (std::vector<std::uint32_t>{3u, 4u, 0u, 2u}));
+}

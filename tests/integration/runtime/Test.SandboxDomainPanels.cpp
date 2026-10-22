@@ -643,6 +643,120 @@ TEST(SandboxDomainPanels, AppearanceCheckboxesCanEnableAndReenableEverySupported
     }
 }
 
+// UI-081: Compute arrow order publishes the domain's glyph rank, after which the layer offers the
+// Arrows slider instead of every n-th element; the slider writes the count (all = 0) and stride 1.
+TEST(SandboxDomainPanels, ComputeArrowOrderSwitchesTheLayerToTheArrowsSlider)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::PointCloud::Cloud cloud;
+    for (int i = 0; i < 40; ++i)
+        (void)cloud.AddPoint({float(i % 8), float(i / 8), 0.0f});
+    GS::PopulateFromCloud(raw, entity, cloud);
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:dir", glm::vec3{0.0f, 0.0f, 1.0f});
+    raw.emplace<Runtime::GeometryPresentationRecipe>(entity).VectorFields = {
+        Runtime::GeometryVectorFieldLayerRecipe{.Vector = {.Domain = Runtime::GeometryElementDomain::PointCloudPoint,
+                                                    .Name = "v:dir",
+                                                    .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .Stride = 4u}};
+    const auto layer = [&]
+    {
+        return raw.get<Runtime::GeometryPresentationRecipe>(entity).VectorFields.at(0);
+    };
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+    const auto& vertices = std::as_const(raw.get<GS::Vertices>(entity).Properties);
+
+    int frame = 0;
+    int step = 0;
+    driver->OnFrame = [&](Runtime::Engine& kernel)
+    {
+        ++frame;
+        auto* window = ImGui::FindWindowByName("Appearance");
+        if (frame < 3)
+            return;
+        if (window == nullptr || frame > 200)
+        {
+            ADD_FAILURE() << "Appearance automation stalled at step " << step;
+            kernel.RequestExit();
+            return;
+        }
+        ImGui::SetWindowSize(window, ImVec2{600.0f, 1100.0f});
+        if (frame % 3 != 0)
+            return;
+        const ImGuiID section = ImHashStr("vector-fields", 0, window->ID);
+        const std::string rowId =
+            std::string(Runtime::DebugNameForEditorVectorFieldDomain(Runtime::GeometryElementDomain::PointCloudPoint)) +
+            "v:dir";
+        const ImGuiID arrows = ImHashStr("Arrows", 0, ImHashStr(rowId.c_str(), 0, section));
+        const auto typeArrows = [&]
+        {
+            ImGui::ActivateItemByID(arrows);
+            ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+        };
+        switch (step)
+        {
+        case 0:
+            ImGui::FocusWindow(window);
+            window->DC.StateStorage->SetInt(ImHashStr("Vector fields", 0, window->ID), 1);
+            break;
+        case 1:
+            EXPECT_FALSE(vertices.Exists("v:glyph_rank"));
+            ImGui::ActivateItemByID(arrows); // no order yet: the stride inputs are drawn instead
+            break;
+        case 2:
+            EXPECT_NE(ImGui::GetCurrentContext()->ActiveId, arrows) << "no Arrows slider without an order";
+            ImGui::ActivateItemByID(ImHashStr("Compute arrow order", 0, section));
+            break;
+        case 3:
+            EXPECT_TRUE(Runtime::SortGeometryGlyphOrderRows(vertices, Runtime::GeometryElementDomain::PointCloudPoint))
+                << "the button publishes a valid order";
+            typeArrows();
+            break;
+        case 4:
+            EXPECT_EQ(ImGui::GetCurrentContext()->ActiveId, arrows) << "the layer now offers the Arrows slider";
+            ImGui::GetIO().AddInputCharactersUTF8("7");
+            break;
+        case 5: ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true); break;
+        case 6:
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+            EXPECT_EQ(layer().MaxGlyphs, 7u);
+            EXPECT_EQ(layer().Stride, 1u) << "the slider replaces the old stride";
+            typeArrows();
+            break;
+        case 7: ImGui::GetIO().AddInputCharactersUTF8("40"); break;
+        case 8: ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true); break;
+        case 9:
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+            EXPECT_EQ(layer().MaxGlyphs, 0u) << "every live element means all arrows";
+            kernel.RequestExit();
+            break;
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 10);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
 // UI automation for the Appearance-level Vector fields section: domain first,
 // then a vec3 property, then edit and close the field. The mesh has no visible
 // lane, which the section must not depend on.

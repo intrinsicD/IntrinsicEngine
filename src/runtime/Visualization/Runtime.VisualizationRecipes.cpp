@@ -1445,6 +1445,7 @@ namespace Extrinsic::Runtime
             : count;
         if (rowCount == 0u)
             return VisualizationRecipeStatus::EmptySource;
+        const std::uint32_t drawRows = inputs.DrawRowCount > 0u ? std::min(inputs.DrawRowCount, rowCount) : rowCount;
 
         const auto alreadyAppended = [&batch](const std::string& key)
         {
@@ -1546,8 +1547,9 @@ namespace Extrinsic::Runtime
             .RowBufferSourceKey = hasRows ? inputs.RowKey : std::string{},
             .Domain = inputs.Domain,
             .ElementCount = count,
-            .RowCount = rowCount,
-            .RowStride = ResolveVectorFieldRowStride(rowCount, inputs.Stride, inputs.MaxGlyphs),
+            .RowCount = drawRows,
+            .RowStride =
+                inputs.DrawRowCount > 0u ? 1u : ResolveVectorFieldRowStride(rowCount, inputs.Stride, inputs.MaxGlyphs),
             .PositionBufferBDA = inputs.AnchorBDA,
             .VectorBufferBDA = inputs.VectorBDA,
             .ObjectToWorld = inputs.ObjectToWorld,

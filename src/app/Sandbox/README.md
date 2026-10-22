@@ -273,7 +273,14 @@ element domain, then a vec3 property, and draws it as arrows; each field has
 visibility, normalized/raw length, width, color, depth test and sampling
 controls and a close button, all through the undoable
 `ApplyEditorGeometryVectorFieldCommand` that Geometry Visualization's
-`Vector field` action also uses. Fields are saved with the scene. `Sandbox.Editor.DomainPanels` registers the one Appearance window and the Properties and Selection
+`Vector field` action also uses. Fields are saved with the scene. **Compute arrow order**
+(UI-081) orders the selected domain's live elements with the **Arrow order method** (farthest point
+by default) on their displayed anchors (vertex, node or point positions, edge midpoints, face
+centers): the first 65536 by the method, the rest after them in row order, stored in the undoable
+`v:`/`e:`/`f:glyph_rank` property. While that order is valid, every field on the domain has an
+**Arrows** slider that draws the first N elements of it, so fewer arrows stay evenly spread.
+Adding or deleting elements makes the order stale: the fields fall back to every n-th element
+until it is recomputed; moving positions does not, recompute after large moves. `Sandbox.Editor.DomainPanels` registers the one Appearance window and the Properties and Selection
 windows for Mesh, Graph, and PointCloud. It owns their menu paths, lazy per-frame model
 cache, texture-bake and property-widget draft state, and
 result presentation. K-Means and Progressive Poisson command/config/result

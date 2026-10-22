@@ -398,10 +398,23 @@ namespace Extrinsic::Runtime
             std::uint64_t LastUsedFrame{0u};
         };
 
+        // The domain's live anchor rows sorted by its UI-081 glyph rank (empty Rows: no valid
+        // order); rebuilt when the rank or the anchors (count, deletion mask) change.
+        struct VectorFieldOrderCache
+        {
+            GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+            Geometry::PropertyRevision Revision{0u};
+            std::uint64_t AnchorStamp{0u};
+            std::vector<std::uint32_t> Rows{};
+            std::uint64_t Stamp{0u};
+            std::uint64_t LastUsedFrame{0u};
+        };
+
         struct VectorFieldEntityCache
         {
             std::vector<VectorFieldAnchorCache> Anchors{};
             std::vector<VectorFieldPayloadCache> Payloads{};
+            std::vector<VectorFieldOrderCache> Orders{};
             std::uint64_t LastUsedFrame{0u};
         };
 

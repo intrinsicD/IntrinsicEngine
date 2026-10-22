@@ -20,6 +20,11 @@ import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.PointSamplingOperations;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Geometry.HalfedgeMesh;
+import Geometry.PointSampling;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.WorldHandle;
@@ -714,4 +719,131 @@ TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFir
         EXPECT_EQ(snapshot.Result.SubsampleTargetBackend, device ? "gpu_vulkan_compute" : "cpu_reference");
         EXPECT_EQ(snapshot.Result.SubsampleBackendDiagnostic.empty(), device) << snapshot.Result.SubsampleBackendDiagnostic;
     }
+}
+
+// UI-081: the arrow order ranks every live element of a mesh domain, starts with the method's
+// order (farthest point by default), is undoable, and goes stale when elements change.
+TEST(PointSamplingOperations, GlyphOrderRanksEveryLiveElementOfEachMeshDomain)
+{
+    Scene s;
+    const auto entity = s.Registry.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    std::vector<Geometry::VertexHandle> v;
+    for (int j = 0; j < 6; ++j)
+        for (int i = 0; i < 6; ++i)
+            v.push_back(mesh.AddVertex({float(i), float(j), 0.1f * float(i * j)}));
+    for (int j = 0; j + 1 < 6; ++j)
+        for (int i = 0; i + 1 < 6; ++i)
+            ASSERT_TRUE(mesh.AddQuad(v[j * 6 + i], v[j * 6 + i + 1], v[(j + 1) * 6 + i + 1], v[(j + 1) * 6 + i]));
+    GS::PopulateFromMesh(s.Registry.Raw(), entity, mesh);
+    for (const D domain : {D::MeshVertex, D::MeshEdge, D::MeshFace})
+    {
+        SCOPED_TRACE(std::string(R::GeometryGlyphOrderPropertyName(domain)));
+        const auto result =
+            R::ApplyEditorGlyphOrderCommand(s.Commands(), {.StableEntityId = Id(entity), .Domain = domain});
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        const auto* properties = domain == D::MeshVertex ? &s.Registry.Raw().get<GS::Vertices>(entity).Properties
+            : domain == D::MeshEdge                      ? &s.Registry.Raw().get<GS::Edges>(entity).Properties
+                                                         : &s.Registry.Raw().get<GS::Faces>(entity).Properties;
+        const auto rows = R::SortGeometryGlyphOrderRows(*properties, domain);
+        ASSERT_TRUE(rows.has_value());
+        EXPECT_EQ(rows->size(), properties->Size());
+        EXPECT_EQ(result.LiveCount, properties->Size());
+        if (domain == D::MeshVertex)
+        {
+            const auto positions = std::as_const(*properties).Get<glm::vec3>("v:position").Vector();
+            const auto expected = Geometry::PointSampling::Order(std::span<const glm::vec3>(positions),
+                Geometry::PointSampling::Params{.Method = Geometry::PointSampling::Method::FarthestPoint},
+                positions.size());
+            EXPECT_EQ(*rows, expected.Order) << "vertex rows follow the farthest-point order";
+        }
+    }
+    const auto& vertices = std::as_const(s.Registry.Raw().get<GS::Vertices>(entity).Properties);
+    ASSERT_TRUE(s.History.Undo().Succeeded());
+    ASSERT_TRUE(s.History.Undo().Succeeded());
+    ASSERT_TRUE(s.History.Undo().Succeeded());
+    EXPECT_FALSE(vertices.Exists("v:glyph_rank"));
+    EXPECT_FALSE(std::as_const(s.Registry.Raw().get<GS::Faces>(entity).Properties).Exists("f:glyph_rank"));
+}
+
+TEST(PointSamplingOperations, GlyphOrderSkipsDeletedRowsAndGoesStaleWithNewElements)
+{
+    Scene s;
+    const auto cloud = MakeCloud(s, 50);
+    auto& vertices = s.Registry.Raw().get<GS::Vertices>(cloud).Properties;
+    auto deleted = vertices.GetOrAdd<bool>("v:deleted", false);
+    deleted[7] = true;
+    const auto result =
+        R::ApplyEditorGlyphOrderCommand(s.Commands(), {.StableEntityId = Id(cloud), .Domain = D::PointCloudPoint});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.LiveCount, 49u);
+    EXPECT_EQ(std::as_const(vertices).Get<float>("v:glyph_rank")[7], -1.0f);
+    const auto rows = R::SortGeometryGlyphOrderRows(vertices, D::PointCloudPoint);
+    ASSERT_TRUE(rows.has_value());
+    EXPECT_EQ(rows->size(), 49u);
+    EXPECT_EQ(std::ranges::find(*rows, 7u), rows->end());
+    // Ranks must be exactly 0..L-1 over the live rows.
+    auto ranks = vertices.Get<float>("v:glyph_rank");
+    const float kept = ranks[0];
+    ranks[0] = ranks[1];
+    EXPECT_FALSE(R::SortGeometryGlyphOrderRows(vertices, D::PointCloudPoint)) << "duplicate rank";
+    ranks[0] = kept + 0.5f;
+    EXPECT_FALSE(R::SortGeometryGlyphOrderRows(vertices, D::PointCloudPoint)) << "fractional rank";
+    EXPECT_EQ(R::CountGeometryGlyphOrderRows(vertices, D::PointCloudPoint), 0u) << "memo sees the rank edit";
+    ranks[0] = kept;
+    ASSERT_TRUE(R::SortGeometryGlyphOrderRows(vertices, D::PointCloudPoint));
+    EXPECT_EQ(R::CountGeometryGlyphOrderRows(vertices, D::PointCloudPoint), 49u);
+    // Deleting the first-ranked element leaves rank 48 among 48 live rows: stale.
+    deleted[rows->front()] = true;
+    EXPECT_FALSE(R::SortGeometryGlyphOrderRows(vertices, D::PointCloudPoint)) << "stale after a deletion";
+    EXPECT_EQ(R::CountGeometryGlyphOrderRows(vertices, D::PointCloudPoint), 0u) << "memo sees the deletion";
+    deleted[rows->front()] = false;
+    EXPECT_EQ(R::CountGeometryGlyphOrderRows(vertices, D::PointCloudPoint), 49u);
+    vertices.Resize(51u); // a new element arrives with the property default
+    EXPECT_FALSE(R::SortGeometryGlyphOrderRows(vertices, D::PointCloudPoint)) << "stale after an element change";
+    EXPECT_EQ(R::CountGeometryGlyphOrderRows(vertices, D::PointCloudPoint), 0u) << "memo sees the new element";
+}
+
+// A rank name already taken by another type is refused, not overwritten (and not dereferenced).
+TEST(PointSamplingOperations, GlyphOrderRefusesARankPropertyOfAnotherType)
+{
+    Scene s;
+    const auto cloud = MakeCloud(s, 20);
+    auto& vertices = s.Registry.Raw().get<GS::Vertices>(cloud).Properties;
+    (void)vertices.GetOrAdd<std::int32_t>("v:glyph_rank", 3);
+    const auto result =
+        R::ApplyEditorGlyphOrderCommand(s.Commands(), {.StableEntityId = Id(cloud), .Domain = D::PointCloudPoint});
+    EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters) << result.Message;
+    EXPECT_EQ(std::as_const(vertices).Get<std::int32_t>("v:glyph_rank")[0], 3);
+    EXPECT_EQ(R::CountGeometryGlyphOrderRows(vertices, D::PointCloudPoint), 0u);
+}
+
+// The order is computed where the arrows are drawn: on a bound Position source when it resolves.
+TEST(PointSamplingOperations, GlyphOrderUsesTheDisplayedPositions)
+{
+    Scene s;
+    const auto cloud = MakeCloud(s, 60);
+    auto& vertices = s.Registry.Raw().get<GS::Vertices>(cloud).Properties;
+    std::vector<glm::vec3> shown(60u);
+    for (std::size_t i = 0; i < shown.size(); ++i)
+        shown[i] = {float(i % 6u), float(i / 6u), 0.0f};
+    vertices.GetOrAdd<glm::vec3>("v:shown", glm::vec3{0.0f}).Vector() = shown;
+    s.Registry.Raw().emplace<R::VertexChannelBindingSet>(cloud,
+        R::VertexChannelBindingSet{
+            .Position = {
+                .Enabled = true, .Property = {D::PointCloudPoint, "v:shown", Geometry::PropertyValueKind::Vec3}}});
+    const auto result =
+        R::ApplyEditorGlyphOrderCommand(s.Commands(), {.StableEntityId = Id(cloud), .Domain = D::PointCloudPoint});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    const auto rows = R::SortGeometryGlyphOrderRows(vertices, D::PointCloudPoint);
+    ASSERT_TRUE(rows.has_value());
+    const auto fps = [](const std::vector<glm::vec3>& points)
+    {
+        return Geometry::PointSampling::Order(std::span<const glm::vec3>(points),
+            Geometry::PointSampling::Params{.Method = Geometry::PointSampling::Method::FarthestPoint},
+            points.size())
+            .Order;
+    };
+    EXPECT_EQ(*rows, fps(shown));
+    EXPECT_NE(*rows, fps(std::as_const(vertices).Get<glm::vec3>("v:position").Vector()));
 }
