@@ -10,7 +10,6 @@ closed when a completion assertion cannot be checked.
 from __future__ import annotations
 
 import argparse
-import contextlib
 import fcntl
 import hashlib
 import json
@@ -1086,21 +1085,28 @@ def record_command(args: argparse.Namespace) -> int:
         try:
             _atomic_write(path, payload)
         except OSError as exc:
-            # Unwritten captured output goes to its own stream instead of being lost;
-            # a stream on the same full volume must not hide the report below.
-            with contextlib.suppress(OSError):
-                for position, stream in ((0, sys.stdout), (1, sys.stderr)):
-                    if position >= index:
-                        stream.flush()
-                        stream.buffer.write(writes[position][1])
-                        stream.flush()
+            # Each unwritten log goes to its own stream instead of being lost; a stream
+            # on the same full volume must not hide the other log or the report below.
+            lost = []
+            for stream, (log, data) in list(zip((sys.stdout, sys.stderr), writes))[index:]:
+                try:
+                    stream.flush()
+                    stream.buffer.write(data)
+                    stream.flush()
+                except OSError:
+                    lost.append(relative_path(repo_root, log))
             kept = ", ".join(relative_path(repo_root, done) for done, _ in writes[:index])
+            printed = (
+                f"could not print {', '.join(lost)} either"
+                if lost
+                else "any unwritten log was printed above"
+            )
             raise ValueError(
                 f"incomplete command evidence for {args.label}: could not write "
                 f"{relative_path(repo_root, path)} ({exc}); the command exited "
-                f"{result.returncode}; kept {kept or 'nothing'}; any unwritten log was "
-                "printed above. This is not a receipt: restore headroom "
-                f"({HEADROOM_DOC}) and rerun under a new label"
+                f"{result.returncode}; kept {kept or 'nothing'}; {printed}. This is "
+                f"not a receipt: restore headroom ({HEADROOM_DOC}) and rerun under a "
+                "new label"
             ) from exc
     print(f"Wrote {relative_path(repo_root, receipt_path)} (exit {result.returncode}).")
     return result.returncode

@@ -77,10 +77,11 @@ the prior route intact. `tools/ci/run_source_coverage.py` already reports
   stay. Any unwritten log is printed to its own stream, and the tool exits 2
   with `incomplete command evidence for <label>: could not write <path>
   (<err>); the command exited <rc>; kept <files|nothing>; ... This is not a
-  receipt`. No receipt is ever written without both logs. If the tool's own
-  stdout is also unwritable, the dump is skipped and the message still reaches
-  stderr; Python's failed final flush then makes the exit 120, still nonzero
-  (ad hoc check, `stdout-on-full-volume-check.log`).
+  receipt`. No receipt is ever written without both logs. Each log is printed
+  under its own `OSError` guard, so an unwritable tool stdout cannot drop the
+  captured stderr; a log that cannot be printed either is named in the message
+  (`could not print <log> either`) instead of claiming it was printed. Python's
+  failed final flush on that stdout then makes the exit 120, still nonzero.
 - Docs: canonical [Disk headroom](../../../docs/build-troubleshooting.md#disk-headroom)
   section (manual `df` check, the floor and its limits, a run with a failed
   write is never a pass, manual-only reclaim policy for inactive generated
@@ -113,6 +114,25 @@ the prior route intact. `tools/ci/run_source_coverage.py` already reports
   ([summary](../../../docs/results/keypoint_compute_verification_2026-09-14.md)).
   Those reruns predate this fix: they re-establish RUNTIME-247's evidence and
   do not exercise the preflight. No selector was weakened.
+
+**Fix round 1 (both independent reviews: one stdout failure skipped the stderr dump).**
+- Regression `test_unprintable_stdout_does_not_drop_captured_stderr`: every
+  write fails with ENOSPC, the tool's stdout raises ENOSPC, its stderr is
+  writable. Predictions written beforehand: the child's stderr reaches the tool's
+  stderr byte for byte, the message says `exited 0` and
+  `could not print .../lost.stdout.log`, and does not say `printed above`. On f8eddf657 the test failed
+  (`b'' != b'CHILD DIAGNOSTIC\n'`); after the fix the full suite passes,
+  42 tests OK. Mutation: dropping the lost-log report makes the message
+  assertion fail; code restored.
+- End-to-end double fault (tool stdout redirected to a file under
+  RLIMIT_FSIZE=256 B, stderr a pipe, the command prints 4000 B to stdout and a
+  stderr marker): f8eddf657 gives exit 120, marker lost, message says
+  "printed above"; after the fix it gives exit 120, marker kept, and the
+  message names the unprinted stdout log, with no traceback.
+- Dropped the test's redundant `SIGXFSZ` ignore. CPython already ignores it
+  at startup, and the suite still passes without it.
+- Untested by design: the stderr log failing after the stdout log was
+  written (index 1). It runs the same loop as the tested cases.
 
 **What remains.**
 - Tooling detection covers only `record-command`. Direct `cmake --build` /

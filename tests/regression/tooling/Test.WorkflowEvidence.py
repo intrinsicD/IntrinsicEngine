@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import contextlib
+import errno
 import hashlib
 import importlib.util
 import io
 import json
 import os
 import resource
-import signal
 import subprocess
 import sys
 import tempfile
@@ -1001,7 +1001,6 @@ def record_with_write_limit(
     """Writes past 256 bytes fail with EFBIG; no volume is filled, no mount needed."""
 
     def limit() -> None:
-        signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
         resource.setrlimit(resource.RLIMIT_FSIZE, (256, 256))
 
     return subprocess.run(
@@ -1085,6 +1084,33 @@ class RecordCommandResourceTests(unittest.TestCase):
             self.assertIn("incomplete command evidence", result.stderr)
             self.assertIn("kept nothing", result.stderr)
             self.assertEqual(listing(commands), [])
+
+    def test_unprintable_stdout_does_not_drop_captured_stderr(self) -> None:
+        tool = load_tool()
+        enospc = OSError(errno.ENOSPC, "No space left on device")
+        full = mock.Mock()
+        full.buffer.write.side_effect = enospc
+        err = SimpleNamespace(flush=lambda: None, buffer=io.BytesIO())
+        child = "import sys; print('out'); print('CHILD DIAGNOSTIC', file=sys.stderr)"
+        with tempfile.TemporaryDirectory() as tmp:
+            Fixture(Path(tmp))
+            args = tool.build_parser().parse_args(
+                ["record-command", "--root", tmp, "--task-id", "TEST-001"]
+                + ["--label", "lost", "--min-free-gib", "0", "--"]
+                + [sys.executable, "-c", child]
+            )
+            with (
+                mock.patch.object(tool, "_atomic_write", side_effect=enospc),
+                mock.patch.object(tool.sys, "stdout", full),
+                mock.patch.object(tool.sys, "stderr", err),
+                self.assertRaises(ValueError) as raised,
+            ):
+                tool.record_command(args)
+        self.assertEqual(err.buffer.getvalue(), b"CHILD DIAGNOSTIC\n")
+        message = str(raised.exception)
+        self.assertIn("exited 0", message)
+        self.assertIn("could not print tasks/evidence/TEST-001/commands/lost.stdout.log", message)
+        self.assertNotIn("printed above", message)
 
 
 if __name__ == "__main__":
