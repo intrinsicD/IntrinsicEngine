@@ -21,6 +21,7 @@ picking backlog work; theme priorities and rationale live in
 - `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/active/UI-079-imguizmo-hidpi-operational-run.md)
 - `UI-081` — Evenly spread vector-field glyphs from a progressive element order (tasks/active/UI-081-vector-field-even-glyph-order.md)
 - `UI-082` — Entity bounding boxes, large-model camera framing and bounds-center gizmo pivot (tasks/active/UI-082-entity-bounds-camera-framing-gizmo-pivot.md)
+- `UI-083` — Grouped processing menus and per-primitive Appearance attributes (tasks/active/UI-083-processing-menu-groups-and-per-primitive-appearance.md)
 
 ## Theme B — Rendering modernization
 

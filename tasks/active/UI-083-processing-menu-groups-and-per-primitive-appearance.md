@@ -1,0 +1,421 @@
+---
+id: UI-083
+theme: J
+depends_on: [RUNTIME-315, UI-075, UI-081]
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: interactive session; evidence is the diff, tests and CI
+maturity_target: Operational
+contract_schema: 1
+contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, repo.source-documentation]
+---
+# UI-083 — Grouped processing menus and per-primitive Appearance attributes
+
+## Operator questions (verbatim, 2026-10-23)
+1. "please move UI/Mesh/Geodesics to Processing/Geodesics."
+2. "Also Group the processing methods into meaningful groups. This should be done for Point Cloud, Graph and Mesh and View"
+3. "Additionally in UI/View/Appearance: There are three Collapsing Headers for Vertices, Edges and Faces."
+4. "Vertices should let me control the attributes for rendering of the vertex primitive point cloud, so Position, Normal, Color (uniform color edit, varying property), PointSize (uniform edit, varying property)"
+5. "Edges should let me control the "attributes" for rendering of the edge primitive graph, so Position, Color (uniform color edit, varying property), Line Width (uniform edit, varying property)"
+6. "Faces should let me control the "attributes" for rendering of the Face primitive surface, so Position, Normal, Texcoords, Color (uniform color edit, varying property)"
+7. "The uniform color edits should only be active if the respective color combo box is set to Default. It should remember the last set color. Default is always grey white."
+8. "Vector field rendering should also let me choose : length (uniform edit, varying property), color (uniform color edit, varying property)"
+
+## Goal
+- Serves Framework24 convergence (theme J, P0): W5 "Inspect rendering and properties" (every
+  render attribute of every primitive reachable and controllable) and W1 discoverability (method
+  menus readable instead of one flat list of 25 entries).
+- Each Appearance section controls exactly the attributes of one render primitive: Vertices =
+  point lane, Edges = line lane, Faces = surface lane.
+- Shortest path: the binding table, overlay targets, uniform fields and vector-field layers
+  already exist (RUNTIME-315, UI-075, UI-050/UI-081). This task re-keys the existing table by
+  lane, splits the one structural Position/Normal stream per lane, and adds two optional
+  per-arrow inputs. No new binding model.
+
+## Operator decisions (2026-10-23)
+- Menu groups (nine, same names under every domain menu and under View > Processing; a domain
+  menu shows only the methods it registers):
+  Filtering & Smoothing, Normals, Features & Descriptors, Segmentation & Clustering,
+  Fields & Spectral, Geodesics, Sampling & Density, Remeshing & UV,
+  Reconstruction & Registration. View keeps its tool windows at the top level.
+- Position and Normal are **independent per primitive**: binding `smoothed_pos` as the point
+  lane's Position does not move the surface or the edges. This reverses RUNTIME-315 slice 6
+  ("meshes viewed as points/edges use the entity's one binding set, no per-lane copies").
+  Why (operator, 2026-10-23): to compare original and processed positions on one entity
+  without creating another, for example to show the original point cloud and the mesh at the
+  new positions.
+- Saved scenes keep loading after slice 3a (operator, 2026-10-23). Slice 3a keeps the existing
+  binding key names; see its Scene keys.
+- Color Default: the imported color (material, texture, `v:color`) when present, else
+  grey-white. The starting uniform color is grey-white instead of orange.
+- Arrow length = uniform Length × per-arrow property value. Per-arrow color works like the
+  Color rows: a scalar goes through the colormap, vec3/vec4 is RGB(A).
+
+## Defaults chosen by the planning session (veto in review)
+- A uniform color/size/width field (and the arrow color) stays visible but greyed out while its
+  row is bound to a property, showing the remembered value; Default restores that value. The
+  arrow length is the exception: its uniform is the multiplier, so it stays enabled.
+- Grey-white is `(0.9, 0.9, 0.9, 1)`, one constant shared by every lane default.
+- Vector-field arrows keep their orange default color (grey-white arrows vanish on a
+  grey-white surface).
+- Window titles keep the `<Domain> / Processing / <Method>` pattern without the group name;
+  only the Geodesics window is renamed, to `Mesh / Processing / Virtual Source Propagation`.
+  Window ids are unchanged, so redirects, agent `open_window` and workspace layouts keep working.
+
+## Context (investigated 2026-10-23 at `f849aafb1`)
+- Menus: `DrawRegisteredWindowMenuTree` (`Sandbox.EditorShell.cpp:273-334`) builds submenus from
+  `MenuPath` in first-registration order. Processing windows are registered in
+  `Sandbox.MeshProcessingPanels.cpp:526-652` (canonical `view.*` windows under `{"View"}` plus
+  per-domain redirect entries under `{<Domain>, "Processing"}`) and `Sandbox.MethodPanels.cpp:603-650,
+  784` (K-Means, Progressive Poisson, Consolidation, Parameterize). Geodesics sits at
+  `{"Mesh", "Geodesics"}` (`Sandbox.MeshProcessingPanels.cpp:553-556`).
+- Appearance: `kAppearanceSections` (`Sandbox.DomainPanels.cpp:856`) maps Vertices/Edges/Faces to
+  the PointCloud/Graph/Mesh lane models; `DrawAttributeSourceTable`
+  (`Sandbox.PanelSupport.cpp:2494`) puts a row into a section by its **element domain**
+  (`SectionOfAttributeDomain`, `:2438`), while the row's Color target is a **lane**
+  (`ColorOverlayTargetFor`, `Runtime.VisualizationEditingOperations.AttributeBindings.cpp:43`).
+  Consequences today, for a mesh: the surface's Position/Normal/Texcoord rows and the `v:color`
+  row (which colors the surface) sit under Vertices; the point lane has no Color row of its
+  own; Edges has no Position row; a graph's node Color row colors the Edges lane.
+- Rules: `kRules` (`Runtime.VertexChannelBindings.cpp:68-91`) keyed by (attribute, element domain).
+  Structural streams live in the per-entity `VertexChannelBindingSet`; Color is the lane's
+  `VisualizationConfig`; size/width are `RenderPoints::SizeSource` / `RenderEdges::WidthSource`,
+  a `std::variant<float, std::string>` (`Graphics.Component.RenderGeometry.cppm:101,118`), so
+  binding a name drops the uniform value and Default restores 6 px / 1 px (UI-075 log).
+- Default colors: `VisualizationConfig::Color{1, 0.6, 0, 1}` (`Graphics.Component.VisualizationConfig.cppm:80`)
+  and the editor command defaults (`Runtime.VisualizationEditingOperations.cppm:415,502`) are orange.
+  Imported color reaches only the surface: `v:color` feeds the surface's structural color stream
+  (`Runtime.GeometryPlanBuilders.Mesh.cpp:215`), while points and edges on Default fall back to
+  white (`assets/shaders/forward/point.vert:26`). The recipe command derives the Color lane from
+  the property domain alone (`Runtime.VisualizationEditingOperations.Actions.cpp:1711`).
+- Uniform fields are hidden, not disabled, while bound (`DrawAppearanceLane`,
+  `Sandbox.DomainPanels.cpp:930-968`). The uniform color is already kept in the lane's
+  `VisualizationConfig::Color` across a bind (comment at `:457`); size/width are not.
+- Related open work: GRAPHICS-158 owns Vulkan evidence for rebound attributes (RUNTIME-315);
+  GRAPHICS-105 owns the material normal channel (texture vs vertex), orthogonal to the
+  structural per-lane normal here; UI-075 slices 1-4 are implemented (its Operational slice 5
+  is open).
+
+## Slice plan
+
+### Slice 1 — grouped processing menus (app only, ~150 lines)
+- One `constexpr` list of the nine group names in `Sandbox.PanelSupport.hpp`, used by both
+  panel files, so a misspelt group cannot create a second submenu.
+- Every processing registration gets `{<Domain>, "Processing", <Group>}`; canonical `view.*`
+  processing windows get `{"View", "Processing", <Group>}`. Geodesics moves to
+  `{"Mesh", "Processing", "Geodesics"}`. Vertex/Face Normals move from
+  `Processing/Vertices` and `Processing/Faces` into `Processing/Normals` as "Vertex Normals" and
+  "Face Normals"; Scalar Field Gradient moves from `Processing/Faces` into Fields & Spectral.
+- Group submenus follow the list order: `DrawRegisteredWindowMenuChildren` orders children that
+  appear in the list by list index and keeps first-registration order for all others.
+- Tests (`IntrinsicSandboxEditorIntegrationTests`): update the id → menu-path table in
+  `Test.SandboxEditorPresentation.cpp` (fails on the old paths); assert no processing window is a
+  direct leaf of `<Domain>/Processing` or of `View`; assert the child order of Mesh > Processing;
+  rename the Geodesics window lookups in `Test.SandboxProcessingPanels.cpp`.
+- Docs: `docs/architecture/primitive-selection.md:30`, `src/app/Sandbox/README.md` and any doc
+  naming the old paths (grep `Mesh / Geodesics`, `Processing / Vertices`, `Processing / Faces`).
+
+### Slice 2 — lane-keyed attribute rows, grey-white default, remembered uniforms (~600 lines)
+- `EditorAttributeBindingRow` gains `GeometryRenderLane Lane`; the model builds one row per
+  (lane, attribute) for every lane the entity draws, and each candidate carries its source
+  domain. `SectionOfAttributeDomain` is removed: the section is the lane. The rows and their
+  admissible source domains (the `kRules` table becomes lane × attribute × domain):
+
+  | Lane | Position | Normal | Texcoord | Color | Point size | Line width |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Surface (mesh) | vertex | vertex, corner | vertex, corner | vertex, face | – | – |
+  | Edges (mesh) | vertex | – | – | vertex, edge | – | edge |
+  | Edges (graph) | node | – | – | node, edge | – | edge |
+  | Points (mesh) | vertex | vertex | – | vertex | vertex | – |
+  | Points (graph) | node | node | – | node | node | – |
+  | Points (cloud) | point | point | – | point | point | – |
+
+  Corner sources stay surface-only: a point record is one per vertex, so several corner normals
+  cannot feed it (`Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp:162`).
+- `EditorAttributeBindingCommand` and the recipe command it calls carry the requested `Lane`
+  (today the lane is derived from the domain, `Actions.cpp:1711`); Color binds that lane's own
+  overlay target, so a mesh's point lane can be colored independently of its surface. The
+  shaders already index these combinations (points: vertex-indexed, `point.vert:102`; edges:
+  endpoint or edge index, `line.vert:72`). A pair outside the table is refused with a typed
+  reason.
+- Position/Normal rows are lane-keyed in the model and command but still write the shared
+  structural stream until slice 3a; their status says "shared by all primitives".
+- Color Default precedence, per lane (row on Default):
+  1. a uniform color the user picked for this lane (remembered across binds);
+  2. else the lane's imported color. Surface: the authored material/texture and `v:color` (as
+     today). Points and Edges: the canonical color property of their source domain (`v:color`
+     on mesh vertices, `p:color` on points). This is new; today they draw white.
+  3. else grey-white `kDefaultUniformColor`, which also replaces the orange starting value
+     (`VisualizationConfig::Color`, editor command defaults).
+  The existing Settings entry "Material / default" clears a picked uniform (back to 2/3) and
+  keeps its value for the next pick.
+- Remembered uniforms: `RenderPoints::SizeSource` / `RenderEdges::WidthSource` become a uniform
+  `float` plus an optional property name; scene codec, agent `set_render_hint`/`bind_attribute`,
+  extraction lowering and undo follow. Uniform fields are drawn disabled while bound.
+- Agent parity: `bind_attribute` takes `lane` (RUNTIME-316 surface), schema and tests updated.
+- Tests (red first):
+  - Model rows equal the table for a mesh, a graph and a point cloud, and an off-table pair is
+    refused (`Test.VertexChannelBindings.cpp`, `Test.SandboxEditorVisualization.cpp`).
+  - A Color bind on a mesh's Points lane changes the Points overlay and not the Surface.
+  - Default precedence through extracted lane colors, not component defaults: an imported
+    `v:color` mesh shows it on surface and points; picking a uniform overrides it; bind a
+    property, then Default, brings the picked uniform back; "Material / default" goes back to
+    the imported color; a mesh with no imported color draws grey-white on all three lanes
+    (`Test.RuntimeRenderExtraction.cpp`).
+  - Size 3.5 px → bind → Default restores 3.5 px.
+  - Faces, Edges and Vertices list exactly the operator's attributes, and a bound row's
+    uniform field is disabled (`Test.SandboxDomainPanels.cpp`).
+  - Scene round trip of a bound size keeps the uniform (`Test.RuntimeSceneSerialization.cpp`).
+  - Agent `bind_attribute` with `lane` (`Test.AgentOperations.cpp`, `Test.SandboxAgentServer.cpp`).
+- `gpu;vulkan` smoke: a mesh's point lane colored apart from its surface, and the grey-white
+  Default, read back.
+
+### Slice 3a — independent Position per primitive (~700 lines)
+Current state: a mesh already uploads three geometries (surface, edge view, vertex view; residency
+sub-keys at `Runtime.RenderExtraction.Geometry.cpp:991-995`), but each resolves the one entity
+binding (`ResolveDisplayedPositions(..., channelBindings)`,
+`Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp:141`). A graph's point lane reuses the line
+geometry (`EnsureGraphPointLaneInstance`, `Runtime.RenderExtraction.Geometry.cpp:1539-1564`).
+Every position reader in the shaders (forward, id, depth passes) reads its own instance's
+`geo.VertexBufferBDA`, so no GPU layout change is needed.
+- Spike first (contract fixture, no production change): a mesh with a bound points-lane
+  Position, picked through each ID pass and through the missing-hint CPU fallback, to pin the
+  lane rules below before the extraction work starts.
+- Storage: `VertexChannelBindingSet` holds explicit per-lane slots, `Surface{Position, Normal,
+  Texcoord}`, `Edges{Position}`, `Points{Position, Normal}`, replacing the entity-level slots.
+  An unset slot draws the canonical property; no lane inherits another lane's slot.
+- Scene keys (scene version stays 6; existing scene files keep loading):
+  - The bare keys `position`, `normal` and `texcoord` stay. Each names the entity's first lane,
+    in Surface, Edges, Points order, that has the attribute: mesh Surface for all three; graph
+    Edges for position and Points for normal; cloud Points.
+  - New keys `edges.position`, `points.position` and `points.normal` hold the other lanes. A
+    prefixed key for a lane that owns a bare key is rejected as a duplicate.
+  - An old file's binding therefore drives the main primitive only. It used to drive every
+    primitive, so on load the other primitives show their canonical positions.
+  - This is one key per slot, not a second reader. Renaming the bare keys would make the
+    strict binding parser (`Runtime.SceneSerialization.cpp:1646-1648`) fail every older scene
+    that has a bound attribute (the caller returns `InvalidFormat`, `:2892-2896`). The operator
+    asked to keep those scenes loading (2026-10-23).
+- `ResolveDisplayedPositions`, `ResolveEntityDisplayedPositions` and
+  `FindVertexChannelSourceBinding` take the lane; mesh views pass theirs and capture their own
+  revision (`Runtime.RenderExtraction.Geometry.cpp:223-237, 360-384`).
+- Graph: when the Points slot resolves to a different source than the Edges lane, upload a
+  points-only graph geometry under its own residency sub-key and bind it in
+  `EnsureGraphPointLaneInstance`; otherwise keep sharing (no extra memory in the common case).
+- Position fronts (GRAPHICS-156): extraction observes one front per distinct displayed source
+  instead of one per entity (`Runtime.RenderExtraction.cpp:511, 1674`). Each front's preview is
+  routed to, and cleared from, exactly the geometries that display that source, and the preview
+  flag and preview bounds become per geometry. A GPU method publishing a secondary lane's
+  property is therefore observed too.
+- Picking and highlights:
+  - Refinement of a GPU hit uses the positions of the lane that **produced** the hint. The
+    encoded id carries its primitive kind (`EncodedSelectionId` domain,
+    `Graphics.SelectionSystem.cppm:40-46`): face → Surface, edge → Edges, point → Points. The
+    depth-derived cursor and the compared positions are then in the same space. The result is a
+    canonical element id. Example: in vertex mode a Surface face hit picks the face's vertex
+    nearest the cursor in surface space (`Runtime.PrimitiveSelectionRefinement.cpp:412`), even
+    when the points lane draws that vertex elsewhere.
+  - The missing-hint CPU fallback (`Runtime.PrimitiveSelectionRefinement.cppm:92`,
+    `.cpp:835-838`) uses the issuing request's target lane. Vertex requests use Points when
+    drawn, else Surface (mesh) or Edges (graph). Edge requests use Edges when drawn, else
+    Surface. Face requests use Surface.
+  - Highlights choose the lane from each stored selection's domain by the same rule, not from
+    the current global mode, so existing selections keep their place across mode changes and
+    delayed readbacks (`Runtime.SelectionController.cppm:48`,
+    `Runtime.SceneInteractionModule.Selection.cpp:35-38`).
+  - The pick stamp records the position revision of every drawn lane. `BindingGeneration`
+    alone misses an edit to an already-bound secondary property
+    (`Runtime.SceneInteractionModule.cpp:168`).
+- Other consumers:
+  - Culling bounds are the union of the drawn lanes' displayed spans
+    (`Runtime.RenderExtraction.cpp:447-492`). UI-082's bounding box, **F** framing and gizmo
+    pivot use the same union.
+  - Vector-field anchors and glyph order use the entity's first lane (mesh Surface, graph
+    Edges, cloud Points), which is today's behavior.
+  - Shadow and depth passes are surface-only.
+- Persistence beyond the keys:
+  - `AnyVertexChannelBindingEnabled` counts every lane slot (`Actions.cpp:317-323`); otherwise
+    a set that holds only Points/Edges slots is deleted (`:1859-1862`).
+  - The asset signature (`AssetWorkflowRecipePolicies.cpp:168-185`) covers the lane slots.
+  - Agent rows and `bind_attribute` use the lane.
+- Tests, red first (`IntrinsicRuntimeContractTests`, `IntrinsicRuntimeGraphicsCpuTests`):
+  - A per-lane variant of `MeshGeometryExtraction.BoundPositionSourceFeedsTheSurfaceAndBothPrimitiveViews`:
+    binding the surface leaves both views canonical, and binding points leaves the surface
+    canonical.
+  - A graph points binding gets its own geometry; an unbound one keeps sharing.
+  - Culling bounds are the union.
+  - Two simultaneous position sources with independent preview accept and discard
+    (`Test.PositionPreviewExtraction.cpp`).
+  - A fixture with widely separated Surface and Points positions (`Test.PrimitiveSelectionRefinementWiring.cpp`,
+    `Test.PrimitiveSelection.cpp`):
+    - a Surface face hit in vertex mode returns the vertex nearest in surface space and
+      highlights it at its points-lane position;
+    - a Points hit refines against points-lane positions;
+    - a delayed pick after a secondary property edit is rejected as stale;
+    - the missing-hint fallback uses the request's target lane;
+    - a stored selection keeps its highlight lane after a mode change.
+  - A scene saved by the current build with a bound `position` loads and binds the main
+    primitive only. A duplicate bare/prefixed key is rejected.
+  - Round trip of the lane keys; a Points-only set survives (`Test.RuntimeSceneSerialization.cpp`,
+    `Test.SceneDocumentModule.cpp`).
+  - Agent `bind_attribute` with `lane`.
+- `gpu;vulkan` smoke: points drawn at a bound position while the surface stays canonical, and a
+  pick at the displayed point pixel returns the canonical vertex id.
+
+### Slice 3b — Normal on the point lane (~250 lines, new shader read)
+- `assets/shaders/forward/point.vert:103` sets the view normal to +Z for every point, so Surfel
+  discs face the camera even for point clouds that upload normals; `point.frag:25` already
+  handles surfel ellipticity and facing. Read `geo.NormalBufferBDA` when the geometry has one
+  and transform it to view space by the inverse transpose; a zero or non-finite normal keeps +Z.
+  Mesh vertex views and graph point lanes upload `NormalBytes` from the `Points.Normal` slot
+  (else `v:normal`) through `PrepareBoundVertexChannels`.
+- Visible effect: Surfel orientation and shading. Flat and Sphere ignore the normal, and the row
+  tooltip says so. The Edges lane gets no Normal row: lines are unlit and read no normal.
+- Tests:
+  - Extraction uploads points-lane normals for a mesh vertex view and a graph point lane.
+  - A non-uniformly scaled entity keeps surfels perpendicular to the transformed normal.
+  - A zero normal falls back to +Z.
+  - A `gpu;vulkan` readback shows an edge-on surfel for a normal perpendicular to the view.
+
+### Slice 4 — per-arrow length and color for vector fields (~750 lines)
+Current state:
+- Each arrow is one GPU instance (9 vertices) expanded in
+  `assets/shaders/visualization_vector_field.vert`.
+- Length, LengthMode and Color are uniform fields of the 128-byte
+  `VisualizationVectorFieldDrawRecord` (`Graphics.VisualizationOverlayUploadHelper.cppm:25-40`).
+- The 12 reserved bytes at offsets 116-127 hold one address at most (at 120). Two addresses
+  plus a range do not fit, so the record grows.
+- No agent operation reaches vector fields.
+
+Plan:
+- Spike first: prove a typed per-element buffer resolves by count through the existing packet
+  path (`Graphics.Renderer.cpp:2246-2283`) and that a not-yet-ready colormap index is observable.
+- Recipe (`Runtime.GeometryPresentation.cppm:177`):
+  - Optional `LengthProperty` and `ColorProperty` (`GeometryPropertyRef`, both on
+    `Vector.Domain`), plus `ColorMap`, `ColorAutoRange` and `ColorRangeMin/Max`.
+  - `ValidateGeometryVectorFieldLayers` accepts every scalar kind the Color rows accept (float,
+    double, signed/unsigned integer, bool) through the overlay's checked conversion
+    (`Runtime.VisualizationRecipes.cpp:591`), and Vec3/Vec4 for color.
+  - It also checks that the colormap is in range and that a manual range is finite with
+    min < max. The editor command resolves the named refs.
+- Extraction (`Runtime.RenderExtraction.VectorFields.cpp`):
+  - Resolve each ref by kind and count. A ref that no longer resolves falls back to the
+    uniform value with a counter and a layer status (the `Vector` pattern).
+  - A float payload cache keyed like the vector cache converts with the checked conversion.
+    It marks NaN, ±inf and overflowing values invalid as +inf (scalar uploads reject NaN,
+    `Graphics.VisualizationPackets.cpp:290-293`).
+  - The auto range comes from the overlay's `ComputeRange`
+    (`Runtime.VisualizationRecipes.cpp:237-310`, exported, not copied), run over valid samples
+    only. A constant range is widened as the overlay does. All samples invalid gives the uniform
+    length/color for the layer and a status line.
+  - A Vec3/Vec4 color with any non-finite component draws the uniform color for that arrow;
+    components are clamped to 0..1.
+- GPU:
+  - The record grows to 144 bytes: `ColormapID@116`, `LengthBDA@120`, `ColorBDA@128`,
+    `RangeMin@136`, `RangeMax@140`, plus two flag bits for the color kind.
+  - The C++ struct, its `static_assert`, the shader struct and
+    `Test.VisualizationOverlayPass.cpp:583` change together.
+  - The shader scales by `Scale * s` and draws no arrow for `s <= 0` or an invalid `s`. It reads
+    the property through the glyph row index, so the UI-081 order indirection applies.
+  - A scalar color samples the bindless colormap texture, as `point.vert` does. An invalid
+    sample or a not-yet-ready colormap draws the uniform color.
+- UI (`Sandbox.DomainPanels.cpp:609-696`):
+  - A Length row: the uniform field is labelled Scale and stays enabled while a property is
+    bound, because it multiplies.
+  - A Color row: the uniform color is disabled while bound; a scalar shows colormap, auto range
+    and min/max.
+  - The vector-field model gets its own candidate lists, so
+    `VectorFieldModelOffersExactlyTheVectorsTheCommandAccepts` stays valid.
+- Agent parity: one agent operation for vector-field layers (add/update/remove with the full
+  layer recipe) through the existing `ApplyEditorGeometryVectorFieldCommand`, in
+  `Runtime.AgentOperations.Editor.cpp`, with its schema. There is no new command layer.
+- Persistence: optional scene keys (absent = no property). Undo snapshots the whole recipe and
+  the recipe's `operator==` is defaulted, so both cover the new fields.
+- Tests, red first:
+  - Recipe validation and model candidates for every scalar kind
+    (`Test.VisualizationRecipes.cpp`, `Test.SandboxEditorVisualization.cpp`).
+  - Extraction (`Test.RuntimeVectorFieldExtraction.cpp`): resolve, overflow, mixed
+    invalid/valid samples, constant range, all invalid, a removed property falling back, and
+    rows read through the glyph order.
+  - Record layout (`Test.VisualizationOverlayPass.cpp`).
+  - Round trip (`Test.RuntimeSceneSerialization.cpp`).
+  - Panel rows (`Test.SandboxDomainPanels.cpp`).
+  - The agent operation matches the UI result (`Test.AgentOperations.cpp`,
+    `Test.SandboxAgentServer.cpp`).
+- `gpu;vulkan` smoke: two arrows with different property lengths and a scalar color at both
+  colormap ends, read back (extends `RuntimeSandboxAcceptanceGpuSmoke.VectorField*`).
+
+### Slice 5 — combined and live check
+- Run every slice's `gpu;vulkan` smoke together on the final tree. Then do a live Sandbox check
+  through the `intrinsic-sandbox` MCP: menus, the three sections on a mesh, a graph and a point
+  cloud, and a vector field with length and color properties. GRAPHICS-158 (rebound-attribute
+  Vulkan evidence) receives the per-lane cases if it is picked up first.
+
+### Order and checkpoints
+- Slices land in order 1 → 2 → 3a → 3b → 4 → 5. Each slice carries its own smoke. After each
+  slice the session stops and reports before starting the next (drift budget; the operator
+  asked to be consulted before the renderer slices). Every slice gets a ponytail review plus an
+  independent correctness review bound to its diff.
+
+## Acceptance criteria
+- [ ] Every processing method sits in one of the nine groups under Mesh, Graph and PointCloud
+      `> Processing` and under `View > Processing`; Geodesics is
+      `Mesh > Processing > Geodesics > Virtual Source Propagation`.
+- [ ] Vertices lists Position, Normal, Color, Point size; Edges lists Position, Color, Line width;
+      Faces lists Position, Normal, Texcoord, Color; each row binds its own primitive from the
+      source domains of the slice 2 table.
+- [ ] A uniform color/size/width edit is enabled only while its row is on Default and keeps its
+      last value across a bind and Default. Color Default follows the slice 2 precedence:
+      picked uniform, then imported color, then grey-white.
+- [ ] Binding a Position or Normal on one primitive leaves the other primitives unchanged;
+      position fronts, picking, highlights and bounds follow the slice 3a rules.
+- [ ] A vector-field layer takes an optional length property (length = uniform × value) and an
+      optional color property (scalar via colormap, vec3/vec4 as RGB), with the slice 4
+      invalid-value rules.
+- [ ] UI, agent tools and scene save/load reach the same commands; undo/redo is one step each.
+- [ ] Operational on Vulkan: each slice's `gpu;vulkan` smoke passes and the live Sandbox check is
+      recorded (or the remaining cases are handed to GRAPHICS-158 with a named owner).
+
+## Verification
+```bash
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 \
+  -R '^(SandboxEditorPresentation|SandboxEditorGeodesics|SandboxProcessingPanels|SandboxDomainPanels|SandboxAgentServer|VertexChannelBindings|SandboxEditorUi|AgentOperations|RuntimeSceneSerialization|SceneDocumentModule|RuntimeRenderExtraction|RuntimeVectorFieldExtraction|VisualizationRecipes|VisualizationOverlayPassContract|PositionPreviewExtraction|PrimitiveSelection|PrimitiveSelectionRefinementWiring|MeshGeometryExtraction|GraphGeometryExtraction|PointCloudGeometryExtraction)\.'
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+# Smokes (Vulkan host; one heavy build at a time):
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120 \
+  -R 'VectorField|PointLane|PerLane|VisualizationOverlay'
+```
+
+## Log
+- 2026-10-23: Plan counter-review (Claude author → Codex reviewer, `codex exec`, codex-cli
+  0.163.0, requested `gpt-6-astra` at `xhigh`, read-only sandbox; thread
+  `01a1685e-1f0a-73e3-adcf-cddf74bc8a5c`). Object: this note, sha256
+  `53004043a20e5a3745d3533ffc5c6ca6a4630410af57bcf6c3ef411b34491431`, base `f849aafb1`.
+  Recursion protection instruction-only: other MCP servers were not disabled. Verdict
+  "revise", with 7 blocking and 4 optional findings: per-lane Default precedence (B1),
+  per-source position fronts (B2), picking lane state and invalidation (B3), the lane × source
+  matrix (B4), vector-field scalar kinds and invalid values (B5), vector-field agent parity
+  (B6), and missing verification suites (B7). O1-O4 covered smoke placement and spikes,
+  explicit per-lane slots, Color combinations and the record reserve. All were folded into
+  this revision.
+- 2026-10-23: Delta round 2 (same thread, revision sha256 `e272084a…`). Verdict "revise":
+  B1, B2, B4-B7 and O1-O4 resolved. B3 was still blocking: the selection mode does not say which
+  lane a GPU hint came from, so a Surface hit could be compared against displaced points. Fix:
+  refinement uses the producing lane from the encoded id's domain, the fallback uses the
+  request's target lane, and highlights use the stored selection's domain, with a
+  separated-lane fixture. Optional: arrow length removed from the disabled-while-bound default.
+- 2026-10-23: Delta round 3 (same thread, revision sha256 `dc6e46e6…`). Verdict verbatim:
+  "approve. Still blocking: none. B3 is resolved at plan level: GPU-hit refinement uses the
+  producing lane, fallback uses the issuing request's target, and highlights use the stored
+  selection's domain." Implementation and runtime behavior are unverified.
+- 2026-10-23: Operator: saved scenes must keep loading. Slice 3a now keeps the bare binding
+  keys for each entity's main primitive and adds prefixed keys for the other lanes. This
+  replaces the round-1 O2 choice of renaming every key, which would have made older scenes with
+  a bound attribute fail to load. The change was not re-sent to the reviewer: it is the
+  operator's decision and narrows the codec change.
