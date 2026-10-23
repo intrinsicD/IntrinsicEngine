@@ -35,6 +35,7 @@ import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.Types;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.DiagnosticsStream;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.GpuPropertyBinding;
@@ -604,8 +605,13 @@ TEST(PointLBVHGpuSmoke, FramedKNearestReusesBuffersAndRejectsStaleTarget)
     auto app=std::make_unique<KnnBatchApp>();auto* run=app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
-    engine.Initialize();Shutdown shutdown{engine};engine.Run();
-    if (!engine.GetDevice().IsOperational()) GTEST_SKIP() << "Operational Vulkan unavailable";
+    engine.Initialize();Shutdown shutdown{engine};
+    // Bootstrap inputs are defined only for the promoted Vulkan device; skip before the framed wait.
+    const auto status=engine.Services().Find<Runtime::EditorDiagnosticsStream>()->ReadDeviceStatus();
+    if (status.ActualBackend!="vulkan") GTEST_SKIP() << status.FallbackReason;
+    const auto ready=Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+    if (!ready.LogicalDeviceReady || !ready.SwapchainReady || !ready.CommandSyncReady) GTEST_SKIP() << "Vulkan bootstrap unavailable";
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut);ASSERT_TRUE(run->Done);
     EXPECT_EQ(run->Stats.Builds,2);EXPECT_EQ(run->Stats.GpuBuilds,2);
 }
