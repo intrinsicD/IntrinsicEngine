@@ -1147,11 +1147,12 @@ TEST(SandboxEditorUi, CameraPoseCommandOrbitPoseKeepsTargetAsPivotAndReportsBoth
     EXPECT_NEAR(glm::length(pivot - target), 0.0f, 1e-3f) << "the orbit pivot is the requested target";
     EXPECT_NEAR(orbit->Radius(), 10.0f, 1e-3f);
 
-    // An orbit radius beyond the controller range is clamped and reported; the pivot stays Target.
+    // Large poses expand the orbit range and retain the requested position and pivot.
     const auto far = rig.Apply({.Mode = Runtime::EditorCameraPoseMode::Pose,
                                 .Position = {0, 0, 5000.0f}, .Target = {0, 0, 0}});
     EXPECT_EQ(far.Status, Runtime::EditorCommandStatus::Applied);
-    EXPECT_TRUE(far.PositionClamped);
+    EXPECT_FALSE(far.PositionClamped);
+    EXPECT_NEAR(orbit->Radius(), 5000.0f, 1e-2f);
     EXPECT_FALSE(far.UpIgnored);
     const auto clamped = rig.View();
     EXPECT_NEAR(glm::length(clamped.Position + clamped.Forward * orbit->Radius()), 0.0f, 1e-2f);
@@ -2554,4 +2555,26 @@ TEST(SandboxEditorUi, VectorFieldAddCreatesPresentationTransactionallyAndUndoRes
     EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshVertex, "v:position"), nullptr);
     ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
     EXPECT_TRUE(absent());
+}
+
+TEST(SandboxEditorUi, BoundsHintWorksWithoutGeometryAndSupportsUndo)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const auto entity = registry.Create();
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    const Runtime::EditorRenderHintCommand command{.StableEntityId = id, .SetBounds = true, .EnableBounds = true};
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(context, command), Runtime::EditorCommandStatus::Applied);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderBounds>(entity));
+    EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderBounds>(entity));
+    EXPECT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderBounds>(entity));
+    EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
+                  context, {.StableEntityId = id, .SetBounds = true, .EnableBounds = false}),
+        Runtime::EditorCommandStatus::Applied);
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderBounds>(entity));
 }

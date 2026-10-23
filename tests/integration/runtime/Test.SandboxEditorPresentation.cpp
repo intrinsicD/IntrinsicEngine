@@ -2152,7 +2152,7 @@ namespace
         Runtime::EditorCommandHistory* History{};
         Runtime::EngineConfigControl* Config{};
         Runtime::GizmoOrientation Orientation{Runtime::GizmoOrientation::Global};
-        Runtime::GizmoPivotMode Pivot{Runtime::GizmoPivotMode::WorldOrigins};
+        Runtime::GizmoPivotMode Pivot{Runtime::GizmoPivotMode::BoundsCenters};
 
         explicit GizmoFixture(
             const Core::Config::CameraControllerKind camera = Core::Config::CameraControllerKind::Orbit)
@@ -2748,9 +2748,6 @@ TEST(SandboxEditorGizmo, PivotAndLocalAxesFromTheMenuIncludingTheGroupFallback)
     f.EnableGizmo();
 
     // Bounds-center pivot: the gizmo sits at (0,0.5,0), not at the origin.
-    f.OpenGizmoMenu();
-    f.ClickMenuItem("Pivot at bounds centers");
-    f.Do([&] { f.Pivot = Runtime::GizmoPivotMode::BoundsCenters; });
     f.Wait();
     f.CenterDrag({40.0f, 0.0f});
     f.Then([&]
@@ -3568,4 +3565,40 @@ TEST(SandboxEditorPresentation, SceneFilePendingQueryObservesRuntimeJobAndAttach
     EXPECT_FALSE(Runtime::IsEditorSceneFilePending(frame.Commands, Runtime::JobToken{}));
     attachment.Detach();
     EXPECT_FALSE(Runtime::IsEditorSceneFilePending(frame.Commands, task));
+}
+
+TEST(SandboxEditorGizmo, BoundsMenuUpdatesAllEntitiesWithHierarchyClosed)
+{
+    GizmoFixture f;
+    const auto first = f.Select({0.0f, 0.0f, 0.0f});
+    const auto second = f.Select({1.0f, 0.0f, 0.0f});
+    f.Do(
+        [&]
+        {
+            EXPECT_TRUE(f.Shell.SetEditorWindowOpen("scene.hierarchy", false));
+        });
+    auto toggle = [&](const char* label)
+    {
+        f.Wait();
+        f.ClickItem("##MainMenuBar", "View", true, TestSupport::MenuBarScan, 200);
+        f.Wait();
+        f.ClickMenuItem("Bounding boxes");
+        f.Wait();
+        f.ClickItem("###Menu_01", label, false, TestSupport::WindowColumnScan, 150);
+    };
+    toggle("All on");
+    f.Then(
+        [&]
+        {
+            EXPECT_TRUE(f.Scene().Raw().all_of<Extrinsic::Graphics::Components::RenderBounds>(first));
+            EXPECT_TRUE(f.Scene().Raw().all_of<Extrinsic::Graphics::Components::RenderBounds>(second));
+        });
+    toggle("All off");
+    f.Then(
+        [&]
+        {
+            EXPECT_FALSE(f.Scene().Raw().all_of<Extrinsic::Graphics::Components::RenderBounds>(first));
+            EXPECT_FALSE(f.Scene().Raw().all_of<Extrinsic::Graphics::Components::RenderBounds>(second));
+        });
+    f.Engine->Run();
 }

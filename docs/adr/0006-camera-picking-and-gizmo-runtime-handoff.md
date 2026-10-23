@@ -125,8 +125,8 @@ one session:
   with mode, orientation, pivot policy and the start state; it writes nothing,
   and a second session is refused. Start world matrices `Wi0` are composed from
   local TRS along the parent chain, not read from the `WorldMatrix` cache.
-- **Pivot and basis.** Pivot is the mean of selected world origins (default) or
-  of world-bounds centers with origin fallback. The basis is world, a single
+- **Pivot and basis.** Pivot is the mean of selected world-bounds centers (default, with origin
+  fallback), or of world origins when bounds-center mode is disabled. The basis is world, a single
   entity's world rotation, or for groups the chordal mean of the selected world
   rotations (`Geometry::Rotation::ChordalMean`); an unavailable mean falls back
   to world with an explicit reason.

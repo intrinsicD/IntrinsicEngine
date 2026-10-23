@@ -183,6 +183,7 @@ namespace Extrinsic::Runtime
                     sourceRaw, destinationRaw, remap,
                     sourceEntity, destinationEntity);
 
+                CopySerializableTag<G::RenderBounds>(sourceRaw, destinationRaw, sourceEntity, destinationEntity);
                 CopySerializableComponent<G::RenderSurface>(
                     sourceRaw, destinationRaw,
                     sourceEntity, destinationEntity);

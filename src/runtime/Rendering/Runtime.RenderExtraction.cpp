@@ -57,6 +57,7 @@ import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.SpatialDebugVisualizers;
 import Extrinsic.RHI.Types;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.Runtime.GeometryPlanBuilders;
@@ -1469,6 +1470,31 @@ namespace Extrinsic::Runtime
                                       stats);
         }
 
+        m_BoundsDebugLines.clear();
+        const auto enabledBounds = registry.view<Graphics::Components::RenderBounds,
+            ECS::Components::Culling::World::Bounds,
+            ECS::Components::Transform::WorldMatrix>();
+        if (enabledBounds.begin() != enabledBounds.end())
+        {
+            std::vector<Graphics::SpatialDebugAabb> boxes;
+            for (const auto entity : enabledBounds)
+            {
+                const auto& matrix = registry.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix;
+                auto found = m_Renderables.find(StableEntityId(entity));
+                const auto bounds = found == m_Renderables.end()
+                    ? ExtractBounds(registry, entity, matrix)
+                    : ExtractDisplayedBounds(registry, entity, matrix, found->second);
+                boxes.push_back({glm::vec3{bounds.WorldAabbMin}, glm::vec3{bounds.WorldAabbMax}});
+            }
+            auto packets = Graphics::BuildSpatialDebugBoundsWireframes(
+                boxes, {.MaxLinePackets = std::numeric_limits<std::uint32_t>::max()});
+            m_BoundsDebugLines = std::move(packets.Lines);
+            if (m_SceneInteraction.World == world)
+                m_BoundsDebugLines.insert(m_BoundsDebugLines.end(),
+                    m_SceneInteraction.DebugLines.begin(),
+                    m_SceneInteraction.DebugLines.end());
+        }
+
         RetireMissingRenderables(m_LiveRenderableKeys, renderer, stats);
 
         FinalizeAndSubmitSnapshot(renderer,
@@ -2553,6 +2579,8 @@ namespace Extrinsic::Runtime
             batch.SelectionHasHovered =
                 m_SceneInteraction.HasHovered;
         }
+        if (!m_BoundsDebugLines.empty())
+            batch.DebugLines = m_BoundsDebugLines;
         renderer.SubmitRuntimeSnapshots(batch, runtimeSnapshotStorageSlot);
     }
 

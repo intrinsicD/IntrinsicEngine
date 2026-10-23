@@ -366,13 +366,26 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndMenu();
         }
 
-        void DrawPanelWindowMenu(
-            EditorWindowRegistry* windowRegistry,
-            const std::vector<EditorWindowMenuEntry>* registeredEntries)
+        void DrawPanelWindowMenu(EditorWindowRegistry* windowRegistry,
+            const std::vector<EditorWindowMenuEntry>* registeredEntries,
+            const SandboxEditorContext* context,
+            const EditorWorkspaceSnapshot* frame)
         {
             if (!ImGui::BeginMenu("View"))
                 return;
 
+            if (context != nullptr && frame != nullptr && ImGui::BeginMenu("Bounding boxes"))
+            {
+                const bool allOn = ImGui::MenuItem("All on");
+                const bool allOff = ImGui::MenuItem("All off");
+                if (allOn || allOff)
+                    for (const auto& row : BuildEditorWorkspaceSnapshot(context->SnapshotQueries).Hierarchy)
+                        (void)ApplyEditorRenderHintCommand(context->VisualizationCommands,
+                            EditorRenderHintCommand{
+                                .StableEntityId = row.StableEntityId, .SetBounds = true, .EnableBounds = allOn});
+                ImGui::TextDisabled("Individual entities: Inspector > Bounding box");
+                ImGui::EndMenu();
+            }
             if (windowRegistry != nullptr && registeredEntries != nullptr)
             {
                 std::vector<std::string> registeredPath{"View"};
@@ -418,7 +431,10 @@ namespace Extrinsic::Sandbox::Editor
             return ticket;
         }
 
-        std::uint64_t DrawMainMenuBar(EditorWindowRegistry* windowRegistry, Runtime::ViewCaptureModule* capture)
+        std::uint64_t DrawMainMenuBar(EditorWindowRegistry* windowRegistry,
+            Runtime::ViewCaptureModule* capture,
+            const SandboxEditorContext* context,
+            const EditorWorkspaceSnapshot* frame)
         {
             if (!ImGui::BeginMainMenuBar())
                 return 0u;
@@ -428,7 +444,7 @@ namespace Extrinsic::Sandbox::Editor
             const std::uint64_t captureTicket = DrawFileMenu(capture, windowRegistry, registeredEntries);
             const std::vector<EditorWindowMenuEntry>* registeredEntriesPtr =
                 windowRegistry != nullptr ? &registeredEntries : nullptr;
-            DrawPanelWindowMenu(windowRegistry, registeredEntriesPtr);
+            DrawPanelWindowMenu(windowRegistry, registeredEntriesPtr, context, frame);
             DrawDomainMenu(
                 EditorDomainWindowKind::PointCloud,
                 windowRegistry,
@@ -1101,6 +1117,12 @@ namespace Extrinsic::Sandbox::Editor
                     }
                     if (inspector.Transform.HasWorldTransform)
                         DrawVec3("World position", inspector.Transform.WorldPosition);
+                    bool showBounds = inspector.RenderHints.HasRenderBounds;
+                    if (ImGui::Checkbox("Bounding box", &showBounds) && context != nullptr)
+                        (void)ApplyEditorRenderHintCommand(context->VisualizationCommands,
+                            EditorRenderHintCommand{.StableEntityId = inspector.Entity.StableEntityId,
+                                .SetBounds = true,
+                                .EnableBounds = showBounds});
                     ImGui::Text("Render hints: surface=%s edges=%s points=%s",
                                 inspector.RenderHints.HasRenderSurface ? "yes" : "no",
                                 inspector.RenderHints.HasRenderEdges ? "yes" : "no",
@@ -2120,7 +2142,7 @@ namespace Extrinsic::Sandbox::Editor
             bool Enabled{false};
             GizmoMode Mode{GizmoMode::Translate};
             GizmoOrientation Orientation{GizmoOrientation::Global};
-            GizmoPivotMode Pivot{GizmoPivotMode::WorldOrigins};
+            GizmoPivotMode Pivot{GizmoPivotMode::BoundsCenters};
             std::optional<GizmoUiToken> Drag{};
             glm::mat4 Working{1.0f};
             GizmoSnapConfig Snap{}; // frozen at drag start
@@ -2396,7 +2418,8 @@ namespace Extrinsic::Sandbox::Editor
                     ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
                     ImGuizmo::BeginFrame();
                 }
-                if (const std::uint64_t ticket = DrawMainMenuBar(&Host->Windows(), ViewCapture))
+                if (const std::uint64_t ticket =
+                        DrawMainMenuBar(&Host->Windows(), ViewCapture, &*ActiveContext, &LastFrame))
                     UserCaptureTicket = ticket;
                 DrawGizmoMenu();
                 DrawScreenshotShortcutAndNotice();

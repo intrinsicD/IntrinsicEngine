@@ -65,7 +65,10 @@ namespace Extrinsic::Runtime
             const float safeNear = std::max(0.0001f, nearPlane);
             const float safeFar = std::max(safeNear + 0.001f, farPlane);
             // Y-up clip space: the RHI viewport has negative height and already maps NDC +Y to the top row.
-            return glm::perspective(kDefaultFovYRadians, SafeAspect(viewport), safeNear, safeFar);
+            const float aspect = SafeAspect(viewport);
+            // Keep the focus sphere inside the shorter viewport dimension.
+            const float fov = 2.0f * std::atan(std::tan(kDefaultFovYRadians * 0.5f) / std::min(1.0f, aspect));
+            return glm::perspective(fov, aspect, safeNear, safeFar);
         }
 
         [[nodiscard]] glm::mat4 MakeOrthographicProjection(const Core::Extent2D viewport,
@@ -240,6 +243,8 @@ namespace Extrinsic::Runtime
         const Graphics::CameraViewInput safeSeed = seed.Valid ? seed : Detail::DefaultSeed();
         const glm::vec3 forward = Detail::SafeNormalized(safeSeed.Forward, {0.0f, 0.0f, -1.0f});
         const float seedDistance = glm::length(safeSeed.Position);
+        if (std::isfinite(seedDistance))
+            m_MaxRadius = std::max(m_MaxRadius, seedDistance * 4.0f);
         m_Radius = std::clamp(seedDistance > m_MinRadius ? seedDistance : m_Radius, m_MinRadius, m_MaxRadius);
         m_Target = safeSeed.Position + forward * m_Radius;
         m_Orientation = Detail::OrientationFromForwardUp(forward, safeSeed.Up);
@@ -255,9 +260,8 @@ namespace Extrinsic::Runtime
             return;
 
         const float radius = Detail::SafeFocusRadius(target);
-        const float distance = std::clamp(Detail::PerspectiveFocusDistance(radius),
-                                          m_MinRadius,
-                                          m_MaxRadius);
+        const float distance = std::max(Detail::PerspectiveFocusDistance(radius), m_MinRadius);
+        m_MaxRadius = std::max(m_MaxRadius, distance * 4.0f);
         m_Target = target.Center;
         m_Radius = distance;
         m_FarPlane = Detail::FocusFarPlane(distance, radius);
@@ -270,6 +274,7 @@ namespace Extrinsic::Runtime
         const glm::vec3 toTarget = target - position;
         const glm::vec3 forward = Detail::SafeNormalized(toTarget, {0.0f, 0.0f, -1.0f});
         m_Target = target;
+        m_MaxRadius = std::max(m_MaxRadius, glm::length(toTarget) * 4.0f);
         m_Radius = std::clamp(glm::length(toTarget), m_MinRadius, m_MaxRadius);
         m_Orientation = Detail::OrientationFromForwardUp(forward, up);
         m_Yaw = Detail::YawFromForward(Detail::ForwardFromOrientation(m_Orientation));
@@ -351,7 +356,7 @@ namespace Extrinsic::Runtime
         view.Forward = forward;
         view.Up = up;
         view.NearPlane = m_NearPlane;
-        view.FarPlane = m_FarPlane;
+        view.FarPlane = std::max(m_FarPlane, m_Radius * 2.0f + 1.0f);
         view.View = glm::lookAt(position, position + forward, view.Up);
         view.Projection = Detail::MakePerspectiveProjection(viewport, view.NearPlane, view.FarPlane);
         view.Valid = true;

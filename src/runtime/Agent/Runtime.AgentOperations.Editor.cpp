@@ -235,15 +235,32 @@ namespace Extrinsic::Runtime
             const auto args = ParseObject(arguments);
             const auto entity = args ? UInt(*args, "entity") : std::nullopt;
             if (!entity || !args->contains("visible") || !(*args)["visible"].is_boolean())
-                return Fail("Pass {\"entity\": <stable id>, \"visible\": true | false, \"lane\": <optional surface | edges | points>}.");
+                return Fail(
+                    "Pass {\"entity\": <stable id>, \"visible\": true | false, \"lane\": <optional surface | edges | points | bounds>}.");
             const bool visible = (*args)["visible"].get<bool>();
             const auto laneName = String(*args, "lane");
-            if (args->contains("lane") && !laneName) return Fail("lane must be \"surface\", \"edges\" or \"points\".");
+            if (args->contains("lane") && !laneName)
+                return Fail("lane must be \"surface\", \"edges\", \"points\" or \"bounds\".");
+            if (laneName == "bounds")
+            {
+                if (context.Attachment == nullptr)
+                    return Fail("No editor attachment.");
+                const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
+                const auto status = ApplyEditorRenderHintCommand(visualization.Commands,
+                    EditorRenderHintCommand{.StableEntityId = *entity, .SetBounds = true, .EnableBounds = visible});
+                const bool ok = status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
+                return {.IsError = !ok,
+                    .Text = Dump({{"status", DebugNameForEditorCommandStatus(status)},
+                        {"entity", *entity},
+                        {"lane", "bounds"},
+                        {"visible", visible}})};
+            }
             std::optional<EditorDomainWindowKind> lane;
             if (laneName == "surface") lane = EditorDomainWindowKind::Mesh;
             else if (laneName == "edges") lane = EditorDomainWindowKind::Graph;
             else if (laneName == "points") lane = EditorDomainWindowKind::PointCloud;
-            else if (laneName) return Fail("lane must be \"surface\", \"edges\" or \"points\".");
+            else if (laneName)
+                return Fail("lane must be \"surface\", \"edges\", \"points\" or \"bounds\".");
             const auto prepared = PrepareSnapshot(context);
             if (!prepared) return Fail(kNoWorkspace);
             for (const auto kind : {EditorDomainWindowKind::Mesh, EditorDomainWindowKind::Graph, EditorDomainWindowKind::PointCloud})
@@ -1092,10 +1109,15 @@ namespace Extrinsic::Runtime
                 return Dump(schema);
             }(),
             false, BindAttribute);
-        add("set_visibility", "Set visibility",
-            "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points checkboxes; by default the "
+        add("set_visibility",
+            "Set visibility",
+            "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points / Bounding box checkboxes; by default the "
             "primary lane (the surface of a mesh, the edges of a graph, the points of a point cloud). One undoable step.",
-            Schema("{" + kEntityProperty + R"(,"visible":{"type":"boolean"},"lane":{"type":"string","enum":["surface","edges","points"],"description":"Which lane; default the entity's primary one."}})", R"(["entity","visible"])"), false, SetVisibility);
+            Schema("{" + kEntityProperty +
+                    R"(,"visible":{"type":"boolean"},"lane":{"type":"string","enum":["surface","edges","points","bounds"],"description":"Which lane; default the entity's primary one."}})",
+                R"(["entity","visible"])"),
+            false,
+            SetVisibility);
         add("set_camera", "Set the main camera",
             "Control the main camera like the Camera panel. Pass exactly one of: controller (orbit, fly, free look or top down; "
             "keeps the current view), pose (position, target and optional up: the camera looks from position at target; the "

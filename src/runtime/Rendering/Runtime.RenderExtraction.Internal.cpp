@@ -325,6 +325,7 @@ namespace Extrinsic::Runtime
         WorldHandle m_World{DefaultWorldHandle}; // the world ExtractAndSubmit is reading
         GpuPropertyObserver m_GpuPropertyObserver{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
+        std::vector<Graphics::DebugLinePacket> m_BoundsDebugLines{};
         std::vector<Graphics::VisualizationSyncRecord> m_Visualizations{};
         std::vector<Graphics::LightSnapshot> m_Lights{};
         std::unique_ptr<Graphics::GeometryResidencyCoordinator>

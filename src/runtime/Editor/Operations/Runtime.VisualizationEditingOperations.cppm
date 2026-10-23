@@ -88,6 +88,7 @@ export namespace Extrinsic::Runtime
     DebugNameForEditorVisualizationTarget(EditorVisualizationTarget target) noexcept;
     struct EditorRenderHintModel
     {
+        bool HasRenderBounds{false};
         bool HasRenderSurface{false};
         std::string SurfaceDomain{};
         Graphics::Components::RenderSurface::SourceDomain SurfaceDomainValue{
@@ -468,6 +469,8 @@ export namespace Extrinsic::Runtime
     struct EditorRenderHintCommand
     {
         std::uint32_t StableEntityId{0u};
+        bool SetBounds{false};
+        bool EnableBounds{false};
 
         bool SetSurface{false};
         bool EnableSurface{false};

@@ -3,6 +3,8 @@ module;
 
 #include <cstdint>
 #include <span>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -192,6 +194,19 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] const GizmoInteractionDiagnostics& Diagnostics() const noexcept { return m_Diagnostics; }
 
     private:
+        struct BoundsPivotCache
+        {
+            const void* Owner{nullptr};
+            const glm::vec3* Data{nullptr};
+            std::uint64_t Revision{0};
+            std::string Name{};
+            glm::vec3 Center{0.0f};
+        };
+        void PruneBoundsPivotCache(const Registry& registry, std::span<const EntityHandle> selected) const;
+        [[nodiscard]] glm::vec3 LocalBoundsCenter(const Registry& registry, EntityHandle entity) const;
+        mutable const Registry* m_BoundsRegistry{nullptr};
+        mutable std::unordered_map<EntityHandle, BoundsPivotCache> m_BoundsPivotCache{};
+
         struct SessionTarget
         {
             EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};

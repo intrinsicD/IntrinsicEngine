@@ -3085,3 +3085,52 @@ TEST(RuntimeRenderExtraction, MeshEdgeAndVertexViewLanesBindNamedWidthsAndSizes)
     EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->MeshEdgeViewInstance).Line.LineWidthBDA, 0u);
     EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->MeshVertexViewInstance).Point.PointSizeBDA, 0u);
 }
+
+TEST(RuntimeRenderExtraction, BoundsOverlayIsOptInAndUsesCurrentWorldBoundsWithoutGeometry)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    auto& raw = scene.Raw();
+    raw.emplace<ECS::Components::Transform::WorldMatrix>(entity);
+    auto& bounds = raw.emplace<ECS::Components::Culling::World::Bounds>(entity);
+    bounds.WorldBoundingOBB.Center = {10.0f, 20.0f, 30.0f};
+    bounds.WorldBoundingOBB.Extents = {2.0f, 3.0f, 4.0f};
+    auto extract = [&]
+    {
+        (void)fixture.Extraction.ExtractAndSubmit(scene, *fixture.Renderer, nullptr, 0u);
+        return fixture.Renderer->ExtractRenderWorld(Graphics::RenderFrameInput{}, 0u);
+    };
+    EXPECT_TRUE(extract().DebugPrimitives.Lines.empty());
+    raw.emplace<Graphics::Components::RenderBounds>(entity);
+    auto world = extract();
+    ASSERT_EQ(world.DebugPrimitives.Lines.size(), 12u);
+    for (const auto& line : world.DebugPrimitives.Lines)
+        for (const auto point : {line.Start, line.End})
+        {
+            EXPECT_GE(point.x, 8.0f);
+            EXPECT_LE(point.x, 12.0f);
+            EXPECT_GE(point.y, 17.0f);
+            EXPECT_LE(point.y, 23.0f);
+            EXPECT_GE(point.z, 26.0f);
+            EXPECT_LE(point.z, 34.0f);
+        }
+    bounds.WorldBoundingOBB.Center.x = 40.0f;
+    world = extract();
+    ASSERT_EQ(world.DebugPrimitives.Lines.size(), 12u);
+    EXPECT_GE(world.DebugPrimitives.Lines.front().Start.x, 38.0f);
+    raw.remove<Graphics::Components::RenderBounds>(entity);
+    EXPECT_TRUE(extract().DebugPrimitives.Lines.empty());
+    EXPECT_FALSE(extract().DebugPrimitives.HasTransientDebug);
+    // More than the generic debug helper's default 4096-line budget.
+    for (int i = 0; i < 342; ++i)
+    {
+        const auto box = scene.Create();
+        raw.emplace<Graphics::Components::RenderBounds>(box);
+        raw.emplace<ECS::Components::Transform::WorldMatrix>(box);
+        raw.emplace<ECS::Components::Culling::World::Bounds>(box).WorldBoundingOBB.Extents = glm::vec3{1.0f};
+    }
+    EXPECT_EQ(extract().DebugPrimitives.Lines.size(), 342u * 12u);
+    raw.clear<Graphics::Components::RenderBounds>();
+    EXPECT_TRUE(extract().DebugPrimitives.Lines.empty());
+}

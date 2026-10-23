@@ -23,6 +23,7 @@ module;
 module Extrinsic.Runtime.GizmoInteraction;
 
 import Geometry.AABB;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.RotationAveraging;
 import Geometry.Validation;
 import Extrinsic.ECS.Component.Culling.Local;
@@ -240,9 +241,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SelectionAnalysis AnalyzeSelection(const Registry& registry,
-                                                         std::span<const EntityHandle> selected,
-                                                         const GizmoOrientation orientation,
-                                                         const GizmoPivotMode pivotMode)
+            std::span<const EntityHandle> selected,
+            const GizmoOrientation orientation,
+            const GizmoPivotMode pivotMode,
+            const auto& localCenter)
         {
             SelectionAnalysis analysis{};
             GizmoFrame& frame = analysis.Frame;
@@ -296,14 +298,7 @@ namespace Extrinsic::Runtime
                 glm::vec3 point{p.World[3]};
                 if (pivotMode == GizmoPivotMode::BoundsCenters)
                 {
-                    const auto* bounds =
-                        registry.Raw().try_get<Extrinsic::ECS::Components::Culling::Local::Bounds>(entity);
-                    if (bounds != nullptr && bounds->LocalBoundingAABB.IsValid() &&
-                        IsFinite(bounds->LocalBoundingAABB.Min) && IsFinite(bounds->LocalBoundingAABB.Max))
-                    {
-                        // Center of TransformAABB(box, World) == World * center for affine World.
-                        point = glm::vec3{p.World * glm::vec4{bounds->LocalBoundingAABB.GetCenter(), 1.f}};
-                    }
+                    point = glm::vec3{p.World * glm::vec4{localCenter(entity), 1.f}};
                 }
                 pivotSum += point;
                 analysis.Participants.push_back(p);
@@ -411,12 +406,60 @@ namespace Extrinsic::Runtime
         m_Links.clear();
     }
 
+    void GizmoInteraction::PruneBoundsPivotCache(
+        const Registry& registry, const std::span<const EntityHandle> selected) const
+    {
+        if (m_BoundsRegistry != &registry)
+        {
+            m_BoundsPivotCache.clear();
+            m_BoundsRegistry = &registry;
+        }
+        std::erase_if(m_BoundsPivotCache,
+            [&](const auto& entry)
+            {
+                return std::ranges::find(selected, entry.first) == selected.end();
+            });
+    }
+
+    glm::vec3 GizmoInteraction::LocalBoundsCenter(const Registry& registry, const EntityHandle entity) const
+    {
+        const auto resolved = ResolveEntityDisplayedPositions(registry.Raw(), entity);
+        if (!resolved.Positions.Bound || resolved.Positions.Values.empty())
+        {
+            m_BoundsPivotCache.erase(entity);
+            const auto box = ComputeEntityLocalDisplayBounds(registry.Raw(), entity);
+            return box && IsFinite(box->Min) && IsFinite(box->Max) ? box->GetCenter() : glm::vec3{0.0f};
+        }
+        auto& cached = m_BoundsPivotCache[entity];
+        const auto revision = resolved.Vertices->FindPropertyRevision(resolved.Positions.Name).value_or(0u);
+        if (revision == 0u || cached.Owner != resolved.Vertices || cached.Data != resolved.Positions.Values.data() ||
+            cached.Revision != revision || cached.Name != resolved.Positions.Name)
+        {
+            cached.Owner = resolved.Vertices;
+            cached.Data = resolved.Positions.Values.data();
+            cached.Revision = revision;
+            cached.Name = resolved.Positions.Name;
+            const auto box = ComputeEntityLocalDisplayBounds(registry.Raw(), entity);
+            cached.Center = box && IsFinite(box->Min) && IsFinite(box->Max) ? box->GetCenter() : glm::vec3{0.0f};
+        }
+        return cached.Center;
+    }
+
     GizmoFrame GizmoInteraction::ComputeFrame(const Registry& registry,
                                               std::span<const EntityHandle> selected,
                                               const GizmoOrientation orientation,
                                               const GizmoPivotMode pivotMode) const
     {
-        return AnalyzeSelection(registry, selected, orientation, pivotMode).Frame;
+        PruneBoundsPivotCache(registry, selected);
+        return AnalyzeSelection(registry,
+            selected,
+            orientation,
+            pivotMode,
+            [&](EntityHandle entity)
+            {
+                return LocalBoundsCenter(registry, entity);
+            })
+            .Frame;
     }
 
     GizmoResult GizmoInteraction::Begin(const Registry& registry,
@@ -428,7 +471,15 @@ namespace Extrinsic::Runtime
         if (m_Dragging)
             return {GizmoStatus::SessionActive};
 
-        SelectionAnalysis analysis = AnalyzeSelection(registry, selected, orientation, pivotMode);
+        PruneBoundsPivotCache(registry, selected);
+        SelectionAnalysis analysis = AnalyzeSelection(registry,
+            selected,
+            orientation,
+            pivotMode,
+            [&](EntityHandle entity)
+            {
+                return LocalBoundsCenter(registry, entity);
+            });
         if (!analysis.Frame.Available())
             return analysis.Frame.Result;
 

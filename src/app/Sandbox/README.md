@@ -94,6 +94,16 @@ selection/hover snapshot and treats omission or mismatch as empty.
 Document New/Load/Close, active-world switch/retirement, and shutdown clear the
 cohort without resurrecting old state.
 
+**Bounding boxes.** **Inspector → Bounding box** toggles an entity’s world-space
+bounding box; **View → Bounding boxes → All on / All off** updates the current
+scene’s entities. These render hints are undoable and saved with the scene.
+Agents use `set_visibility` with `lane: "bounds"`. Disabled entities generate no
+box packets; enabled boxes use current transformed bounds after the frame’s transform flush.
+
+**Camera framing.** Imports keep their original size. Press **F** with an entity
+selected to frame it and set the orbit center to its bounds center. Large models
+can be framed beyond 500 world units; portrait viewports preserve the framing.
+
 **Transform gizmo.** The editor gizmo is ImGuizmo, private to `EditorShell`; it drives
 `SceneInteractionModule`'s token-checked gizmo calls
 ([ADR 0006](../../../docs/adr/0006-camera-picking-and-gizmo-runtime-handoff.md)).
@@ -102,8 +112,8 @@ cohort without resurrecting old state.
   hidden). W/E/R pick translate/rotate/scale while it is enabled and no text
   field is focused. While hovered or dragged it owns the viewport: no camera
   input, no click selection.
-- All selected entities move together. The pivot is the mean of their world
-  origins, or of their world-bounds centers with **Pivot at bounds centers**
+- All selected entities move together. The default pivot is the mean of their
+  world-bounds centers. Disable **Pivot at bounds centers** to use their world origins
   (entities without bounds use their origin). **Local axes** uses the entity's
   rotation, for a group the averaged rotation; if no average exists the gizmo
   falls back to world axes and says so.

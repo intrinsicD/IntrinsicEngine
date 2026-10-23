@@ -4,6 +4,7 @@
 module;
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -15,6 +16,7 @@ export module Extrinsic.Runtime.VertexChannelBindings;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.GeometryAvailability;
+import Geometry.AABB;
 
 export namespace Extrinsic::Runtime
 {
@@ -148,6 +150,10 @@ export namespace Extrinsic::Runtime
         const Geometry::PropertySet* Vertices{nullptr};
     };
     [[nodiscard]] EntityDisplayedPositions ResolveEntityDisplayedPositions(
+        const entt::registry& registry, entt::entity entity);
+
+    // Local display bounds; canonical bounds need no position traversal.
+    [[nodiscard]] std::optional<Geometry::AABB> ComputeEntityLocalDisplayBounds(
         const entt::registry& registry, entt::entity entity);
 
     // The structural binding slot for Position/Normal/Texcoord; nullptr for

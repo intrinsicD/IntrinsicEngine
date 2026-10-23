@@ -1097,6 +1097,12 @@ namespace Extrinsic::Runtime
             json render = json::object();
             bool hasAny = false;
 
+            if (raw.all_of<G::RenderBounds>(entity))
+            {
+                render["bounds"] = true;
+                hasAny = true;
+            }
+
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
             {
                 render["surface"] = json{
@@ -1168,6 +1174,15 @@ namespace Extrinsic::Runtime
                     return false;
                 }
                 raw.emplace_or_replace<G::RenderSurface>(entity, surface);
+                hasAny = true;
+            }
+
+            if (render.contains("bounds"))
+            {
+                if (!render["bounds"].is_boolean())
+                    return false;
+                if (render["bounds"].get<bool>())
+                    raw.emplace_or_replace<G::RenderBounds>(entity);
                 hasAny = true;
             }
 

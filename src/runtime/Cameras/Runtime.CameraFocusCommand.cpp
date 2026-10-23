@@ -53,30 +53,16 @@ namespace Extrinsic::Runtime
             return Geometry::Validation::IsFinite(sphere.Center) && std::isfinite(sphere.Radius);
         }
 
-        // RUNTIME-315: an entity drawn from a bound Position source is framed by
-        // the bounds of what is drawn (the same box culling uses), not by its
-        // canonical bounds component. nullopt when the entity displays canonical
-        // positions or has no world matrix; callers then use the component.
         [[nodiscard]] std::optional<Geometry::Sphere> DisplayedWorldSphere(
             const entt::registry& raw, const entt::entity entity)
         {
-            const DisplayedPositions displayed =
-                ResolveEntityDisplayedPositions(raw, entity).Positions;
-            const auto* world =
-                raw.try_get<ECS::Components::Transform::WorldMatrix>(entity);
-            if (!displayed.Bound || displayed.Values.empty() || world == nullptr)
+            const auto box = ComputeEntityLocalDisplayBounds(raw, entity);
+            const auto* world = raw.try_get<ECS::Components::Transform::WorldMatrix>(entity);
+            if (!box || world == nullptr)
                 return std::nullopt;
-            glm::vec3 lo{std::numeric_limits<float>::max()};
-            glm::vec3 hi{std::numeric_limits<float>::lowest()};
-            for (const glm::vec3& p : displayed.Values)
-            {
-                lo = glm::min(lo, p);
-                hi = glm::max(hi, p);
-            }
             ECS::Components::Culling::Local::Bounds local{};
-            local.LocalBoundingAABB = Geometry::AABB{lo, hi};
-            local.LocalBoundingSphere =
-                Geometry::Sphere{local.LocalBoundingAABB.GetCenter(), glm::length(hi - lo) * 0.5f};
+            local.LocalBoundingAABB = *box;
+            local.LocalBoundingSphere = Geometry::Sphere{box->GetCenter(), glm::length(box->GetExtents())};
             ECS::Components::Culling::World::Bounds worldBounds{};
             if (!ECS::Systems::BoundsPropagation::TryComputeWorldBounds(local, world->Matrix, worldBounds))
                 return std::nullopt;

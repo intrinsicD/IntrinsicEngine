@@ -528,12 +528,8 @@ namespace {
         [[nodiscard]] bool AnyRenderHintEdit(
             const EditorRenderHintCommand& command) noexcept
         {
-            return command.SetSurface ||
-                   command.SetEdges ||
-                   command.SetUniformEdgeWidth ||
-                   command.SetPoints ||
-                   command.SetPointRenderType ||
-                   command.SetUniformPointSize;
+            return command.SetBounds || command.SetSurface || command.SetEdges || command.SetUniformEdgeWidth ||
+                command.SetPoints || command.SetPointRenderType || command.SetUniformPointSize;
         }
 
         [[nodiscard]] bool RenderHintCommandMatchesDomain(
@@ -548,7 +544,7 @@ namespace {
                 command.SetPointRenderType ||
                 command.SetUniformPointSize;
 
-            if (!editsSurface && !editsEdges && !editsPoints)
+            if (!command.SetBounds && !editsSurface && !editsEdges && !editsPoints)
                 return false;
 
             if (editsSurface &&
@@ -587,6 +583,9 @@ namespace {
             EditorRenderHintState state,
             const EditorRenderHintCommand& command)
         {
+            if (command.SetBounds)
+                state.Components.Bounds = command.EnableBounds;
+
             if (command.SetSurface)
             {
                 if (command.EnableSurface)

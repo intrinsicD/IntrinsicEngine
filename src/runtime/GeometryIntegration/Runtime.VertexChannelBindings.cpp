@@ -13,6 +13,7 @@ module;
 module Extrinsic.Runtime.VertexChannelBindings;
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.Runtime.GeometryAvailability;
 
 namespace Extrinsic::Runtime
@@ -252,6 +253,25 @@ namespace Extrinsic::Runtime
                 DisplayedPositionDomainFor(GS::BuildSourceAvailability(view).ProvenanceDomain),
                 bindings),
             .Vertices = &view.VertexSource->Properties};
+    }
+
+    std::optional<Geometry::AABB> ComputeEntityLocalDisplayBounds(const entt::registry& raw, entt::entity entity)
+    {
+        const auto displayed = ResolveEntityDisplayedPositions(raw, entity).Positions;
+        if (displayed.Bound && !displayed.Values.empty())
+        {
+            Geometry::AABB box{};
+            for (const auto& point : displayed.Values)
+            {
+                box.Min = glm::min(box.Min, point);
+                box.Max = glm::max(box.Max, point);
+            }
+            return box;
+        }
+        if (const auto* bounds = raw.try_get<ECS::Components::Culling::Local::Bounds>(entity);
+            bounds && bounds->LocalBoundingAABB.IsValid())
+            return bounds->LocalBoundingAABB;
+        return std::nullopt;
     }
 
     VertexChannelSourceBinding* FindVertexChannelSourceBinding(

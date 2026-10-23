@@ -20,6 +20,7 @@ picking backlog work; theme priorities and rationale live in
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 - `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/active/UI-079-imguizmo-hidpi-operational-run.md)
 - `UI-081` — Evenly spread vector-field glyphs from a progressive element order (tasks/active/UI-081-vector-field-even-glyph-order.md)
+- `UI-082` — Entity bounding boxes, large-model camera framing and bounds-center gizmo pivot (tasks/active/UI-082-entity-bounds-camera-framing-gizmo-pivot.md)
 
 ## Theme B — Rendering modernization
 

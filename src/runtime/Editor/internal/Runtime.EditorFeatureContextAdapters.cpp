@@ -2263,6 +2263,7 @@ namespace
         const ECS::EntityHandle entity)
     {
         EditorRenderHintComponents state{};
+        state.Bounds = raw.all_of<G::RenderBounds>(entity);
         if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
             state.Surface = *surface;
         if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
@@ -2276,9 +2277,9 @@ namespace
         const EditorRenderHintComponents& lhs,
         const EditorRenderHintComponents& rhs)
     {
-        return SameOptionalRenderComponent(lhs.Surface, rhs.Surface, SameRenderSurface) &&
-               SameOptionalRenderComponent(lhs.Edges, rhs.Edges, SameRenderEdges) &&
-               SameOptionalRenderComponent(lhs.Points, rhs.Points, SameRenderPoints);
+        return lhs.Bounds == rhs.Bounds && SameOptionalRenderComponent(lhs.Surface, rhs.Surface, SameRenderSurface) &&
+            SameOptionalRenderComponent(lhs.Edges, rhs.Edges, SameRenderEdges) &&
+            SameOptionalRenderComponent(lhs.Points, rhs.Points, SameRenderPoints);
     }
 
     [[nodiscard]] EditorCommandHistoryStatus ApplyRenderHintComponents(
@@ -2294,6 +2295,11 @@ namespace
             SelectionController::ToEntityHandle(stableEntityId);
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return EditorCommandHistoryStatus::StaleEntity;
+
+        if (state.Bounds)
+            raw.emplace_or_replace<G::RenderBounds>(entity);
+        else
+            raw.remove<G::RenderBounds>(entity);
 
         if (state.Surface.has_value())
             raw.emplace_or_replace<G::RenderSurface>(entity, *state.Surface);

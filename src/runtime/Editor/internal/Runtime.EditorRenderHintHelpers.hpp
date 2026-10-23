@@ -12,6 +12,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 {
     struct EditorRenderHintComponents
     {
+        bool Bounds{false};
         std::optional<Graphics::Components::RenderSurface> Surface{};
         std::optional<Graphics::Components::RenderEdges> Edges{};
         std::optional<Graphics::Components::RenderPoints> Points{};

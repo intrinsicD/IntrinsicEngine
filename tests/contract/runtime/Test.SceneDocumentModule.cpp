@@ -51,6 +51,7 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -785,6 +786,7 @@ TEST(SceneDocumentModule, QueuedSavePreservesAttributeBindings)
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const auto entity = scene.Create();
+    scene.Raw().emplace<Extrinsic::Graphics::Components::RenderBounds>(entity);
     auto& properties = scene.Raw().emplace<ECSC::GeometrySources::Vertices>(entity).Properties;
     properties.Resize(2u);
     (void)properties.GetOrAdd<glm::vec3>("v:position", glm::vec3{1.0f});
@@ -806,6 +808,7 @@ TEST(SceneDocumentModule, QueuedSavePreservesAttributeBindings)
     ASSERT_NE(bound.begin(), bound.end());
     for (const auto loadedEntity : bound)
     {
+        EXPECT_TRUE(loaded.Raw().all_of<Extrinsic::Graphics::Components::RenderBounds>(loadedEntity));
         EXPECT_EQ(bound.get<const Runtime::VertexChannelBindingSet>(loadedEntity).Normal, normal);
         const auto& restored = bound.get<const ECSC::GeometrySources::Vertices>(loadedEntity).Properties;
         const auto values = restored.Get<glm::vec3>("v:custom_normal");

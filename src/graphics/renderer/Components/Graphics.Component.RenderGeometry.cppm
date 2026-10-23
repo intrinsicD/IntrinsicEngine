@@ -1,3 +1,4 @@
+// Render-lane and bounds-overlay hints shared by scene authoring and rendering.
 module;
 
 #include <array>
@@ -70,6 +71,11 @@ export namespace Extrinsic::Graphics::Components
     // ----------------------------------------------------------------
     // RenderSurface — filled triangle / quad rendering hint.
     // ----------------------------------------------------------------
+    // Component presence enables the entity bounding-box overlay.
+    struct RenderBounds
+    {
+    };
+
     struct RenderSurface
     {
         enum class SourceDomain : std::uint8_t

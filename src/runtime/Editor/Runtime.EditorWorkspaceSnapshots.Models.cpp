@@ -826,6 +826,7 @@ namespace {
             const ECS::EntityHandle entity)
         {
             EditorRenderHintModel model{};
+            model.HasRenderBounds = raw.all_of<G::RenderBounds>(entity);
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
             {
                 model.HasRenderSurface = true;

@@ -32,6 +32,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Geometry.Properties;
@@ -464,6 +465,11 @@ TEST(VertexChannelBindings, CameraFocusAndDefaultVectorFieldLengthFollowTheDispl
     EXPECT_NEAR(displayed->Center.y, 5.0f, 1e-3f);
     EXPECT_NEAR(displayed->Center.z, 100.0f, 1e-3f);
     EXPECT_GE(displayed->Radius, std::sqrt(50.0f) - 1e-3f);
+    const Runtime::GizmoInteraction gizmo;
+    const auto frame = gizmo.ComputeFrame(
+        f.Registry, entities, Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::BoundsCenters);
+    ASSERT_TRUE(frame.Available());
+    EXPECT_LT(glm::length(frame.Pivot - displayed->Center), 1e-3f);
 
     // The default glyph length is 2% of the displayed diagonal (canonical: 0.028).
     ASSERT_EQ(Runtime::ApplyEditorGeometryVectorFieldCommand(
@@ -476,6 +482,15 @@ TEST(VertexChannelBindings, CameraFocusAndDefaultVectorFieldLengthFollowTheDispl
     const auto& recipe = raw.get<Runtime::GeometryPresentationRecipe>(mesh);
     ASSERT_EQ(recipe.VectorFields.size(), 1u);
     EXPECT_NEAR(recipe.VectorFields.front().Length, 0.02f * std::sqrt(200.0f), 1e-4f);
+    auto shifted = properties.GetOrAdd<glm::vec3>("v:shifted", {});
+    for (auto& point : shifted.Vector())
+        point.z = 200.0f;
+    const auto updated = gizmo.ComputeFrame(
+        f.Registry, entities, Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::BoundsCenters);
+    EXPECT_NEAR(updated.Pivot.z, 200.0f, 1e-3f);
+    const auto unchanged = gizmo.ComputeFrame(
+        f.Registry, entities, Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::BoundsCenters);
+    EXPECT_EQ(unchanged.Pivot, updated.Pivot);
 }
 
 TEST(VertexChannelBindings, NormalAndTexcoordBindOnVertexOrCornerDomainsThroughOneSlot)

@@ -393,6 +393,38 @@ TEST(RuntimeCameraControllers, FocusCentersOffOriginTargetForEveryControllerKind
     }
 }
 
+TEST(RuntimeCameraControllers, OrbitFramesLargeOffOriginGeometryAndKeepsZoomContinuous)
+{
+    Runtime::OrbitCameraController controller{MakeSeed()};
+    const Runtime::CameraFocusTarget target{{1200.0f, -800.0f, 300.0f}, 1500.0f};
+    controller.Focus(target);
+    const auto view = controller.GetView({1280, 720});
+    ExpectWorldPointCentered(view, target.Center);
+    ExpectWorldPointInsideClipSpace(view, target.Center + glm::vec3{0.0f, target.Radius, 0.0f});
+    EXPECT_GT(controller.Radius(), target.Radius);
+    const auto portrait = controller.GetView({320, 1000});
+    ExpectWorldPointInsideClipSpace(portrait, target.Center + glm::vec3{target.Radius, 0.0f, 0.0f});
+    Runtime::OrbitCameraController restored{MakeSeed()};
+    restored.LookAt(view.Position, target.Center, view.Up);
+    ExpectWorldPointCentered(restored.GetView({1280, 720}), target.Center);
+    EXPECT_NEAR(restored.Radius(), controller.Radius(), 0.01f);
+    ExpectWorldPointInsideClipSpace(restored.GetView({1280, 720}), target.Center);
+
+    const float before = controller.Radius();
+    Platform::Input::Context input{};
+    input.AccumulateScroll(0.0f, 0.1f);
+    input.Update();
+    controller.Update(input, 1.0 / 60.0);
+    EXPECT_GT(controller.Radius(), before * 0.98f);
+    EXPECT_LT(controller.Radius(), before);
+    input.AccumulateScroll(0.0f, -100.0f);
+    input.Update();
+    controller.Update(input, 1.0 / 60.0);
+    ExpectWorldPointInsideClipSpace(controller.GetView({1280, 720}), target.Center);
+    ExpectWorldPointInsideClipSpace(
+        controller.GetView({1280, 720}), target.Center + glm::vec3{target.Radius, 0.0f, 0.0f});
+}
+
 TEST(RuntimeCameraControllers, TopDownUsesOrthographicProjectionAndClampsZoom)
 {
     Runtime::TopDownCameraController controller{MakeSeed()};

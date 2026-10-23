@@ -293,6 +293,7 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
 {
     ECS::Scene::Registry source;
     const ECS::EntityHandle mesh = AddMeshEntity(source);
+    source.Raw().emplace<G::RenderBounds>(mesh);
     const ECS::EntityHandle graph = AddGraphEntity(source);
     const ECS::EntityHandle cloud = AddPointCloudEntity(source);
     ECS::Hierarchy::Attach(source.Raw(), graph, mesh);
@@ -336,6 +337,8 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     ASSERT_NE(loadedCloud, ECS::InvalidEntityHandle);
 
     const entt::registry& raw = loaded.Raw();
+    EXPECT_TRUE(raw.all_of<G::RenderBounds>(loadedMesh));
+    EXPECT_FALSE(raw.all_of<G::RenderBounds>(loadedGraph));
     ASSERT_TRUE(raw.all_of<ECSC::StableId>(loadedMesh));
     EXPECT_EQ(raw.get<ECSC::StableId>(loadedMesh).High, 11u);
     EXPECT_EQ(raw.get<ECSC::StableId>(loadedMesh).Low, 22u);
