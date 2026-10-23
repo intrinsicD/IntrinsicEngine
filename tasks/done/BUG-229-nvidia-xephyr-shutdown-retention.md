@@ -106,8 +106,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 Retirement preparation only; no implementation change.
 
 - Implementation: `9395eb9e6` on `main`. It added the qualification boundary in
-  `tests/README.md` and `src/graphics/vulkan/README.md`. It changed no production
-  code, suppression or test gate. CI is the same as for BUG-221: the first green
+  `tests/README.md` and `src/graphics/vulkan/README.md`. BUG-229's part changed no
+  production code, suppression, test label or leak-detection condition (the same commit
+  added BUG-221's driver-selection precondition to the runner). CI is the same as for BUG-221: the first green
   `main` runs are `ci-docs` at `b4e0ca630` and `ci-linux-clang` at `1c79eacbb`
   (both 2026-10-08), and both are green at `599f02ff1`.
 - Durable record: `tests/README.md` now records the exact versions and the
@@ -126,6 +127,23 @@ Retirement preparation only; no implementation change.
 - The evidence links above now use exact revision `599f02ff1`; those objects are
   byte-identical to `9395eb9e6`. Prepared deletion: the 27 tracked files under
   `tasks/evidence/BUG-229/`.
-- Remaining before retirement: an independent review of the summaries, the link
-  repairs and the deletion list against the raw evidence. After that review:
-  delete, move, and update the indexes.
+
+## Completion
+Completed 2026-10-24. Commit: `9395eb9e6`.
+Reviewer decision 2026-10-24: independent Claude review approved at `800f1c371` (summaries,
+link repairs and deletion list, checked against the raw evidence before deletion): AC1 "met",
+AC2 "met", AC3 "met".
+Maturity: Operational for the native X11 shutdown gate (`gpu;vulkan` contract passed on
+2026-10-01). The nested Xephyr combination is the intended endpoint: a documented unsupported
+qualification boundary in `tests/README.md`, whose remedy is an upstream driver fix. After
+retirement that text is the only owner of the expected Xephyr red. Later GPU-suite runs
+(GRAPHICS-155/156, RUNTIME-292/293/296-300) record it as environmental; none is a native rerun.
+The GPU contract was not rerun at retirement; a native `:1` rerun would refresh the evidence.
+
+The 27 tracked files under `tasks/evidence/BUG-229/` were deleted at retirement; the links above
+and the `tests/README.md` recipe resolve at Git revision `599f02ff1`. Limitations recorded
+before deletion:
+- `native-contract.log` is a non-verbose CTest summary; it does not record `DISPLAY` or the
+  selected ICD.
+- `mesa-0.log` and `mesa-3.log` do not record their display. The independent review asked for
+  the lavapipe control on `:9`; the raw evidence cannot confirm that it ran there.

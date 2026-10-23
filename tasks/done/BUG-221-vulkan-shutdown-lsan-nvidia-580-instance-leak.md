@@ -148,8 +148,8 @@ Retirement preparation only; no implementation change.
   `tests/regression/tooling/Test.VulkanShutdownLsanPrerequisites.py` are unchanged
   since. `ci-docs`, which runs the prerequisite test, did not run on `main` between
   2026-09-15 and 2026-10-08; its first green `main` run after the commit is at
-  `b4e0ca630` (2026-10-08). `ci-linux-clang` was red on `main` from 2026-10-01
-  until its first green run at `1c79eacbb` (2026-10-08). The run that included
+  `b4e0ca630` (2026-10-08). `ci-linux-clang` was red on `main` from after 2026-09-11,
+  before this commit, until its first green run at `1c79eacbb` (2026-10-08). The run that included
   this commit failed in `full-cpu`, step "Capture CPU test selection". Both
   workflows are green at `599f02ff1` (2026-10-23).
 - Checked on 2026-10-24 at `599f02ff1`: the prerequisite test passes (11 subtests).
@@ -162,7 +162,21 @@ Retirement preparation only; no implementation change.
 - The evidence links above now use exact revision `599f02ff1`; those objects are
   byte-identical to `9395eb9e6`. Prepared deletion: the 12 tracked files under
   `tasks/evidence/BUG-221/`. BUG-229's links into them were repaired the same way.
-- Remaining before retirement: an independent review of the implementation, these
-  summaries, the link repairs and the deletion list against the raw evidence. No
-  such review of BUG-221 is recorded in this note. The 2026-10-01 author ticked the
-  acceptance boxes. After that review: delete, move, and update the indexes.
+
+## Completion
+Completed 2026-10-24. Commit: `9395eb9e6`.
+Reviewer decision 2026-10-24: independent Claude review approved at `800f1c371` (implementation,
+summaries, link repairs and deletion list, checked against the raw evidence before deletion):
+AC1 "met", AC2 "met". For AC1 the attribution is to module and offset, not function symbols;
+the engine-free reproduction plus the NVIDIA-only removal control meets its intent.
+Maturity: Operational on the recorded host. The `gpu;vulkan` contract passed natively on
+2026-10-01 (RTX 4090, NVIDIA 580.159.04); `Test.VulkanShutdownLsanPrerequisites.py` (11 cases,
+run in `ci-docs`) pins the ICD-selection rejections. The GPU contract was not rerun at retirement.
+
+The 12 tracked files under `tasks/evidence/BUG-221/` were deleted at retirement; the links above
+resolve at Git revision `599f02ff1`. Limitations recorded before deletion:
+- `fixed-contract.log`, `desktop-nvidia.log` and `legacy-contract.log` are non-verbose CTest
+  summaries. They do not record `DISPLAY` or the selected ICD; "native `DISPLAY=:1`, NVIDIA
+  ICD" rests on the author's command record.
+- The Evidence section's "Vulkan loader 1.4.312" differs from the installed package
+  `libvulkan1 1.3.296.0~rc1` recorded for BUG-229; `tests/README.md` uses the package version.

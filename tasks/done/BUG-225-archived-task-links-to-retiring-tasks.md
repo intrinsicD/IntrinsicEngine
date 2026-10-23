@@ -87,7 +87,14 @@ Retirement preparation only; no implementation change.
 - The evidence links above now use exact revision `599f02ff1`; those objects are
   byte-identical to `2688e7480`. Prepared deletion: the 2 tracked files under
   `tasks/evidence/BUG-225/`.
-- Remaining before retirement: an independent review of the implementation, the
-  summaries, the link repairs and the deletion list. No such review of BUG-225 is
-  recorded in this note. The 2026-10-01 author ticked the acceptance boxes. After
-  that review: delete, move, and update the indexes.
+
+## Completion
+Completed 2026-10-24. Commit: `2688e7480`.
+Reviewer decision 2026-10-24: independent Claude review approved at `800f1c371` (implementation,
+summaries, link repairs and deletion list, checked against the raw evidence before deletion):
+AC1 "met", AC2 "met". The reviewer re-ran `Test.ValidateTasks.py` (31 pass) and strict doc
+links (4649 links, none broken; GEOM-020 lines 15 and 39 resolve to `../done/GEOM-024-...`).
+Maturity: Operational. The validator and strict doc-link check run on the real repository in
+`ci-docs` (green at `599f02ff1`, run 39957196726); the archived-link cases in
+`Test.ValidateTasks.py` pin the rule. The 2 tracked files under `tasks/evidence/BUG-225/` were
+deleted at retirement; the links above resolve at Git revision `599f02ff1`.

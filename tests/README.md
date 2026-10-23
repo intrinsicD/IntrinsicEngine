@@ -523,7 +523,7 @@ suppressions; these four entries are scoped to this runner. Hosted CI selects
 lavapipe explicitly; local runs must likewise select the tested operational ICD
 when multiple installed ICDs would otherwise expose non-selected driver-loader
 allocations. On an NVIDIA host (BUG-221), the unselected lavapipe and RADV ICDs
-each left 256 bytes from instance enumeration and unloaded before exit, so LSan
+each left 256 bytes during instance creation/enumeration and unloaded before exit, so LSan
 showed `<unknown module>` stacks; an engine-free enumeration probe reproduced them.
 Broad loader, Mesa, ICD, unknown-module, pthread, and X11/GLFW
 suppressions remain forbidden.
@@ -552,7 +552,7 @@ loader 1.3.296.0~rc1: `vkDestroySwapchainKHR` retained 1,392 + 1,392 + 2,800
 bytes and each XCB surface-capabilities query retained two 32-byte replies
 (64 bytes, linear in the query count), while native X11 was clean
 under the four suppressions. Version-specific measurements are in
-[BUG-229](../tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md).
+[BUG-229](../tasks/done/BUG-229-nvidia-xephyr-shutdown-retention.md).
 The engine-free probes are kept at an exact Git revision. To check a new driver,
 start an owned Xephyr on `:9` beside the native display `:1`, then run (nonzero
 while the nested path retains memory):
