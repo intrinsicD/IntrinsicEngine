@@ -257,7 +257,7 @@ after feature preparation resolves `EngineConfigControl` from
   typed draft through `SetPointCloudConsolidationConfig`, preview, and hot
   apply before submitting the same value to
   `PointCloudConsolidationService`. The app-owned
-  `PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` window drives
+  `PointCloud > Processing > Filtering & Smoothing > Consolidate (LOP/WLOP/CLOP/EAR)` window drives
   that surface and reports its pointer-free completion diagnostics; file,
   editor-operation, agent/CLI, and programmatic callers share validation and
   execution semantics. Its backend selector edits that same typed section;

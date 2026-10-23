@@ -188,7 +188,7 @@ zero domain imports, two re-exports, and ten kernel getter names.
 ### Runtime Editor Mesh Simplification Workflow
 
 `UI-028` retires the promoted Sandbox EditorUI mesh simplification workflow at
-`CPUContracted`. `Mesh > Processing > Simplify` now calls the geometry-owned
+`CPUContracted`. `Mesh > Processing > Remeshing & UV > Simplify` now calls the geometry-owned
 `GEOM-014` classical QEM / FA-QEM simplification kernel from the mesh-processing
 panel registered with app-owned `Extrinsic.Sandbox.Editor.Shell`, through
 `Extrinsic.Runtime.GeometryProcessingOperations`. The runtime command replaces selected

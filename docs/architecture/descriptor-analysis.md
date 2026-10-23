@@ -1,6 +1,6 @@
 # FPFH descriptor analysis
 
-**View → FPFH Descriptor Analysis** and the mesh, graph and point-cloud Processing menus share the validated `sandbox.descriptor_analysis` config and execution commands. Position and normal inputs are canonical vec3 property references. The output is 33 named float properties on that same domain, grouped into one undoable publication. The panel can display any bin with the existing scalar visualization recipe.
+**View → Processing → Features & Descriptors → FPFH Descriptor Analysis** and the mesh, graph and point-cloud Processing menus share the validated `sandbox.descriptor_analysis` config and execution commands. Position and normal inputs are canonical vec3 property references. The output is 33 named float properties on that same domain, grouped into one undoable publication. The panel can display any bin with the existing scalar visualization recipe.
 
 ## Formulation
 

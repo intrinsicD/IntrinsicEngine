@@ -1,6 +1,6 @@
 # Compact density weights
 
-**View → Compact Density Weights** and the mesh, graph and point-cloud Processing menus share the validated `sandbox.density_weights` config and execution commands. A canonical vec3 position property produces one named float property on the same element domain. The panel uses the existing scalar visualization recipe to show the weights.
+**View → Processing → Sampling & Density → Compact Density Weights** and the mesh, graph and point-cloud Processing menus share the validated `sandbox.density_weights` config and execution commands. A canonical vec3 position property produces one named float property on the same element domain. The panel uses the existing scalar visualization recipe to show the weights.
 
 ## Formulation and support
 

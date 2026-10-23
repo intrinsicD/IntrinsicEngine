@@ -4,7 +4,7 @@ CPU reference for approximate distances over triangle surfaces, exposed by
 `Geometry::Geodesic::ComputeVirtualSourceDistance` in `Geometry.HalfedgeMesh.Geodesic`.
 See [formulation and limitations](paper.md) and [manifest](method.yaml).
 
-Open **Mesh → Geodesics → Virtual Source Propagation**, select a mesh, add
+Open **Mesh → Processing → Geodesics → Virtual Source Propagation**, select a mesh, add
 picked vertices or explicit vertex indices, and compute. The panel uses the
 same validated `sandbox.geodesics` config path as programmatic callers and
 activates `v:geodesic_distance` scalar coloring after successful publication.

@@ -77,7 +77,7 @@ getter used by the executable is the read-only
 `GetLastFramePacingDiagnostics()` sample for the bounded report mode.
 
 `Sandbox.Editor.MethodPanels` also owns the registered
-`Mesh > Processing > Parameterize (UV)` window. The window offers only LSCM,
+`Mesh > Processing > Remeshing & UV > Parameterize (UV)` window. The window offers only LSCM,
 harmonic cotangent, uniform Tutte, and Boundary First Flattening; maintains an
 explicit typed draft; and applies that draft through the runtime-owned
 registered `sandbox.parameterization` validation lane before executing the

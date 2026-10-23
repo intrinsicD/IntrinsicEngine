@@ -263,6 +263,18 @@ namespace Extrinsic::Sandbox::Editor
                         value.z);
         }
 
+        // Processing submenu groups in menu order; every processing window
+        // registers under {<menu>, "Processing", <group>}.
+        inline constexpr std::array<std::string_view, 9> kProcessingMenuGroups{"Filtering & Smoothing",
+            "Normals",
+            "Features & Descriptors",
+            "Segmentation & Clustering",
+            "Fields & Spectral",
+            "Geodesics",
+            "Sampling & Density",
+            "Remeshing & UV",
+            "Reconstruction & Registration"};
+
         [[nodiscard]] bool RegisteredMenuPathStartsWith(
             const EditorWindowMenuEntry& entry,
             const std::vector<std::string>& path)
@@ -298,28 +310,7 @@ namespace Extrinsic::Sandbox::Editor
             std::vector<std::string>& path,
             const std::span<const std::string_view> excludedChildren = {})
         {
-            std::vector<std::string> children{};
-            for (const EditorWindowMenuEntry& entry : entries)
-            {
-                if (!RegisteredMenuPathStartsWith(entry, path) ||
-                    entry.MenuPath.size() == path.size())
-                {
-                    continue;
-                }
-
-                const std::string& child = entry.MenuPath[path.size()];
-                if (std::find(excludedChildren.begin(),
-                              excludedChildren.end(),
-                              child) != excludedChildren.end() ||
-                    std::find(children.begin(), children.end(), child) !=
-                        children.end())
-                {
-                    continue;
-                }
-                children.push_back(child);
-            }
-
-            for (const std::string& child : children)
+            for (const std::string& child : RegisteredMenuChildren(entries, path, excludedChildren))
             {
                 if (!ImGui::BeginMenu(child.c_str()))
                     continue;
@@ -2193,6 +2184,33 @@ namespace Extrinsic::Sandbox::Editor
                 return "No active scene with undo history.";
             }
         }
+    }
+
+    std::vector<std::string> RegisteredMenuChildren(const std::span<const EditorWindowMenuEntry> entries,
+        const std::vector<std::string>& path,
+        const std::span<const std::string_view> excluded)
+    {
+        std::vector<std::string> children{};
+        for (const EditorWindowMenuEntry& entry : entries)
+        {
+            if (!RegisteredMenuPathStartsWith(entry, path) || entry.MenuPath.size() == path.size())
+                continue;
+            const std::string& child = entry.MenuPath[path.size()];
+            if (std::ranges::find(excluded, child) == excluded.end() &&
+                std::ranges::find(children, child) == children.end())
+                children.push_back(child);
+        }
+        // Under a Processing menu a group's rank is its list position; any
+        // other submenu ranks past the list, so the stable sort keeps their
+        // registration order. Elsewhere a group name is an ordinary submenu.
+        if (!path.empty() && path.back() == "Processing")
+            std::ranges::stable_sort(children,
+                {},
+                [](const std::string& child)
+                {
+                    return std::ranges::find(kProcessingMenuGroups, child) - kProcessingMenuGroups.begin();
+                });
+        return children;
     }
 
     extern "C++"

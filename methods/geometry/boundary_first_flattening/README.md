@@ -48,7 +48,7 @@ pointer-free UV view model carries UVs, triangle index triples, finite bounds,
 and aggregate diagnostics; it does not invent cones, chart/seam records, or
 per-face distortion. The retired
 [`UI-036`](../../../tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
-panel exposes BFF at `Mesh > Processing > Parameterize (UV)` alongside LSCM,
+panel exposes BFF at `Mesh > Processing > Remeshing & UV > Parameterize (UV)` alongside LSCM,
 harmonic cotangent, and uniform Tutte. BFF mode, boundary data, and tolerances
 stay in an explicit draft until the validated runtime config path accepts them;
 execution then writes undoable `v:texcoord` values. The resizable UV pane draws

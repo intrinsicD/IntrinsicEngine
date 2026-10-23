@@ -248,14 +248,14 @@ TEST(SandboxPointCloudConsolidationPanel,
     };
     const std::array<ExpectedWindow, 3u> expected{{
         {"pointcloud.processing.consolidation",
-         {"PointCloud", "Processing"},
-         "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
+            {"PointCloud", "Processing", "Filtering & Smoothing"},
+            "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
         {"graph.processing.consolidation",
-         {"Graph", "Processing"},
-         "Graph / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
+            {"Graph", "Processing", "Filtering & Smoothing"},
+            "Graph / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
         {"mesh.processing.consolidation",
-         {"Mesh", "Processing"},
-         "Mesh / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
+            {"Mesh", "Processing", "Filtering & Smoothing"},
+            "Mesh / Processing / Consolidate (LOP/WLOP/CLOP/EAR)"},
     }};
 
     EditorUiShellHarness harness{};

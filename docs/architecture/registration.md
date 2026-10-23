@@ -1,8 +1,8 @@
 # ICP registration
 
-Open **Mesh / Processing / ICP Registration**, **Graph / Processing / ICP
-Registration**, or **PointCloud / Processing / ICP Registration**. These entries
-open the same window as **View / ICP Registration**. Choose source and target
+Open **ICP Registration** from **Processing / Reconstruction & Registration** in
+the Mesh, Graph or PointCloud menu. These entries open the same window as
+**View / Processing / Reconstruction & Registration / ICP Registration**. Choose source and target
 entities and their named float3 position properties. Each operand independently
 supports mesh vertices, edges, halfedges and faces; graph nodes, edges and
 halfedges; and point-cloud points. No conversion or compatibility property alias

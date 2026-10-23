@@ -1,7 +1,8 @@
 # Construct from points
 
-The sandbox's **View → Construct from Points** window is also available under
-**Mesh / Graph / PointCloud → Processing**. Choose a canonical float3 position
+The sandbox's **View → Processing → Reconstruction & Registration → Construct
+from Points** window is also available in the same group under **Mesh / Graph /
+PointCloud → Processing**. Choose a canonical float3 position
 property, then Hoppe surface reconstruction or kNN graph construction. These
 operations create a separate mesh or graph; they preserve the source geometry.
 

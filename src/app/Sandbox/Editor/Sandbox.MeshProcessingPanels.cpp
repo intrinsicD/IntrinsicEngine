@@ -527,100 +527,166 @@ namespace Extrinsic::Sandbox::Editor
     {
         Unregister();
         Shell = &editorShell;
-        RegisterWindow("view.property_smoothing", {"View"}, "Smooth Property", &Impl::DrawSmoothingWindow);
+        RegisterWindow("view.property_smoothing",
+            {"View", "Processing", "Filtering & Smoothing"},
+            "Smooth Property",
+            &Impl::DrawSmoothingWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.property_smoothing", "Mesh"},
                 {"graph.processing.property_smoothing", "Graph"},
                 {"pointcloud.processing.property_smoothing", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Smooth Property", "view.property_smoothing");
-        RegisterWindow("view.harmonic_field", {"View"}, "Harmonic Field", &Impl::DrawHarmonicFieldWindow);
-        RegisterWindow("view.laplacian_eigenbasis", {"View"}, "Spectral Modes", &Impl::DrawEigenbasisWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Filtering & Smoothing"}, "Smooth Property", "view.property_smoothing");
+        RegisterWindow("view.harmonic_field",
+            {"View", "Processing", "Fields & Spectral"},
+            "Harmonic Field",
+            &Impl::DrawHarmonicFieldWindow);
+        RegisterWindow("view.laplacian_eigenbasis",
+            {"View", "Processing", "Fields & Spectral"},
+            "Spectral Modes",
+            &Impl::DrawEigenbasisWindow);
         for (const auto& [id, domain] :
             std::initializer_list<std::pair<const char*, const char*>>{{"mesh.processing.laplacian_eigenbasis", "Mesh"},
                 {"graph.processing.laplacian_eigenbasis", "Graph"},
                 {"pointcloud.processing.laplacian_eigenbasis", "PointCloud"}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Spectral Modes", "view.laplacian_eigenbasis");
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Fields & Spectral"}, "Spectral Modes", "view.laplacian_eigenbasis");
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.harmonic_field", "Mesh"},
                 {"graph.processing.harmonic_field", "Graph"},
                 {"pointcloud.processing.harmonic_field", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Harmonic Field", "view.harmonic_field");
-        RegisterWindow("mesh.processing.denoise", {"Mesh", "Processing"}, "Denoise", &Impl::DrawDenoiseWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Fields & Spectral"}, "Harmonic Field", "view.harmonic_field");
+        RegisterWindow("mesh.processing.denoise",
+            {"Mesh", "Processing", "Filtering & Smoothing"},
+            "Denoise",
+            &Impl::DrawDenoiseWindow);
         RegisterWindow("mesh.processing.faces.scalar_gradient",
-            {"Mesh", "Processing", "Faces"},
+            {"Mesh", "Processing", "Fields & Spectral"},
             "Scalar Field Gradient",
             &Impl::DrawGradientWindow);
         RegisterWindow("mesh.processing.geodesics",
-            {"Mesh", "Geodesics"},
+            {"Mesh", "Processing", "Geodesics"},
             "Virtual Source Propagation",
             &Impl::DrawGeodesicsWindow);
-        RegisterWindow("mesh.processing.curvature", {"Mesh", "Processing"}, "Curvature", &Impl::DrawCurvatureWindow);
+        RegisterWindow("mesh.processing.curvature",
+            {"Mesh", "Processing", "Features & Descriptors"},
+            "Curvature",
+            &Impl::DrawCurvatureWindow);
         RegisterWindow("mesh.processing.segmentation",
-            {"Mesh", "Processing"},
+            {"Mesh", "Processing", "Segmentation & Clustering"},
             "Curvature Segmentation",
             &Impl::DrawSegmentationWindow);
+        RegisterWindow("mesh.processing.scalar_ridges",
+            {"Mesh", "Processing", "Features & Descriptors"},
+            "Scalar Ridges",
+            &Impl::DrawScalarRidgesWindow);
         RegisterWindow(
-            "mesh.processing.scalar_ridges", {"Mesh", "Processing"}, "Scalar Ridges", &Impl::DrawScalarRidgesWindow);
-        RegisterWindow("mesh.processing.remesh", {"Mesh", "Processing"}, "Remesh", &Impl::DrawRemeshWindow);
-        RegisterWindow("mesh.processing.subdivide", {"Mesh", "Processing"}, "Subdivide", &Impl::DrawSubdivideWindow);
-        RegisterWindow("mesh.processing.simplify", {"Mesh", "Processing"}, "Simplify", &Impl::DrawSimplifyWindow);
-        RegisterWindow("view.outlier_analysis", {"View"}, "Outlier Analysis", &Impl::DrawOutliersWindow);
+            "mesh.processing.remesh", {"Mesh", "Processing", "Remeshing & UV"}, "Remesh", &Impl::DrawRemeshWindow);
+        RegisterWindow("mesh.processing.subdivide",
+            {"Mesh", "Processing", "Remeshing & UV"},
+            "Subdivide",
+            &Impl::DrawSubdivideWindow);
+        RegisterWindow("mesh.processing.simplify",
+            {"Mesh", "Processing", "Remeshing & UV"},
+            "Simplify",
+            &Impl::DrawSimplifyWindow);
+        RegisterWindow("view.outlier_analysis",
+            {"View", "Processing", "Filtering & Smoothing"},
+            "Outlier Analysis",
+            &Impl::DrawOutliersWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.outliers", "Mesh"},
                 {"graph.processing.outliers", "Graph"},
                 {"pointcloud.processing.remove_outliers", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Outlier Analysis", "view.outlier_analysis");
-        RegisterWindow("view.keypoint_analysis", {"View"}, "ISS Keypoint Analysis", &Impl::DrawKeypointsWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Filtering & Smoothing"}, "Outlier Analysis", "view.outlier_analysis");
+        RegisterWindow("view.keypoint_analysis",
+            {"View", "Processing", "Features & Descriptors"},
+            "ISS Keypoint Analysis",
+            &Impl::DrawKeypointsWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.keypoints", "Mesh"},
                 {"graph.processing.keypoints", "Graph"},
                 {"pointcloud.processing.keypoints", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "ISS Keypoint Analysis", "view.keypoint_analysis");
-        RegisterWindow("view.descriptor_analysis", {"View"}, "FPFH Descriptor Analysis", &Impl::DrawDescriptorsWindow);
+            RegisterRedirectWindow(id,
+                {domain, "Processing", "Features & Descriptors"},
+                "ISS Keypoint Analysis",
+                "view.keypoint_analysis");
+        RegisterWindow("view.descriptor_analysis",
+            {"View", "Processing", "Features & Descriptors"},
+            "FPFH Descriptor Analysis",
+            &Impl::DrawDescriptorsWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.descriptors", "Mesh"},
                 {"graph.processing.descriptors", "Graph"},
                 {"pointcloud.processing.descriptors", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "FPFH Descriptor Analysis", "view.descriptor_analysis");
-        RegisterWindow("view.kernel_density", {"View"}, "Kernel Density", &Impl::DrawDensityWindow);
+            RegisterRedirectWindow(id,
+                {domain, "Processing", "Features & Descriptors"},
+                "FPFH Descriptor Analysis",
+                "view.descriptor_analysis");
+        RegisterWindow("view.kernel_density",
+            {"View", "Processing", "Sampling & Density"},
+            "Kernel Density",
+            &Impl::DrawDensityWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.kernel_density", "Mesh"},
                 {"graph.processing.kernel_density", "Graph"},
                 {"pointcloud.processing.kernel_density", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Kernel Density", "view.kernel_density");
-        RegisterWindow("view.density_weights", {"View"}, "Compact Density Weights", &Impl::DrawDensityWeightsWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Sampling & Density"}, "Kernel Density", "view.kernel_density");
+        RegisterWindow("view.density_weights",
+            {"View", "Processing", "Sampling & Density"},
+            "Compact Density Weights",
+            &Impl::DrawDensityWeightsWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.density_weights", "Mesh"},
                 {"graph.processing.density_weights", "Graph"},
                 {"pointcloud.processing.density_weights", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Compact Density Weights", "view.density_weights");
-        RegisterWindow("view.point_construction", {"View"}, "Construct from Points", &Impl::DrawConstructionWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Sampling & Density"}, "Compact Density Weights", "view.density_weights");
+        RegisterWindow("view.point_construction",
+            {"View", "Processing", "Reconstruction & Registration"},
+            "Construct from Points",
+            &Impl::DrawConstructionWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.point_construction", "Mesh"},
                 {"graph.processing.point_construction", "Graph"},
                 {"pointcloud.processing.point_construction", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Construct from Points", "view.point_construction");
-        RegisterWindow("view.point_spacing", {"View"}, "Point Spacing and Radii", &Impl::DrawSpacingWindow);
+            RegisterRedirectWindow(id,
+                {domain, "Processing", "Reconstruction & Registration"},
+                "Construct from Points",
+                "view.point_construction");
+        RegisterWindow("view.point_spacing",
+            {"View", "Processing", "Sampling & Density"},
+            "Point Spacing and Radii",
+            &Impl::DrawSpacingWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.point_spacing", "Mesh"},
                 {"graph.processing.point_spacing", "Graph"},
                 {"pointcloud.processing.point_spacing", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Point Spacing and Radii", "view.point_spacing");
-        RegisterWindow("view.bilateral_filter", {"View"}, "Bilateral Point Filter", &Impl::DrawBilateralWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Sampling & Density"}, "Point Spacing and Radii", "view.point_spacing");
+        RegisterWindow("view.bilateral_filter",
+            {"View", "Processing", "Filtering & Smoothing"},
+            "Bilateral Point Filter",
+            &Impl::DrawBilateralWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.bilateral_filter", "Mesh"},
                 {"graph.processing.bilateral_filter", "Graph"},
                 {"pointcloud.processing.bilateral_filter", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Bilateral Point Filter", "view.bilateral_filter");
-        RegisterWindow("view.normal_estimation", {"View"}, "Normal Estimation", &Impl::DrawNormalsWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Filtering & Smoothing"}, "Bilateral Point Filter", "view.bilateral_filter");
+        RegisterWindow(
+            "view.normal_estimation", {"View", "Processing", "Normals"}, "Normal Estimation", &Impl::DrawNormalsWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.vertices.normals", "Mesh"},
                 {"graph.processing.vertices.normals", "Graph"},
                 {"pointcloud.processing.vertices.normals", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing", "Vertices"}, "Normals", "view.normal_estimation");
+            RegisterRedirectWindow(id, {domain, "Processing", "Normals"}, "Vertex Normals", "view.normal_estimation");
         Handles.push_back(Shell->RegisterEditorWindow({.Id = "mesh.processing.faces.normals",
-            .MenuPath = {"Mesh", "Processing", "Faces"},
-            .Title = "Normals",
+            .MenuPath = {"Mesh", "Processing", "Normals"},
+            .Title = "Face Normals",
             .Draw =
                 [](bool& open, const SandboxEditorContext&)
             {
@@ -635,20 +701,32 @@ namespace Extrinsic::Sandbox::Editor
                 (void)Shell->SetEditorWindowOpen("view.normal_estimation", true);
                 (void)Shell->SetEditorWindowOpen("mesh.processing.faces.normals", false);
             }}));
-        RegisterWindow("view.registration", {"View"}, "ICP Registration", &Impl::DrawRegistrationWindow);
+        RegisterWindow("view.registration",
+            {"View", "Processing", "Reconstruction & Registration"},
+            "ICP Registration",
+            &Impl::DrawRegistrationWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.registration", "Mesh"},
                 {"graph.processing.registration", "Graph"},
                 {"pointcloud.processing.registration", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "ICP Registration", "view.registration");
-        RegisterWindow(
-            "view.coherent_point_drift", {"View"}, "Coherent Point Drift", &Impl::DrawCoherentPointDriftWindow);
-        RegisterWindow("view.point_sampling", {"View"}, "Point Sampling", &Impl::DrawPointSamplingWindow);
+            RegisterRedirectWindow(
+                id, {domain, "Processing", "Reconstruction & Registration"}, "ICP Registration", "view.registration");
+        RegisterWindow("view.coherent_point_drift",
+            {"View", "Processing", "Reconstruction & Registration"},
+            "Coherent Point Drift",
+            &Impl::DrawCoherentPointDriftWindow);
+        RegisterWindow("view.point_sampling",
+            {"View", "Processing", "Sampling & Density"},
+            "Point Sampling",
+            &Impl::DrawPointSamplingWindow);
         for (const auto& [id, domain] :
             std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.coherent_point_drift", "Mesh"},
                 {"graph.processing.coherent_point_drift", "Graph"},
                 {"pointcloud.processing.coherent_point_drift", "PointCloud"}}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Coherent Point Drift", "view.coherent_point_drift");
+            RegisterRedirectWindow(id,
+                {domain, "Processing", "Reconstruction & Registration"},
+                "Coherent Point Drift",
+                "view.coherent_point_drift");
     }
 
     void MeshProcessingPanels::Impl::Unregister()
@@ -4945,7 +5023,7 @@ namespace Extrinsic::Sandbox::Editor
 
     void MeshProcessingPanels::Impl::DrawGradientWindow(bool& open, const SandboxEditorContext& context)
     {
-        if (!ImGui::Begin("Mesh / Processing / Faces / Scalar Field Gradient", &open))
+        if (!ImGui::Begin("Mesh / Processing / Scalar Field Gradient", &open))
         {
             ImGui::End();
             return;
@@ -5046,7 +5124,7 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::Impl::DrawGeodesicsWindow(bool& open, const SandboxEditorContext& context)
     {
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Mesh / Geodesics / Virtual Source Propagation", &open))
+        if (!ImGui::Begin("Mesh / Processing / Virtual Source Propagation", &open))
         {
             ImGui::End();
             return;

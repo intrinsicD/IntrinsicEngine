@@ -126,7 +126,7 @@ settings remain serialized for switching methods but are hidden and unused by
 METHOD-040. The default remains METHOD-037.
 
 To try METHOD-040, import a triangle OBJ, select the mesh, open **Mesh →
-Processing → Curvature**, choose **Feature boundaries (METHOD-040,
+Processing → Segmentation & Clustering → Curvature Segmentation**, choose **Feature boundaries (METHOD-040,
 experimental curves_v1)**, and press **Run segmentation**. The default checked
 visualization option shows colored regions and hard/soft/closure boundaries;
 **Show result** reapplies that view. The solve is synchronous, so larger inputs

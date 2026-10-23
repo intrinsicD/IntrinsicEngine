@@ -3,7 +3,7 @@
 `Geometry.HarmonicField` interpolates scalar or vector signals from constrained
 rows on a nonnegative weighted graph, solves Poisson and pure-Neumann problems,
 and propagates seed labels with the random walker. Runtime binds it to every canonical element domain through
-**View → Harmonic Field** (also under Mesh/Graph/PointCloud → Processing) and
+**View → Processing → Fields & Spectral → Harmonic Field** (also under Mesh/Graph/PointCloud → Processing → Fields & Spectral) and
 the `sandbox.harmonic_field` config section. It uses the same sample graphs as
 [property smoothing](property-smoothing.md): kNN on any domain, and uniform or
 nonnegative cotangent mesh edges on mesh vertices.
@@ -71,7 +71,7 @@ tracked in GEOM-100.
 | Boundary-value problems (Dirichlet data on the boundary) | Laplace equation, Pinkall–Polthier cotangent weights | Pin mesh boundary, cotangent weights | Supported |
 | Membrane or thin-plate data fitting with per-row confidence | Screened fitting; least-squares meshes (Sorkine–Cohen-Or 2004) | Soft weights, optionally with hard rows | Supported |
 | Screened Poisson / one implicit heat step `(M + tL) u = M u0` | Heat method step (Crane et al. 2013), screened Poisson | Soft weights `m_i / t` on every row with the input as target | Supported (expressed through soft weights) |
-| Robust, total-variation or tolerance-bounded fitting of a noisy signal (e.g. mean curvature) | Rudin–Osher–Fatemi 1992; Huber 1964; Morozov discrepancy principle | `FitProperty`, exposed as **Variational fit** in View → Smooth Property ([property smoothing](property-smoothing.md)) | Supported (IRLS and active set over `Solve`, or ADMM with one factorization) |
+| Robust, total-variation or tolerance-bounded fitting of a noisy signal (e.g. mean curvature) | Rudin–Osher–Fatemi 1992; Huber 1964; Morozov discrepancy principle | `FitProperty`, exposed as **Variational fit** in View → Processing → Filtering & Smoothing → Smooth Property ([property smoothing](property-smoothing.md)) | Supported (IRLS and active set over `Solve`, or ADMM with one factorization) |
 | Bone-heat skinning weights `(-Δ + H) w = H p` | Baran–Popović 2007 (Pinocchio), Blender "automatic weights" | Soft weights `H_i` with target 1 near the bone, 0 elsewhere, one run per bone | Supported (expressed through soft weights) |
 | Poisson problems `-Δu = f` (sources, sinks, potentials) | Poisson surface editing, divergence-driven fields | Source density property (lumped mass on meshes) plus hard rows | Supported |
 | Pure-Neumann Poisson (fields defined up to a constant) | Boundary First Flattening Neumann solve, potential flows, gradient integration | Source + `unconstrained = ZeroMean`, no constraints | Supported |
@@ -94,7 +94,7 @@ tracked in GEOM-100.
 | Entity/domain sources | All eight canonical domains; positions on the input domain, or vertex/node positions for derived face centers and edge/halfedge midpoints. |
 | Runtime owner | `Runtime.MeshFieldOperations.HarmonicField.cpp`; the sample capture and graph construction are shared with property smoothing in `Runtime.MeshFieldOperations.PropertyGraph.cpp`. |
 | Config/agent | `sandbox.harmonic_field`; serialization and preview/apply share one validator. Unused optional bindings are `null`. |
-| UI | View → Harmonic Field and the three domain Processing redirects. |
+| UI | View → Processing → Fields & Spectral → Harmonic Field and the three domain Processing redirects. |
 | Publication | Same domain and cardinality. Field mode writes one output; label mode writes labels and optional confidence in one guarded undo/redo transaction. Inputs and constraint properties are publication guards. |
 | Verification | `Test.HarmonicField.cpp` (kernel), `Test.HarmonicFieldOperations.cpp` (binding, config, history). |
 

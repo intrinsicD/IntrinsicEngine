@@ -1,7 +1,7 @@
 # Point spacing and splat radii
 
-**View → Point Spacing and Radii** (also in mesh, graph and point-cloud
-Processing menus) estimates a named float radius on any canonical float3 sample
+**View → Processing → Sampling & Density → Point Spacing and Radii** (also in
+the mesh, graph and point-cloud Processing menus) estimates a named float radius on any canonical float3 sample
 domain. Choose the entity, positions, output, neighbor backend, k and scale.
 **Estimate radii** uses validated config and publishes an undoable property;
 **Show radii** colors samples through the shared scalar visualization recipe.

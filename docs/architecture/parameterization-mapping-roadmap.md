@@ -306,7 +306,7 @@ Scope:
   invent chart/seam records, per-face distortion, fallback telemetry, or an
   optimized/GPU selector.
 - Retired Sandbox editor panel + resizable UV split view (`UI-036`): the registered
-  `Mesh > Processing > Parameterize (UV)` window offers exactly LSCM, harmonic
+  `Mesh > Processing > Remeshing & UV > Parameterize (UV)` window offers exactly LSCM, harmonic
   cotangent, uniform Tutte, and BFF. A persistent explicit draft holds the
   selected strategy's typed values until Apply routes them through the same
   validated config lane used by files and agents; configured execution writes

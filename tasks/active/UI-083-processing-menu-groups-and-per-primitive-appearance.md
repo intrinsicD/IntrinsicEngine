@@ -360,7 +360,7 @@ Plan:
   independent correctness review bound to its diff.
 
 ## Acceptance criteria
-- [ ] Every processing method sits in one of the nine groups under Mesh, Graph and PointCloud
+- [x] Every processing method sits in one of the nine groups under Mesh, Graph and PointCloud
       `> Processing` and under `View > Processing`; Geodesics is
       `Mesh > Processing > Geodesics > Virtual Source Propagation`.
 - [ ] Vertices lists Position, Normal, Color, Point size; Edges lists Position, Color, Line width;
@@ -419,3 +419,33 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   replaces the round-1 O2 choice of renaming every key, which would have made older scenes with
   a bound attribute fail to load. The change was not re-sent to the reviewer: it is the
   operator's decision and narrows the codec change.
+- 2026-10-23: Slice 1 implemented (grouped processing menus).
+  - Every processing registration in `Sandbox.MeshProcessingPanels.cpp` and
+    `Sandbox.MethodPanels.cpp` sits at `{<menu>, "Processing", <group>}`. Geodesics is
+    `Mesh/Processing/Geodesics`. The normals entries are "Vertex Normals" and "Face Normals"
+    under Normals. Two titles are renamed: `Mesh / Processing / Virtual Source Propagation` and
+    `Mesh / Processing / Scalar Field Gradient`. Window ids are unchanged.
+  - `RegisteredMenuChildren` (exported from `Sandbox.EditorShell.cppm`) now owns the
+    child-name loop of the menu tree. Under a `Processing` parent it orders the groups by a list
+    local to `Sandbox.EditorShell.cpp`.
+  - Deviation from the slice plan: there are no shared group-name constants. Panels use
+    literals, and `ProcessingMenusListTheirGroupsInMenuOrder` fails if any processing window
+    names a group outside the list.
+  - Docs naming the old paths are updated.
+  - Verification: every CPU test of `IntrinsicSandboxEditorIntegrationTests` passes (510/510).
+  - Mutation checks: without the sort the order test fails (registration order); with the sort
+    at every depth `MenuChildrenSortOnlyProcessingGroups` fails.
+  - Layering, doc links, docs sync, task policy and `SourceRules` pass; the module inventory is
+    unchanged; jscpd finds no clone in the changed ranges.
+  - The live menu in a running Sandbox is not checked (slice 5).
+- 2026-10-23: Slice 1 code review (Claude author → Codex reviewer, `codex exec`, requested
+  `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a1688d-73de-77e2-b443-1417368820cb`;
+  recursion protection instruction-only).
+  - Ponytail (author): no findings.
+  - Round 1 on diff sha256 `29b13f18…`: "revise required". C1: two docs still named old paths.
+    C2: the METHOD-040 instructions pointed to Curvature instead of Curvature Segmentation. C3
+    (optional): the sort ran at every menu depth. All fixed; C3 got a red-first test.
+  - Round 2 on `cd2b7acb…`: C1-C3 resolved. New C4: the Progressive Poisson menu test still
+    expected the old paths; the author's suite filter had missed that suite. Fixed, and
+    verification widened to the whole executable.
+  - Round 3 on `83f54e7c…`: verdict verbatim "approve. Still blocking: none".

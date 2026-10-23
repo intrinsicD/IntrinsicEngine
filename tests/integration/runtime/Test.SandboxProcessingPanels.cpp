@@ -956,8 +956,8 @@ TEST(SandboxProcessingPanels, NamedMeshOutputsUseAppearanceWithoutRecomputing)
                           &segmentation.Boundaries, &segmentation.BoundaryColors, &segmentation.HardFeatures,
                           &segmentation.FeatureConfidence, &segmentation.BoundaryRoles, &segmentation.FeatureColors})
         add("mesh.processing.segmentation", "Mesh / Processing / Curvature Segmentation", *property);
-    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", geodesics.DistanceProperty);
-    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", geodesics.SourceMaskProperty);
+    add("mesh.processing.geodesics", "Mesh / Processing / Virtual Source Propagation", geodesics.DistanceProperty);
+    add("mesh.processing.geodesics", "Mesh / Processing / Virtual Source Propagation", geodesics.SourceMaskProperty);
     for (auto* property : {&clustering.Properties->OutputLabels, &clustering.Properties->OutputColors})
         add("mesh.processing.kmeans", "Mesh / Processing / K-Means", *property);
     add("mesh.processing.parameterize_uv", "Mesh / Processing / Parameterize (UV)", parameterization.Texcoords);
@@ -1056,14 +1056,17 @@ TEST(SandboxProcessingPanels, GeodesicsFollowsEntityAndResetsMeshLocalSources)
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.geodesics", true));
     int frame = 0;
-    h.Driver->OnFrame = [&](R::Engine& engine) {
-        auto* window = ImGui::FindWindowByName("Mesh / Geodesics / Virtual Source Propagation");
-        if (!window) return;
+    h.Driver->OnFrame = [&](R::Engine& engine)
+    {
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Virtual Source Propagation");
+        if (!window)
+            return;
         ImGui::SetWindowSize(window, {750, 1600});
         ImGui::SetWindowPos(window, {0, 0});
         ImGui::FocusWindow(window);
         // Opening without a mesh must not consume the initial configured sources.
-        if (frame == 1) EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, first));
+        if (frame == 1)
+            EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, first));
         if (frame == 3 || frame == 12)
             ImGui::ActivateItemByID(window->GetID("Compute geodesics"));
         if (frame == 6)
@@ -1082,7 +1085,8 @@ TEST(SandboxProcessingPanels, GeodesicsFollowsEntityAndResetsMeshLocalSources)
             EXPECT_TRUE(scene.Raw().get<GS::Vertices>(second).Properties.Exists(geodesics.DistanceProperty.Name));
             h.Selection().ClearSelection(scene);
         }
-        if (++frame == 19) engine.RequestExit();
+        if (++frame == 19)
+            engine.RequestExit();
     };
     h.Engine->Run();
     EXPECT_EQ(frame, 19);
@@ -2607,7 +2611,7 @@ TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
     bool completed = false;
     h.Driver->OnFrame = [&](R::Engine& engine) {
         if (++frames > 100) { ADD_FAILURE() << "Geodesics retry did not complete"; engine.RequestExit(); return; }
-        auto* window = ImGui::FindWindowByName("Mesh / Geodesics / Virtual Source Propagation");
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Virtual Source Propagation");
         if (!window) return;
         ImGui::SetWindowSize(window, {800, 1500});
         ImGui::SetWindowPos(window, {0, 0});
@@ -3630,7 +3634,7 @@ TEST(SandboxProcessingPanels, FaceScalarGradientComputesAndShowsVectorfield)
     bool requested = false, shown = false;
     h.Driver->OnFrame = [&](R::Engine& engine) {
         ++frames;
-        auto* window = ImGui::FindWindowByName("Mesh / Processing / Faces / Scalar Field Gradient");
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Scalar Field Gradient");
         if (window)
         {
             ImGui::SetWindowSize(window, {700, 900});
@@ -4126,8 +4130,12 @@ TEST(SandboxProcessingPanels, EigenbasisClampsToTheSpecRange)
 
 TEST(SandboxProcessingPanels, GeodesicsExpansionBudgetClampsToTheSpecRange)
 {
-    ExpectSpecClamp({"mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", "Expansion budget",
-                     "0", R::kGeodesicsConfigSectionName, "\"max_halfedge_expansions\":1,"});
+    ExpectSpecClamp({"mesh.processing.geodesics",
+        "Mesh / Processing / Virtual Source Propagation",
+        "Expansion budget",
+        "0",
+        R::kGeodesicsConfigSectionName,
+        "\"max_halfedge_expansions\":1,"});
 }
 
 // UI-072 slice 3: the topology panels bound their drags by the command owners' tables. The ranges are the

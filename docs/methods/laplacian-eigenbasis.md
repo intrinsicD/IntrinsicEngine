@@ -1,6 +1,6 @@
 # Spectral modes
 
-**View → Spectral Modes** (also under Mesh/Graph/PointCloud → Processing) computes
+**View → Processing → Fields & Spectral → Spectral Modes** (also under Mesh/Graph/PointCloud → Processing → Fields & Spectral) computes
 the k smallest eigenpairs of a modal operator and publishes each mode as a property
 `<prefix><j>` (default `eigen_0`, `eigen_1`, …). The panel shows the eigenvalues as
 a bar chart and a show button for the selected mode, and can additionally publish a
@@ -61,7 +61,7 @@ range and `t`.
 | Entity/domain sources | All eight canonical domains for the graph Laplacian via the shared property-graph capture; mesh operators, mesh weights and lumped mass need mesh vertices and vertex positions. |
 | Runtime owner | `Runtime.MeshFieldOperations.Eigenbasis.cpp`. |
 | Config/agent | `sandbox.laplacian_eigenbasis` (operator, domain, positions, weight, neighbors, spatial_sigma, lumped_mass, count 1–256, output_prefix, max_iterations, tolerance, shell_flexural/length/area, skip_modes, signature_output, signature_scale, distance_source, distance_output, distance_samples). Payloads without the newer fields keep the graph-Laplacian defaults. |
-| UI | View → Spectral Modes with operator selection, shell weights, a signature/distance section, spectrum bar chart and show buttons (`Runtime.EditorPropertyWidgets::DrawEditorSpectrumBarWidget`). |
+| UI | View → Processing → Fields & Spectral → Spectral Modes with operator selection, shell weights, a signature/distance section, spectrum bar chart and show buttons (`Runtime.EditorPropertyWidgets::DrawEditorSpectrumBarWidget`). |
 | Publication | k float or vec3 mode properties plus optional float signature and distance in one guarded undo/redo transaction; outputs of another storage type or duplicate names are rejected. |
 | Verification | `Test.SparseEigensolver.cpp`, `Test.ModalAnalysis.cpp` (finite-difference gradients and Hessian, planar and sphere identities, rigid nullspace, signature invariants), `Test.LaplacianEigenbasisOperations.cpp`, and the ImGui actions in `Test.SandboxProcessingPanels.cpp`. |
 

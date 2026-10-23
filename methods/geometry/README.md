@@ -24,7 +24,7 @@ The stable config tokens are `lscm`, `harmonic_cotangent`, `tutte_uniform`, and
 `bff`; the configured command writes undoable `v:texcoord` values and produces
 the pointer-free UV model consumed by the Sandbox editor. The retired
 [`UI-036`](../../tasks/done/UI-036-sandbox-parameterization-editor-and-uv-split-view.md)
-window at `Mesh > Processing > Parameterize (UV)` exposes exactly those four
+window at `Mesh > Processing > Remeshing & UV > Parameterize (UV)` exposes exactly those four
 strategies, keeps typed edits in an explicit draft, and uses the same validated
 config lane before execution. Its resizable controls/UV split supplies fit,
 unit-square grid/checker, zoom, pan, and aggregate last-run diagnostics. The

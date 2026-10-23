@@ -1,6 +1,6 @@
 # Bilateral point filtering
 
-**View → Bilateral Point Filter**, also available from mesh, graph and point-cloud Processing menus, filters a named position property using a count-matched normal property on the same canonical domain. The default writes `filtered_positions`. **Write to input positions** selects the input property as output for an undoable geometry update. Both choices use the same validated config and execution path.
+**View → Processing → Filtering & Smoothing → Bilateral Point Filter**, also available from the mesh, graph and point-cloud Processing menus, filters a named position property using a count-matched normal property on the same canonical domain. The default writes `filtered_positions`. **Write to input positions** selects the input property as output for an undoable geometry update. Both choices use the same validated config and execution path.
 
 ## Formulation
 

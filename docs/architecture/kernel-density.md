@@ -1,7 +1,7 @@
 # Local Gaussian kernel density
 
-**View → Kernel Density**, also exposed in mesh, graph and point-cloud Processing
-menus, estimates a named float density property on the selected position domain.
+**View → Processing → Sampling & Density → Kernel Density**, also exposed in the
+same group of the mesh, graph and point-cloud Processing menus, estimates a named float density property on the selected position domain.
 Choose a canonical float3 input (including face centers or edge/halfedge samples),
 neighbor backend, k and bandwidth. **Estimate density** applies the shared config
 and command; **Show density** uses the scalar visualization recipe. Undo restores

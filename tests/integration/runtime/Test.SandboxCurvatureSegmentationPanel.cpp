@@ -129,8 +129,7 @@ TEST(SandboxCurvatureSegmentationPanel,
     const Runtime::EditorWindowMenuEntry* entry =
         FindWindow(menu, "mesh.processing.curvature");
     ASSERT_NE(entry, nullptr);
-    EXPECT_EQ(entry->MenuPath,
-              (std::vector<std::string>{"Mesh", "Processing"}));
+    EXPECT_EQ(entry->MenuPath, (std::vector<std::string>{"Mesh", "Processing", "Features & Descriptors"}));
     EXPECT_EQ(entry->Title, "Curvature");
     EXPECT_EQ(
         std::count_if(
@@ -144,7 +143,7 @@ TEST(SandboxCurvatureSegmentationPanel,
     const auto* segmentation = FindWindow(menu, "mesh.processing.segmentation");
     ASSERT_NE(segmentation, nullptr);
     EXPECT_EQ(segmentation->Title, "Curvature Segmentation");
-    EXPECT_EQ(segmentation->MenuPath, (std::vector<std::string>{"Mesh", "Processing"}));
+    EXPECT_EQ(segmentation->MenuPath, (std::vector<std::string>{"Mesh", "Processing", "Segmentation & Clustering"}));
     ASSERT_TRUE(shell.SetEditorWindowOpen("mesh.processing.segmentation", true));
     ASSERT_TRUE(shell.SetEditorWindowOpen(
         "mesh.processing.curvature", true));

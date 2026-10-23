@@ -252,8 +252,7 @@ TEST(SandboxParameterizationPanel, RegistrationIsStableAndIdempotent)
     const Runtime::EditorWindowMenuEntry* entry =
         FindWindow(menu, "mesh.processing.parameterize_uv");
     ASSERT_NE(entry, nullptr);
-    EXPECT_EQ(entry->MenuPath,
-              (std::vector<std::string>{"Mesh", "Processing"}));
+    EXPECT_EQ(entry->MenuPath, (std::vector<std::string>{"Mesh", "Processing", "Remeshing & UV"}));
     EXPECT_EQ(entry->Title, "Parameterize (UV)");
     EXPECT_FALSE(entry->Open);
     EXPECT_EQ(

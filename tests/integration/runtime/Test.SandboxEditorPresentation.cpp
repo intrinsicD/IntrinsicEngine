@@ -454,93 +454,97 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
+    const std::string filtering = "Filtering & Smoothing", normals = "Normals", features = "Features & Descriptors",
+                      segmentation = "Segmentation & Clustering", fields = "Fields & Spectral",
+                      sampling = "Sampling & Density", remeshing = "Remeshing & UV",
+                      reconstruction = "Reconstruction & Registration";
     const std::array<ExpectedWindow, 86> expected{{
         {"view.property_inspector", {"View"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
-        {"pointcloud.processing.remove_outliers", {"PointCloud", "Processing"}},
+        {"pointcloud.processing.remove_outliers", {"PointCloud", "Processing", filtering}},
         {"graph.properties", {"Graph"}},
         {"graph.selection", {"Graph"}},
         {"scene.appearance", {"View"}},
         {"mesh.properties", {"Mesh"}},
         {"mesh.selection", {"Mesh"}},
-        {"pointcloud.processing.kmeans", {"PointCloud", "Processing"}},
-        {"graph.processing.kmeans", {"Graph", "Processing"}},
-        {"mesh.processing.kmeans", {"Mesh", "Processing"}},
-        {"mesh.processing.segmentation", {"Mesh", "Processing"}},
-        {"mesh.processing.scalar_ridges", {"Mesh", "Processing"}},
-        {"pointcloud.processing.progressive_poisson", {"PointCloud", "Processing"}},
-        {"graph.processing.progressive_poisson", {"Graph", "Processing"}},
-        {"pointcloud.processing.consolidation", {"PointCloud", "Processing"}},
-        {"graph.processing.consolidation", {"Graph", "Processing"}},
-        {"mesh.processing.consolidation", {"Mesh", "Processing"}},
-        {"mesh.processing.progressive_poisson", {"Mesh", "Processing"}},
-        {"mesh.processing.parameterize_uv", {"Mesh", "Processing"}},
+        {"pointcloud.processing.kmeans", {"PointCloud", "Processing", segmentation}},
+        {"graph.processing.kmeans", {"Graph", "Processing", segmentation}},
+        {"mesh.processing.kmeans", {"Mesh", "Processing", segmentation}},
+        {"mesh.processing.segmentation", {"Mesh", "Processing", segmentation}},
+        {"mesh.processing.scalar_ridges", {"Mesh", "Processing", features}},
+        {"pointcloud.processing.progressive_poisson", {"PointCloud", "Processing", sampling}},
+        {"graph.processing.progressive_poisson", {"Graph", "Processing", sampling}},
+        {"pointcloud.processing.consolidation", {"PointCloud", "Processing", filtering}},
+        {"graph.processing.consolidation", {"Graph", "Processing", filtering}},
+        {"mesh.processing.consolidation", {"Mesh", "Processing", filtering}},
+        {"mesh.processing.progressive_poisson", {"Mesh", "Processing", sampling}},
+        {"mesh.processing.parameterize_uv", {"Mesh", "Processing", remeshing}},
         {"mesh.uv_atlas_workspace", {"Mesh"}},
-        {"mesh.processing.denoise", {"Mesh", "Processing"}},
-        {"mesh.processing.geodesics", {"Mesh", "Geodesics"}},
-        {"mesh.processing.curvature", {"Mesh", "Processing"}},
-        {"mesh.processing.remesh", {"Mesh", "Processing"}},
-        {"mesh.processing.subdivide", {"Mesh", "Processing"}},
-        {"mesh.processing.simplify", {"Mesh", "Processing"}},
-        {"mesh.processing.vertices.normals", {"Mesh", "Processing", "Vertices"}},
-        {"mesh.processing.faces.normals", {"Mesh", "Processing", "Faces"}},
-        {"mesh.processing.faces.scalar_gradient", {"Mesh", "Processing", "Faces"}},
-        {"view.property_smoothing", {"View"}},
-        {"mesh.processing.property_smoothing", {"Mesh", "Processing"}},
-        {"graph.processing.property_smoothing", {"Graph", "Processing"}},
-        {"pointcloud.processing.property_smoothing", {"PointCloud", "Processing"}},
-        {"view.harmonic_field", {"View"}},
-        {"mesh.processing.harmonic_field", {"Mesh", "Processing"}},
-        {"graph.processing.harmonic_field", {"Graph", "Processing"}},
-        {"pointcloud.processing.harmonic_field", {"PointCloud", "Processing"}},
-        {"view.laplacian_eigenbasis", {"View"}},
-        {"mesh.processing.laplacian_eigenbasis", {"Mesh", "Processing"}},
-        {"graph.processing.laplacian_eigenbasis", {"Graph", "Processing"}},
-        {"pointcloud.processing.laplacian_eigenbasis", {"PointCloud", "Processing"}},
-        {"graph.processing.vertices.normals", {"Graph", "Processing", "Vertices"}},
-        {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", "Vertices"}},
-        {"view.normal_estimation", {"View"}},
-        {"view.kernel_density", {"View"}},
-        {"view.point_spacing", {"View"}},
-        {"view.bilateral_filter", {"View"}},
-        {"view.keypoint_analysis", {"View"}},
-        {"view.descriptor_analysis", {"View"}},
-        {"view.density_weights", {"View"}},
-        {"view.point_construction", {"View"}},
-        {"mesh.processing.kernel_density", {"Mesh", "Processing"}},
-        {"mesh.processing.point_spacing", {"Mesh", "Processing"}},
-        {"mesh.processing.bilateral_filter", {"Mesh", "Processing"}},
-        {"mesh.processing.keypoints", {"Mesh", "Processing"}},
-        {"mesh.processing.descriptors", {"Mesh", "Processing"}},
-        {"mesh.processing.density_weights", {"Mesh", "Processing"}},
-        {"mesh.processing.point_construction", {"Mesh", "Processing"}},
-        {"graph.processing.kernel_density", {"Graph", "Processing"}},
-        {"graph.processing.point_spacing", {"Graph", "Processing"}},
-        {"graph.processing.bilateral_filter", {"Graph", "Processing"}},
-        {"graph.processing.keypoints", {"Graph", "Processing"}},
-        {"graph.processing.descriptors", {"Graph", "Processing"}},
-        {"graph.processing.density_weights", {"Graph", "Processing"}},
-        {"graph.processing.point_construction", {"Graph", "Processing"}},
-        {"pointcloud.processing.kernel_density", {"PointCloud", "Processing"}},
-        {"pointcloud.processing.point_spacing", {"PointCloud", "Processing"}},
-        {"pointcloud.processing.bilateral_filter", {"PointCloud", "Processing"}},
-        {"pointcloud.processing.keypoints", {"PointCloud", "Processing"}},
-        {"pointcloud.processing.descriptors", {"PointCloud", "Processing"}},
-        {"pointcloud.processing.density_weights", {"PointCloud", "Processing"}},
-        {"pointcloud.processing.point_construction", {"PointCloud", "Processing"}},
-        {"view.outlier_analysis", {"View"}},
-        {"mesh.processing.outliers", {"Mesh", "Processing"}},
-        {"graph.processing.outliers", {"Graph", "Processing"}},
-        {"view.registration", {"View"}},
-        {"mesh.processing.registration", {"Mesh", "Processing"}},
-        {"graph.processing.registration", {"Graph", "Processing"}},
-        {"pointcloud.processing.registration", {"PointCloud", "Processing"}},
-        {"view.coherent_point_drift", {"View"}},
-        {"view.point_sampling", {"View"}},
-        {"mesh.processing.coherent_point_drift", {"Mesh", "Processing"}},
-        {"graph.processing.coherent_point_drift", {"Graph", "Processing"}},
-        {"pointcloud.processing.coherent_point_drift", {"PointCloud", "Processing"}},
+        {"mesh.processing.denoise", {"Mesh", "Processing", filtering}},
+        {"mesh.processing.geodesics", {"Mesh", "Processing", "Geodesics"}},
+        {"mesh.processing.curvature", {"Mesh", "Processing", features}},
+        {"mesh.processing.remesh", {"Mesh", "Processing", remeshing}},
+        {"mesh.processing.subdivide", {"Mesh", "Processing", remeshing}},
+        {"mesh.processing.simplify", {"Mesh", "Processing", remeshing}},
+        {"mesh.processing.vertices.normals", {"Mesh", "Processing", normals}},
+        {"mesh.processing.faces.normals", {"Mesh", "Processing", normals}},
+        {"mesh.processing.faces.scalar_gradient", {"Mesh", "Processing", fields}},
+        {"view.property_smoothing", {"View", "Processing", filtering}},
+        {"mesh.processing.property_smoothing", {"Mesh", "Processing", filtering}},
+        {"graph.processing.property_smoothing", {"Graph", "Processing", filtering}},
+        {"pointcloud.processing.property_smoothing", {"PointCloud", "Processing", filtering}},
+        {"view.harmonic_field", {"View", "Processing", fields}},
+        {"mesh.processing.harmonic_field", {"Mesh", "Processing", fields}},
+        {"graph.processing.harmonic_field", {"Graph", "Processing", fields}},
+        {"pointcloud.processing.harmonic_field", {"PointCloud", "Processing", fields}},
+        {"view.laplacian_eigenbasis", {"View", "Processing", fields}},
+        {"mesh.processing.laplacian_eigenbasis", {"Mesh", "Processing", fields}},
+        {"graph.processing.laplacian_eigenbasis", {"Graph", "Processing", fields}},
+        {"pointcloud.processing.laplacian_eigenbasis", {"PointCloud", "Processing", fields}},
+        {"graph.processing.vertices.normals", {"Graph", "Processing", normals}},
+        {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", normals}},
+        {"view.normal_estimation", {"View", "Processing", normals}},
+        {"view.kernel_density", {"View", "Processing", sampling}},
+        {"view.point_spacing", {"View", "Processing", sampling}},
+        {"view.bilateral_filter", {"View", "Processing", filtering}},
+        {"view.keypoint_analysis", {"View", "Processing", features}},
+        {"view.descriptor_analysis", {"View", "Processing", features}},
+        {"view.density_weights", {"View", "Processing", sampling}},
+        {"view.point_construction", {"View", "Processing", reconstruction}},
+        {"mesh.processing.kernel_density", {"Mesh", "Processing", sampling}},
+        {"mesh.processing.point_spacing", {"Mesh", "Processing", sampling}},
+        {"mesh.processing.bilateral_filter", {"Mesh", "Processing", filtering}},
+        {"mesh.processing.keypoints", {"Mesh", "Processing", features}},
+        {"mesh.processing.descriptors", {"Mesh", "Processing", features}},
+        {"mesh.processing.density_weights", {"Mesh", "Processing", sampling}},
+        {"mesh.processing.point_construction", {"Mesh", "Processing", reconstruction}},
+        {"graph.processing.kernel_density", {"Graph", "Processing", sampling}},
+        {"graph.processing.point_spacing", {"Graph", "Processing", sampling}},
+        {"graph.processing.bilateral_filter", {"Graph", "Processing", filtering}},
+        {"graph.processing.keypoints", {"Graph", "Processing", features}},
+        {"graph.processing.descriptors", {"Graph", "Processing", features}},
+        {"graph.processing.density_weights", {"Graph", "Processing", sampling}},
+        {"graph.processing.point_construction", {"Graph", "Processing", reconstruction}},
+        {"pointcloud.processing.kernel_density", {"PointCloud", "Processing", sampling}},
+        {"pointcloud.processing.point_spacing", {"PointCloud", "Processing", sampling}},
+        {"pointcloud.processing.bilateral_filter", {"PointCloud", "Processing", filtering}},
+        {"pointcloud.processing.keypoints", {"PointCloud", "Processing", features}},
+        {"pointcloud.processing.descriptors", {"PointCloud", "Processing", features}},
+        {"pointcloud.processing.density_weights", {"PointCloud", "Processing", sampling}},
+        {"pointcloud.processing.point_construction", {"PointCloud", "Processing", reconstruction}},
+        {"view.outlier_analysis", {"View", "Processing", filtering}},
+        {"mesh.processing.outliers", {"Mesh", "Processing", filtering}},
+        {"graph.processing.outliers", {"Graph", "Processing", filtering}},
+        {"view.registration", {"View", "Processing", reconstruction}},
+        {"mesh.processing.registration", {"Mesh", "Processing", reconstruction}},
+        {"graph.processing.registration", {"Graph", "Processing", reconstruction}},
+        {"pointcloud.processing.registration", {"PointCloud", "Processing", reconstruction}},
+        {"view.coherent_point_drift", {"View", "Processing", reconstruction}},
+        {"view.point_sampling", {"View", "Processing", sampling}},
+        {"mesh.processing.coherent_point_drift", {"Mesh", "Processing", reconstruction}},
+        {"graph.processing.coherent_point_drift", {"Graph", "Processing", reconstruction}},
+        {"pointcloud.processing.coherent_point_drift", {"PointCloud", "Processing", reconstruction}},
     }};
 
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
@@ -571,6 +575,89 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
     engine.Shutdown();
 }
 
+TEST(SandboxEditorPresentation, ProcessingMenusListTheirGroupsInMenuOrder)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MethodPanels methodPanels;
+    Editor::MeshProcessingPanels meshProcessingPanels;
+    Editor::DomainPanels domainPanels;
+    RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
+    const auto menu = shell.BuildEditorWindowMenuModel();
+
+    // The method panels register K-Means (a clustering method) before any
+    // filter, so first-registration order would not give this order.
+    const std::vector<std::string> meshGroups{"Filtering & Smoothing",
+        "Normals",
+        "Features & Descriptors",
+        "Segmentation & Clustering",
+        "Fields & Spectral",
+        "Geodesics",
+        "Sampling & Density",
+        "Remeshing & UV",
+        "Reconstruction & Registration"};
+    const std::vector<std::string> vertexDomainGroups{"Filtering & Smoothing",
+        "Normals",
+        "Features & Descriptors",
+        "Segmentation & Clustering",
+        "Fields & Spectral",
+        "Sampling & Density",
+        "Reconstruction & Registration"};
+    EXPECT_EQ(Editor::RegisteredMenuChildren(menu, {"Mesh", "Processing"}), meshGroups);
+    EXPECT_EQ(Editor::RegisteredMenuChildren(menu, {"Graph", "Processing"}), vertexDomainGroups);
+    EXPECT_EQ(Editor::RegisteredMenuChildren(menu, {"PointCloud", "Processing"}), vertexDomainGroups);
+    EXPECT_EQ(Editor::RegisteredMenuChildren(menu, {"View", "Processing"}),
+        (std::vector<std::string>{"Filtering & Smoothing",
+            "Normals",
+            "Features & Descriptors",
+            "Fields & Spectral",
+            "Sampling & Density",
+            "Reconstruction & Registration"}));
+    EXPECT_EQ(Editor::RegisteredMenuChildren(menu, {"Mesh"}), std::vector<std::string>{"Processing"});
+    ASSERT_NE(FindWindow(menu, "mesh.processing.vertices.normals"), nullptr);
+    ASSERT_NE(FindWindow(menu, "mesh.processing.faces.normals"), nullptr);
+    EXPECT_EQ(FindWindow(menu, "mesh.processing.vertices.normals")->Title, "Vertex Normals");
+    EXPECT_EQ(FindWindow(menu, "mesh.processing.faces.normals")->Title, "Face Normals");
+
+    // Every processing window sits in exactly one group, never directly under Processing.
+    for (const Runtime::EditorWindowMenuEntry& entry : menu)
+    {
+        if (entry.MenuPath.size() < 2u || entry.MenuPath[1] != "Processing")
+            continue;
+        ASSERT_EQ(entry.MenuPath.size(), 3u) << entry.Id;
+        EXPECT_NE(std::ranges::find(meshGroups, entry.MenuPath[2]), meshGroups.end()) << entry.Id;
+    }
+    domainPanels.Unregister();
+    meshProcessingPanels.Unregister();
+    methodPanels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, MenuChildrenSortOnlyProcessingGroups)
+{
+    const auto entry = [](std::vector<std::string> path)
+    {
+        return Runtime::EditorWindowMenuEntry{.MenuPath = std::move(path)};
+    };
+    const std::vector<Runtime::EditorWindowMenuEntry> entries{entry({"Tools", "Analysis"}),
+        entry({"Tools", "Normals"}),
+        entry({"Tools", "Analysis"}),
+        entry({"Tools", "Processing", "Analysis"}),
+        entry({"Tools", "Processing", "Normals"}),
+        entry({"Tools"}),
+        entry({"Mesh"})};
+    // Outside a Processing menu a group name is an ordinary submenu.
+    EXPECT_EQ(Editor::RegisteredMenuChildren(entries, {"Tools"}),
+        (std::vector<std::string>{"Analysis", "Normals", "Processing"}));
+    EXPECT_EQ(Editor::RegisteredMenuChildren(entries, {"Tools", "Processing"}),
+        (std::vector<std::string>{"Normals", "Analysis"}));
+    const std::array<std::string_view, 1> excluded{"Mesh"};
+    EXPECT_EQ(Editor::RegisteredMenuChildren(entries, {}, excluded), std::vector<std::string>{"Tools"});
+}
+
 TEST(SandboxEditorGeodesics, RegistersAndDrawsWindow)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(
@@ -586,13 +673,13 @@ TEST(SandboxEditorGeodesics, RegistersAndDrawsWindow)
     const auto* entry = FindWindow(menu, "mesh.processing.geodesics");
     ASSERT_NE(entry, nullptr);
     EXPECT_EQ(entry->Title, "Virtual Source Propagation");
-    EXPECT_EQ(entry->MenuPath, (std::vector<std::string>{"Mesh", "Geodesics"}));
+    EXPECT_EQ(entry->MenuPath, (std::vector<std::string>{"Mesh", "Processing", "Geodesics"}));
     EXPECT_EQ(std::ranges::count_if(menu, [](const auto& row) {
         return row.Id == "mesh.processing.geodesics";
     }), 1);
     ASSERT_TRUE(shell.SetEditorWindowOpen("mesh.processing.geodesics", true));
     engine.Run();
-    EXPECT_TRUE(ImGuiWindowExists("Mesh / Geodesics / Virtual Source Propagation"));
+    EXPECT_TRUE(ImGuiWindowExists("Mesh / Processing / Virtual Source Propagation"));
 
     panels.Unregister();
     shell.Detach();
@@ -610,13 +697,13 @@ TEST(SandboxEditorProgressivePoisson,
     };
     const std::array<ExpectedWindow, 3u> expected{{
         {"pointcloud.processing.progressive_poisson",
-         {"PointCloud", "Processing"},
+         {"PointCloud", "Processing", "Sampling & Density"},
          "PointCloud / Processing / Progressive Poisson"},
         {"graph.processing.progressive_poisson",
-         {"Graph", "Processing"},
+         {"Graph", "Processing", "Sampling & Density"},
          "Graph / Processing / Progressive Poisson"},
         {"mesh.processing.progressive_poisson",
-         {"Mesh", "Processing"},
+         {"Mesh", "Processing", "Sampling & Density"},
          "Mesh / Processing / Progressive Poisson"},
     }};
 

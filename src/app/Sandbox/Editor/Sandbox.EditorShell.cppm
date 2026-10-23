@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -36,6 +37,14 @@ export namespace Extrinsic::Sandbox::Editor
             const SandboxEditorContext&)> Draw{};
         std::function<void(bool)> OpenStateChanged{};
     };
+
+    // Submenu names directly under `path`, skipping `excluded`. Under a
+    // `Processing` menu the processing groups come in their fixed menu order;
+    // every other submenu keeps first-registration order.
+    [[nodiscard]] std::vector<std::string> RegisteredMenuChildren(
+        std::span<const Runtime::EditorWindowMenuEntry> entries,
+        const std::vector<std::string>& path,
+        std::span<const std::string_view> excluded = {});
 
     extern "C++"
     {

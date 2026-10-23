@@ -1,13 +1,13 @@
 # Normal estimation
 
-Open **View / Normal Estimation**, or **Mesh / Graph / PointCloud → Processing →
-Vertices → Normals**. These menu entries open one shared window. Choose the
+Open **View / Processing / Normals / Normal Estimation**, or **Mesh / Graph /
+PointCloud → Processing → Normals → Vertex Normals**. These menu entries open one shared window. Choose the
 canonical position property, method and named output; then select
 **Estimate normals**. The Entity input follows scene selection, including clearing
 when nothing is selected; an explicit input choice lasts until selection changes.
 **Show normals** selects the named output for color display through the same
 undoable Appearance property configuration on the corresponding surface, edge,
-or point layer. **Mesh → Processing → Faces → Normals**
+or point layer. **Mesh → Processing → Normals → Face Normals**
 opens the same window with `mesh_face_normals`, vertex positions and `f:normal`
 on the face property set selected. **Show face normals** selects Face surface
 appearance and displays the output as a constant color per original face.

@@ -27,7 +27,7 @@ points and edge/face outlines, including occluded selected elements, without
 changing geometry properties or the active scalar/color visualization. Point
 radius is in world units.
 
-In **Mesh / Geodesics / Virtual Source Propagation**, **Use selected vertices as
+In **Mesh / Processing / Geodesics / Virtual Source Propagation**, **Use selected vertices as
 sources** copies the vertex set into the geodesics draft. Compute applies that
 configuration through the normal validated config path. Parameterization offers
 an equivalent action for two ordered LSCM pins and for harmonic/Tutte boundary

@@ -221,7 +221,7 @@ fitting/orientation through the same persisted config. **Show normals** selects
 the output property for Appearance color display on the corresponding surface,
 edge, or point layer. Processing Show actions resolve already-published output
 properties independently of whether the current method parameters can run.
-Mesh / Processing / Faces / Scalar Field Gradient binds a vertex scalar and
+Mesh / Processing / Scalar Field Gradient (menu group Fields & Spectral) binds a vertex scalar and
 vertex positions, then publishes a face `vec3` property (`f:scalar_gradient` by
 default) with undo/redo. **Show Gradient Vectorfield** adds the output to the
 mesh's Appearance vector fields, with arrows anchored at face centers. Bindings
@@ -230,15 +230,15 @@ the same validation path. This operation requires triangle faces and finite
 scalar values; degenerate triangles produce zero vectors. Polygon meshes must
 be triangulated first. Arrow scale, color and visibility use Appearance controls.
 
-Mesh / Processing / Faces / Normals presets full-polygon face-normal computation
+Mesh / Processing / Normals / Face Normals presets full-polygon face-normal computation
 and a face output (`f:normal`), with a button to display its object-space colors. It
 uses the persisted `sandbox.normal_estimation` config and canonical property bindings. The panels own their ImGui
 input/result-presentation state, and consumes only runtime snapshots and typed
 operations. Curvature has its own `sandbox.mesh_curvature` config: a vertex
 position input, four scalar outputs, and two principal-direction outputs.
 **Show <property name>** selects an existing output through the same Appearance
-command path without recomputing it. Mesh / Processing / Curvature Segmentation
-is a separate window with production METHOD-037 and diagnostic
+command path without recomputing it. Curvature Segmentation (Mesh / Processing /
+Segmentation & Clustering) is a separate window with production METHOD-037 and diagnostic
 METHOD-039/METHOD-040 choices through the registered
 `sandbox.curvature_segmentation` draft/apply/reload lane. Select **Feature
 boundaries (METHOD-040, experimental curves_v1)** and **Run segmentation** to
@@ -367,7 +367,12 @@ or graphics state.
 The promoted editor also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
 domain windows for render-hint status, visualization/spatial-debug controls,
-primitive-selection details, and processing-discovery affordances. These
+primitive-selection details, and processing-discovery affordances. Processing
+windows sit in group submenus under each domain's `Processing` menu and under
+`View > Processing`: Filtering & Smoothing, Normals, Features & Descriptors,
+Segmentation & Clustering, Fields & Spectral, Geodesics, Sampling & Density,
+Remeshing & UV, Reconstruction & Registration (in that order; a menu shows
+only the groups it has windows in). These
 windows are registered by the app-owned `Sandbox.Editor.DomainPanels` module
 through `Sandbox.Editor.Shell`'s contribution seam backed by
 `Runtime.EditorWindowRegistry`; runtime has no fixed Sandbox windows or
@@ -390,7 +395,7 @@ created. The one Appearance window (`UI-075`) reuses the same predicate
 Edges and Faces, a graph Vertices and Edges, a point cloud Vertices.
 
 `Mesh`, `Graph`, and `PointCloud` each expose a stable `Processing >
-Consolidate (LOP/WLOP/CLOP/EAR)` entry. All three open the same panel path and
+Filtering & Smoothing > Consolidate (LOP/WLOP/CLOP/EAR)` entry. All three open the same panel path and
 shared state; the menu location is only a discovery surface and does not gate
 the selected entity's provenance. A Position slot accepts any finite `vec3`
 property in the selected entity's canonical property catalog, including mesh
@@ -423,7 +428,7 @@ with the exact runtime diagnostic. If config control, the service, a selected
 compatible property, or a valid strategy is unavailable, controls fail closed
 rather than using a panel-private path.
 
-`Mesh > Processing > Parameterize (UV)` exposes exactly the four CPU strategies
+`Mesh > Processing > Remeshing & UV > Parameterize (UV)` exposes exactly the four CPU strategies
 implemented by `Runtime.ParameterizationOperations`: LSCM, harmonic cotangent, uniform Tutte, and
 Boundary First Flattening. Its controls keep an explicit panel-local draft for
 the selected strategy's typed values; edits remain marked as unapplied until
@@ -676,20 +681,20 @@ ICP registration supports named point properties across mesh, graph and point-cl
 
 [Kernel Density](../../../docs/architecture/kernel-density.md) binds point-valued
 properties on all domains to CPU octree, cached CPU LBVH or Vulkan neighborhoods.
-Open **View → Kernel Density**, choose the input/backend/bandwidth and run
+Open **View → Processing → Sampling & Density → Kernel Density**, choose the input/backend/bandwidth and run
 **Estimate density**; **Show density** displays the named output. The same
 `sandbox.kernel_density` config drives UI and agent commands.
 
 [Point Spacing and Radii](../../../docs/architecture/point-spacing.md) exposes canonical positions, radius output, k, scale and CPU/Vulkan neighborhoods through View and geometry Processing menus. Show radii uses scalar colors; model-space radius rendering is tracked by RUNTIME-222.
 
-Property filtering is available through **View → Smooth Property** and each
-geometry domain's Processing menu. Select a floating scalar/vector input and
+Property filtering is available through **View → Processing → Filtering & Smoothing → Smooth
+Property** and the same group of each geometry domain's Processing menu. Select a floating scalar/vector input and
 a same-domain output; filter settings round-trip in `sandbox.property_smoothing`.
 Implicit backward Euler supports cotangent weights, lumped mesh areas, boundary
 pinning, and a sparse Cholesky (default) or conjugate-gradient solver. Select positions as both input and output to smooth geometry.
 See [property smoothing](../../../docs/methods/property-smoothing.md).
 
-**View → Harmonic Field** (and each domain's Processing menu) interpolates a
+**View → Processing → Fields & Spectral → Harmonic Field** (and each domain's Processing menu) interpolates a
 floating property from hard-mask, soft-weight or pinned-boundary rows with an
 optional Poisson source (harmonic, biharmonic or triharmonic; zero-mean Neumann
 for unconstrained parts), or propagates Int32 seed labels (random walker) with

@@ -1,6 +1,6 @@
 # Outlier analysis
 
-**View → Outlier Analysis** and the Mesh, Graph, and PointCloud Processing menus
+**View → Processing → Filtering & Smoothing → Outlier Analysis** and the same group of the Mesh, Graph, and PointCloud Processing menus
 open one window. Select an entity and a canonical `vec3` property, choose
 Statistical, Radius or Local distance ratio, then **Detect outliers**. CPU detection publishes two named
 properties on the selected element domain: `outlier_mask` (`uint32`, 1 rejects,

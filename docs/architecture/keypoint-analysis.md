@@ -1,6 +1,6 @@
 # ISS-style keypoint analysis
 
-**View → ISS Keypoint Analysis**, also exposed by mesh, graph and point-cloud Processing menus, publishes a named uint32 keypoint mask and float saliency on the selected position property's domain. The same validated config and execution commands serve UI and config/agent callers. Mask and saliency display use existing label and scalar visualization recipes.
+**View → Processing → Features & Descriptors → ISS Keypoint Analysis**, also exposed by the mesh, graph and point-cloud Processing menus, publishes a named uint32 keypoint mask and float saliency on the selected position property's domain. The same validated config and execution commands serve UI and config/agent callers. Mask and saliency display use existing label and scalar visualization recipes.
 
 ## Formulation
 

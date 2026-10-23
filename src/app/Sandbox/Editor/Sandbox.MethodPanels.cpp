@@ -604,47 +604,38 @@ namespace Extrinsic::Sandbox::Editor
             Unregister();
             Shell = &editorShell;
 
-            RegisterKMeansWindow(
-                Runtime::EditorDomainWindowKind::PointCloud,
+            RegisterKMeansWindow(Runtime::EditorDomainWindowKind::PointCloud,
                 "pointcloud.processing.kmeans",
-                {"PointCloud", "Processing"},
+                {"PointCloud", "Processing", "Segmentation & Clustering"},
                 "PointCloud / Processing / K-Means");
-            RegisterKMeansWindow(
-                Runtime::EditorDomainWindowKind::Graph,
+            RegisterKMeansWindow(Runtime::EditorDomainWindowKind::Graph,
                 "graph.processing.kmeans",
-                {"Graph", "Processing"},
+                {"Graph", "Processing", "Segmentation & Clustering"},
                 "Graph / Processing / K-Means");
-            RegisterKMeansWindow(
-                Runtime::EditorDomainWindowKind::Mesh,
+            RegisterKMeansWindow(Runtime::EditorDomainWindowKind::Mesh,
                 "mesh.processing.kmeans",
-                {"Mesh", "Processing"},
+                {"Mesh", "Processing", "Segmentation & Clustering"},
                 "Mesh / Processing / K-Means");
-            RegisterProgressivePoissonWindow(
-                Runtime::EditorDomainWindowKind::PointCloud,
+            RegisterProgressivePoissonWindow(Runtime::EditorDomainWindowKind::PointCloud,
                 "pointcloud.processing.progressive_poisson",
-                {"PointCloud", "Processing"},
+                {"PointCloud", "Processing", "Sampling & Density"},
                 "PointCloud / Processing / Progressive Poisson");
-            RegisterProgressivePoissonWindow(
-                Runtime::EditorDomainWindowKind::Graph,
+            RegisterProgressivePoissonWindow(Runtime::EditorDomainWindowKind::Graph,
                 "graph.processing.progressive_poisson",
-                {"Graph", "Processing"},
+                {"Graph", "Processing", "Sampling & Density"},
                 "Graph / Processing / Progressive Poisson");
-            RegisterProgressivePoissonWindow(
-                Runtime::EditorDomainWindowKind::Mesh,
+            RegisterProgressivePoissonWindow(Runtime::EditorDomainWindowKind::Mesh,
                 "mesh.processing.progressive_poisson",
-                {"Mesh", "Processing"},
+                {"Mesh", "Processing", "Sampling & Density"},
                 "Mesh / Processing / Progressive Poisson");
-            RegisterPointSetConsolidationWindow(
-                "pointcloud.processing.consolidation",
-                {"PointCloud", "Processing"},
+            RegisterPointSetConsolidationWindow("pointcloud.processing.consolidation",
+                {"PointCloud", "Processing", "Filtering & Smoothing"},
                 "PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
-            RegisterPointSetConsolidationWindow(
-                "graph.processing.consolidation",
-                {"Graph", "Processing"},
+            RegisterPointSetConsolidationWindow("graph.processing.consolidation",
+                {"Graph", "Processing", "Filtering & Smoothing"},
                 "Graph / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
-            RegisterPointSetConsolidationWindow(
-                "mesh.processing.consolidation",
-                {"Mesh", "Processing"},
+            RegisterPointSetConsolidationWindow("mesh.processing.consolidation",
+                {"Mesh", "Processing", "Filtering & Smoothing"},
                 "Mesh / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
             RegisterParameterizationWindow();
         }
@@ -778,20 +769,17 @@ namespace Extrinsic::Sandbox::Editor
 
         void RegisterParameterizationWindow()
         {
-            Handles.push_back(Shell->RegisterEditorWindow(
-                EditorWindowDescriptor{
-                    .Id = "mesh.processing.parameterize_uv",
-                    .MenuPath = {"Mesh", "Processing"},
-                    .Title = "Parameterize (UV)",
-                    .OpenByDefault = false,
-                    .Draw =
-                        [this](
-                            bool& open,
-                            const SandboxEditorContext& context)
-                        {
-                            DrawParameterizationWindow(open, context);
-                        },
-                }));
+            Handles.push_back(Shell->RegisterEditorWindow(EditorWindowDescriptor{
+                .Id = "mesh.processing.parameterize_uv",
+                .MenuPath = {"Mesh", "Processing", "Remeshing & UV"},
+                .Title = "Parameterize (UV)",
+                .OpenByDefault = false,
+                .Draw =
+                    [this](bool& open, const SandboxEditorContext& context)
+                {
+                    DrawParameterizationWindow(open, context);
+                },
+            }));
             Handles.push_back(Shell->RegisterEditorWindow(
                 EditorWindowDescriptor{
                     .Id = std::string{kAtlasWorkspaceWindowId},
