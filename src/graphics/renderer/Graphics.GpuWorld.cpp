@@ -149,9 +149,12 @@ namespace Extrinsic::Graphics
             std::uint64_t GatherUploadedStamp = 0;
             std::uint64_t CopiedStamp = 0;
             std::uint64_t CopiedGatherStamp = 0;
+            // Global frame number of the last recorded copy; it reached the block only once
+            // the device frame number moved past it (a submitted frame, BUG-232).
+            std::uint64_t CopiedFrame = 0;
             bool Recopy = true;
-            // RUNTIME-293: the front was accepted; the next copy ends the preview and leaves
-            // the (already patched) shadow authoritative.
+            // RUNTIME-293: the front was accepted; once a submitted frame carried its copy the
+            // preview ends and leaves the (already patched) shadow authoritative.
             bool CommitOnCopy = false;
             // The accepted front's lease while its copy is pending (RUNTIME-311).
             std::shared_ptr<const void> SourceLease{};
@@ -708,6 +711,31 @@ namespace Extrinsic::Graphics
                 return now >= retiring.Frame && now - retiring.Frame > inFlight;
             });
         }
+        // BUG-232: a copy recorded in a frame whose submit failed (the device frame number did
+        // not move past it) never reached the block, so it is recorded again. A commit copy that
+        // a submitted frame carried ends its preview: the shadow already holds the accepted bytes.
+        void SettleRecordedCopies()
+        {
+            if (!Device) return;
+            const std::uint64_t now = Device->GetGlobalFrameNumber();
+            for (auto it = PositionPreviews.begin(); it != PositionPreviews.end();)
+            {
+                PositionPreview& preview = it->second;
+                if (!preview.Recopy && now <= preview.CopiedFrame)
+                    preview.Recopy = true;
+                if (preview.Recopy || !preview.CommitOnCopy)
+                {
+                    ++it;
+                    continue;
+                }
+                if (it->first < GeometryAllocations.size())
+                    GeometryAllocations[it->first].PositionShadowStale = false;
+                // Retired at the copy's frame, not now: the lease follows that frame's completion.
+                if (preview.SourceLease)
+                    RetiringSourceLeases.push_back({preview.CopiedFrame, std::move(preview.SourceLease)});
+                it = PositionPreviews.erase(it);
+            }
+        }
         RHI::PipelineHandle PositionGatherPipeline{};
 
         [[nodiscard]] std::uint64_t IssueGeometryContentRevision() noexcept
@@ -1120,15 +1148,8 @@ namespace Extrinsic::Graphics
                 }
                 preview.CopiedStamp = preview.Stamp;
                 preview.CopiedGatherStamp = preview.GatherStamp;
+                preview.CopiedFrame = Device->GetGlobalFrameNumber();
                 preview.Recopy = false;
-                if (preview.CommitOnCopy)
-                {
-                    // The accepted front is in the block now, and the shadow already holds
-                    // its bytes (CommitGeometryPositions): the preview is over.
-                    allocation.PositionShadowStale = false;
-                    it = ErasePreview(it); // the copy just recorded holds the front until its frame completes
-                    continue;
-                }
                 allocation.PositionShadowStale = true;
                 ++it;
             }
@@ -1989,10 +2010,13 @@ namespace Extrinsic::Graphics
         // The block holds the front when its last copy read this very publication and no
         // newer front or block rewrite followed. The stamp is the residency's publication
         // number, not the buffer: a ring slot is reused with the same buffer, so only a
-        // copied stamp equal to the preview's and the accepted one is the same bytes.
+        // copied stamp equal to the preview's and the accepted one is the same bytes. Accept
+        // runs before SyncFrame settles the last copy, so its frame must have been submitted.
         const bool holdsFront =
             preview != m_Impl->PositionPreviews.end() &&
             !preview->second.Recopy &&
+            m_Impl->Device != nullptr &&
+            m_Impl->Device->GetGlobalFrameNumber() > preview->second.CopiedFrame &&
             preview->second.Source == desc.Source &&
             preview->second.SourceOffsetBytes == desc.SourceOffsetBytes &&
             preview->second.CopiedStamp == desc.Stamp &&
@@ -2022,9 +2046,9 @@ namespace Extrinsic::Graphics
             }
             return GeometryPositionCommitStatus::Committed;
         }
-        // One copy of the accepted front at the next culling head; until then the block
-        // shows older bytes the shadow does not describe (a replay skips the range and
-        // the copy fills it).
+        // One copy of the accepted front at the next culling head (recorded again while its
+        // frame's submit fails); until a submitted frame carried it the block shows older bytes
+        // the shadow does not describe (a replay skips the range and the copy fills it).
         auto& pending = m_Impl->PositionPreviews[geometry.Index];
         m_Impl->RetireSourceLease(pending);
         pending.SourceLease = desc.SourceLease;
@@ -2386,6 +2410,7 @@ namespace Extrinsic::Graphics
         ++m_Impl->FrameIndex;
         m_Impl->InstanceSlots.RetirePending(m_Impl->FrameIndex);
         m_Impl->GeometrySlots.RetirePending(m_Impl->FrameIndex);
+        m_Impl->SettleRecordedCopies();
         m_Impl->ReleaseRetiredSourceLeases();
 
         if (!m_Impl->Device || !m_Impl->Initialized || !m_Impl->Device->IsOperational())

@@ -127,6 +127,14 @@ namespace
             return count;
         }
 
+        // The frame's EndFrame. MockDevice, like VulkanDevice::EndFrame, advances the global
+        // frame number only when the frame was submitted (BUG-232).
+        void EndFrame(const bool submitted)
+        {
+            Device.AdvanceGlobalFrameOnEndFrame = submitted;
+            Device.EndFrame(RHI::FrameHandle{});
+        }
+
         [[nodiscard]] bool HasBarrier(const RHI::BufferHandle buffer,
                                       const RHI::MemoryAccess before,
                                       const RHI::MemoryAccess after) const
@@ -214,6 +222,7 @@ TEST(GpuWorldPositionPreviewContract, CompactionDoesNotReplayAStaleShadowAndReco
     ASSERT_TRUE(f.View(c).PositionShadowStale);
 
     f.World.FreeGeometry(b);
+    f.EndFrame(true); // the copy's frame was submitted: only the compaction re-arms the copy
     f.World.SyncFrame();
     const auto plan = f.World.PlanManagedBufferCompaction();
     ASSERT_TRUE(plan.ShouldCompact);
@@ -489,6 +498,45 @@ TEST(GpuWorldPositionPreviewContract, AFailedGatherPipelineAfterARebuildReplaysT
     EXPECT_TRUE(f.View(geometry).PositionShadowStale);
 }
 
+// BUG-232: a recorded copy is only done once its frame was submitted; a copy whose frame's
+// submit failed is recorded again at the next culling head, without a stamp change.
+TEST(GpuWorldPositionPreviewContract, APreviewCopyLostToAFailedSubmitIsRecordedAgain)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(1u)), Status::Accepted);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+
+    // Control: a submitted copy is not repeated, nor after a later failed frame that recorded none.
+    for (const bool submitted : {true, false})
+    {
+        f.EndFrame(submitted);
+        ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(1u)), Status::Accepted);
+        f.World.SyncFrame();
+        f.World.SubmitPendingUploadBarriers(f.Commands);
+        EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 1u) << "submitted=" << submitted;
+    }
+
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(2u)), Status::Accepted);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 2u);
+    f.EndFrame(false);
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(2u)), Status::Accepted);
+    f.World.SyncFrame();
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 3u) << "the lost copy is recorded again";
+    EXPECT_EQ(f.Commands.CopyBufferRecords.back().Src, f.Front);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.back().DstOffset, f.BlockPositionOffset(geometry));
+    EXPECT_TRUE(f.View(geometry).PositionShadowStale);
+
+    f.EndFrame(true);
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(2u)), Status::Accepted);
+    f.World.SyncFrame();
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 3u) << "the submitted retry is not repeated";
+}
+
 // RUNTIME-293 (ADR 0030 decision 6): Accept of GPU-authored positions patches only the
 // position range of the shadow, keeps the copied front in the block (no upload), and ends
 // the preview; a block that does not hold the front copies it once at the next culling head;
@@ -546,6 +594,7 @@ TEST(GpuWorldPositionCommitContract, CommitOfACopiedFrontPatchesOnlyThePositionS
     ASSERT_TRUE(before.PositionShadowStale);
     const std::size_t writesBefore = f.Device.BufferWrites.size();
 
+    f.EndFrame(true); // the next frame's extraction accepts the copied front
     const auto bytes = ShiftedPositionBytes();
     ASSERT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, bytes, 1u)), CommitStatus::Committed);
     const auto after = f.View(geometry);
@@ -589,6 +638,8 @@ TEST(GpuWorldPositionCommitContract, CommitWithoutACopiedFrontCopiesItOnceThenEn
     ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
     EXPECT_EQ(f.Commands.CopyBufferRecords.back().Src, f.Front);
     EXPECT_EQ(f.Commands.CopyBufferRecords.back().DstOffset, f.BlockPositionOffset(geometry));
+    f.EndFrame(true);
+    f.World.SyncFrame();
     EXPECT_FALSE(f.View(geometry).PositionShadowStale) << "the shadow describes the copied block";
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 1u) << "one copy, then the preview is over";
@@ -602,13 +653,15 @@ TEST(GpuWorldPositionCommitContract, CommitWithoutACopiedFrontCopiesItOnceThenEn
     ASSERT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, bytes, 9u)), CommitStatus::CopyPending);
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 3u);
+    f.EndFrame(true);
+    f.World.SyncFrame();
     EXPECT_FALSE(f.View(geometry).PositionShadowStale);
 }
 
-// RUNTIME-311: a pending commit copy holds the accepted front's residency lease. Once the copy
-// is recorded (or the commit is superseded) the lease is retired, and it is released only after
-// the frame that may have recorded the copy completed (`GetFramesInFlight`), however late the
-// culling head runs; Shutdown drops every lease.
+// RUNTIME-311: a pending commit copy holds the accepted front's residency lease. Once a submitted
+// frame carried the copy (BUG-232), or the commit is superseded, the lease is retired, and it is
+// released only after the frame that may have recorded the copy completed (`GetFramesInFlight`),
+// however late the culling head runs; Shutdown drops every lease.
 TEST(GpuWorldPositionCommitContract, APendingCopyHoldsTheFrontLeaseUntilItsFrameCompleted)
 {
     Fixture f;
@@ -625,12 +678,13 @@ TEST(GpuWorldPositionCommitContract, APendingCopyHoldsTheFrontLeaseUntilItsFrame
     f.World.SubmitPendingUploadBarriers(f.Commands);
     ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
     const auto recorded = f.Device.GlobalFrameNumber;
-    for (std::uint64_t frame = 0; frame <= f.Device.FramesInFlight; ++frame)
+    for (std::uint64_t frame = 0; frame < f.Device.FramesInFlight; ++frame)
     {
+        f.EndFrame(true);
         f.World.SyncFrame();
         EXPECT_GT(lease.use_count(), 1) << "the recorded copy may still read the front at frame " << f.Device.GlobalFrameNumber;
-        ++f.Device.GlobalFrameNumber;
     }
+    f.EndFrame(true);
     ASSERT_GT(f.Device.GlobalFrameNumber - recorded, f.Device.FramesInFlight);
     f.World.SyncFrame();
     EXPECT_EQ(lease.use_count(), 1) << "released once the copy's frame completed";
@@ -793,6 +847,8 @@ TEST(GpuWorldPositionCommitContract, ARecycledSlotRepublishedAfterTheLastCopyIsC
     f.World.SubmitPendingUploadBarriers(f.Commands);
     ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 2u) << "the republished slot is copied again";
     EXPECT_EQ(f.Commands.CopyBufferRecords.back().Src, first.Buffer);
+    f.EndFrame(true);
+    f.World.SyncFrame();
     EXPECT_FALSE(f.View(geometry).PositionShadowStale);
     EXPECT_EQ(f.View(geometry).PositionFingerprint, ShiftedFingerprint());
 
@@ -803,8 +859,79 @@ TEST(GpuWorldPositionCommitContract, ARecycledSlotRepublishedAfterTheLastCopyIsC
     ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, previewOf(fourth)), Status::Accepted);
     f.World.SubmitPendingUploadBarriers(f.Commands);
     ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 3u);
+    f.EndFrame(true);
     ASSERT_EQ(f.World.CommitGeometryPositions(geometry, commitOf(fourth)), CommitStatus::Committed);
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 3u);
     residency.Discard(key);
+}
+
+// BUG-232: a commit copy recorded in a frame whose submit failed never reached the block. The
+// accepted front stays leased and is copied again (no CPU upload); the shadow becomes current,
+// and the lease is retired, only once a submitted frame carried the copy.
+TEST(GpuWorldPositionCommitContract, ACommitCopyWhoseFrameWasNotSubmittedIsCopiedAgain)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    const std::size_t writesBefore = f.Device.BufferWrites.size();
+    auto lease = std::make_shared<int>(0);
+    auto commit = Commit(f, bytes, 7u);
+    commit.SourceLease = lease;
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, commit), CommitStatus::CopyPending);
+    commit.SourceLease.reset();
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+    EXPECT_TRUE(f.View(geometry).PositionShadowStale) << "a recorded copy is not done before its frame was submitted";
+
+    f.EndFrame(false);
+    f.World.SyncFrame();
+    EXPECT_GT(lease.use_count(), 1) << "the front stays leased for the retry";
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 2u) << "the lost copy is recorded again";
+    const auto& first = f.Commands.CopyBufferRecords[0];
+    const auto& again = f.Commands.CopyBufferRecords[1];
+    EXPECT_EQ(again.Src, first.Src);
+    EXPECT_EQ(again.DstOffset, first.DstOffset);
+    EXPECT_EQ(again.Size, first.Size);
+    EXPECT_TRUE(f.View(geometry).PositionShadowStale);
+    EXPECT_EQ(f.VertexWritesOverlapping(f.BlockPositionOffset(geometry), kPositionBytes, writesBefore), 0u)
+        << "restored by the copy, not by a CPU upload";
+
+    f.EndFrame(true);
+    f.World.SyncFrame();
+    EXPECT_FALSE(f.View(geometry).PositionShadowStale) << "the submitted copy holds the accepted front";
+    EXPECT_EQ(f.View(geometry).PositionFingerprint, ShiftedFingerprint());
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 2u) << "then the commit copy is over";
+    EXPECT_GT(lease.use_count(), 1) << "retired, not yet released";
+    for (std::uint32_t frame = 0; frame < f.Device.FramesInFlight; ++frame)
+    {
+        f.EndFrame(true);
+        f.World.SyncFrame();
+    }
+    EXPECT_EQ(lease.use_count(), 1) << "released after the submitted copy's frames in flight";
+}
+
+// BUG-232: Accept runs in the next frame's extraction, before that frame's SyncFrame. A preview
+// copy whose frame was not submitted does not make the block hold the accepted front.
+TEST(GpuWorldPositionCommitContract, AcceptAfterAFailedSubmitDoesNotKeepTheLostPreviewCopy)
+{
+    Fixture f;
+    const auto geometry = f.World.UploadGeometry(TriangleUpload());
+    const auto bytes = ShiftedPositionBytes();
+    ASSERT_EQ(f.World.SetGeometryPositionPreview(geometry, f.Preview(1u)), Status::Accepted);
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
+
+    f.EndFrame(false);
+    ASSERT_EQ(f.World.CommitGeometryPositions(geometry, Commit(f, bytes, 1u)), CommitStatus::CopyPending);
+    f.World.SyncFrame();
+    f.World.SubmitPendingUploadBarriers(f.Commands);
+    ASSERT_EQ(f.Commands.CopyBufferRecords.size(), 2u) << "the accepted front is copied again";
+    EXPECT_TRUE(f.View(geometry).PositionShadowStale);
+    f.EndFrame(true);
+    f.World.SyncFrame();
+    EXPECT_FALSE(f.View(geometry).PositionShadowStale);
+    EXPECT_EQ(f.View(geometry).PositionFingerprint, ShiftedFingerprint());
 }
