@@ -364,6 +364,9 @@ For each change:
       CTest command just run.
     - For noisy commands, capture full output with `tee`, display a bounded tail, and use `set -o pipefail` so filtering
       does not hide failures.
+    - Before clean, multi-preset or sanitizer builds, check free space on the repository volume and reclaim only
+      inactive generated artifacts, per [Disk headroom](../../../../../docs/build-troubleshooting.md#disk-headroom). A run that could not
+      write its logs or result records is incomplete evidence, not a pass.
 - The full CPU-supported correctness gate (operator-triggered, justified as above, or run by PR/merge CI) is:
 
   ```bash

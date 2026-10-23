@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import importlib.util
+import io
 import json
 import os
+import resource
+import signal
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 import yaml
 
@@ -223,6 +230,8 @@ class Fixture:
             "TEST-001",
             "--label",
             label,
+            "--min-free-gib",
+            "0",
             "--",
             executable,
         ).returncode
@@ -976,6 +985,106 @@ class WorkflowEvidenceTests(unittest.TestCase):
             fixture.review()
             result = fixture.validate()
         self.assertEqual(result.returncode, 0, result.stdout)
+
+
+def load_tool():
+    spec = importlib.util.spec_from_file_location("workflow_evidence_under_test", TOOL)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def record_with_write_limit(
+    repo: Path, label: str, *command: str
+) -> subprocess.CompletedProcess[str]:
+    """Writes past 256 bytes fail with EFBIG; no volume is filled, no mount needed."""
+
+    def limit() -> None:
+        signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+        resource.setrlimit(resource.RLIMIT_FSIZE, (256, 256))
+
+    return subprocess.run(
+        [
+            sys.executable,
+            str(TOOL),
+            "record-command",
+            "--root",
+            str(repo),
+            "--task-id",
+            "TEST-001",
+            "--label",
+            label,
+            "--min-free-gib",
+            "0",
+            "--",
+            *command,
+        ],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        preexec_fn=limit,
+        check=False,
+    )
+
+
+def listing(path: Path) -> list[str]:
+    return sorted(entry.name for entry in path.iterdir()) if path.exists() else []
+
+
+class RecordCommandResourceTests(unittest.TestCase):
+    def test_record_command_refuses_low_disk_headroom_before_running(self) -> None:
+        tool = load_tool()
+        floor = tool.DEFAULT_MIN_FREE_GIB * 1024**3
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Fixture(Path(tmp)).repo
+            commands = repo / "tasks/evidence/TEST-001/commands"
+
+            def record(label: str, free: int, *extra: str) -> int:
+                args = tool.build_parser().parse_args(
+                    ["record-command", "--root", tmp, "--task-id", "TEST-001"]
+                    + ["--label", label, *extra, "--", "touch", f"{label}.ran"]
+                )
+                usage = SimpleNamespace(free=free)
+                with mock.patch.object(tool.shutil, "disk_usage", return_value=usage):
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        return tool.record_command(args)
+
+            with self.assertRaisesRegex(
+                ValueError, r"(?s)insufficient disk headroom.*--min-free-gib"
+            ):
+                record("low", floor - 1)
+            self.assertFalse((repo / "low.ran").exists())
+            self.assertFalse(commands.exists())
+
+            self.assertEqual(record("at-floor", floor), 0)
+            self.assertEqual(record("disabled", 0, "--min-free-gib", "0"), 0)
+            self.assertTrue((repo / "at-floor.ran").exists())
+            self.assertTrue((repo / "disabled.ran").exists())
+
+    def test_unwritable_receipt_is_reported_and_completed_logs_are_kept(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Fixture(Path(tmp)).repo
+            commands = repo / "tasks/evidence/TEST-001/commands"
+            result = record_with_write_limit(repo, "full", "echo", "ok")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("incomplete command evidence", result.stderr)
+            self.assertIn("exited 0", result.stderr)
+            self.assertEqual((commands / "full.stdout.log").read_bytes(), b"ok\n")
+            self.assertEqual(listing(commands), ["full.stderr.log", "full.stdout.log"])
+
+    def test_unwritable_log_output_is_emitted_not_lost(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Fixture(Path(tmp)).repo
+            commands = repo / "tasks/evidence/TEST-001/commands"
+            result = record_with_write_limit(
+                repo, "big", sys.executable, "-c", "print('x' * 4000)"
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("x" * 4000 + "\n", result.stdout)
+            self.assertIn("incomplete command evidence", result.stderr)
+            self.assertIn("kept nothing", result.stderr)
+            self.assertEqual(listing(commands), [])
 
 
 if __name__ == "__main__":

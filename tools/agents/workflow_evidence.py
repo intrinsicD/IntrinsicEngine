@@ -10,12 +10,14 @@ closed when a completion assertion cannot be checked.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fcntl
 import hashlib
 import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -97,6 +99,9 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 REVISION_RE = re.compile(r"^(?:[0-9a-f]{40}|worktree:[0-9a-f]{64})$")
 TASK_ID_RE = re.compile(r"^[A-Z]+-\d+[A-Z0-9-]*$")
 LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
+# Catches a nearly full volume before a command runs; not a measured build footprint.
+DEFAULT_MIN_FREE_GIB = 20
+HEADROOM_DOC = "docs/build-troubleshooting.md#disk-headroom"
 CHECKBOX_RE = re.compile(r"^\s*-\s+\[([ xX])\]\s+(.+?)\s*$", re.MULTILINE)
 
 
@@ -1034,6 +1039,16 @@ def record_command(args: argparse.Namespace) -> int:
     except ValueError as exc:
         raise ValueError("command cwd must be inside the repository") from exc
 
+    # shortcut: checks only the repository volume; a separate build or /tmp mount is not checked.
+    free = shutil.disk_usage(repo_root).free
+    if free < args.min_free_gib * 1024**3:
+        raise ValueError(
+            f"insufficient disk headroom for {args.label}: {free / 1024**3:.1f} GiB "
+            f"free on the volume of {repo_root}, {args.min_free_gib} GiB required; "
+            f"nothing was run. Reclaim space per {HEADROOM_DOC}, or pass "
+            "--min-free-gib N to set a different floor"
+        )
+
     started = utc_now()
     started_monotonic = time.monotonic()
     result = subprocess.run(
@@ -1045,8 +1060,6 @@ def record_command(args: argparse.Namespace) -> int:
     )
     duration_ms = round((time.monotonic() - started_monotonic) * 1000)
     finished = utc_now()
-    _atomic_write(stdout_path, result.stdout)
-    _atomic_write(stderr_path, result.stderr)
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "task_id": args.task_id,
@@ -1064,10 +1077,31 @@ def record_command(args: argparse.Namespace) -> int:
         "stderr_path": relative_path(repo_root, stderr_path),
         "stderr_sha256": sha256_bytes(result.stderr),
     }
-    _atomic_write(
-        receipt_path,
-        (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode("utf-8"),
-    )
+    writes = [
+        (stdout_path, result.stdout),
+        (stderr_path, result.stderr),
+        (receipt_path, (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode()),
+    ]
+    for index, (path, payload) in enumerate(writes):
+        try:
+            _atomic_write(path, payload)
+        except OSError as exc:
+            # Unwritten captured output goes to its own stream instead of being lost;
+            # a stream on the same full volume must not hide the report below.
+            with contextlib.suppress(OSError):
+                for position, stream in ((0, sys.stdout), (1, sys.stderr)):
+                    if position >= index:
+                        stream.flush()
+                        stream.buffer.write(writes[position][1])
+                        stream.flush()
+            kept = ", ".join(relative_path(repo_root, done) for done, _ in writes[:index])
+            raise ValueError(
+                f"incomplete command evidence for {args.label}: could not write "
+                f"{relative_path(repo_root, path)} ({exc}); the command exited "
+                f"{result.returncode}; kept {kept or 'nothing'}; any unwritten log was "
+                "printed above. This is not a receipt: restore headroom "
+                f"({HEADROOM_DOC}) and rerun under a new label"
+            ) from exc
     print(f"Wrote {relative_path(repo_root, receipt_path)} (exit {result.returncode}).")
     return result.returncode
 
@@ -2127,6 +2161,12 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument("--cwd")
     record.add_argument("--optional", action="store_true")
     record.add_argument("--shell")
+    record.add_argument(
+        "--min-free-gib",
+        type=int,
+        default=DEFAULT_MIN_FREE_GIB,
+        help="Refuse to run below this free space (GiB) on the repository volume; 0 disables.",
+    )
     record.add_argument("command", nargs=argparse.REMAINDER)
     record.set_defaults(handler=record_command)
 
