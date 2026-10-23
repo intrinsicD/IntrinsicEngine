@@ -56,8 +56,10 @@ Agent workflow and task policy tooling.
 
 `mcp_bridge.py` connects an MCP client (the `intrinsic-sandbox` entry in
 `.mcp.json` for Claude Code or `.codex/config.toml` for Codex) to a Sandbox started
-with `--agent-socket`; stdlib only. The launch commands resolve the current Git
-root, so starts from subdirectories and worktrees use their own bridge. See
+with `--agent-socket`; stdlib only. Both configs start it through `mcp_launch.sh`
+(also the `knowledge-graph` and `jscpd` servers), which the launch commands find in
+the Claude Code project, the current Git root or `INTRINSIC_ENGINE_ROOT`, so starts
+from subdirectories and worktrees use their own bridge and no machine path is tracked. See
 [the agent control lane](../../docs/architecture/agent-control-lane.md), which holds the tool catalog.
 The bridge is one single-threaded `selectors` loop, so calls are concurrent: `tools/call`
 is forwarded under a fresh `bridge-N` id (params and `_meta.progressToken` untouched),
@@ -87,4 +89,4 @@ a busy refusal, only `sandbox_status` resumes acquisition. The engine admits one
 `sandbox_disconnect` releases the connection and pauses automatic reconnect until
 `sandbox_status` is called. It refuses while tool replies are pending; already
 timed-out or cancelled operations can still finish after release.
-Regression cases: `tests/regression/tooling/Test.McpBridge.py`.
+Regression cases (bridge and launcher): `tests/regression/tooling/Test.McpBridge.py`.

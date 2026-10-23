@@ -512,5 +512,113 @@ class McpBridgeTests(unittest.TestCase):
         self.assertEqual(sandbox.accepts, 1)
 
 
+class McpLaunchTests(unittest.TestCase):
+    """The config commands start tools/agents/mcp_launch.sh from any folder, under a bare GUI PATH.
+
+    PATH holds only fake programs (printing their argv) for python3, graphify-mcp, jscpd and node,
+    plus links to the system tools the launch needs, so no installed node or jscpd interferes.
+    """
+
+    SERVERS = ("intrinsic-sandbox", "knowledge-graph", "jscpd")
+    SYSTEM_TOOLS = ("bash", "git", "dirname", "ls", "sort", "tail")
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory(prefix="mcp-launch-")
+        self.addCleanup(directory.cleanup)
+        self.tmp = Path(directory.name)
+        self.home = self.tmp / "home"
+        self.bin = self.tmp / "bin"
+        self.system = self.tmp / "system"
+        self.outside = self.tmp / "outside"  # a start folder outside any repository
+        for folder in (self.home, self.bin, self.system, self.outside):
+            folder.mkdir()
+        for tool in self.SYSTEM_TOOLS:
+            found = subprocess.run(["bash", "-c", f"command -v {tool}"], capture_output=True, text=True).stdout.strip()
+            (self.system / tool).symlink_to(found)
+
+    def fake(self, path: Path, node_script: bool = False) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("#!/usr/bin/env node\n" if node_script else '#!/bin/sh\necho "$0 $*"\n')
+        path.chmod(0o755)
+
+    def launch(self, name: str, cwd: Path, **env) -> subprocess.CompletedProcess:
+        args = json.loads((ROOT / ".mcp.json").read_text())["mcpServers"][name]["args"]
+        environment = {"HOME": str(self.home), "PATH": f"{self.bin}:{self.system}", **env}
+        return subprocess.run(["bash", *args], cwd=cwd, env=environment, capture_output=True, text=True, timeout=WAIT)
+
+    def test_both_clients_get_the_same_launch_commands(self):
+        import tomllib
+        claude = json.loads((ROOT / ".mcp.json").read_text())["mcpServers"]
+        codex = tomllib.loads((ROOT / ".codex/config.toml").read_text())["mcp_servers"]
+        for name in self.SERVERS:
+            self.assertEqual(claude[name]["args"][-1], name)
+            self.assertEqual((claude[name]["command"], claude[name]["args"]),
+                             (codex[name]["command"], codex[name]["args"]), name)
+        # Codex forwards only allow-listed variables; without these the bridge looks for the wrong socket.
+        self.assertEqual(codex["intrinsic-sandbox"].get("env_vars"), ["XDG_RUNTIME_DIR", "INTRINSIC_AGENT_SOCKET"])
+
+    def test_the_repository_is_found_without_the_start_folder(self):
+        self.fake(self.bin / "python3")
+        expected = f"{self.bin}/python3 {ROOT}/tools/agents/mcp_bridge.py"
+        cases = {
+            "Claude Code": (self.outside, {"CLAUDE_PROJECT_DIR": str(ROOT)}),
+            "Git root of a subfolder": (ROOT / "tests", {"CLAUDE_PROJECT_DIR": str(ROOT / "src")}),
+            "IDE outside the repository": (self.outside, {"INTRINSIC_ENGINE_ROOT": str(ROOT)}),
+        }
+        for case, (cwd, env) in cases.items():
+            result = self.launch("intrinsic-sandbox", cwd, **env)
+            self.assertEqual((result.returncode, result.stdout.strip()), (0, expected), f"{case}: {result.stderr}")
+        result = self.launch("intrinsic-sandbox", self.outside)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("set INTRINSIC_ENGINE_ROOT", result.stderr)
+
+    def test_the_session_checkout_wins_over_the_machine_default(self):
+        # environment.d exports INTRINSIC_ENGINE_ROOT to every client: a worktree or second clone
+        # opened in Claude Code or Codex must still start its own launcher.
+        self.fake(self.bin / "python3")
+        other = self.tmp / "other-checkout"
+        (other / "tools/agents").mkdir(parents=True)
+        (other / "tools/agents/mcp_launch.sh").write_text((ROOT / "tools/agents/mcp_launch.sh").read_text())
+        expected = f"{self.bin}/python3 {ROOT}/tools/agents/mcp_bridge.py"
+        for case, (cwd, env) in {"Claude Code": (self.outside, {"CLAUDE_PROJECT_DIR": str(ROOT)}),
+                                 "Git root": (ROOT / "tests", {})}.items():
+            result = self.launch("intrinsic-sandbox", cwd, INTRINSIC_ENGINE_ROOT=str(other), **env)
+            self.assertEqual(result.stdout.strip(), expected, f"{case}: {result.stderr}")
+
+    def test_tools_are_found_under_a_bare_path(self):
+        self.fake(self.home / ".local/bin/graphify-mcp")
+        result = self.launch("knowledge-graph", self.outside, INTRINSIC_ENGINE_ROOT=str(ROOT))
+        self.assertEqual(result.stdout.strip(),
+                         f"{self.home}/.local/bin/graphify-mcp --graph {ROOT}/build/knowledge-graph/graphify-out/graph.json",
+                         result.stderr)
+        # The newest nvm version (version order, not text order) that has jscpd runs it with the node
+        # beside it, not the newest node.
+        nvm = self.home / ".nvm/versions/node"
+        for version in ("v9.0.0", "v10.2.0"):
+            self.fake(nvm / version / "bin/jscpd", node_script=True)
+            self.fake(nvm / version / "bin/node")
+        self.fake(nvm / "v22.1.0/bin/node")
+        jscpd = nvm / "v10.2.0/bin"
+        result = self.launch("jscpd", self.outside, INTRINSIC_ENGINE_ROOT=str(ROOT))
+        self.assertEqual(result.stdout.strip(), f"{jscpd}/node {jscpd}/jscpd --mcp {ROOT}", result.stderr)
+        # A jscpd in ~/.local/bin (installed by an nvm npm) has no node beside it: the newest nvm node.
+        self.fake(self.home / ".local/bin/jscpd", node_script=True)
+        result = self.launch("jscpd", self.outside, INTRINSIC_ENGINE_ROOT=str(ROOT))
+        self.assertEqual(result.stdout.strip(), f"{nvm}/v22.1.0/bin/node {self.home}/.local/bin/jscpd --mcp {ROOT}",
+                         result.stderr)
+
+    def test_a_missing_tool_names_its_install(self):
+        cases = (("jscpd", "install.sh"), ("knowledge-graph", "provision_knowledge_graph.sh"))
+        for name, hint in cases:
+            result = self.launch(name, self.outside, INTRINSIC_ENGINE_ROOT=str(ROOT))
+            self.assertEqual(result.returncode, 1, name)
+            self.assertIn(hint, result.stderr)
+        self.fake(self.home / ".local/bin/jscpd", node_script=True)
+        self.fake(self.outside / "node")  # an empty PATH entry would find this one in the start folder
+        result = self.launch("jscpd", self.outside, INTRINSIC_ENGINE_ROOT=str(ROOT))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("node not found", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -2,8 +2,20 @@
 # Explicit per-call limits may override this default when the task needs more.
 tool_output_token_limit = 3000
 
+# Every entry starts tools/agents/mcp_launch.sh <server>, found from the Git root of the start
+# folder (docs/architecture/agent-control-lane.md); same commands as .mcp.json. Codex forwards only
+# an allow-list of variables: the bridge needs the socket location the Sandbox uses.
 [mcp_servers.intrinsic-sandbox]
 command = "bash"
-args = ["-c", 'repo_root=$(git rev-parse --show-toplevel) || exit; exec python3 "$repo_root/tools/agents/mcp_bridge.py"']
+args = ["-c", 'for r in "$CLAUDE_PROJECT_DIR" "$(git rev-parse --show-toplevel 2>/dev/null)" "$INTRINSIC_ENGINE_ROOT"; do [ -f "$r/tools/agents/mcp_launch.sh" ] && exec bash "$r/tools/agents/mcp_launch.sh" "$1"; done; echo "IntrinsicEngine MCP: start the client inside the repository or set INTRINSIC_ENGINE_ROOT" >&2; exit 1', "mcp_launch", "intrinsic-sandbox"]
+env_vars = ["XDG_RUNTIME_DIR", "INTRINSIC_AGENT_SOCKET"]
 startup_timeout_sec = 15
 tool_timeout_sec = 150
+
+[mcp_servers.knowledge-graph]
+command = "bash"
+args = ["-c", 'for r in "$CLAUDE_PROJECT_DIR" "$(git rev-parse --show-toplevel 2>/dev/null)" "$INTRINSIC_ENGINE_ROOT"; do [ -f "$r/tools/agents/mcp_launch.sh" ] && exec bash "$r/tools/agents/mcp_launch.sh" "$1"; done; echo "IntrinsicEngine MCP: start the client inside the repository or set INTRINSIC_ENGINE_ROOT" >&2; exit 1', "mcp_launch", "knowledge-graph"]
+
+[mcp_servers.jscpd]
+command = "bash"
+args = ["-c", 'for r in "$CLAUDE_PROJECT_DIR" "$(git rev-parse --show-toplevel 2>/dev/null)" "$INTRINSIC_ENGINE_ROOT"; do [ -f "$r/tools/agents/mcp_launch.sh" ] && exec bash "$r/tools/agents/mcp_launch.sh" "$1"; done; echo "IntrinsicEngine MCP: start the client inside the repository or set INTRINSIC_ENGINE_ROOT" >&2; exit 1', "mcp_launch", "jscpd"]

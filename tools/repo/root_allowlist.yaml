@@ -29,6 +29,7 @@ ignored_local_entries:
   - .agents/
   - .idea/
   - .ruff_cache/
+  - .serena/
   - Testing/
   - __pycache__/
   - build/

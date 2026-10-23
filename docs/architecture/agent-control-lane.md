@@ -14,8 +14,19 @@ local-only.
    (repeatable, default: the working directory) bounds file arguments.
 2. The MCP client launches `tools/agents/mcp_bridge.py`: the repository's
    `.codex/config.toml` registers `intrinsic-sandbox` for Codex (trusted project),
-   and `.mcp.json` registers it for Claude Code. Both launch commands resolve the
-   current Git root, including worktrees and starts from a subdirectory. Restart
+   and `.mcp.json` registers it for Claude Code (GitHub Copilot in JetBrains IDEs
+   reads it too), with the same commands for `knowledge-graph` and `jscpd`. Each
+   command starts `tools/agents/mcp_launch.sh` from the first checkout it finds:
+   `CLAUDE_PROJECT_DIR` (Claude Code), the Git root of the start folder (Codex,
+   terminals, worktrees, subdirectories), then `INTRINSIC_ENGINE_ROOT`. The launcher
+   finds `python3`, `graphify-mcp` and `jscpd` (also an nvm install) under a bare
+   PATH, so the files hold no machine paths. IDE plugins start servers outside the
+   repository (Copilot in CLion: in the IDE's install folder); for them set, once per
+   machine, `INTRINSIC_ENGINE_ROOT=<absolute checkout path>` (no `~`) in
+   `~/.config/environment.d/intrinsic-engine.conf` and log in again (Linux with a systemd
+   user session). Such a plugin then always uses that checkout; Claude Code and Codex use
+   their own project folder first. The Codex entry forwards `XDG_RUNTIME_DIR` and
+   `INTRINSIC_AGENT_SOCKET`, which Codex otherwise withholds from MCP servers. Restart
    or refresh the client's MCP connections after changing registration; in Codex,
    `codex mcp get intrinsic-sandbox --json` checks the effective configuration.
    Registration does not launch the engine. The bridge starts even without a Sandbox, offers

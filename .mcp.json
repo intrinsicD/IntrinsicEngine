@@ -1,17 +1,30 @@
 {
   "mcpServers": {
     "knowledge-graph": {
-      "command": "graphify-mcp",
+      "command": "bash",
       "args": [
-        "--graph",
-        "build/knowledge-graph/graphify-out/graph.json"
+        "-c",
+        "for r in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$INTRINSIC_ENGINE_ROOT\"; do [ -f \"$r/tools/agents/mcp_launch.sh\" ] && exec bash \"$r/tools/agents/mcp_launch.sh\" \"$1\"; done; echo \"IntrinsicEngine MCP: start the client inside the repository or set INTRINSIC_ENGINE_ROOT\" >&2; exit 1",
+        "mcp_launch",
+        "knowledge-graph"
       ]
     },
     "intrinsic-sandbox": {
       "command": "bash",
       "args": [
         "-c",
-        "repo_root=$(git rev-parse --show-toplevel) || exit; exec python3 \"$repo_root/tools/agents/mcp_bridge.py\""
+        "for r in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$INTRINSIC_ENGINE_ROOT\"; do [ -f \"$r/tools/agents/mcp_launch.sh\" ] && exec bash \"$r/tools/agents/mcp_launch.sh\" \"$1\"; done; echo \"IntrinsicEngine MCP: start the client inside the repository or set INTRINSIC_ENGINE_ROOT\" >&2; exit 1",
+        "mcp_launch",
+        "intrinsic-sandbox"
+      ]
+    },
+    "jscpd": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "for r in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$INTRINSIC_ENGINE_ROOT\"; do [ -f \"$r/tools/agents/mcp_launch.sh\" ] && exec bash \"$r/tools/agents/mcp_launch.sh\" \"$1\"; done; echo \"IntrinsicEngine MCP: start the client inside the repository or set INTRINSIC_ENGINE_ROOT\" >&2; exit 1",
+        "mcp_launch",
+        "jscpd"
       ]
     }
   }
