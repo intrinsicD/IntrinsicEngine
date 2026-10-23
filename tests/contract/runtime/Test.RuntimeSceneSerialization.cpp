@@ -6,6 +6,7 @@
 #include <span>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -205,7 +206,7 @@ namespace
         raw.emplace<G::RenderSurface>(entity, surface);
         G::RenderEdges renderEdges{};
         renderEdges.Domain = G::RenderEdges::SourceDomain::Edge;
-        renderEdges.WidthSource = 2.5f;
+        renderEdges.Width = 2.5f;
         raw.emplace<G::RenderEdges>(entity, renderEdges);
 
         G::VisualizationConfig visualization{};
@@ -253,7 +254,8 @@ namespace
         raw.emplace<G::RenderEdges>(entity);
         G::RenderPoints points{};
         points.Type = G::RenderPoints::RenderType::Flat;
-        points.SizeSource = std::string{"node:radius"};
+        points.Size = 3.5f;  // the uniform a bound property replaces is saved too
+        points.SizeProperty = "node:radius";
         raw.emplace<G::RenderPoints>(entity, std::move(points));
         return entity;
     }
@@ -270,7 +272,7 @@ namespace
                      });
         G::RenderPoints points{};
         points.Type = G::RenderPoints::RenderType::Surfel;
-        points.SizeSource = 0.125f;
+        points.Size = 0.125f;
         raw.emplace<G::RenderPoints>(entity, points);
         return entity;
     }
@@ -379,8 +381,8 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     EXPECT_EQ(surface.Domain, G::RenderSurface::SourceDomain::Face);
     const auto& renderEdges = raw.get<G::RenderEdges>(loadedMesh);
     EXPECT_EQ(renderEdges.Domain, G::RenderEdges::SourceDomain::Edge);
-    ASSERT_NE(std::get_if<float>(&renderEdges.WidthSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&renderEdges.WidthSource), 2.5f);
+    EXPECT_TRUE(renderEdges.WidthProperty.empty());
+    EXPECT_FLOAT_EQ(renderEdges.Width, 2.5f);
     ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(loadedMesh));
     const auto& visualization = raw.get<G::VisualizationConfig>(loadedMesh);
     EXPECT_EQ(visualization.Source, G::VisualizationConfig::ColorSource::ScalarField);
@@ -425,8 +427,8 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
                   .size(),
               4u);
     const auto& graphPoints = raw.get<G::RenderPoints>(loadedGraph);
-    ASSERT_NE(std::get_if<std::string>(&graphPoints.SizeSource), nullptr);
-    EXPECT_EQ(*std::get_if<std::string>(&graphPoints.SizeSource), "node:radius");
+    EXPECT_EQ(graphPoints.SizeProperty, "node:radius");
+    EXPECT_FLOAT_EQ(graphPoints.Size, 3.5f);
 
     const GS::ConstSourceView cloudView = GS::BuildConstView(raw, loadedCloud);
     ASSERT_EQ(cloudView.ActiveDomain, GS::Domain::PointCloud);
@@ -535,6 +537,44 @@ TEST(RuntimeSceneSerialization, SiblingOrderSurvivesRoundTrip)
         child = link.NextSibling;
     }
     EXPECT_EQ(child, ECS::InvalidEntityHandle);
+}
+
+// A bound point size saves the uniform it replaces; a file written before that
+// (property form without "value") still loads, with the component default.
+TEST(RuntimeSceneSerialization, BoundPointSizeKeepsItsUniformAndOlderFilesStillLoad)
+{
+    ECS::Scene::Registry source;
+    const auto entity = ECS::Scene::CreateDefault(source, "Cloud");
+    G::RenderPoints points{};
+    points.Size = 3.5f;
+    points.SizeProperty = "radius";
+    source.Raw().emplace<G::RenderPoints>(entity, points);
+    const auto serialized = Runtime::SerializeSceneDocument(source);
+    ASSERT_TRUE(serialized.has_value());
+
+    const auto loadedPoints = [](const std::string& document) -> std::optional<G::RenderPoints>
+    {
+        ECS::Scene::Registry loaded;
+        if (!Runtime::DeserializeSceneDocument(loaded, document).has_value())
+            return std::nullopt;
+        const auto view = loaded.Raw().view<G::RenderPoints>();
+        return view.empty() ? std::nullopt : std::optional{view.get<G::RenderPoints>(view.front())};
+    };
+    const auto roundTrip = loadedPoints(*serialized);
+    ASSERT_TRUE(roundTrip.has_value());
+    EXPECT_EQ(roundTrip->SizeProperty, "radius");
+    EXPECT_FLOAT_EQ(roundTrip->Size, 3.5f);
+
+    auto older = nlohmann::json::parse(*serialized);
+    bool stripped = false;
+    for (auto& entityJson : older["entities"])
+        if (entityJson.contains("render") && entityJson["render"].contains("points"))
+            stripped = entityJson["render"]["points"]["size"].erase("value") == 1u;
+    ASSERT_TRUE(stripped);
+    const auto fromOlder = loadedPoints(older.dump());
+    ASSERT_TRUE(fromOlder.has_value()) << "a scene saved before the uniform was stored still loads";
+    EXPECT_EQ(fromOlder->SizeProperty, "radius");
+    EXPECT_FLOAT_EQ(fromOlder->Size, G::RenderPoints{}.Size);
 }
 
 TEST(RuntimeSceneSerialization, MalformedSiblingOrdersRejectWithoutReplacingScene)

@@ -5,7 +5,6 @@ module;
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <string>
-#include <variant>
 
 export module Extrinsic.Graphics.Component.RenderGeometry;
 
@@ -96,9 +95,12 @@ export namespace Extrinsic::Graphics::Components
             Edge     ///< Colour constant per edge.
         } Domain = SourceDomain::Vertex;
 
-        /// Uniform edge width or name of a per-edge
-        /// width buffer in GpuSceneSlot::Buffers.
-        std::variant<float, std::string> WidthSource = 1.0f;
+        /// Uniform edge width in pixels. Kept while WidthProperty is set, so
+        /// clearing the property brings the last uniform width back.
+        float Width = 1.0f;
+        /// Name of a per-edge float width property drawn instead of Width;
+        /// empty draws the uniform width.
+        std::string WidthProperty{};
     };
 
     // ----------------------------------------------------------------
@@ -113,8 +115,11 @@ export namespace Extrinsic::Graphics::Components
             Surfel   ///< Surface-aligned disc; requires vertex normals.
         } Type = RenderType::Sphere;
 
-        /// Uniform screen-space diameter in pixels or name of a per-point size buffer
-        /// in GpuSceneSlot::Buffers.
-        std::variant<float, std::string> SizeSource = 6.0f;
+        /// Uniform screen-space diameter in pixels. Kept while SizeProperty is
+        /// set, so clearing the property brings the last uniform size back.
+        float Size = 6.0f;
+        /// Name of a per-point float size property drawn instead of Size;
+        /// empty draws the uniform size.
+        std::string SizeProperty{};
     };
 }

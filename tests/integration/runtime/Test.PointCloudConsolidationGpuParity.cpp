@@ -1182,7 +1182,7 @@ namespace
             Entity = Scene->Create();
             SetPositions(Scene->Raw().emplace<GS::Vertices>(Entity), Input);
             Scene->Raw().emplace<Extrinsic::ECS::Components::Transform::WorldMatrix>(Entity);
-            Scene->Raw().emplace<Graphics::Components::RenderPoints>(Entity).SizeSource = 5.0f;
+            Scene->Raw().emplace<Graphics::Components::RenderPoints>(Entity).Size = 5.0f;
             Config.MaxIterations = 4u;
             Config.GpuPreviewInterval = 2u;
             Config.ConvergenceTolerance = 0.0;

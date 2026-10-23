@@ -1739,11 +1739,13 @@ TEST(SandboxAgentServer, AttributeBindingsListThePanelsSourceTable)
         const auto listing = c.Tool("attribute_bindings", {{"entity", mesh}}, &isError);
         rig.Check(!isError, "attribute_bindings: " + listing.dump());
         if (isError) return;
-        const auto findRow = [&](const Json& result, const std::string& domain, const std::string& attribute) -> Json {
-            for (const auto& group : result["domains"])
-                if (group["domain"] == domain)
+        const auto findRow = [&](const Json& result, const std::string& lane, const std::string& attribute) -> Json
+        {
+            for (const auto& group : result["lanes"])
+                if (group["lane"] == lane)
                     for (const auto& row : group["attributes"])
-                        if (row["attribute"] == attribute) return row;
+                        if (row["attribute"] == attribute)
+                            return row;
             return Json{};
         };
         const auto named = [](const Json& list, const std::string& name) {
@@ -1751,28 +1753,33 @@ TEST(SandboxAgentServer, AttributeBindingsListThePanelsSourceTable)
                 if (entry["name"] == name) return entry;
             return Json{};
         };
-        std::vector<std::string> domains;
-        for (const auto& group : listing["domains"]) domains.push_back(group["domain"].get<std::string>());
-        rig.Check(std::ranges::find(domains, "MeshVertex") != domains.end() && std::ranges::find(domains, "MeshFace") != domains.end(),
-                  "the mesh's element domains are listed: " + listing.dump());
-        const Json position = findRow(listing, "MeshVertex", "position");
+        std::vector<std::string> lanes;
+        for (const auto& group : listing["lanes"])
+            lanes.push_back(group["lane"].get<std::string>());
+        rig.Check(lanes == std::vector<std::string>{"surface", "edges", "points"},
+            "a mesh lists its surface, edges and points lanes: " + listing.dump());
+        const Json position = findRow(listing, "surface", "position");
         rig.Check(position.is_object() && position["bound"] == false && position["source"].is_null() &&
-                      position["canonical_property"] == "v:position" && position["expected_type"] == "vec3" &&
-                      position["expected_count"] == 36,
-                  "position row with its canonical default: " + position.dump());
+                position["canonical_property"] == "v:position" && position["expected_type"] == "vec3" &&
+                position["domains"] == Json::array({Json{{"domain", "MeshVertex"}, {"count", 36}}}),
+            "position row with its canonical default: " + position.dump());
         rig.Check(named(position["candidates"], "offset")["kind"] == "vec3", "offset is a compatible position source: " + position.dump());
         const Json heightAsPosition = named(position["incompatible"], "height");
         rig.Check(heightAsPosition["status"] == "ValueKindMismatch" && heightAsPosition["reason"] == "requires vec3",
                   "height is refused as a position with its reason: " + position.dump());
-        const Json color = findRow(listing, "MeshVertex", "color");
-        rig.Check(color["lane"] == "surface" && named(color["candidates"], "height").is_object(),
-                  "a vertex scalar can color the surface overlay: " + color.dump());
-        rig.Check(findRow(listing, "MeshFace", "position").is_null(), "no position row on faces");
+        const Json color = findRow(listing, "points", "color");
+        rig.Check(color["lane"] == "points" && named(color["candidates"], "height")["domain"] == "MeshVertex",
+            "a vertex scalar can color the points lane: " + color.dump());
+        rig.Check(findRow(listing, "edges", "texcoord").is_null(), "the edges lane has no texcoord row");
 
         const auto onlyColor = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "color"}, {"domain", "MeshFace"}}, &isError);
-        rig.Check(!isError && onlyColor["domains"].size() == 1u && onlyColor["domains"][0]["attributes"].size() == 1u &&
-                      onlyColor["domains"][0]["attributes"][0]["attribute"] == "color",
-                  "domain and attribute narrow the listing: " + onlyColor.dump());
+        rig.Check(!isError && onlyColor["lanes"].size() == 1u && onlyColor["lanes"][0]["lane"] == "surface" &&
+                onlyColor["lanes"][0]["attributes"].size() == 1u &&
+                onlyColor["lanes"][0]["attributes"][0]["attribute"] == "color",
+            "domain and attribute narrow the listing to the surface color: " + onlyColor.dump());
+        const auto onlyPoints = c.Tool("attribute_bindings", {{"entity", mesh}, {"lane", "points"}}, &isError);
+        rig.Check(!isError && onlyPoints["lanes"].size() == 1u && onlyPoints["lanes"][0]["attributes"].size() == 4u,
+            "lane narrows the listing: " + onlyPoints.dump());
 
         const auto unknown = c.Request("tools/call", {{"name", "attribute_bindings"}, {"arguments", {{"entity", 999999}}}});
         rig.Check(unknown["result"]["isError"] == true && unknown["result"]["structuredContent"]["error"]["code"] == "stale_entity",
@@ -1809,54 +1816,73 @@ TEST(SandboxAgentServer, BindAttributeRebindsRefusesAndRestoresTheDefault)
             return response["result"]["isError"] == true ? response["result"]["structuredContent"]["error"]["code"] : Json(nullptr);
         };
         const int before = undoCount();
-        const auto bound = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"},
-                                                     {"property", "offset"}}, &isError);
-        rig.Check(!isError && bound["status"] == "Applied" && bound["row"]["bound"] == true && bound["row"]["source"] == "offset" &&
-                      bound["row"]["using_fallback"] == false,
-                  "bind position to offset, reply carries the row: " + bound.dump());
+        const auto bound = c.Tool("bind_attribute",
+            {{"entity", mesh}, {"lane", "surface"}, {"attribute", "position"}, {"property", "offset"}},
+            &isError);
+        rig.Check(!isError && bound["status"] == "Applied" && bound["domain"] == "MeshVertex" &&
+                bound["row"]["bound"] == true &&
+                bound["row"]["source"] == Json{{"name", "offset"}, {"domain", "MeshVertex"}} &&
+                bound["row"]["using_fallback"] == false,
+            "bind position to offset, reply carries the row: " + bound.dump());
         rig.Check(undoCount() == before + 1, "one undo step");
         const auto label = c.Tool("history")["undo_label"].get<std::string>();
         rig.Check(label.starts_with("Agent: "), "agent history label: " + label);
 
-        rig.Check(errorCode({{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"}, {"property", "height"}}) ==
-                      "attribute_source_type_mismatch",
-                  "a scalar cannot be the position");
-        rig.Check(errorCode({{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"}, {"property", "nothing"}}) ==
-                      "attribute_source_missing",
-                  "a missing property is refused");
-        rig.Check(errorCode({{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshFace"}, {"property", "offset"}}) ==
-                      "unsupported_render_attribute",
-                  "faces have no position row");
-        rig.Check(errorCode({{"entity", 999999}, {"attribute", "color"}, {"domain", "MeshVertex"}, {"default", true}}) == "stale_entity",
-                  "unknown entity");
+        rig.Check(
+            errorCode({{"entity", mesh}, {"lane", "surface"}, {"attribute", "position"}, {"property", "height"}}) ==
+                "attribute_source_type_mismatch",
+            "a scalar cannot be the position");
+        rig.Check(
+            errorCode({{"entity", mesh}, {"lane", "surface"}, {"attribute", "position"}, {"property", "nothing"}}) ==
+                "attribute_source_missing",
+            "a missing property is refused");
+        rig.Check(errorCode({{"entity", mesh},
+                      {"lane", "surface"},
+                      {"attribute", "position"},
+                      {"domain", "MeshFace"},
+                      {"property", "offset"}}) == "unsupported_render_attribute",
+            "the surface reads positions from vertices only");
+        rig.Check(errorCode({{"entity", 999999}, {"lane", "surface"}, {"attribute", "color"}, {"default", true}}) ==
+                "stale_entity",
+            "unknown entity");
         rig.Check(undoCount() == before + 1, "refusals change nothing");
-        const auto listing = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "position"}}, &isError);
-        rig.Check(!isError && listing["domains"][0]["attributes"][0]["source"] == "offset", "the refusals kept the binding: " + listing.dump());
+        const auto listing =
+            c.Tool("attribute_bindings", {{"entity", mesh}, {"lane", "surface"}, {"attribute", "position"}}, &isError);
+        rig.Check(!isError && listing["lanes"][0]["attributes"][0]["source"]["name"] == "offset",
+            "the refusals kept the binding: " + listing.dump());
 
-        const auto restored = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"},
-                                                        {"default", true}}, &isError);
+        const auto restored = c.Tool("bind_attribute",
+            {{"entity", mesh}, {"lane", "surface"}, {"attribute", "position"}, {"default", true}},
+            &isError);
         rig.Check(!isError && restored["status"] == "Applied" && restored["row"]["bound"] == false && restored["row"]["source"].is_null(),
                   "default restores the canonical source: " + restored.dump());
         rig.Check(undoCount() == before + 2, "default is one more undo step");
-        const auto again = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "position"}, {"domain", "MeshVertex"},
-                                                     {"default", true}}, &isError);
+        const auto again = c.Tool("bind_attribute",
+            {{"entity", mesh}, {"lane", "surface"}, {"attribute", "position"}, {"default", true}},
+            &isError);
         rig.Check(!isError && again["status"] == "NoChange", "default twice changes nothing: " + again.dump());
 
         const auto undone = c.Tool("undo", Json::object(), &isError);
         rig.Check(!isError && undone["undone"].size() == 1u, "undo: " + undone.dump());
-        const auto afterUndo = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "position"}}, &isError);
-        rig.Check(!isError && afterUndo["domains"][0]["attributes"][0]["source"] == "offset", "undo brings the binding back: " + afterUndo.dump());
+        const auto afterUndo =
+            c.Tool("attribute_bindings", {{"entity", mesh}, {"lane", "surface"}, {"attribute", "position"}}, &isError);
+        rig.Check(!isError && afterUndo["lanes"][0]["attributes"][0]["source"]["name"] == "offset",
+            "undo brings the binding back: " + afterUndo.dump());
 
-        const auto hiddenLane = c.Request("tools/call", {{"name", "bind_attribute"}, {"arguments", {{"entity", mesh},
-            {"attribute", "point_size"}, {"domain", "MeshVertex"}, {"property", "radius"}}}});
+        const auto hiddenLane = c.Request("tools/call",
+            {{"name", "bind_attribute"},
+                {"arguments",
+                    {{"entity", mesh}, {"lane", "points"}, {"attribute", "point_size"}, {"property", "radius"}}}});
         rig.Check(hiddenLane["result"]["structuredContent"]["error"]["code"] == "unsupported_render_attribute" &&
                       hiddenLane["result"]["structuredContent"]["error"]["message"].get<std::string>().find("points lane") != std::string::npos,
                   "a point size needs a shown points lane: " + hiddenLane.dump());
         c.Tool("set_visibility", {{"entity", mesh}, {"visible", true}, {"lane", "points"}}, &isError);
         rig.Check(!isError, "show the mesh's points lane");
-        const auto width = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", "point_size"}, {"domain", "MeshVertex"},
-                                                     {"property", "radius"}}, &isError);
-        rig.Check(!isError && width["row"]["source"] == "radius", "a float binds as a pixel point size: " + width.dump());
+        const auto width = c.Tool("bind_attribute",
+            {{"entity", mesh}, {"lane", "points"}, {"attribute", "point_size"}, {"property", "radius"}},
+            &isError);
+        rig.Check(!isError && width["row"]["source"]["name"] == "radius",
+            "a float binds as a pixel point size: " + width.dump());
     });
     EXPECT_TRUE(canonicalUnchanged) << "canonical positions are never written";
 }
@@ -1877,17 +1903,23 @@ TEST(SandboxAgentServer, ShowPropertyIsTheColorBinding)
     }
     rig.Run([&](Client& c) {
         bool isError = true;
-        const auto colorSource = [&] {
-            const auto listing = c.Tool("attribute_bindings", {{"entity", mesh}, {"attribute", "color"}, {"domain", "MeshVertex"}});
-            return listing["domains"][0]["attributes"][0]["source"];
+        const auto colorSource = [&]() -> Json
+        {
+            const auto listing =
+                c.Tool("attribute_bindings", {{"entity", mesh}, {"lane", "surface"}, {"attribute", "color"}});
+            const Json& source = listing["lanes"][0]["attributes"][0]["source"];
+            return source.is_null() ? Json(nullptr) : source["name"];
         };
-        const auto bindColor = [&](Json source) {
-            Json arguments{{"entity", mesh}, {"attribute", "color"}, {"domain", "MeshVertex"}};
+        const auto bindColor = [&](Json source)
+        {
+            Json arguments{{"entity", mesh}, {"lane", "surface"}, {"attribute", "color"}};
             arguments.update(source);
             return c.Tool("bind_attribute", arguments, &isError);
         };
         const auto shown = c.Tool("show_property", {{"entity", mesh}, {"name", "height"}}, &isError);
-        rig.Check(!isError && shown["status"] == "Applied" && shown["row"]["source"] == "height", "show_property binds Color: " + shown.dump());
+        rig.Check(!isError && shown["status"] == "Applied" && shown["lane"] == "surface" &&
+                shown["row"]["source"]["name"] == "height",
+            "show_property binds the surface Color: " + shown.dump());
         rig.Check(c.Tool("history")["undo_label"].get<std::string>().starts_with("Agent: "), "agent history label");
         rig.Check(colorSource() == "height", "attribute_bindings reports show_property's choice as the Color source");
         const auto same = bindColor({{"property", "height"}});
@@ -1934,10 +1966,19 @@ TEST(SandboxAgentServer, BindAttributeCoversEveryAttributeAndItsDefault)
         auto& halfedges = raw.get<GS::Halfedges>(handle).Properties;
         (void)halfedges.GetOrAdd<float>("hscalar", 1.0f);
     }
-    struct Case { const char* Attribute; const char* Domain; const char* Property; };
+    struct Case
+    {
+        const char* Lane;
+        const char* Attribute;
+        const char* Property;
+    };
     const Case cases[] = {
-        {"position", "MeshVertex", "offset"}, {"normal", "MeshVertex", "offset"}, {"texcoord", "MeshVertex", "uv2"},
-        {"color", "MeshVertex", "height"},    {"point_size", "MeshVertex", "radius"}, {"line_width", "MeshEdge", "ewidth"},
+        {"surface", "position", "offset"},
+        {"surface", "normal", "offset"},
+        {"surface", "texcoord", "uv2"},
+        {"surface", "color", "height"},
+        {"points", "point_size", "radius"},
+        {"edges", "line_width", "ewidth"},
     };
     rig.Run([&](Client& c) {
         bool isError = true;
@@ -1950,18 +1991,20 @@ TEST(SandboxAgentServer, BindAttributeCoversEveryAttributeAndItsDefault)
         std::vector<std::string> covered;
         for (const Case& test : cases)
         {
-            const std::string what = std::string(test.Attribute) + " on " + test.Domain;
+            const std::string what = std::string(test.Attribute) + " of the " + test.Lane + " lane";
             const int before = c.Tool("history")["undo_count"].get<int>();
-            const auto bound = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", test.Attribute}, {"domain", test.Domain},
-                                                         {"property", test.Property}}, &isError);
-            rig.Check(!isError && bound["status"] == "Applied" && bound["row"]["source"] == test.Property &&
-                          bound["row"]["using_fallback"] == false,
-                      what + " binds: " + bound.dump());
+            const auto bound = c.Tool("bind_attribute",
+                {{"entity", mesh}, {"lane", test.Lane}, {"attribute", test.Attribute}, {"property", test.Property}},
+                &isError);
+            rig.Check(!isError && bound["status"] == "Applied" && bound["row"]["source"]["name"] == test.Property &&
+                    bound["row"]["using_fallback"] == false,
+                what + " binds: " + bound.dump());
             const auto history = c.Tool("history");
             rig.Check(history["undo_count"] == before + 1 && history["undo_label"].get<std::string>().starts_with("Agent: "),
                       what + " is one agent undo step: " + history.dump());
-            const auto restored = c.Tool("bind_attribute", {{"entity", mesh}, {"attribute", test.Attribute}, {"domain", test.Domain},
-                                                            {"default", true}}, &isError);
+            const auto restored = c.Tool("bind_attribute",
+                {{"entity", mesh}, {"lane", test.Lane}, {"attribute", test.Attribute}, {"default", true}},
+                &isError);
             rig.Check(!isError && restored["status"] == "Applied" && restored["row"]["bound"] == false,
                       what + " default restores the canonical source: " + restored.dump());
             covered.push_back(test.Attribute);

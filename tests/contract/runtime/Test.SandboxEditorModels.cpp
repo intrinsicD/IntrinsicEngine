@@ -955,10 +955,10 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
     surface.Domain = G::RenderSurface::SourceDomain::Face;
     auto& lines = raw.emplace<G::RenderEdges>(first);
     lines.Domain = G::RenderEdges::SourceDomain::Edge;
-    lines.WidthSource = 2.5f;
+    lines.Width = 2.5f;
     auto& points = raw.get<G::RenderPoints>(first);
     points.Type = G::RenderPoints::RenderType::Surfel;
-    points.SizeSource = std::string{"v:radius"};
+    points.SizeProperty = "v:radius";
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, first));
 
@@ -1601,7 +1601,7 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnRenderHintSignature)
     AddTriangleMeshSource(registry, mesh);
     auto& edges = registry.Raw().emplace<G::RenderEdges>(mesh);
     edges.Domain = G::RenderEdges::SourceDomain::Edge;
-    edges.WidthSource = 1.0f;
+    edges.Width = 1.0f;
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
     Runtime::EditorSelectedModelCache cache{};
@@ -1624,7 +1624,7 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnRenderHintSignature)
     EXPECT_EQ(cached.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
     EXPECT_EQ(cached.ModelBuildStats.BoundStateModelBuilds, 0u);
 
-    registry.Raw().get<G::RenderEdges>(mesh).WidthSource = 3.5f;
+    registry.Raw().get<G::RenderEdges>(mesh).Width = 3.5f;
 
     const Runtime::EditorWorkspaceSnapshot changed =
         Runtime::BuildEditorWorkspaceSnapshot(

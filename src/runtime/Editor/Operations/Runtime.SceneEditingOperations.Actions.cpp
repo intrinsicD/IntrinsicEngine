@@ -791,7 +791,7 @@ ApplyEditorPrimitiveViewCommand(
             if (command.SetVertexRenderMode)
                 after.Points->Type = ToRenderPointType(command.VertexRenderMode);
             if (command.SetVertexPointRadius)
-                after.Points->SizeSource = command.VertexPointRadiusPx;
+                after.Points->Size = command.VertexPointRadiusPx;
         }
 
         if (SameRenderHintComponents(before, after))

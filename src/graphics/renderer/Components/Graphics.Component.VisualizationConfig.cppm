@@ -55,6 +55,11 @@ import Extrinsic.Graphics.Component.RenderGeometry;  // ScalarFieldConfig
 
 export namespace Extrinsic::Graphics::Components
 {
+    // Lane colors drawn when nothing is imported or picked: the surface is
+    // grey-white; edges and points are dark so they stay visible on it.
+    inline constexpr glm::vec4 kDefaultSurfaceColor{0.9f, 0.9f, 0.9f, 1.0f};
+    inline constexpr glm::vec4 kDefaultLineAndPointColor{0.02f, 0.02f, 0.02f, 1.0f};
+
     struct VisualizationConfig
     {
         enum class ColorSource : std::uint8_t
@@ -77,7 +82,7 @@ export namespace Extrinsic::Graphics::Components
 
         // ----- UniformColor -------------------------------------------------
         /// RGBA colour used when Source == UniformColor.
-        glm::vec4 Color{1.f, 0.6f, 0.f, 1.f};
+        glm::vec4 Color{kDefaultSurfaceColor};
         /// Editor intent, not read by graphics: with no property bound the lane
         /// draws Color instead of the material, so unbinding a property restores it.
         bool UniformByDefault{false};

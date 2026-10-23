@@ -1,11 +1,13 @@
-// RUNTIME-315: the unified render-attribute binding model. Rows come from the
-// runtime attribute x element-domain table; the current source of each row is
-// read from the storage that owns it (structural streams, visualization
-// overlay, point/line render hints).
+// The unified render-attribute binding model. Rows come from the runtime
+// lane x attribute table (RenderLaneAttributeRows()), each validated per source
+// domain by the attribute x element-domain table; the current source of each
+// row is read from the storage that owns it (structural streams, the lane's
+// visualization overlay, point/line render hints).
 module;
 #include <entt/entity/fwd.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -40,33 +42,53 @@ extern "C++"
 {
 namespace Extrinsic::Runtime::EditorFeatureDetail
 {
-    std::optional<ColorOverlayTarget> ColorOverlayTargetFor(const GeometryElementDomain domain) noexcept
+    EditorVisualizationTarget VisualizationTargetFor(const GeometryRenderLane lane) noexcept
+    {
+        switch (lane)
+        {
+        case GeometryRenderLane::Surface: return EditorVisualizationTarget::Surface;
+        case GeometryRenderLane::Edges:   return EditorVisualizationTarget::Edges;
+        case GeometryRenderLane::Points:  return EditorVisualizationTarget::Points;
+        }
+        return EditorVisualizationTarget::Surface;
+    }
+
+    std::optional<ColorOverlayTarget> ColorOverlayTargetFor(
+        const GeometryElementDomain domain, const std::optional<EditorVisualizationTarget> lane) noexcept
     {
         using VD = Graphics::Components::VisualizationConfig::Domain;
         using CS = Graphics::Components::VisualizationConfig::ColorSource;
-        using T = EditorVisualizationTarget;
-        using D = GeometryElementDomain;
-        switch (domain)
-        {
-        case D::MeshVertex: return ColorOverlayTarget{T::Surface, VD::Vertex, CS::PerVertexBuffer};
-        case D::MeshFace: return ColorOverlayTarget{T::Surface, VD::Face, CS::PerFaceBuffer};
-        case D::MeshEdge:
-        case D::GraphEdge: return ColorOverlayTarget{T::Edges, VD::Edge, CS::PerEdgeBuffer};
-        case D::GraphNode: return ColorOverlayTarget{T::Edges, VD::Vertex, CS::PerVertexBuffer};
-        case D::PointCloudPoint: return ColorOverlayTarget{T::Points, VD::Vertex, CS::PerVertexBuffer};
-        case D::MeshHalfedge:
-        case D::GraphHalfedge:
-        case D::Unknown: break;
-        }
-        return std::nullopt;
+        const std::optional<GeometryRenderLane> defaultLane = DefaultColorLaneFor(domain);
+        if (!defaultLane.has_value())
+            return std::nullopt;
+        // The buffer layout follows the property's domain; the lane is the chosen or default one.
+        ColorOverlayTarget target{.Target = VisualizationTargetFor(*defaultLane)};
+        if (domain == GeometryElementDomain::MeshFace)
+            target = {target.Target, VD::Face, CS::PerFaceBuffer};
+        else if (domain == GeometryElementDomain::MeshEdge || domain == GeometryElementDomain::GraphEdge)
+            target = {target.Target, VD::Edge, CS::PerEdgeBuffer};
+        if (!lane.has_value())
+            return target;
+        constexpr std::array kLanes{GeometryRenderLane::Surface, GeometryRenderLane::Edges, GeometryRenderLane::Points};
+        const auto geometryLane = std::ranges::find_if(kLanes,
+            [&](const GeometryRenderLane candidate)
+            {
+                return VisualizationTargetFor(candidate) == *lane;
+            });
+        if (geometryLane == kLanes.end() || !RenderLaneReadsDomain(*geometryLane, RenderAttribute::Color, domain))
+            return std::nullopt;
+        target.Target = *lane;
+        return target;
     }
 
-    std::optional<std::string> BoundColorOverlaySource(
-        const entt::registry& raw, const ECS::EntityHandle entity, const GeometryElementDomain domain)
+    std::optional<std::string> BoundColorOverlaySource(const entt::registry& raw,
+        const ECS::EntityHandle entity,
+        const GeometryElementDomain domain,
+        const std::optional<EditorVisualizationTarget> lane)
     {
         namespace G = Graphics::Components;
         using Source = G::VisualizationConfig::ColorSource;
-        const std::optional<ColorOverlayTarget> target = ColorOverlayTargetFor(domain);
+        const std::optional<ColorOverlayTarget> target = ColorOverlayTargetFor(domain, lane);
         if (!target.has_value())
             return std::nullopt;
         const std::optional<G::VisualizationConfig> config =
@@ -152,8 +174,12 @@ namespace Extrinsic::Runtime
         std::mutex g_SourceScanMutex;
         std::map<SourceScanKey, GeometryPropertyResolution> g_SourceScans;
 
-        [[nodiscard]] std::optional<std::string> BoundSourceName(
-            const entt::registry& raw, const ECS::EntityHandle entity,
+        // The property `lane` draws `rule.Attribute` from on `rule.Domain`, if
+        // one is authored there. Position/Normal/Texcoord are still one
+        // structural slot per entity, read by every lane.
+        [[nodiscard]] std::optional<std::string> BoundSourceName(const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const GeometryRenderLane lane,
             const RenderAttributeRule& rule)
         {
             switch (rule.Attribute)
@@ -173,20 +199,17 @@ namespace Extrinsic::Runtime
                 }
                 return std::nullopt;
             case RenderAttribute::Color:
-                return EditorFeatureDetail::BoundColorOverlaySource(raw, entity, rule.Domain);
+                return EditorFeatureDetail::BoundColorOverlaySource(
+                    raw, entity, rule.Domain, EditorFeatureDetail::VisualizationTargetFor(lane));
             case RenderAttribute::PointSize:
-                if (const auto* points = raw.try_get<G::RenderPoints>(entity))
-                {
-                    if (const auto* name = std::get_if<std::string>(&points->SizeSource))
-                        return *name;
-                }
+                if (const auto* points = raw.try_get<G::RenderPoints>(entity);
+                    points != nullptr && !points->SizeProperty.empty())
+                    return points->SizeProperty;
                 return std::nullopt;
             case RenderAttribute::LineWidth:
-                if (const auto* edges = raw.try_get<G::RenderEdges>(entity))
-                {
-                    if (const auto* name = std::get_if<std::string>(&edges->WidthSource))
-                        return *name;
-                }
+                if (const auto* edges = raw.try_get<G::RenderEdges>(entity);
+                    edges != nullptr && !edges->WidthProperty.empty())
+                    return edges->WidthProperty;
                 return std::nullopt;
             }
             return std::nullopt;
@@ -239,65 +262,71 @@ namespace Extrinsic::Runtime
         model.HasEntity = true;
 
         const GeometryEntityAvailability availability = BuildGeometryAvailability(raw, *entity);
-        for (const RenderAttributeRule& rule : RenderAttributeRules())
+        for (const RenderLaneAttributeRow& laneRow : RenderLaneAttributeRows())
         {
-            const Geometry::PropertySet* properties =
-                ResolveGeometryPropertySet(availability, rule.Domain);
-            if (properties == nullptr)
-                continue;
-
             EditorAttributeBindingRow row{
-                .Attribute = rule.Attribute,
-                .Domain = rule.Domain,
-                .ExpectedType = std::string{RenderAttributeExpectedTypeText(rule)},
-                .ExpectedElementCount = properties->Size(),
-                .DefaultSource = std::string{rule.DefaultDescription},
+                .Lane = laneRow.Lane,
+                .Attribute = laneRow.Attribute,
+                .DefaultSource = std::string{laneRow.DefaultDescription},
             };
-            if (rule.Attribute == RenderAttribute::Color)
+            for (const GeometryElementDomain domain : laneRow.Domains)
             {
-                if (const auto overlay = EditorFeatureDetail::ColorOverlayTargetFor(rule.Domain))
-                    row.OverlayTarget = overlay->Target;
-            }
-            if (const std::optional<std::string> bound = BoundSourceName(raw, *entity, rule))
-            {
-                row.Bound = true;
-                row.Source = GeometryPropertyRef{
-                    .Domain = rule.Domain,
-                    .Name = *bound,
-                    .ValueKind = DetectGeometryPropertyValueKind(*properties, *bound),
-                };
-                row.Resolution = ResolveEditorAttributeBindingSource(
-                    availability, rule.Attribute, rule.Domain, *bound);
-                row.UsingFallback = !row.Resolution.Resolved();
-                if (row.UsingFallback)
-                    row.Diagnostic = "'" + *bound + "' " + ResolutionReason(rule, row.Resolution) +
-                                     "; drawing the default (" + row.DefaultSource + ")";
-            }
-
-            for (const std::string& name : properties->Properties())
-            {
-                if (IsTopologyProperty(rule.Domain, name))
+                const Geometry::PropertySet* properties = ResolveGeometryPropertySet(availability, domain);
+                const RenderAttributeRule* rule = FindRenderAttributeRule(laneRow.Attribute, domain);
+                if (properties == nullptr || rule == nullptr)
                     continue;
-                const GeometryPropertyResolution resolution =
-                    ResolveEditorAttributeBindingSource(availability, rule.Attribute, rule.Domain, name);
-                row.Candidates.push_back(EditorAttributeBindingCandidate{
-                    .Property = GeometryPropertyRef{
-                        .Domain = rule.Domain,
-                        .Name = name,
-                        .ValueKind = resolution.ResolvedValueKind,
-                    },
-                    .ElementCount = resolution.ElementCount,
-                    .Compatible = resolution.Resolved(),
-                    .Reason = resolution.Status,
-                    .DisabledReason = resolution.Resolved()
-                        ? std::string{}
-                        : ResolutionReason(rule, resolution),
-                });
+                if (row.Domains.empty())
+                    row.ExpectedType = std::string{RenderAttributeExpectedTypeText(*rule)};
+                row.Domains.push_back({.Domain = domain, .ElementCount = properties->Size()});
+
+                if (const std::optional<std::string> bound = BoundSourceName(raw, *entity, laneRow.Lane, *rule);
+                    bound.has_value() && !row.Bound)
+                {
+                    row.Bound = true;
+                    row.Source = GeometryPropertyRef{
+                        .Domain = domain,
+                        .Name = *bound,
+                        .ValueKind = DetectGeometryPropertyValueKind(*properties, *bound),
+                    };
+                    row.Resolution =
+                        ResolveEditorAttributeBindingSource(availability, laneRow.Attribute, domain, *bound);
+                    row.UsingFallback = !row.Resolution.Resolved();
+                    if (row.UsingFallback)
+                        row.Diagnostic = "'" + *bound + "' " + ResolutionReason(*rule, row.Resolution) +
+                            "; drawing the default (" + row.DefaultSource + ")";
+                }
+
+                for (const std::string& name : properties->Properties())
+                {
+                    if (IsTopologyProperty(domain, name))
+                        continue;
+                    const GeometryPropertyResolution resolution =
+                        ResolveEditorAttributeBindingSource(availability, laneRow.Attribute, domain, name);
+                    row.Candidates.push_back(EditorAttributeBindingCandidate{
+                        .Property =
+                            GeometryPropertyRef{
+                                .Domain = domain,
+                                .Name = name,
+                                .ValueKind = resolution.ResolvedValueKind,
+                            },
+                        .ElementCount = resolution.ElementCount,
+                        .Compatible = resolution.Resolved(),
+                        .Reason = resolution.Status,
+                        .DisabledReason = resolution.Resolved() ? std::string{} : ResolutionReason(*rule, resolution),
+                    });
+                }
             }
-            std::ranges::sort(row.Candidates, {},
-                              [](const EditorAttributeBindingCandidate& c) -> const std::string& {
-                                  return c.Property.Name;
-                              });
+            if (row.Domains.empty())
+                continue;
+            if (row.Attribute == RenderAttribute::Color)
+                row.OverlayTarget = EditorFeatureDetail::VisualizationTargetFor(row.Lane);
+            // By name; a name on several domains keeps the row's domain order.
+            std::ranges::stable_sort(row.Candidates,
+                {},
+                [](const EditorAttributeBindingCandidate& c) -> const std::string&
+                {
+                    return c.Property.Name;
+                });
             model.Rows.push_back(std::move(row));
         }
         return model;

@@ -833,6 +833,9 @@ TEST(SandboxDomainPanels, VectorFieldSectionAddsEditsAndRemovesFieldsWithoutVisi
             // driven through the widget itself.
             ImGui::FocusWindow(window);
             window->DC.StateStorage->SetInt(ImHashStr("Vector fields", 0, window->ID), 1);
+            // Collapse the lane sections so the vector-field section and its popups stay on screen.
+            for (const char* lane : {"Vertices", "Edges", "Faces"})
+                window->DC.StateStorage->SetInt(ImHashStr(lane, 0, window->ID), 0);
             break;
         case 1: ImGui::ActivateItemByID(ImHashStr("Domain", 0, section)); break;
         case 2: EXPECT_TRUE(selectInPopup("Faces (1)")) << "Domain dropdown did not open"; break;
@@ -1440,8 +1443,8 @@ TEST(SandboxDomainPanels, AttributeSelectorBindsOneUndoStepRefusesIncompatibleAn
         ImGui::SetWindowSize(window, ImVec2{700.0f, 1100.0f});
         if (frame % 3 != 0)
             return;
-        // Row 0 of the Vertices table is Position on the mesh vertices.
-        const ImGuiID combo = AppearanceRowComboId(AppearanceTableId(window, Kind::PointCloud, "Vertices"), 0);
+        // Row 0 of the model is the surface's Position, in the Faces table.
+        const ImGuiID combo = AppearanceRowComboId(AppearanceTableId(window, Kind::Mesh, "Faces"), 0);
         switch (step)
         {
         case 0: ImGui::FocusWindow(window); ImGui::ActivateItemByID(combo); break;
@@ -1489,18 +1492,22 @@ TEST(SandboxDomainPanels, AttributeSelectorShowsTheRuntimeReasonOfAnIncompatible
     model.HasEntity = true;
     model.StableEntityId = 7u;
     Runtime::EditorAttributeBindingRow row{};
+    row.Lane = Runtime::GeometryRenderLane::Points;
     row.Attribute = Runtime::RenderAttribute::Position;
-    row.Domain = Runtime::GeometryElementDomain::MeshVertex;
+    row.Domains = {{.Domain = Runtime::GeometryElementDomain::MeshVertex, .ElementCount = 3u}};
     row.ExpectedType = "vec3";
-    row.ExpectedElementCount = 3u;
     row.DefaultSource = "v:position";
-    row.Candidates.push_back({.Property = {.Domain = row.Domain, .Name = "v:offset",
-                                           .ValueKind = Geometry::PropertyValueKind::Vec3},
-                              .ElementCount = 3u, .Compatible = true});
-    row.Candidates.push_back({.Property = {.Domain = row.Domain, .Name = "v:pair",
-                                           .ValueKind = Geometry::PropertyValueKind::Vec2},
-                              .ElementCount = 3u, .Compatible = false,
-                              .DisabledReason = "requires vec3"});
+    row.Candidates.push_back({.Property = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+                                  .Name = "v:offset",
+                                  .ValueKind = Geometry::PropertyValueKind::Vec3},
+        .ElementCount = 3u,
+        .Compatible = true});
+    row.Candidates.push_back({.Property = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+                                  .Name = "v:pair",
+                                  .ValueKind = Geometry::PropertyValueKind::Vec2},
+        .ElementCount = 3u,
+        .Compatible = false,
+        .DisabledReason = "requires vec3"});
     model.Rows.push_back(std::move(row));
 
     Editor::SandboxEditorContext context{};
@@ -1515,7 +1522,7 @@ TEST(SandboxDomainPanels, AttributeSelectorShowsTheRuntimeReasonOfAnIncompatible
         ImGui::SetNextWindowSize({700, 300});
         ImGui::Begin("Attribute host", nullptr, ImGuiWindowFlags_NoSavedSettings);
         ImGui::LogToBuffer();
-        Editor::DrawAttributeSourceTable(model, Editor::AppearanceElementSection::Vertices, &context, state);
+        Editor::DrawAttributeSourceTable(model, Runtime::GeometryRenderLane::Points, &context, state);
         logged = ImGui::GetCurrentContext()->LogBuffer.c_str();
         ImGui::LogFinish();
         ImGui::End();
@@ -1536,6 +1543,47 @@ TEST(SandboxDomainPanels, AttributeSelectorShowsTheRuntimeReasonOfAnIncompatible
 
 // A section the reading reaches but the runtime refuses is drawn disabled
 // with the runtime's own diagnostic instead of disappearing.
+// UI-083: each section lists the attributes of its own primitive: Vertices
+// (points) Position, Normal, Color, Point size; Edges Position, Color, Line
+// width; Faces (surface) Position, Normal, Texcoord, Color.
+TEST(SandboxDomainPanels, AppearanceSectionsListThePrimitiveAttributes)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    using L = Runtime::GeometryRenderLane;
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {800, 600};
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    const auto model =
+        Runtime::BuildEditorAttributeBindingModel(scene, Runtime::SelectionController::ToStableEntityId(entity));
+    Editor::AttributeSourceUiState state{};
+    const auto rowsOf = [&](const L lane)
+    {
+        gui.NextFrame();
+        ImGui::SetNextWindowSize({700, 400});
+        ImGui::Begin("Attribute host", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        ImGui::LogToBuffer();
+        Editor::DrawAttributeSourceTable(model, lane, nullptr, state);
+        const std::string logged = ImGui::GetCurrentContext()->LogBuffer.c_str();
+        ImGui::LogFinish();
+        ImGui::End();
+        std::vector<std::string> labels;
+        for (const char* label : {"Position", "Normal", "Texcoord", "Color", "Point size", "Line width"})
+            if (logged.find(label) != std::string::npos)
+                labels.emplace_back(label);
+        return labels;
+    };
+    EXPECT_EQ(rowsOf(L::Points), (std::vector<std::string>{"Position", "Normal", "Color", "Point size"}));
+    EXPECT_EQ(rowsOf(L::Edges), (std::vector<std::string>{"Position", "Color", "Line width"}));
+    EXPECT_EQ(rowsOf(L::Surface), (std::vector<std::string>{"Position", "Normal", "Texcoord", "Color"}));
+}
+
 TEST(SandboxDomainPanels, UnavailableAppearanceSectionStatesTheRuntimeReason)
 {
     TestSupport::ImGuiFrameScope gui;
@@ -1619,12 +1667,12 @@ TEST(SandboxDomainPanels, AppearanceOfAMeshLackingEdgesShowsNoSectionTables)
 namespace
 {
     [[nodiscard]] int RowIndexOf(const Runtime::EditorAttributeBindingModel& model,
-                                 const Runtime::RenderAttribute attribute,
-                                 const Runtime::GeometryElementDomain domain)
+        const Runtime::GeometryRenderLane lane,
+        const Runtime::RenderAttribute attribute)
     {
         for (std::size_t i = 0u; i < model.Rows.size(); ++i)
         {
-            if (model.Rows[i].Attribute == attribute && model.Rows[i].Domain == domain)
+            if (model.Rows[i].Lane == lane && model.Rows[i].Attribute == attribute)
                 return static_cast<int>(i);
         }
         return -1;
@@ -1663,8 +1711,7 @@ TEST(SandboxDomainPanels, ColorInterpretationAppearsOnTheBoundColorRowOnly)
     ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
     const auto bindings = Runtime::BuildEditorAttributeBindingModel(
         scene, Runtime::SelectionController::ToStableEntityId(entity));
-    const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color,
-                                    Runtime::GeometryElementDomain::MeshVertex);
+    const int colorRow = RowIndexOf(bindings, Runtime::GeometryRenderLane::Points, Runtime::RenderAttribute::Color);
     ASSERT_GE(colorRow, 0);
 
     Editor::EditorShell shell;
@@ -1752,8 +1799,7 @@ TEST(SandboxDomainPanels, UniformPointSizeSitsOnItsRowAndYieldsToABoundSource)
     ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
     const auto bindings = Runtime::BuildEditorAttributeBindingModel(
         scene, Runtime::SelectionController::ToStableEntityId(entity));
-    const int sizeRow = RowIndexOf(bindings, Runtime::RenderAttribute::PointSize,
-                                   Runtime::GeometryElementDomain::PointCloudPoint);
+    const int sizeRow = RowIndexOf(bindings, Runtime::GeometryRenderLane::Points, Runtime::RenderAttribute::PointSize);
     ASSERT_GE(sizeRow, 0);
 
     Editor::EditorShell shell;
@@ -1798,9 +1844,20 @@ TEST(SandboxDomainPanels, UniformPointSizeSitsOnItsRowAndYieldsToABoundSource)
             ImGui::ActivateItemByID(source);
             break;
         case 2: EXPECT_TRUE(selectInPopup("p:radius (Float, 1)")); break;
-        case 3: ImGui::ActivateItemByID(field); break;
+        case 3:
+            ImGui::ActivateItemByID(field);
+            ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+            break;
         case 4:
-            EXPECT_NE(ImGui::GetActiveID(), field) << "a bound source replaces the uniform field";
+            EXPECT_EQ(ImGui::GetActiveID(), field) << "a bound row keeps its uniform size field";
+            ImGui::GetIO().AddInputCharactersUTF8("9");
+            break;
+        case 5: ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true); break;
+        case 6:
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+            EXPECT_FLOAT_EQ(raw.get<G::RenderPoints>(entity).Size, G::RenderPoints{}.Size)
+                << "a bound row's uniform size is not written";
+            EXPECT_EQ(raw.get<G::RenderPoints>(entity).SizeProperty, "p:radius");
             kernel.RequestExit();
             break;
         default: break;
@@ -1808,7 +1865,7 @@ TEST(SandboxDomainPanels, UniformPointSizeSitsOnItsRowAndYieldsToABoundSource)
         ++step;
     };
     engine.Run();
-    EXPECT_EQ(step, 5);
+    EXPECT_EQ(step, 7);
     panels.Unregister();
     shell.Detach();
     engine.Shutdown();
@@ -1850,8 +1907,7 @@ TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
     ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
     const auto stableId = Runtime::SelectionController::ToStableEntityId(entity);
     const auto bindings = Runtime::BuildEditorAttributeBindingModel(scene, stableId);
-    const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color,
-                                    Runtime::GeometryElementDomain::MeshVertex);
+    const int colorRow = RowIndexOf(bindings, Runtime::GeometryRenderLane::Points, Runtime::RenderAttribute::Color);
     ASSERT_GE(colorRow, 0);
 
     Editor::EditorShell shell;
@@ -1935,8 +1991,8 @@ TEST(SandboxDomainPanels, AppearanceContentFitsTheDefaultWindowWidth)
     engine.Shutdown();
 }
 
-// UI-075: every Color row edits the overlay of the lane the runtime names for
-// it (`OverlayTarget`), not the lane of the section it is listed in.
+// Every Color row edits the overlay of its own lane (UI-083): each section
+// colors its primitive, whichever element domain the property lives on.
 namespace
 {
     enum class ColorLane { Surface, Edges, Points };
@@ -1948,6 +2004,7 @@ namespace
         Runtime::GeometryElementDomain Domain;
         Runtime::EditorDomainWindowKind SectionKind;
         const char* SectionTitle;
+        Runtime::GeometryRenderLane Lane;
         ColorLane ExpectedLane;
     };
 
@@ -2003,29 +2060,17 @@ namespace
         ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
         const auto bindings = Runtime::BuildEditorAttributeBindingModel(
             scene, Runtime::SelectionController::ToStableEntityId(entity));
-        const int colorRow = RowIndexOf(bindings, Runtime::RenderAttribute::Color, testCase.Domain);
+        const int colorRow = RowIndexOf(bindings, testCase.Lane, Runtime::RenderAttribute::Color);
         ASSERT_GE(colorRow, 0);
-        // A Color row of another domain that colors the same lane (mesh vertices and
-        // faces, graph nodes and edges): once this row binds a property it stays Default.
-        int twinRow = -1;
-        for (std::size_t i = 0u; i < bindings.Rows.size(); ++i)
-        {
-            const auto& row = bindings.Rows[i];
-            if (row.Attribute == Runtime::RenderAttribute::Color && row.Domain != testCase.Domain &&
-                row.OverlayTarget == bindings.Rows[static_cast<std::size_t>(colorRow)].OverlayTarget)
-                twinRow = static_cast<int>(i);
-        }
-        const auto twinDomain = twinRow < 0 ? D::Unknown : bindings.Rows[static_cast<std::size_t>(twinRow)].Domain;
-        const bool twinOnVertices = twinDomain == D::MeshVertex || twinDomain == D::GraphNode;
-        const auto twinKind = twinOnVertices ? Runtime::EditorDomainWindowKind::PointCloud
-            : twinDomain == D::MeshFace      ? Runtime::EditorDomainWindowKind::Mesh
-                                             : Runtime::EditorDomainWindowKind::Graph;
-        const char* twinTitle = twinOnVertices ? "Vertices" : twinDomain == D::MeshFace ? "Faces" : "Edges";
+        const auto& row = bindings.Rows[static_cast<std::size_t>(colorRow)];
         std::string candidate;
-        for (const auto& c : bindings.Rows[static_cast<std::size_t>(colorRow)].Candidates)
+        for (const auto& c : row.Candidates)
         {
-            if (c.Property.Name == "x:tint")
-                candidate = "x:tint (Vec3, " + std::to_string(c.ElementCount) + ")";
+            if (c.Property.Name == "x:tint" && c.Property.Domain == testCase.Domain)
+                candidate = "x:tint (" +
+                    (row.Domains.size() > 1u ? std::string{Runtime::ToString(c.Property.Domain)} + ", "
+                                             : std::string{}) +
+                    "Vec3, " + std::to_string(c.ElementCount) + ")";
         }
         ASSERT_FALSE(candidate.empty());
 
@@ -2117,23 +2162,20 @@ namespace
                     EXPECT_EQ(normalDirection(lane), lane == testCase.ExpectedLane)
                         << "lane " << static_cast<int>(lane);
                 }
-                editRed(); // a bound row offers no uniform color
+                editRed();
                 break;
             case 8:
-                EXPECT_NE(ImGui::GetCurrentContext()->ActiveId, red) << "a bound row offers no uniform color";
-                if (twinRow >= 0)
-                    ImGui::ActivateItemByID(ImHashStr("##X",
-                        0,
-                        RowItemId(AppearanceSectionId(window, twinKind, twinTitle), twinRow, "##Uniform color")));
+                EXPECT_EQ(ImGui::GetCurrentContext()->ActiveId, red) << "a bound row keeps its uniform color field";
+                ImGui::GetIO().AddInputCharactersUTF8("1");
                 break;
-            case 9:
-                if (twinRow >= 0)
-                    EXPECT_EQ(ImGui::GetCurrentContext()->ActiveId, 0u)
-                        << "a Default row whose lane a property colors offers no uniform color";
+            case 9: ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true); break;
+            case 10:
+                ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+                EXPECT_TRUE(normalDirection(testCase.ExpectedLane)) << "a bound row's uniform color is not written";
                 ImGui::ActivateItemByID(source);
                 break;
-            case 10: EXPECT_TRUE(selectInPopup("Default")); break;
-            case 11:
+            case 11: EXPECT_TRUE(selectInPopup("Default")); break;
+            case 12:
                 EXPECT_EQ(uniformRed(testCase.ExpectedLane), std::optional{0.0f})
                     << "unbinding the property brings the chosen color back";
                 kernel.RequestExit();
@@ -2143,7 +2185,7 @@ namespace
             ++step;
         };
         engine.Run();
-        EXPECT_EQ(step, 12);
+        EXPECT_EQ(step, 13);
         panels.Unregister();
         shell.Detach();
         engine.Shutdown();
@@ -2154,14 +2196,59 @@ TEST(SandboxDomainPanels, EveryColorRowEditsTheOverlayLaneTheRuntimeNamesForIt)
 {
     using D = Runtime::GeometryElementDomain;
     using K = Runtime::EditorDomainWindowKind;
-    for (const ColorRowCase& testCase : {
-             ColorRowCase{"mesh vertices", ProbeEntity::Mesh, D::MeshVertex, K::PointCloud, "Vertices", ColorLane::Surface},
-             ColorRowCase{"mesh edges", ProbeEntity::Mesh, D::MeshEdge, K::Graph, "Edges", ColorLane::Edges},
-             ColorRowCase{"mesh faces", ProbeEntity::Mesh, D::MeshFace, K::Mesh, "Faces", ColorLane::Surface},
-             ColorRowCase{"graph nodes", ProbeEntity::Graph, D::GraphNode, K::PointCloud, "Vertices", ColorLane::Edges},
-             ColorRowCase{"graph edges", ProbeEntity::Graph, D::GraphEdge, K::Graph, "Edges", ColorLane::Edges},
-             ColorRowCase{"cloud points", ProbeEntity::PointCloud, D::PointCloudPoint, K::PointCloud, "Vertices",
-                          ColorLane::Points}})
+    using L = Runtime::GeometryRenderLane;
+    for (const ColorRowCase& testCase :
+        {ColorRowCase{"mesh points from vertices",
+             ProbeEntity::Mesh,
+             D::MeshVertex,
+             K::PointCloud,
+             "Vertices",
+             L::Points,
+             ColorLane::Points},
+            ColorRowCase{"mesh edges from vertices",
+                ProbeEntity::Mesh,
+                D::MeshVertex,
+                K::Graph,
+                "Edges",
+                L::Edges,
+                ColorLane::Edges},
+            ColorRowCase{
+                "mesh edges from edges", ProbeEntity::Mesh, D::MeshEdge, K::Graph, "Edges", L::Edges, ColorLane::Edges},
+            ColorRowCase{"mesh surface from vertices",
+                ProbeEntity::Mesh,
+                D::MeshVertex,
+                K::Mesh,
+                "Faces",
+                L::Surface,
+                ColorLane::Surface},
+            ColorRowCase{"mesh surface from faces",
+                ProbeEntity::Mesh,
+                D::MeshFace,
+                K::Mesh,
+                "Faces",
+                L::Surface,
+                ColorLane::Surface},
+            ColorRowCase{"graph points from nodes",
+                ProbeEntity::Graph,
+                D::GraphNode,
+                K::PointCloud,
+                "Vertices",
+                L::Points,
+                ColorLane::Points},
+            ColorRowCase{"graph edges from edges",
+                ProbeEntity::Graph,
+                D::GraphEdge,
+                K::Graph,
+                "Edges",
+                L::Edges,
+                ColorLane::Edges},
+            ColorRowCase{"cloud points",
+                ProbeEntity::PointCloud,
+                D::PointCloudPoint,
+                K::PointCloud,
+                "Vertices",
+                L::Points,
+                ColorLane::Points}})
         RunColorRowInterpretationCase(testCase);
 }
 

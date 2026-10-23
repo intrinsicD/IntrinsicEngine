@@ -629,8 +629,8 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
     const G::RenderEdges& meshEdges = raw.get<G::RenderEdges>(mesh);
     EXPECT_EQ(meshEdges.Domain, G::RenderEdges::SourceDomain::Edge);
-    ASSERT_NE(std::get_if<float>(&meshEdges.WidthSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&meshEdges.WidthSource), 3.0f);
+    EXPECT_TRUE(meshEdges.WidthProperty.empty());
+    EXPECT_FLOAT_EQ(meshEdges.Width, 3.0f);
 
     EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
                   context,
@@ -646,8 +646,8 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
     const G::RenderPoints& meshPoints = raw.get<G::RenderPoints>(mesh);
     EXPECT_EQ(meshPoints.Type, G::RenderPoints::RenderType::Surfel);
-    ASSERT_NE(std::get_if<float>(&meshPoints.SizeSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&meshPoints.SizeSource), 7.0f);
+    EXPECT_TRUE(meshPoints.SizeProperty.empty());
+    EXPECT_FLOAT_EQ(meshPoints.Size, 7.0f);
 
     const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
     AddGraphSource(registry, graph);
@@ -678,8 +678,8 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(graph));
     const G::RenderPoints& graphPoints = raw.get<G::RenderPoints>(graph);
     EXPECT_EQ(graphPoints.Type, G::RenderPoints::RenderType::Flat);
-    ASSERT_NE(std::get_if<float>(&graphPoints.SizeSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&graphPoints.SizeSource), 0.25f);
+    EXPECT_TRUE(graphPoints.SizeProperty.empty());
+    EXPECT_FLOAT_EQ(graphPoints.Size, 0.25f);
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
     const Runtime::EditorDomainWindowModel graphModel =
@@ -728,22 +728,50 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(cloud));
     const G::RenderPoints& cloudPoints = raw.get<G::RenderPoints>(cloud);
     EXPECT_EQ(cloudPoints.Type, G::RenderPoints::RenderType::Surfel);
-    ASSERT_NE(std::get_if<float>(&cloudPoints.SizeSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&cloudPoints.SizeSource), 0.05f);
+    EXPECT_TRUE(cloudPoints.SizeProperty.empty());
+    EXPECT_FLOAT_EQ(cloudPoints.Size, 0.05f);
 }
+// UI-083: with no color config a lane's uniform color starts at what the lane
+// draws: grey-white for the surface, the dark lane color for edges and points.
+TEST(SandboxEditorUi, LaneUniformColorStartsAtTheLaneDefault)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    const auto mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderEdges>(mesh);
+    registry.Raw().emplace<G::RenderPoints>(mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    using Kind = Runtime::EditorDomainWindowKind;
+    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::Mesh).Visualization.Visualization.Color,
+        G::kDefaultSurfaceColor);
+    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::Graph).Visualization.Visualization.Color,
+        G::kDefaultLineAndPointColor);
+    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::PointCloud).Visualization.Visualization.Color,
+        G::kDefaultLineAndPointColor);
+}
+
 TEST(SandboxEditorUi, RenderHintHistoryPreservesScalarSourceIdentityAcrossCommandFamilies)
 {
-    const std::array<std::variant<float, std::string>, 4> sources{
-        2.0f, -0.0f, std::bit_cast<float>(0x7fc00001u), std::string{"v:size"}};
+    struct Source
+    {
+        float Uniform{};
+        std::string Property{};
+    };
+    const std::array<Source, 4> sources{
+        {{2.0f, {}}, {-0.0f, {}}, {std::bit_cast<float>(0x7fc00001u), {}}, {1.5f, "v:size"}}};
+    const auto flipped = [](const float value)
+    {
+        return std::bit_cast<float>(std::bit_cast<std::uint32_t>(value) ^ 0x80000000u);
+    };
     for (const bool visualizationCommand : {false, true})
     {
-        for (const auto& source : sources)
+        for (const Source& source : sources)
         {
             SCOPED_TRACE(visualizationCommand);
-            SCOPED_TRACE(source.index());
-            SCOPED_TRACE(std::holds_alternative<float>(source)
-                ? std::to_string(std::bit_cast<std::uint32_t>(std::get<float>(source)))
-                : std::get<std::string>(source));
+            SCOPED_TRACE(std::to_string(std::bit_cast<std::uint32_t>(source.Uniform)) + " " + source.Property);
             ECS::Scene::Registry registry;
             Runtime::SelectionController selection;
             Runtime::EditorCommandHistory history;
@@ -752,10 +780,13 @@ TEST(SandboxEditorUi, RenderHintHistoryPreservesScalarSourceIdentityAcrossComman
             const auto mesh = MakeSelectable(registry, "Mesh");
             AddTriangleMeshSource(registry, mesh);
             auto& raw = registry.Raw();
-            raw.emplace_or_replace<G::RenderEdges>(mesh).WidthSource = source;
+            auto& edges = raw.emplace_or_replace<G::RenderEdges>(mesh);
+            edges.Width = source.Uniform;
+            edges.WidthProperty = source.Property;
             auto& points = raw.emplace_or_replace<G::RenderPoints>(mesh);
             points.Type = G::RenderPoints::RenderType::Flat;
-            points.SizeSource = source;
+            points.Size = source.Uniform;
+            points.SizeProperty = source.Property;
             const auto stableId = Runtime::SelectionController::ToStableEntityId(mesh);
             const auto apply = [&]
             {
@@ -775,21 +806,14 @@ TEST(SandboxEditorUi, RenderHintHistoryPreservesScalarSourceIdentityAcrossComman
             };
             const auto expectSources = [&]
             {
-                for (const auto* restored : {
-                         &raw.get<G::RenderPoints>(mesh).SizeSource,
-                         &raw.get<G::RenderEdges>(mesh).WidthSource})
-                {
-                    ASSERT_EQ(restored->index(), source.index());
-                    if (const auto* scalar = std::get_if<float>(&source))
-                    {
-                        EXPECT_EQ(std::bit_cast<std::uint32_t>(std::get<float>(*restored)),
-                                  std::bit_cast<std::uint32_t>(*scalar));
-                    }
-                    else
-                    {
-                        EXPECT_EQ(std::get<std::string>(*restored), std::get<std::string>(source));
-                    }
-                }
+                const auto& restoredPoints = raw.get<G::RenderPoints>(mesh);
+                const auto& restoredEdges = raw.get<G::RenderEdges>(mesh);
+                EXPECT_EQ(
+                    std::bit_cast<std::uint32_t>(restoredPoints.Size), std::bit_cast<std::uint32_t>(source.Uniform));
+                EXPECT_EQ(
+                    std::bit_cast<std::uint32_t>(restoredEdges.Width), std::bit_cast<std::uint32_t>(source.Uniform));
+                EXPECT_EQ(restoredPoints.SizeProperty, source.Property);
+                EXPECT_EQ(restoredEdges.WidthProperty, source.Property);
             };
             ASSERT_EQ(apply(), Runtime::EditorCommandStatus::Applied);
             EXPECT_EQ(apply(), Runtime::EditorCommandStatus::NoChange);
@@ -800,28 +824,19 @@ TEST(SandboxEditorUi, RenderHintHistoryPreservesScalarSourceIdentityAcrossComman
                       G::RenderPoints::RenderType::Flat);
             ASSERT_TRUE(history.Redo().Succeeded());
             expectSources();
-            if (const auto* scalar = std::get_if<float>(&source))
-                raw.get<G::RenderEdges>(mesh).WidthSource = std::bit_cast<float>(
-                    std::bit_cast<std::uint32_t>(*scalar) ^ 0x80000000u);
-            else
-                raw.get<G::RenderEdges>(mesh).WidthSource = std::string{"v:other"};
+            // A changed uniform bit pattern or property name makes the undo stale.
+            raw.get<G::RenderEdges>(mesh).Width = flipped(source.Uniform);
             const auto beforeRejectedUndo = history.Snapshot();
             EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
             EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
             EXPECT_EQ(raw.get<G::RenderPoints>(mesh).Type,
                       G::RenderPoints::RenderType::Sphere);
-            raw.get<G::RenderEdges>(mesh).WidthSource =
-                std::holds_alternative<float>(source)
-                    ? std::variant<float, std::string>{std::string{"v:other"}}
-                    : std::variant<float, std::string>{2.0f};
+            raw.get<G::RenderEdges>(mesh).Width = source.Uniform;
+            raw.get<G::RenderEdges>(mesh).WidthProperty = source.Property.empty() ? "v:other" : "";
             EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
             EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
-            raw.get<G::RenderEdges>(mesh).WidthSource = source;
-            raw.get<G::RenderPoints>(mesh).SizeSource =
-                std::holds_alternative<float>(source)
-                    ? std::variant<float, std::string>{std::bit_cast<float>(
-                          std::bit_cast<std::uint32_t>(std::get<float>(source)) ^ 0x80000000u)}
-                    : std::variant<float, std::string>{std::string{"v:other"}};
+            raw.get<G::RenderEdges>(mesh).WidthProperty = source.Property;
+            raw.get<G::RenderPoints>(mesh).Size = flipped(source.Uniform);
             EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
             EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
         }
@@ -1355,8 +1370,8 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
     const G::RenderPoints& points = raw.get<G::RenderPoints>(mesh);
     EXPECT_EQ(points.Type, G::RenderPoints::RenderType::Surfel);
-    ASSERT_NE(std::get_if<float>(&points.SizeSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&points.SizeSource), 11.0f);
+    EXPECT_TRUE(points.SizeProperty.empty());
+    EXPECT_FLOAT_EQ(points.Size, 11.0f);
 
     EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,
@@ -1414,8 +1429,8 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
     const G::RenderPoints& vertexOnlyPoints =
         raw.get<G::RenderPoints>(vertexOnlyMesh);
     EXPECT_EQ(vertexOnlyPoints.Type, G::RenderPoints::RenderType::Flat);
-    ASSERT_NE(std::get_if<float>(&vertexOnlyPoints.SizeSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&vertexOnlyPoints.SizeSource), 7.0f);
+    EXPECT_TRUE(vertexOnlyPoints.SizeProperty.empty());
+    EXPECT_FLOAT_EQ(vertexOnlyPoints.Size, 7.0f);
 
     EXPECT_EQ(Runtime::ApplyEditorPrimitiveViewCommand(
                   context,

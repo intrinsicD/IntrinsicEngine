@@ -171,15 +171,24 @@ export namespace Extrinsic::Runtime
         std::string DisabledReason{};
     };
 
-    // One (attribute, element domain) row of the entity's binding table.
+    // An element domain a row reads, with the entity's element count on it.
+    struct EditorAttributeBindingDomain
+    {
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        std::size_t ElementCount{0u};
+    };
+
+    // One (render lane, attribute) row of the entity's binding table
+    // (RenderLaneAttributeRows()). `Domains` are the row's domains the entity
+    // has; each candidate and the bound `Source` name their own domain.
     // `Bound` means an authored non-default source; when it no longer
     // resolves, `UsingFallback` is set and the default is drawn.
     struct EditorAttributeBindingRow
     {
+        GeometryRenderLane Lane{GeometryRenderLane::Surface};
         RenderAttribute Attribute{RenderAttribute::Position};
-        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        std::vector<EditorAttributeBindingDomain> Domains{};
         std::string ExpectedType{};
-        std::size_t ExpectedElementCount{0u};
         std::string DefaultSource{};
         bool Bound{false};
         GeometryPropertyRef Source{};
@@ -412,7 +421,7 @@ export namespace Extrinsic::Runtime
         bool HasConfig{false};
         Graphics::Components::VisualizationConfig::ColorSource Source{
             Graphics::Components::VisualizationConfig::ColorSource::Material};
-        glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
+        glm::vec4 Color{Graphics::Components::kDefaultSurfaceColor};
         bool UniformByDefault{false};
         std::string ScalarFieldName{};
         Graphics::Components::VisualizationConfig::Domain ScalarDomain{
@@ -499,7 +508,7 @@ export namespace Extrinsic::Runtime
         bool EnableConfig{true};
         Graphics::Components::VisualizationConfig::ColorSource Source{
             Graphics::Components::VisualizationConfig::ColorSource::UniformColor};
-        glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
+        glm::vec4 Color{Graphics::Components::kDefaultSurfaceColor};
         bool UniformByDefault{false};
         std::string ScalarFieldName{};
         Graphics::Components::VisualizationConfig::Domain ScalarDomain{
@@ -539,14 +548,20 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         bool EnableRecipe{true};
         VisualizationRecipe Recipe{};
+        // The lane whose overlay shows the property; unset uses the lane a
+        // property of that domain colors by default (surface for mesh vertices).
+        std::optional<EditorVisualizationTarget> Target{};
     };
-    // Chooses the source property of one render attribute on one element
-    // domain (RUNTIME-315). An empty `PropertyName` restores the default
-    // source. Structural streams, the Color overlay and the point/line pixel
-    // sizes each commit as one undoable step on their owning storage.
+    // Chooses the source property of one render attribute on one render
+    // lane; `Domain` is the source property's element domain and must be one
+    // of the lane row's domains. An empty `PropertyName` restores the default
+    // source (`Domain` is then ignored). Structural streams, the lane's Color
+    // overlay and the point/line pixel sizes each commit as one undoable step
+    // on their owning storage.
     struct EditorAttributeBindingCommand
     {
         std::uint32_t StableEntityId{0u};
+        GeometryRenderLane Lane{GeometryRenderLane::Surface};
         RenderAttribute Attribute{RenderAttribute::Position};
         GeometryElementDomain Domain{GeometryElementDomain::Unknown};
         std::string PropertyName{};

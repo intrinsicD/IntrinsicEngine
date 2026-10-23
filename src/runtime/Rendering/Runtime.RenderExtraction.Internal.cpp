@@ -162,6 +162,10 @@ namespace Extrinsic::Runtime
             Graphics::Components::VisualizationLaneOverrides
                 VisualizationOverrides{};
             bool HasVisualizationOverrides{false};
+            // Edge and point lanes on Default draw the source's imported vertex
+            // colors; these hold that per-frame overlay.
+            std::optional<Graphics::Components::VisualizationConfig> ImportedEdgeColor{};
+            std::optional<Graphics::Components::VisualizationConfig> ImportedPointColor{};
             Graphics::GpuGeometryHandle Geometry{};
             std::optional<Graphics::GeometryResidencyKey> ProceduralKey{};
             Graphics::GpuGeometryHandle MeshGeometry{};

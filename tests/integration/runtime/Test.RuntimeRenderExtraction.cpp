@@ -1809,8 +1809,7 @@ TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAnd
     const Graphics::ScalarAttributePacket* edgeScalar =
         findScalar("edge_score");
     ASSERT_NE(edgeScalar, nullptr);
-    EXPECT_EQ(edgeScalar->SourceBufferKey,
-              std::to_string(StableId(edgeScalarEntity)) + ":scalar:edge_score");
+    EXPECT_EQ(edgeScalar->SourceBufferKey, std::to_string(StableId(edgeScalarEntity)) + ":scalar.edge:edge_score");
     EXPECT_EQ(edgeScalar->Domain, Graphics::VisualizationAttributeDomain::Edge);
     EXPECT_EQ(edgeScalar->ElementCount, 2u);
     EXPECT_NE(edgeScalar->ScalarBufferBDA, 0u);
@@ -1828,8 +1827,7 @@ TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAnd
     const Graphics::ColorAttributePacket* edgeColor =
         findColor("edge_color");
     ASSERT_NE(edgeColor, nullptr);
-    EXPECT_EQ(edgeColor->SourceBufferKey,
-              std::to_string(StableId(edgeColorEntity)) + ":color:edge_color");
+    EXPECT_EQ(edgeColor->SourceBufferKey, std::to_string(StableId(edgeColorEntity)) + ":color.edge:edge_color");
     EXPECT_EQ(edgeColor->Domain, Graphics::VisualizationAttributeDomain::Edge);
     EXPECT_EQ(edgeColor->ElementCount, 2u);
     EXPECT_NE(edgeColor->ColorBufferBDA, 0u);
@@ -2961,14 +2959,14 @@ TEST(RuntimeRenderExtraction, NamedPointSizeAndLineWidthBindPerElementPixelBuffe
     AttachPointCloudSources(scene, cloud);
     scene.Raw().get<GS::Vertices>(cloud).Properties.GetOrAdd<float>("v:radius", 1.0f).Vector() =
         {2.0f, 4.0f, 8.0f};
-    scene.Raw().emplace<G::RenderPoints>(cloud).SizeSource = std::string{"v:radius"};
+    scene.Raw().emplace<G::RenderPoints>(cloud).SizeProperty = "v:radius";
 
     const auto graph = scene.Create();
     scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(graph).Matrix = glm::mat4{1.f};
     AttachLineGraphSources(scene, graph);
     scene.Raw().get<GS::Edges>(graph).Properties.GetOrAdd<float>("e:width", 1.0f).Vector() =
         {3.0f, 5.0f};
-    scene.Raw().emplace<G::RenderEdges>(graph).WidthSource = std::string{"e:width"};
+    scene.Raw().emplace<G::RenderEdges>(graph).WidthProperty = "e:width";
 
     const auto configOf = [&](const entt::entity entity) {
         const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
@@ -3001,13 +2999,13 @@ TEST(RuntimeRenderExtraction, NamedPointSizeAndLineWidthBindPerElementPixelBuffe
     // A non-finite or missing source falls back to the uniform default size.
     const auto expectUniform = [&] {
         EXPECT_EQ(configOf(cloud).Point.PointSizeBDA, 0u);
-        EXPECT_FLOAT_EQ(configOf(cloud).Point.PointSize, std::get<float>(G::RenderPoints{}.SizeSource));
+        EXPECT_FLOAT_EQ(configOf(cloud).Point.PointSize, G::RenderPoints{}.Size);
     };
     scene.Raw().get<GS::Vertices>(cloud).Properties.Get<float>("v:radius").Vector()[1] =
         std::numeric_limits<float>::quiet_NaN();
     (void)frame();
     expectUniform();
-    scene.Raw().get<G::RenderPoints>(cloud).SizeSource = std::string{"v:missing"};
+    scene.Raw().get<G::RenderPoints>(cloud).SizeProperty = "v:missing";
     (void)frame();
     expectUniform();
 }
@@ -3027,7 +3025,7 @@ TEST(RuntimeRenderExtraction, GraphSplitPointLaneBindsNamedPerElementSizes)
     scene.Raw().get<GS::Vertices>(graph).Properties.GetOrAdd<float>("v:size", 1.0f).Vector() =
         {5.0f, 6.0f, 7.0f};
     scene.Raw().emplace<G::RenderEdges>(graph);
-    scene.Raw().emplace<G::RenderPoints>(graph).SizeSource = std::string{"v:size"};
+    scene.Raw().emplace<G::RenderPoints>(graph).SizeProperty = "v:size";
 
     fixture.Extract(scene);
     auto world = fixture.Renderer->ExtractRenderWorld({});
@@ -3040,7 +3038,8 @@ TEST(RuntimeRenderExtraction, GraphSplitPointLaneBindsNamedPerElementSizes)
     EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->GraphPointLaneInstance).Point.PointSizeBDA, 0u);
 
     // A uniform size returns the split lane to the scalar size.
-    scene.Raw().get<G::RenderPoints>(graph).SizeSource = 9.0f;
+    scene.Raw().get<G::RenderPoints>(graph).SizeProperty.clear();
+    scene.Raw().get<G::RenderPoints>(graph).Size = 9.0f;
     fixture.Extract(scene);
     world = fixture.Renderer->ExtractRenderWorld({});
     fixture.Renderer->PrepareFrame(world);
@@ -3067,8 +3066,8 @@ TEST(RuntimeRenderExtraction, MeshEdgeAndVertexViewLanesBindNamedWidthsAndSizes)
     edges.GetOrAdd<float>("e:width", 1.0f).Vector() = {2.0f, 3.0f, 4.0f};
     scene.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:size", 1.0f).Vector() =
         {5.0f, 6.0f, 7.0f};
-    scene.Raw().emplace<G::RenderEdges>(mesh).WidthSource = std::string{"e:width"};
-    scene.Raw().emplace<G::RenderPoints>(mesh).SizeSource = std::string{"v:size"};
+    scene.Raw().emplace<G::RenderEdges>(mesh).WidthProperty = "e:width";
+    scene.Raw().emplace<G::RenderPoints>(mesh).SizeProperty = "v:size";
 
     fixture.Extract(scene);
     auto world = fixture.Renderer->ExtractRenderWorld({});
@@ -3084,6 +3083,134 @@ TEST(RuntimeRenderExtraction, MeshEdgeAndVertexViewLanesBindNamedWidthsAndSizes)
     auto& gpuWorld = fixture.Renderer->GetGpuWorld();
     EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->MeshEdgeViewInstance).Line.LineWidthBDA, 0u);
     EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecar->MeshVertexViewInstance).Point.PointSizeBDA, 0u);
+}
+
+// UI-083: a mesh's edge and point lanes on Default draw the imported vertex
+// colors (v:color), a point cloud its p:color; a uniform color picked for a
+// lane wins, and without imported colors the lanes keep their dark default.
+TEST(RuntimeRenderExtraction, PointAndEdgeLanesOnDefaultDrawImportedVertexColors)
+{
+    namespace G = Graphics::Components;
+    namespace GS = ECS::Components::GeometrySources;
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto addMesh = [&](const bool colored)
+    {
+        const auto mesh = scene.Create();
+        scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(mesh).Matrix = glm::mat4{1.f};
+        scene.Raw().emplace<G::RenderSurface>(mesh);
+        AttachTriangleMeshSources(scene, mesh);
+        auto& edges = scene.Raw().get<GS::Edges>(mesh).Properties;
+        edges.Resize(3u);
+        edges.GetOrAdd<std::uint32_t>(std::string{ECS::Components::GeometrySources::PropertyNames::kEdgeV0}, 0u)
+            .Vector() = {0u, 1u, 2u};
+        edges.GetOrAdd<std::uint32_t>(std::string{ECS::Components::GeometrySources::PropertyNames::kEdgeV1}, 0u)
+            .Vector() = {1u, 2u, 0u};
+        auto& vertices = scene.Raw().get<GS::Vertices>(mesh).Properties;
+        auto color = vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f});
+        if (colored)
+            color.Vector() = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}};
+        else
+            (void)vertices.Remove(color);  // the triangle helper adds v:color
+        scene.Raw().emplace<G::RenderEdges>(mesh);
+        scene.Raw().emplace<G::RenderPoints>(mesh);
+        return mesh;
+    };
+    const auto colored = addMesh(true);
+    const auto plain = addMesh(false);
+    const auto cloud = scene.Create();
+    scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(cloud).Matrix = glm::mat4{1.f};
+    AttachPointCloudSources(scene, cloud);
+    const std::size_t points = scene.Raw().get<GS::Vertices>(cloud).Properties.Size();
+    scene.Raw().get<GS::Vertices>(cloud).Properties.GetOrAdd<glm::vec4>("p:color", glm::vec4{0.5f}).Vector() =
+        std::vector<glm::vec4>(points, glm::vec4{0.5f, 0.25f, 0.0f, 1.0f});
+    scene.Raw().emplace<G::RenderPoints>(cloud);
+
+    const auto extract = [&]
+    {
+        for (int i = 0; i < 2; ++i)  // primitive views follow the resident surface
+        {
+            fixture.Extract(scene);
+            auto world = fixture.Renderer->ExtractRenderWorld({});
+            fixture.Renderer->PrepareFrame(world);
+        }
+    };
+    extract();
+    auto& gpuWorld = fixture.Renderer->GetGpuWorld();
+    const auto sidecarOf = [&](const entt::entity entity)
+    {
+        auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+        EXPECT_TRUE(sidecar.has_value());
+        return *sidecar;
+    };
+    const auto coloredSidecar = sidecarOf(colored);
+    ASSERT_TRUE(coloredSidecar.MeshVertexViewInstance.IsValid());
+    ASSERT_TRUE(coloredSidecar.MeshEdgeViewInstance.IsValid());
+    EXPECT_NE(gpuWorld.GetEntityConfigForTest(coloredSidecar.MeshVertexViewInstance).ColorBDA, 0u);
+    EXPECT_NE(gpuWorld.GetEntityConfigForTest(coloredSidecar.MeshEdgeViewInstance).ColorBDA, 0u);
+    EXPECT_NE(gpuWorld.GetEntityConfigForTest(sidecarOf(cloud).Instance).ColorBDA, 0u);
+
+    const auto plainSidecar = sidecarOf(plain);
+    const auto plainPoints = gpuWorld.GetEntityConfigForTest(plainSidecar.MeshVertexViewInstance);
+    EXPECT_EQ(plainPoints.ColorBDA, 0u);
+    EXPECT_EQ(plainPoints.UniformColor, G::kDefaultLineAndPointColor);
+
+    // A picked uniform color for the points lane wins over the imported colors.
+    G::VisualizationConfig picked{};
+    picked.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    picked.Color = {1.0f, 0.0f, 1.0f, 1.0f};
+    scene.Raw().emplace<G::VisualizationLaneOverrides>(colored).Points = picked;
+    extract();
+    const auto pickedPoints = gpuWorld.GetEntityConfigForTest(coloredSidecar.MeshVertexViewInstance);
+    EXPECT_EQ(pickedPoints.ColorBDA, 0u);
+    EXPECT_EQ(pickedPoints.UniformColor, picked.Color);
+    EXPECT_NE(gpuWorld.GetEntityConfigForTest(coloredSidecar.MeshEdgeViewInstance).ColorBDA, 0u);
+}
+
+// UI-083: two lanes may draw same-named properties of two element domains at
+// once (a graph's node and edge "weight"); each keeps its own property buffer.
+TEST(RuntimeRenderExtraction, SameNamedPropertiesOnTwoDomainsKeepSeparateLaneBuffers)
+{
+    namespace G = Graphics::Components;
+    namespace GS = ECS::Components::GeometrySources;
+    using ColorSource = G::VisualizationConfig::ColorSource;
+    using Domain = G::VisualizationConfig::Domain;
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto graph = scene.Create();
+    scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(graph).Matrix = glm::mat4{1.f};
+    AttachLineGraphSources(scene, graph);
+    scene.Raw().get<GS::Vertices>(graph).Properties.GetOrAdd<float>("weight", 0.0f).Vector() = {0.0f, 0.5f, 1.0f};
+    scene.Raw().get<GS::Edges>(graph).Properties.GetOrAdd<float>("weight", 0.0f).Vector() = {2.0f, 4.0f};
+    scene.Raw().emplace<G::RenderEdges>(graph);
+    scene.Raw().emplace<G::RenderPoints>(graph);
+    const auto scalarConfig = [](const Domain domain)
+    {
+        G::VisualizationConfig config{};
+        config.Source = ColorSource::ScalarField;
+        config.ScalarFieldName = "weight";
+        config.ScalarDomain = domain;
+        return config;
+    };
+    auto& lanes = scene.Raw().emplace<G::VisualizationLaneOverrides>(graph);
+    lanes.Points = scalarConfig(Domain::Vertex);
+    lanes.Edges = scalarConfig(Domain::Edge);
+
+    for (int frame = 0; frame < 2; ++frame)
+    {
+        fixture.Extract(scene);
+        auto world = fixture.Renderer->ExtractRenderWorld({});
+        fixture.Renderer->PrepareFrame(world);
+    }
+    const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(graph));
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->HasGraphPointLaneInstance);
+    auto& gpuWorld = fixture.Renderer->GetGpuWorld();
+    const auto points = gpuWorld.GetEntityConfigForTest(sidecar->GraphPointLaneInstance);
+    const auto edges = gpuWorld.GetEntityConfigForTest(sidecar->Instance);
+    EXPECT_NE(points.ScalarBDA, 0u);
+    EXPECT_NE(edges.ScalarBDA, 0u);
+    EXPECT_NE(points.ScalarBDA, edges.ScalarBDA) << "each lane reads its own domain's buffer";
 }
 
 TEST(RuntimeRenderExtraction, BoundsOverlayIsOptInAndUsesCurrentWorldBoundsWithoutGeometry)

@@ -623,7 +623,7 @@ namespace {
                         state.Components.Edges.value_or(G::RenderEdges{});
                     lines.Domain = command.EdgeDomain;
                     if (command.SetUniformEdgeWidth)
-                        lines.WidthSource = command.UniformEdgeWidth;
+                        lines.Width = command.UniformEdgeWidth;
                     state.Components.Edges = lines;
                 }
                 else
@@ -633,7 +633,7 @@ namespace {
             }
             else if (command.SetUniformEdgeWidth && state.Components.Edges.has_value())
             {
-                state.Components.Edges->WidthSource = command.UniformEdgeWidth;
+                state.Components.Edges->Width = command.UniformEdgeWidth;
             }
 
             if (command.SetPoints)
@@ -644,7 +644,7 @@ namespace {
                         state.Components.Points.value_or(G::RenderPoints{});
                     points.Type = command.PointType;
                     if (command.SetUniformPointSize)
-                        points.SizeSource = command.UniformPointSize;
+                        points.Size = command.UniformPointSize;
                     state.Components.Points = points;
                 }
                 else
@@ -657,7 +657,7 @@ namespace {
                 if (command.SetPointRenderType)
                     state.Components.Points->Type = command.PointType;
                 if (command.SetUniformPointSize)
-                    state.Components.Points->SizeSource = command.UniformPointSize;
+                    state.Components.Points->Size = command.UniformPointSize;
             }
 
             return state;
@@ -1708,7 +1708,8 @@ ApplyEditorRenderHintCommand(
                         if (!pendingResident && !EncodeVisualizationRecipe(availability, {.Data = resolved}).Succeeded())
                             return EditorCommandStatus::InvalidVisualizationProperty;
 
-                        const auto lane = EditorFeatureDetail::ColorOverlayTargetFor(resolved.Source.Domain);
+                        const auto lane =
+                            EditorFeatureDetail::ColorOverlayTargetFor(resolved.Source.Domain, command.Target);
                         if (!lane)
                             return EditorCommandStatus::UnsupportedGeometryDomain;
                         EditorVisualizationConfigCommand config{
@@ -1836,9 +1837,9 @@ ApplyEditorRenderHintCommand(
                 *FindVertexChannelSourceBinding(after, command.Attribute);
             if (command.PropertyName.empty())
             {
-                // Default only clears a binding authored on this row's domain.
+                // Default only clears a binding this lane row draws.
                 if (!IsVertexChannelBindingEnabled(target) ||
-                    target.Property.Domain != command.Domain)
+                    !RenderLaneReadsDomain(command.Lane, command.Attribute, target.Property.Domain))
                 {
                     return EditorCommandStatus::NoChange;
                 }
@@ -1884,24 +1885,27 @@ ApplyEditorRenderHintCommand(
             const Geometry::PropertyValueKind kind)
         {
             const entt::registry& raw = context.Scene->Raw();
+            const EditorVisualizationTarget lane = EditorFeatureDetail::VisualizationTargetFor(command.Lane);
             if (!command.PropertyName.empty())
             {
                 // The same recipe `show_property` and the processing panels
                 // use, so the overlay is the one Color mechanism (the recipe
                 // path keeps the lane's colormap, bins, isolines and baking).
-                return ApplyEditorVisualizationRecipeCommand(
-                    context,
+                return ApplyEditorVisualizationRecipeCommand(context,
                     EditorVisualizationRecipeCommand{
                         .StableEntityId = command.StableEntityId,
                         .Recipe = MakeEditorPropertyVisualizationRecipe(GeometryPropertyRef{
-                            .Domain = command.Domain, .Name = command.PropertyName,
-                            .ValueKind = kind}),
+                            .Domain = command.Domain, .Name = command.PropertyName, .ValueKind = kind}),
+                        .Target = lane,
                     });
             }
-            if (!EditorFeatureDetail::BoundColorOverlaySource(raw, entity, command.Domain))
+            const RenderLaneAttributeRow& laneRow = *FindRenderLaneAttributeRow(command.Lane, command.Attribute);
+            if (std::ranges::none_of(laneRow.Domains,
+                    [&](const GeometryElementDomain domain)
+                    {
+                        return EditorFeatureDetail::BoundColorOverlaySource(raw, entity, domain, lane).has_value();
+                    }))
                 return EditorCommandStatus::NoChange;
-            const EditorVisualizationTarget lane =
-                EditorFeatureDetail::ColorOverlayTargetFor(command.Domain)->Target;
             // A lane whose Default is a chosen uniform color returns to that color.
             if (const auto stored = EffectiveVisualizationConfigForTarget(raw, entity, lane);
                 stored.has_value() && stored->UniformByDefault)
@@ -1931,9 +1935,9 @@ ApplyEditorRenderHintCommand(
                 });
         }
 
-        // Point size / line width bind through the lane's render hint: the
-        // name alternative of the uniform pixel size. Default restores the
-        // component's uniform default.
+        // Point size / line width bind through the lane's render hint: a named
+        // property drawn instead of the uniform pixel size, which stays
+        // stored, so Default brings the last uniform value back.
         [[nodiscard]] EditorCommandStatus CommitPixelSizeAttributeBinding(
             const EditorVisualizationEditingContext& context,
             const ECS::EntityHandle entity,
@@ -1941,35 +1945,16 @@ ApplyEditorRenderHintCommand(
         {
             const EditorRenderHintState before = ReadRenderHintState(context.Scene->Raw(), entity);
             EditorRenderHintState after = before;
-            std::variant<float, std::string>* source = nullptr;
-            std::variant<float, std::string> defaultSource{};
+            std::string* property = nullptr;
             if (command.Attribute == RenderAttribute::PointSize && after.Components.Points)
-            {
-                source = &after.Components.Points->SizeSource;
-                defaultSource = G::RenderPoints{}.SizeSource;
-            }
+                property = &after.Components.Points->SizeProperty;
             else if (command.Attribute == RenderAttribute::LineWidth && after.Components.Edges)
-            {
-                source = &after.Components.Edges->WidthSource;
-                defaultSource = G::RenderEdges{}.WidthSource;
-            }
-            if (source == nullptr)
+                property = &after.Components.Edges->WidthProperty;
+            if (property == nullptr)
                 return EditorCommandStatus::UnsupportedRenderAttribute;  // lane not shown
-            if (command.PropertyName.empty())
-            {
-                if (std::holds_alternative<float>(*source))
-                    return EditorCommandStatus::NoChange;
-                *source = defaultSource;
-            }
-            else
-            {
-                if (const auto* name = std::get_if<std::string>(source);
-                    name != nullptr && *name == command.PropertyName)
-                {
-                    return EditorCommandStatus::NoChange;
-                }
-                *source = command.PropertyName;
-            }
+            if (*property == command.PropertyName)
+                return EditorCommandStatus::NoChange;
+            *property = command.PropertyName;
             if (context.CommandHistory != nullptr)
             {
                 return ToEditorCommandStatus(
@@ -1996,8 +1981,17 @@ ApplyEditorRenderHintCommand(
             return EditorCommandStatus::StaleEntity;
 
         const GeometryEntityAvailability availability = BuildGeometryAvailability(raw, *entity);
-        if (FindRenderAttributeRule(command.Attribute, command.Domain) == nullptr ||
-            !SupportsGeometryElementDomain(availability, command.Domain))
+        const RenderLaneAttributeRow* laneRow = FindRenderLaneAttributeRow(command.Lane, command.Attribute);
+        // A source must come from one of the row's domains; Default needs the
+        // entity to have any of them.
+        if (laneRow == nullptr ||
+            (command.PropertyName.empty() ? std::ranges::none_of(laneRow->Domains,
+                                                [&](const GeometryElementDomain domain)
+                                                {
+                                                    return SupportsGeometryElementDomain(availability, domain);
+                                                })
+                                          : !RenderLaneReadsDomain(command.Lane, command.Attribute, command.Domain) ||
+                        !SupportsGeometryElementDomain(availability, command.Domain)))
         {
             return EditorCommandStatus::UnsupportedRenderAttribute;
         }

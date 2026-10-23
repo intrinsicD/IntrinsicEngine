@@ -824,23 +824,8 @@ namespace Extrinsic::Runtime
             const G::RenderPoints& current,
             const G::RenderPoints& expected) noexcept
         {
-            if (current.Type != expected.Type ||
-                current.SizeSource.index() != expected.SizeSource.index())
-            {
-                return false;
-            }
-            if (const float* currentSize =
-                    std::get_if<float>(&current.SizeSource))
-            {
-                const float* expectedSize =
-                    std::get_if<float>(&expected.SizeSource);
-                return expectedSize != nullptr &&
-                       SameProgressivePoissonValue(
-                           *currentSize,
-                           *expectedSize);
-            }
-            return std::get<std::string>(current.SizeSource) ==
-                   std::get<std::string>(expected.SizeSource);
+            return current.Type == expected.Type && current.SizeProperty == expected.SizeProperty &&
+                SameProgressivePoissonValue(current.Size, expected.Size);
         }
 
         [[nodiscard]] bool SameOptionalRenderPoints(
@@ -990,14 +975,7 @@ namespace Extrinsic::Runtime
         {
             if (domain != GeometryElementDomain::MeshVertex && domain != GeometryElementDomain::GraphNode &&
                 domain != GeometryElementDomain::PointCloudPoint) return;
-            G::RenderPoints points =
-                state.RenderPoints.value_or(G::RenderPoints{});
-            if (!std::holds_alternative<float>(points.SizeSource) &&
-                !std::holds_alternative<std::string>(points.SizeSource))
-            {
-                points.SizeSource = 4.0f;
-            }
-            state.RenderPoints = std::move(points);
+            state.RenderPoints = state.RenderPoints.value_or(G::RenderPoints{});
 
             G::VisualizationConfig config =
                 state.Visualization.value_or(G::VisualizationConfig{});

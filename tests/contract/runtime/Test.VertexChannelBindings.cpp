@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <set>
 #include <string>
 #include <tuple>
@@ -59,13 +60,64 @@ namespace
         properties.GetOrAdd<T>(name, T{}).Vector() = std::move(values);
     }
 
+    using L = Runtime::GeometryRenderLane;
+
+    // The lane a source on `domain` drew before rows were keyed by lane: the
+    // lane its Color overlay targets by default, the size/width lane, and for
+    // structural streams the entity's first lane with that attribute.
+    [[nodiscard]] L LaneFor(const A attribute, const D domain)
+    {
+        if (attribute == A::PointSize)
+            return L::Points;
+        if (attribute == A::LineWidth)
+            return L::Edges;
+        switch (domain)
+        {
+        case D::MeshVertex:
+        case D::MeshHalfedge:
+        case D::MeshFace:     return L::Surface;
+        case D::MeshEdge:
+        case D::GraphEdge:    return L::Edges;
+        case D::GraphNode:    return attribute == A::Normal ? L::Points : L::Edges;
+        default:              return L::Points;
+        }
+    }
+
+    [[nodiscard]] const Runtime::EditorAttributeBindingRow* FindRow(
+        const Runtime::EditorAttributeBindingModel& model, const L lane, const A attribute)
+    {
+        const auto found = std::ranges::find_if(model.Rows,
+            [&](const auto& row)
+            {
+                return row.Lane == lane && row.Attribute == attribute;
+            });
+        return found == model.Rows.end() ? nullptr : &*found;
+    }
+
+    // The row that reads `domain` on the lane LaneFor() picks.
     [[nodiscard]] const Runtime::EditorAttributeBindingRow* FindRow(
         const Runtime::EditorAttributeBindingModel& model, const A attribute, const D domain)
     {
-        const auto found = std::ranges::find_if(model.Rows, [&](const auto& row) {
-            return row.Attribute == attribute && row.Domain == domain;
-        });
-        return found == model.Rows.end() ? nullptr : &*found;
+        const auto* row = FindRow(model, LaneFor(attribute, domain), attribute);
+        return row != nullptr &&
+                std::ranges::any_of(row->Domains,
+                    [&](const auto& d)
+                    {
+                        return d.Domain == domain;
+                    })
+            ? row
+            : nullptr;
+    }
+
+    // (lane, attribute) -> the element domains the row reads, for whole-table comparisons.
+    [[nodiscard]] std::map<std::pair<L, A>, std::vector<D>> RowDomains(
+        const Runtime::EditorAttributeBindingModel& model)
+    {
+        std::map<std::pair<L, A>, std::vector<D>> rows;
+        for (const auto& row : model.Rows)
+            for (const auto& domain : row.Domains)
+                rows[{row.Lane, row.Attribute}].push_back(domain.Domain);
+        return rows;
     }
 
     [[nodiscard]] const Runtime::EditorAttributeBindingCandidate* FindCandidate(
@@ -174,29 +226,36 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     Runtime::EditorAttributeBindingModel model =
         Runtime::BuildEditorAttributeBindingModel(registry, meshId);
     ASSERT_TRUE(model.HasEntity);
-    std::set<std::pair<A, D>> meshRows;
-    for (const auto& row : model.Rows)
-        meshRows.emplace(row.Attribute, row.Domain);
-    EXPECT_EQ(meshRows, (std::set<std::pair<A, D>>{
-                            {A::Position, D::MeshVertex}, {A::Normal, D::MeshVertex},
-                            {A::Normal, D::MeshHalfedge}, {A::Texcoord, D::MeshVertex},
-                            {A::Texcoord, D::MeshHalfedge}, {A::Color, D::MeshVertex},
-                            {A::Color, D::MeshEdge}, {A::Color, D::MeshFace},
-                            {A::PointSize, D::MeshVertex}, {A::LineWidth, D::MeshEdge}}));
+    // Faces = surface, Edges = edges, Vertices = points: each section lists
+    // the attributes of its own primitive, read from the lane's domains.
+    using Rows = std::map<std::pair<L, A>, std::vector<D>>;
+    EXPECT_EQ(RowDomains(model),
+        (Rows{{{L::Surface, A::Position}, {D::MeshVertex}},
+            {{L::Surface, A::Normal}, {D::MeshVertex, D::MeshHalfedge}},
+            {{L::Surface, A::Texcoord}, {D::MeshVertex, D::MeshHalfedge}},
+            {{L::Surface, A::Color}, {D::MeshVertex, D::MeshFace}},
+            {{L::Edges, A::Position}, {D::MeshVertex}},
+            {{L::Edges, A::Color}, {D::MeshVertex, D::MeshEdge}},
+            {{L::Edges, A::LineWidth}, {D::MeshEdge}},
+            {{L::Points, A::Position}, {D::MeshVertex}},
+            {{L::Points, A::Normal}, {D::MeshVertex}},
+            {{L::Points, A::Color}, {D::MeshVertex}},
+            {{L::Points, A::PointSize}, {D::MeshVertex}}}));
 
-    // A Color row names the lane overlay it binds; other attributes have none.
+    // A Color row names its lane's overlay; other attributes have none.
     using Target = Runtime::EditorVisualizationTarget;
-    EXPECT_EQ(FindRow(model, A::Color, D::MeshVertex)->OverlayTarget, Target::Surface);
-    EXPECT_EQ(FindRow(model, A::Color, D::MeshFace)->OverlayTarget, Target::Surface);
-    EXPECT_EQ(FindRow(model, A::Color, D::MeshEdge)->OverlayTarget, Target::Edges);
+    EXPECT_EQ(FindRow(model, L::Surface, A::Color)->OverlayTarget, Target::Surface);
+    EXPECT_EQ(FindRow(model, L::Edges, A::Color)->OverlayTarget, Target::Edges);
+    EXPECT_EQ(FindRow(model, L::Points, A::Color)->OverlayTarget, Target::Points);
     EXPECT_FALSE(FindRow(model, A::Position, D::MeshVertex)->OverlayTarget.has_value());
 
     const auto* position = FindRow(model, A::Position, D::MeshVertex);
     ASSERT_NE(position, nullptr);
     EXPECT_FALSE(position->Bound);
     EXPECT_EQ(position->ExpectedType, "vec3");
-    EXPECT_EQ(position->ExpectedElementCount, 3u);
-    EXPECT_EQ(position->DefaultSource, "v:position");
+    ASSERT_EQ(position->Domains.size(), 1u);
+    EXPECT_EQ(position->Domains.front().ElementCount, 3u);
+    EXPECT_EQ(position->DefaultSource, "v:position; shared by all primitives");
     const auto* offset = FindCandidate(*position, "v:offset");
     ASSERT_NE(offset, nullptr);
     EXPECT_TRUE(offset->Compatible);
@@ -224,7 +283,7 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     color.ScalarFieldName = "v:temperature";
     color.ScalarDomain = G::VisualizationConfig::Domain::Vertex;
     registry.Raw().emplace<G::VisualizationConfig>(mesh, color);
-    registry.Raw().emplace<G::RenderPoints>(mesh, G::RenderPoints{.SizeSource = std::string{"v:temperature"}});
+    registry.Raw().emplace<G::RenderPoints>(mesh, G::RenderPoints{.SizeProperty = "v:temperature"});
 
     model = Runtime::BuildEditorAttributeBindingModel(registry, meshId);
     position = FindRow(model, A::Position, D::MeshVertex);
@@ -236,12 +295,12 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     EXPECT_TRUE(normal->UsingFallback);
     EXPECT_EQ(normal->Resolution.Status, Status::MissingProperty);
     EXPECT_NE(normal->Diagnostic.find("drawing the default"), std::string::npos);
-    EXPECT_FALSE(FindRow(model, A::Normal, D::MeshHalfedge)->Bound);
+    EXPECT_EQ(normal->Source.Domain, D::MeshVertex);
     const auto* vertexColor = FindRow(model, A::Color, D::MeshVertex);
     ASSERT_TRUE(vertexColor->Bound);
     EXPECT_EQ(vertexColor->Source.Name, "v:temperature");
+    EXPECT_EQ(vertexColor->Source.Domain, D::MeshVertex);
     EXPECT_EQ(vertexColor->Source.ValueKind, Kind::Float);
-    EXPECT_FALSE(FindRow(model, A::Color, D::MeshFace)->Bound);
     const auto* size = FindRow(model, A::PointSize, D::MeshVertex);
     ASSERT_TRUE(size->Bound);
     EXPECT_EQ(size->Source.Name, "v:temperature");
@@ -254,26 +313,26 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     AddGraphSource(registry, graph);
     model = Runtime::BuildEditorAttributeBindingModel(
         registry, Runtime::SelectionController::ToStableEntityId(graph));
-    std::set<std::pair<A, D>> graphRows;
-    for (const auto& row : model.Rows)
-        graphRows.emplace(row.Attribute, row.Domain);
-    EXPECT_EQ(graphRows, (std::set<std::pair<A, D>>{
-                             {A::Position, D::GraphNode}, {A::Normal, D::GraphNode},
-                             {A::Color, D::GraphNode}, {A::Color, D::GraphEdge},
-                             {A::PointSize, D::GraphNode}, {A::LineWidth, D::GraphEdge}}));
-    EXPECT_EQ(FindRow(model, A::LineWidth, D::GraphEdge)->ExpectedElementCount, 2u);
+    EXPECT_EQ(RowDomains(model),
+        (Rows{{{L::Edges, A::Position}, {D::GraphNode}},
+            {{L::Edges, A::Color}, {D::GraphNode, D::GraphEdge}},
+            {{L::Edges, A::LineWidth}, {D::GraphEdge}},
+            {{L::Points, A::Position}, {D::GraphNode}},
+            {{L::Points, A::Normal}, {D::GraphNode}},
+            {{L::Points, A::Color}, {D::GraphNode}},
+            {{L::Points, A::PointSize}, {D::GraphNode}}}));
+    EXPECT_EQ(FindRow(model, A::LineWidth, D::GraphEdge)->Domains.front().ElementCount, 2u);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 2u);
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}});
     model = Runtime::BuildEditorAttributeBindingModel(
         registry, Runtime::SelectionController::ToStableEntityId(cloud));
-    std::set<std::pair<A, D>> cloudRows;
-    for (const auto& row : model.Rows)
-        cloudRows.emplace(row.Attribute, row.Domain);
-    EXPECT_EQ(cloudRows, (std::set<std::pair<A, D>>{
-                             {A::Position, D::PointCloudPoint}, {A::Normal, D::PointCloudPoint},
-                             {A::Color, D::PointCloudPoint}, {A::PointSize, D::PointCloudPoint}}));
+    EXPECT_EQ(RowDomains(model),
+        (Rows{{{L::Points, A::Position}, {D::PointCloudPoint}},
+            {{L::Points, A::Normal}, {D::PointCloudPoint}},
+            {{L::Points, A::Color}, {D::PointCloudPoint}},
+            {{L::Points, A::PointSize}, {D::PointCloudPoint}}}));
 
     EXPECT_FALSE(Runtime::BuildEditorAttributeBindingModel(registry, 0u).HasEntity);
 }
@@ -300,12 +359,19 @@ namespace
         Cmd Bind(const ECS::EntityHandle entity, const A attribute, const D domain,
                  std::string name = {})
         {
-            return Runtime::ApplyEditorAttributeBindingCommand(
-                Context, Runtime::EditorAttributeBindingCommand{
-                             .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
-                             .Attribute = attribute,
-                             .Domain = domain,
-                             .PropertyName = std::move(name)});
+            return BindOn(entity, LaneFor(attribute, domain), attribute, domain, std::move(name));
+        }
+
+        Cmd BindOn(
+            const ECS::EntityHandle entity, const L lane, const A attribute, const D domain, std::string name = {})
+        {
+            return Runtime::ApplyEditorAttributeBindingCommand(Context,
+                Runtime::EditorAttributeBindingCommand{
+                    .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
+                    .Lane = lane,
+                    .Attribute = attribute,
+                    .Domain = domain,
+                    .PropertyName = std::move(name)});
         }
 
         [[nodiscard]] const Runtime::EditorAttributeBindingRow& Row(
@@ -314,6 +380,17 @@ namespace
             Model = Runtime::BuildEditorAttributeBindingModel(
                 Registry, Runtime::SelectionController::ToStableEntityId(entity));
             const auto* row = FindRow(Model, attribute, domain);
+            EXPECT_NE(row, nullptr);
+            static const Runtime::EditorAttributeBindingRow kMissing{};
+            return row != nullptr ? *row : kMissing;
+        }
+
+        [[nodiscard]] const Runtime::EditorAttributeBindingRow& RowOn(
+            const ECS::EntityHandle entity, const L lane, const A attribute)
+        {
+            Model = Runtime::BuildEditorAttributeBindingModel(
+                Registry, Runtime::SelectionController::ToStableEntityId(entity));
+            const auto* row = FindRow(Model, lane, attribute);
             EXPECT_NE(row, nullptr);
             static const Runtime::EditorAttributeBindingRow kMissing{};
             return row != nullptr ? *row : kMissing;
@@ -507,15 +584,17 @@ TEST(VertexChannelBindings, NormalAndTexcoordBindOnVertexOrCornerDomainsThroughO
 
     ASSERT_EQ(f.Bind(mesh, A::Normal, D::MeshVertex, "v:n2"), Cmd::Applied);
     ASSERT_EQ(f.Bind(mesh, A::Normal, D::MeshHalfedge, "h:n2"), Cmd::Applied);
-    EXPECT_FALSE(f.Row(mesh, A::Normal, D::MeshVertex).Bound);  // one normal source at a time
+    EXPECT_EQ(f.Row(mesh, A::Normal, D::MeshVertex).Source.Domain, D::MeshHalfedge);  // one normal source at a time
     EXPECT_EQ(f.Row(mesh, A::Normal, D::MeshHalfedge).Source.Name, "h:n2");
-    EXPECT_EQ(f.Bind(mesh, A::Normal, D::MeshVertex), Cmd::NoChange);  // that row is not bound
+    // Default clears what the surface row draws, whichever of its domains that is.
+    EXPECT_EQ(f.Bind(mesh, A::Normal, D::MeshVertex), Cmd::Applied);
+    EXPECT_FALSE(f.Row(mesh, A::Normal, D::MeshHalfedge).Bound);
     f.Registry.Raw().remove<Dirty::DirtyVertexTexcoords>(mesh);
     ASSERT_EQ(f.Bind(mesh, A::Texcoord, D::MeshHalfedge, "h:uv2"), Cmd::Applied);
     EXPECT_EQ(f.Registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh).Texcoord.Property.Domain,
               D::MeshHalfedge);
     EXPECT_TRUE(f.Registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
-    EXPECT_EQ(f.History.UndoCount(), 3u);
+    EXPECT_EQ(f.History.UndoCount(), 4u);
 }
 
 TEST(VertexChannelBindings, CommandRefusesMismatchesWithTypedReasons)
@@ -560,7 +639,7 @@ TEST(VertexChannelBindings, ColorBindsThroughTheOverlayOnEveryLaneAndDefaultClea
     EXPECT_EQ(f.Row(mesh, A::Color, D::MeshVertex).Source.Name, "v:heat");
     ASSERT_EQ(f.Bind(mesh, A::Color, D::MeshFace, "f:paint"), Cmd::Applied);
     EXPECT_EQ(f.Row(mesh, A::Color, D::MeshFace).Source.Name, "f:paint");
-    EXPECT_FALSE(f.Row(mesh, A::Color, D::MeshVertex).Bound);  // one surface overlay
+    EXPECT_EQ(f.Row(mesh, A::Color, D::MeshVertex).Source.Domain, D::MeshFace);  // one surface overlay
     ASSERT_EQ(f.Bind(mesh, A::Color, D::MeshEdge, "e:paint"), Cmd::Applied);
     const auto* edges = f.Registry.Raw().try_get<G::VisualizationLaneOverrides>(mesh);
     ASSERT_NE(edges, nullptr);
@@ -613,23 +692,121 @@ TEST(VertexChannelBindings, PixelSizeBindingsWriteTheRenderHintAndDefaultRestore
     SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(cloud).Properties, "v:radius", {2.0f, 3.0f});
     SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(cloud).Properties, "v:nan",
                        {std::numeric_limits<float>::quiet_NaN(), 3.0f});
-    const auto size = [&] { return f.Registry.Raw().get<G::RenderPoints>(cloud).SizeSource; };
+    const auto size = [&]
+    {
+        return f.Registry.Raw().get<G::RenderPoints>(cloud).SizeProperty;
+    };
 
     EXPECT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint, "v:nan"), Cmd::AttributeSourceNonFinite);
     EXPECT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint), Cmd::NoChange);
     ASSERT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint, "v:radius"), Cmd::Applied);
-    EXPECT_EQ(std::get<std::string>(size()), "v:radius");
+    EXPECT_EQ(size(), "v:radius");
     EXPECT_EQ(f.Row(cloud, A::PointSize, D::PointCloudPoint).Source.Name, "v:radius");
     ASSERT_EQ(f.Bind(cloud, A::PointSize, D::PointCloudPoint), Cmd::Applied);
-    EXPECT_TRUE(std::holds_alternative<float>(size()));
+    EXPECT_TRUE(size().empty());
     ASSERT_EQ(f.History.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_EQ(std::get<std::string>(size()), "v:radius");
+    EXPECT_EQ(size(), "v:radius");
 
     const ECS::EntityHandle graph = MakeSelectable(f.Registry, "Graph");
     AddGraphSource(f.Registry, graph);
     SetProperty<float>(f.Registry.Raw().get<GS::Edges>(graph).Properties, "e:width", {1.0f, 4.0f});
     ASSERT_EQ(f.Bind(graph, A::LineWidth, D::GraphEdge, "e:width"), Cmd::Applied);
-    EXPECT_EQ(std::get<std::string>(f.Registry.Raw().get<G::RenderEdges>(graph).WidthSource), "e:width");
+    EXPECT_EQ(f.Registry.Raw().get<G::RenderEdges>(graph).WidthProperty, "e:width");
+}
+
+// Each Appearance section colors its own primitive: a Color chosen on the
+// points lane of a mesh or a graph leaves the surface and the edges alone.
+TEST(VertexChannelBindings, ColorBindsOnlyTheLaneItIsChosenOn)
+{
+    using Source = G::VisualizationConfig::ColorSource;
+    BindingFixture f;
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);
+    SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(mesh).Properties, "v:heat", {0.0f, 0.5f, 1.0f});
+
+    ASSERT_EQ(f.BindOn(mesh, L::Points, A::Color, D::MeshVertex, "v:heat"), Cmd::Applied);
+    EXPECT_EQ(f.RowOn(mesh, L::Points, A::Color).Source.Name, "v:heat");
+    EXPECT_FALSE(f.RowOn(mesh, L::Surface, A::Color).Bound);
+    EXPECT_FALSE(f.RowOn(mesh, L::Edges, A::Color).Bound);
+    const auto* meshLanes = f.Registry.Raw().try_get<G::VisualizationLaneOverrides>(mesh);
+    ASSERT_NE(meshLanes, nullptr);
+    ASSERT_TRUE(meshLanes->Points.has_value());
+    EXPECT_EQ(meshLanes->Points->Source, Source::ScalarField);
+    EXPECT_FALSE(meshLanes->Surface.has_value());
+    ASSERT_EQ(f.BindOn(mesh, L::Edges, A::Color, D::MeshVertex, "v:heat"), Cmd::Applied);
+    EXPECT_TRUE(f.RowOn(mesh, L::Edges, A::Color).Bound);
+    ASSERT_EQ(f.BindOn(mesh, L::Points, A::Color, D::MeshVertex), Cmd::Applied);  // Default
+    EXPECT_FALSE(f.RowOn(mesh, L::Points, A::Color).Bound);
+    EXPECT_TRUE(f.RowOn(mesh, L::Edges, A::Color).Bound);
+
+    const ECS::EntityHandle graph = MakeSelectable(f.Registry, "Graph");
+    AddGraphSource(f.Registry, graph);
+    const std::size_t nodes = f.Registry.Raw().get<GS::Vertices>(graph).Properties.Size();
+    SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(graph).Properties, "v:rank", std::vector<float>(nodes, 2.0f));
+    ASSERT_EQ(f.BindOn(graph, L::Points, A::Color, D::GraphNode, "v:rank"), Cmd::Applied);
+    EXPECT_TRUE(f.RowOn(graph, L::Points, A::Color).Bound);
+    EXPECT_FALSE(f.RowOn(graph, L::Edges, A::Color).Bound);
+}
+
+// A source outside the lane table is refused with a typed status.
+TEST(VertexChannelBindings, LaneRowsRefuseDomainsTheirLaneDoesNotRead)
+{
+    BindingFixture f;
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);
+    SetProperty<glm::vec3>(f.Registry.Raw().get<GS::Halfedges>(mesh).Properties,
+        "h:dir",
+        std::vector<glm::vec3>(f.Registry.Raw().get<GS::Halfedges>(mesh).Properties.Size(), glm::vec3{0, 0, 1}));
+    SetProperty<glm::vec3>(
+        f.Registry.Raw().get<GS::Vertices>(mesh).Properties, "v:dir", std::vector<glm::vec3>(3u, glm::vec3{0, 0, 1}));
+    // Corner normals feed the surface only; edges read no normal.
+    EXPECT_EQ(f.BindOn(mesh, L::Points, A::Normal, D::MeshHalfedge, "h:dir"), Cmd::UnsupportedRenderAttribute);
+    EXPECT_EQ(f.BindOn(mesh, L::Surface, A::Normal, D::MeshHalfedge, "h:dir"), Cmd::Applied);
+    EXPECT_EQ(f.BindOn(mesh, L::Edges, A::Normal, D::MeshVertex, "v:dir"), Cmd::UnsupportedRenderAttribute);
+    EXPECT_EQ(f.BindOn(mesh, L::Points, A::Texcoord, D::MeshVertex), Cmd::UnsupportedRenderAttribute);
+
+    const ECS::EntityHandle cloud = MakeSelectable(f.Registry, "Cloud");
+    AddPointCloudSource(f.Registry, cloud, 2u);
+    SetPositions(f.Registry.Raw().get<GS::Vertices>(cloud), {{0, 0, 0}, {1, 0, 0}});
+    EXPECT_EQ(f.BindOn(cloud, L::Surface, A::Color, D::MeshVertex), Cmd::UnsupportedRenderAttribute);
+}
+
+// A uniform size or width is kept while a property is bound; Default brings
+// the last uniform value back instead of the component default.
+TEST(VertexChannelBindings, DefaultRestoresTheRememberedUniformSizeAndWidth)
+{
+    BindingFixture f;
+    const ECS::EntityHandle mesh = MakeSelectable(f.Registry, "Mesh");
+    AddTriangleMeshSource(f.Registry, mesh);
+    SetProperty<float>(f.Registry.Raw().get<GS::Vertices>(mesh).Properties, "v:radius", {1.0f, 2.0f, 3.0f});
+    SetProperty<float>(f.Registry.Raw().get<GS::Edges>(mesh).Properties, "e:width", {1.0f, 2.0f, 3.0f});
+    const auto stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+    ASSERT_EQ(Runtime::ApplyEditorRenderHintCommand(f.Context,
+                  Runtime::EditorRenderHintCommand{.StableEntityId = stableId,
+                      .SetEdges = true,
+                      .EnableEdges = true,
+                      .SetUniformEdgeWidth = true,
+                      .UniformEdgeWidth = 2.5f,
+                      .SetPoints = true,
+                      .EnablePoints = true,
+                      .SetUniformPointSize = true,
+                      .UniformPointSize = 3.5f}),
+        Cmd::Applied);
+
+    ASSERT_EQ(f.BindOn(mesh, L::Points, A::PointSize, D::MeshVertex, "v:radius"), Cmd::Applied);
+    ASSERT_EQ(f.BindOn(mesh, L::Edges, A::LineWidth, D::MeshEdge, "e:width"), Cmd::Applied);
+    const auto& points = f.Registry.Raw().get<G::RenderPoints>(mesh);
+    const auto& edges = f.Registry.Raw().get<G::RenderEdges>(mesh);
+    EXPECT_EQ(points.SizeProperty, "v:radius");
+    EXPECT_FLOAT_EQ(points.Size, 3.5f);
+    EXPECT_FLOAT_EQ(edges.Width, 2.5f);
+
+    ASSERT_EQ(f.BindOn(mesh, L::Points, A::PointSize, D::MeshVertex), Cmd::Applied);
+    ASSERT_EQ(f.BindOn(mesh, L::Edges, A::LineWidth, D::MeshEdge), Cmd::Applied);
+    EXPECT_TRUE(f.Registry.Raw().get<G::RenderPoints>(mesh).SizeProperty.empty());
+    EXPECT_FLOAT_EQ(f.Registry.Raw().get<G::RenderPoints>(mesh).Size, 3.5f);
+    EXPECT_TRUE(f.Registry.Raw().get<G::RenderEdges>(mesh).WidthProperty.empty());
+    EXPECT_FLOAT_EQ(f.Registry.Raw().get<G::RenderEdges>(mesh).Width, 2.5f);
 }
 
 TEST(VertexChannelBindings, ColorDefaultMasksOnlyItsLaneWhenTheOverlayIsInherited)
@@ -757,9 +934,9 @@ TEST(VertexChannelBindings, ShowPropertyAndColorBindingKeepTheLaneColormapAlike)
     EXPECT_EQ(surfaceMap(), Extrinsic::Graphics::Colormap::Type::Viridis);
 }
 
-// Every row of the attribute x element-domain table: a compatible property on
-// that domain binds as one undoable step, the model reports it as the row's
-// source, and Default restores the default source.
+// Every (lane, attribute, domain) of the lane table: a compatible property on
+// that domain binds as one undoable step, the model reports it as the lane
+// row's source, and Default restores the default source.
 TEST(VertexChannelBindings, EveryTableRowBindsAndRestoresItsDefault)
 {
     BindingFixture f;
@@ -795,29 +972,35 @@ TEST(VertexChannelBindings, EveryTableRowBindsAndRestoresItsDefault)
         }
     };
 
-    for (const Runtime::RenderAttributeRule& rule : Runtime::RenderAttributeRules())
+    for (const Runtime::RenderLaneAttributeRow& laneRow : Runtime::RenderLaneAttributeRows())
     {
-        SCOPED_TRACE(std::string{Runtime::ToString(rule.Attribute)} + " on " +
-                     std::string{Runtime::ToString(rule.Domain)});
-        Geometry::PropertySet& properties = propertiesFor(rule.Domain);
-        const std::string name = "x:" + std::string{Runtime::ToString(rule.Attribute)};
-        const std::size_t count = properties.Size();
-        if (rule.AcceptsVec2)
-            SetProperty<glm::vec2>(properties, name, std::vector<glm::vec2>(count, glm::vec2{0.5f}));
-        else if (rule.AcceptsVec3 || rule.ValidatedByVisualizationRecipe)
-            SetProperty<glm::vec3>(properties, name, std::vector<glm::vec3>(count, glm::vec3{0.0f, 0.0f, 1.0f}));
-        else
-            SetProperty<float>(properties, name, std::vector<float>(count, 3.0f));
+        for (const D domain : laneRow.Domains)
+        {
+            const Runtime::RenderAttributeRule* rule = Runtime::FindRenderAttributeRule(laneRow.Attribute, domain);
+            ASSERT_NE(rule, nullptr);
+            SCOPED_TRACE(std::string{Runtime::ToString(laneRow.Lane)} + " " +
+                std::string{Runtime::ToString(laneRow.Attribute)} + " on " + std::string{Runtime::ToString(domain)});
+            Geometry::PropertySet& properties = propertiesFor(domain);
+            const std::string name = "x:" + std::string{Runtime::ToString(laneRow.Attribute)};
+            const std::size_t count = properties.Size();
+            if (rule->AcceptsVec2)
+                SetProperty<glm::vec2>(properties, name, std::vector<glm::vec2>(count, glm::vec2{0.5f}));
+            else if (rule->AcceptsVec3 || rule->ValidatedByVisualizationRecipe)
+                SetProperty<glm::vec3>(properties, name, std::vector<glm::vec3>(count, glm::vec3{0.0f, 0.0f, 1.0f}));
+            else
+                SetProperty<float>(properties, name, std::vector<float>(count, 3.0f));
 
-        const ECS::EntityHandle entity = entityFor(rule.Domain);
-        const std::size_t undoBefore = f.History.UndoCount();
-        ASSERT_EQ(f.Bind(entity, rule.Attribute, rule.Domain, name), Cmd::Applied);
-        EXPECT_EQ(f.History.UndoCount(), undoBefore + 1u);
-        const auto& bound = f.Row(entity, rule.Attribute, rule.Domain);
-        EXPECT_TRUE(bound.Bound);
-        EXPECT_EQ(bound.Source.Name, name);
-        EXPECT_FALSE(bound.UsingFallback);
-        ASSERT_EQ(f.Bind(entity, rule.Attribute, rule.Domain), Cmd::Applied);
-        EXPECT_FALSE(f.Row(entity, rule.Attribute, rule.Domain).Bound);
+            const ECS::EntityHandle entity = entityFor(domain);
+            const std::size_t undoBefore = f.History.UndoCount();
+            ASSERT_EQ(f.BindOn(entity, laneRow.Lane, laneRow.Attribute, domain, name), Cmd::Applied);
+            EXPECT_EQ(f.History.UndoCount(), undoBefore + 1u);
+            const auto& bound = f.RowOn(entity, laneRow.Lane, laneRow.Attribute);
+            EXPECT_TRUE(bound.Bound);
+            EXPECT_EQ(bound.Source.Name, name);
+            EXPECT_EQ(bound.Source.Domain, domain);
+            EXPECT_FALSE(bound.UsingFallback);
+            ASSERT_EQ(f.BindOn(entity, laneRow.Lane, laneRow.Attribute, domain), Cmd::Applied);
+            EXPECT_FALSE(f.RowOn(entity, laneRow.Lane, laneRow.Attribute).Bound);
+        }
     }
 }

@@ -249,6 +249,30 @@ namespace Extrinsic::Runtime
             return key;
         }
 
+        // A property buffer's identity includes its element domain: one name
+        // can live on several domains of an entity (a graph's node and edge
+        // "weight"), and two lanes may draw them at once. Vertex keys carry no suffix.
+        [[nodiscard]] std::string DomainKeyLane(std::string lane, const GeometryElementDomain domain)
+        {
+            if (domain == GeometryElementDomain::MeshEdge || domain == GeometryElementDomain::GraphEdge)
+                lane += ".edge";
+            else if (domain == GeometryElementDomain::MeshFace)
+                lane += ".face";
+            return lane;
+        }
+
+        [[nodiscard]] GeometryElementDomain KeyDomainOf(
+            const Graphics::Components::VisualizationConfig& config) noexcept
+        {
+            using VC = Graphics::Components::VisualizationConfig;
+            const bool scalar = config.Source == VC::ColorSource::ScalarField;
+            if (scalar ? config.ScalarDomain == VC::Domain::Edge : config.Source == VC::ColorSource::PerEdgeBuffer)
+                return GeometryElementDomain::MeshEdge;
+            if (scalar ? config.ScalarDomain == VC::Domain::Face : config.Source == VC::ColorSource::PerFaceBuffer)
+                return GeometryElementDomain::MeshFace;
+            return GeometryElementDomain::MeshVertex;
+        }
+
         [[nodiscard]] std::optional<VisualizationRecipe>
         BuildScalarVisualizationRecipe(
             const GeometryEntityAvailability& availability,
@@ -368,11 +392,8 @@ namespace Extrinsic::Runtime
             {
                 return 1.0f;
             }
-            // A named per-point source falls back to the default uniform size.
-            const auto* uniform = std::get_if<float>(&points->SizeSource);
-            return uniform != nullptr
-                ? *uniform
-                : std::get<float>(Graphics::Components::RenderPoints{}.SizeSource);
+            // A named per-point source falls back to the uniform size.
+            return points->Size;
         }
 
         [[nodiscard]] RHI::GpuEntityConfig BuildImmediateLaneConfig(
@@ -384,7 +405,7 @@ namespace Extrinsic::Runtime
             RHI::GpuEntityConfig cfg{};
             cfg.ColorSourceMode = 1u;
             cfg.VisualizationAlpha = 1.0f;
-            cfg.UniformColor = {0.02f, 0.02f, 0.02f, 1.0f};
+            cfg.UniformColor = G::kDefaultLineAndPointColor;
             if (visualization != nullptr &&
                 visualization->Source ==
                     G::VisualizationConfig::ColorSource::UniformColor)
@@ -393,12 +414,7 @@ namespace Extrinsic::Runtime
             }
             if (edges != nullptr)
             {
-                if (const auto* uniform =
-                        std::get_if<float>(&edges->WidthSource);
-                    uniform != nullptr)
-                {
-                    cfg.Line.LineWidth = *uniform;
-                }
+                cfg.Line.LineWidth = edges->Width;
             }
             if (points != nullptr)
             {
@@ -950,7 +966,9 @@ namespace Extrinsic::Runtime
         const Graphics::MaterialTypeHandle standardType = renderer.GetMaterialSystem().FindType(Graphics::kMaterialTypeName_StandardPBR);
         if (standardType.IsValid())
         {
-            sidecar.Material.Lease = renderer.GetMaterialSystem().CreateInstance(standardType, Graphics::MaterialParams{});
+            Graphics::MaterialParams params{};
+            params.BaseColorFactor = Graphics::Components::kDefaultSurfaceColor;
+            sidecar.Material.Lease = renderer.GetMaterialSystem().CreateInstance(standardType, params);
             sidecar.Material.EffectiveSlot = renderer.GetMaterialSystem().GetMaterialSlot(sidecar.Material.Lease.GetHandle());
         }
 
@@ -1156,17 +1174,15 @@ namespace Extrinsic::Runtime
         // buffer bound through the visualization property-buffer residency.
         // A source that does not resolve (missing, wrong kind or count,
         // non-finite) emits nothing, so the lane draws its uniform default.
-        [[nodiscard]] std::string AppendPixelSizePropertyBuffer(
-            VisualizationEncodingBatch& batch,
+        [[nodiscard]] std::string AppendPixelSizePropertyBuffer(VisualizationEncodingBatch& batch,
             const GeometryEntityAvailability& availability,
             const std::uint32_t stableId,
             const RenderAttribute attribute,
             const GeometryElementDomain domain,
-            const std::variant<float, std::string>& source)
+            const std::string& propertyName)
         {
-            const auto* name = std::get_if<std::string>(&source);
-            if (name == nullptr ||
-                !ResolveRenderAttributeSource(availability, attribute, domain, *name).Resolved())
+            const std::string* name = &propertyName;
+            if (name->empty() || !ResolveRenderAttributeSource(availability, attribute, domain, *name).Resolved())
             {
                 return {};
             }
@@ -1589,7 +1605,6 @@ namespace Extrinsic::Runtime
                 gpuAssets,
                 stats);
         }
-
         const bool dirtyTransform = registry.any_of<ECS::Components::DirtyTags::DirtyTransform>(entity);
         if (dirtyTransform)
         {
@@ -1920,6 +1935,29 @@ namespace Extrinsic::Runtime
                 gpuAssets,
                 stats);
         }
+        // After every texture source (direct bindings, presentation slots, a
+        // baked Appearance texture) resolved: a material with an albedo texture
+        // keeps a white factor so the texture shows as imported; an untextured
+        // one draws the grey-white default. Only the two defaults are switched;
+        // any other factor was authored and stays.
+        if (sidecar->Material.Lease.IsValid() && !sidecar->Material.TintOverride.has_value())
+        {
+            Graphics::MaterialSystem& materials = renderer.GetMaterialSystem();
+            const Graphics::MaterialParams params = materials.GetParams(sidecar->Material.Lease.GetHandle());
+            const glm::vec4 factor = params.AlbedoID != RHI::kInvalidBindlessIndex
+                ? glm::vec4{1.0f}
+                : Graphics::Components::kDefaultSurfaceColor;
+            const glm::vec4 current = params.BaseColorFactor;
+            if (current != factor &&
+                (current == glm::vec4{1.0f} || current == Graphics::Components::kDefaultSurfaceColor))
+            {
+                materials.Patch(sidecar->Material.Lease.GetHandle(),
+                    [factor](Graphics::MaterialParams& patched)
+                    {
+                        patched.BaseColorFactor = factor;
+                    });
+            }
+        }
 
         // Shared procedural residency is one reference per renderable, not
         // one reference per extraction. Drop that ownership when procedural
@@ -2091,6 +2129,44 @@ namespace Extrinsic::Runtime
                 visualization,
                 visualizationOverrides,
                 VisualizationLane::Points);
+        // A lane on Default (no config, or the material) draws the vertex
+        // source's imported colors when it has them; a picked color or a
+        // bound property wins.
+        {
+            namespace G = Graphics::Components;
+            std::string importedColor{};
+            if (availabilityThisFrame.has_value())
+            {
+                const Geometry::PropertySet* vertices = ResolveGeometryPropertySet(*availabilityThisFrame,
+                    DisplayedPositionDomainFor(availabilityThisFrame->Sources.ProvenanceDomain));
+                if (vertices != nullptr)
+                {
+                    const Geometry::ConstPropertySet props{*vertices};
+                    for (const std::string_view name : {std::string_view{"v:color"}, std::string_view{"p:color"}})
+                    {
+                        if (props.Get<glm::vec4>(name).IsValid() || props.Get<glm::vec3>(name).IsValid())
+                        {
+                            importedColor = name;
+                            break;
+                        }
+                    }
+                }
+            }
+            const auto useImported =
+                [&](const G::VisualizationConfig* config,
+                    std::optional<G::VisualizationConfig>& storage) -> const G::VisualizationConfig*
+            {
+                storage.reset();
+                if (importedColor.empty() ||
+                    (config != nullptr && config->Source != G::VisualizationConfig::ColorSource::Material))
+                    return config;
+                storage = G::VisualizationConfig{
+                    .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer, .ColorBufferName = importedColor};
+                return &*storage;
+            };
+            edgeVisualization = useImported(edgeVisualization, sidecar->ImportedEdgeColor);
+            pointVisualization = useImported(pointVisualization, sidecar->ImportedPointColor);
+        }
         const auto* renderEdges =
             registry.try_get<Graphics::Components::RenderEdges>(entity);
         const auto* renderPoints =
@@ -2102,9 +2178,8 @@ namespace Extrinsic::Runtime
                 if (IsScalarVisualizationSource(config) &&
                     !config->ScalarFieldName.empty())
                 {
-                    return BuildVisualizationPropertySourceKey(
-                        stableId,
-                        canonicalMeshLane ? "scalar.canonical" : "scalar",
+                    return BuildVisualizationPropertySourceKey(stableId,
+                        DomainKeyLane(canonicalMeshLane ? "scalar.canonical" : "scalar", KeyDomainOf(*config)),
                         config->ScalarFieldName);
                 }
                 return std::string{};
@@ -2116,11 +2191,12 @@ namespace Extrinsic::Runtime
                 if (IsColorBufferVisualizationSource(config) &&
                     !config->ColorBufferName.empty())
                 {
-                    return BuildVisualizationPropertySourceKey(
-                        stableId,
-                        config->Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection
-                            ? (canonicalMeshLane ? "color.normal.canonical" : "color.normal")
-                            : (canonicalMeshLane ? "color.canonical" : "color"),
+                    return BuildVisualizationPropertySourceKey(stableId,
+                        DomainKeyLane(config->Interpretation ==
+                                    Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection
+                                ? (canonicalMeshLane ? "color.normal.canonical" : "color.normal")
+                                : (canonicalMeshLane ? "color.canonical" : "color"),
+                            KeyDomainOf(*config)),
                         config->ColorBufferName);
                 }
                 return std::string{};
@@ -2148,20 +2224,23 @@ namespace Extrinsic::Runtime
             const SourceDomain provenance = availabilityThisFrame->Sources.ProvenanceDomain;
             if (renderPoints != nullptr)
             {
-                pointSizeKey = AppendPixelSizePropertyBuffer(
-                    m_VisualizationState.Batch, *availabilityThisFrame, stableId,
-                    RenderAttribute::PointSize, DisplayedPositionDomainFor(provenance),
-                    renderPoints->SizeSource);
+                pointSizeKey = AppendPixelSizePropertyBuffer(m_VisualizationState.Batch,
+                    *availabilityThisFrame,
+                    stableId,
+                    RenderAttribute::PointSize,
+                    DisplayedPositionDomainFor(provenance),
+                    renderPoints->SizeProperty);
             }
             if (renderEdges != nullptr)
             {
-                lineWidthKey = AppendPixelSizePropertyBuffer(
-                    m_VisualizationState.Batch, *availabilityThisFrame, stableId,
+                lineWidthKey = AppendPixelSizePropertyBuffer(m_VisualizationState.Batch,
+                    *availabilityThisFrame,
+                    stableId,
                     RenderAttribute::LineWidth,
-                    provenance == SourceDomain::Mesh ? GeometryElementDomain::MeshEdge
-                    : provenance == SourceDomain::Graph ? GeometryElementDomain::GraphEdge
-                                                        : GeometryElementDomain::Unknown,
-                    renderEdges->WidthSource);
+                    provenance == SourceDomain::Mesh        ? GeometryElementDomain::MeshEdge
+                        : provenance == SourceDomain::Graph ? GeometryElementDomain::GraphEdge
+                                                            : GeometryElementDomain::Unknown,
+                    renderEdges->WidthProperty);
             }
         }
 
@@ -2266,7 +2345,8 @@ namespace Extrinsic::Runtime
                             if constexpr (std::is_same_v<T, ColorVisualizationRecipe>)
                                 if (value.Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection)
                                     lane = "color.normal";
-                            value.BufferSourceKey = BuildVisualizationPropertySourceKey(stableId, lane, value.Source.Name);
+                            value.BufferSourceKey = BuildVisualizationPropertySourceKey(
+                                stableId, DomainKeyLane(std::string{lane}, value.Source.Domain), value.Source.Name);
                         }
                     }
                 }, recipe.Data);

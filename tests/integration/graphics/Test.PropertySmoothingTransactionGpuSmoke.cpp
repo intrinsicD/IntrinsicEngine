@@ -112,7 +112,7 @@ namespace
             raw.emplace<ECSC::Transform::WorldMatrix>(Entity).Matrix = glm::mat4{1.f};
             raw.emplace<ECSC::Selection::SelectableTag>(Entity);
             raw.emplace<ECSC::StableId>(Entity, ECSC::StableId{292u, 1u});
-            raw.emplace<GC::RenderPoints>(Entity).SizeSource = 6.0f;
+            raw.emplace<GC::RenderPoints>(Entity).Size = 6.0f;
             // Runtime-authored geometry carries its culling bounds; the reference camera at
             // (0, 0, 3) looks at the origin.
             raw.emplace<ECSC::Culling::World::Bounds>(Entity, ECSC::Culling::World::Bounds{

@@ -52,6 +52,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
@@ -1572,7 +1573,8 @@ namespace
             if (importedDefault)
             {
                 EXPECT_EQ(params.Flags, defaults.Flags);
-                EXPECT_EQ(params.BaseColorFactor, defaults.BaseColorFactor);
+                // Untextured imports draw the grey-white default surface color.
+                EXPECT_EQ(params.BaseColorFactor, Graphics::Components::kDefaultSurfaceColor);
                 EXPECT_FLOAT_EQ(params.MetallicFactor, defaults.MetallicFactor);
                 EXPECT_FLOAT_EQ(params.RoughnessFactor, defaults.RoughnessFactor);
             }

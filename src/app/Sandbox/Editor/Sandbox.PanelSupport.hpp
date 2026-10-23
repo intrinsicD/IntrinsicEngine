@@ -562,10 +562,6 @@ namespace Extrinsic::Sandbox::Editor
         TextureBakeUiState* state,
         TextureBakeMutationUiState& mutation);
 
-    // UI-075: the element-domain sections of the Appearance window. Which sections an
-    // entity shows is the runtime's reading predicate; the table only renders rows.
-    enum class AppearanceElementSection : std::uint8_t { Vertices, Edges, Faces };
-
     // The last refused binding stays visible until the next accepted change on the same entity.
     struct AttributeSourceUiState
     {
@@ -578,19 +574,20 @@ namespace Extrinsic::Sandbox::Editor
     void DrawUnavailableAppearanceSection(
         const char* title, const Runtime::EditorDomainWindowModel& model);
 
-    // One section's attribute table, rendered from the runtime binding model: a row per
-    // (attribute, element domain) of `section` with the current source, a selector (Default plus every
-    // candidate; incompatible ones disabled with the runtime's reason) and the fallback status.
+    // One Appearance section's attribute table (Vertices = points lane, Edges = edges lane, Faces =
+    // surface lane), rendered from the runtime binding model: a row per attribute of `lane` with the
+    // current source, a selector (Default plus every candidate of the row's element domains;
+    // incompatible ones disabled with the runtime's reason) and the fallback status.
     // A pick goes through `ApplyEditorAttributeBindingCommand` (one undo step); nothing is cached here.
     // `rowDetails`, when set, draws the controls that belong to a row (color interpretation, uniform
     // size) on full-width lines under the table, one call per row with the row's label; it draws
     // nothing when the row has nothing to add.
-    void DrawAttributeSourceTable(
-        const Runtime::EditorAttributeBindingModel& model,
-        AppearanceElementSection section,
+    void DrawAttributeSourceTable(const Runtime::EditorAttributeBindingModel& model,
+        Runtime::GeometryRenderLane lane,
         const SandboxEditorContext* context,
         AttributeSourceUiState& state,
-        const std::function<void(const Runtime::EditorAttributeBindingRow&, const std::string& label)>& rowDetails = {});
+        const std::function<void(const Runtime::EditorAttributeBindingRow&, const std::string& label)>& rowDetails =
+            {});
 
     void DrawUniformVisualizationColorEdit(
         const Runtime::EditorVisualizationConfigModel& visualization,

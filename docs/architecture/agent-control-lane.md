@@ -249,24 +249,28 @@ stack ends the requested batch successfully; it does not mask a failed command.
 - Appearance and camera. `set_visibility` shows or hides a lane of an entity (`lane`: surface, edges or
   points, default the entity's primary one: mesh surface, graph edges, point-cloud points)
   through `ApplyEditorRenderHintCommand` exactly as the appearance panel's checkboxes do (one
-  undoable step). The unified Appearance panel's per-attribute source selectors (Position, Normal, Texcoord,
-  Color, Point size, Line width per element domain) call `ApplyEditorAttributeBindingCommand`.
-  `attribute_bindings {entity, domain?, attribute?}` lists the same table the panel draws
-  (`BuildEditorAttributeBindingModel`, read through the prepared snapshot's inspector model), grouped by element
-  domain: per row the expected type and count, what Default draws (`default`, `canonical_property`), the current
-  source (`bound`, `source`, its resolution `status`, `using_fallback` and a `diagnostic` when an authored source no
-  longer resolves), the overlay `lane` of Color rows, the compatible `candidates` and the `incompatible` properties
-  with their typed status and reason (an unknown entity answers `stale_entity`, one without geometry
-  `unsupported_geometry_domain`). Its `attribute` enum and the row documentation in its description are
-  generated from `RenderAttributeRules()`. `bind_attribute {entity, attribute, domain}` with exactly one of
-  `property` or `default: true` runs the panel's `ApplyEditorAttributeBindingCommand` (one undoable step on the
-  attribute's owner: structural stream, Color overlay or point/line render hint; canonical data is never
-  written) and replies with the resulting row. A refusal ends with the command status in snake case as error
+  undoable step). The unified Appearance panel's per-attribute source selectors (one table per render lane:
+  surface Position, Normal, Texcoord, Color; edges Position, Color, Line width; points Position, Normal, Color,
+  Point size) call `ApplyEditorAttributeBindingCommand`.
+  `attribute_bindings {entity, lane?, attribute?, domain?}` lists the same table the panel draws
+  (`BuildEditorAttributeBindingModel`, read through the prepared snapshot's inspector model), grouped by lane
+  (`surface`, `edges`, `points`): per row the expected type, the element `domains` it reads with their counts, what
+  Default draws (`default`, `canonical_property`), the current source (`bound`, `source` as `{name, domain}`, its
+  resolution `status`, `using_fallback` and a `diagnostic` when an authored source no longer resolves), the compatible
+  `candidates` and the `incompatible` properties with their domain, typed status and reason (an unknown entity
+  answers `stale_entity`, one without geometry `unsupported_geometry_domain`). Its `attribute` enum and the row
+  documentation in its description are generated from `RenderLaneAttributeRows()`.
+  `bind_attribute {entity, lane, attribute, domain?}` with exactly one of `property` or `default: true` runs the
+  panel's `ApplyEditorAttributeBindingCommand` (one undoable step on the attribute's owner: structural stream, the
+  lane's Color overlay or point/line render hint; canonical data is never written) and replies with the resulting
+  row; `domain` is needed only when the lane reads that property name on several element domains. Position,
+  Normal and Texcoord are still one source per entity shared by every lane. A refusal ends with the command status in snake case as error
   code (`unsupported_render_attribute`, `attribute_source_missing`, `attribute_source_type_mismatch`,
   `attribute_source_count_mismatch`, `attribute_source_non_finite`, `stale_entity`; `ErrorCodeFor`) and the
   candidate's reason from the model; malformed arguments end with `invalid_params`. Point sizes and line widths
   need the lane that draws them shown (`set_visibility`). `show_property` is the Color binding: without
-  `normal_direction` it runs the same `bind_attribute` color path on the property's domain (one Color mechanism,
+  `normal_direction` it runs the same `bind_attribute` color path on the lane that domain colors by default (mesh
+  vertices and faces the surface, edges and graph nodes the edges, points the points; one Color mechanism,
   the lane's visualization overlay, as decided in RUNTIME-315), so the last of the two calls wins, `attribute_bindings`
   reports either one as the Color source, `bind_attribute` color `default: true` clears both, and its refusals carry
   the same codes; `normal_direction: true` writes the same overlay through the recipe command the Color binding

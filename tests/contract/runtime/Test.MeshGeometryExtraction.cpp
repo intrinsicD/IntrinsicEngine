@@ -551,6 +551,11 @@ TEST(MeshGeometryExtraction, GeneratedGeometryPresentationTexturesBindUniqueMate
     EXPECT_TRUE(Extrinsic::Graphics::HasFlag(
         params.Flags,
         Extrinsic::Graphics::MaterialFlags::ObjectSpaceNormalMap));
+    // UI-083: a presentation albedo texture draws as imported (white factor,
+    // not the grey-white untextured default), also on the next frame.
+    EXPECT_EQ(params.BaseColorFactor, glm::vec4{1.0f});
+    (void)extraction.ExtractAndSubmit(scene, *renderer, &cache);
+    EXPECT_EQ(renderer->GetMaterialSystem().GetParams(sidecar->MaterialHandle).BaseColorFactor, glm::vec4{1.0f});
 
     extraction.Shutdown(*renderer);
     renderer->Shutdown();

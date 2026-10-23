@@ -295,7 +295,7 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesLineWidthConfig)
 
     Graphics::Components::MaterialInstance materialInstance{};
     Graphics::Components::RenderEdges edges{};
-    edges.WidthSource = std::string{"edge_widths"};
+    edges.WidthProperty = "edge_widths";
 
     std::array<Graphics::VisualizationSyncRecord, 1> records{{
         Graphics::VisualizationSyncRecord{
@@ -312,7 +312,8 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesLineWidthConfig)
     EXPECT_FLOAT_EQ(config.Line.LineWidth, 1.0f);
     EXPECT_EQ(config.Line.LineWidthBDA, device.GetBufferDeviceAddress(widthBuffer));
 
-    edges.WidthSource = 3.5f;
+    edges.WidthProperty.clear();
+    edges.Width = 3.5f;
     visSync.Sync(records, matSys, colorSys, world);
 
     config = world.GetEntityConfigForTest(instance);
@@ -601,9 +602,9 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesPropertyBufferConfigToTar
 
     Graphics::Components::MaterialInstance surfaceMaterial{};
     Graphics::Components::RenderEdges edges{};
-    edges.WidthSource = 7.5f;
+    edges.Width = 7.5f;
     Graphics::Components::RenderPoints points{};
-    points.SizeSource = 9.25f;
+    points.Size = 9.25f;
     points.Type = Graphics::Components::RenderPoints::RenderType::Sphere;
 
     Graphics::Components::VisualizationConfig scalarVis{};

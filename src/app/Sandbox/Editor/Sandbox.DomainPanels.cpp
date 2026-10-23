@@ -377,17 +377,18 @@ namespace Extrinsic::Sandbox::Editor
 
 // The uniform edge width, shown on the Line width row while no property is
 // bound there (a bound width is drawn from its source instead).
-        void DrawUniformEdgeWidthField(const EditorDomainWindowModel& model, const SandboxEditorContext& context)
+        void DrawUniformEdgeWidthField(
+            const EditorDomainWindowModel& model, const SandboxEditorContext& context, const bool bound)
         {
             if (!model.RenderHints.HasUniformEdgeWidth)
                 return;
             float edgeWidth = model.RenderHints.UniformEdgeWidth;
-            ImGui::BeginDisabled(!context.SceneAvailable || !model.VisualizationControlsAvailable);
+            ImGui::BeginDisabled(bound || !context.SceneAvailable || !model.VisualizationControlsAvailable);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const bool changed = ImGui::DragFloat(
                 "##Edge width", &edgeWidth, 0.05f, 0.01f, 32.0f, "%.3f px", ImGuiSliderFlags_AlwaysClamp);
             ImGui::EndDisabled();
-            if (changed)
+            if (changed && !bound)
             {
                 (void)ApplyEditorRenderHintCommand(context.VisualizationCommands,
                     EditorRenderHintCommand{
@@ -433,17 +434,18 @@ namespace Extrinsic::Sandbox::Editor
         }
 
 // The uniform point size, shown on the Point size row while no property is bound.
-        void DrawUniformPointSizeField(const EditorDomainWindowModel& model, const SandboxEditorContext& context)
+        void DrawUniformPointSizeField(
+            const EditorDomainWindowModel& model, const SandboxEditorContext& context, const bool bound)
         {
             if (!model.RenderHints.HasUniformPointSize)
                 return;
             float pointSize = model.RenderHints.UniformPointSize;
-            ImGui::BeginDisabled(!context.SceneAvailable || !model.VisualizationControlsAvailable);
+            ImGui::BeginDisabled(bound || !context.SceneAvailable || !model.VisualizationControlsAvailable);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const bool changed = ImGui::DragFloat(
                 "##Point size", &pointSize, 0.05f, 0.01f, 32.0f, "%.3f px", ImGuiSliderFlags_AlwaysClamp);
             ImGui::EndDisabled();
-            if (changed)
+            if (changed && !bound)
             {
                 (void)ApplyEditorRenderHintCommand(context.VisualizationCommands,
                     EditorRenderHintCommand{
@@ -454,30 +456,30 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
-// The uniform color, shown on a Color row while it is on Default. Editing it
-// makes that color the overlay lane's Default, which unbinding a property later
-// restores; a lane colored by a property keeps its mapping, so no field is offered there.
+// The uniform color of a Color row. Editing it makes that color the overlay
+// lane's Default, which unbinding a property later restores; while a property
+// is bound the field is disabled and shows that remembered color.
         void DrawUniformColorField(const std::string& label,
             const EditorDomainWindowModel& lane,
             const SandboxEditorContext& context,
-            EditorCommandStatus& status)
+            EditorCommandStatus& status,
+            const bool bound)
         {
             const auto& visualization = lane.Visualization.Visualization;
-            if (ColoredByProperty(visualization))
-                return;
             ImGui::SeparatorText(label.c_str());
             glm::vec4 color = visualization.Color;
-            ImGui::BeginDisabled(!context.SceneAvailable || !lane.VisualizationControlsAvailable);
+            ImGui::BeginDisabled(bound || !context.SceneAvailable || !lane.VisualizationControlsAvailable);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const bool changed = ImGui::ColorEdit4("##Uniform color", &color.x);
-            if (visualization.Source != kUniformColorSource)
+            if (!bound && visualization.Source != kUniformColorSource)
             {
                 ImGui::PushTextWrapPos(0.0f);
                 ImGui::TextDisabled("Drawn with its default color until you pick one.");
                 ImGui::PopTextWrapPos();
             }
             ImGui::EndDisabled();
-            if (changed)
+            // A disabled widget can still be activated programmatically; a bound row never writes.
+            if (changed && !bound)
             {
                 status = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands,
                     MakeUniformVisualizationConfigCommandFromModel(
@@ -850,7 +852,7 @@ namespace Extrinsic::Sandbox::Editor
             const char* LaneLabel;
             EditorDomainWindowKind Kind;
             GeometryElementDomain ElementProbe;
-            AppearanceElementSection Section;
+            GeometryRenderLane Lane;
         };
 
         inline constexpr std::array<AppearanceSection, 3> kAppearanceSections{{
@@ -858,17 +860,17 @@ namespace Extrinsic::Sandbox::Editor
                 "Points",
                 EditorDomainWindowKind::PointCloud,
                 GeometryElementDomain::PointCloudPoint,
-                AppearanceElementSection::Vertices},
+                GeometryRenderLane::Points},
             {"Edges",
                 "Edges",
                 EditorDomainWindowKind::Graph,
                 GeometryElementDomain::GraphEdge,
-                AppearanceElementSection::Edges},
+                GeometryRenderLane::Edges},
             {"Faces",
                 "Surface",
                 EditorDomainWindowKind::Mesh,
                 GeometryElementDomain::MeshFace,
-                AppearanceElementSection::Faces},
+                GeometryRenderLane::Surface},
         }};
 
         [[nodiscard]] bool AppearanceSectionApplies(
@@ -930,7 +932,7 @@ namespace Extrinsic::Sandbox::Editor
             if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
                 ImGui::TextWrapped("Appearance change failed: %s", DebugNameForEditorCommandStatus(status));
   // A bound color, size or width is drawn from its source (the row's selector);
-  // the uniform field shows only while the row is on Default.
+  // the uniform field stays visible but is disabled, keeping the value Default restores.
             const auto rowDetails = [&](const EditorAttributeBindingRow& row, const std::string& label)
             {
                 switch (row.Attribute)
@@ -941,35 +943,31 @@ namespace Extrinsic::Sandbox::Editor
                         if (const EditorDomainWindowModel* lane = FindLaneForTarget(draw, *row.OverlayTarget))
                         {
                             EditorCommandStatus& laneStatus = draw.Statuses[static_cast<std::size_t>(lane->Kind)];
-                            if (!row.Bound)
-                                DrawUniformColorField(label, *lane, context, laneStatus);
-                            else
-                            {
-                                ImGui::SeparatorText(label.c_str());
+                            DrawUniformColorField(label, *lane, context, laneStatus, row.Bound);
+                            if (row.Bound)
                                 DrawColorRowControls(*lane, context, laneStatus);
-                            }
                         }
                     }
                     break;
                 case RenderAttribute::PointSize:
-                    if (!row.Bound && model.RenderHints.HasUniformPointSize)
+                    if (model.RenderHints.HasUniformPointSize)
                     {
                         ImGui::SeparatorText(label.c_str());
-                        DrawUniformPointSizeField(model, context);
+                        DrawUniformPointSizeField(model, context, row.Bound);
                     }
                     break;
                 case RenderAttribute::LineWidth:
-                    if (!row.Bound && model.RenderHints.HasUniformEdgeWidth)
+                    if (model.RenderHints.HasUniformEdgeWidth)
                     {
                         ImGui::SeparatorText(label.c_str());
-                        DrawUniformEdgeWidthField(model, context);
+                        DrawUniformEdgeWidthField(model, context, row.Bound);
                     }
                     break;
                 default: break;
                 }
             };
             DrawAttributeSourceTable(
-                model.PropertyCatalog.AttributeBindings, section.Section, &context, draw.AttributeState, rowDetails);
+                model.PropertyCatalog.AttributeBindings, section.Lane, &context, draw.AttributeState, rowDetails);
             if (!visible || !ImGui::TreeNode("Settings"))
                 return;
             switch (model.Kind)

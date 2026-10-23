@@ -835,7 +835,7 @@ namespace Extrinsic::Runtime
             ++stats.PointCloudGeometryReleases;
         };
 
-        // A named per-point size (`RenderPoints::SizeSource` string) is a
+        // A named per-point size (`RenderPoints::SizeProperty`) is a
         // pixel-size property buffer bound by the visualization sync
         // (RUNTIME-315); the position-only upload is the same for every size
         // source and render type.

@@ -207,7 +207,7 @@ namespace
     {
         namespace G = Extrinsic::Graphics::Components;
         G::RenderEdges edges{};
-        edges.WidthSource = width;
+        edges.Width = width;
         scene.Raw().emplace_or_replace<G::RenderEdges>(entity, edges);
     }
 
@@ -221,7 +221,7 @@ namespace
         namespace G = Extrinsic::Graphics::Components;
         G::RenderPoints points{};
         points.Type = type;
-        points.SizeSource = size;
+        points.Size = size;
         scene.Raw().emplace_or_replace<G::RenderPoints>(entity, points);
     }
 

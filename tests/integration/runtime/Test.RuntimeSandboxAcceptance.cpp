@@ -208,7 +208,7 @@ namespace
         const EntityHandle entity = scene.Create();
         StampCommon(scene, entity, "AcceptanceCloud", 103u);
         auto& raw = scene.Raw();
-        raw.emplace<G::RenderPoints>(entity); // default uniform float SizeSource.
+        raw.emplace<G::RenderPoints>(entity); // default uniform size.
 
         auto& vertices = raw.emplace<gs::Vertices>(entity);
         SetPositions(vertices.Properties, {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 1.f, 0.f}});

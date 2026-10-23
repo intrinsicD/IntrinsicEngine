@@ -106,6 +106,30 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view RenderAttributeExpectedTypeText(
         const RenderAttributeRule& rule) noexcept;
 
+    // One row of the Appearance panel: an attribute a render lane draws and
+    // the element domains whose properties may feed it, in preference order
+    // (a corner normal or a face color is drawn by the surface only). Each
+    // (attribute, domain) pair is also a RenderAttributeRules() row.
+    struct RenderLaneAttributeRow
+    {
+        GeometryRenderLane Lane{GeometryRenderLane::Surface};
+        RenderAttribute Attribute{RenderAttribute::Position};
+        std::span<const GeometryElementDomain> Domains{};
+        // User-facing description of what "Default" draws on this lane.
+        std::string_view DefaultDescription{};
+    };
+
+    // Ordered by lane (Surface, Edges, Points), then by attribute.
+    [[nodiscard]] std::span<const RenderLaneAttributeRow> RenderLaneAttributeRows() noexcept;
+    [[nodiscard]] const RenderLaneAttributeRow* FindRenderLaneAttributeRow(
+        GeometryRenderLane lane, RenderAttribute attribute) noexcept;
+    [[nodiscard]] bool RenderLaneReadsDomain(
+        GeometryRenderLane lane, RenderAttribute attribute, GeometryElementDomain domain) noexcept;
+    // The lane a Color property of `domain` colors when no lane is chosen
+    // (show_property): mesh vertices and faces the surface, mesh edges and
+    // graph nodes and edges the edges, points the points; none for halfedges.
+    [[nodiscard]] std::optional<GeometryRenderLane> DefaultColorLaneFor(GeometryElementDomain domain) noexcept;
+
     // Validates `propertyName` as the source of `attribute` on `domain` against
     // live geometry: UnsupportedDomain when the table has no such row or the
     // entity lacks the domain; otherwise the canonical property resolution

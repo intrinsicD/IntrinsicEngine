@@ -209,12 +209,9 @@ namespace Extrinsic::Graphics
                 return;
 
             cfg.Point.PointMode = ToPointMode(points->Type);
-            // A named per-point source keeps the component's default uniform
-            // size as the fallback when its buffer is unavailable.
-            const auto* uniform = std::get_if<float>(&points->SizeSource);
-            cfg.Point.PointSize = uniform != nullptr
-                ? *uniform
-                : std::get<float>(Components::RenderPoints{}.SizeSource);
+            // A named per-point source falls back to the uniform size while
+            // its buffer is unavailable.
+            cfg.Point.PointSize = points->Size;
         }
 
         static void ApplyLineRenderConfig(
@@ -224,12 +221,7 @@ namespace Extrinsic::Graphics
             if (edges == nullptr)
                 return;
 
-            if (const auto* uniform =
-                    std::get_if<float>(&edges->WidthSource);
-                uniform != nullptr)
-            {
-                cfg.Line.LineWidth = *uniform;
-            }
+            cfg.Line.LineWidth = edges->Width;
         }
 
         // Per-element point size / line width buffers a record names, as
@@ -287,11 +279,9 @@ namespace Extrinsic::Graphics
                 setBda("normals", cfg.VertexNormalBDA);
                 if (record.Points != nullptr && pointSizeBda == 0u)
                 {
-                    if (const auto* sizeName =
-                            std::get_if<std::string>(&record.Points->SizeSource);
-                        sizeName != nullptr)
+                    if (!record.Points->SizeProperty.empty())
                     {
-                        setBda(*sizeName, cfg.Point.PointSizeBDA);
+                        setBda(record.Points->SizeProperty, cfg.Point.PointSizeBDA);
                     }
                     else
                     {
@@ -300,11 +290,9 @@ namespace Extrinsic::Graphics
                 }
                 if (record.Edges != nullptr && lineWidthBda == 0u)
                 {
-                    if (const auto* widthName =
-                            std::get_if<std::string>(&record.Edges->WidthSource);
-                        widthName != nullptr)
+                    if (!record.Edges->WidthProperty.empty())
                     {
-                        setBda(*widthName, cfg.Line.LineWidthBDA);
+                        setBda(record.Edges->WidthProperty, cfg.Line.LineWidthBDA);
                     }
                 }
             }

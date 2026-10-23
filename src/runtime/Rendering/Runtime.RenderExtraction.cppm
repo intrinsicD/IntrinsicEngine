@@ -169,7 +169,7 @@ export namespace Extrinsic::Runtime
         // are the likeliest structural authoring bugs in cloud sources; every
         // other bind-level rejection (`WrongDomain`, unsupported
         // `RenderSurface`/`RenderEdges` requests, plus an unsupported per-point
-        // `RenderPoints::SizeSource` buffer variant — only a uniform float
+        // `RenderPoints::SizeProperty` buffer — only a uniform float
         // point size is supported in this slice) folds into `FailedPack`.
         // `Releases` is incremented per release-initiated event (entity
         // destruction, eligibility flip away from point-cloud, or full dirty

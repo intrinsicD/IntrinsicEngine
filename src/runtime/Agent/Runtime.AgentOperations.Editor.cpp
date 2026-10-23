@@ -310,22 +310,39 @@ namespace Extrinsic::Runtime
                 names += std::string(names.empty() ? "" : ",") + "\"" + std::string(ToString(attribute)) + "\"";
             return R"("attribute":{"type":"string","enum":[)" + names + R"(],"description":"Render attribute (shader input) whose source property is chosen."})";
         }
-        // One line per attribute: its accepted type, then each element domain with what Default draws there.
+        // Lanes by the names set_visibility uses.
+        const char* LaneName(const GeometryRenderLane lane)
+        {
+            return lane == GeometryRenderLane::Surface ? "surface"
+                : lane == GeometryRenderLane::Edges    ? "edges"
+                                                       : "points";
+        }
+        std::optional<GeometryRenderLane> ParseLane(const std::optional<std::string>& name)
+        {
+            for (const GeometryRenderLane lane :
+                {GeometryRenderLane::Surface, GeometryRenderLane::Edges, GeometryRenderLane::Points})
+                if (name && *name == LaneName(lane))
+                    return lane;
+            return std::nullopt;
+        }
+        std::string LaneProperty(const std::string& description)
+        {
+            return R"("lane":{"type":"string","enum":["surface","edges","points"],"description":")" + description +
+                "\"}";
+        }
+        // One line per lane row: attribute, accepted type, source domains and what Default draws.
         std::string AttributeTableText()
         {
             std::string text;
-            for (const RenderAttribute attribute : TableAttributes())
+            for (const RenderLaneAttributeRow& row : RenderLaneAttributeRows())
             {
-                std::string line;
-                for (const RenderAttributeRule& rule : RenderAttributeRules())
-                {
-                    if (rule.Attribute != attribute) continue;
-                    if (line.empty())
-                        line = std::string(ToString(attribute)) + " (" + std::string(RenderAttributeExpectedTypeText(rule)) +
-                               (rule.RequireFiniteValues ? ", all finite" : "") + "):";
-                    line += " " + std::string(ToString(rule.Domain)) + " [default: " + std::string(rule.DefaultDescription) + "]";
-                }
-                text += line + ". ";
+                const RenderAttributeRule* rule = FindRenderAttributeRule(row.Attribute, row.Domains.front());
+                text += std::string(LaneName(row.Lane)) + " " + std::string(ToString(row.Attribute)) + " (" +
+                    std::string(RenderAttributeExpectedTypeText(*rule)) +
+                    (rule->RequireFiniteValues ? ", all finite" : "") + ") from";
+                for (const GeometryElementDomain domain : row.Domains)
+                    text += " " + std::string(ToString(domain));
+                text += " [default: " + std::string(row.DefaultDescription) + "]. ";
             }
             return text;
         }
@@ -343,13 +360,18 @@ namespace Extrinsic::Runtime
         // One row of the binding model the Appearance panel draws (BuildEditorAttributeBindingModel).
         Json AttributeRowJson(const EditorAttributeBindingRow& row)
         {
-            const RenderAttributeRule* rule = FindRenderAttributeRule(row.Attribute, row.Domain);
+            const RenderAttributeRule* rule = FindRenderAttributeRule(row.Attribute, row.Domains.front().Domain);
+            Json domains = Json::array();
+            for (const EditorAttributeBindingDomain& domain : row.Domains)
+                domains.push_back({{"domain", std::string(ToString(domain.Domain))}, {"count", domain.ElementCount}});
             Json compatible = Json::array();
             Json incompatible = Json::array();
             for (const EditorAttributeBindingCandidate& candidate : row.Candidates)
             {
-                Json entry{{"name", candidate.Property.Name}, {"kind", KindName(candidate.Property.ValueKind)},
-                           {"count", candidate.ElementCount}};
+                Json entry{{"name", candidate.Property.Name},
+                    {"domain", std::string(ToString(candidate.Property.Domain))},
+                    {"kind", KindName(candidate.Property.ValueKind)},
+                    {"count", candidate.ElementCount}};
                 if (candidate.Compatible)
                 {
                     compatible.push_back(std::move(entry));
@@ -359,27 +381,24 @@ namespace Extrinsic::Runtime
                 entry["reason"] = candidate.DisabledReason;
                 incompatible.push_back(std::move(entry));
             }
-            Json out{{"attribute", std::string(ToString(row.Attribute))},
-                     {"domain", std::string(ToString(row.Domain))},
-                     {"expected_type", row.ExpectedType},
-                     {"expected_count", row.ExpectedElementCount},
-                     {"default", row.DefaultSource},
-                     {"canonical_property", rule != nullptr && !rule->CanonicalProperty.empty()
-                                                ? Json(std::string(rule->CanonicalProperty)) : Json(nullptr)},
-                     {"bound", row.Bound},
-                     {"source", row.Bound ? Json(row.Source.Name) : Json(nullptr)},
-                     {"using_fallback", row.UsingFallback},
-                     {"candidates", std::move(compatible)},
-                     {"incompatible", std::move(incompatible)}};
+            Json out{{"lane", LaneName(row.Lane)},
+                {"attribute", std::string(ToString(row.Attribute))},
+                {"domains", std::move(domains)},
+                {"expected_type", row.ExpectedType},
+                {"default", row.DefaultSource},
+                {"canonical_property",
+                    rule != nullptr && !rule->CanonicalProperty.empty() ? Json(std::string(rule->CanonicalProperty))
+                                                                        : Json(nullptr)},
+                {"bound", row.Bound},
+                {"source",
+                    row.Bound ? Json{{"name", row.Source.Name}, {"domain", std::string(ToString(row.Source.Domain))}}
+                              : Json(nullptr)},
+                {"using_fallback", row.UsingFallback},
+                {"candidates", std::move(compatible)},
+                {"incompatible", std::move(incompatible)}};
             if (row.Bound) out["status"] = std::string(ToString(row.Resolution.Status));
-            if (!row.Diagnostic.empty()) out["diagnostic"] = row.Diagnostic;
-            // Color rows: the lane whose overlay they write, named like set_visibility's lanes.
-            if (row.OverlayTarget)
-            {
-                std::string lane = DebugNameForEditorVisualizationTarget(*row.OverlayTarget);
-                std::ranges::transform(lane, lane.begin(), [](char c) { return c >= 'A' && c <= 'Z' ? char(c - 'A' + 'a') : c; });
-                out["lane"] = std::move(lane);
-            }
+            if (!row.Diagnostic.empty())
+                out["diagnostic"] = row.Diagnostic;
             return out;
         }
 
@@ -408,7 +427,13 @@ namespace Extrinsic::Runtime
         {
             const auto args = ParseObject(arguments);
             const auto entity = args ? UInt(*args, "entity") : std::nullopt;
-            if (!entity) return InvalidParams("Pass {\"entity\": <stable id>, \"domain\": <optional>, \"attribute\": <optional>}.");
+            if (!entity)
+                return InvalidParams("Pass {\"entity\": <stable id>, \"lane\": <optional>, \"attribute\": <optional>, "
+                                     "\"domain\": <optional>}.");
+            const auto laneName = String(*args, "lane");
+            const auto lane = ParseLane(laneName);
+            if (args->contains("lane") && !lane)
+                return InvalidParams("Unknown lane '" + laneName.value_or("") + "'; use surface, edges or points.");
             const auto domainName = String(*args, "domain");
             const auto domain = ParseDomain(domainName);
             if (args->contains("domain") && !domain) return InvalidParams(UnknownDomainMessage(domainName.value_or("")));
@@ -422,43 +447,71 @@ namespace Extrinsic::Runtime
                 return {.IsError = true,
                         .Text = "Entity " + std::to_string(*entity) + " has no geometry element domain with render attributes.",
                         .ErrorCode = ErrorCodeFor(EditorCommandStatus::UnsupportedGeometryDomain)};
-            const auto* model = &lookup.Model;
-            // Grouped by element domain in the table's order of first appearance.
-            Json domains = Json::array();
-            for (const EditorAttributeBindingRow& row : model->Rows)
+            // Grouped by lane in the table's order.
+            Json lanes = Json::array();
+            for (const EditorAttributeBindingRow& row : lookup.Model.Rows)
             {
-                if ((domain && row.Domain != *domain) || (attribute && row.Attribute != *attribute)) continue;
-                const std::string name{ToString(row.Domain)};
-                auto group = std::ranges::find_if(domains, [&](const Json& g) { return g["domain"] == name; });
-                if (group == domains.end())
+                if ((lane && row.Lane != *lane) || (attribute && row.Attribute != *attribute) ||
+                    (domain &&
+                        std::ranges::none_of(row.Domains,
+                            [&](const EditorAttributeBindingDomain& d)
+                            {
+                                return d.Domain == *domain;
+                            })))
+                    continue;
+                const std::string name = LaneName(row.Lane);
+                auto group = std::ranges::find_if(lanes,
+                    [&](const Json& g)
+                    {
+                        return g["lane"] == name;
+                    });
+                if (group == lanes.end())
                 {
-                    domains.push_back({{"domain", name}, {"count", row.ExpectedElementCount}, {"attributes", Json::array()}});
-                    group = domains.end() - 1;
+                    lanes.push_back({{"lane", name}, {"attributes", Json::array()}});
+                    group = lanes.end() - 1;
                 }
                 (*group)["attributes"].push_back(AttributeRowJson(row));
             }
-            return Ok({{"entity", *entity}, {"domains", std::move(domains)}});
+            return Ok({{"entity", *entity}, {"lanes", std::move(lanes)}});
         }
 
         // Why a refused binding was refused, in the panel's words where the model has them.
         std::string BindingRefusal(const EditorCommandStatus status, const EditorAttributeBindingCommand& command,
                                    const EditorAttributeBindingRow* row)
         {
-            const std::string what = std::string(ToString(command.Attribute)) + " on " + std::string(ToString(command.Domain));
+            const std::string what =
+                std::string(ToString(command.Attribute)) + " of the " + LaneName(command.Lane) + " lane";
             std::string text = std::string(DebugNameForEditorCommandStatus(status)) + ": ";
             if (status == EditorCommandStatus::StaleEntity) return text + "no entity with id " + std::to_string(command.StableEntityId) + ".";
-            if (status == EditorCommandStatus::UnsupportedRenderAttribute && row != nullptr)
+            if (status == EditorCommandStatus::UnsupportedRenderAttribute && row != nullptr &&
+                (command.Attribute == RenderAttribute::PointSize || command.Attribute == RenderAttribute::LineWidth))
                 return text + "entity " + std::to_string(command.StableEntityId) + " does not draw the lane that shows " + what +
                        " (point sizes need a shown points lane, line widths an edges lane; see set_visibility).";
             if (status == EditorCommandStatus::UnsupportedRenderAttribute || row == nullptr)
-                return text + "entity " + std::to_string(command.StableEntityId) + " has no " + what +
-                       " row (the attribute is not defined on that element domain, or the entity lacks the domain); see attribute_bindings.";
-            if (const auto candidate = std::ranges::find_if(row->Candidates, [&](const EditorAttributeBindingCandidate& c) {
-                    return c.Property.Name == command.PropertyName; });
+                return text + "entity " + std::to_string(command.StableEntityId) + " has no " + what + " row reading " +
+                    std::string(ToString(command.Domain)) +
+                    " (the lane does not read that element domain, or the entity lacks it); "
+                    "see attribute_bindings.";
+            if (const auto candidate = std::ranges::find_if(row->Candidates,
+                    [&](const EditorAttributeBindingCandidate& c)
+                    {
+                        return c.Property.Name == command.PropertyName && c.Property.Domain == command.Domain;
+                    });
                 candidate != row->Candidates.end() && !candidate->DisabledReason.empty())
                 return text + "'" + command.PropertyName + "' cannot be the " + what + " source: " + candidate->DisabledReason + ".";
             return text + "'" + command.PropertyName + "' cannot be the " + what + " source (" + row->ExpectedType +
-                   " on that domain expected); see attribute_bindings.";
+                " on " + std::string(ToString(command.Domain)) + " expected); see attribute_bindings.";
+        }
+
+        const EditorAttributeBindingRow* FindAttributeRow(
+            const EditorAttributeBindingModel& model, const GeometryRenderLane lane, const RenderAttribute attribute)
+        {
+            const auto found = std::ranges::find_if(model.Rows,
+                [&](const EditorAttributeBindingRow& r)
+                {
+                    return r.Lane == lane && r.Attribute == attribute;
+                });
+            return found != model.Rows.end() ? &*found : nullptr;
         }
 
         // Runs the panel's ApplyEditorAttributeBindingCommand (one undo step on the attribute's owner)
@@ -469,9 +522,7 @@ namespace Extrinsic::Runtime
             const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
             const EditorCommandStatus status = ApplyEditorAttributeBindingCommand(visualization.Commands, command);
             const auto lookup = AttributeBindingModel(context, command.StableEntityId);
-            const EditorAttributeBindingRow* row = nullptr;
-            for (const EditorAttributeBindingRow& r : lookup.Model.Rows)
-                    if (r.Attribute == command.Attribute && r.Domain == command.Domain) row = &r;
+            const EditorAttributeBindingRow* row = FindAttributeRow(lookup.Model, command.Lane, command.Attribute);
             if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
                 return {.IsError = true, .Text = BindingRefusal(status, command, row), .ErrorCode = ErrorCodeFor(status)};
             reply["status"] = DebugNameForEditorCommandStatus(status);
@@ -482,29 +533,65 @@ namespace Extrinsic::Runtime
         AgentOperationOutcome BindAttribute(const AgentOperationContext& context, std::string_view arguments)
         {
             constexpr const char* kUsage =
-                "Pass {\"entity\": <stable id>, \"attribute\": <attribute>, \"domain\": <element domain>} and exactly one of "
-                "\"property\": <property name> or \"default\": true.";
+                "Pass {\"entity\": <stable id>, \"lane\": surface|edges|points, \"attribute\": <attribute>} and exactly one of "
+                "\"property\": <property name> (with \"domain\" when the lane reads that name on several element domains) "
+                "or \"default\": true.";
             const auto args = ParseObject(arguments);
             if (!args) return InvalidParams(kUsage);
             const auto entity = UInt(*args, "entity");
+            const auto laneName = String(*args, "lane");
+            const auto lane = ParseLane(laneName);
             const auto attributeName = String(*args, "attribute");
             const auto attribute = ParseAttribute(attributeName);
             const auto domainName = String(*args, "domain");
             const auto domain = ParseDomain(domainName);
             const auto property = String(*args, "property");
             const bool restoreDefault = args->contains("default") && (*args)["default"].is_boolean() && (*args)["default"].get<bool>();
-            if (!entity || !attributeName || !domainName) return InvalidParams(kUsage);
+            if (!entity || !laneName || !attributeName)
+                return InvalidParams(kUsage);
+            if (!lane)
+                return InvalidParams("Unknown lane '" + *laneName + "'; use surface, edges or points.");
             if (!attribute) return InvalidParams("Unknown attribute '" + *attributeName + "'; see the tool schema.");
-            if (!domain) return InvalidParams(UnknownDomainMessage(*domainName));
+            if (args->contains("domain") && !domain)
+                return InvalidParams(UnknownDomainMessage(domainName.value_or("")));
             if (args->contains("property") == args->contains("default") || (args->contains("property") && (!property || property->empty())) ||
                 (args->contains("default") && !restoreDefault))
                 return InvalidParams(kUsage);
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace);
+            // Without "domain" the source is the one domain of the lane row carrying that name.
+            GeometryElementDomain sourceDomain = domain.value_or(GeometryElementDomain::Unknown);
+            if (property && !domain)
+            {
+                const auto lookup = AttributeBindingModel(context, *entity);
+                if (!lookup.HasEntity)
+                    return UnknownEntity(*entity);
+                const EditorAttributeBindingRow* row = FindAttributeRow(lookup.Model, *lane, *attribute);
+                if (row != nullptr)
+                {
+                    std::vector<GeometryElementDomain> carriers;
+                    for (const EditorAttributeBindingCandidate& candidate : row->Candidates)
+                        if (candidate.Property.Name == *property)
+                            carriers.push_back(candidate.Property.Domain);
+                    if (carriers.size() > 1u)
+                        return InvalidParams("'" + *property + "' exists on several element domains of the " +
+                            *laneName + " lane; pass \"domain\".");
+                    sourceDomain = carriers.empty() ? row->Domains.front().Domain : carriers.front();
+                }
+            }
             return ApplyAttributeBinding(context,
-                                         EditorAttributeBindingCommand{.StableEntityId = *entity, .Attribute = *attribute,
-                                                                       .Domain = *domain, .PropertyName = property.value_or("")},
-                                         Json{{"entity", *entity}, {"attribute", *attributeName}, {"domain", *domainName},
-                                              {"property", property ? Json(*property) : Json(nullptr)}, {"default", restoreDefault}});
+                EditorAttributeBindingCommand{.StableEntityId = *entity,
+                    .Lane = *lane,
+                    .Attribute = *attribute,
+                    .Domain = sourceDomain,
+                    .PropertyName = property.value_or("")},
+                Json{{"entity", *entity},
+                    {"lane", *laneName},
+                    {"attribute", *attributeName},
+                    {"domain",
+                        sourceDomain == GeometryElementDomain::Unknown ? Json(nullptr)
+                                                                       : Json(std::string(ToString(sourceDomain)))},
+                    {"property", property ? Json(*property) : Json(nullptr)},
+                    {"default", restoreDefault}});
         }
 
         AgentOperationOutcome ShowProperty(const AgentOperationContext& context, std::string_view arguments)
@@ -532,10 +619,22 @@ namespace Extrinsic::Runtime
             // One Color mechanism: showing a property is binding it as the Color source of its domain
             // (bind_attribute color), the same command and overlay as the Appearance panel's selector.
             if (!normalDirection)
+            {
+                const auto lane = DefaultColorLaneFor(row->Descriptor.Domain);
+                if (!lane)
+                    return {.IsError = true,
+                        .Text = "'" + row->Name + "' is on " + std::string(ToString(row->Descriptor.Domain)) +
+                            ", which no lane's Color reads.",
+                        .ErrorCode = ErrorCodeFor(EditorCommandStatus::UnsupportedRenderAttribute)};
+                reply["lane"] = LaneName(*lane);
                 return ApplyAttributeBinding(context,
-                                             EditorAttributeBindingCommand{.StableEntityId = *entity, .Attribute = RenderAttribute::Color,
-                                                                           .Domain = row->Descriptor.Domain, .PropertyName = row->Name},
-                                             std::move(reply));
+                    EditorAttributeBindingCommand{.StableEntityId = *entity,
+                        .Lane = *lane,
+                        .Attribute = RenderAttribute::Color,
+                        .Domain = row->Descriptor.Domain,
+                        .PropertyName = row->Name},
+                    std::move(reply));
+            }
             // Normal directions are a display recipe of a vector, not a source binding; they write the
             // same overlay through the recipe command the Color binding itself uses.
             const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
@@ -1080,35 +1179,49 @@ namespace Extrinsic::Runtime
                        R"(,"normal_direction":{"type":"boolean","default":false}})",
                    R"(["entity","name"])"),
             false, ShowProperty);
-        add("attribute_bindings", "Render attribute sources",
-            "List, per element domain of an entity, every render attribute row of the Appearance panel's source "
-            "selectors: the current source (bound, source, status; using_fallback with a diagnostic when an authored source no "
-            "longer resolves and the default is drawn), what Default draws (default, canonical_property), the compatible "
-            "candidate properties and the incompatible ones with their typed status and reason. Optional domain and attribute "
-            "narrow the listing. Rows: " + AttributeTableText(),
-            Schema("{" + kEntityProperty + "," + DomainProperty("Optional: only this element domain.") + "," + AttributeProperty() + "}",
-                   R"(["entity"])"),
-            true, AttributeBindings);
-        add("bind_attribute", "Bind render attribute source",
-            "Choose the property that feeds one render attribute on one element domain of an entity, like the Appearance "
+        add("attribute_bindings",
+            "Render attribute sources",
+            "List, per render lane of an entity (surface, edges, points: the Appearance panel's Faces, Edges and Vertices "
+            "sections), every render attribute row of the panel's source selectors: the element domains the row reads "
+            "(domains), the current source (bound, source with its domain, status; using_fallback with a diagnostic when an "
+            "authored source no longer resolves and the default is drawn), what Default draws (default, canonical_property), "
+            "the compatible candidate properties and the incompatible ones with their domain, typed status and reason. "
+            "Optional lane, attribute and domain narrow the listing. Rows: " +
+                AttributeTableText(),
+            Schema("{" + kEntityProperty + "," + LaneProperty("Optional: only this lane.") + "," +
+                    DomainProperty("Optional: only rows reading this element domain.") + "," + AttributeProperty() +
+                    "}",
+                R"(["entity"])"),
+            true,
+            AttributeBindings);
+        add(
+            "bind_attribute",
+            "Bind render attribute source",
+            "Choose the property that feeds one render attribute of one render lane of an entity, like the Appearance "
             "panel's source selector (ApplyEditorAttributeBindingCommand): pass property (a compatible candidate from "
-            "attribute_bindings) or default: true to restore the canonical source. One undoable step; the reply carries "
-            "the resulting row. A binding is a rendering-time choice: canonical data such as v:position is never written. "
-            "Color writes the lane's visualization overlay, the one Color mechanism shared with show_property. Refusals "
-            "end with the snake-case command status as error code: unsupported_render_attribute (no such row on the "
-            "domain, or the entity lacks it), attribute_source_missing, attribute_source_type_mismatch, "
-            "attribute_source_count_mismatch, attribute_source_non_finite, stale_entity; bad arguments invalid_params. "
-            "Rows: " + AttributeTableText(),
-            [] {
-                Json schema = Json::parse(Schema(
-                    "{" + kEntityProperty + "," + AttributeProperty() + "," + DomainProperty("Element domain of the row.") +
-                        R"(,"property":{"type":"string","minLength":1,"description":"Source property on that domain."},)"
-                        R"("default":{"type":"boolean","const":true,"description":"Restore the canonical source."}})",
-                    R"(["entity","attribute","domain"])"));
+            "attribute_bindings; add domain when the lane reads that name on several element domains) or default: true to "
+            "restore the default source. One undoable step; the reply carries the resulting row. A binding is a "
+            "rendering-time choice: canonical data such as v:position is never written. Color writes that lane's "
+            "visualization overlay, the one Color mechanism shared with show_property; position, normal and texcoord are "
+            "still one source per entity shared by all lanes. Refusals end with the snake-case command status as error "
+            "code: unsupported_render_attribute (the lane does not read that domain, or the entity lacks it), "
+            "attribute_source_missing, attribute_source_type_mismatch, attribute_source_count_mismatch, "
+            "attribute_source_non_finite, stale_entity; bad arguments invalid_params. Rows: " +
+                AttributeTableText(),
+            []
+            {
+                Json schema = Json::parse(Schema("{" + kEntityProperty + "," + LaneProperty("Render lane of the row.") +
+                        "," + AttributeProperty() + "," +
+                        DomainProperty(
+                            "Element domain of the source property; needed only when the lane reads that name on several.") +
+                        R"(,"property":{"type":"string","minLength":1,"description":"Source property."},)"
+                        R"("default":{"type":"boolean","const":true,"description":"Restore the default source."}})",
+                    R"(["entity","lane","attribute"])"));
                 schema["oneOf"] = Json::array({Json{{"required", {"property"}}}, Json{{"required", {"default"}}}});
                 return Dump(schema);
             }(),
-            false, BindAttribute);
+            false,
+            BindAttribute);
         add("set_visibility",
             "Set visibility",
             "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points / Bounding box checkboxes; by default the "

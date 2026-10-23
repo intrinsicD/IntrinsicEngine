@@ -19,10 +19,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         ECS::EntityHandle entity,
         EditorVisualizationTarget target);
 
-    // RUNTIME-315: the one element-domain -> overlay-lane mapping. The Color
-    // binding, the property-display recipe path and the model all use it.
-    // Defined with the attribute-binding model; nullopt for domains without an
-    // overlay (halfedges, unknown).
+    // The one element-domain -> overlay mapping. The Color binding, the
+    // property-display recipe path and the model all use it. Without `lane`
+    // the overlay is the lane a property of that domain colors by default
+    // (mesh vertices and faces the surface, graph nodes the edges); with it,
+    // that lane, if its Color row reads `domain`. Defined with the
+    // attribute-binding model; nullopt for domains without an overlay
+    // (halfedges, unknown) or a lane that does not read the domain.
     struct ColorOverlayTarget
     {
         EditorVisualizationTarget Target{EditorVisualizationTarget::Surface};
@@ -32,9 +35,12 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer};
     };
     [[nodiscard]] std::optional<ColorOverlayTarget> ColorOverlayTargetFor(
-        GeometryElementDomain domain) noexcept;
+        GeometryElementDomain domain, std::optional<EditorVisualizationTarget> lane = std::nullopt) noexcept;
     // Property the effective overlay of that lane colors `domain` by, if any.
-    [[nodiscard]] std::optional<std::string> BoundColorOverlaySource(
-        const entt::registry& raw, ECS::EntityHandle entity, GeometryElementDomain domain);
+    [[nodiscard]] std::optional<std::string> BoundColorOverlaySource(const entt::registry& raw,
+        ECS::EntityHandle entity,
+        GeometryElementDomain domain,
+        std::optional<EditorVisualizationTarget> lane = std::nullopt);
+    [[nodiscard]] EditorVisualizationTarget VisualizationTargetFor(GeometryRenderLane lane) noexcept;
 }
 }

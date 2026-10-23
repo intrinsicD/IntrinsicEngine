@@ -366,7 +366,7 @@ Plan:
 - [ ] Vertices lists Position, Normal, Color, Point size; Edges lists Position, Color, Line width;
       Faces lists Position, Normal, Texcoord, Color; each row binds its own primitive from the
       source domains of the slice 2 table.
-- [ ] A uniform color/size/width edit is enabled only while its row is on Default and keeps its
+- [x] A uniform color/size/width edit is enabled only while its row is on Default and keeps its
       last value across a bind and Default. Color Default follows the slice 2 precedence:
       picked uniform, then imported color, then grey-white.
 - [ ] Binding a Position or Normal on one primitive leaves the other primitives unchanged;
@@ -449,3 +449,59 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
     expected the old paths; the author's suite filter had missed that suite. Fixed, and
     verification widened to the whole executable.
   - Round 3 on `83f54e7c…`: verdict verbatim "approve. Still blocking: none".
+- 2026-10-23: Operator decision (slice 2): Default is grey-white for the surface only. Edges and
+  points keep their dark default (`0.02`), so a wireframe or point overlay stays visible on a
+  grey-white surface. Imported colors still win on every primitive.
+- 2026-10-23: Slice 2 implemented (lane-keyed attribute rows, Default color precedence,
+  remembered uniforms).
+  - `RenderLaneAttributeRows()` (`Runtime.VertexChannelBindings`) is the lane × attribute ×
+    domain table. Model rows, commands (`EditorAttributeBindingCommand::Lane`), the panel
+    sections and the agent tools are keyed by it.
+  - Color binds the chosen lane's overlay (`EditorVisualizationRecipeCommand::Target`).
+    `show_property` uses `DefaultColorLaneFor(domain)`, the one default lane mapping, which
+    `ColorOverlayTargetFor` now uses too.
+  - Position/Normal/Texcoord rows still write the one shared structural slot until slice 3a.
+    Their Default text says "shared by all primitives", and Default clears a source on any
+    domain of the row.
+  - Colors: `kDefaultSurfaceColor` (0.9 grey) and `kDefaultLineAndPointColor` (0.02) in
+    `Graphics.Component.VisualizationConfig`. Untextured surfaces get the grey base color; an
+    albedo texture keeps a white factor so it shows as imported. Edge and point lanes on Default
+    draw `v:color`/`p:color` when present (an extraction-made per-vertex overlay). A lane's
+    uniform color starts at what the lane draws.
+  - Remembered uniforms: `RenderPoints::Size` + `SizeProperty` and `RenderEdges::Width` +
+    `WidthProperty` replace the `std::variant`. The scene codec stores the uniform as `value` in
+    the property form, and older files without it load the component default. A uniform
+    size/width command only sets the uniform; unbinding is the attribute Default.
+  - UI: uniform color/size/width fields are always drawn and disabled while bound. ImGui 1.92.5
+    still lets a disabled widget be activated by id, so a bound field never writes
+    (`changed && !bound`).
+  - Agent: `attribute_bindings` groups rows by `lane` with `domains`, and `source` is
+    `{name, domain}`. `bind_attribute` takes `lane` and an optional `domain`, needed only when
+    the name exists on several of the lane's domains. Docs: `agent-control-lane.md`, Sandbox
+    README, `rendering-target-architecture.md`.
+  - Verification: all CPU tests of `IntrinsicRuntimeContractTests`,
+    `IntrinsicRuntimeGraphicsCpuTests`, `IntrinsicGraphicsContractCpuTests`,
+    `IntrinsicGraphicsContractTests` and `IntrinsicSandboxEditorIntegrationTests` pass
+    (2734/2734).
+  - Mutation check: ten targeted tests each fail with their mechanism removed. The mechanisms
+    are the imported edge/point color, grey-white base, lane starting color, remembered size
+    on Default, `value` in the codec, lane target of Color, a lane row, the bound-field write
+    guard and the lane-domain refusal.
+  - The five GPU smoke sources with mechanical `Size`/`Width` renames compile only in
+    `ci-vulkan` and were not compiled here.
+- 2026-10-23: Slice 2 code review (Claude author → Codex reviewer, `codex exec`, requested
+  `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a168c5-1fb3-7293-93b4-f1b81a8ba052`;
+  recursion protection instruction-only).
+  - Ponytail (author): one finding, the per-frame base-color patch would overwrite authored
+    factors once GRAPHICS-105 projects them. Fixed: only the two defaults are switched.
+  - Round 1: "revise required".
+    - P1: the diff carried ARA edits from another session in this checkout; they were
+      unstaged.
+    - C1: albedo textures from presentation slots or a baked Appearance texture got the grey
+      factor. Fixed: the factor is decided after all texture sources, from the resolved
+      `AlbedoID`.
+    - C2: same-named properties on two domains shared one property-buffer key. Fixed:
+      `DomainKeyLane` adds the domain to the key.
+    - C1 and C2 each got a regression test that fails with its fix removed.
+  - Round 2: verdict verbatim "approve. Still blocking: none. New findings: none".
+  - Full CPU suite 5876/5876 after the fixes.

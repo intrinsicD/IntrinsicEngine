@@ -92,7 +92,7 @@ namespace
         const EntityHandle entity = scene.Create();
         auto& raw = scene.Raw();
         raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
-        raw.emplace<G::RenderPoints>(entity);  // default uniform float SizeSource.
+        raw.emplace<G::RenderPoints>(entity);  // default uniform size.
         AttachPointCloudSources(scene, entity);
         return entity;
     }
@@ -588,7 +588,7 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceUploadsLikeAUniformSize)
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
     auto& points = raw.emplace<G::RenderPoints>(entity);
-    points.SizeSource = std::string{"v:radius"};
+    points.SizeProperty = "v:radius";
     AttachPointCloudSources(scene, entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -1076,7 +1076,7 @@ TEST(PointCloudGeometryExtraction, SwitchingToANamedSizeSourceKeepsResidency)
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     // The size source is not part of the geometry: no repack, no release.
-    raw.get<G::RenderPoints>(entity).SizeSource = std::string{"v:radius"};
+    raw.get<G::RenderPoints>(entity).SizeProperty = "v:radius";
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));

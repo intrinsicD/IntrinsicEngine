@@ -614,7 +614,7 @@ TEST(SandboxEditorUi,
         .Vector() = priorLevels;
     G::RenderPoints priorPoints{};
     priorPoints.Type = G::RenderPoints::RenderType::Flat;
-    priorPoints.SizeSource = std::string{"p:prior_size"};
+    priorPoints.SizeProperty = "p:prior_size";
     registry.Raw().emplace_or_replace<G::RenderPoints>(
         cloud,
         priorPoints);
@@ -674,11 +674,8 @@ TEST(SandboxEditorUi,
     const G::RenderPoints& undonePoints =
         registry.Raw().get<G::RenderPoints>(cloud);
     EXPECT_EQ(undonePoints.Type, priorPoints.Type);
-    ASSERT_TRUE(
-        std::holds_alternative<std::string>(undonePoints.SizeSource));
-    EXPECT_EQ(
-        std::get<std::string>(undonePoints.SizeSource),
-        "p:prior_size");
+    ASSERT_TRUE(!undonePoints.SizeProperty.empty());
+    EXPECT_EQ(undonePoints.SizeProperty, "p:prior_size");
     const G::VisualizationConfig& undoneVisualization =
         registry.Raw().get<G::VisualizationConfig>(cloud);
     EXPECT_EQ(undoneVisualization.Source, priorVisualization.Source);

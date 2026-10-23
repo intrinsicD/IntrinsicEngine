@@ -691,7 +691,7 @@ EntityHandle MakePointCloud(Registry& scene)
     const EntityHandle entity = scene.Create();
     StampCommon(scene, entity, "AcceptanceCloud", 103u);
     auto& raw = scene.Raw();
-    raw.emplace<G::RenderPoints>(entity); // default uniform float SizeSource.
+    raw.emplace<G::RenderPoints>(entity); // default uniform size.
 
     auto& vertices = raw.emplace<gs::Vertices>(entity);
     SetPositions(vertices.Properties, {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 1.f, 0.f}});
@@ -2811,7 +2811,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
 
     auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     G::RenderEdges edges{};
-    edges.WidthSource = kReferenceTriangleLineWidthSmokePx;
+    edges.Width = kReferenceTriangleLineWidthSmokePx;
     raw.emplace_or_replace<G::RenderEdges>(triangle, edges);
     G::RenderPoints points{};
     raw.emplace_or_replace<G::RenderPoints>(triangle, points);
@@ -3287,10 +3287,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
     // scalar-field colormap is proven on the forward LinePass and PointPass, not
     // only the surface pass.
     G::RenderEdges edges{};
-    edges.WidthSource = kScalarFieldSmokeLineWidthPx;
+    edges.Width = kScalarFieldSmokeLineWidthPx;
     raw.emplace_or_replace<G::RenderEdges>(triangle, edges);
     G::RenderPoints points{};
-    points.SizeSource = kScalarFieldSmokePointSizePx;
+    points.Size = kScalarFieldSmokePointSizePx;
     raw.emplace_or_replace<G::RenderPoints>(triangle, points);
 
     auto& visualization = raw.get<G::VisualizationConfig>(triangle);

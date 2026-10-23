@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -90,7 +91,79 @@ namespace Extrinsic::Runtime
             PixelRow(A::LineWidth, D::MeshEdge, "uniform line width (px)"),
             PixelRow(A::LineWidth, D::GraphEdge, "uniform line width (px)"),
         };
+
+        constexpr std::array kMeshVertex{D::MeshVertex};
+        constexpr std::array kSurfaceCorner{D::MeshVertex, D::MeshHalfedge};
+        constexpr std::array kSurfaceColor{D::MeshVertex, D::MeshFace};
+        constexpr std::array kEdgeVertices{D::MeshVertex, D::GraphNode};
+        constexpr std::array kEdgeColor{D::MeshVertex, D::MeshEdge, D::GraphNode, D::GraphEdge};
+        constexpr std::array kEdgeElements{D::MeshEdge, D::GraphEdge};
+        constexpr std::array kPointVertices{D::MeshVertex, D::GraphNode, D::PointCloudPoint};
+
+        using L = GeometryRenderLane;
+        // Position and Normal are one structural stream per entity until each
+        // lane gets its own slot, so their rows say the binding is shared.
+        constexpr std::array kLaneRows{
+            RenderLaneAttributeRow{L::Surface, A::Position, kMeshVertex, "v:position; shared by all primitives"},
+            RenderLaneAttributeRow{L::Surface,
+                A::Normal,
+                kSurfaceCorner,
+                "h:normal corners, else v:normal, else +Z; shared by all primitives"},
+            RenderLaneAttributeRow{
+                L::Surface, A::Texcoord, kSurfaceCorner, "h:texcoord corners, else v:texcoord, else zero"},
+            RenderLaneAttributeRow{
+                L::Surface, A::Color, kSurfaceColor, "material or texture, v:color when present, else grey-white"},
+            RenderLaneAttributeRow{L::Edges, A::Position, kEdgeVertices, "v:position; shared by all primitives"},
+            RenderLaneAttributeRow{L::Edges, A::Color, kEdgeColor, "v:color when present, else dark lane color"},
+            RenderLaneAttributeRow{L::Edges, A::LineWidth, kEdgeElements, "uniform line width (px)"},
+            RenderLaneAttributeRow{L::Points, A::Position, kPointVertices, "v:position; shared by all primitives"},
+            RenderLaneAttributeRow{
+                L::Points, A::Normal, kPointVertices, "v:normal, not yet read by points; shared by all primitives"},
+            RenderLaneAttributeRow{
+                L::Points, A::Color, kPointVertices, "v:color or p:color when present, else dark lane color"},
+            RenderLaneAttributeRow{L::Points, A::PointSize, kPointVertices, "uniform point size (px)"},
+        };
     } // namespace
+
+    std::span<const RenderLaneAttributeRow> RenderLaneAttributeRows() noexcept
+    {
+        return kLaneRows;
+    }
+
+    const RenderLaneAttributeRow* FindRenderLaneAttributeRow(
+        const GeometryRenderLane lane, const RenderAttribute attribute) noexcept
+    {
+        const auto found = std::ranges::find_if(kLaneRows,
+            [&](const RenderLaneAttributeRow& row)
+            {
+                return row.Lane == lane && row.Attribute == attribute;
+            });
+        return found != kLaneRows.end() ? &*found : nullptr;
+    }
+
+    bool RenderLaneReadsDomain(
+        const GeometryRenderLane lane, const RenderAttribute attribute, const GeometryElementDomain domain) noexcept
+    {
+        const RenderLaneAttributeRow* row = FindRenderLaneAttributeRow(lane, attribute);
+        return row != nullptr && std::ranges::find(row->Domains, domain) != row->Domains.end();
+    }
+
+    std::optional<GeometryRenderLane> DefaultColorLaneFor(const GeometryElementDomain domain) noexcept
+    {
+        switch (domain)
+        {
+        case D::MeshVertex:
+        case D::MeshFace:        return GeometryRenderLane::Surface;
+        case D::MeshEdge:
+        case D::GraphNode:
+        case D::GraphEdge:       return GeometryRenderLane::Edges;
+        case D::PointCloudPoint: return GeometryRenderLane::Points;
+        case D::MeshHalfedge:
+        case D::GraphHalfedge:
+        case D::Unknown:         break;
+        }
+        return std::nullopt;
+    }
 
     std::string_view ToString(const RenderAttribute attribute) noexcept
     {

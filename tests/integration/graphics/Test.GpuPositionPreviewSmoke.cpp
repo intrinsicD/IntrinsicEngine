@@ -103,7 +103,7 @@ namespace
             if (MeshScenario)
                 raw.emplace<GC::RenderSurface>(Entity);
             else
-                raw.emplace<GC::RenderPoints>(Entity).SizeSource = 6.0f;
+                raw.emplace<GC::RenderPoints>(Entity).Size = 6.0f;
             // No authored culling bounds: extraction uses the default unit sphere at the
             // entity's translation, which is inside the frustum at the origin and far outside
             // it at kCulledOffset (the reference camera at (0, 0, 3) looks at the origin).

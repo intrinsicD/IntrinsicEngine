@@ -126,7 +126,7 @@ namespace
             raw.emplace<ECSC::Transform::WorldMatrix>(Entity).Matrix = glm::translate(glm::mat4{1.f}, translation);
             raw.emplace<ECSC::Selection::SelectableTag>(Entity);
             raw.emplace<ECSC::StableId>(Entity, ECSC::StableId{293u, 1u});
-            raw.emplace<GC::RenderPoints>(Entity).SizeSource = 6.0f;
+            raw.emplace<GC::RenderPoints>(Entity).Size = 6.0f;
             if (auto* cameras = Kernel().Services().Find<Runtime::CameraControllerRegistry>())
             {
                 Graphics::CameraViewInput seed{};

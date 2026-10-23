@@ -3176,8 +3176,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
     ASSERT_TRUE(raw.all_of<G::RenderPoints>(*meshEntity));
     const G::RenderPoints& points = raw.get<G::RenderPoints>(*meshEntity);
     EXPECT_EQ(points.Type, G::RenderPoints::RenderType::Sphere);
-    ASSERT_NE(std::get_if<float>(&points.SizeSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&points.SizeSource), 10.0f);
+    EXPECT_TRUE(points.SizeProperty.empty());
+    EXPECT_FLOAT_EQ(points.Size, 10.0f);
 
     Runtime::RenderExtractionCache extraction;
     const Runtime::RuntimeRenderExtractionStats stats =

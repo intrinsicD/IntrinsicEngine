@@ -794,8 +794,29 @@ TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
     EXPECT_NE(badShow.Text.find("Unknown domain 'Bogus'"), std::string::npos) << badShow.Text;
 }
 
-// RUNTIME-316: the attribute tools take their attribute enum and row documentation from the
-// runtime table (RenderAttributeRules), and refuse malformed arguments with invalid_params.
+// RUNTIME-316 / UI-083: the attribute tools take their attribute enum and row documentation from
+// the runtime lane table (RenderLaneAttributeRows), and refuse malformed arguments with invalid_params.
+namespace
+{
+    // "<lane> <attribute> (... ) from <domains> [default: ...]" for every lane row.
+    std::vector<std::string> LaneRowTexts()
+    {
+        std::vector<std::string> rows;
+        for (const R::RenderLaneAttributeRow& row : R::RenderLaneAttributeRows())
+        {
+            const std::string lane = row.Lane == R::GeometryRenderLane::Surface ? "surface"
+                : row.Lane == R::GeometryRenderLane::Edges                      ? "edges"
+                                                                                : "points";
+            std::string domains;
+            for (const R::GeometryElementDomain domain : row.Domains)
+                domains += " " + std::string(R::ToString(domain));
+            rows.push_back(lane + " " + std::string(R::ToString(row.Attribute)));
+            rows.push_back("from" + domains + " [default: " + std::string(row.DefaultDescription) + "]");
+        }
+        return rows;
+    }
+}
+
 TEST(AgentOperations, AttributeBindingToolsFollowTheRuntimeTable)
 {
     R::AgentOperationRegistry registry;
@@ -813,14 +834,15 @@ TEST(AgentOperations, AttributeBindingToolsFollowTheRuntimeTable)
     const auto schema = Json::parse(listing->InputSchemaJson);
     EXPECT_EQ(schema["properties"]["attribute"]["enum"], attributes);
     EXPECT_EQ(schema["required"], Json::array({"entity"}));
-    for (const R::RenderAttributeRule& rule : R::RenderAttributeRules())
-    {
-        const std::string row = std::string(R::ToString(rule.Domain)) + " [default: " + std::string(rule.DefaultDescription) + "]";
+    EXPECT_EQ(schema["properties"]["lane"]["enum"], Json::array({"surface", "edges", "points"}));
+    for (const std::string& row : LaneRowTexts())
         EXPECT_NE(listing->Description.find(row), std::string::npos) << "the description documents " << row;
-    }
 
     const R::AgentOperationContext empty{};
-    for (const char* arguments : {R"({})", R"({"entity":1,"attribute":"radius"})", R"({"entity":1,"domain":"Bogus"})"})
+    for (const char* arguments : {R"({})",
+             R"({"entity":1,"attribute":"radius"})",
+             R"({"entity":1,"domain":"Bogus"})",
+             R"({"entity":1,"lane":"faces"})"})
     {
         const auto refused = R::InvokeAgentOperation(registry, "attribute_bindings", empty, arguments, false);
         EXPECT_TRUE(refused.IsError) << arguments;
@@ -844,28 +866,33 @@ TEST(AgentOperations, BindAttributeValidatesItsArgumentsBeforeTouchingTheScene)
     EXPECT_FALSE(bind->NeedsPresentedFrame);
     const auto schema = Json::parse(bind->InputSchemaJson);
     EXPECT_EQ(schema["properties"]["attribute"], Json::parse(registry.Find("attribute_bindings")->InputSchemaJson)["properties"]["attribute"]);
-    EXPECT_EQ(schema["required"], Json::array({"entity", "attribute", "domain"}));
+    EXPECT_EQ(schema["required"], Json::array({"entity", "lane", "attribute"}));
+    EXPECT_EQ(schema["properties"]["lane"]["enum"],
+        Json::parse(registry.Find("attribute_bindings")->InputSchemaJson)["properties"]["lane"]["enum"]);
     EXPECT_EQ(schema["oneOf"].size(), 2u);
-    for (const R::RenderAttributeRule& rule : R::RenderAttributeRules())
-        EXPECT_NE(bind->Description.find(std::string(R::ToString(rule.Domain)) + " [default: " + std::string(rule.DefaultDescription) + "]"),
-                  std::string::npos);
+    for (const std::string& row : LaneRowTexts())
+        EXPECT_NE(bind->Description.find(row), std::string::npos) << row;
 
     const R::AgentOperationContext empty{};
-    for (const char* arguments : {
-             R"({})",
-             R"({"entity":1,"attribute":"position","domain":"MeshVertex"})",
-             R"({"entity":1,"attribute":"position","domain":"MeshVertex","property":"p","default":true})",
-             R"({"entity":1,"attribute":"position","domain":"MeshVertex","default":false})",
-             R"({"entity":1,"attribute":"position","domain":"MeshVertex","property":""})",
-             R"({"entity":1,"attribute":"radius","domain":"MeshVertex","property":"p"})",
-             R"({"entity":1,"attribute":"position","domain":"Bogus","property":"p"})"})
+    for (const char* arguments : {R"({})",
+             R"({"entity":1,"lane":"surface","attribute":"position"})",
+             R"({"entity":1,"lane":"surface","attribute":"position","property":"p","default":true})",
+             R"({"entity":1,"lane":"surface","attribute":"position","default":false})",
+             R"({"entity":1,"lane":"surface","attribute":"position","property":""})",
+             R"({"entity":1,"lane":"surface","attribute":"radius","property":"p"})",
+             R"({"entity":1,"lane":"faces","attribute":"position","property":"p"})",
+             R"({"entity":1,"attribute":"position","property":"p"})",
+             R"({"entity":1,"lane":"surface","attribute":"position","domain":"Bogus","property":"p"})"})
     {
         const auto refused = R::InvokeAgentOperation(registry, "bind_attribute", empty, arguments, false);
         EXPECT_TRUE(refused.IsError) << arguments;
         EXPECT_EQ(refused.ErrorCode, "invalid_params") << arguments;
     }
-    const auto detached = R::InvokeAgentOperation(registry, "bind_attribute", empty,
-                                                  R"({"entity":1,"attribute":"position","domain":"MeshVertex","default":true})", false);
+    const auto detached = R::InvokeAgentOperation(registry,
+        "bind_attribute",
+        empty,
+        R"({"entity":1,"lane":"surface","attribute":"position","default":true})",
+        false);
     EXPECT_TRUE(detached.IsError);
     EXPECT_NE(detached.Text.find("not attached"), std::string::npos) << detached.Text;
     EXPECT_TRUE(R::InvokeAgentOperation(registry, "bind_attribute", empty, "{}", true).IsError) << "refused in a read-only session";

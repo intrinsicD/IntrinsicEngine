@@ -33,7 +33,7 @@ export namespace Extrinsic::Graphics::Components
     //   "colors"      — vec4 per-vertex or per-edge colors
     //   "scalars"     — float per-element scalar field values
     //   "sizes"       — float per-point screen-space sizes in pixels
-    //   RenderEdges::WidthSource names — float per-edge screen-space widths
+    //   RenderEdges::WidthProperty names — float per-edge screen-space widths
     struct BufferEntry
     {
         RHI::BufferHandle Handle;

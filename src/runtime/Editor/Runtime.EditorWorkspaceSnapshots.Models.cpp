@@ -164,9 +164,13 @@ namespace {
         {
             const std::optional<G::VisualizationConfig> config =
                 EffectiveVisualizationConfigForTarget(raw, entity, target);
-            return config.has_value()
-                ? FromVisualizationConfig(*config)
-                : EditorVisualizationConfigModel{};
+            if (config.has_value())
+                return FromVisualizationConfig(*config);
+            // Without a config the uniform color starts at what the lane draws.
+            EditorVisualizationConfigModel model{};
+            if (target == EditorVisualizationTarget::Edges || target == EditorVisualizationTarget::Points)
+                model.Color = G::kDefaultLineAndPointColor;
+            return model;
         }
 
         [[nodiscard]] EditorVisualizationTarget
@@ -839,16 +843,11 @@ namespace {
                 model.HasRenderEdges = true;
                 model.EdgeDomainValue = lines->Domain;
                 model.EdgeDomain = RenderEdgeDomainName(lines->Domain);
-                if (const auto* width = std::get_if<float>(&lines->WidthSource))
-                {
-                    model.HasUniformEdgeWidth = true;
-                    model.UniformEdgeWidth = *width;
-                }
-                else if (const auto* name = std::get_if<std::string>(&lines->WidthSource))
-                {
-                    model.HasNamedEdgeWidth = true;
-                    model.EdgeWidthName = *name;
-                }
+                // The uniform width is kept while a width property is bound.
+                model.HasUniformEdgeWidth = true;
+                model.UniformEdgeWidth = lines->Width;
+                model.HasNamedEdgeWidth = !lines->WidthProperty.empty();
+                model.EdgeWidthName = lines->WidthProperty;
             }
 
             if (const auto* points = raw.try_get<G::RenderPoints>(entity))
@@ -857,16 +856,10 @@ namespace {
                 model.PointRenderTypeValue = points->Type;
                 model.PointRenderType = RenderPointTypeName(points->Type);
 
-                if (const auto* size = std::get_if<float>(&points->SizeSource))
-                {
-                    model.HasUniformPointSize = true;
-                    model.UniformPointSize = *size;
-                }
-                else if (const auto* name = std::get_if<std::string>(&points->SizeSource))
-                {
-                    model.HasNamedPointSize = true;
-                    model.PointSizeName = *name;
-                }
+                model.HasUniformPointSize = true;
+                model.UniformPointSize = points->Size;
+                model.HasNamedPointSize = !points->SizeProperty.empty();
+                model.PointSizeName = points->SizeProperty;
             }
 
             return model;
@@ -1466,22 +1459,10 @@ namespace {
         }
 
         void AppendRenderHintSourceSignature(
-            std::uint64_t& signature,
-            const std::variant<float, std::string>& source) noexcept
+            std::uint64_t& signature, const float uniform, const std::string_view property) noexcept
         {
-            if (const auto* value = std::get_if<float>(&source))
-            {
-                MixSignature(signature, 1u);
-                MixSignatureFloat(signature, *value);
-                return;
-            }
-
-            const auto* name = std::get_if<std::string>(&source);
-            MixSignature(signature, 2u);
-            if (name != nullptr)
-                MixSignatureString(signature, *name);
-            else
-                MixSignatureString(signature, {});
+            MixSignatureFloat(signature, uniform);
+            MixSignatureString(signature, property);
         }
 
         [[nodiscard]] std::uint64_t RenderHintSignatureForEntity(
@@ -1512,7 +1493,7 @@ namespace {
                 MixSignature(signature, 1u);
                 MixSignature(signature,
                              static_cast<std::uint64_t>(edges->Domain));
-                AppendRenderHintSourceSignature(signature, edges->WidthSource);
+                AppendRenderHintSourceSignature(signature, edges->Width, edges->WidthProperty);
             }
             else
             {
@@ -1524,7 +1505,7 @@ namespace {
                 MixSignature(signature, 1u);
                 MixSignature(signature,
                              static_cast<std::uint64_t>(points->Type));
-                AppendRenderHintSourceSignature(signature, points->SizeSource);
+                AppendRenderHintSourceSignature(signature, points->Size, points->SizeProperty);
             }
             else
             {

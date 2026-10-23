@@ -779,41 +779,48 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] json SizeOrWidthSourceToJson(
-            const std::variant<float, std::string>& value)
+        // A bound property also stores the uniform it replaces (`value`),
+        // so Default restores it after a reload; files without it load the
+        // component default.
+        [[nodiscard]] json SizeOrWidthSourceToJson(const float uniform, const std::string& property)
         {
-            if (const float* uniform = std::get_if<float>(&value))
+            if (property.empty())
             {
                 return json{
                     {"kind", "uniform"},
-                    {"value", *uniform},
+                    {"value", uniform},
                 };
             }
             return json{
                 {"kind", "property"},
-                {"name", *std::get_if<std::string>(&value)},
+                {"name", property},
+                {"value", uniform},
             };
         }
 
-        [[nodiscard]] bool TrySourceFromJson(
-            const json& value,
-            std::variant<float, std::string>& out)
+        [[nodiscard]] bool TrySourceFromJson(const json& value, float& uniform, std::string& property)
         {
             if (!value.is_object() || !value.contains("kind") || !value["kind"].is_string())
                 return false;
             const std::string kind = value["kind"].get<std::string>();
+            const bool hasValue = value.contains("value");
+            if (hasValue && !value["value"].is_number())
+                return false;
             if (kind == "uniform")
             {
-                if (!value.contains("value") || !value["value"].is_number())
+                if (!hasValue)
                     return false;
-                out = value["value"].get<float>();
+                uniform = value["value"].get<float>();
+                property.clear();
                 return true;
             }
             if (kind == "property")
             {
-                if (!value.contains("name") || !value["name"].is_string())
+                if (!value.contains("name") || !value["name"].is_string() || value["name"].get<std::string>().empty())
                     return false;
-                out = value["name"].get<std::string>();
+                property = value["name"].get<std::string>();
+                if (hasValue)
+                    uniform = value["value"].get<float>();
                 return true;
             }
             return false;
@@ -1115,7 +1122,7 @@ namespace Extrinsic::Runtime
             {
                 render["edges"] = json{
                     {"domain", EdgeDomainToString(edges->Domain)},
-                    {"width", SizeOrWidthSourceToJson(edges->WidthSource)},
+                    {"width", SizeOrWidthSourceToJson(edges->Width, edges->WidthProperty)},
                 };
                 hasAny = true;
             }
@@ -1124,7 +1131,7 @@ namespace Extrinsic::Runtime
             {
                 render["points"] = json{
                     {"type", PointTypeToString(points->Type)},
-                    {"size", SizeOrWidthSourceToJson(points->SizeSource)},
+                    {"size", SizeOrWidthSourceToJson(points->Size, points->SizeProperty)},
                 };
                 hasAny = true;
             }
@@ -1199,9 +1206,8 @@ namespace Extrinsic::Runtime
                 }
 
                 G::RenderEdges edges{};
-                if (!TryEdgeDomainFromString(edgesJson["domain"].get<std::string>(),
-                                             edges.Domain) ||
-                    !TrySourceFromJson(edgesJson["width"], edges.WidthSource))
+                if (!TryEdgeDomainFromString(edgesJson["domain"].get<std::string>(), edges.Domain) ||
+                    !TrySourceFromJson(edgesJson["width"], edges.Width, edges.WidthProperty))
                 {
                     return false;
                 }
@@ -1221,9 +1227,8 @@ namespace Extrinsic::Runtime
                 }
 
                 G::RenderPoints points{};
-                if (!TryPointTypeFromString(pointsJson["type"].get<std::string>(),
-                                            points.Type) ||
-                    !TrySourceFromJson(pointsJson["size"], points.SizeSource))
+                if (!TryPointTypeFromString(pointsJson["type"].get<std::string>(), points.Type) ||
+                    !TrySourceFromJson(pointsJson["size"], points.Size, points.SizeProperty))
                 {
                     return false;
                 }

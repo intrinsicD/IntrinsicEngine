@@ -2435,35 +2435,38 @@ namespace Extrinsic::Sandbox::Editor
 
     namespace
     {
-        [[nodiscard]] AppearanceElementSection SectionOfAttributeDomain(
-            const Runtime::GeometryElementDomain domain) noexcept
-        {
-            using D = Runtime::GeometryElementDomain;
-            switch (domain)
-            {
-            case D::MeshEdge:
-            case D::GraphEdge: return AppearanceElementSection::Edges;
-            case D::MeshFace: return AppearanceElementSection::Faces;
-            default: return AppearanceElementSection::Vertices; // vertices, nodes, points, corners
-            }
-        }
-
         [[nodiscard]] std::string AttributeRowLabel(const Runtime::EditorAttributeBindingRow& row)
         {
             using A = Runtime::RenderAttribute;
-            std::string label;
             switch (row.Attribute)
             {
-            case A::Position: label = "Position"; break;
-            case A::Normal: label = "Normal"; break;
-            case A::Texcoord: label = "Texcoord"; break;
-            case A::Color: label = "Color"; break;
-            case A::PointSize: label = "Point size"; break;
-            case A::LineWidth: label = "Line width"; break;
+            case A::Position:  return "Position";
+            case A::Normal:    return "Normal";
+            case A::Texcoord:  return "Texcoord";
+            case A::Color:     return "Color";
+            case A::PointSize: return "Point size";
+            case A::LineWidth: return "Line width";
             }
-            if (row.Domain == Runtime::GeometryElementDomain::MeshHalfedge)
-                label += " (corners)";
-            return label;
+            return {};
+        }
+
+        // "name (kind, count)", with the element domain first when the row reads several.
+        [[nodiscard]] std::string CandidateLabel(
+            const Runtime::EditorAttributeBindingRow& row, const Runtime::EditorAttributeBindingCandidate& candidate)
+        {
+            const std::string domain =
+                row.Domains.size() > 1u ? std::string{ToString(candidate.Property.Domain)} + ", " : std::string{};
+            return candidate.Property.Name + " (" + domain +
+                Runtime::DebugNameForGeometryPropertyValueKind(candidate.Property.ValueKind) + ", " +
+                std::to_string(candidate.ElementCount) + ")";
+        }
+
+        // The bound source, with its element domain when the row reads several.
+        [[nodiscard]] std::string SourceLabel(
+            const Runtime::EditorAttributeBindingRow& row, const Runtime::GeometryPropertyRef& source)
+        {
+            return row.Domains.size() > 1u ? source.Name + " (" + std::string{ToString(source.Domain)} + ")"
+                                           : source.Name;
         }
 
         [[nodiscard]] std::string AttributeRowStatus(const Runtime::EditorAttributeBindingRow& row)
@@ -2472,9 +2475,9 @@ namespace Extrinsic::Sandbox::Editor
                 return "default: " + row.DefaultSource;
             if (row.UsingFallback)
                 return row.Diagnostic;
-            return std::string{"bound ("} +
-                   Runtime::DebugNameForGeometryPropertyValueKind(row.Source.ValueKind) + ", " +
-                   std::to_string(row.Resolution.ElementCount) + ")";
+            return std::string{"bound ("} + Runtime::DebugNameForGeometryPropertyValueKind(row.Source.ValueKind) +
+                ", " + std::to_string(row.Resolution.ElementCount) + " " + std::string{ToString(row.Source.Domain)} +
+                ")";
         }
     } // namespace
 
@@ -2491,9 +2494,8 @@ namespace Extrinsic::Sandbox::Editor
             DrawDiagnostics(model.Diagnostics);
     }
 
-    void DrawAttributeSourceTable(
-        const Runtime::EditorAttributeBindingModel& model,
-        const AppearanceElementSection section,
+    void DrawAttributeSourceTable(const Runtime::EditorAttributeBindingModel& model,
+        const Runtime::GeometryRenderLane lane,
         const SandboxEditorContext* const context,
         AttributeSourceUiState& state,
         const std::function<void(const Runtime::EditorAttributeBindingRow&, const std::string& label)>& rowDetails)
@@ -2501,8 +2503,9 @@ namespace Extrinsic::Sandbox::Editor
         if (state.Entity != model.StableEntityId)
             state = {.Entity = model.StableEntityId};
         const bool commandsAvailable = context != nullptr && context->SceneAvailable;
-        constexpr std::array<const char*, 3> sectionIds{"Vertices", "Edges", "Faces"};
-        ImGui::PushID(sectionIds[static_cast<std::size_t>(section)]);
+        ImGui::PushID(lane == Runtime::GeometryRenderLane::Surface ? "Faces"
+                : lane == Runtime::GeometryRenderLane::Edges       ? "Edges"
+                                                                   : "Vertices");
         constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                           ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp;
         if (ImGui::BeginTable("Attributes", 3, flags))
@@ -2514,7 +2517,7 @@ namespace Extrinsic::Sandbox::Editor
             for (std::size_t i = 0u; i < model.Rows.size(); ++i)
             {
                 const Runtime::EditorAttributeBindingRow& row = model.Rows[i];
-                if (SectionOfAttributeDomain(row.Domain) != section)
+                if (row.Lane != lane)
                     continue;
                 ImGui::PushID(static_cast<int>(i));
                 ImGui::TableNextRow();
@@ -2522,25 +2525,30 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TextUnformatted(AttributeRowLabel(row).c_str());
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
                 {
-                    ImGui::SetTooltip(
-                        "Expects %s, one value per %s (%zu).\nDefault: %s.\n"
-                        "A source that is missing or no longer fits falls back to the default.",
+                    std::string domains;
+                    for (const Runtime::EditorAttributeBindingDomain& domain : row.Domains)
+                        domains += (domains.empty() ? "" : ", ") + std::string{ToString(domain.Domain)} + " (" +
+                            std::to_string(domain.ElementCount) + ")";
+                    ImGui::SetTooltip("Expects %s, one value per element of %s.\nDefault: %s.\n"
+                                      "A source that is missing or no longer fits falls back to the default.",
                         row.ExpectedType.c_str(),
-                        std::string{ToString(row.Domain)}.c_str(),
-                        row.ExpectedElementCount, row.DefaultSource.c_str());
+                        domains.c_str(),
+                        row.DefaultSource.c_str());
                 }
 
                 ImGui::TableSetColumnIndex(1);
-                const auto bind = [&](std::string name) {
+                const auto bind = [&](const Runtime::GeometryPropertyRef& source)
+                {
                     if (!commandsAvailable)
                         return;
-                    const std::string label = name.empty() ? std::string{"Default"} : name;
-                    const Runtime::EditorCommandStatus status = Runtime::ApplyEditorAttributeBindingCommand(
-                        context->VisualizationCommands,
-                        Runtime::EditorAttributeBindingCommand{.StableEntityId = model.StableEntityId,
-                                                               .Attribute = row.Attribute,
-                                                               .Domain = row.Domain,
-                                                               .PropertyName = std::move(name)});
+                    const std::string label = source.Name.empty() ? std::string{"Default"} : SourceLabel(row, source);
+                    const Runtime::EditorCommandStatus status =
+                        Runtime::ApplyEditorAttributeBindingCommand(context->VisualizationCommands,
+                            Runtime::EditorAttributeBindingCommand{.StableEntityId = model.StableEntityId,
+                                .Lane = row.Lane,
+                                .Attribute = row.Attribute,
+                                .Domain = source.Domain,
+                                .PropertyName = source.Name});
                     state.Refusal =
                         status == Runtime::EditorCommandStatus::Applied ||
                                 status == Runtime::EditorCommandStatus::NoChange
@@ -2550,21 +2558,20 @@ namespace Extrinsic::Sandbox::Editor
                 };
                 ImGui::BeginDisabled(!commandsAvailable);
                 ImGui::SetNextItemWidth(-FLT_MIN);
-                if (ImGui::BeginCombo("##Source", row.Bound ? row.Source.Name.c_str() : "Default"))
+                const std::string preview = row.Bound ? SourceLabel(row, row.Source) : std::string{"Default"};
+                if (ImGui::BeginCombo("##Source", preview.c_str()))
                 {
                     if (ImGui::Selectable("Default", !row.Bound))
                         bind({});
                     for (const Runtime::EditorAttributeBindingCandidate& candidate : row.Candidates)
                     {
-                        const std::string label =
-                            candidate.Property.Name + " (" +
-                            Runtime::DebugNameForGeometryPropertyValueKind(candidate.Property.ValueKind) +
-                            ", " + std::to_string(candidate.ElementCount) + ")";
-                        const bool selected = row.Bound && row.Source.Name == candidate.Property.Name;
+                        const std::string label = CandidateLabel(row, candidate);
+                        const bool selected = row.Bound && row.Source.Name == candidate.Property.Name &&
+                            row.Source.Domain == candidate.Property.Domain;
                         if (ImGui::Selectable(
                                 label.c_str(), selected,
                                 candidate.Compatible ? 0 : ImGuiSelectableFlags_Disabled))
-                            bind(candidate.Property.Name);
+                            bind(candidate.Property);
                         if (!candidate.Compatible)
                         {
                             DrawDisabledReasonTooltip(candidate.DisabledReason);
@@ -2592,7 +2599,7 @@ namespace Extrinsic::Sandbox::Editor
             for (std::size_t i = 0u; i < model.Rows.size(); ++i)
             {
                 const Runtime::EditorAttributeBindingRow& row = model.Rows[i];
-                if (SectionOfAttributeDomain(row.Domain) != section)
+                if (row.Lane != lane)
                     continue;
                 ImGui::PushID(static_cast<int>(i));
                 rowDetails(row, AttributeRowLabel(row));

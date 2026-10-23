@@ -2211,20 +2211,13 @@ namespace
         return lhs.Domain == rhs.Domain;
     }
 
-    [[nodiscard]] bool SameRenderScalarSource(
-        const std::variant<float, std::string>& lhs,
-        const std::variant<float, std::string>& rhs) noexcept
+    [[nodiscard]] bool SameRenderScalarSource(const float lhsUniform,
+        const std::string& lhsProperty,
+        const float rhsUniform,
+        const std::string& rhsProperty) noexcept
     {
-        if (lhs.index() != rhs.index())
-            return false;
-        if (const auto* lhsUniform = std::get_if<float>(&lhs))
-        {
-            const auto* rhsUniform = std::get_if<float>(&rhs);
-            return rhsUniform != nullptr &&
-                   std::bit_cast<std::uint32_t>(*lhsUniform) ==
-                       std::bit_cast<std::uint32_t>(*rhsUniform);
-        }
-        return std::get<std::string>(lhs) == std::get<std::string>(rhs);
+        return std::bit_cast<std::uint32_t>(lhsUniform) == std::bit_cast<std::uint32_t>(rhsUniform) &&
+            lhsProperty == rhsProperty;
     }
 
     [[nodiscard]] bool SameRenderEdges(
@@ -2232,15 +2225,14 @@ namespace
         const Graphics::Components::RenderEdges& rhs)
     {
         return lhs.Domain == rhs.Domain &&
-               SameRenderScalarSource(lhs.WidthSource, rhs.WidthSource);
+            SameRenderScalarSource(lhs.Width, lhs.WidthProperty, rhs.Width, rhs.WidthProperty);
     }
 
     [[nodiscard]] bool SameRenderPoints(
         const Graphics::Components::RenderPoints& lhs,
         const Graphics::Components::RenderPoints& rhs)
     {
-        return lhs.Type == rhs.Type &&
-               SameRenderScalarSource(lhs.SizeSource, rhs.SizeSource);
+        return lhs.Type == rhs.Type && SameRenderScalarSource(lhs.Size, lhs.SizeProperty, rhs.Size, rhs.SizeProperty);
     }
 
     template <typename T, typename SameFn>

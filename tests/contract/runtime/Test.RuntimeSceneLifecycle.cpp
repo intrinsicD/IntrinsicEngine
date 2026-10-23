@@ -404,11 +404,10 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     ASSERT_EQ(selection.InFlightPickCount(), 1u);
 
     scene.Raw().emplace<G::RenderEdges>(entity);
-    scene.Raw().emplace<G::RenderPoints>(
-        entity,
+    scene.Raw().emplace<G::RenderPoints>(entity,
         G::RenderPoints{
             .Type = G::RenderPoints::RenderType::Surfel,
-            .SizeSource = 4.0f,
+            .Size = 4.0f,
         });
     extraction.SetVisualizationRecipe(
         stableId,
@@ -424,8 +423,8 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     const G::RenderPoints& translatedPoints =
         scene.Raw().get<G::RenderPoints>(entity);
     EXPECT_EQ(translatedPoints.Type, G::RenderPoints::RenderType::Surfel);
-    ASSERT_TRUE(std::holds_alternative<float>(translatedPoints.SizeSource));
-    EXPECT_FLOAT_EQ(std::get<float>(translatedPoints.SizeSource), 4.0f);
+    ASSERT_TRUE(translatedPoints.SizeProperty.empty());
+    EXPECT_FLOAT_EQ(translatedPoints.Size, 4.0f);
     ASSERT_TRUE(extraction.GetVisualizationRecipe(stableId).has_value());
 
     const auto reset = engine.Services().Find<Runtime::SceneDocumentModule>()->NewSceneDocument();
