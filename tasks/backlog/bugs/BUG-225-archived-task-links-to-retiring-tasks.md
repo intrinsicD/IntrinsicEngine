@@ -30,7 +30,7 @@ The strict link check on the method-review session still fails on the two
 GEOM-020 references. It also reports stale retired-task paths in the methods,
 rendering, and runtime backlog README files (METHOD-056, GRAPHICS-148,
 RUNTIME-290). These files were unchanged by this session. The complete
-[strict output](../../evidence/BUG-225/2026-10-01-doc-links.log) is retained;
+[strict output](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-225/2026-10-01-doc-links.log) is retained;
 the default warning-mode exit is not a passing strict gate. No archive or
 checker policy was changed.
 
@@ -48,7 +48,7 @@ headings. The canonical contract and archive README state this narrow exception.
 Verification: 31 task-validator tests, 3 doc-link tests, 7 task-state-link tests,
 strict doc links, strict task policy and strict task-state links.
 The task-state regression initially had a
-[stale CI-script expectation](../../evidence/BUG-225/2026-10-01-stale-ci-policy-expectation.log);
+[stale CI-script expectation](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-225/2026-10-01-stale-ci-policy-expectation.log);
 it now requires the two already-enabled compiler-hazard/MCP regression scripts
 as well, preserving the exact-list check. No broken links are ignored.
 Implementation is verified in the working tree; retirement awaits a commit reference.
@@ -62,3 +62,32 @@ Implementation is verified in the working tree; retirement awaits a commit refer
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Resolution — 2026-10-24
+
+Retirement preparation only; no implementation change.
+
+- Implementation: `2688e7480` on `main`. `tools/agents/validate_tasks.py` and
+  `tests/regression/tooling/Test.ValidateTasks.py` are unchanged since. `ci-docs`
+  runs strict doc links, `Test.ValidateTasks.py` and `Test.CheckTaskStateLinks.py`.
+  It did not run on `main` between 2026-09-15 and 2026-10-08; its first green `main`
+  run after the commit is at `b4e0ca630` (2026-10-08). It is also green at `599f02ff1`.
+- Checked on 2026-10-24 at `599f02ff1`: `Test.ValidateTasks.py` passes 31 tests and
+  `Test.CheckTaskStateLinks.py` passes 7. Strict doc links report no broken links.
+  With only the validator restored to `2688e7480^` there are 6 failures, including
+  `test_archived_task_link_may_follow_retired_target`. Real-repository discovery
+  also fails, because the old validator rejects the repaired GEOM-020 archive file.
+- Durable record: the path-only exception in `docs/agent/contract.md` (and its
+  generated skill mirror), `tasks/archive/README.md` and `tools/agents/README.md`.
+  The executable safeguard is the archived-link tests in `Test.ValidateTasks.py`.
+  The facts from both logs are already in the text above: the five broken links
+  before the fix, and the exact-list expectation that lacked
+  `Test.CheckCompilerHazards.py` and `Test.McpBridge.py`. There is no reusable
+  lesson beyond the contract rule.
+- The evidence links above now use exact revision `599f02ff1`; those objects are
+  byte-identical to `2688e7480`. Prepared deletion: the 2 tracked files under
+  `tasks/evidence/BUG-225/`.
+- Remaining before retirement: an independent review of the implementation, the
+  summaries, the link repairs and the deletion list. No such review of BUG-225 is
+  recorded in this note. The 2026-10-01 author ticked the acceptance boxes. After
+  that review: delete, move, and update the indexes.

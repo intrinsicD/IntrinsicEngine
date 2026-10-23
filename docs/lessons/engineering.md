@@ -74,3 +74,19 @@ equals its function's count. The collector error now names the location and
 both causes, and the [collector notes](../../tools/ci/README.md) give the
 coding rule. [BUG-242](../../tasks/done/BUG-242-cpu-source-coverage-counter-invalid.md)
 records the diagnosis.
+
+## Attribute unknown-module leak frames before blaming a driver
+
+LeakSanitizer prints `<unknown module>` for code in a library that unloaded
+before exit; here the Vulkan loader had unloaded the ICD libraries. BUG-221's two
+256-byte "NVIDIA" shutdown leaks came from the unselected lavapipe and RADV
+ICDs: a dynamic-loader map trace placed the PCs inside `libvulkan_lvp.so` and
+`libvulkan_radeon.so`, and a 13-line instance/enumeration probe reproduced the
+512 bytes without engine code. Map unknown PCs to load ranges, reproduce with an
+engine-free probe, and select exactly one ICD before reading a leak report; the
+[shutdown runner](../../tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake)
+now rejects an ambiguous selection.
+Never add loader, ICD or unknown-module suppressions. Qualify on the driver's
+native display: the same build and NVIDIA ICD still failed on Xephyr while the
+native X11 run passed (BUG-229). A nested-display result is a separate WSI-path
+finding, not evidence for or against an engine leak.

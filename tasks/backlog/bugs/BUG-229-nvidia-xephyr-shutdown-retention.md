@@ -24,9 +24,9 @@ Xephyr `DISPLAY=:9` (6,128 bytes/20 allocations with the existing suppressions).
 The original unrelated 512 bytes from enumeration of unselected Mesa drivers
 are separately resolved by BUG-221's explicit ICD prerequisite.
 
-[NVIDIA-only nested-display failure](../../evidence/BUG-221/diagnosis-2026-10-01/nvidia-only.log),
-[native pass](../../evidence/BUG-221/diagnosis-2026-10-01/fixed-contract.log), and
-[diagnostic library-pinning stacks](../../evidence/BUG-221/diagnosis-2026-10-01/pinned-driver.log)
+[NVIDIA-only nested-display failure](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-221/diagnosis-2026-10-01/nvidia-only.log),
+[native pass](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-221/diagnosis-2026-10-01/fixed-contract.log), and
+[diagnostic library-pinning stacks](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-221/diagnosis-2026-10-01/pinned-driver.log)
 retain the evidence. The latter attributes the large allocations to
 `libnvidia-glcore.so.580.159.04` and the XCB path; library pinning is not the fix.
 No production teardown change or suppression was introduced. Do not substitute
@@ -44,9 +44,9 @@ version or all nested rendering. Native X11 remains the qualified shutdown
 path. The vendor leak still exists; no driver upgrade was performed or claimed
 as a fix. No production code, suppression, test label or failure condition changed.
 
-Independent [Vulkan/XCB](../../evidence/BUG-229/wsi-closefirst.c) and
-[Vulkan/Xlib](../../evidence/BUG-229/wsi-xlib-closefirst.c) probes contain no
-engine or GLFW code. The [reproduction script](../../evidence/BUG-229/reproduce.sh)
+Independent [Vulkan/XCB](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/wsi-closefirst.c) and
+[Vulkan/Xlib](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/wsi-xlib-closefirst.c) probes contain no
+engine or GLFW code. The [reproduction script](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/reproduce.sh)
 compiles these small diagnostic programs with Clang/ASan; it is not an engine
 preset build or substitute for the shutdown contract.
 
@@ -68,17 +68,17 @@ counts. The original Xlib cleanup order exposed an unloaded callback crash on
 the native display; the retained reproduction uses connection-close-first and
 keeps the original-order log as evidence rather than claiming that run passed.
 
-The [validation-enabled probe](../../evidence/BUG-229/validation.log) loads the
+The [validation-enabled probe](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/validation.log) loads the
 Khronos instance/device validation layers, completes, and reports no VUIDs.
 The Mesa control has the same known 256-byte enumeration leak at
-[stage 0](../../evidence/BUG-229/mesa-0.log) and
-[stage 3](../../evidence/BUG-229/mesa-3.log), with no additional WSI retention;
+[stage 0](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/mesa-0.log) and
+[stage 3](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/mesa-3.log), with no additional WSI retention;
 it is not represented as a wholly leak-free run.
 
-The [full native shutdown contract](../../evidence/BUG-229/native-contract.log)
+The [full native shutdown contract](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/native-contract.log)
 passes, including its synthetic 4,096-byte engine-leak negative control and
 unchanged four-entry suppressions. Xephyr's same contract remains an expected
-failure. [Claude Opus 5.5 medium's independent review](../../evidence/BUG-229/independent-review.txt)
+failure. [Claude Opus 5.5 medium's independent review](https://github.com/intrinsicD/IntrinsicEngine/blob/599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02/tasks/evidence/BUG-229/independent-review.txt)
 accepts the unsupported-combination resolution and identifies no safe missing
 engine correction; its validation/control suggestions were subsequently run.
 The remaining remedy is an upstream driver correction validated against this
@@ -100,3 +100,32 @@ DISPLAY=:9 VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json ctest --test-
 DISPLAY=:1 VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json ctest --test-dir build/ci-vulkan --output-on-failure -R '^ExtrinsicSandbox.VulkanShutdownLsanContract$' --timeout 180
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Resolution — 2026-10-24
+
+Retirement preparation only; no implementation change.
+
+- Implementation: `9395eb9e6` on `main`. It added the qualification boundary in
+  `tests/README.md` and `src/graphics/vulkan/README.md`. It changed no production
+  code, suppression or test gate. CI is the same as for BUG-221: the first green
+  `main` runs are `ci-docs` at `b4e0ca630` and `ci-linux-clang` at `1c79eacbb`
+  (both 2026-10-08), and both are green at `599f02ff1`.
+- Durable record: `tests/README.md` now records the exact versions and the
+  retention mechanism. It also gives a recipe that extracts the probes and
+  `reproduce.sh` from exact revision `599f02ff1` with `git archive`. Checked
+  mechanically on 2026-10-24: the archive has 27 files, its `lsan.supp` is identical
+  to the current file, `reproduce.sh` passes `bash -n`, and both closing-first probes
+  compile with `clang-23 -fsanitize=address`. The probes were not run. The lesson is
+  in `docs/lessons/engineering.md`.
+- After deletion, the `bash tasks/evidence/BUG-229/reproduce.sh` command in
+  Verification refers to the pre-retirement checkout; use the `tests/README.md`
+  recipe instead.
+- Limitation: the review's optional suggestion to loop swapchain create/destroy was
+  not run. The probes destroy one swapchain per process, so retention per window
+  resize is not quantified.
+- The evidence links above now use exact revision `599f02ff1`; those objects are
+  byte-identical to `9395eb9e6`. Prepared deletion: the 27 tracked files under
+  `tasks/evidence/BUG-229/`.
+- Remaining before retirement: an independent review of the summaries, the link
+  repairs and the deletion list against the raw evidence. After that review:
+  delete, move, and update the indexes.
