@@ -451,7 +451,8 @@ Reviews:
   findings. It explicitly decided no checkbox, because the operator had not chosen yet.
   Its wording finding is fixed in `26ed00a06`.
 - Independent Claude review of the merge `4c30f2b82..b4812f951` after the decision
-  (read-only, 2026-10-24): "VERDICT: approve (code at b4812f951)"; the merged patch has
+  (read-only, 2026-10-24; recorded only in the integrator's session as the hand-back of
+  reviewer agent `a091e5b1f9e81b290`, not under `_reviews/` or anywhere on disk): "VERDICT: approve (code at b4812f951)"; the merged patch has
   the same patch-id as `0d7b5b4d3..26ed00a06`; BUG-250's `HasResolvedTexcoords` gates are
   unaltered; no remaining setter or reader of any removed name in `src`, `tests`, `tools`,
   `benchmarks` or `methods`. Its item decisions: AC1 "partially met" (no needed path, no
