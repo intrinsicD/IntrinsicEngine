@@ -33,24 +33,24 @@ Current source already propagates producer/sealer failures and exits via
 the remaining defect is suffix-based output-root classification. The earlier
 zero-exit observation above is historical, not the current implementation.
 
-- [ ] Resolve the producer output root without using a directory name's suffix as a file/directory discriminator; validate the exact target before invoking the sealer.
-- [ ] Preserve the existing nonzero producer/sealer exit propagation while
+- [x] Resolve the producer output root without using a directory name's suffix as a file/directory discriminator; validate the exact target before invoking the sealer.
+- [x] Preserve the existing nonzero producer/sealer exit propagation while
       fixing root resolution; add explicit regression coverage for both stages.
-- [ ] Keep sealing confined to the exact requested root and refuse ambiguous/missing outputs without walking a parent such as `/tmp`.
+- [x] Keep sealing confined to the exact requested root and refuse ambiguous/missing outputs without walking a parent such as `/tmp`.
 
 ## Tests
-- [ ] Add `tests/regression/tooling/Test.BenchmarkRunAndSeal.py` (not yet
+- [x] Add `tests/regression/tooling/Test.BenchmarkRunAndSeal.py` (not yet
       present) covering dotted and non-dotted output directories, an explicit
       JSON output file if supported, producer failure, sealer failure, and
       proof that sibling JSON is untouched.
 
 ## Docs
-- [ ] Clarify accepted `--output` path forms in the benchmark workflow/help if both directory and explicit file forms remain supported.
+- [x] Clarify accepted `--output` path forms in the benchmark workflow/help if both directory and explicit file forms remain supported.
 
 ## Acceptance criteria
-- [ ] The captured dotted-directory repro seals only its producer results and returns zero only when production and sealing both succeed.
-- [ ] A forced sealer failure is nonzero, and no sibling or parent JSON is inspected or modified.
-- [ ] Benchmark tooling regressions and strict manifest/result validation pass.
+- [x] The captured dotted-directory repro seals only its producer results and returns zero only when production and sealing both succeed.
+- [x] A forced sealer failure is nonzero, and no sibling or parent JSON is inspected or modified.
+- [x] Benchmark tooling regressions and strict manifest/result validation pass.
 
 ## Verification
 
@@ -74,9 +74,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Root cause: `run_and_seal.py` chose
   `output if output.suffix == "" else output.parent`. A dotted directory such as
   `method037-bench.E4nKT7` has a suffix, so `seal_benchmark_results.py --replace`
-  walked the parent with `rglob("*.json")`. The producers already classify the
-  path by what exists (`is_directory || !has_extension`), so only the wrapper
-  disagreed. Exit propagation (sealer rc first, then producer rc) was already
+  walked the parent with `rglob("*.json")`. The smoke and GPU-smoke producers
+  already classify the path by what exists (`is_directory || !has_extension`),
+  so only the wrapper disagreed. `CoherentPointDriftScalingRunner` and
+  `PointSamplingComparisonRunner` check only `!has_extension` and are not run
+  through the wrapper today; given a dotted directory the wrapper still fails
+  closed. Exit propagation (sealer rc first, then producer rc) was already
   present and is unchanged.
 - Change: after the producer runs, the wrapper seals an existing directory
   exactly and an existing `.json` file's parent (explicit-file form used by
@@ -126,5 +129,19 @@ python3 tools/agents/check_task_policy.py --root . --strict
     directory form and drop it.
   - `tools/benchmark/*.py` has no touched-scope route to its regressions. This
     is unchanged and out of scope.
-  - An independent correctness review and a ponytail review are owed. Acceptance
-    boxes are left to the reviewers.
+- Review (round 1, reviewed `771f95368ad1c4bf8cdcf30630d1788a1d631666`,
+  implementation commit `771f95368`): the boxes under Required changes, Tests,
+  Docs and Acceptance criteria are ticked as both reviewers decided.
+  - Independent Claude review (correctness and ponytail): verdict approve;
+    every required change, the test, the docs item, all three acceptance
+    criteria and the forbidden-change check decided `met`.
+  - Independent Codex review (correctness and ponytail, thread
+    `01a16b29-7478-7280-bdcf-8c0e78f1830b`): `VERDICT: approve`; all three
+    acceptance criteria **Met**; "The required root validation, exit
+    propagation, regression coverage, and output-form documentation are
+    satisfied." It reran strict manifest validation (123 files) and strict
+    result validation of the retained dotted real-producer directory (41 files).
+  - Optional Claude findings: the producer-classification claim above was
+    narrowed after the review. Not adopted: the `run_and_seal.py` refusal hint
+    names the dotted-directory case for every refusal; this section was not
+    shortened; the `ara` heuristic H12 code-ref list omits the new test.
