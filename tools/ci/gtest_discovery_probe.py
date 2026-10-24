@@ -284,6 +284,9 @@ def cmd_ctest(args: argparse.Namespace) -> int:
 
 
 def ctest_once(args: argparse.Namespace, repetition: int, output, limit: float) -> bool:
+    # Wait for the regime first, so eviction and residency describe the moment of launch.
+    if wait_for_regime(args, limit, output) is None:
+        return False
     before_files = tests_files(args.tests_dir)
     resident = {}
     for target in args.force:
@@ -293,8 +296,8 @@ def ctest_once(args: argparse.Namespace, repetition: int, output, limit: float) 
         if args.evict:
             evict(exe)
         resident[target] = residency(exe)
-    before = wait_for_regime(args, limit, output)
-    if before is None or time.monotonic() >= limit:
+    before = telemetry()
+    if time.monotonic() >= limit:
         return False
     raw, status, timed_out, wall = _run_bounded(args.command, args.cap_seconds, stderr=subprocess.STDOUT)
     text = raw.decode(errors="replace")
@@ -381,12 +384,12 @@ def _identity_kills(samples: list[dict], real: list[dict], starts: list[dict],
 
 def _real_run_status(run: dict, args: argparse.Namespace, expected_total: int | None) -> str:
     """valid | timeout | invalid:<reason> | kill:<reason> for one forced-stale CTest run."""
-    # Failure kinds first, so a failure is never hidden behind a regime exclusion.
+    # Failure kinds first, so a failure is never hidden behind a regime exclusion. A discovery
+    # timeout is H1 evidence in any regime (see evaluate) but counts toward coverage only when
+    # the run qualifies.
     if run.get("timed_out"):
         return "kill:capped"
-    if run["discovery_timeout_seen"]:
-        return "timeout"
-    if run["exit_status"] != 0:
+    if run["exit_status"] != 0 and not run["discovery_timeout_seen"]:
         return "kill:failed without a discovery timeout"
     if run["arm"] == "idle" and not idle(run, args.idle_max_load):
         return "invalid:not-idle"
@@ -394,6 +397,8 @@ def _real_run_status(run: dict, args: argparse.Namespace, expected_total: int | 
         return "invalid:no-compile"
     if run.get("evicted") and any(v != 0 for v in run.get("residency_bytes", {}).values()):
         return "invalid:residency"
+    if run["discovery_timeout_seen"]:
+        return "timeout"
     if not set(run["forced"]) <= set(run["enumerated"]):
         return "kill:forced target not relisted"
     if run["total_tests"] is None or run["total_tests"] != expected_total:
@@ -454,7 +459,7 @@ def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]
     kills += [f"required arm invalid or not collected: {arm}" for arm in missing]
     valid_walls = [w for c in cells.values() for w in c["valid"]]
     m_obs = max(valid_walls) if valid_walls else None
-    real_timeouts = [r for r, s in zip(real, statuses) if s == "timeout"]
+    real_timeouts = [r for r in real if r["discovery_timeout_seen"] and not r.get("timed_out")]
     if real_timeouts and (m_obs is None or m_obs < CURRENT_BUDGET):
         kills.append("C-real discovery timeout not reproduced by any direct sample: diagnose")
     if (m_obs is not None and m_obs >= CURRENT_BUDGET) or real_timeouts:

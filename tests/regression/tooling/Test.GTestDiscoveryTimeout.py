@@ -472,6 +472,17 @@ class DecisionRuleTests(unittest.TestCase):
         busy_real[-1]["exit_status"] = 8  # a failure is never hidden behind a regime exclusion
         self.assertTrue(any("without a discovery timeout" in kill
                             for kill in self.decide(busy_real)["kill_conditions"]))
+        # Off-regime timeouts are H1 evidence but do not count toward C-real coverage.
+        off_regime = self.records(wall=0.1, wall_seconds=6.0)
+        idle_runs = [row for row in off_regime if row["event"] == "ctest" and row["arm"] == "idle"]
+        for row in idle_runs[:6]:
+            row.update(processes={"compile": 2}, exit_status=8, discovery_timeout_seen=True,
+                       enumerated=[], removed=[self.TARGETS[0]], total_tests=None)
+        verdict = self.decide(off_regime)
+        self.assertEqual(verdict["arms"]["idle"]["ctest_runs"], {"invalid:not-idle": 6, "valid": 14})
+        self.assertFalse(verdict["arms"]["idle"]["valid"])
+        self.assertEqual(verdict["h1"], "supported")
+        self.assertIsNone(verdict["chosen_budget_seconds"])
         unstamped = self.records()
         del unstamped[0]["executable_mtime_ns"]
         self.assertTrue(any("executable changed" in kill for kill in self.decide(unstamped)["kill_conditions"]))
