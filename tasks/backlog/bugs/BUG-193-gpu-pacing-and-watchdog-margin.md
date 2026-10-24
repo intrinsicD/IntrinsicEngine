@@ -218,11 +218,18 @@ BUG-228; same host and states).
   timed out at 1-minute load of about 12 and passed alone in 28.52 s.
 
 ### Evidence status — 2026-10-24
-- Verification runs against pass/fail predictions committed beforehand
-  (25550e64e) or appended to `predictions.txt` before the run: W1, W2 and S1 (the dirty-scan timing).
-- A number that informed a choice: the 20 s keypoint stall bound was chosen
-  after the 25 s trial fired at 28.66 s, 1.3 s before the CTest kill. No run
-  exercised the final 20 s bound firing.
+Predictions for S1, W1 and W2 were committed beforehand (25550e64e); the
+other runs listed had none. That
+does not make them verification: a run whose numbers informed a keep or
+change choice is decision-bearing.
+- Decision-bearing:
+  - S1, the dirty-scan timing (median 67.6 ms). It decided whether to change
+    the dirty scan.
+  - BUG-228's fix-condition runs and 25 s watchdog trial (listed there).
+- Verification only (no other use of the numbers): W1 (WLOP 261.75 s, monitor
+  off, FIFO), W2 (WLOP 6.41 s after the fix), the monitor-off
+  `LocalDistanceRatio` and surface-appearance runs, the Sandbox monitor-on
+  `render_prepare` after the fix, and the CPU gate.
 - No experiment pre-flight was run: no frozen packet, no prospective review
-  and no HTML report exists for these runs. The operator's disposition of
-  this gap is pending.
+  and no HTML report exists for these runs. The operator's pending
+  disposition covers every decision-bearing measurement listed above.

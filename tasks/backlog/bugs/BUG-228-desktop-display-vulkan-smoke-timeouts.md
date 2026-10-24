@@ -260,11 +260,22 @@ running at any run boundary, RTX 4090, NVIDIA 580.159.04. Logs and states:
   the next commit. No Codex review was run.
 
 ### Evidence status — 2026-10-24
-- Verification runs against pass/fail predictions committed beforehand
-  (25550e64e) or appended to `predictions.txt` before the run: D1–D3 and the fix condition, the 23-case cohort on and off, and the fix-condition Sandbox runs.
-- A number that informed a choice: the 20 s keypoint stall bound was chosen
-  after the 25 s trial fired at 28.66 s, 1.3 s before the CTest kill. No run
-  exercised the final 20 s bound firing.
+Predictions for D1–D3, the fix condition and the cohort were committed
+beforehand (25550e64e) or appended to `predictions.txt` before the run; the
+25 s trial and the `gpu` label run had none. That does not make them
+verification: a run whose numbers informed a keep or change choice is
+decision-bearing.
+- Decision-bearing:
+  - D1–D3 (monitor-off keypoint timeout, Xephyr pass, Sandbox present 918 ms):
+    they located the wait and led to the choice to change the present mode.
+  - The fix-condition runs: the keypoint case with the monitor off after the
+    fix (3.74 s), Sandbox `enable_vsync: false` with the monitor off (median
+    present + begin 0.17 ms) and the FIFO control (991.6 ms present). They
+    decided whether the present-mode fix was kept.
+  - The 25 s watchdog trial, which fired at 28.66 s, 1.3 s before the CTest
+    kill. It set the final 20 s bound. No run exercised the 20 s bound firing.
+- Verification only (no other use of the numbers): the 23-case cohort with the
+  monitor on and off, and the whole `gpu` label run.
 - No experiment pre-flight was run: no frozen packet, no prospective review
-  and no HTML report exists for these runs. The operator's disposition of
-  this gap is pending.
+  and no HTML report exists for these runs. The operator's pending
+  disposition covers every decision-bearing measurement listed above.
