@@ -1036,7 +1036,9 @@ struct AcceptanceBootstrap
 }
 
 // Reproduce the actual `src/app/Sandbox/main.cpp` config path: keep
-// `CreateReferenceEngineConfig()` defaults, including validation and VSync.
+// `CreateReferenceEngineConfig()` defaults, including validation, except VSync.
+// VSync is off like every gpu;vulkan fixture (BUG-228): FIFO presents wait
+// about 1 s per frame while the monitor is off.
 // `probe` is an optional test module that needs its own frame hooks; modules
 // can only be added before Initialize().
 [[nodiscard]] AcceptanceBootstrap
@@ -1059,6 +1061,7 @@ BootstrapDefaultSandboxAppEngineWithApp(std::unique_ptr<Intrinsic::Tests::Runtim
     auto config =
         Extrinsic::Runtime::CreateReferenceEngineConfig(
             configControl->SectionRegistry());
+    config.Render.EnableVSync = false;
     auto enginePtr = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
         config, std::make_unique<SandboxCompositionApp>(std::move(app)));
     enginePtr->AddModule(std::move(configControl));

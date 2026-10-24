@@ -493,8 +493,10 @@ namespace
         }
         void Frame(double,double) override
         {
-            if (std::chrono::steady_clock::now()-Started>std::chrono::seconds(40))
-            { TimedOut=true; Kernel().RequestExit();return; }
+            // Below the registered 30 s CTest TIMEOUT, so a stall fails with its round and frame.
+            if (std::chrono::steady_clock::now()-Started>std::chrono::seconds(20))
+            { ADD_FAILURE()<<"Framed batch timeout after 20 s round="<<Round<<" frame="<<Kernel().GetLastFramePacingDiagnostics().FrameIndex;
+              TimedOut=true; Kernel().RequestExit();return; }
             if (!Kernel().GetDevice().IsOperational())
             {
                 if (RadiusMode && ++ColdFrames > 4) { TimedOut=true;Kernel().RequestExit(); }
@@ -1956,8 +1958,9 @@ namespace
         }
         void Frame(double,double) override
         {
-            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(50))
-            {ADD_FAILURE()<<"Keypoint timeout: phase="<<Phase<<" results="<<Results.size();TimedOut=true;Kernel().RequestExit();return;}
+            // Below the 30 s CTest TIMEOUT of ...IgnoresHybridCapacity (absent from the 120 s fixup), so a stall fails with its phase and frame.
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(20))
+            {ADD_FAILURE()<<"Keypoint timeout after 20 s phase="<<Phase<<" results="<<Results.size()<<" frame="<<Kernel().GetLastFramePacingDiagnostics().FrameIndex;TimedOut=true;Kernel().RequestExit();return;}
             if(!Kernel().GetDevice().IsOperational())
             {if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}return;}
             if(Submitted)

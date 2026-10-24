@@ -109,9 +109,11 @@ The default CPU gate must stay green alongside
 - Record window size, framebuffer size and pixel ratio. A run at ratio 1 is no
   HiDPI evidence, and a forced `DisplayFramebufferScale` is none either; limit
   the claim to the measured ratio (`UI-079` owns the gizmo's HiDPI run).
-- Present-bound and focus smokes need an unlocked session with the monitor on
-  (DPMS off blocks presents ~1 s per frame; a locked GNOME session refuses
-  programmatic focus). Record the session state with the run.
+- `gpu;vulkan` fixtures set `Render.EnableVSync=false` (BUG-228). Only a fixture
+  that keeps VSync on (FIFO) needs the monitor on: with DPMS off each FIFO
+  present waits about 1 s. Focus smokes need an unlocked session (a locked
+  GNOME session refuses programmatic focus). Record the session state with
+  the run.
 - Never relax, skip, or delete a readback assertion to make a gate pass; that
   is a forbidden change in every bug task that owns one (`BUG-016`,
   `BUG-024B`). A flaky smoke gets a diagnosis (`intrinsicengine-diagnose`) or
