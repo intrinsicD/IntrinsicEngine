@@ -278,6 +278,11 @@ class ProbeSelfTests(unittest.TestCase):
             stopped = self.probe("ctest", "--tests-dir", str(project.build), "--cap-seconds", "1",
                                  "--max-minutes", "0.01", "--", "ctest", "--test-dir", str(project.build), "-N")
             self.assertEqual(stopped[-1], {"event": "stop", "reason": "deadline"})
+            never_idle = self.probe("ctest", "--tests-dir", str(project.build), "--cap-seconds", "1",
+                                    "--max-minutes", "0.1", "--wait-idle", "--idle-max-load", "0",
+                                    "--poll-seconds", "1", "--", "ctest", "--test-dir", str(project.build), "-N")
+            self.assertEqual({record["event"] for record in never_idle}, {"start", "wait_idle", "stop"})
+            self.assertEqual(never_idle[-1], {"event": "stop", "reason": "deadline"})
 
     def test_process_classifier_ignores_command_lines_that_mention_clang(self) -> None:
         sys.path.insert(0, str(PROBE.parent))
@@ -331,7 +336,8 @@ class DecisionRuleTests(unittest.TestCase):
                                      "exit_status": 0, "timed_out": False, "listing_sha256": target,
                                      "listed_cases": 10, "json_written": True, "load": load,
                                      "processes": processes, "wall_clock": float(len(rows)),
-                                     "mtime_ns": {target: 1, f"{target}[1]_include.cmake": 1 + repetition}})
+                                     "mtime_ns": {f"{target}[1]_include.cmake": 1 + repetition},
+                                     "executable_mtime_ns": 1})
         rows[-1].update(override)
         for arm, (load, processes) in self.REGIMES.items():
             rows += [{"event": "ctest", "arm": arm, "repetition": repetition, "exit_status": 0,
@@ -346,6 +352,10 @@ class DecisionRuleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-decide-") as directory:
             path = Path(directory) / "samples.jsonl"
             path.write_text("".join(json.dumps(record) + "\n" for record in records))
+            baseline = Path(directory) / "baseline.jsonl"
+            baseline.write_text("".join(json.dumps({"event": "sample", "target": target, "listing_sha256": target})
+                                        + "\n" for target in self.TARGETS))
+            gates = ("--baseline", str(baseline), *gates)
             html = Path(directory) / "report.html"
             result = subprocess.run([sys.executable, str(PROBE), "decide", str(path), *gates, *extra], text=True,
                                     capture_output=True, timeout=120)
@@ -396,7 +406,7 @@ class DecisionRuleTests(unittest.TestCase):
     def test_identity_and_real_path_failures_block_rejection(self) -> None:
         pooled = self.records()
         pooled.append(dict(pooled[0]))
-        relinked = self.records(mtime_ns={"IntrinsicRuntimeContractTests": 2})
+        relinked = self.records(executable_mtime_ns=2)
         rehashed = self.records(listing_sha256="other")
         empty = self.records(listed_cases=0)
         failed_real = self.records()
@@ -459,6 +469,12 @@ class DecisionRuleTests(unittest.TestCase):
         verdict = self.decide(busy_real)
         self.assertEqual(verdict["arms"]["idle"]["ctest_runs"], {"invalid:not-idle": 20})
         self.assertFalse(verdict["arms"]["idle"]["valid"])
+        busy_real[-1]["exit_status"] = 8  # a failure is never hidden behind a regime exclusion
+        self.assertTrue(any("without a discovery timeout" in kill
+                            for kill in self.decide(busy_real)["kill_conditions"]))
+        unstamped = self.records()
+        del unstamped[0]["executable_mtime_ns"]
+        self.assertTrue(any("executable changed" in kill for kill in self.decide(unstamped)["kill_conditions"]))
 
 
 def reconcile(build_dir: Path) -> str:

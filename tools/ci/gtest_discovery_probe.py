@@ -226,17 +226,9 @@ def cmd_direct(args: argparse.Namespace) -> int:
         for target in args.target[shift:] + args.target[:shift]:
             exe = Path(fields[target]["TEST_EXECUTABLE"])
             for condition in ("cold", "warm"):
-                while True:
-                    if time.monotonic() >= limit:
-                        stop = "deadline"
-                        break
-                    before = telemetry()
-                    if not args.wait_idle or idle(before, args.idle_max_load):
-                        break
-                    emit({"event": "wait_idle", "load": before["load"],
-                          "processes": before["processes"]}, output)
-                    time.sleep(min(args.poll_seconds, max(0.0, limit - time.monotonic())))
-                if stop != "completed":
+                before = wait_for_regime(args, limit, output)
+                if before is None:
+                    stop = "deadline"
                     break
                 if condition == "cold":
                     evict(exe)
@@ -249,6 +241,7 @@ def cmd_direct(args: argparse.Namespace) -> int:
                 emit({"event": "sample", "arm": args.arm, "repetition": repetition, "target": target,
                       "condition": condition, "residency_bytes": resident, **result, **before,
                       "mtime_ns": mtimes(exe, includes[target], ctest_file),
+                      "executable_mtime_ns": exe.stat().st_mtime_ns,
                       "wall_clock": time.time()}, output)
             if stop != "completed":
                 break
@@ -260,6 +253,17 @@ def cmd_direct(args: argparse.Namespace) -> int:
 
 def tests_files(tests_dir: Path) -> dict[str, int]:
     return {path.name.split("[", 1)[0]: path.stat().st_mtime_ns for path in tests_dir.glob("*_tests.cmake")}
+
+
+def wait_for_regime(args: argparse.Namespace, limit: float, output) -> dict | None:
+    """Telemetry once the regime holds (always with --wait-idle off); None at the deadline."""
+    while time.monotonic() < limit:
+        before = telemetry()
+        if not args.wait_idle or idle(before, args.idle_max_load):
+            return before
+        emit({"event": "wait_idle", "load": before["load"], "processes": before["processes"]}, output)
+        time.sleep(min(args.poll_seconds, max(0.0, limit - time.monotonic())))
+    return None
 
 
 def cmd_ctest(args: argparse.Namespace) -> int:
@@ -289,8 +293,8 @@ def ctest_once(args: argparse.Namespace, repetition: int, output, limit: float) 
         if args.evict:
             evict(exe)
         resident[target] = residency(exe)
-    before = telemetry()
-    if time.monotonic() >= limit:
+    before = wait_for_regime(args, limit, output)
+    if before is None or time.monotonic() >= limit:
         return False
     raw, status, timed_out, wall = _run_bounded(args.command, args.cap_seconds, stderr=subprocess.STDOUT)
     text = raw.decode(errors="replace")
@@ -361,13 +365,14 @@ def _identity_kills(samples: list[dict], real: list[dict], starts: list[dict],
         hashes = {s["listing_sha256"] for s in own}
         if len(hashes) != 1:
             kills.append(f"listing hash changed for {target}")
-        elif baseline and hashes != {baseline.get(target)}:
+        elif hashes != {baseline.get(target)}:
             kills.append(f"listing differs from the validated baseline: {target}")
         if not all(s["listed_cases"] > 0 for s in own):
             kills.append(f"empty listing: {target}")
         # Include mtimes change by design when C-real forces rediscovery; content is
         # compared through the start records' include hashes instead.
-        if len({s["mtime_ns"].get(target) for s in own}) != 1:
+        if len({s.get("executable_mtime_ns") for s in own} - {None}) != 1 or any(
+                "executable_mtime_ns" not in s for s in own):
             kills.append(f"executable changed during the run: {target}")
         if len({r["include_sha256"][target] for r in starts if target in r.get("include_sha256", {})}) > 1:
             kills.append(f"include content differs between starts: {target}")
@@ -376,18 +381,19 @@ def _identity_kills(samples: list[dict], real: list[dict], starts: list[dict],
 
 def _real_run_status(run: dict, args: argparse.Namespace, expected_total: int | None) -> str:
     """valid | timeout | invalid:<reason> | kill:<reason> for one forced-stale CTest run."""
+    # Failure kinds first, so a failure is never hidden behind a regime exclusion.
     if run.get("timed_out"):
         return "kill:capped"
+    if run["discovery_timeout_seen"]:
+        return "timeout"
+    if run["exit_status"] != 0:
+        return "kill:failed without a discovery timeout"
     if run["arm"] == "idle" and not idle(run, args.idle_max_load):
         return "invalid:not-idle"
     if run["arm"] == "contention" and run["processes"]["compile"] == 0:
         return "invalid:no-compile"
     if run.get("evicted") and any(v != 0 for v in run.get("residency_bytes", {}).values()):
         return "invalid:residency"
-    if run["discovery_timeout_seen"]:
-        return "timeout"
-    if run["exit_status"] != 0:
-        return "kill:failed without a discovery timeout"
     if not set(run["forced"]) <= set(run["enumerated"]):
         return "kill:forced target not relisted"
     if run["total_tests"] is None or run["total_tests"] != expected_total:
@@ -399,8 +405,8 @@ def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]
     samples = [r for r in records if r.get("event") == "sample"]
     real = [r for r in records if r.get("event") == "ctest"]
     starts = [r for r in records if r.get("event") == "start"]
-    baseline = ({r["target"]: r["listing_sha256"] for r in load_records([args.baseline])
-                 if r.get("event") == "sample"} if args.baseline else {})
+    baseline = {r["target"]: r["listing_sha256"] for r in load_records([args.baseline])
+                if r.get("event") == "sample"}
     kills = _identity_kills(samples, real, starts, baseline)
     hash_ok = not any("listing" in kill for kill in kills)
     cells: dict[str, dict] = {}
@@ -633,14 +639,14 @@ def main(argv: list[str] | None = None) -> int:
         mode.add_argument("--output", type=Path, help="append JSON lines here as well as stdout")
         mode.add_argument("--cap-seconds", type=float, default=120.0)
         mode.add_argument("--repetitions", type=int, default=1)
+        mode.add_argument("--wait-idle", action="store_true")
+        mode.add_argument("--idle-max-load", type=float, default=2.0)
+        mode.add_argument("--poll-seconds", type=float, default=120.0)
         mode.add_argument("--max-minutes", type=float, default=35.0)
         mode.add_argument("--deadline", help="ISO time with offset; no sample starts unless it can end before it")
         mode.add_argument("--pace-seconds", type=float, default=0.0, help="minimum spacing of repetitions")
     direct = sub.choices["direct"]
     direct.add_argument("--target", action="append", required=True)
-    direct.add_argument("--wait-idle", action="store_true")
-    direct.add_argument("--idle-max-load", type=float, default=2.0)
-    direct.add_argument("--poll-seconds", type=float, default=120.0)
     ctest = sub.choices["ctest"]
     ctest.add_argument("--force", action="append", default=[], help="target whose include is touched")
     ctest.add_argument("--evict", action="store_true", help="evict forced executables from page cache")
@@ -654,7 +660,8 @@ def main(argv: list[str] | None = None) -> int:
         mode.add_argument("--contention-min-load", type=float, default=4.0)
         mode.add_argument("--min-ctest-runs", type=int, default=20)
         mode.add_argument("--expected-ctest-total", type=int, help="selected-test count of a valid C-real run")
-        mode.add_argument("--baseline", type=Path, help="validated direct run whose listing hashes bind identity")
+        mode.add_argument("--baseline", type=Path, required=True,
+                          help="validated direct run whose listing hashes bind identity")
         mode.add_argument("--post-arm-gates", nargs="*", default=[], metavar="ARM=pass|fail")
         mode.add_argument("--idle-max-load", type=float, default=2.0)
     sub.choices["report"].add_argument("--html", type=Path, required=True)
