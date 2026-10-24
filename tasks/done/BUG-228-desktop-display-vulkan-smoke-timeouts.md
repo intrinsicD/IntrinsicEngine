@@ -378,5 +378,9 @@ Completed 2026-10-24. Commit: `25550e64e`, `3d39d1737`, `d626b8b51`, `535f2e5eb`
   exercised a 20 s stall bound firing. The LeakSanitizer reports from direct
   `ExtrinsicSandbox` runs belong to BUG-180. The stale `...RejectsStaleCancellationAndOverflow`
   name in the 120 s fixup is unchanged.
+- Follow-up 2026-10-24 (operator: "Ja bitte korrigiere ihn"): the fixup now names
+  `KeypointVulkanComputeRejectsStaleCancellationAndIgnoresHybridCapacity`, so that case gets
+  the intended 120 s TIMEOUT instead of the default 30 s (`ctest --show-only=json-v1` on
+  `build/ci`: 120). Every other literal name in the fixups is registered.
 - Raw logs stay git-ignored under `tasks/evidence/BUG-228/` in the `gpu` lane worktree;
   nothing was deleted.
