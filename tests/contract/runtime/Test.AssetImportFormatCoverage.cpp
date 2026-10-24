@@ -33,6 +33,7 @@
 
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Asset.ImportRouter;
@@ -45,6 +46,7 @@ import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
@@ -731,6 +733,25 @@ namespace
             "f 3 8 7\n"
             "f 4 1 5\n"
             "f 4 5 8\n";
+    }
+
+    // A quad split into two triangles; vertex 1 carries (0,0) in the first
+    // triangle and (0.5,0.5) in the second — a seam a per-vertex channel
+    // cannot express.
+    [[nodiscard]] std::string AuthoredCornerSeamQuadObjText()
+    {
+        return
+            "v 0 0 0\n"
+            "v 1 0 0\n"
+            "v 1 1 0\n"
+            "v 0 1 0\n"
+            "vt 0 0\n"
+            "vt 1 0\n"
+            "vt 1 1\n"
+            "vt 0 1\n"
+            "vt 0.5 0.5\n"
+            "f 1/1 2/2 3/3\n"
+            "f 1/5 3/3 4/4\n";
     }
 
     struct MeshTopologyCounts
@@ -1813,22 +1834,9 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportOfSculptFixturePreservesIt
 // not re-parameterize the file either.
 TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesAuthoredCornerUvs)
 {
-    // A quad split into two triangles; vertex 1 carries (0,0) in the first
-    // triangle and (0.5,0.5) in the second — a seam a per-vertex channel
-    // cannot express.
     TempAssetFile meshFile(
         "bug137_authored_corner_uvs.obj",
-        "v 0 0 0\n"
-        "v 1 0 0\n"
-        "v 1 1 0\n"
-        "v 0 1 0\n"
-        "vt 0 0\n"
-        "vt 1 0\n"
-        "vt 1 1\n"
-        "vt 0 1\n"
-        "vt 0.5 0.5\n"
-        "f 1/1 2/2 3/3\n"
-        "f 1/5 3/3 4/4\n");
+        AuthoredCornerSeamQuadObjText());
 
     std::optional<ECS::EntityHandle> meshEntity{};
     ComposedNormalBakeProbe bakeProbe{};
@@ -2165,6 +2173,138 @@ TEST(RuntimeAssetImportFormatCoverage, RejectedAtlasDoesNotDiscardModelScene)
     EXPECT_EQ(ReadMeshTopologyCounts(scene, *entity).Faces, 2u);
     EXPECT_TRUE((scene.Raw().all_of<G::RenderSurface, Sel::SelectableTag>(*entity)));
     EXPECT_FALSE(MeshHasVertexProperty(engine, *entity, "v:texcoord"));
+    engine.Shutdown();
+}
+
+// BUG-250 — the direct model-scene bake gate must follow the resolved UV
+// authority. A UV seam leaves `h:texcoord` as the only UV channel, so a gate on
+// `v:texcoord` skipped both automatic bakes for seam-carrying primitives. The
+// payload is built by hand because glTF import carries no COLOR_0, which the
+// albedo bake needs.
+TEST(RuntimeAssetImportFormatCoverage, ModelSceneSeamAtlasRequestsGeneratedTextureBakes)
+{
+    constexpr std::string_view modelPath = "/virtual/bug250_seam_bake.gltf";
+    Assets::AssetModelScenePayload model{};
+    model.SourcePath = std::string{modelPath};
+    model.Materials.push_back(Assets::AssetModelMaterialPayload{.Name = "untextured"});
+    model.RootNodeIndices.push_back(0u);
+    model.Nodes.push_back(Assets::AssetModelNodePayload{.Name = "bug250-root"});
+    const auto addPrimitive = [&model](const std::string& name,
+                                       const std::string& objText,
+                                       const std::vector<glm::vec2>& vertexUvs = {})
+    {
+        TempAssetFile file("bug250_" + name + ".obj", objText);
+        auto mesh = Geometry::MeshIO::LoadOBJ(file.Path.string());
+        ASSERT_TRUE(mesh.has_value()) << name;
+        (void)mesh->Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f});
+        if (!vertexUvs.empty())
+        {
+            auto texcoords = mesh->Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{0.0f});
+            texcoords.Vector() = vertexUvs;
+        }
+        model.Nodes[0].PrimitiveIndices.push_back(
+            static_cast<std::uint32_t>(model.Primitives.size()));
+        model.Primitives.push_back(Assets::AssetModelPrimitivePayload{
+            .Name = name,
+            .GeometryKind = Assets::AssetPayloadKind::Mesh,
+            .GeometryPayloadIndex = static_cast<std::uint32_t>(model.GeometryPayloads.size()),
+            .MaterialIndex = 0u,
+            .VertexCount = static_cast<std::uint32_t>(mesh->Vertices.Size()),
+        });
+        model.GeometryPayloads.push_back(Assets::AssetGeometryPayload::Make(
+            Assets::AssetPayloadKind::Mesh,
+            std::move(*mesh),
+            "Geometry::MeshIO::MeshIOResult"));
+    };
+    addPrimitive("seam-atlas", ClosedCubeObjText());
+    addPrimitive("vertex-uv", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n",
+                 {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}});
+    addPrimitive("no-uv",
+        "v 0 0 0\nv 1000 0 0\nv 0 1000 0\nv 2000 0 0\nv 2000.1 0 0\nv 2000 0.1 0\nf 1 2 3\nf 4 5 6\n");
+    addPrimitive("authored-corner-seam", AuthoredCornerSeamQuadObjText());
+    ASSERT_EQ(model.Primitives.size(), 4u);
+
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+    ASSERT_NE(bakeProbe.Service, nullptr);
+
+    auto& assets = RequiredEngineService<Assets::AssetService>(engine);
+    const auto loaded = assets.Load<Assets::AssetModelScenePayload>(
+        modelPath,
+        [&model](std::string_view, Assets::AssetId)
+            -> Core::Expected<Assets::AssetModelScenePayload>
+        {
+            return std::move(model);
+        });
+    ASSERT_TRUE(loaded.has_value());
+    ASSERT_TRUE(assets.CompleteCpuLoadAndFlushEvent(*loaded).has_value());
+
+    // Entities carry their primitive's name.
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto entityNamed = [&scene](const std::string_view name)
+    {
+        std::optional<ECS::EntityHandle> found{};
+        scene.Raw().view<const ECS::Components::MetaData>().each(
+            [&](const ECS::EntityHandle entity, const ECS::Components::MetaData& meta)
+            {
+                if (meta.EntityName == name)
+                    found = entity;
+            });
+        return found;
+    };
+    const auto seamAtlas = entityNamed("seam-atlas");
+    const auto vertexUv = entityNamed("vertex-uv");
+    const auto noUv = entityNamed("no-uv");
+    const auto authoredSeam = entityNamed("authored-corner-seam");
+    ASSERT_TRUE(seamAtlas && vertexUv && noUv && authoredSeam);
+
+    // Fixture preconditions: each primitive reaches the UV domain it stands for.
+    for (const ECS::EntityHandle entity : {*seamAtlas, *vertexUv, *noUv, *authoredSeam})
+    {
+        ASSERT_TRUE(MeshHasVertexProperty(engine, entity, "v:normal"));
+        ASSERT_TRUE(MeshHasVertexProperty(engine, entity, "v:color"));
+    }
+    ASSERT_TRUE(MeshHasCornerTexcoordSeam(scene, *seamAtlas));
+    ASSERT_FALSE(MeshHasVertexProperty(engine, *seamAtlas, "v:texcoord"));
+    ASSERT_TRUE(MeshHasVertexProperty(engine, *vertexUv, "v:texcoord"));
+    ASSERT_FALSE(MeshHasVertexProperty(engine, *noUv, "v:texcoord"));
+    ASSERT_FALSE(MeshHasHalfedgeProperty(engine, *noUv, "h:texcoord"));
+    ASSERT_TRUE(MeshHasCornerTexcoordSeam(scene, *authoredSeam));
+    ASSERT_FALSE(MeshHasVertexProperty(engine, *authoredSeam, "v:texcoord"));
+
+    const auto slotDiagnostic =
+        [&scene](const ECS::EntityHandle entity,
+                 const Runtime::GeometryPresentationSlotSemantic semantic)
+    {
+        const auto* state =
+            scene.Raw().try_get<Runtime::GeometryPresentationRuntimeState>(entity);
+        const auto* status = state != nullptr
+            ? Runtime::FindGeometryPresentationSlotStatus(*state, "mesh.surface", semantic)
+            : nullptr;
+        return status != nullptr ? status->Diagnostic : std::string{"<no slot status>"};
+    };
+    // Headless: the bake service rejects each request it receives.
+    constexpr std::string_view requested =
+        "texture-bake GPU service is non-operational; no CPU fallback is available";
+    for (const auto& [name, entity] : {std::pair{"seam-atlas", *seamAtlas},
+                                       std::pair{"vertex-uv", *vertexUv},
+                                       std::pair{"authored-corner-seam", *authoredSeam}})
+    {
+        SCOPED_TRACE(name);
+        EXPECT_EQ(slotDiagnostic(entity, Runtime::GeometryPresentationSlotSemantic::Normal),
+                  requested);
+        EXPECT_EQ(slotDiagnostic(entity, Runtime::GeometryPresentationSlotSemantic::Albedo),
+                  requested);
+    }
+    EXPECT_EQ(slotDiagnostic(*noUv, Runtime::GeometryPresentationSlotSemantic::Normal),
+              "waiting for resolved UVs and vertex normals before property texture bake request");
+    EXPECT_EQ(slotDiagnostic(*noUv, Runtime::GeometryPresentationSlotSemantic::Albedo),
+              "waiting for generated UV atlas before vertex color albedo bake");
+    // A normal and an albedo request per primitive with resolved UVs; none without.
+    EXPECT_EQ(bakeProbe.Service->Stats().BakeRequests, 6u);
     engine.Shutdown();
 }
 
