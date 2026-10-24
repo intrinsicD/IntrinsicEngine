@@ -49,11 +49,17 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Diagnosis — 2026-10-24
 
-### Predictions (written before the first run)
+### Predictions
+H1 and H2 are not in `predictions.txt`. They are recorded only in this note,
+which was first committed at 02:05 (16dd3b5ef), after the runs (01:47–02:03),
+so the artifacts cannot show that they preceded the runs. The backtest,
+iconify, offscreen, cohort, Sandbox and resident LOP predictions are in
+`predictions.txt`, which says each was appended before its run.
 Source: `origin/main` 599f02ff1, fresh `ci-vulkan` tree, RTX 4090 with NVIDIA
-580.159.04 ICD selected. At 01:46 `DISPLAY=:1` was GNOME/Xorg with two 4K
-60 Hz outputs, DPMS enabled with `Monitor is On`, and the session locked
-(`LockedHint=yes`). The GPU was in P8.
+580.159.04 ICD selected. At 01:46 `DISPLAY=:1` was the operator's X desktop,
+DPMS enabled with `Monitor is On`, and at 01:47 the session was locked
+(`LockedHint=yes`). `predictions.txt` gives the desktop as 10240x2880; output
+modes and refresh rates were not recorded. The GPU was in P8.
 Code reading before the runs: `Render.EnableVSync=false` reaches no device.
 Nothing calls `IDevice::SetPresentMode`, so `VulkanDevice` keeps
 `PresentMode::VSync`, and `ToVkPresentMode` returns `VK_PRESENT_MODE_FIFO_KHR`.
@@ -76,8 +82,12 @@ and in the swapchain acquire inside `BeginFrame`.
 
 ### Results
 Raw logs, the probe diff and the display states are in
-`tasks/evidence/BUG-228/2026-10-24/` (ignored by git). Host during the runs:
-1-minute load 0.6–2.4, no compiler running.
+`tasks/evidence/BUG-228/2026-10-24/` (ignored by git). Host at run starts:
+1-minute load 0.64–4.24 (`state-*.txt`; 4.24 at the `:9` cohort, 4.10 and 4.01
+at the Sandbox runs). Compiler processes were not recorded. This lane's own
+incremental builds (`build-probe*.log` 01:49–01:54, `build-bug182.log` 01:56,
+about 28 s each) ran between runs; by file times none overlapped a run. Other
+lanes' compiles were not recorded.
 - Task commands, clean binary: `:1` passed in 10.79 s and `:9` in 10.11 s. The
   display dependence did not reproduce in this state (`Monitor is On`, session
   locked). The H1 prediction for `:1` (more than 30 s) failed. This matches the
@@ -92,6 +102,9 @@ Raw logs, the probe diff and the display states are in
   (13 ms in total on `:1`, 32 ms on `:9`), acquire about 20 µs and the fence wait about 13 µs.
   The case's wall time is therefore its fixed frame count multiplied by the
   frame time. Its progress is paced by frames, not by elapsed time.
+- H2 is moot in this state. Its observable (same frame count on both
+  displays, wall time outside present/acquire) is what these monitor-on runs
+  show, but neither display was slow, so there was no slow run to attribute.
 - Backtest against 2026-10-01: the degenerate sibling
   `KeypointResident4096IdenticalPointsRetainsDevice` runs 8 operational frames
   and passes in 3.90 s now; its frame loop takes 0.95 s. With 8 frames at about
@@ -117,8 +130,13 @@ Raw logs, the probe diff and the display states are in
   about 900 ms of present plus about 100 ms of acquire per frame with
   `Monitor is Off`. The probe shows both take well under 1 ms while the
   monitor is on.
-- Xephyr has no DPMS extension, so the host display's power state cannot
-  throttle it. It copies each presented frame instead. `ExtrinsicSandbox
+- Untested expectation: Xephyr's presentation does not depend on the host
+  monitors' DPMS state. There was no display-off run on `:9`, and the
+  2026-10-01 display state is unknown. `/usr/bin/Xephyr` does contain the DPMS
+  extension: its strings include `noDPMSExtension` and the option
+  `-dpms disables VESA DPMS monitor control`.
+- Measured with the monitor on, Xephyr presentation is slower, presumably its
+  copy of each frame into the host window. `ExtrinsicSandbox
   --frame-pacing-report` (32 frames, 1600x900) shows a median `present_micros`
   of 141 µs on `:1` and 28,108 µs on `:9`. That is 0.2 % and 21.5 % of frame
   time; the prediction of < 20 ms on `:9` failed. Median `render_prepare` is
@@ -130,13 +148,19 @@ Raw logs, the probe diff and the display states are in
   merged: 21 cases (`Keypoint*`, `NormalNeighborhoods*`,
   `RUNTIME290/292/293/296/297/298/299`). On `:1` 19 of 21 passed (170.3 s); on
   `:9` 19 of 21 passed (158.9 s). The slowest case took 14.71 s and nothing
-  timed out. The same two cases fail on both displays, so the failures do not
-  depend on the display. Not predicted:
-  `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` fails because
-  `KeypointCount` is 5, not 8, in all eight domains.
-  `KeypointResidentSubnormalScores` has 12 mask mismatches and a saliency L∞
-  of 7.58e-42, against a bound of 1.12e-44. These failures are separate from
-  this display bug and are not tracked yet.
+  timed out. The same two cases fail on both displays with the same failure
+  lines, so the failures do not depend on the display. `predictions.txt`
+  predicted the `KeypointResidentSubnormalScores` failure on both displays;
+  only the `PlanarZero` failure was not predicted. Failure lines in
+  `Test.PointLBVHGpuSmoke.cpp`, the same in `cohort-d1.log` and `cohort-d9.log`:
+  `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` has 8 at `:1981`
+  (`KeypointCount` 5, expected 8, in each of the eight domains) and 8 at
+  `:1989` (keypoint mask differs from the reference).
+  `KeypointResidentSubnormalScores` has 12 mask mismatches at `:2830` (preview)
+  and 12 at `:2849` (after accept), and the saliency L∞ bound fails at both
+  `:2833` and `:2855` (7.58e-42 against 1.12e-44). RUNTIME-291's note (its
+  worktree) records both cases failing with its `src/` change reverted. These
+  failures are separate from this display bug, and no bug file tracks them.
 - Resident LOP, built afterwards: both `PointCloudConsolidationGpuParity.ResidentLop*`
   cases passed on both displays: `PreviewDiscardAcceptParityAndRepeatInputIo`
   in 6.00 s on `:1` and 5.29 s on `:9` (limit 30 s), and

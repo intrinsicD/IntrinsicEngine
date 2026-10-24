@@ -53,7 +53,11 @@ cohorts with leak detection disabled; BUG-180 owns that separate investigation.
 
 ## Diagnosis — 2026-10-24
 
-### Plan and predictions (written before the runs)
+### Plan and predictions
+P1–P3 are not in `predictions.txt`. They are recorded only in this note, which
+was first committed at 02:37 (945c79d15), after the runs, so the artifacts
+cannot show that they preceded the runs. The sampler, gdb, unwind and Xephyr
+predictions are in `predictions.txt`, which says each was appended before its run.
 Host and source: RTX 4090 with NVIDIA 580.159.04 (the retired notes were
 measured on an RTX 3050 with 590.48.01), `ci-vulkan`, 2df2a2837 (`origin/main`
 599f02ff1 plus the BUG-182 test change). The three registered cases run
@@ -83,8 +87,9 @@ numbers set no budget, timeout or threshold.
 Raw logs, the probe diff, the analysis script and the GPU/display states are
 in `tasks/evidence/BUG-193/2026-10-24/` (ignored by git). Runs took place
 02:16–02:38 CEST with `Monitor is On`, the session locked, and 1-minute
-load between 1.0 and 3.0. No compiler was running, except one process from
-another lane when the `:1` surface-appearance run started. The GPU went from
+load 1.02–3.03 at the case boundaries (`state-d*.txt`). The state files count
+no compiler process, except one from another lane when the `:1`
+surface-appearance run started. The GPU went from
 P8 (idle) to P0 at 2520 MHz during the runs. Every case selected the RTX 4090
 with the NVIDIA 580.159.04 driver.
 
@@ -96,10 +101,18 @@ with the NVIDIA 580.159.04 driver.
 
 Shares are fractions of summed frame time on `:1`; where two values appear,
 the second is `:9`. The clean registered runs without the probe, on `:1`,
-passed in 6.26 s, 17.39 s and 25.37 s.
+passed in 6.26 s, 17.39 s and 25.37 s. The probe was reverted before them:
+`build-revert.log` recompiles `tests/support/RuntimeTestModule.cpp` and relinks
+the three test executables, and `git grep -E 'BUG193|BUG228' -- src tests`
+finds nothing at this branch's HEAD.
 - P1 was met on `:1`. Presentation plus acquire is at most 1.3 %, and
-  `render_prepare` is the largest phase. On `:9` the surface-appearance window
-  pays for Xephyr's copy (19 %).
+  `render_prepare` is the largest phase.
+- The Xephyr prediction failed for surface appearance. It predicted, for `:9`,
+  frame counts within ±2 of `:1`, wall time within ±15 % and a present share
+  below 2 %. Frame counts (26/26, 63/63, 264/263 on `:1`/`:9`) and wall times
+  (−11 %, −10 %, −2 % on `:9`) were within range. Present alone was 0.4 % for distance ratio and 1.7 %
+  for WLOP, but 18.8 % for surface appearance (19.3 % with begin), whose median
+  frame rose from 93 to 121 ms.
 - P2 was met. WLOP passed in 25.55 s; its internal bound is 300 s and its
   CTest limit 360 s. Frame counts on `:1` and `:9` agree within one frame.
 - P3 was met only by WLOP. In WLOP a job is in flight in 97 % of frames, but
@@ -112,15 +125,24 @@ passed in 6.26 s, 17.39 s and 25.37 s.
 - The frame time is main-thread CPU work. During WLOP the main thread was
   in state `R` in 4478 of 4515 `/proc` samples (99.2 %), and only one thread
   was runnable in 97.6 % of samples.
-- Where `render_prepare` goes: all 3 gdb stack samples of the main thread,
-  taken after frame 3 of `KeypointResidentPreviewDiscardRepeatPagedParity`,
-  were in `GpuWorld::SyncFrame` → `FlushDirtyRuns<GpuGeometryRecord>`, in
-  `std::vector<bool>` element access. `FlushDirtyRuns` tests every dirty bit
-  up to capacity on every frame. That is 4 × `MaxInstances` (100,000) +
-  `MaxGeometryRecords` (65,536) = 465,536 bits, however few are dirty. The
-  constant 68 ms per frame in this Debug ASan/UBSan build fits about 146 ns
-  per bit. Three samples are few. The cost is the same in the Sandbox (69 ms)
-  and in all three cases, which supports the finding.
+- Where `render_prepare` goes (hypothesis): the gdb sampler gave 1 effective
+  stack sample. Between its SIGINT stops the inferior did not advance: in
+  `gdb-samples3.log` the three stops have the same PC, the same
+  `this=0x7bfff55adea0` and the same `__i=15843`, and the probe's frame 4
+  reports `prepare_us=30,273,119`. `gdb-samples.log` (3 identical stops) and
+  `gdb-samples2.log` (two identical groups of 4) show the same sampler fault.
+  The gdb prediction (≥ 60 % of about 12 stacks inside
+  `RenderPrepPipeline::Run`) was therefore not tested. The one stack, taken
+  after frame 3 of `KeypointResidentPreviewDiscardRepeatPagedParity`, is in
+  `GpuWorld::SyncFrame` → `FlushDirtyRuns<GpuGeometryRecord>`, in
+  `std::vector<bool>` element access. Code reading: `FlushDirtyRuns` tests
+  every dirty bit up to capacity on every frame, 4 × `MaxInstances` (100,000)
+  + `MaxGeometryRecords` (65,536) = 465,536 bits, however few are dirty.
+  Hypothesis, not measured: this scan is most of the constant 68–70 ms median
+  `render_prepare` in this Debug ASan/UBSan build, which would be about 146 ns
+  per bit. Its support is the one stack, the code reading and the same median
+  `render_prepare` in every case and in the Sandbox (69 ms). The scan itself
+  was not timed.
 - Ruled out as the prepare cost: ASan slow unwinding. Setting
   `fast_unwind_on_malloc=1` (direct runs, order A B A B) leaves median
   `render_prepare` at 67.8–68.1 ms; it lowers `render_execute` from 7.9 to
@@ -134,13 +156,16 @@ passed in 6.26 s, 17.39 s and 25.37 s.
 - Margin, as facts and not a budget decision: with the monitor on, WLOP uses
   25.5 s of its 300 s internal bound. At ~1 s per frame with the display off,
   264 frames would need about 267 s, roughly 11 % below that bound. The
-  margin therefore depends on display state times frame count. Under
-  display-off presentation the `FlushDirtyRuns` cost is hidden.
+  margin therefore depends on display state times frame count. Inference,
+  not measured: at ~1 s per display-off frame, the ~68 ms `render_prepare`
+  would be a small share of each frame, so its cost would be masked.
 
 ### What remains
 - Acceptance 1: comparing display states needs DPMS off on the operator's
   display (see BUG-228).
 - Acceptance 3: no owner was repaired. The candidates are the
-  `GpuWorld::SyncFrame` full-capacity dirty scan (monitor-on frame cost),
+  `GpuWorld::SyncFrame` full-capacity dirty scan (hypothesized monitor-on
+  frame cost; the measured ~68 ms `render_prepare` total is an upper bound on
+  it, not a measurement of it),
   the display-off presentation (display policy, BUG-228) and frame-paced job
   apply. Which one to take on is a scope decision for the operator.
