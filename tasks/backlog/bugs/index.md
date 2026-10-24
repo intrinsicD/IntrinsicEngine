@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-250 — Direct texture bakes skip models with a seam atlas](BUG-250-direct-texture-bakes-skip-seam-atlas-models.md):
+  the direct normal/albedo bake gate checks only `v:texcoord`, but a seam atlas leaves only
+  `h:texcoord`. Found by code reading, not reproduced; regression first.
+
 - [BUG-249 — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x](BUG-249-concurrent-ctest-discovery-cmake4.md):
   the race probe knows only the 3.28/3.31 `file(WRITE)` forms; CMake 4.3's
   REMOVE+APPEND module fails all three cases. Hosted `ci-docs` passed on `main` `599f02ff1`
