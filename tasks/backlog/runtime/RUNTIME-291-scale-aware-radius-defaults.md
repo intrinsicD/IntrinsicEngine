@@ -198,3 +198,53 @@ RTX 4090.
   in the generic scalar transaction; left as is.
 - `MakeEditorDensityWeightTransactionForTest` injects values and never resolves an automatic
   radius; its Sandbox caller now shows radius 0. Harmless, not changed.
+
+## Live check — 2026-10-24
+
+What ran: `ExtrinsicSandbox` from `build/ci-vulkan` (head 0b51444a9, ASan/UBSan Debug) on
+DISPLAY=:1, RTX 4090, driver 580.159.04, Vulkan device operational, 0 validation errors, started
+in an empty directory (no `config/engine.json`, so the reference config with section defaults)
+with `--agent-socket` and `--agent-root` for the Vlasic data. A throwaway socket client
+(`tasks/evidence/RUNTIME-291/live/agent_client.py`) drove it through the agent tools
+(`import_file`, `config_apply`, `run_operation density_weight`, `property_*`, `view_capture`). These
+call the panels' editor commands; the ImGui panel was not clicked. Meshes: `I_crane/meshes/mesh_0060.obj`
+(the operator's mesh: diagonal 2.1409) and `D_march/meshes/mesh_0060.obj` (the path in the lane brief:
+10002 vertices, diagonal 2.2693), both imported as mesh entities, weights on `MeshVertex`.
+Predictions were written first (`live/predictions.txt`). Session 1 ran the full sequence;
+sessions 2 and 3 repeated it with identical values.
+
+| Check | I_crane | D_march | Prediction |
+| --- | --- | --- | --- |
+| Default `support_radius` | 0 (backend cpu_kdtree, capacity 256) | same | held |
+| `vulkan_lbvh`, radius 0 | Applied, weights 1.0206 to 9.6770, 10002 finite | Applied, 1.0149 to 6.0159 | held |
+| `cpu_kdtree`, radius 0 | "... support radius 0.04634." | "... support radius 0.04749." | held |
+| Vulkan vs CPU weights | 10002/10002 rows identical, max error 0 | same | held (bound 1e-4) |
+| `vulkan_lbvh`, radius 1.0 | GeometryProcessingFailed: "Radius candidate overflow: support radius 1 is too large (10001 candidates, capacity 256). Use about 0.0256, 0 for automatic, or a CPU backend." | same text | held |
+| Output after the overflow | generation, statistics, CPU equality unchanged | same | held |
+
+- The Vulkan agent reply is the GPU snapshot message ("Device scalar accepted; input upload:
+  120024 bytes; ..."). It does not state the radius, as predicted (see Remaining). The equal
+  CPU weights show that Vulkan used the same automatic radius.
+- Viewport capture (`live/icrane_density_weight_vulkan_auto.png`, Viridis legend 1.23 to 4.73)
+  shows the mesh coloured by the Vulkan weights. The surface colours look brighter than the legend
+  strip; not investigated.
+- Each overflow run logs `[JobService] Job 'Device point scalar' completion publisher rejected
+  result type ... bool; completion dropped.` at error level. The pre-fix GPU smoke log
+  (`prefix-gpu-densityweight-ctest.log`, old message) has the same line, so it predates this task
+  and is not tracked here.
+- Shutdown: a WM_DELETE_WINDOW sent to the Sandbox's own window took the clean path ("Window close
+  requested; stopping Engine::Run loop. source=platform-event") in all three sessions. Exit status:
+  1 in session 1 (leak report with one-frame stacks that `lsan.supp` cannot match), 1 in session 2
+  (full stacks, `fast_unwind_on_malloc=0`; `lsan.supp` matched 22 allocations, 3 x 80 bytes remain
+  in NVIDIA driver frames under `VulkanDevice::CreatePipeline` from
+  `Renderer::InitializeOperationalPassResources` / `CullingSystem::Initialize`), and 0 in session 3
+  (same steps with `detect_leaks=0`, as the BUG-056 / BUG-092 manual Sandbox runs did). The leaks
+  come from startup pipeline creation, not from density weights. No suppression was added.
+
+Still missing for Operational (the reviewers decide whether this run counts):
+- The panel path itself: `StartEditorDensityWeightTransaction` with manual Accept/Discard and the
+  panel line "Support radius R; query radius Q" on Vulkan. The agent's `run_operation` auto-accepts
+  through `ApplyEditorDensityWeightCommand`. The panel was only covered by
+  `SandboxProcessingPanels` contract tests.
+- No committed `gpu;vulkan` test runs the Vlasic mesh. The GPU smoke `PointLBVHGpuSmoke.DensityWeight*`
+  covers the overflow message on synthetic data.
