@@ -109,7 +109,9 @@ Raw logs, the probe diff and the display states are in
 - Moving the test's own window outside both outputs did not work; the window
   manager clamped it to (5056, 2816), so that run tells us nothing.
 - Where the wait is: `Render.EnableVSync=false` has no effect, so the swapchain
-  is always FIFO. When presentation is slow, the wait is `vkQueuePresentKHR` in
+  is always FIFO. `VulkanDevice::Initialize` reads `EnableValidation` but not
+  `EnableVSync`, yet `docs/architecture/engine-config.md` lists VSync as a
+  boot-only toggle. When presentation is slow, the wait is `vkQueuePresentKHR` in
   `VulkanDevice::Present` (`present_micros`) plus `vkAcquireNextImageKHR` with
   an `UINT64_MAX` timeout in `VulkanDevice::BeginFrame`. BUG-143 measured
   about 900 ms of present plus about 100 ms of acquire per frame with
