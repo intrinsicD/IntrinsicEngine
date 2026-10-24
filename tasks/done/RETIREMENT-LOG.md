@@ -1,5 +1,26 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-221, BUG-225 and BUG-229 retired after landed fixes
+
+Retired [BUG-221](BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md) and
+[BUG-229](BUG-229-nvidia-xephyr-shutdown-retention.md) (`9395eb9e6`) and
+[BUG-225](BUG-225-archived-task-links-to-retiring-tasks.md) (`2688e7480`); both commits were
+on `main` and `ci-docs`/`ci-linux-clang` are green at `599f02ff1`.
+
+- BUG-221: the two 256-byte "NVIDIA" leaks map to `libvulkan_lvp.so` and `libvulkan_radeon.so`,
+  which unloaded before exit; an engine-free probe reproduces them and selecting NVIDIA removes
+  them. The shutdown runner rejects missing, multiple or invalid ICD manifests (11 prerequisite
+  cases; 7 fail without the fix). Native contract passed on 2026-10-01; four suppressions unchanged.
+- BUG-229: engine-free XCB and Xlib probes reproduce NVIDIA 580.159.04 retention on Xephyr
+  (`vkDestroySwapchainKHR` 1,392 + 1,392 + 2,800 bytes, 64 bytes per capabilities query); no
+  engine cause. Documented in `tests/README.md` as unsupported for leak-clean shutdown; native
+  X11 stays the gate, with the probes retrievable from `599f02ff1` via `git archive`.
+- BUG-225: archived task links may change only their directory when the same task moves,
+  validated against Git baseline bytes (31 validator tests; 6 fail without the fix).
+- Review: independent Claude review approved the retirement at `800f1c371`, all seven criteria
+  "met". The 41 tracked evidence files were deleted; links use Git revision `599f02ff1`. The GPU
+  contract was not rerun at retirement.
+
 ## 2026-10-20 — BUG-242 coverage counter-map gap
 
 Retired [BUG-242](BUG-242-cpu-source-coverage-counter-invalid.md) (`ca66d4261`).

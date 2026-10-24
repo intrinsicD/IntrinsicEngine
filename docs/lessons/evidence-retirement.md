@@ -38,7 +38,11 @@ while its reviewed configuration depends on them. This retention does not
 preserve the completed METHOD-081/082 run outputs.
 
 The METHOD-040, METHOD-043 and METHOD-083 evidence directories and
-backlog BUG-221/222/225/228/229 evidence remain. METHOD-077's tracked diagnostic
+backlog BUG-228 evidence remain. BUG-222's tracked evidence was deleted at its
+2026-10-19 retirement (`d9459666d`). The BUG-221, BUG-225 and BUG-229 tracked
+evidence was retired on 2026-10-24; its files remain at Git revision
+`599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02` and the task notes in `tasks/done/`
+record the outcomes. METHOD-077's tracked diagnostic
 was retired on 2026-10-19; its files remain at Git object
 `bfc95f02dd367b11631daa1248605b9ce9548fba` and its
 [result summary](../results/method077_cpd_landmark_variants_2026-10-10.md)

@@ -522,7 +522,10 @@ fixed upstream and recorded by BUG-118. GoogleTest binaries embed no default
 suppressions; these four entries are scoped to this runner. Hosted CI selects
 lavapipe explicitly; local runs must likewise select the tested operational ICD
 when multiple installed ICDs would otherwise expose non-selected driver-loader
-allocations. Broad loader, Mesa, ICD, unknown-module, pthread, and X11/GLFW
+allocations. On an NVIDIA host (BUG-221), the unselected lavapipe and RADV ICDs
+each left 256 bytes during instance creation/enumeration and unloaded before exit, so LSan
+showed `<unknown module>` stacks; an engine-free enumeration probe reproduced them.
+Broad loader, Mesa, ICD, unknown-module, pthread, and X11/GLFW
 suppressions remain forbidden.
 
 The runner rejects missing, multiple, or invalid driver manifests before launching
@@ -543,8 +546,22 @@ leak-clean shutdown qualification**. Independent Vulkan/XCB and Vulkan/Xlib
 probes reproduce retention without engine or GLFW code; switching surface APIs
 or enabling Xephyr glamor does not eliminate it. Use the native X11 display for
 this driver's shutdown gate. Nested UI results do not establish clean shutdown,
-and that combination still fails the unchanged leak gate. Reproduction and
-version-specific evidence are in [BUG-229](../tasks/backlog/bugs/BUG-229-nvidia-xephyr-shutdown-retention.md).
+and that combination still fails the unchanged leak gate. The tested combination
+was Xephyr `2:21.1.4-2ubuntu1.7~22.04.16`, libxcb 1.14-3ubuntu3 and Vulkan
+loader 1.3.296.0~rc1: `vkDestroySwapchainKHR` retained 1,392 + 1,392 + 2,800
+bytes and each XCB surface-capabilities query retained two 32-byte replies
+(64 bytes, linear in the query count), while native X11 was clean
+under the four suppressions. Version-specific measurements are in
+[BUG-229](../tasks/done/BUG-229-nvidia-xephyr-shutdown-retention.md).
+The engine-free probes are kept at an exact Git revision. To check a new driver,
+start an owned Xephyr on `:9` beside the native display `:1`, then run (nonzero
+while the nested path retains memory):
+
+```bash
+probe=$(mktemp -d)
+git archive 599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02 lsan.supp tasks/evidence/BUG-229 | tar -x -C "$probe"
+bash "$probe/tasks/evidence/BUG-229/reproduce.sh"
+```
 
 ```bash
 ctest --test-dir build/ci-vulkan --output-on-failure \

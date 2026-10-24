@@ -25,8 +25,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 - [BUG-188 — Sandbox blocks LeakSanitizer during CTest discovery](BUG-188-sandbox-sanitizer-test-discovery.md).
 
-- [BUG-221 — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation](BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md): reproduced on unchanged `main` and the UI-050 tree; suppressions must not be widened without review.
-
 - [BUG-193 — GPU pacing and watchdog margin](BUG-193-gpu-pacing-and-watchdog-margin.md): controlled follow-up to the corrected Vulkan fixture budgets; preserve finite-work and backend assertions.
 
 
@@ -51,6 +49,17 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-221 — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation](../../done/BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md).
+  The 512 bytes came from the unselected lavapipe and RADV ICDs; the runner now requires one selected ICD and
+  the contract passes natively on NVIDIA. Suppressions unchanged.
+
+- Closed 2026-10-24: [BUG-225 — Archived tasks cannot follow links to tasks that retire later](../../done/BUG-225-archived-task-links-to-retiring-tasks.md).
+  Archived task links may change only their directory when the same task moves; strict doc links are clean.
+
+- Closed 2026-10-24: [BUG-229 — NVIDIA shutdown retention on a nested Xephyr display](../../done/BUG-229-nvidia-xephyr-shutdown-retention.md).
+  Engine-free probes reproduce the driver's nested WSI retention; the combination is a documented unsupported
+  shutdown-qualification boundary, native X11 stays the gate.
 
 - Closed 2026-10-03: [BUG-234 — Generic processing imports SelectionController](../../done/BUG-234-editor-processing-selection-controller-dependency.md).
   Generic readiness reuses StableEntityLookup directly; the unchanged compilation-locality gate and full CPU rerun pass.
