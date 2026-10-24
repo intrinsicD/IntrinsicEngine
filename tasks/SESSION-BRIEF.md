@@ -141,6 +141,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-107` — Wachspress, mean-value and modified-face-normal Laplacian weights (tasks/backlog/geometry/GEOM-107-additional-mesh-laplacian-weights.md)
 - unblocked: `GEOM-108` — Small Framework24 parity helpers (tasks/backlog/geometry/GEOM-108-framework24-small-parity-helpers.md)
 - unblocked: `GEOM-116` — Vulkan Tournament point sampling (tasks/backlog/geometry/GEOM-116-vulkan-tournament-point-sampling.md)
+- unblocked: `GEOM-117` — Cheaper noise-level weight search for the variational fit (tasks/backlog/geometry/GEOM-117-cheaper-variational-fit-noise-level-search.md)
 - unblocked: `GRAPHICS-151` — Sorted segment heads and fixed-order segment reduction (tasks/backlog/rendering/GRAPHICS-151-sorted-segment-heads-and-reduction.md)
 - unblocked: `GRAPHICS-152` — Device round trips that do not lose small inputs to frame pacing (tasks/backlog/rendering/GRAPHICS-152-small-input-device-round-trip-pacing.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)

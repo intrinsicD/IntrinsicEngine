@@ -21,6 +21,7 @@ its dependencies, conditional gates, scope and verification.
 - [GEOM-074 — Graph property and adjacency contracts](GEOM-074-graph-property-adjacency-contracts.md)
 - [GEOM-076 — Evidence-gated curvature-region UV atlas cuts](GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
 - [GEOM-078 — Intrinsic surface-sample point cloud with contiguous face ranges](GEOM-078-intrinsic-surface-sample-point-cloud.md)
+- [GEOM-117 — Cheaper noise-level weight search for the variational fit](GEOM-117-cheaper-variational-fit-noise-level-search.md)
 
 ## Agent lane and inspection kernels
 
