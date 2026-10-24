@@ -29,15 +29,16 @@ contract_review: Test-only wait predicate fix in a runtime contract test; engine
   a continuation with empty text instead of a `published` answer. Every sibling test in the
   file waits with `jobs.IsComplete(foreign)`.
 - Reproduction (diagnosis agent, 2026-10-24): in-process `--gtest_repeat` about 16 failures in
-  8000 (~0.2%), always the CI signature; fresh-process `ctest` 0/500.
+  8000, always the CI signature; fresh-process `ctest` 0/500. The measured in-process rate
+  varied between about 0.06% (5/8000, the fix's before run) and 0.2% (16/8000, this run).
 - Test added in `750cb5855` (RUNTIME-279, 2026-10-02); no 2026-10-24 commit touched the test
   or `Runtime.JobService.cpp`.
 
 ## Acceptance criteria
-- [ ] The test waits for every job it later queries (`foreign` included).
-- [ ] A repeated in-process run shows 0 failures at a repetition count where the old predicate
-      failed.
-- [ ] No engine change.
+- [x] The test waits for every job it later queries (`foreign` included). Review: "met (`:3430`)".
+- [x] A repeated in-process run shows 0 failures at a repetition count where the old predicate
+      failed. Review: "met (5/8000 before, 0/8000 twice after, plus my 0/3000)".
+- [x] No engine change. Review: "met (the diff touches only the test and task files)".
 
 ## Resolution
 - 2026-10-24: the post-release `WaitFor` predicate now returns
@@ -60,3 +61,18 @@ build/ci/bin/IntrinsicRuntimeContractTests \
 build/ci/bin/IntrinsicRuntimeContractTests --gtest_filter='EditorKeypointAgent.*'
 ctest --test-dir build/ci -R 'EditorKeypointAgent' --output-on-failure
 ```
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `411ca6ecc` (filed) and `c2bd44899` (the fix) on the night
+integration branch `claude/night-2026-10-24-bug-sweep`. Not yet on `main`.
+
+Reviewer decisions: independent Claude review of `dde5776d6..c2bd44899`, 2026-10-24, relayed
+verbatim by the coordinator; the record is not on disk. Verdict approve; all three boxes are
+ticked from its decisions quoted above. It confirmed the root cause by reading:
+`DrainCompletions` takes the `CompletionQueue` at `Runtime.JobService.cpp:639` and finalizers
+run at `:786`; `JobsWait` returns a pending continuation for an incomplete job at
+`Runtime.AgentOperations.Editor.cpp:1068-1086`, which is correct protocol, not an engine bug.
+Its minor finding (state the varying measured rate) is applied in Context and the bug index.
+
+Limits: the hosted `full-cpu` job has not run on the fix; the rule-of-three bound (about 0.02%
+from 0/16000) leaves very rare failures possible. No temporary evidence to delete.

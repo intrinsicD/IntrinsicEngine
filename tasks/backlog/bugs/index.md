@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-253 — Editor job tools test queries a job it never waited for](BUG-253-editor-job-tools-wait-skips-foreign-completion.md):
-  `EditorKeypointAgent.EditorJobToolsListWaitAndCancelThroughTheSurface` waits only for the editor run, not `foreign`;
-  ~0.2% in-process flake, red in hosted `full-cpu` run 40100277575 at `cca289328`.
-
 - [BUG-252 — GTestDiscoveryTimeout budget test fails on CMake 4.0.3](BUG-252-gtest-discovery-timeout-budget-cmake403.md):
   `test_declared_budget_passes_below_and_fails_bounded_above` reports "timed-out lister is still running" on 4.0.3,
   also before BUG-251. 4.0.3 is outside the supported matrix; CI uses 3.31.6.
@@ -23,6 +19,11 @@ promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-253 — Editor job tools test queries a job it never waited for](../../done/BUG-253-editor-job-tools-wait-skips-foreign-completion.md).
+  The test's post-release wait now also waits for `foreign` (test-only). The measured in-process rate varied between
+  about 0.06% (5/8000, the fix's run) and 0.2% (16/8000, the diagnosis run); after the fix 0/8000 twice. Hosted
+  `full-cpu` has not run on the fix.
 
 - Closed 2026-10-24: [BUG-228 — Vulkan smoke timeout depends on the display environment](../../done/BUG-228-desktop-display-vulkan-smoke-timeouts.md).
   The device ignored `Render.EnableVSync`, so every present was FIFO (about 1 s per frame with the monitor off);

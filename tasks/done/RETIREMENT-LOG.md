@@ -1,5 +1,20 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-253 retired after its independent review
+
+Retired [BUG-253](BUG-253-editor-job-tools-wait-skips-foreign-completion.md) (`411ca6ecc`, `c2bd44899`) on the
+night integration branch `claude/night-2026-10-24-bug-sweep`. Not yet on `main`; hosted CI has not run on it.
+
+- Cause: `EditorKeypointAgent.EditorJobToolsListWaitAndCancelThroughTheSurface` waited only for the editor run;
+  one `DrainCompletions` could apply it before `foreign`'s result, so `jobs_wait` on `foreign` returned a pending
+  continuation (correct protocol). Test-only fix: the wait also requires `jobs.IsComplete(foreign)`.
+- Measured in-process failure rate varied between about 0.06% (5/8000, the fix's before run) and 0.2% (16/8000,
+  the diagnosis run); after the fix 0/8000 twice.
+- Review: independent Claude review of `dde5776d6..c2bd44899` (relayed by the coordinator, not on disk) approve,
+  all three criteria "met"; it reran 0/3000 and confirmed the root cause by reading.
+- Limits: hosted `full-cpu` not yet run on the fix; the rule-of-three bound (about 0.02%) leaves very rare
+  failures possible. No evidence to delete.
+
 ## 2026-10-24 — BUG-228 and BUG-193 retired by operator decision on the evidence disposition
 
 Retired [BUG-228](BUG-228-desktop-display-vulkan-smoke-timeouts.md) and
