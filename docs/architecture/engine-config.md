@@ -350,8 +350,9 @@ The schema is primarily a boot config. Runtime reads it before constructing
   `enable_vsync` once in `Initialize`; swapchain recreation keeps that choice. It logs the requested
   value and the actual `VkPresentModeKHR`, and the bootstrap diagnostics record
   `VSyncRequested`, `SwapchainPresentMode` and `SupportedPresentModeMask`.
-  FIFO waits for the display, so with the monitor off each present takes
-  about 1 s (BUG-228). Most `gpu;vulkan` smokes therefore set it to
+  FIFO waits for the display. On the tested NVIDIA/X11 desktop with the
+  monitor off each present took about 1 s (BUG-228); an Xephyr display did
+  not show this. Most `gpu;vulkan` smokes therefore set it to
   `false`; the Sandbox acceptance smokes keep the Sandbox default `true`;
 - scheduler worker-thread count;
 - window title, size, resizable flag, and platform backend override;

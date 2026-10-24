@@ -2041,9 +2041,6 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             if (static_cast<std::uint32_t>(mode) < 32u)
                 diagnostics.SupportedPresentModeMask |= 1u << static_cast<std::uint32_t>(mode);
         }
-        diagnostics.SwapchainPresentMode = static_cast<std::int32_t>(presentMode);
-        Core::Log::Info("[VulkanDevice::Initialize] Swapchain present mode: VSync requested={} actual VkPresentModeKHR={}",
-                        config.EnableVSync, static_cast<std::int32_t>(presentMode));
 
         const std::array<std::uint32_t, 2> queueFamilyIndices{m_GraphicsFamily, m_PresentFamily};
         const VkSwapchainCreateInfoKHR swapchainInfo = MakeSwapchainCreateInfo(
@@ -2060,6 +2057,9 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             return;
         }
 
+        diagnostics.SwapchainPresentMode = static_cast<std::int32_t>(presentMode);
+        Core::Log::Info("[VulkanDevice::Initialize] Swapchain present mode: VSync requested={} actual VkPresentModeKHR={}",
+                        config.EnableVSync, static_cast<std::int32_t>(presentMode));
         diagnostics.Status = VulkanBootstrapStatus::CreatedSwapchain;
         m_SwapchainFormat = surfaceFormat.format;
         m_SwapchainExtent = swapchainExtent;

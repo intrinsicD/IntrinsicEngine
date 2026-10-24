@@ -251,10 +251,20 @@ running at any run boundary, RTX 4090, NVIDIA 580.159.04. Logs and states:
   Sandbox defaults, including VSync. With the monitor off its surface-appearance
   case still passed, but in 71.27 s (17–21 s with the monitor on).
   Whether those smokes should switch VSync off is an open decision.
-- Whole `gpu` label at 3d39d1737, `:1`, monitor on: 161 of 161 passed (one
-  capability skip, `METHOD056VulkanCpdEStep.ScalingProfile`), 682 s, at a
+- Whole `gpu` label at 3d39d1737, `:1`, monitor on: of 161 cases 160 passed
+  and one was a capability skip (`METHOD056VulkanCpdEStep.ScalingProfile`), 682 s, at a
   1-minute load of 3.6–6.0.
 - Review of 3d39d1737: a fresh Claude reviewer that did not write the change
   read the code only and answered "Verdict: APPROVE", with two nits (a test
   inserted under another test's comment; loose doc wording) that are fixed in
   the next commit. No Codex review was run.
+
+### Evidence status — 2026-10-24
+- Verification runs against pass/fail predictions committed beforehand
+  (25550e64e) or appended to `predictions.txt` before the run: D1–D3 and the fix condition, the 23-case cohort on and off, and the fix-condition Sandbox runs.
+- A number that informed a choice: the 20 s keypoint stall bound was chosen
+  after the 25 s trial fired at 28.66 s, 1.3 s before the CTest kill. No run
+  exercised the final 20 s bound firing.
+- No experiment pre-flight was run: no frozen packet, no prospective review
+  and no HTML report exists for these runs. The operator's disposition of
+  this gap is pending.

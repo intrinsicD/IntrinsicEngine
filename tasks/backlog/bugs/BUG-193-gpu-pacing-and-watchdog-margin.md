@@ -192,7 +192,8 @@ Logs are in `tasks/evidence/BUG-228/2026-10-24-display-off/` (shared with
 BUG-228; same host and states).
 - W1 met: WLOP on `:1` with the monitor off and FIFO passed in 261.75 s,
   38 s inside its 300 s internal bound (25.5 s with the monitor on this morning).
-  The display-off pacing explains RUNTIME-236's 264 s.
+  The display-off pacing is consistent with RUNTIME-236's 264 s; the RTX 3050
+  host's frame count was never checked.
 - S1 confirmed: a temporary timer around the five `FlushDirtyRuns` calls
   (tagged `[DBG-BUG193]`, reverted) gave, over 93 frames of the keypoint case
   on `:1` with the monitor on, a median of 67.6 ms (min 67.2, max 113.3) for
@@ -215,3 +216,13 @@ BUG-228; same host and states).
 - CPU gate (`-LE 'gpu|vulkan|slow|flaky-quarantine'`, `-j16`): 5942 of 5943
   passed. `PropertySmoothingWorkflows.VariationalFitVariantsAndSolverSwitches`
   timed out at 1-minute load of about 12 and passed alone in 28.52 s.
+
+### Evidence status — 2026-10-24
+- Verification runs against pass/fail predictions committed beforehand
+  (25550e64e) or appended to `predictions.txt` before the run: W1, W2 and S1 (the dirty-scan timing).
+- A number that informed a choice: the 20 s keypoint stall bound was chosen
+  after the 25 s trial fired at 28.66 s, 1.3 s before the CTest kill. No run
+  exercised the final 20 s bound firing.
+- No experiment pre-flight was run: no frozen packet, no prospective review
+  and no HTML report exists for these runs. The operator's disposition of
+  this gap is pending.
