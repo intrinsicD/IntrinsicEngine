@@ -90,6 +90,8 @@ export namespace Extrinsic::Runtime
         std::string ActualBackend{}, Message{};
         std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
         Geometry::PointCloud::Kernels::DensityWeightDiagnostics Diagnostics{};
+        // Resolved compact-support radius in source-property units (configured, or derived when 0).
+        double SupportRadius{};
         float QueryRadius{}, MinWeight{}, MaxWeight{};
         std::size_t MaximumNeighbors{};
         std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};

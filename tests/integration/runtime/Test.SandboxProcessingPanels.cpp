@@ -1649,7 +1649,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
     constexpr std::array methods{
         Method{"view.keypoint_analysis", "ISS Keypoint Analysis", "Detect keypoints", "Salient radius (0 = automatic)"},
         Method{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Compute FPFH descriptors", "Feature radius (0 = automatic)"},
-        Method{"view.density_weights", "Compact Density Weights", "Compute compact weights", "Support radius"},
+        Method{"view.density_weights", "Compact Density Weights", "Compute compact weights", "Support radius (0 = automatic)"},
         Method{"view.bilateral_filter", "Bilateral Point Filter", "Filter positions", "Normal sigma"},
         Method{"view.normal_estimation", "Normal Estimation", "Estimate normals", "Radius##Normals"}};
     for (std::size_t method = 0; method < methods.size(); ++method)
@@ -1792,7 +1792,10 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             if (shownPhase == 0) { shownPhase = 1; shownAt = frame; capture(); }
             if (shownPhase == 1 && frame == shownAt + 5)
             {
-                EXPECT_NE(read().find("done"), std::string::npos) << "the finished run stays visible";
+                const auto shown = read();
+                EXPECT_NE(shown.find("done"), std::string::npos) << "the finished run stays visible";
+                // RUNTIME-291: the result reports the radius the run used.
+                if (method == 2) EXPECT_NE(shown.find("Support radius 2;"), std::string::npos) << shown;
                 EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, other));
                 shownPhase = 2; shownAt = frame;
             }

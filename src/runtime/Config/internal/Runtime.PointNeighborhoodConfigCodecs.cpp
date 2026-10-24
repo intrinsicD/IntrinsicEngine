@@ -179,10 +179,10 @@ namespace Extrinsic::Runtime
                 .EnumValues = kDensityWeightMode},
             {.Name = "support_radius",
                 .Type = ConfigFieldType::Float,
-                .Description = "Support radius.",
+                .Description = "Support radius; 0 derives it from the selected positions (support-radius policy), "
+                               "positive values are source units.",
                 .Min = 0,
-                .Max = double(std::numeric_limits<float>::max()),
-                .ExclusiveMin = true},
+                .Max = double(std::numeric_limits<float>::max())},
             {.Name = "positions",
                 .Type = ConfigFieldType::PropertyRef,
                 .Description = "Position and weight bindings must have distinct names on the same element domain.",
@@ -625,7 +625,8 @@ namespace Extrinsic::Runtime
         if (!data["support_radius"].is_number() ||
             !ConfigDetail::InConfigFieldRange(
                 kDensityWeightFields, "support_radius", data["support_radius"].get<double>()))
-            return RejectConfigSection(subject, "Support radius must be positive and finite, at most floatmax.");
+            return RejectConfigSection(
+                subject, "Support radius must be 0 (automatic) or positive and finite, at most floatmax.");
         if (!ConfigDetail::IsConfigFieldToken(kDensityWeightFields, "kernel", data["kernel"]))
             return RejectConfigSection(subject, "Unknown radial kernel.");
         if (!ConfigDetail::IsConfigFieldToken(kDensityWeightFields, "mode", data["mode"]))
