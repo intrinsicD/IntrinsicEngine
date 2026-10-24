@@ -119,6 +119,59 @@ Predictions, written before any build:
 Kill condition: a frontend crash stops the arm. Its logs and reproducer are kept,
 and the failing command is rerun alone with and without ccache.
 
+Results (13:17–13:28, after the GPU-timing measurement had finished; tree commit
+`12e9f6c19`, which differs from `4c30f2b82` only in this note). Each step
+lists: exit code, wall time, compile steps.
+
+| Arm | full build | edited rebuild | reverted rebuild | ccache in the step |
+|---|---|---|---|---|
+| (a) on, cold | 0, 185 s, 892 | 0, 32 s, 20 | 0, 15 s, 20 | full: 0 hits / 446 misses / 446 uncacheable; edited: 1 hit / 18 misses / 1 uncacheable; reverted: 19 hits / 1 uncacheable |
+| (b) on, warm, new tree | 0, 64 s, 892 | 0, 15 s, 20 | 0, 15 s, 20 | full: 446 hits / 446 uncacheable; edited: 19 hits; reverted: 19 hits |
+| (c) `CCACHE_DISABLE=1` | (tree from b) | 0, 26 s, 20 | 0, 26 s, 20 | counters unchanged |
+| (d) fresh, no ccache | 0, 127 s, 892 | 0, 26 s, 20 | 0, 26 s, 20 | counters unchanged; `CCACHE_PROGRAM-NOTFOUND` |
+
+In every arm, the no-op builds before and after the scenario printed `[0/2]`. No log
+contains `PLEASE submit a bug report`, `Stack dump` or `error:`, no new
+reproducer appeared in `/tmp`, and `git status` was clean afterwards. Free disk
+never fell below 26 GB. Predictions 1, 2, 3, 5 and 6 held. Prediction 4
+held with one addition: one implementation unit already hit in the edited
+rebuild. The cause of that hit was not examined. All 448 uncacheable
+calls are counted as `Unsupported source language`; they are the module-interface
+compiles, which ccache 4.5.1 passes to the compiler. In (a) and (b), the revert
+rebuild restored 19 importer objects from the cache while the edited interface's BMI
+was regenerated. That is the mix of cached objects and fresh BMIs this bug suspected,
+and it built without a crash.
+
+Result: bounded non-reproduction. With a stable source surface and one writer per
+tree, the incremental scenario does not crash on this host. That holds with
+ccache on (cold or warm), with ccache disabled, and on a fresh tree. No compiler or
+cache cause is established. Limits: ccache 4.5.1 instead of CI's 4.9.1, one
+target, comment-only edits, a single repetition per arm. Concurrent writers and
+source edits during a build (present in the 2026-09-12 incident) were
+deliberately not tested. The strict module/toolchain gates are unchanged. Because
+nothing reproduced, no tooling fix is needed. The build discipline goes into the
+stale-build triage skill (`tools/agents/skills/intrinsicengine-stale-build-triage/SKILL.md`).
+Both trees I created were deleted afterwards.
+The cache (about 0.2 GB) remains under `_state/ccache-bug178`. Logs, ccache statistics
+before and after each step, and `summary.txt` per arm are git-ignored under
+`tasks/evidence/BUG-178/{a,b,c,d}/`.
+
+The 110 reproducers in `/tmp` from 2026-10-19 (11:55:10–11:57:04), examined
+read-only: all come from one deleted worktree,
+`IntrinsicEngine/.claude/worktrees/admiring-lewin-336fda`, built with the
+`ci-coverage-cpu` tree. They are coverage-instrumented (`-fprofile-instr-generate
+-fcoverage-mapping`), without sanitizers, and not `ci-vulkan`. There are 110 distinct
+main files (88 module interfaces with `-fmodule-output`, 22 implementation units)
+across the layers. By file-name prefix: Runtime 37, Geometry 29, Graphics 20,
+Core 9, Sandbox 6, Asset 2, Backends 2, Platform 2, RHI 2, ECS 1. Examples
+are `Asset.GeometryPayload.cppm` and `Runtime.SceneDocumentModule.cppm`. No single
+file or module is shared by all of them; the most common imported module is
+`Extrinsic.Core.StrongHandle` (74 of 110). The crashes affected almost every unit
+of a whole-tree build within two minutes, including Core. That fits an
+event on the whole tree (for example, the worktree or its build files disappearing
+during the build) better than a defect in one module, but the crash messages are
+not preserved, so the cause is unknown.
+
 ## Acceptance criteria
 - [ ] Reproduce with one stabilized source surface and exactly one writer per preset tree, comparing enabled/disabled ccache and a fresh tree.
 - [ ] Record the compiler/cache cause or a bounded non-reproduction; preserve the existing strict module/toolchain gates.

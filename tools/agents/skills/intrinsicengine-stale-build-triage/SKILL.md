@@ -51,6 +51,16 @@ cmake --preset ci && CCACHE_DISABLE=1 cmake --build --preset ci --target <failin
 rm -rf build/ci && cmake --preset ci && cmake --build --preset ci --target <failing-target>
 ```
 
+Keep the source surface stable while any rung runs: exactly one writer (one
+build command, no agent or editor saving sources) per build tree, and a
+separate `-B` tree for each comparison. A crash on a tree whose sources
+changed during the build is not a compiler reproducer. `BUG-178` ran the
+incremental module scenario on `ci-vulkan` (Clang 23, ASan+UBSan) with ccache
+on (cold and warm cache), with `CCACHE_DISABLE=1`, and on a fresh cache-free
+tree. Under that discipline all four built without a crash. Of the original
+crashes, the 2026-09-12 one overlapped source edits; the cause of the
+2026-09-08 one is not established.
+
 Re-run the failing test after each rung. The clean-preset rebuild rule is
 documented as the authoritative prevention in `src/graphics/rhi/README.md`
 (mandatory after RHI interface/vtable changes) — cite that section rather than
