@@ -328,10 +328,14 @@ TEST(CoreTasks, ParkedWorkerDispatchHandshakeMakesRepeatedProgress)
 
     // BUG-220: Dispatch counts a wake only if its parked-count load still sees
     // the worker. A worker in the pre-sleep spin or the signal recheck can take
-    // the new signal and unpark first, uncounted. Gating every dispatch on the
-    // worker sleeping in the park futex makes the count exact. The gate is sound
-    // only while no signal is pending: the first park precedes every dispatch,
-    // and the worker consumes each signal before it parks again.
+    // the new signal and unpark first, uncounted, so every dispatch waits until
+    // the worker sleeps in the park futex. The gate is sound only while no
+    // signal is pending: the first park precedes every dispatch, and the worker
+    // consumes each signal before it parks again. A sleeping worker can still
+    // leave the futex without the notify through a wake from outside the
+    // protocol (signal, ptrace stop, spurious kernel wakeup) between Dispatch's
+    // signal bump and that load. Such a dispatch completes uncounted and is
+    // retried; a second one fails the test.
     while (Scheduler::GetStats().ParkedWorkers != 1u)
         std::this_thread::yield();
     Scheduler::Dispatch([&workerTid]()
@@ -342,37 +346,45 @@ TEST(CoreTasks, ParkedWorkerDispatchHandshakeMakesRepeatedProgress)
     workerTid.wait(0, std::memory_order_acquire);
     const pid_t tid = workerTid.load(std::memory_order_acquire);
     EXPECT_NE(tid, static_cast<pid_t>(syscall(SYS_gettid)));
-    const auto wakeNotificationsBefore = Scheduler::GetStats().WorkerWakeNotifications;
 
-    for (std::uint32_t iteration = 0u; iteration < iterationCount; ++iteration)
+    std::uint32_t counted = 0u;
+    std::uint32_t uncounted = 0u;
+    while (counted < iterationCount && uncounted <= 1u)
     {
         if (!WaitUntilWorkerSleepsInPark(tid))
         {
-            ADD_FAILURE() << "worker never slept in the park futex before iteration " << iteration;
+            ADD_FAILURE() << "worker never slept in the park futex before dispatch " << counted + uncounted;
             break;
         }
 
+        const auto notificationsBefore = Scheduler::GetStats().WorkerWakeNotifications;
         Scheduler::Dispatch([&completed]()
         {
             completed.fetch_add(1u, std::memory_order_release);
             completed.notify_all();
         });
 
-        const auto expected = iteration + 1u;
+        const auto expected = counted + uncounted + 1u;
         auto observed = completed.load(std::memory_order_acquire);
         while (observed < expected)
         {
             completed.wait(observed, std::memory_order_acquire);
             observed = completed.load(std::memory_order_acquire);
         }
+
+        const auto notified = Scheduler::GetStats().WorkerWakeNotifications - notificationsBefore;
+        EXPECT_LE(notified, 1u);
+        if (notified == 0u)
+            ++uncounted;
+        else
+            ++counted;
     }
 
     Scheduler::WaitForAll();
     const auto stats = Scheduler::GetStats();
-    EXPECT_EQ(completed.load(std::memory_order_acquire), iterationCount);
-    const auto notifications =
-        stats.WorkerWakeNotifications - wakeNotificationsBefore;
-    EXPECT_EQ(notifications, static_cast<std::uint64_t>(iterationCount));
+    EXPECT_EQ(counted, iterationCount);
+    EXPECT_LE(uncounted, 1u);
+    EXPECT_EQ(completed.load(std::memory_order_acquire), counted + uncounted);
     EXPECT_LE(stats.ParkedWorkers, 1u);
     Scheduler::Shutdown();
 }
