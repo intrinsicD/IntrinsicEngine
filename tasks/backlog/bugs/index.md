@@ -12,18 +12,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
   assertion failure under ASan, one timeout under UBSan.
 
-- [BUG-232 — A failed frame submit loses an accepted position copy](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md):
-  a `CommitOnCopy` preview is erased once its copy is recorded; a submit failure leaves the block
-  older than its shadow. Found in RUNTIME-311 review; keep the front lease until the copy ran.
-
 
 
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 
 - [BUG-180 — Leak-enabled framed ICP process reports 240 retained bytes](BUG-180-framed-icp-leak-enabled-process-retention.md).
-
-- [BUG-188 — Sandbox blocks LeakSanitizer during CTest discovery](BUG-188-sandbox-sanitizer-test-discovery.md).
 
 - [BUG-193 — GPU pacing and watchdog margin](BUG-193-gpu-pacing-and-watchdog-margin.md): controlled follow-up to the corrected Vulkan fixture budgets; preserve finite-work and backend assertions.
 
@@ -49,6 +43,14 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-232 — A failed frame submit loses an accepted position copy](../../done/BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md).
+  A recorded commit copy counts as done only after its frame's submit advanced the device frame number;
+  otherwise it is copied again from the still-leased front. Mock-device contract tests; real Vulkan recovery not run.
+
+- Closed 2026-10-24: [BUG-188 — Sandbox blocks LeakSanitizer during CTest discovery](../../done/BUG-188-sandbox-sanitizer-test-discovery.md).
+  `tests/README.md` documents the discovery signature, cause and host-context rerun; sanitizer settings,
+  selectors and suppressions unchanged. No automatic routing.
 
 - Closed 2026-10-24: [BUG-221 — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation](../../done/BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md).
   The 512 bytes came from the unselected lavapipe and RADV ICDs; the runner now requires one selected ICD and

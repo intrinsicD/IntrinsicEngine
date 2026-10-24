@@ -12134,7 +12134,7 @@ tree:
     - build/analysis/assetio012-format-catalog-2026-09-14/source-commit.json
     - build/analysis/assetio012-format-catalog-2026-09-14/claude-review.txt
     - build/analysis/assetio012-format-catalog-2026-09-14/claude-fix-review.txt
-    - tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md
+    - tasks/done/BUG-188-sandbox-sanitizer-test-discovery.md
     status: resolved
 
   - id: N558

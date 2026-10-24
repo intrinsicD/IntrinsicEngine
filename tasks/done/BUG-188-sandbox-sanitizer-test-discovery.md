@@ -31,8 +31,8 @@ hosts whose filesystem sandbox prevents LeakSanitizer thread inspection.
 
 ## Acceptance criteria
 - [x] Record the identical host retry outcome and distinguish discovery failure from a sanitizer finding.
-- [ ] Document or route required discovery through a supported local execution context.
-- [ ] Preserve test selectors, dedicated leak controls and sanitizer settings; do not alter host ptrace policy or add suppressions to hide this limitation.
+- [x] Document or route required discovery through a supported local execution context.
+- [x] Preserve test selectors, dedicated leak controls and sanitizer settings; do not alter host ptrace policy or add suppressions to hide this limitation.
 
 ## Verification
 ```bash
@@ -118,3 +118,26 @@ Covers criterion 2 (documented route) and criterion 3 (nothing weakened). Raw lo
   `python3 tools/docs/check_docs_sync.py --root .` (satisfied);
   `python3 tools/agents/check_task_policy.py --root . --strict` (0 findings).
 - **Remaining:** reviewer decision on criteria 2 and 3, then retirement by the integrator.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `b0ffa3b66`, `abb88a4c1` (merged into the night integration
+branch; not yet on `main`, hosted CI not run on them). They share a lane with BUG-240, which stays
+open.
+Reviewer decisions, both on `599f02ff1..abb88a4c1` (reviewed head `abb88a4c1`), round 1:
+- Independent Claude review: approve, no blocking findings; criterion 1 "met" (ticked before the
+  branch, from the September host retries), 2 "met", 3 "met".
+- Independent Codex review: "VERDICT: approve" ("Approval covers this partial change, not BUG-240
+  retirement"); 1 "**Met from existing recorded evidence.**", 2 "**Met.**", 3 "**Met.**".
+Outcome: documented route, not automatic routing. `tests/README.md` §"Sanitizer discovery under
+ptrace restrictions" records the signature, cause and host-context rerun; selectors, leak
+controls, sanitizer settings, suppressions and ptrace policy are unchanged.
+Limitations the reviewers named:
+- This session's two execution contexts both had host access, so there is no fresh
+  sandbox-versus-host reproduction. The mechanism was reproduced under `strace`; the route rests
+  on the September host-retry evidence.
+- The 2026-09-14 note asked for automatic supported-context routing; the docs-only default was
+  chosen in the lane, and the operator may still want more (Claude).
+- Claude, optional: the README's host-context rerun could say that it still goes through the
+  session's normal permission approval, so it is not read as a standing authorization. Not changed.
+No tracked evidence existed. The raw logs stay git-ignored in the `asan` lane worktree under
+`tasks/evidence/BUG-188/`.

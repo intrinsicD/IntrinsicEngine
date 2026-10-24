@@ -61,7 +61,7 @@ cancellation after submission. New CPU/ASan/UBSan tests cover freeing the scene
 while work is queued, result copies, dismissal and expired attachment callbacks.
 Strict layering, task policy, doc links, docs synchronization and skill mirrors
 pass. The initial sandbox-only ASan discovery failure is tracked separately as
-[BUG-188](../../tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md);
+[BUG-188](../../tasks/done/BUG-188-sandbox-sanitizer-test-discovery.md);
 the identical host retry passed without changing sanitizer settings. Existing
 root metadata hygiene remains [BUG-177](../../tasks/done/BUG-177-root-hygiene-local-agent-metadata.md).
 

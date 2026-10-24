@@ -261,7 +261,7 @@ file splits as code reduction.
 
 - ASan compilation passed. Its first CTest invocation stopped during test
   discovery because the local sandbox blocks LeakSanitizer thread inspection.
-  [BUG-188](../backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md) owns this
+  [BUG-188](BUG-188-sandbox-sanitizer-test-discovery.md) owns this
   verification-environment issue. The identical CTest command was retried successfully
   outside the sandbox; no sanitizer setting or host ptrace policy was changed.
 

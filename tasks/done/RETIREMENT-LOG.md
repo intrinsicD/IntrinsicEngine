@@ -1,5 +1,27 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-232 and BUG-188 retired after night-lane reviews
+
+Retired [BUG-232](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md) (`c2cd2d13c`) and
+[BUG-188](BUG-188-sandbox-sanitizer-test-discovery.md) (`b0ffa3b66`, `abb88a4c1`). The commits are
+merged into the night integration branch `claude/night-2026-10-24-bug-sweep`; they are not yet on
+`main`, and hosted CI has not run on them.
+
+- BUG-232: a recorded `CommitOnCopy` copy is settled only after its frame's submit advanced the
+  device frame number; otherwise it is copied again from the still-leased front. Three new
+  mock-device contract tests fail without the fix (18/21) and pass with it (21/21); three mutations
+  are caught. CPUContracted; real Vulkan failed-submit recovery was not run, and the reviewers name
+  a low-likelihood residual case when the next frame skips `SyncFrame`.
+- BUG-188: documentation route, not automatic routing. `tests/README.md` records the discovery
+  signature (LeakSanitizer under ptrace during PRE_TEST discovery, `ctest` rc 8), the cause and the
+  host-context rerun; no sanitizer setting, selector, suppression or ptrace policy changed. No fresh
+  sandbox-versus-host reproduction was possible in this session; the mechanism was reproduced under
+  `strace`.
+- Review: independent Claude and independent Codex reviews, round 1, both "approve" with every
+  BUG-232 and BUG-188 criterion "met", on `599f02ff1..c2cd2d13c` and `599f02ff1..abb88a4c1`. Neither
+  task had tracked evidence; their git-ignored raw logs stay in the `bug-232` and `asan` lane
+  worktrees. BUG-240 shares the BUG-188 lane and stays open (its criteria 2 and 3 are not met).
+
 ## 2026-10-24 — BUG-221, BUG-225 and BUG-229 retired after landed fixes
 
 Retired [BUG-221](BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md) and

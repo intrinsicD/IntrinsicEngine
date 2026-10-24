@@ -35,9 +35,9 @@ contract_review: A frame-submission failure path of the GpuWorld position commit
   lease (or fall back to a shadow upload) until the copy's frame is known to have executed.
 
 ## Acceptance criteria
-- [ ] A recorded commit copy is only treated as done once its frame's submission succeeded;
+- [x] A recorded commit copy is only treated as done once its frame's submission succeeded;
       otherwise the block is restored (re-copy while the lease is held, or a shadow upload).
-- [ ] A contract test with the mock device simulates a failed submit after the copy was recorded
+- [x] A contract test with the mock device simulates a failed submit after the copy was recorded
       and observes the restore.
 
 ## Verification
@@ -134,3 +134,28 @@ ctest --test-dir build/ci -R 'GpuWorldPosition' --output-on-failure --timeout 60
       shadow for that range. The commit preview is still pending (stale, lease held), so the
       replay skips the range and the front is re-copied. This matches the documented
       `RebuildGpuResources` intent ("pending copies keep their leases and are recorded again").
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `c2cd2d13c` (merged into the night integration branch; not yet on
+`main`, hosted CI not run on it).
+Reviewer decisions, both on `599f02ff1..c2cd2d13c` (reviewed head `c2cd2d13c`), round 1:
+- Independent Claude review: approve, no blocking findings; AC1 "met", AC2 "met". It re-ran
+  `ctest -R GpuWorldPosition` against the existing build tree (21/21) and checked the fail-first
+  log (18/21, exactly the 3 new tests) and the three mutation logs.
+- Independent Codex review: "VERDICT: approve"; AC1 "**Met.**", AC2 "**Met.**". It re-ran the
+  existing `IntrinsicGraphicsContractCpuTests --gtest_filter='GpuWorldPosition*'` (21/21).
+Maturity: CPUContracted (Codex: "Evidence supports **CPUContracted**, without establishing real
+Vulkan recovery"). `Operational` is deferred: the real Vulkan recovery after a non-device-lost
+submit failure was not run and no follow-up task owns it; whether one is owed is an operator
+decision.
+Limitations the reviewers named:
+- Not run: real Vulkan failed-submit recovery, Vulkan smokes, sanitizers, fresh builds.
+- Claude, low likelihood: a lost copy can still be settled as done if the next frame skips
+  `SyncFrame` (PrepareFrame fails before `ExecuteGpuWorldSync`) while `VulkanDevice::EndFrame`
+  submits its minimal abort command buffer and advances the frame number.
+- Claude, optional: `docs/architecture/property-coherence.md` (around lines 231-234) and the
+  `Graphics.GpuWorld.cppm` `CopyPending` comment do not say that a copy is recorded again after
+  a failed submit; the second half of `CommitWithoutACopiedFrontCopiesItOnceThenEndsThePreview`
+  now answers `CopyPending` for two reasons. Neither was changed.
+No tracked evidence existed. The raw logs stay git-ignored in the `bug-232` lane worktree under
+`tasks/evidence/BUG-232/`.
