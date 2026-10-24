@@ -1,5 +1,26 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-248 retired after its round-1 reviews
+
+Retired [BUG-248](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md) (`1852942c9`, `efb83a73e`,
+`7f122a51c`), merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as
+`6cec3dcb0`; not yet on `main`, and hosted CI has not run on it.
+
+- Root cause: `ffe7e8372` (HARDEN-090/GEOM-114) made the CPU PCA isotropic cutoff scale-relative;
+  `point_keypoints.comp` kept a private Jacobi with the old absolute floor `max(1,|a_ij|)`, which sent
+  1e-4-scaled planar rows and the subnormal fixture to the isotropic branch. Fix: the kernel calls the
+  shared `pcaEigen` (4 lines added, 37 deleted); no test, tolerance or timeout changed.
+- `ci-vulkan` on an RTX 4090, NVIDIA 580.159.04: `PointLBVHGpuSmoke.Keypoint*` 9/11 before, 11/11
+  after; a shader-only revert restores both failures with the baseline signature. A fixture backtest
+  reproduces the observed 4 domains x 2 phases and the exact L-inf 7.58e-42.
+- Review: round 1 on `7f122a51c`, independent Claude review and independent Codex review both
+  `approve`, all three criteria "met"; all three boxes ticked.
+- Limits: no gate selects these `gpu;vulkan` cases; hosted lavapipe behaviour and other drivers are
+  unchecked; the shared include's ineffective `precise` qualifiers are inherited (no owning task).
+  Open for the operator: gate coverage for the cases and renaming
+  `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor`. Evidence stays git-ignored in the
+  integration and `gpu` lane worktrees; nothing was deleted.
+
 ## 2026-10-24 — BUG-091 retired after its re-review
 
 Retired [BUG-091](BUG-091-gtest-pretest-discovery-cold-timeout.md) (`d14029314` through `931ebff5a`,

@@ -37,7 +37,7 @@ contracts: [geometry.property-coherence]
 - `PointLBVHGpuSmoke.KeypointResidentSubnormalScores` fails 12 times at `:2830` (preview mask)
   and 12 times at `:2849` (mask after accept). The saliency L∞ bound fails at `:2833` and
   `:2855`: 7.58e-42 against 1.12e-44 (8 × `denorm_min`).
-- RUNTIME-291's note ([RUNTIME-291](../runtime/RUNTIME-291-scale-aware-radius-defaults.md))
+- RUNTIME-291's note ([RUNTIME-291](../backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md))
   records both cases failing the same way with its `src/` change reverted, so they predate it.
 - CI coverage: the cases are `gpu;vulkan`-labelled, so no CPU gate selects them. The hosted
   `ci-vulkan` workflow (pull requests, merge queue and manual dispatch; lavapipe, displayless batch)
@@ -47,11 +47,11 @@ contracts: [geometry.property-coherence]
   byte-for-byte from the GPU lane's `tasks/evidence/BUG-228/2026-10-24/`.
 
 ## Acceptance criteria
-- [ ] Reproduce both failures on `ci-vulkan` at the current integration head and name the root
+- [x] Reproduce both failures on `ci-vulkan` at the current integration head and name the root
       cause (GPU kernel, CPU reference or test expectation) with evidence.
-- [ ] Both cases pass on a Vulkan host with every existing assertion kept; any tolerance change
+- [x] Both cases pass on a Vulkan host with every existing assertion kept; any tolerance change
       is recorded with its reasoning and approved by the operator before it lands.
-- [ ] The other keypoint cases in the same selection still pass.
+- [x] The other keypoint cases in the same selection still pass.
 
 ## Verification
 ```bash
@@ -141,3 +141,50 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke\.Key
     `af8a4df3f9ed0e38b245a52afac8ae878beaf495c67b040b8d3893e110d15bc9`) gave, verbatim,
     "VERDICT: approve".
   - Packets and answers: `review-*.{md,json}` and `delta-*.{md,json}`.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commits: `1852942c9` (the fix), `efb83a73e` and `7f122a51c` (evidence
+and review records), on `45efeaf7d`, branch `claude/bug-248-keypoint-gpu-parity`, merged into
+the night integration branch `claude/night-2026-10-24-bug-sweep` as `6cec3dcb0`. Not yet on
+`main`; hosted CI has not run on these commits.
+
+Root cause: `ffe7e8372` (HARDEN-090/GEOM-114) made the CPU PCA isotropic cutoff
+scale-relative; the keypoint kernel kept a private Jacobi with the old absolute floor. Fix:
+`point_keypoints.comp` calls the shared `pcaEigen`; no test, tolerance or timeout changed.
+
+Verification, as recorded in the Resolution above: `ci-vulkan` on an RTX 4090 with NVIDIA
+driver 580.159.04 and `DISPLAY=:1`. `PointLBVHGpuSmoke.Keypoint*` passed 9 of 11 at
+`45efeaf7d` and 11 of 11 after the fix; reverting only the shader restored both failures with
+the baseline signature; restoring it gave 11 of 11 again.
+
+Reviewer decisions (coordinator's local review record `wfE.json`, lane `BUG-248`, outside the
+repository), round 1 on `7f122a51cef9f2853c835277f3c1acc1cb6ed004`
+(`45efeaf7d..7f122a51c`):
+- Independent Claude review `approve`, no blocking findings; criteria 1, 2 and 3 "met". It
+  reran the two-case `ctest` on the existing `build/ci-vulkan` tree: 2/2 passed, none skipped.
+- Independent Codex review (thread `01a16bdc-9b47-78e3-88cd-38221dbcce20`) `approve`, no
+  blocking findings. Its table rates criterion 1 "Met — reproduce and identify the cause",
+  2 "Met — both cases pass without weakening assertions" and 3 "Met — remaining keypoint cases
+  pass". It ran no builds or GPU tests.
+
+Boxes: all three are ticked, as both round-1 reviews decided.
+
+Limits:
+- No regular gate selects these `gpu;vulkan` cases; whether they skip on hosted lavapipe
+  `ci-vulkan` is unchecked, and so is parity on other drivers.
+- The shared include `pca_eigen_double.glsl` puts `precise` on input parameters (`:38`,
+  `:77`), where glslc says it has no effect, so FP contraction inside the Jacobi fallback is not
+  ruled out. The keypoint kernel now inherits this from `point_normals.comp` (optional finding
+  of the Claude review; no owning task).
+- The duplication check covered the two shader files, not the whole repository.
+
+Open for the operator: whether these `gpu;vulkan` keypoint cases get gate coverage (or a
+hosted lavapipe check), and whether
+`KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` is renamed, since its name describes
+the pre-GEOM-114 rule.
+
+Evidence: the cohort logs cited in Context are git-ignored in the integration worktree
+(`tasks/evidence/BUG-248/cohort-d1.log`, `cohort-d9.log`; `cmp` at retirement found them
+byte-identical to the GPU lane's `tasks/evidence/BUG-228/2026-10-24/` copies). The Resolution's
+logs, probe and review packets are git-ignored in the `gpu` lane worktree
+(`tasks/evidence/BUG-248/`). Nothing was deleted.

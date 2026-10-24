@@ -10,11 +10,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   REMOVE+APPEND module fails all three cases. Hosted `ci-docs` passed on `main` `599f02ff1`
   (run 39957196726).
 
-- [BUG-248 — Keypoint GPU parity smokes fail on main](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md):
-  `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` (5 keypoints, reference 8) and
-  `KeypointResidentSubnormalScores` (mask and saliency bound) fail on `ci-vulkan` on any display;
-  restore parity without weakening assertions.
-
 - [BUG-247 — Local root hygiene rejects existing tool state](BUG-247-local-root-hygiene-state-mismatch.md):
   local `.aws/` and `.serena/` remain unclassified; preserve both pending an operator setup decision.
 
@@ -42,6 +37,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   atlas replacement; otherwise verify supersession when that replacement
   lands. Preserve corner-domain seams, source topology, and stale rejection.
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-248 — Keypoint GPU parity smokes fail on main](../../done/BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md).
+  The keypoint kernel kept a private Jacobi with the absolute isotropic floor that GEOM-114 removed on the CPU;
+  it now calls the shared `pcaEigen`. 11/11 `Keypoint*` cases pass on `ci-vulkan` (RTX 4090); no gate selects them.
 
 - Closed 2026-10-24: [BUG-091 — GoogleTest PRE_TEST discovery times out on a cold start](../../done/BUG-091-gtest-pretest-discovery-cold-timeout.md).
   The 5 s discovery budget is explicit and separate from case budgets; a failed listing prints the executable and budget

@@ -162,7 +162,8 @@ lanes' compiles were not recorded.
   `:2833` and `:2855` (7.58e-42 against 1.12e-44). RUNTIME-291's note (its
   worktree) records both cases failing with its `src/` change reverted. These
   failures are separate from this display bug;
-  [BUG-248](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md) tracks them.
+  [BUG-248](../../done/BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md) fixed them
+  in the keypoint kernel (retired 2026-10-24).
 - Resident LOP, built afterwards: both `PointCloudConsolidationGpuParity.ResidentLop*`
   cases passed on both displays: `PreviewDiscardAcceptParityAndRepeatInputIo`
   in 6.00 s on `:1` and 5.29 s on `:9` (limit 30 s), and
