@@ -99,8 +99,10 @@ CI helper scripts and workflow validation tools.
   every configured report, and archives the per-producer XML beside the CTest
   JUnit and log.
 - `gtest_discovery_probe.py`: BUG-091 diagnostic for GoogleTest PRE_TEST
-  discovery. `direct` reruns the exact `--gtest_list_tests` command of a
-  generated `<target>[1]_include.cmake` cold (page cache evicted) and warm;
+  discovery. `direct` reruns the `--gtest_list_tests` command of a generated
+  `<target>[1]_include.cmake` cold (page cache evicted) and warm, with the argv
+  of the CMake module that include runs (`--gtest_output=json:` only on CMake
+  4.x; only the JSON file name differs);
   `ctest` forces chosen targets stale, runs a CTest command and reports which
   `_tests.cmake` files were rewritten. Both emit JSON lines with load, PSI,
   memory and build/CTest process counts (matched by program name) taken outside

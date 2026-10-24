@@ -180,8 +180,8 @@ workflow moves the original contract-baseline hash unchanged to `consumed`.
 Unattended lane (operator absent until 09:00). No budget value was chosen; the
 value question is the operator's.
 
-**Landed** (branch `claude/bug-091-gtest-discovery-timeout`, commits
-`d14029314`..`b8fb5b50f` plus the commit carrying this note):
+**Landed** (branch `claude/bug-091-gtest-discovery-timeout`, from `d14029314`;
+later commits are in its history):
 - `tests/CMakeLists.txt` declares `_intrinsic_gtest_discovery_timeout_seconds 5`
   next to the 30 s / 120 s case budgets and passes it as `DISCOVERY_TIMEOUT`.
   The generated includes are byte-identical to before (a reconfigure rewrote
@@ -193,10 +193,10 @@ value question is the operator's.
   compile/link/ninja/ctest counts. Processes are matched by program name, not by
   `pgrep -f`, which matches its own shell. `decide` holds the frozen rule;
   `report` writes the HTML report.
-- `tests/regression/tooling/Test.GTestDiscoveryTimeout.py` (17 hermetic tests,
-  plus `--build-dir`): source policy; a slow fake lister passes below the
-  declared budget and fails nonzero at it, with path, timeout result and (CMake
-  4.x) the budget; the lister is gone afterwards (except CTest 3.31, below) and
+- `tests/regression/tooling/Test.GTestDiscoveryTimeout.py` (19 hermetic tests
+  after fix round 1, plus `--build-dir`): source policy; a slow fake lister
+  passes below the declared budget and fails nonzero at it, with path, timeout
+  result and the repository-owned budget line (fix round 1); the lister is gone afterwards (except CTest 3.31, below) and
   the lock is free; probe, decision-rule and live-reconcile self-checks.
   Wired into `ci-docs.yml` (hermetic) and `ci-linux-clang.yml` (`--build-dir
   build/ci`); `touched_scope.py` maps the probe and `collect_test_timing.py` to
@@ -270,7 +270,8 @@ failed out of 7", 1.33-1.37 s each.
   lister-gone assertion is therefore scoped: on 3.31 the test reaps the lister
   and prints a note, and the gate bounds are still asserted.
 - The 3.22, 3.28 and 3.31 modules print the path and the timeout result but not
-  the budget; only CMake 4.x prints `Timeout: '<N>'`.
+  the budget; only CMake 4.x prints `Timeout: '<N>'`. CI installs Ubuntu 24.04's
+  CMake 3.28.3. Fix round 1 adds a repository-owned budget line (below).
 - `Test.ConcurrentCTestDiscovery.py` fails 3/3 with local CMake 4.3.2 ("CMake
   flush implementation changed": the 4.3 module uses REMOVE+APPEND). It passes
   with 3.31.6. This predates the change and is not fixed here.
@@ -293,13 +294,67 @@ of 4; arms in fixed order (contention, then idle); probe children bound by
 broad C++ build was skipped, because the CMake change is byte-identical in
 generated output.
 
+**Fix round 1 (review findings; predictions in
+`tasks/evidence/BUG-091/fix-round-1/predictions.txt`, written first).**
+- C-real coverage (decision rule v4). A forced-stale CTest run now counts only
+  if it forced exactly the planned targets with eviction on (otherwise
+  `kill:not forced and evicted as planned`), and if it recorded a residency of
+  0 for every forced target (otherwise `invalid:residency`). New negative
+  controls: the reviewer's reproduction (forced/enumerated/residency empty,
+  eviction off), eviction off in one run, one forced target only, residency
+  missing for one target, residency `None`. On the unchanged probe the test
+  failed (`'rejected' == 'rejected'`, `before-probe-fix.log`). Replaying the
+  recorded raw JSONL with v4 gives the same verdict as the frozen v3
+  `decision.json`: H1 rejected, no kill conditions, 25 valid runs per arm. Only
+  the rule string differs (`runs/decision-v4.json`; v3 output kept unchanged).
+- Direct replay argv. `parse_include` reads the `GoogleTestAddTests.cmake`
+  that the include runs. `direct` adds `--gtest_output=json:<file>` only when
+  that module passes it (CMake 4.x), and fails closed if the include does not
+  name exactly one module. The fake lister now logs cwd and argv. The new test
+  compares CTest's discovery call with the probe's cold and warm calls; only
+  the JSON file name is normalized. On the unchanged probe it failed under
+  3.28.3 and 3.31.6 (extra `--gtest_output=json:<file>`) and passed under 4.3.2.
+- Budget diagnostic on every CMake. `cmake/IntrinsicTestDiscovery.cmake`'s
+  acquire script installs `variable_watch(result ...)`. The watch fires when
+  `GoogleTestAddTests.cmake` sets its listing result to a nonzero value, and it
+  prints before the upstream error:
+  `IntrinsicTestDiscovery: listing '<exe>' failed (<result>); its GoogleTest
+  discovery budget (TEST_DISCOVERY_TIMEOUT) is <N> s. See tests/README.md.`
+  It reads `arg_TEST_*` (3.31+) or `_TEST_*` (3.28). A line printed on every
+  relist was rejected: `cpu_test_selection._ctest_document` merges stderr into
+  the `--show-only=json-v1` JSON. The regression asserts the line
+  unconditionally, and asserts no line on the passing listing. With the HEAD
+  helper it failed on 4.3.2, 3.28.3 and 3.31.6 (`before-helper-fix.log`).
+- Mutations (`fix-round-1/mutations.log`), each failing its test for the
+  intended reason: watch removed (3.28.3 and 4.3.2), watch printing on success,
+  forced/evicted kill removed, residency completeness removed, JSON argument
+  always added (3.28.3), JSON argument never added (4.3.2).
+- After the fix: the hermetic suite runs 19/19 OK on 4.3.2, 3.28.3 and 3.31.6
+  (`after-fix.log`); no fake lister remains afterwards.
+  `Test.ConcurrentCTestDiscovery.py` passes on 3.28.3 and 3.31.6. It still
+  fails 3/3 on 4.3.2 for the pre-existing reason. `build/ci` was reconfigured,
+  and all 41 includes are hash-identical. Results (`real-tree.log`, all as
+  predicted): `--build-dir` ok, 41 includes. With the 3 built targets forced
+  stale, stderr-merged `--show-only=json-v1` parses, has 2101 tests and no
+  diagnostic, and the 3 targets were relisted. The focused RuntimeModule run
+  exits 0 with "0 tests failed out of 7". `direct` on the real includes lists
+  129/32/1785 cases, with `json_written` true on 4.3.2. Doc links strict and
+  docs-sync strict pass.
+- Also: the orphan reap is registered with `addCleanup` right after the hung
+  CTest call. The shortcut comment now names the tests that must be deleted
+  together with `decide`/`report`.
+- Chosen defaults: a plan deviation is a kill and missing residency is
+  invalid; the failure-only watch was chosen over a pre-listing line; the
+  touched-scope broad build was skipped (compiled code and generated includes
+  are unchanged).
+
 **Remaining.** Independent code review (session
 `29987edd-d5fe-403b-9503-0c6c39b64871`, Read/Grep/Glob only): round 1 REVISE
 (docs-sync, CMake versions), round 2 REVISE (README failure text vs CTest 3.31);
 both fixed in the following commits; round 3 on `5d90ef934`: "VERDICT:
 approve", blocking none (`tasks/evidence/BUG-091/code-review/`, final delta round).
-Its open optional items are an `addCleanup` for the CTest 3.31 reap, checking
-the 3.31 orphan on Kitware's binary as well as the PyPI wheel, and a separate
+Its open optional items were an `addCleanup` for the CTest 3.31 reap (done in
+fix round 1), checking the 3.31 orphan on Kitware's binary as well as the PyPI wheel, and a separate
 BUG task for `Test.ConcurrentCTestDiscovery.py` on CMake 4. Whether the evidence
 satisfies acceptance criteria 1-4, especially AC2 (budget in the failure
 message) on CMake < 4, is the reviewers' and operator's call. Index and

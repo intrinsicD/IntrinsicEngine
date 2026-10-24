@@ -38,15 +38,19 @@ class ProbeError(RuntimeError):
     pass
 
 
-def parse_include(path: Path) -> dict[str, str]:
+def parse_include(path: Path) -> dict[str, str | bool]:
     text = path.read_text(encoding="utf-8")
-    fields = dict(re.findall(r"(?m)^\s+([A-Z_]+) \[==\[(.*?)\]==\]\s*$", text))
-    if text.count("gtest_discover_tests_impl(") != 1 or "TEST_EXECUTABLE" not in fields:
+    fields: dict[str, str | bool] = dict(re.findall(r"(?m)^\s+([A-Z_]+) \[==\[(.*?)\]==\]\s*$", text))
+    module = re.findall(r'(?m)^\s+include\("([^"]*/GoogleTestAddTests\.cmake)"\)\s*$', text)
+    if text.count("gtest_discover_tests_impl(") != 1 or "TEST_EXECUTABLE" not in fields or len(module) != 1:
         raise ProbeError(f"{path}: unexpected GoogleTest include layout")
     # Fail closed: the rebuilt argv below omits these inputs.
     for key in ("TEST_EXECUTOR", "TEST_EXTRA_ARGS", "TEST_FILTER", "TEST_DISCOVERY_EXTRA_ARGS"):
         if fields.get(key, ""):
             raise ProbeError(f"{path}: {key} is not empty; probe would measure a different command")
+    # The module this include runs decides the argv: CMake 4.x adds --gtest_output=json:<file>,
+    # CMake 3.28/3.31 pass --gtest_list_tests alone.
+    fields["json_output"] = "--gtest_output=json:" in Path(module[0]).read_text(encoding="utf-8")
     return fields
 
 
@@ -199,12 +203,14 @@ def _run_bounded(command: list[str], cap: float, **kwargs) -> tuple[bytes, int |
     return stdout, process.returncode, timed_out, time.monotonic() - start
 
 
-def time_listing(target: str, fields: dict[str, str], cap: float) -> dict[str, object]:
-    # Same argv, cwd and output directory as GoogleTestAddTests.cmake; stdout captured,
-    # stderr inherited (CMake passes it through).
+def time_listing(target: str, fields: dict[str, str | bool], cap: float) -> dict[str, object]:
+    # Same argv and cwd as the include's GoogleTestAddTests.cmake (only the JSON file name
+    # differs); stdout captured, stderr inherited (CMake passes it through).
     json_out = Path(fields["TEST_WORKING_DIR"]) / f"gtest_discovery_probe_{target}.json"
     json_out.unlink(missing_ok=True)
-    command = [fields["TEST_EXECUTABLE"], "--gtest_list_tests", f"--gtest_output=json:{json_out}"]
+    command = [fields["TEST_EXECUTABLE"], "--gtest_list_tests"]
+    if fields["json_output"]:
+        command.append(f"--gtest_output=json:{json_out}")
     stdout, status, timed_out, wall = _run_bounded(command, cap, cwd=fields["TEST_WORKING_DIR"])
     written = json_out.exists()
     json_out.unlink(missing_ok=True)
@@ -328,8 +334,9 @@ def ctest_once(args: argparse.Namespace, repetition: int, output, limit: float) 
     return True
 
 
-# --- BUG-091 decision rule (frozen with the pre-flight packet) ---------------
-# shortcut: one-off BUG-091 analysis (decide/report); delete it when BUG-091 retires.
+# --- BUG-091 decision rule (v3 frozen with the pre-flight packet; v4 after review) ---
+# shortcut: one-off BUG-091 analysis (decide/report); delete it when BUG-091 retires, together
+# with DecisionRuleTests and test_planned_sequence_does_not_trip_identity_checks.
 LADDER = (15, 20, 30, 45, 60)
 CURRENT_BUDGET = 5.0
 MIN_CELL_SAMPLES = 300
@@ -404,11 +411,15 @@ def _real_run_status(run: dict, args: argparse.Namespace, expected_total: int | 
         return "kill:capped"
     if run["exit_status"] != 0 and not run["discovery_timeout_seen"]:
         return "kill:failed without a discovery timeout"
+    # Coverage needs the planned forced, evicted discovery of every target (rule v4).
+    if sorted(run["forced"]) != sorted(args.targets) or run.get("evicted") is not True:
+        return "kill:not forced and evicted as planned"
     if run["arm"] == "idle" and not idle(run, args.idle_max_load):
         return "invalid:not-idle"
     if run["arm"] == "contention" and run["processes"]["compile"] == 0:
         return "invalid:no-compile"
-    if run.get("evicted") and any(v != 0 for v in run.get("residency_bytes", {}).values()):
+    residency = run.get("residency_bytes", {})
+    if set(residency) != set(run["forced"]) or any(v != 0 for v in residency.values()):
         return "invalid:residency"
     if run["discovery_timeout_seen"]:
         return "timeout"
@@ -490,7 +501,7 @@ def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]
         else:
             kills.append(f"3 x max(5, M_obs) = {need:.3f} s exceeds the 60 s ceiling")
     valid_arms = {arm for arm, summary in arms.items() if summary["valid"]}
-    return {"schema": SCHEMA, "rule": "bug-091-budget/v3", "m_obs_seconds": m_obs, "h1": h1,
+    return {"schema": SCHEMA, "rule": "bug-091-budget/v4", "m_obs_seconds": m_obs, "h1": h1,
             "kill_conditions": kills, "chosen_budget_seconds": chosen,
             "decision": (f"set DISCOVERY_TIMEOUT {chosen}" if chosen is not None else
                          "no value chosen: keep explicit 5 s; operator decision"),

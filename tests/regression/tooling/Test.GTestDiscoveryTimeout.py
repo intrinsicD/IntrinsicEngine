@@ -68,15 +68,6 @@ def run(*args: str, timeout: float = 60, **kwargs) -> subprocess.CompletedProces
     return subprocess.run(args, check=True, text=True, capture_output=True, timeout=timeout, **kwargs)
 
 
-def googletest_module() -> str:
-    with tempfile.TemporaryDirectory(prefix="intrinsic-cmake-root-") as directory:
-        probe = Path(directory) / "locate.cmake"
-        probe.write_text('file(WRITE "${CMAKE_CURRENT_LIST_DIR}/root.txt" "${CMAKE_ROOT}")\n')
-        run("cmake", "-P", str(probe))
-        root = (Path(directory) / "root.txt").read_text()
-    return (Path(root) / "Modules/GoogleTestAddTests.cmake").read_text()
-
-
 def parse_include(path: Path) -> dict[str, str]:
     text = path.read_text(encoding="utf-8")
     fields = dict(re.findall(r"(?m)^\s+([A-Z_]+) \[==\[(.*?)\]==\]\s*$", text))
@@ -128,7 +119,10 @@ class FakeListerProject:
         for target in targets:
             fake = self.source / f"{target}.py"
             fake.write_text(
-                f"#!{sys.executable}\nimport os, pathlib, sys, time\n"
+                f"#!{sys.executable}\nimport json, os, pathlib, sys, time\n"
+                f'argv_file = os.environ.get("FAKE_ARGV_FILE_{target}")\n'
+                "if argv_file:\n"
+                "    with open(argv_file, 'a') as log: log.write(json.dumps([os.getcwd(), *sys.argv[1:]]) + '\\n')\n"
                 'if "--gtest_list_tests" in sys.argv:\n'
                 f'    pid_file = os.environ.get("FAKE_PID_FILE_{target}")\n'
                 "    if pid_file: pathlib.Path(pid_file).write_text(str(os.getpid()))\n"
@@ -170,7 +164,6 @@ def _alive(pid: int) -> bool:
 class FakeListerBudgetTests(unittest.TestCase):
     def test_declared_budget_passes_below_and_fails_bounded_above(self) -> None:
         budget = declared_budget()
-        module = googletest_module()
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-budget-") as directory:
             root = Path(directory)
             project = FakeListerProject(root, budget)
@@ -182,6 +175,8 @@ class FakeListerBudgetTests(unittest.TestCase):
                                             timeout=budget + 30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertGreaterEqual(elapsed, delay, "fake lister did not run during this CTest call")
+            # Callers merge stderr into this JSON (cpu_test_selection), so success stays silent.
+            self.assertNotIn("IntrinsicTestDiscovery:", result.stderr)
             tests = json.loads(result.stdout)["tests"]
             self.assertEqual(sorted(test["name"] for test in tests),
                              sorted(f"Fake.Case{i}" for i in range(CASE_COUNT)))
@@ -194,15 +189,18 @@ class FakeListerBudgetTests(unittest.TestCase):
             result, elapsed = project.ctest("-N", env={"FAKE_DELAY_Fake": str(10 * budget),
                                                        "FAKE_PID_FILE_Fake": str(pid_file)},
                                             timeout=budget + 60)
+            pid = int(pid_file.read_text())
+            self.addCleanup(lambda: _alive(pid) and os.kill(pid, 9))  # CTest 3.31 orphan, even on failure
             output = result.stdout + result.stderr
             self.assertNotEqual(result.returncode, 0, output)
             self.assertGreaterEqual(elapsed, budget, output)
             self.assertLess(elapsed, budget + 15, output)
             self.assertIn(str(project.fakes["Fake"]), output, "failure must name the lister executable")
             self.assertIn("Process terminated due to timeout", output)
-            if "  Timeout: '" in module:
-                self.assertIn(f"Timeout: '{budget}'", output, "failure must print the declared budget")
-            pid = int(pid_file.read_text())
+            # Repository-owned line: CMake < 4 does not print the budget itself.
+            self.assertIn(f"IntrinsicTestDiscovery: listing '{project.fakes['Fake']}' failed (Process terminated "
+                          f"due to timeout); its GoogleTest discovery budget (TEST_DISCOVERY_TIMEOUT) is {budget} s",
+                          output, "failure must name the executable and the declared budget")
             deadline = time.monotonic() + 5
             while _alive(pid) and time.monotonic() < deadline:
                 time.sleep(0.05)
@@ -216,8 +214,7 @@ class FakeListerBudgetTests(unittest.TestCase):
             self.assertIn(f"Total Tests: {CASE_COUNT}", result.stdout)
             if orphaned:
                 # CTest 3.31 returns at the budget but leaves the timed-out lister running
-                # (BUG-091 diagnosis); the gate is still bounded. Reap it here.
-                os.kill(pid, 9)
+                # (BUG-091 diagnosis); the gate is still bounded. The cleanup reaps it.
                 print(f"note: CTest {'.'.join(map(str, ctest_version()))} left the timed-out lister running",
                       file=sys.stderr)
 
@@ -252,6 +249,22 @@ class ProbeSelfTests(unittest.TestCase):
                     self.assertLess(sample["wall_seconds"], 0.5)
             # Rotation: each repetition starts with a different target.
             self.assertEqual([s["target"] for s in samples[::4]], ["Slow", "Instant"])
+
+    def test_direct_replays_this_cmakes_discovery_command(self) -> None:
+        # The fake logs cwd and argv; only the JSON file name may differ (CMake 4.x passes one).
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-argv-") as directory:
+            project = FakeListerProject(Path(directory), declared_budget())
+            log = Path(directory) / "argv.jsonl"
+            env = {"FAKE_ARGV_FILE_Fake": str(log)}
+            project.stale("Fake")
+            result, _ = project.ctest("-N", env=env, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.probe("direct", "--tests-dir", str(project.build), "--target", "Fake",
+                       "--max-minutes", "2", "--cap-seconds", "10", env=env)
+            calls = [[re.sub(r"^--gtest_output=json:.*", "--gtest_output=json:<file>", arg) for arg in json.loads(line)]
+                     for line in log.read_text().splitlines()]
+            self.assertEqual(len(calls), 3, calls)  # CTest discovery, then the probe's cold and warm listing
+            self.assertEqual(calls[1:], [calls[0]] * 2)
 
     def test_listing_child_dies_with_a_killed_probe(self) -> None:
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-orphan-") as directory:
@@ -484,6 +497,29 @@ class DecisionRuleTests(unittest.TestCase):
             self.assertTrue(any("validated baseline" in kill for kill in verdict["kill_conditions"]))
         few_real = [row for row in self.records() if not (row["event"] == "ctest" and row["repetition"] >= 19)]
         self.assertFalse(self.decide(few_real)["arms"]["idle"]["valid"])
+
+    def test_c_real_runs_count_only_with_the_planned_forced_cold_discovery(self) -> None:
+        def every_real(rows: list[dict], **fields) -> list[dict]:
+            for row in rows:
+                if row["event"] == "ctest":
+                    row.update(fields)
+            return rows
+        # Cached CTest calls that forced, evicted and observed nothing must not count as coverage.
+        verdict = self.decide(every_real(self.records(), forced=[], enumerated=[], evicted=False, residency_bytes={}))
+        self.assertNotEqual(verdict["h1"], "rejected")
+        self.assertTrue(any("not forced and evicted as planned" in kill for kill in verdict["kill_conditions"]))
+        for fields in ({"evicted": False}, {"forced": [self.TARGETS[0]], "residency_bytes": {self.TARGETS[0]: 0}}):
+            rows = self.records()
+            rows[-1].update(fields)
+            verdict = self.decide(rows)
+            self.assertNotEqual(verdict["h1"], "rejected", fields)
+            self.assertTrue(any("not forced and evicted as planned" in kill for kill in verdict["kill_conditions"]),
+                            (fields, verdict["kill_conditions"]))
+        # A forced target without an observed zero residency was not shown cold.
+        for residency in ({target: 0 for target in self.TARGETS[:2]}, {target: None for target in self.TARGETS}):
+            verdict = self.decide(every_real(self.records(), residency_bytes=residency))
+            self.assertEqual(verdict["arms"]["idle"]["ctest_runs"], {"invalid:residency": 20}, residency)
+            self.assertEqual(verdict["h1"], "inconclusive")
 
     def test_failed_sample_blocks_a_value(self) -> None:
         verdict = self.decide(self.records(wall=0.1, wall_seconds=6.0, exit_status=1))
