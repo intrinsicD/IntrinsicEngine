@@ -369,7 +369,7 @@ RULES: list[Rule] = [
          count=(("JobDesc{", 1), (".Scope = request.World", 1))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/model-handoff",
          files=("src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp",),
-         count=(("JobDesc ", 3), (".Scope = ", 3))),
+         count=(("JobDesc ", 0), (".Scope = ", 0))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/geometry-operations",
          files=(OPERATIONS + "Runtime.PointSetOperations.Processing.cpp",),
          count=(("JobDesc desc{", 1), (".Scope = context.World", 1))),

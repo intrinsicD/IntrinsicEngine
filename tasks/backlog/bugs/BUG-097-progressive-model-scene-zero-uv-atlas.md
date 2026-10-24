@@ -206,3 +206,225 @@ python3 tools/agents/check_task_policy.py --root . --strict
   stale-generation contract through the opt-in progressive runtime path.
 - This task has no backend promotion claim; after those CPU contracts pass, no
   `Operational` follow-up is owed. GPU bake execution remains separately owned.
+
+## Proposal — 2026-10-24 (awaiting operator decision)
+
+Branch `claude/bug-097-remove-progressive-model-path-v2`, based on the
+integration head `0d7b5b4d3`. It replaces the first proposal branch
+`claude/bug-097-remove-progressive-model-path` (`311ad6938`, based on
+`599f02ff1`), which stays unchanged; see "v2 on the integration head" below.
+It is a proposal and is not merged. It removes the unreachable progressive
+model-scene path instead of repairing it. No checkbox above is ticked, and the
+start-gate item stays open until the operator decides.
+
+### Start gate
+- Currently needed workflow: none. No code in `src`, `tests`, `tools`,
+  `benchmarks` or `methods` sets `ProgressiveRawGeometryFirst` or
+  `ProgressiveJobs`. The only construction of
+  `AssetWorkflowModelMaterializationOptions` is
+  `Runtime.AssetWorkflowModule.cpp:598`. It uses designated initializers
+  (`World`, `BindingEpoch`, `BindingValid`, `TextureBake`).
+  `git log -S` shows that `0fdeac008` (2026-07-31) removed the last four
+  setters together with `Test.AssetModelSceneHandoff.cpp`. Since then every
+  `hasProgressiveJobs` / `ProgressiveRawGeometryFirst` branch has been
+  constant-false in every composition.
+- Replacement owner/branch: not identified. No task or branch matches the
+  shared-atlas replacement. `METHOD-040`/`GEOM-076` were not assumed to be it.
+- Options for the operator:
+  - A: delete now (this branch).
+  - B: keep the dead path until the replacement lands, then supersede.
+  - C: interim repair. Not recommended, because the path is unreachable and
+    there is nothing to reproduce.
+
+  The first acceptance criterion names only interim repair or a landed
+  replacement. Closing by removal without a replacement is therefore the
+  operator's call.
+
+### Change (deletion only; no behavior change in any composition)
+- `Runtime.AssetWorkflowModelMaterialization.cppm`:
+  - Removed the options `ProgressiveRawGeometryFirst` and `ProgressiveJobs`.
+  - Removed the never-read counters `ProgressiveRawPrimitiveEntitiesPublished`,
+    `ProgressiveUvAtlasJobsQueued` and `ProgressiveNormalJobsQueued`.
+  - Removed the `JobService` import.
+- `Runtime.AssetWorkflowModelMaterialization.cpp`:
+  - Removed `WriteDefaultTexcoords`, `WriteDefaultVectorProperty`,
+    `ProgressiveEnrichmentResult`, `QueueProgressiveNoopJob`,
+    `MeshHasVertexNormals` and (v2 only) `MeshHasVertexTexcoords`.
+  - Removed the uv and normal no-op jobs, the job-scheduled normal and albedo
+    bake requests, and the geometry-only branch of `PreparePrimitives`.
+  - Removed the `JobService` and `KernelEvents` imports and `<functional>`.
+  - Each kept condition equals the old one without its constant-false arm:
+    the early return, the normal arm, the albedo arm and the publication guard.
+- `Runtime.AssetWorkflowGeometryMaterialization.cppm/.cpp`:
+  - Removed `MeshPayloadHasValidVertexTexcoords` and
+    `HasValidTexcoords(const MeshIOResult&)`. Their only caller was the
+    deleted branch.
+  - `BuildRuntimeHalfedgeMeshGeometryOnly` stays, because
+    `Runtime.AssetWorkflowImportExecutor.cpp:1024` still calls it.
+- `tools/repo/source_rules_engine_layering.py`: the `model-handoff` counts for
+  `JobDesc ` and `.Scope = ` change from 3 to 0. The rule still fails if any
+  job submission returns to this file: its self-check injects one token even
+  when the expected count is 0.
+- `docs/architecture/runtime.md`: dropped "or progressive" from the bake-extent
+  fallback sentence.
+- Size, not counting this note: 6 files, 10 insertions, 345 deletions (v1);
+  10 insertions, 350 deletions (v2).
+
+### Regression-first statement
+Unreachable code cannot have a test that fails before its deletion, so no
+test was written. The evidence instead:
+- (a) No setter exists (see the start gate above).
+- (b) The same suites give the same results before and after the change.
+- (c) The source-rule count follows the deletion. The prediction was written
+  before the run. After the deletion and before the rule edit,
+  `check_source_rules.py --suite RuntimeEngineLayering` exited 1 with exactly
+  two problems: "count of 'JobDesc ' is 0, expected 3" and
+  "count of '.Scope = ' is 0, expected 3". After the edit it reported
+  0 problems over 165 rules, and `--self-check` reported 0 problems over
+  265 rules.
+
+### Verification of v1 (at `599f02ff1`, `ci` preset)
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`: exit 0,
+  no warnings.
+- Focused `ctest -R '^(AssetWorkflowModule|RuntimeAssetImportFormatCoverage|RuntimeAssetImportRecipe|RuntimeTextureBakeModule|AssetFormatCapabilities|RuntimeReuseDriftGuard)\.|^AssetCompilationLocality\.ModelMaterialization$|^RuntimeEngineLayering\.SourceRules$'`:
+  109/109 passed after every executable was rebuilt.
+  - The baseline at `599f02ff1` had 108/108.
+  - The extra test is the slow-labeled
+    `RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically`.
+    Its executable did not exist yet when the baseline ran.
+- `cmake --build --preset ci --target IntrinsicTests`: exit 0, no warnings.
+- `ctest -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`: 5934/5934
+  passed and 1 skipped (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`),
+  the same as the baseline.
+  - The whole CPU suite ran because a `.cppm` interface changed.
+  - GPU tests were excluded because no GPU code changed.
+- The static checks all passed:
+  - `check_layering --strict`: 0 violations.
+  - `check_test_layout --strict`: 0 findings.
+  - `check_doc_links`: no broken links.
+  - `check_task_policy --strict`: 0 findings.
+  - `generate_session_brief --check`: up to date.
+  - `check_docs_sync --diff-mode --base-ref 599f02ff1`: satisfied.
+- `rg` over `src tests tools` for every removed name: no hits.
+- jscpd over the two touched `.cpp` files: 2 clones before, 1 after. The one
+  left is pre-existing and unrelated.
+
+### Acceptance criteria → removed-surface disposition (reviewers decide)
+1. Needed path: none exists (see the start gate). Closing by removal is the
+   operator's decision.
+2. Zero-fill: the progressive UV enrichment is gone, and so are
+   `WriteDefaultTexcoords` and `WriteDefaultVectorProperty`. `rg` finds no
+   remaining zero-fill helper.
+3. Canonical UVs: met only for the removed publisher. Model scenes get UVs
+   only from the synchronous `BuildRuntimeHalfedgeMeshMaterialization`, which
+   uses corner-over-vertex resolution and publishes seam UVs as `h:texcoord`.
+   The kept bake gates read the canonical `HasResolvedTexcoords` since
+   BUG-250; v2 keeps that.
+4. Stale completion: model materialization has no deferred write left, so this
+   file has no stale-completion window. Bake requests go to
+   `TextureBakeService`, whose stale and unknown-source handling the
+   `RuntimeTextureBakeModule` suite covers.
+5. Atlas failure: the default path uses `RuntimeMeshUvFailurePolicy::Optional`.
+   It counts `UvAtlasFailures` and writes no UVs.
+   `RuntimeAssetImportFormatCoverage.RejectedAtlasDoesNotDiscardModelScene`
+   asserts that no `v:texcoord` exists. Automatic bakes need resolved UVs
+   (BUG-250's gate), so a failure blocks them instead of faking readiness;
+   `ModelSceneSeamAtlasRequestsGeneratedTextureBakes` covers a rejected-atlas
+   primitive.
+6. Raw-first and thread ownership: raw-first mode is removed. Publication is
+   one synchronous main-thread materialization, covered by
+   `ExpectModelSceneCompletionRoute` (synchronous and queued) in
+   `ModelSceneCompletionSelectsAndFramesCreatedPrimitives` and
+   `AuthoredModelMaterialsUseOnlyPerRenderableLeases`.
+7. Default setting: unchanged. The removed options were false or null in every
+   composition.
+
+The Tests checklist applies to the interim-repair branch only. Of the Docs
+items, the `runtime.md` wording is fixed; indexes and retirement are left to
+the integrator.
+
+### Finding for the 09:00 decision (resolved by BUG-250)
+The finding below was filed as option (i), BUG-250, and fixed in
+`9c5b4559e` (`tasks/done/BUG-250-direct-texture-bakes-skip-seam-atlas-models.md`).
+The v1 text is kept as the record; its line numbers refer to v1.
+- What the code does:
+  - The kept direct-bake branches gate on `MeshHasVertexTexcoords`
+    (`Runtime.AssetWorkflowModelMaterialization.cpp:882`, used at `:1032` for
+    the normal bake and `:1073` for albedo). It reads only `v:texcoord`.
+  - A seam-bearing generated atlas publishes only `h:texcoord` and removes
+    `v:texcoord` (`Runtime.AssetWorkflowGeometryMaterialization.cpp:582`,
+    `:927`).
+  - `TextureBakeService` accepts `h:texcoord`
+    (`Runtime.TextureBakeModule.cpp:415`, `:572`). The direct-mesh path checks
+    both properties.
+  - `docs/architecture/property-coherence.md:437-440` says that watching only
+    `v:texcoord` is wrong for seam meshes.
+- Likely effect (inferred from the code, not run): model primitives with a
+  seam atlas never get the automatic normal or albedo bake request. Their
+  normal slot stays at "waiting for resolved UVs and vertex normals ...". No
+  CPU test targets the model-scene direct normal-bake branch.
+- Options:
+  - (i) File a new bug.
+  - (ii) Extend BUG-097's scope.
+
+  Candidate fix for either: gate on the canonical
+  `PreparedPrimitive::HasResolvedTexcoords` instead, and add a seam-atlas
+  model-scene test that asserts a bake request.
+
+### Defaults chosen
+- The helper cleanup in `GeometryMaterialization` is included.
+- `ProgressiveTextureBakeJobsQueued`, `RecordProgressiveTextureBakeDiagnostic`
+  and the name `QueueProgressiveEnrichmentJobs` are kept. They are on the live
+  path, and renaming them is out of scope.
+- The source rule is kept with count 0 rather than deleted.
+- ADR 0021 and rule 5 of the import-visibility skill ("publish decoded raw
+  geometry first") are unchanged. They record history and principle, and the
+  model-scene raw-first seam was never wired.
+- If model scenes need an async atlas, the base to reuse is the direct-mesh
+  deferred atlas job in `Runtime.AssetWorkflowRecipePolicies.cpp`.
+
+### v2 on the integration head (2026-10-24)
+- Why: `311ad6938` rewrites the two direct-bake gates that BUG-250
+  (`9c5b4559e`) changed. Merging it as it was would revert BUG-250.
+- How: `git switch -c claude/bug-097-remove-progressive-model-path-v2
+  0d7b5b4d3`, then `git cherry-pick 311ad6938` (the only commit on the old
+  branch). It conflicted only in `Runtime.AssetWorkflowModelMaterialization.cpp`.
+- Resolution, in the cherry-pick commit itself (a split would leave a commit
+  that either does not build or reverts BUG-250):
+  - Normal and albedo gates: the progressive arm is gone as the proposal
+    intends; the condition is BUG-250's `primitive.HasResolvedTexcoords`,
+    unchanged.
+  - `MeshHasVertexTexcoords` is removed as well. After BUG-250 its only
+    caller was the deleted progressive UV-job guard
+    (`if (hasProgressiveJobs && !MeshHasVertexTexcoords(primitive.Mesh))`).
+  - The one extra focused test against v1 (110 vs 109) is
+    `RuntimeAssetImportFormatCoverage.ModelSceneSeamAtlasRequestsGeneratedTextureBakes`
+    (checked by name by the independent review of `3fb7ae908`).
+- Verification (this session, `build/ci`):
+  - `IntrinsicRuntimeContractTests` build: exit 0. No warnings in
+    `AssetWorkflow` files; the warnings in the log are in unrelated files.
+  - The v1 focused `ctest -R` set with `-LE 'gpu|vulkan|flaky-quarantine'`:
+    110/110 passed (v1: 109; the extra one is BUG-250's
+    `RuntimeAssetImportFormatCoverage.ModelSceneSeamAtlasRequestsGeneratedTextureBakes`).
+  - Mutation of the resolution: both gates set back to a `v:texcoord` check
+    made that test fail (normal slot "waiting for resolved UVs and vertex
+    normals ...", albedo slot "waiting for vertex color albedo bake"). With
+    the resolution restored it passed.
+  - `IntrinsicTests` build: exit 0, no warnings in `AssetWorkflow` files.
+    `ctest -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j12`:
+    5942 tests, 0 failed, 1 skipped
+    (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, as in v1).
+  - `check_layering --strict`: 0 violations. `check_test_layout --strict`:
+    0 findings. `check_doc_links --strict`: no broken links.
+    `check_task_policy --strict`: 0 findings.
+    `check_source_rules.py --suite RuntimeEngineLayering`: 0 problems over
+    165 rules; `--self-check`: 0 problems over 265 rules;
+    `Test.CheckSourceRules.py`: ok. `generate_session_brief --check`: up to
+    date. `check_docs_sync --diff-mode --base-ref 0d7b5b4d3`: satisfied.
+  - `rg` over `src tests tools` for every removed name, including
+    `MeshHasVertexTexcoords`: no hits.
+
+### Remaining
+- The operator's choice of A, B or C.
+- An independent correctness review of the diff.
+- Index and retirement records, which belong to the integrator.

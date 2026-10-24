@@ -95,9 +95,6 @@ struct RuntimeMeshGeometryOnlyOptions {
 GenerateRuntimeMeshTexcoords(Geometry::HalfedgeMesh::Mesh mesh,
     const Geometry::MeshIO::MeshIOResult& source);
 
-[[nodiscard]] bool MeshPayloadHasValidVertexTexcoords(
-    const Geometry::MeshIO::MeshIOResult &meshPayload) noexcept;
-
 [[nodiscard]] Core::Expected<RuntimeMeshMaterializationResult>
 BuildRuntimeHalfedgeMeshMaterialization(
     const Geometry::MeshIO::MeshIOResult &meshPayload,

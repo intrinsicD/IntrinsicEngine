@@ -5,7 +5,6 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -42,8 +41,6 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 import Extrinsic.Runtime.AssetWorkflowTextureResidency;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -477,8 +474,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Expected<std::vector<PreparedPrimitive>> PreparePrimitives(
             const Assets::AssetModelScenePayload& model,
-            AssetWorkflowModelMaterializationDiagnostics* diagnostics,
-            const bool progressiveRawGeometryFirst)
+            AssetWorkflowModelMaterializationDiagnostics* diagnostics)
         {
             std::vector<PreparedPrimitive> prepared{};
             prepared.reserve(model.Primitives.size());
@@ -504,49 +500,6 @@ namespace Extrinsic::Runtime
                 if (!meshPayload.has_value())
                 {
                     return Core::Err<std::vector<PreparedPrimitive>>(meshPayload.error());
-                }
-
-                if (progressiveRawGeometryFirst)
-                {
-                    auto mesh = BuildRuntimeHalfedgeMeshGeometryOnly(**meshPayload, {
-                        .AllowDisconnectedRenderableFallback = true,
-                        .ValidationOptions = model.ValidationOptions,
-                        .ValidationReport = model.ValidationReport.get(),
-                        .PrimitiveIndex = primitiveIndex});
-                    if (!mesh.has_value())
-                    {
-                        return Core::Err<std::vector<PreparedPrimitive>>(mesh.error());
-                    }
-                    auto localBounds = ComputeLocalBounds(*mesh);
-                    if (!localBounds.has_value())
-                    {
-                        return Core::Err<std::vector<PreparedPrimitive>>(
-                            localBounds.error());
-                    }
-
-                    const bool hasAuthoredTexcoords = MeshPayloadHasValidVertexTexcoords(**meshPayload) ||
-                        mesh->HalfedgeProperties().Exists("h:texcoord");
-                    prepared.push_back(PreparedPrimitive{
-                        .PrimitiveIndex = static_cast<std::uint32_t>(primitiveIndex),
-                        .GeometryPayloadIndex = primitive.GeometryPayloadIndex,
-                        .MaterialIndex = primitive.MaterialIndex,
-                        .VertexCount = primitive.VertexCount,
-                        .IndexCount = primitive.IndexCount,
-                        .Name = primitive.Name.empty()
-                            ? "model-primitive-" + std::to_string(primitiveIndex)
-                            : primitive.Name,
-                        .Mesh = std::move(*mesh),
-                        .LocalBounds = *localBounds,
-                        .HasResolvedTexcoords = hasAuthoredTexcoords,
-                        .TexcoordProvenance = hasAuthoredTexcoords
-                            ? RuntimeMeshResolvedUvProvenance::AuthoredPreserved
-                            : RuntimeMeshResolvedUvProvenance::None,
-                    });
-                    if (diagnostics != nullptr && hasAuthoredTexcoords)
-                    {
-                        ++diagnostics->AuthoredUvPrimitives;
-                    }
-                    continue;
                 }
 
                 // An unusable atlas must not discard otherwise renderable geometry.
@@ -926,16 +879,6 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] bool MeshHasVertexNormals(const Geometry::HalfedgeMesh::Mesh& mesh)
-        {
-            return mesh.VertexProperties().Exists("v:normal");
-        }
-
-        [[nodiscard]] bool MeshHasVertexTexcoords(const Geometry::HalfedgeMesh::Mesh& mesh)
-        {
-            return mesh.VertexProperties().Exists("v:texcoord");
-        }
-
         [[nodiscard]] std::string_view NormalBakePropertyName(
             const AssetWorkflowModelMaterializationOptions& options) noexcept
         {
@@ -1043,80 +986,6 @@ namespace Extrinsic::Runtime
                 GeometryPresentationProvenance::PropertyBinding;
         }
 
-        void WriteDefaultVectorProperty(
-            ECS::Scene::Registry& scene,
-            const ECS::EntityHandle entity,
-            const std::string_view propertyName,
-            const glm::vec3 value)
-        {
-            auto* vertices = scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
-            if (vertices == nullptr)
-            {
-                return;
-            }
-            auto property = vertices->Properties.GetOrAdd<glm::vec3>(
-                std::string{propertyName},
-                value);
-            property.Vector().assign(vertices->Properties.Size(), value);
-        }
-
-        void WriteDefaultTexcoords(
-            ECS::Scene::Registry& scene,
-            const ECS::EntityHandle entity)
-        {
-            auto* vertices = scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
-            if (vertices == nullptr)
-            {
-                return;
-            }
-            auto property = vertices->Properties.GetOrAdd<glm::vec2>(
-                "v:texcoord",
-                glm::vec2{0.0f});
-            property.Vector().assign(vertices->Properties.Size(), glm::vec2{0.0f});
-        }
-
-        // The retired `DerivedJobOutput` carried a payload token and a
-        // diagnostic on every derived job. `JobService` results are typed, so
-        // the enrichment chain declares the one record its apply bodies read.
-        // Jobs whose apply ignores the payload still return a populated
-        // envelope, because an empty envelope is how `JobService` reports a
-        // dropped job.
-        struct ProgressiveEnrichmentResult
-        {
-            std::uint64_t PayloadToken{0u};
-            std::string Diagnostic{};
-        };
-
-        // RUNTIME-194 Slice B5b: the enrichment jobs no longer carry a
-        // `DerivedJobKey`. Nothing here looked the jobs up by entity, semantic,
-        // or generation — the key existed only for the retired registry's
-        // dedup/enumeration — so identity stays with the consumer that has a
-        // reason to hold it, per the Slice B5 decision.
-        [[nodiscard]] JobToken QueueProgressiveNoopJob(
-            JobService& jobs,
-            const WorldHandle world,
-            std::string name,
-            std::uint64_t payloadToken,
-            std::move_only_function<Core::Result()> apply)
-        {
-            JobDesc desc{};
-            desc.DebugName = std::move(name);
-            desc.Scope = world;
-            desc.Work = [payloadToken](const JobCancellation&) -> JobResultEnvelope
-            {
-                return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
-                    ProgressiveEnrichmentResult{.PayloadToken = payloadToken});
-            };
-            desc.PublishCompletion =
-                [apply = std::move(apply)](
-                    KernelEventBus&,
-                    const JobResultEnvelope&) mutable -> bool
-            {
-                return !apply || apply().has_value();
-            };
-            return jobs.Submit(std::move(desc));
-        }
-
         void QueueProgressiveEnrichmentJobs(
             ECS::Scene::Registry& scene,
             const ECS::EntityHandle entity,
@@ -1125,8 +994,7 @@ namespace Extrinsic::Runtime
             const AssetWorkflowModelMaterializationOptions& options,
             AssetWorkflowModelMaterializationDiagnostics* diagnostics)
         {
-            const bool hasProgressiveJobs = options.ProgressiveJobs != nullptr;
-            if (!hasProgressiveJobs && options.TextureBake == nullptr)
+            if (options.TextureBake == nullptr)
             {
                 return;
             }
@@ -1147,57 +1015,6 @@ namespace Extrinsic::Runtime
                         : 1024u;
             }
 
-            JobToken uvJob{};
-            JobToken normalJob{};
-
-            if (hasProgressiveJobs && !MeshHasVertexTexcoords(primitive.Mesh))
-            {
-                uvJob = QueueProgressiveNoopJob(
-                    *options.ProgressiveJobs,
-                    options.World,
-                    "generate mesh uv atlas",
-                    1001u,
-                    [&scene, entity]() -> Core::Result
-                    {
-                        if (!scene.IsValid(entity))
-                        {
-                            return Core::Err(Core::ErrorCode::InvalidState);
-                        }
-                        WriteDefaultTexcoords(scene, entity);
-                        return Core::Ok();
-                    });
-                if (diagnostics != nullptr)
-                {
-                    ++diagnostics->ProgressiveUvAtlasJobsQueued;
-                }
-            }
-
-            if (hasProgressiveJobs && !MeshHasVertexNormals(primitive.Mesh))
-            {
-                normalJob = QueueProgressiveNoopJob(
-                    *options.ProgressiveJobs,
-                    options.World,
-                    "compute mesh vertex normals",
-                    1002u,
-                    [&scene, entity, propertyName = options.GeneratedNormalPropertyName]() -> Core::Result
-                    {
-                        if (!scene.IsValid(entity))
-                        {
-                            return Core::Err(Core::ErrorCode::InvalidState);
-                        }
-                        WriteDefaultVectorProperty(
-                            scene,
-                            entity,
-                            propertyName.empty() ? std::string_view{"v:normal"} : std::string_view{propertyName},
-                            glm::vec3{0.0f, 0.0f, 1.0f});
-                        return Core::Ok();
-                    });
-                if (diagnostics != nullptr)
-                {
-                    ++diagnostics->ProgressiveNormalJobsQueued;
-                }
-            }
-
             const bool materialHasAuthoredNormal =
                 material != nullptr && material->NormalTexture.IsValid();
             const bool useTextureBake =
@@ -1207,70 +1024,8 @@ namespace Extrinsic::Runtime
                 options.TextureBake != nullptr;
             if (useTextureBake)
             {
-                if (hasProgressiveJobs)
-                {
-                    JobDesc schedule{};
-                    schedule.DebugName = "schedule normal GPU bake request";
-                    schedule.Scope = options.World;
-                    if (uvJob.IsValid())
-                    {
-                        schedule.DependsOn.push_back(JobDependency{
-                            .Job = uvJob,
-                            .Reason = "uv atlas ready",
-                        });
-                    }
-                    if (normalJob.IsValid())
-                    {
-                        schedule.DependsOn.push_back(JobDependency{
-                            .Job = normalJob,
-                            .Reason = "vertex normals ready",
-                        });
-                    }
-                    schedule.Work = [](const JobCancellation&) -> JobResultEnvelope
-                    {
-                        return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
-                            ProgressiveEnrichmentResult{
-                                .PayloadToken = 0u,
-                                .Diagnostic = "property texture bake request dependencies ready",
-                            });
-                    };
-                    schedule.PublishCompletion =
-                        [&scene,
-                         entity,
-                         textureBake = options.TextureBake,
-                         requestOptions = bakeOptions](
-                            KernelEventBus&,
-                            const JobResultEnvelope&) mutable -> bool
-                    {
-                        if (!scene.IsValid(entity))
-                        {
-                            return false;
-                        }
-
-                        PropertyTextureBakeResult result =
-                            ScheduleGeneratedPropertyTextureBake(
-                                *textureBake,
-                                entity,
-                                requestOptions,
-                                NormalBakePropertyName(requestOptions),
-                                Geometry::PropertyValueKind::Vec3,
-                                PropertyTextureBakeEncoding::Normal,
-                                "generated-normal");
-                        RecordProgressiveTextureBakeDiagnostic(
-                            scene,
-                            entity,
-                            GeometryPresentationSlotSemantic::Normal,
-                            std::move(result.Diagnostic));
-                        return true;
-                    };
-                    (void)options.ProgressiveJobs->Submit(std::move(schedule));
-                    if (diagnostics != nullptr)
-                    {
-                        ++diagnostics->ProgressiveTextureBakeJobsQueued;
-                    }
-                }
-                else if (primitive.HasResolvedTexcoords &&
-                         MeshHasVertexProperty(primitive.Mesh, NormalBakePropertyName(options)))
+                if (primitive.HasResolvedTexcoords &&
+                    MeshHasVertexProperty(primitive.Mesh, NormalBakePropertyName(options)))
                 {
                     PropertyTextureBakeResult result =
                         ScheduleGeneratedPropertyTextureBake(
@@ -1308,64 +1063,9 @@ namespace Extrinsic::Runtime
                 !materialHasAuthoredAlbedo &&
                 MeshHasVertexProperty(primitive.Mesh,
                                       options.GeneratedAlbedoPropertyName);
-            if (options.TextureBake != nullptr && wantsGeneratedAlbedo &&
-                hasProgressiveJobs)
-            {
-                JobDesc albedoBake{};
-                albedoBake.DebugName = "schedule albedo GPU bake request";
-                albedoBake.Scope = options.World;
-                if (uvJob.IsValid())
-                {
-                    albedoBake.DependsOn.push_back(JobDependency{
-                        .Job = uvJob,
-                        .Reason = "uv atlas ready",
-                    });
-                }
-                albedoBake.Work = [](const JobCancellation&) -> JobResultEnvelope
-                {
-                    return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
-                        ProgressiveEnrichmentResult{
-                            .Diagnostic = "property texture bake request "
-                                          "dependencies ready",
-                        });
-                };
-                albedoBake.PublishCompletion =
-                    [&scene, entity,
-                     textureBake = options.TextureBake,
-                     requestOptions =
-                         bakeOptions](KernelEventBus&,
-                                     const JobResultEnvelope&) mutable -> bool
-                {
-                    if (!scene.IsValid(entity))
-                    {
-                        return false;
-                    }
-
-                    PropertyTextureBakeResult result =
-                        ScheduleGeneratedPropertyTextureBake(
-                            *textureBake,
-                            entity,
-                            requestOptions,
-                            requestOptions.GeneratedAlbedoPropertyName,
-                            Geometry::PropertyValueKind::Unknown,
-                            PropertyTextureBakeEncoding::RgbaColor,
-                            "generated-albedo");
-                    RecordProgressiveTextureBakeDiagnostic(
-                        scene,
-                        entity,
-                        GeometryPresentationSlotSemantic::Albedo,
-                        std::move(result.Diagnostic));
-                    return true;
-                };
-                (void)options.ProgressiveJobs->Submit(std::move(albedoBake));
-                if (diagnostics != nullptr)
-                {
-                    ++diagnostics->ProgressiveTextureBakeJobsQueued;
-                }
-            }
-            else if (options.TextureBake != nullptr &&
+            if (options.TextureBake != nullptr &&
                 wantsGeneratedAlbedo &&
-                     primitive.HasResolvedTexcoords)
+                primitive.HasResolvedTexcoords)
             {
                 PropertyTextureBakeResult result =
                     ScheduleGeneratedPropertyTextureBake(
@@ -1420,10 +1120,7 @@ namespace Extrinsic::Runtime
                 return Core::Err<AssetWorkflowModelMaterializationRecord>(valid.error());
             }
 
-            auto prepared = PreparePrimitives(
-                model,
-                diagnostics,
-                options.ProgressiveRawGeometryFirst);
+            auto prepared = PreparePrimitives(model, diagnostics);
             if (!prepared.has_value())
             {
                 RecordFailure(diagnostics, modelAsset, prepared.error());
@@ -1530,8 +1227,7 @@ namespace Extrinsic::Runtime
                     primitive.MaterialIndex < model.Materials.size()
                         ? &model.Materials[primitive.MaterialIndex]
                         : nullptr;
-                if (options.ProgressiveRawGeometryFirst ||
-                    options.TextureBake != nullptr)
+                if (options.TextureBake != nullptr)
                 {
                     AttachGeometryPresentationRecipe(
                         scene,
@@ -1560,10 +1256,6 @@ namespace Extrinsic::Runtime
                 if (diagnostics != nullptr)
                 {
                     ++diagnostics->PrimitiveEntitiesCreated;
-                    if (options.ProgressiveRawGeometryFirst)
-                    {
-                        ++diagnostics->ProgressiveRawPrimitiveEntitiesPublished;
-                    }
                 }
             }
 
