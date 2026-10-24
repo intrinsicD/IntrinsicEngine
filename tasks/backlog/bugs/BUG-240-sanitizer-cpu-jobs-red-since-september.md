@@ -121,6 +121,13 @@ Covers criterion 1 and the diagnosis for criterion 2. Raw logs are in
   building the fixture is a cheap loop), which the test uses so that the job spans several
   frames. A deterministic, gate-held job would need a production seam. That goes to the
   operator, below.
+- **UBSan `IntrinsicGeometryScalarfieldExtremaTests.Grouped`** (fresh `ci-ubsan` tree,
+  `-DINTRINSIC_GROUP_PURE_CTEST=ON`, CI ctest flags): passed in 112.40 s locally at load
+  average about 20. Comparing per case with CI UBSan, the runner is 1.87x slower (Orientation
+  29.59 vs 15.85 s; Gaussian 14.82 vs 7.94 s; Retriangulation 14.81 vs 7.91 s). The producer
+  therefore needs about 210 s on CI UBSan and about 180 s on CI ASan; `IntrinsicGeometryTests.Grouped`
+  needs about 160-170 s on CI ASan. A 120 s wrapper cannot hold these producers in their current
+  form. Refinement (33.6 s locally) is the largest single case.
 - **Cases near the limit on CI ASan** (passed, but likely to tip over):
   `ReusedExecutionPanelsRejectInvalidRequestsBeforePublishing` 29.61 s,
   `EveryEntityInputFollowsSelectionWithSelectionDetailsClosed` 28.24 s,
@@ -129,8 +136,18 @@ Covers criterion 1 and the diagnosis for criterion 2. Raw logs are in
   `ShowButtonsApplyAppearancePropertiesOnMeshGraphAndCloud` 24.11 s.
 
 ### Remaining
-- Criterion 2 needs an operator decision: split case by case, a sanitizer-only budget, or a
-  label/lane change. Options and evidence are in the lane report. No budget, label or grouping
-  was changed.
+- Criterion 2 needs an operator decision. No budget, label or grouping was changed. If no
+  decision is taken, everything stays as it is and the listed cases stay red on CI. Options:
+  - Policy: either split case by case (the CPD precedent), or a sanitizer-only budget, i.e. a
+    `ci-asan`/`ci-ubsan` cache variable that scales the 30 s/120 s `TIMEOUT` properties. The
+    budget covers all items below at once. Hang detection would get coarser by the same factor.
+  - VariationalFit: three-way split (about 2 s / 15 s / 5.7 s locally; the noise-level part has
+    no margin on CI), or a cheaper noise-level weight search in the product (warm start or
+    tolerance; this changes numerics and needs its own task and review).
+  - KMeans/SceneSave: a test seam for a job held by a gate instead of the 300 000-point cloud
+    (production seam, own task), or a smaller cloud (a timing-derived parameter, results-bearing).
+  - Grouped producers: split them following the `tests/README.md` precedent, together with
+    parity and inventory updates, or a longer wrapper timeout for the sanitizer lanes only.
+  - The `slow` label is not recommended: it removes the cases from every required CPU lane.
 - Criterion 3 needs the coordinator's integrated `ci-linux-clang` dispatch. BUG-240 stays open
   until that dispatch is green, or until every remaining failure has its own task.
