@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib.util
 import json
 import os
 import re
@@ -22,6 +23,29 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 class ReconciliationError(RuntimeError):
     pass
+
+
+def _load_case_budgets() -> object:
+    # Single owner of the declared case budgets and the BUG-240 sanitizer scale.
+    path = Path(__file__).with_name("Test.GTestDiscoveryTimeout.py")
+    spec = importlib.util.spec_from_file_location("intrinsic_gtest_case_budgets", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load case-budget helpers from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+CASE_BUDGETS = _load_case_budgets()
+
+
+def _grouped_timeout(build_dir: Path) -> float:
+    """Whole-producer wrapper TIMEOUT the tree must carry: slow budget x sanitizer scale."""
+    try:
+        _default, slow = CASE_BUDGETS.case_budgets()
+        return float(slow * CASE_BUDGETS.tree_scale(build_dir))
+    except AssertionError as error:
+        raise ReconciliationError(str(error)) from error
 
 
 @dataclass(frozen=True)
@@ -721,6 +745,8 @@ def _verify_grouped_ctest_contract(
     target: str,
     build_dir: Path,
     command: Sequence[object],
+    *,
+    grouped_timeout: float,
 ) -> None:
     name = test.get("name")
     expected_name = f"{target}.Grouped"
@@ -764,9 +790,10 @@ def _verify_grouped_ctest_contract(
             f"{expected_name} must write one canonical GTest XML diagnostic"
         )
 
-    if _ctest_property(test, "TIMEOUT") != [120.0]:
+    if _ctest_property(test, "TIMEOUT") != [grouped_timeout]:
         raise ReconciliationError(
-            f"{expected_name} must use the whole-producer 120 second timeout"
+            f"{expected_name} must use the whole-producer "
+            f"{grouped_timeout:g} second timeout"
         )
 
     working_directories = _ctest_property(test, "WORKING_DIRECTORY")
@@ -789,6 +816,8 @@ def _registered_gtest_cases_by_target(
     aggregate: str,
     aggregate_members: frozenset[str],
     expected_grouped_targets: frozenset[str] = frozenset(),
+    *,
+    grouped_timeout: float,
 ) -> dict[str, tuple[str, ...]]:
     path_to_target: dict[Path, str] = {}
     for target in source_targets:
@@ -852,7 +881,9 @@ def _registered_gtest_cases_by_target(
             aggregate_members,
         )
         if grouped:
-            _verify_grouped_ctest_contract(test, target, build_dir, command)
+            _verify_grouped_ctest_contract(
+                test, target, build_dir, command, grouped_timeout=grouped_timeout
+            )
             representations[target].add("grouped")
             grouped_counts[target] += 1
             if target in aggregate_members:
@@ -1113,6 +1144,7 @@ def reconcile(build_dir: Path, aggregate: str) -> tuple[int, int, int]:
         aggregate,
         members,
         expected_grouped_targets,
+        grouped_timeout=_grouped_timeout(build_dir),
     )
     expected_affected_targets = members & AFFECTED_TARGET_CASE_COUNTS.keys()
     if aggregate == "IntrinsicGpuVulkanTests":
@@ -1319,6 +1351,7 @@ OrdinarySuite.
                 target,
                 build_dir,
                 invalid["command"],
+                grouped_timeout=120.0,
             )
         with self.assertRaisesRegex(
             ReconciliationError, "duplicate grouped CTest registrations"
@@ -1331,7 +1364,41 @@ OrdinarySuite.
                 "IntrinsicCpuTests",
                 frozenset(),
                 frozenset({target}),
+                grouped_timeout=120.0,
             )
+
+        # BUG-240: the wrapper TIMEOUT must equal the tree's expectation exactly.
+        _verify_grouped_ctest_contract(
+            record, target, build_dir, record["command"], grouped_timeout=120.0
+        )
+        for expected in (240.0, 60.0):
+            with self.assertRaisesRegex(
+                ReconciliationError, f"whole-producer {expected:g} second timeout"
+            ):
+                _verify_grouped_ctest_contract(
+                    record,
+                    target,
+                    build_dir,
+                    record["command"],
+                    grouped_timeout=expected,
+                )
+
+    def test_grouped_timeout_follows_the_tree_sanitizer_scale(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            build_dir = Path(directory)
+            cache = build_dir / "CMakeCache.txt"
+            expectations = {"none": 120.0, "asan": 240.0, "ubsan": 240.0}
+            for identity, expected in expectations.items():
+                cache.write_text(
+                    f"INTRINSIC_SANITIZER_IDENTITY:INTERNAL={identity}\n",
+                    encoding="utf-8",
+                )
+                self.assertEqual(_grouped_timeout(build_dir), expected, identity)
+            cache.write_text("INTRINSIC_GROUP_PURE_CTEST:BOOL=ON\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ReconciliationError, "no INTRINSIC_SANITIZER_IDENTITY"
+            ):
+                _grouped_timeout(build_dir)
 
     def test_affected_case_deletion_is_rejected(self) -> None:
         expected = frozenset(
@@ -1417,6 +1484,7 @@ OrdinarySuite.
                 },
                 "IntrinsicCpuTests",
                 frozenset({"Target"}),
+                grouped_timeout=120.0,
             ),
             {"Target": ("Suite.DISABLED_Case",)},
         )
@@ -1439,6 +1507,7 @@ OrdinarySuite.
                 {"GpuTarget": frozenset({"gpu", "graphics", "vulkan"})},
                 "IntrinsicCpuTests",
                 frozenset(),
+                grouped_timeout=120.0,
             )
 
     def test_malformed_ctest_labels_fail_closed(self) -> None:

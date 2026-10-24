@@ -165,6 +165,17 @@ Covers criterion 1 and the diagnosis for criterion 2. Raw logs are in
 - **What this does not settle.** Hang detection in sanitizer lanes is coarser by 2x. The diagnosed
   producers need about 160-210 s on CI against the new 240 s wrapper budget, so their margin is
   small. KMeans/SceneSave (about 20 s locally, 1.6-1.9x on CI) fit the new 60 s case budget.
+- **2026-10-24 follow-up: routing checker.** The scale change broke the sanitizer jobs' routing
+  step (`ci-linux-clang` dispatch 40099074759, asan and ubsan): `Test.TestGateRouting.py`
+  pinned grouped wrappers to 120 s, but sanitizer trees configure with
+  `INTRINSIC_GROUP_PURE_CTEST=ON` and now carry 240 s. The checker now expects slow budget x
+  tree scale, reusing `case_budgets()`/`tree_scale()` from `Test.GTestDiscoveryTimeout.py`; it
+  still requires the exact value in both tree kinds. Local grouped ASan tree
+  (`cmake --preset ci -B build/ci-asan-routing -DINTRINSIC_ENABLE_SANITIZERS=ON
+  -DINTRINSIC_SANITIZER_MODE=address -DINTRINSIC_GROUP_PURE_CTEST=ON`, `IntrinsicCpuTests`
+  built): before, the same CI error; after, `ok: targets=28 cases=5837`. `build/ci` and
+  `--self-test` pass. `tools/ci/source_coverage.py` keeps its 120 s pin because coverage and
+  sanitizers are mutually exclusive.
 
 ### Remaining
 - Criterion 3 needs the coordinator's integrated `ci-linux-clang` dispatch. BUG-240 stays open

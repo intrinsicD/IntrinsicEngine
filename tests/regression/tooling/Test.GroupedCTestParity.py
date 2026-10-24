@@ -150,6 +150,7 @@ def _load_registration(build_dir: Path, grouped: bool) -> Registration:
         AGGREGATE,
         members,
         expected_grouped,
+        grouped_timeout=GATE._grouped_timeout(build_dir),
     )
     selected_targets = frozenset(members.intersection(source_targets))
     cases = {
