@@ -177,8 +177,11 @@ Limits:
 - The Resolution's "proposed to the operator, not filed" line predates BUG-251's filing.
 
 Open for the operator: the 4.4 choice carried into BUG-251 (support it now or pin CMake in CI).
-The review's optional cosmetic findings (duplicated write literals, presets in the form
-selection, the reused message for the function-entry count) were left as they are.
+The lane's second question ("Can BUG-249 retire with 4.4.4 as an actionable hard failure?
+Default: yes") was retired on that default; the operator can reverse it at 09:00.
+The review's optional findings (duplicated write literals, presets in the form selection, the
+reused message for the function-entry count, a one-line comment on the barrier order of the 4.2+
+`before-write` hook) were left as they are.
 
 Evidence: the logs cited in the Resolution stay git-ignored in the `bug-149` lane worktree
 (`tasks/evidence/BUG-249/`); the integration worktree has none. Nothing was deleted.

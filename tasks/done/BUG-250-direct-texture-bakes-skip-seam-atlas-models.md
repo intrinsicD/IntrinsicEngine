@@ -170,6 +170,8 @@ Limits:
   records the reproduction.
 - The duplication check covered `tests/contract/runtime` and `src/runtime/AssetWorkflow`, not
   the whole repository.
+- The Resolution's "Remains" lines for a correctness review and a ponytail review predate the
+  round-1 reviews above, which cover both.
 
 Open for the operator:
 - The deliberate behaviour change: a primitive whose `v:texcoord` is present but non-finite no

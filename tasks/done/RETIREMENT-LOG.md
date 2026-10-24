@@ -11,7 +11,8 @@ on `main`, and hosted CI has not run on it.
   leave `h:texcoord` as the only UV channel. Fix: both gates read `PreparedPrimitive::HasResolvedTexcoords`
   (two tokens); the progressive branch is left to BUG-097.
 - `ModelSceneSeamAtlasRequestsGeneratedTextureBakes` failed first (2 of 6 requests), passes after the fix;
-  forcing both gates open fails its no-UV control (8 requests). Owning suites 100/100 on `ci`.
+  forcing both gates open fails its no-UV control (8 requests). Owning suites 100/100 in the `bug-220`
+  lane's `build/ci` at `9c5b4559e`, before the merge; nothing was built at the merge.
 - Review: round 1 on `9c5b4559e`, independent Claude review and independent Codex review both `approve`,
   all three criteria "met"; all three boxes ticked.
 - Limits: CPU request only, no GPU bake of a seam atlas run. Open for the operator: the non-finite
