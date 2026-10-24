@@ -2,6 +2,8 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <fstream>
+#include <string>
 #include <thread>
 #include <vector>
 #include <coroutine>
@@ -10,6 +12,8 @@
 #include <latch>
 #include <numeric>
 #include <random>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 import Extrinsic.Core.Tasks;
 import Extrinsic.Core.Tasks.CounterEvent;
@@ -19,6 +23,26 @@ using namespace Extrinsic::Core::Tasks;
 
 namespace
 {
+    // Waits until the single worker is parked and asleep in its park futex; false
+    // after a deadline. Same /proc probe as tests/integration/runtime/Test.CoreProcess.cpp.
+    bool WaitUntilWorkerSleepsInPark(const pid_t workerTid)
+    {
+        const auto syscallPath = "/proc/self/task/" + std::to_string(workerTid) + "/syscall";
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            if (Scheduler::GetStats().ParkedWorkers == 1u)
+            {
+                std::ifstream state(syscallPath);
+                long call = -1;
+                if (state >> call && call == SYS_futex)
+                    return true;
+            }
+            std::this_thread::yield();
+        }
+        return false;
+    }
+
     Job WaitForCounterTrackStartAndIncrement(CounterEvent* event,
                                              std::atomic<int>* startedCount,
                                              std::atomic<int>* resumedCount) noexcept
@@ -300,51 +324,67 @@ TEST(CoreTasks, ParkedWorkerDispatchHandshakeMakesRepeatedProgress)
 
     constexpr std::uint32_t iterationCount = 512u;
     std::atomic<std::uint32_t> completed{0u};
+    std::atomic<pid_t> workerTid{0};
 
+    // BUG-220: Dispatch counts a wake only if its parked-count load still sees
+    // the worker. A worker in the pre-sleep spin or the signal recheck can take
+    // the new signal and unpark first, uncounted, so every dispatch waits until
+    // the worker sleeps in the park futex. The gate is sound only while no
+    // signal is pending: the first park precedes every dispatch, and the worker
+    // consumes each signal before it parks again. A sleeping worker can still
+    // leave the futex without the notify through a wake from outside the
+    // protocol (signal, ptrace stop, spurious kernel wakeup) between Dispatch's
+    // signal bump and that load. Such a dispatch completes uncounted and is
+    // retried; a second one fails the test.
     while (Scheduler::GetStats().ParkedWorkers != 1u)
         std::this_thread::yield();
-    const auto wakeNotificationsBefore = Scheduler::GetStats().WorkerWakeNotifications;
-
-    for (std::uint32_t iteration = 0u; iteration < iterationCount; ++iteration)
+    Scheduler::Dispatch([&workerTid]()
     {
-        while (Scheduler::GetStats().ParkedWorkers != 1u)
-            std::this_thread::yield();
-        // A published park can still be in the waiter's pre-sleep spin, where a racing
-        // dispatch may legitimately skip the notify. Give the first iteration time to
-        // block so at least one dispatch must notify a sleeping worker.
-        if (iteration == 0u)
-            std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        workerTid.store(static_cast<pid_t>(syscall(SYS_gettid)), std::memory_order_release);
+        workerTid.notify_all();
+    });
+    workerTid.wait(0, std::memory_order_acquire);
+    const pid_t tid = workerTid.load(std::memory_order_acquire);
+    EXPECT_NE(tid, static_cast<pid_t>(syscall(SYS_gettid)));
 
+    std::uint32_t counted = 0u;
+    std::uint32_t uncounted = 0u;
+    while (counted < iterationCount && uncounted <= 1u)
+    {
+        if (!WaitUntilWorkerSleepsInPark(tid))
+        {
+            ADD_FAILURE() << "worker never slept in the park futex before dispatch " << counted + uncounted;
+            break;
+        }
+
+        const auto notificationsBefore = Scheduler::GetStats().WorkerWakeNotifications;
         Scheduler::Dispatch([&completed]()
         {
             completed.fetch_add(1u, std::memory_order_release);
             completed.notify_all();
         });
 
-        const auto expected = iteration + 1u;
+        const auto expected = counted + uncounted + 1u;
         auto observed = completed.load(std::memory_order_acquire);
         while (observed < expected)
         {
             completed.wait(observed, std::memory_order_acquire);
             observed = completed.load(std::memory_order_acquire);
         }
+
+        const auto notified = Scheduler::GetStats().WorkerWakeNotifications - notificationsBefore;
+        EXPECT_LE(notified, 1u);
+        if (notified == 0u)
+            ++uncounted;
+        else
+            ++counted;
     }
 
     Scheduler::WaitForAll();
     const auto stats = Scheduler::GetStats();
-    EXPECT_EQ(completed.load(std::memory_order_acquire), iterationCount);
-    // Dispatch bumps workSignal and then samples the parked count. A worker
-    // that is entering its futex wait can observe the bumped signal and leave
-    // without a notification, so a dispatch preempted between those two steps
-    // sees zero parked workers and legitimately skips the notify. The exact
-    // count is therefore not an invariant; progress is (checked above and by
-    // the completion wait). Require only that notifications are never
-    // over-counted and that the sleeping-worker notify of the first iteration
-    // was counted (only a spurious futex wake could skip it).
-    const auto notifications =
-        stats.WorkerWakeNotifications - wakeNotificationsBefore;
-    EXPECT_LE(notifications, static_cast<std::uint64_t>(iterationCount));
-    EXPECT_GT(notifications, 0u);
+    EXPECT_EQ(counted, iterationCount);
+    EXPECT_LE(uncounted, 1u);
+    EXPECT_EQ(completed.load(std::memory_order_acquire), counted + uncounted);
     EXPECT_LE(stats.ParkedWorkers, 1u);
     Scheduler::Shutdown();
 }
