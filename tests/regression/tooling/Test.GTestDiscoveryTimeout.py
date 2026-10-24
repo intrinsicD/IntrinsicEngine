@@ -235,6 +235,27 @@ class ProbeSelfTests(unittest.TestCase):
             # Rotation: each repetition starts with a different target.
             self.assertEqual([s["target"] for s in samples[::4]], ["Slow", "Instant"])
 
+    def test_listing_child_dies_with_a_killed_probe(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-orphan-") as directory:
+            project = FakeListerProject(Path(directory), declared_budget())
+            pid_file = Path(directory) / "pid"
+            probe = subprocess.Popen([sys.executable, str(PROBE), "direct", "--tests-dir", str(project.build),
+                                      "--target", "Fake", "--max-minutes", "2", "--cap-seconds", "60"],
+                                     stdout=subprocess.DEVNULL, env={**os.environ, "FAKE_DELAY_Fake": "60",
+                                                                     "FAKE_PID_FILE_Fake": str(pid_file)})
+            try:
+                deadline = time.monotonic() + 10
+                while not pid_file.exists() and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                pid = int(pid_file.read_text())
+            finally:
+                probe.kill()
+                probe.wait()
+            deadline = time.monotonic() + 5
+            while _alive(pid) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertFalse(_alive(pid), "listing child outlived the killed probe")
+
     def test_planned_sequence_does_not_trip_identity_checks(self) -> None:
         # Run plan order: direct arm, forced-stale C-real, second direct arm, decide.
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-sequence-") as directory:
@@ -255,7 +276,8 @@ class ProbeSelfTests(unittest.TestCase):
             identity = [kill for kill in verdict["kill_conditions"]
                         if any(word in kill for word in ("changed", "differs", "duplicate", "listing", "C-real"))]
             self.assertEqual(identity, [])
-            self.assertEqual(verdict["ctest_runs"][0]["status"], "invalid:no-compile")
+            # Host-dependent regime: other builds may or may not be compiling right now.
+            self.assertIn(verdict["ctest_runs"][0]["status"], ("valid", "invalid:no-compile"))
 
     def test_ctest_mode_caps_a_hung_command_and_keeps_its_record(self) -> None:
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-cap-") as directory:

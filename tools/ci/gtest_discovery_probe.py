@@ -11,6 +11,7 @@ BUG-091 budget rule to direct samples; ``report`` renders an HTML report.
 from __future__ import annotations
 
 import argparse
+import ctypes
 from datetime import datetime
 import hashlib
 import json
@@ -19,6 +20,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import statistics
 import subprocess
 import sys
@@ -173,10 +175,17 @@ def _tools() -> dict[str, str | None]:
     return found
 
 
+def _die_with_parent() -> None:
+    # The cap lives in this probe; if the probe is killed, the child must not outlive it.
+    if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL) != 0:  # PR_SET_PDEATHSIG
+        os._exit(127)
+
+
 def _run_bounded(command: list[str], cap: float, **kwargs) -> tuple[bytes, int | None, bool, float]:
     """Run in its own session; on timeout kill the whole group so no lister survives."""
     start = time.monotonic()
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, start_new_session=True, **kwargs)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, start_new_session=True,
+                               preexec_fn=_die_with_parent, **kwargs)
     try:
         stdout, _ = process.communicate(timeout=cap)
         timed_out = False
