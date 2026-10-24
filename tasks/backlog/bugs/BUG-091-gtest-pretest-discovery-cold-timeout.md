@@ -296,8 +296,11 @@ generated output.
 **Remaining.** Independent code review (session
 `29987edd-d5fe-403b-9503-0c6c39b64871`, Read/Grep/Glob only): round 1 REVISE
 (docs-sync, CMake versions), round 2 REVISE (README failure text vs CTest 3.31);
-both fixed in the following commits; the final round's verdict is recorded in
-`tasks/evidence/BUG-091/code-review/`. Whether the evidence
+both fixed in the following commits; round 3 on `5d90ef934`: "VERDICT:
+approve", blocking none (`tasks/evidence/BUG-091/code-review/claude-review-delta2.txt`).
+Its open optional items are an `addCleanup` for the CTest 3.31 reap, checking
+the 3.31 orphan on Kitware's binary as well as the PyPI wheel, and a separate
+BUG task for `Test.ConcurrentCTestDiscovery.py` on CMake 4. Whether the evidence
 satisfies acceptance criteria 1-4, especially AC2 (budget in the failure
 message) on CMake < 4, is the reviewers' and operator's call. Index and
 retirement-log updates belong to the integrator.
