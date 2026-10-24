@@ -178,6 +178,17 @@ met: the local router `touched_scope.py --run` had no preflight).**
   `workflow_evidence.py validate --root .`, `check_root_hygiene.py --root .
   --strict`.
 
+**Relative build directory — 2026-10-24 (independent Codex review of
+f21ba9425, P2: a relative `--build-dir` was resolved against the caller's cwd,
+while configure and build run with cwd=root).** The preflight now resolves
+`--build-dir` under `--root`; absolute paths are unchanged. New test
+`test_run_checks_relative_build_dir_under_root_not_cwd` runs from another cwd
+with the default relative build directory, no space under root and ample
+elsewhere. It failed before the fix (`7 != 3`) and passes after; the suite
+gives 39 OK. Real path from `/tmp` with `--root <worktree> --min-free-gib
+999999 --run` exits 3 and names `<worktree>/build`. Only the build-dir volume
+is checked; that limit is now commented in code and documented.
+
 **What remains.**
 - Tooling detection covers `record-command` and `touched_scope.py --run`.
   Direct `cmake --build` / `ctest` runs and the separate `touched_scope.py

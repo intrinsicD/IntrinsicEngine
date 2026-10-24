@@ -2007,8 +2007,11 @@ def _action_test(args: argparse.Namespace, root: Path) -> int:
 
 
 def _legacy_run(args: argparse.Namespace, root: Path) -> int:
-    build_dir = Path(args.build_dir).resolve()
+    # Relative to root, as configure and build run with cwd=root.
+    build_dir = (root / args.build_dir).resolve()
     # A fresh build tree does not exist yet; its nearest existing parent decides.
+    # shortcut: only the build-dir volume is checked, not /tmp or a separate
+    # ccache mount; add those if a run fails there with space left here.
     volume = next(path for path in (build_dir, *build_dir.parents) if path.exists())
     free = shutil.disk_usage(volume).free
     if free < args.min_free_gib * 1024**3:

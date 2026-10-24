@@ -1304,6 +1304,36 @@ class TouchedScopeTests(unittest.TestCase):
                         plan.assert_called_once()
                         self.assertEqual(stderr.getvalue(), "")
 
+    def test_run_checks_relative_build_dir_under_root_not_cwd(self) -> None:
+        # Configure and build run with cwd=root, so the default relative
+        # build directory lives under --root even when invoked elsewhere.
+        with tempfile.TemporaryDirectory() as root_tmp, \
+                tempfile.TemporaryDirectory() as cwd_tmp:
+            root = Path(root_tmp).resolve()
+            free = {True: 0, False: 10**15}
+            with contextlib.chdir(cwd_tmp), mock.patch(
+                "shutil.disk_usage",
+                side_effect=lambda path: mock.Mock(
+                    free=free[Path(path).is_relative_to(root)]
+                ),
+            ) as usage, mock.patch.object(
+                touched_scope, "_action_plan", return_value=7
+            ) as plan, mock.patch.object(
+                touched_scope, "_run_command"
+            ) as run, contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    touched_scope.main([
+                        "--root", str(root),
+                        "--changed-file", "src/geometry/Geometry.Mesh.cpp",
+                        "--output", str(root / "route.json"),
+                        "--run",
+                    ]),
+                    3,
+                )
+                usage.assert_called_once_with(root)
+                plan.assert_not_called()
+                run.assert_not_called()
+
 
 class LocalChangeTests(unittest.TestCase):
     def setUp(self) -> None:

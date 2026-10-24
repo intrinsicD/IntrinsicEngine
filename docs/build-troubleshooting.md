@@ -499,8 +499,10 @@ change it; `0` or a negative value disables the check:
   mount.
 - `tools/ci/touched_scope.py --run` refuses before its first step (exit 3,
   `insufficient disk headroom`, nothing run or written) when the volume of
-  `--build-dir` is below the floor. A build directory that does not exist yet
-  is checked on its nearest existing parent.
+  `--build-dir` (a relative path is taken under `--root`) is below the
+  floor. A build directory that does not exist yet is checked on its nearest
+  existing parent. It checks only that volume, not `/tmp` or a separate ccache
+  mount.
 
 Direct `cmake --build`/`ctest` runs and the separate `touched_scope.py
 --action` steps that CI uses do not check headroom.
