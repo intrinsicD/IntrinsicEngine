@@ -168,7 +168,7 @@ Boxes: all three are ticked, as both round-1 reviews decided.
 
 Limits:
 - CMake 4.4 is not supported: 4.4.4 fails 3/3 with the layout message. Moved to
-  [BUG-251](../backlog/bugs/BUG-251-cmake44-gtest-discovery-include-layout.md), which also covers
+  [BUG-251](BUG-251-cmake44-gtest-discovery-include-layout.md), which also covers
   `Test.GTestDiscoveryTimeout.py:144` and `tools/ci/gtest_discovery_probe.py:230,311`. The
   production-lock claims for 4.4 are inferred from source.
 - Only PyPI `cmake` wheels were run; no distro-packaged CMake. The hosted `ci-docs` run was

@@ -9,11 +9,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   `test_declared_budget_passes_below_and_fails_bounded_above` reports "timed-out lister is still running" on 4.0.3,
   also before BUG-251. 4.0.3 is outside the supported matrix; CI uses 3.31.6.
 
-- [BUG-251 — Support the CMake 4.4 GoogleTest discovery include layout](BUG-251-cmake44-gtest-discovery-include-layout.md):
-  CMake 4.4 names the PRE_TEST include `<target>_<sha8>_include.cmake`; two regressions and the
-  BUG-091 probe hard-code `<target>[1]_include.cmake`. Operator chose support now; fixed on a lane branch,
-  passing on 3.28.3, 3.31.6, 4.3.2 and 4.4.4; awaits review.
-
 - [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](BUG-240-sanitizer-cpu-jobs-red-since-september.md):
   sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
   assertion failure under ASan, one timeout under UBSan.
@@ -41,6 +36,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 ## Verified / Closed
 
+- Closed 2026-10-24: [BUG-251 — Support the CMake 4.4 GoogleTest discovery include layout](../../done/BUG-251-cmake44-gtest-discovery-include-layout.md).
+  The discovery regressions and the probe accept the 4.4 `<target>_<sha8>_*` layout beside `[N]` and fail on any other;
+  3/3 and 21/21 on 3.28.3, 3.31.6, 4.3.2 and 4.4.4. No live 4.4 engine `--build-dir` run.
+
 - Closed 2026-10-24: [BUG-247 — Local root hygiene rejects existing tool state](../../done/BUG-247-local-root-hygiene-state-mismatch.md).
   Operator decision: ".serena und .aws nicht ins git". Currently `.serena/` is ignored local state and `.aws/` is
   absent and unclassified; whether `.aws/` belongs in `.gitignore` is open with the operator. Strict root hygiene and
@@ -61,7 +60,7 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 - Closed 2026-10-24: [BUG-249 — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x](../../done/BUG-249-concurrent-ctest-discovery-cmake4.md).
   The race probe recognises the CMake 4.2+ REMOVE+APPEND form and checks that its hooks ran; OK on nine CMake
   versions from 3.28.3 to 4.3.4.
-  CMake 4.4 still fails hard on its new include layout (BUG-251).
+  CMake 4.4 failed hard on its new include layout until BUG-251.
 
 - Closed 2026-10-24: [BUG-248 — Keypoint GPU parity smokes fail on main](../../done/BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md).
   The keypoint kernel kept a private Jacobi with the absolute isotropic floor that GEOM-114 removed on the CPU;

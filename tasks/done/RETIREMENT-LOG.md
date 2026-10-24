@@ -1,5 +1,24 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-251 retired after its independent review
+
+Retired [BUG-251](BUG-251-cmake44-gtest-discovery-include-layout.md) (`cca518f55`, follow-ups `7f0e75abd`),
+merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as `78943cfdc`; not yet on
+`main`, and hosted CI has not run on it.
+
+- Operator decision, verbatim: "jetzt unterstützten". `gtest_discovery_probe.py` owns the layout: one
+  `<target>[1]_include.cmake` or `<target>_<sha8>_include.cmake`, the 4.4 call in the `_discovery.cmake` it
+  includes, 4.4 list fields joined; unknown names raise. Both regressions use it; the race probe copies
+  `Modules/GoogleTest/`. Production `IntrinsicTestDiscovery.cmake` unchanged.
+- Before on 4.4.4: race probe 3 failures, timeout suite 4 failures and 2 errors; after: 3/3 and 21/21 on 3.28.3,
+  3.31.6, 4.3.2 and 4.4.4, again after the follow-ups on 4.3.2 and 4.4.4.
+- Review: independent Claude review of `cca518f55` (relayed by the coordinator, not on disk) approve, all four
+  criteria "met"; it reran on six CMake versions and checked `reconcile` on six real engine trees. Its two
+  small follow-ups are `7f0e75abd`, not re-reviewed.
+- Limits: no live 4.4 engine `--build-dir` run; multi-config names fail closed; probe CLI not run standalone on
+  an engine tree; 4.4 old-hash files need a clean tree. The 4.0.3 budget-case failure (also at the base) is
+  BUG-252. Evidence stays git-ignored in the `bug-149` lane worktree; nothing was deleted.
+
 ## 2026-10-24 — BUG-247 retired after the operator decision on local tool state
 
 Retired [BUG-247](BUG-247-local-root-hygiene-state-mismatch.md) on the night integration branch
@@ -85,7 +104,7 @@ on `main`, and hosted CI has not run on it.
 - Review: round 1 on `dc67373eb`, independent Claude review and independent Codex review both `approve`,
   all three criteria "met"; all three boxes ticked.
 - Limits: CMake 4.4 fails hard on its new include layout; moved to
-  [BUG-251](../backlog/bugs/BUG-251-cmake44-gtest-discovery-include-layout.md) with the operator's
+  [BUG-251](BUG-251-cmake44-gtest-discovery-include-layout.md) with the operator's
   choice to support it or pin CMake in CI. No distro-packaged CMake run. Evidence stays git-ignored in
   the `bug-149` lane worktree; nothing was deleted.
 

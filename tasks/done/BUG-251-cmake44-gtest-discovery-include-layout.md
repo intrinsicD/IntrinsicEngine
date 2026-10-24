@@ -19,7 +19,7 @@ contract_review: Private CMake test instrumentation and a CI diagnostic only; th
   unknown layout a hard failure.
 
 ## Context
-- Split from [BUG-249](../../done/BUG-249-concurrent-ctest-discovery-cmake4.md) (retired
+- Split from [BUG-249](BUG-249-concurrent-ctest-discovery-cmake4.md) (retired
   2026-10-24), which made
   `tests/regression/tooling/Test.ConcurrentCTestDiscovery.py` support the CMake 4.2+
   REMOVE+APPEND write form and left 4.4 out of its scope. BUG-249's independent Claude review
@@ -70,22 +70,22 @@ contract_review: Private CMake test instrumentation and a CI diagnostic only; th
   is the operator's decision.
 
 ## Acceptance criteria
-- [ ] With CMake 4.4.4, `Test.ConcurrentCTestDiscovery.py` runs its three cases and they pass.
+- [x] With CMake 4.4.4, `Test.ConcurrentCTestDiscovery.py` runs its three cases and they pass.
       The unlocked control still shows duplicated registrations, and dropping any
       instrumentation hook fails the marker check. An unrecognised layout or write form still
-      fails at once with a message naming the CMake version.
-- [ ] With CMake 4.4.4, `Test.GTestDiscoveryTimeout.py` passes and still checks what it checks
+      fails at once with a message naming the CMake version. Independent Claude review of `cca518f55`, 2026-10-24: "1. Concurrent on 4.4.4 — met."
+- [x] With CMake 4.4.4, `Test.GTestDiscoveryTimeout.py` passes and still checks what it checks
       on 4.3.2, or it fails at once with a message naming the version and the layout. A live
       `--build-dir` run on a 4.4 configure is recorded, or recorded as not run. Either way,
       `reconcile()` reads a 4.4-layout tree (a synthetic one is enough) with the right target
-      names and the discovery call's fields, and still rejects an unknown layout.
-- [ ] `tools/ci/gtest_discovery_probe.py` finds a target's generated discovery call on both
+      names and the discovery call's fields, and still rejects an unknown layout. Independent Claude review of `cca518f55`, 2026-10-24: "2. Timeout on 4.4.4 — met."
+- [x] `tools/ci/gtest_discovery_probe.py` finds a target's generated discovery call on both
       layouts (in `_include.cmake` before 4.4, in the `_discovery.cmake` it includes on 4.4) and
       parses it in `cmd_direct` and `ctest_once`, without guessing between several matching
-      files. An unknown layout still raises.
-- [ ] The three tools still pass on CMake 3.28.3, 3.31.6 and the host's 4.3.2. Installed CMake
+      files. An unknown layout still raises. Independent Claude review of `cca518f55`, 2026-10-24: "3. Probe — met."
+- [x] The three tools still pass on CMake 3.28.3, 3.31.6 and the host's 4.3.2. Installed CMake
       modules and `cmake/IntrinsicTestDiscovery.cmake` stay unchanged, unless a 4.4 run shows
-      that the production lock or watch is affected; any such change is recorded with that run.
+      that the production lock or watch is affected; any such change is recorded with that run. Independent Claude review of `cca518f55`, 2026-10-24: "4. 3.28.3 / 3.31.6 / host 4.3.2 — met."
 
 ## Verification
 ```bash
@@ -134,3 +134,37 @@ python3 tools/agents/check_task_policy.py --root . --strict
   ... 0 GoogleTest discovery includes for Fake ...`.
 - Not run: a live `--build-dir` reconcile on a 4.4 engine configure (no engine build in this
   lane); only the synthetic 4.4 tree is checked.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `cca518f55` (the change, on `4c30f2b82`) and `7f0e75abd` (the
+review's two follow-ups), branch `claude/bug-251-cmake44-discovery-layout`, merged into the night
+integration branch `claude/night-2026-10-24-bug-sweep` as `78943cfdc`. Not yet on `main`; hosted
+CI has not run on it.
+
+Reviewer decisions: independent Claude review of `cca518f55`, 2026-10-24, relayed verbatim by
+the coordinator; the record is not on disk. Verdict approve, with "1. Concurrent on 4.4.4 —
+met. 2. Timeout on 4.4.4 — met. 3. Probe — met. 4. 3.28.3 / 3.31.6 / host 4.3.2 — met." It
+reran the regressions on 4.4.4, 3.28.3, 3.31.6, 4.3.2, 4.3.4 and 4.2.3 and checked `reconcile`
+on six real engine trees with byte-identical output. All four boxes are ticked from these
+decisions.
+
+Follow-ups in `7f0e75abd` (the review's two small items, not re-reviewed):
+`tests/README.md` names the 4.4 stale-hash limit, and `target_include()`'s error uses
+`LAYOUTS`. After it, `Test.GTestDiscoveryTimeout.py` (21 tests) and
+`Test.ConcurrentCTestDiscovery.py` (3 tests) pass on host CMake 4.3.2 and on 4.4.4
+(`/tmp/bug249-cmake/4.4.4/cmake/data/bin`; the wheel's `bin/cmake` wrapper resolves the
+host 4.3.2, so it is not a valid 4.4 PATH entry).
+
+Limits:
+- No live `--build-dir` reconcile on a real CMake 4.4 engine configure; only a synthetic 4.4
+  tree is checked.
+- Multi-config generator names (`_<CONFIG>`) are not supported; they fail closed as an unknown
+  layout.
+- The probe CLI was not run standalone on an engine tree.
+- On 4.4 a change to the `gtest_discover_tests` arguments leaves old-hash files in a reused
+  build tree, which fails `target_include` and `reconcile` until the tree is cleaned
+  (documented in `tests/README.md`).
+- `Test.GTestDiscoveryTimeout.py` fails on CMake 4.0.3, also at the base; filed as [BUG-252](../backlog/bugs/BUG-252-gtest-discovery-timeout-budget-cmake403.md).
+
+Evidence: the logs cited in the Resolution stay git-ignored in the `bug-149` lane worktree
+(`tasks/evidence/BUG-251/`); nothing was deleted.
