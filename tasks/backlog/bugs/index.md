@@ -50,11 +50,11 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 - Closed 2026-10-24: [BUG-195 — Verification can exhaust host disk space](../../done/BUG-195-verification-disk-headroom.md).
   `record-command` and `touched_scope.py --run` refuse below a 20 GiB floor; failed log/receipt writes keep earlier
-  files and exit 2 as incomplete evidence. Manual reclaim policy documented; direct `cmake`/`ctest` rely on `df`.
+  files and exit nonzero (normally 2) as incomplete evidence. Manual reclaim policy documented; direct `cmake`/`ctest` rely on `df`.
 
 - Closed 2026-10-24: [BUG-232 — A failed frame submit loses an accepted position copy](../../done/BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md).
-  A recorded commit copy counts as done only after its frame's submit advanced the device frame number;
-  otherwise it is copied again from the still-leased front. Mock-device contract tests; real Vulkan recovery not run.
+  A recorded commit copy counts as done only after a later submit advanced the frame number past the copy's frame;
+  otherwise it is copied again from the still-leased front (low-likelihood residual when the next frame skips SyncFrame). Mock-device contract tests; real Vulkan recovery not run.
 
 - Closed 2026-10-24: [BUG-188 — Sandbox blocks LeakSanitizer during CTest discovery](../../done/BUG-188-sandbox-sanitizer-test-discovery.md).
   `tests/README.md` documents the discovery signature, cause and host-context rerun; sanitizer settings,

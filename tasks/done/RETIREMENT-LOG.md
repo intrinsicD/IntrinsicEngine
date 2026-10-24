@@ -16,16 +16,22 @@ Retired [BUG-171](BUG-171-required-command-receipt-supersession.md) (`3e7c98e27`
   blocked: it needs a fresh passing receipt with the exact failed argv and cwd.
 - BUG-195: `record-command` and `touched_scope.py --run` refuse before running below
   `--min-free-gib` (default 20). Log and receipt write failures keep the earlier files, print the
-  unwritten logs and exit 2 as incomplete evidence, never as a receipt. The reclaim policy in
+  unwritten logs and exit nonzero (normally 2) as incomplete evidence, never as a receipt. The reclaim policy in
   `docs/build-troubleshooting.md#disk-headroom` is manual only. Write failures were reproduced with
   RLIMIT_FSIZE; no volume was filled and no real `--run` build ran.
 - Review: BUG-171 round 1 on `3e7c98e27`: independent Claude and independent Codex reviews both
   "approve", all criteria "met". The final independent Claude review "accepted" `bc0cab458`
   (content digest `87e9ab98…`) and decided the Required changes, Tests and Docs ticks.
-  `--require-complete BUG-171` gives 0 errors. BUG-195: two rounds of independent Claude and
-  independent Codex reviews ended with criterion 1 "partially met" (a relative `--build-dir`
-  fixed in `cb816e606`). The criterion-1 follow-up review approved `cb816e606` with all three
-  criteria "met".
+  `--require-complete BUG-171` gives 0 errors. BUG-195, per round: on `f8eddf657` the
+  independent Claude review approved with criterion 1 "partially met" (direct cmake/ctest and
+  `touched_scope.py` relied on a manual `df` check) and the independent Codex review asked for
+  revision (criterion 1 "met within the documented coverage", 2 "partially met"); on `6577e4cf6`
+  the independent Claude review approved, criterion 1 still "partially met" for the same reason
+  (no Codex round). Option B added the `touched_scope.py --run` preflight in `f21ba9425`: the
+  independent Claude review approved with all three criteria "met", the independent Codex review
+  asked for revision (criterion 1 "partially met": a relative `--build-dir` resolved against the
+  caller's cwd). The fix `cb816e606` was approved by an independent Claude re-review with all
+  three criteria "met".
 - Open for the operator: the BUG-171 defaults 1-8, and whether supersessions and `report.yaml`
   must be review-bound. Also open: whether more BUG-195 entry points get a preflight, and which
   METHOD-040 failures to supersede. The git-ignored evidence stays in the `bug-171` and `bug-195`
@@ -41,7 +47,7 @@ merged into the night integration branch `claude/night-2026-10-24-bug-sweep`; th
 - BUG-232: a recorded `CommitOnCopy` copy is settled only after its frame's submit advanced the
   device frame number; otherwise it is copied again from the still-leased front. Three new
   mock-device contract tests fail without the fix (18/21) and pass with it (21/21); three mutations
-  are caught. CPUContracted; real Vulkan failed-submit recovery was not run, and the reviewers name
+  are caught. CPUContracted; real Vulkan failed-submit recovery was not run, and the independent Claude review names
   a low-likelihood residual case when the next frame skips `SyncFrame`.
 - BUG-188: documentation route, not automatic routing. `tests/README.md` records the discovery
   signature (LeakSanitizer under ptrace during PRE_TEST discovery, `ctest` rc 8), the cause and the

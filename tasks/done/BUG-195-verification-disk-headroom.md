@@ -39,9 +39,10 @@ missing preflight/recovery behavior.
 - [x] Preserve completed evidence and report failures to write result records explicitly.
 - [x] Document a conservative policy for reclaiming inactive generated artifacts.
 
-Ticked from the criterion-1 follow-up review of `cb816e606` (verdict
-`approve`; structured verdict relayed by the night workflow coordinator, no
-transcript on disk), which decided all three criteria `met`. See Completion.
+Ticked from the independent Claude reviews of `f21ba9425` (night workflow
+agent `aeda33da084f0232d`) and of the fix `cb816e606` (re-review, agent
+`a6e7f705b7fd84f3e`), which both decided all three criteria `met`. Their full
+results are in the coordinator's local workflow journal. See Completion.
 
 ## Verification
 Reproduce a write failure on a bounded temporary filesystem or injected writer,
@@ -216,11 +217,15 @@ Reviewer decisions, base `599f02ff1`:
 - Round 2 on `6577e4cf6`: independent Claude review `approve` (criterion 1
   `partially met`, 2 and 3 `met`). Option B (`touched_scope.py --run`
   preflight) followed in `f21ba9425`.
-- On `f21ba9425`: independent Codex review (thread
+- On `f21ba9425`: independent Claude review (agent `aeda33da084f0232d`)
+  `approve`, all three criteria `met` (criterion 1: `touched_scope.py --run`,
+  the documented local router, now refuses before its first step, closing the
+  gap both earlier Claude reviews named); independent Codex review (thread
   `01a16b75-874d-7032-8254-f3194a783b24`) "VERDICT: revise required"
   (criterion 1 partially met: a relative `--build-dir` was resolved against
   the caller's cwd; 2 and 3 met). Fixed in `cb816e606`.
-- Criterion-1 follow-up on `cb816e606`: `approve`, all three criteria `met`
+- Re-review on `cb816e606`: independent Claude review (agent
+  `a6e7f705b7fd84f3e`) `approve`, all three criteria `met`
   ("tools/agents/workflow_evidence.py is unchanged between f21ba9425 and
   cb816e606, so the prior 'met' assessment still holds"; the reclaim policy
   "has not changed"). The boxes above are ticked from this decision.
