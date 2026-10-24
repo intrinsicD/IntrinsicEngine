@@ -198,17 +198,21 @@ Content changes include a new budget value and a different CMake installation,
 because every include embeds `CMAKE_ROOT`. Unbuilt targets register a
 `_NOT_BUILT` placeholder and are never listed.
 
-A listing that exceeds the budget is killed. CTest exits nonzero before any
-test starts, and prints the executable path and `Process terminated due to
-timeout`. CMake 4.x also prints `Timeout: '<budget>'`; the 3.22, 3.28 and 3.31
-modules do not, so on those versions the budget is the include's
-`TEST_DISCOVERY_TIMEOUT`. Nothing retries. `Test.GTestDiscoveryTimeout.py` checks three
-things. It checks the source policy. It runs a slow fake lister in a private
-project: the lister passes below the declared budget and fails at the budget,
-and afterwards the lister is gone and the registry lock is free. It also runs
-probe self-checks. With `--build-dir`, it checks that every generated include
-of a configured tree carries the declared discovery budget, together with its
-unchanged 30 s or 120 s case budget:
+When a listing exceeds the budget, CTest stops waiting at the budget and exits
+nonzero before any test starts. It prints the executable path and `Process
+terminated due to timeout`. CMake 4.x also prints `Timeout: '<budget>'`; the
+3.22, 3.28 and 3.31 modules do not, so on those versions the budget is the
+include's `TEST_DISCOVERY_TIMEOUT`. CTest 3.28.3 and 4.3.2 kill the lister.
+CTest 3.31.6 leaves it running, so on such hosts each later call that lists
+the same stale target can add another orphaned lister. Nothing retries.
+
+`Test.GTestDiscoveryTimeout.py` checks the source policy. It also runs a slow
+fake lister in a private project: the lister passes below the declared budget,
+fails at the budget, and leaves the registry lock free. Afterwards the lister
+must be gone, except on CTest 3.31, where the test reaps it. The script also
+runs probe self-checks. With `--build-dir`, it checks that every generated
+include of a configured tree carries the declared discovery budget, together
+with its unchanged 30 s or 120 s case budget:
 
 ```bash
 python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py

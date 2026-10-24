@@ -293,8 +293,11 @@ of 4; arms in fixed order (contention, then idle); probe children bound by
 broad C++ build was skipped, because the CMake change is byte-identical in
 generated output.
 
-**Remaining.** Independent code review: the first round returned REVISE; a
-delta review of its fixes is pending at commit time. Whether the evidence
+**Remaining.** Independent code review (session
+`29987edd-d5fe-403b-9503-0c6c39b64871`, Read/Grep/Glob only): round 1 REVISE
+(docs-sync, CMake versions), round 2 REVISE (README failure text vs CTest 3.31);
+both fixed in the following commits; the final round's verdict is recorded in
+`tasks/evidence/BUG-091/code-review/`. Whether the evidence
 satisfies acceptance criteria 1-4, especially AC2 (budget in the failure
 message) on CMake < 4, is the reviewers' and operator's call. Index and
 retirement-log updates belong to the integrator.

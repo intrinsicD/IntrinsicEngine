@@ -206,19 +206,20 @@ class FakeListerBudgetTests(unittest.TestCase):
             deadline = time.monotonic() + 5
             while _alive(pid) and time.monotonic() < deadline:
                 time.sleep(0.05)
-            if ctest_version()[:2] in LISTER_SURVIVES_TIMEOUT and _alive(pid):
-                # CTest 3.31 returns at the budget but leaves the killed-for-timeout lister
-                # running (BUG-091 diagnosis); the gate is still bounded. Reap it here.
-                os.kill(pid, 9)
-                print(f"note: CTest {'.'.join(map(str, ctest_version()))} left the timed-out lister running",
-                      file=sys.stderr)
-            else:
+            orphaned = ctest_version()[:2] in LISTER_SURVIVES_TIMEOUT and _alive(pid)
+            if not orphaned:
                 self.assertFalse(_alive(pid), "timed-out lister is still running")
 
-            # The registry lock is released after the failed discovery.
+            # The registry lock is released after the failed discovery, even with an orphan.
             result, elapsed = project.ctest("-N", env={}, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn(f"Total Tests: {CASE_COUNT}", result.stdout)
+            if orphaned:
+                # CTest 3.31 returns at the budget but leaves the timed-out lister running
+                # (BUG-091 diagnosis); the gate is still bounded. Reap it here.
+                os.kill(pid, 9)
+                print(f"note: CTest {'.'.join(map(str, ctest_version()))} left the timed-out lister running",
+                      file=sys.stderr)
 
 
 class ProbeSelfTests(unittest.TestCase):
@@ -302,7 +303,8 @@ class ProbeSelfTests(unittest.TestCase):
                         if any(word in kill for word in ("changed", "differs", "duplicate", "listing", "C-real"))]
             self.assertEqual(identity, [])
             # The regime depends on the host (other builds, tmpfs eviction); only failures matter.
-            self.assertFalse(verdict["ctest_runs"][0]["status"].startswith("kill:"), verdict["ctest_runs"])
+            status = verdict["ctest_runs"][0]["status"]
+            self.assertTrue(status == "valid" or status.startswith("invalid:"), verdict["ctest_runs"])
 
     def test_ctest_mode_caps_a_hung_command_and_keeps_its_record(self) -> None:
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-cap-") as directory:
