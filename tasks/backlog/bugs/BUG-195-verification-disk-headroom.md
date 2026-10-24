@@ -134,10 +134,65 @@ the prior route intact. `tools/ci/run_source_coverage.py` already reports
 - Untested by design: the stderr log failing after the stdout log was
   written (index 1). It runs the same loop as the tested cases.
 
+**Option B — 2026-10-24 (both independent reviews rated criterion 1 partially
+met: the local router `touched_scope.py --run` had no preflight).**
+- `tools/ci/touched_scope.py --run` now checks free space before its first
+  step (plan, structural, configure, build, test). Below the floor it prints
+  `touched_scope: error: insufficient disk headroom: <free> GiB free on the
+  volume of <dir> (build directory <build-dir>), <N> GiB required; nothing
+  was run. Reclaim space per docs/build-troubleshooting.md#disk-headroom, or
+  pass --min-free-gib N ...` and exits 3. Exit 2 is already its route error.
+  The volume is that of `--build-dir`. A tree that does not exist yet, as
+  before a fresh configure, is checked on its nearest existing parent.
+- Same default and flag as `record-command`: `DEFAULT_MIN_FREE_GIB = 20`,
+  `--min-free-gib`, `0` or negative disables. The value is restated with a
+  comment, not imported. Importing it would make the CI planner load
+  `tools/agents/workflow_evidence.py` and `validate_tasks`. The test reads the
+  floor from `workflow_evidence`, so a drifted default fails it.
+- Only `--run` is gated. CI calls the separate `--action` steps, so hosted
+  runners are not affected.
+- Test `test_run_refuses_below_record_command_headroom_floor` in
+  `tests/regression/tooling/Test.TouchedScope.py` fakes `shutil.disk_usage`
+  and stubs the plan step (sentinel 7) and `_run_command`. It covers three
+  cases: floor − 1 B refuses with exit 3, the message parts above, and no step
+  run; exactly the floor runs; `--min-free-gib 0` with 0 B free runs. In all
+  three, `disk_usage` gets the existing parent of the missing build directory.
+  Predictions were written as assertions before the first run.
+- Before the fix (6577e4cf6 tool): the test fails (`7 != 3`, `disk_usage`
+  called 0 times, argparse rejects `--min-free-gib`). After: the test passes,
+  and `python3 tests/regression/tooling/Test.TouchedScope.py` gives 38 tests
+  OK (37 at baseline). `Test.WorkflowEvidence.py` still gives 42 OK.
+- Mutations, each restored afterwards: headroom `if` disabled → `7 != 3`;
+  default changed to 21 → `3 != 7`; `disk_usage(build_dir)` without the
+  parent walk → `expected call not found`.
+- Real path, no mock: `touched_scope.py --root . --changed-file
+  docs/build-troubleshooting.md --output /tmp/bug195-route.json --build-dir
+  build/never-created/ci-fast --min-free-gib 999999 --run` exits 3 with the
+  message above, naming the volume of the existing `build/`. Neither the route
+  file nor the build directory was created.
+- Not run: a real `--run` with configure/build. C++ builds were held back on
+  this host tonight. The refusal path returns before any subprocess.
+- Structural checks pass: `check_doc_links.py --root . --strict`,
+  `check_task_policy.py --root . --strict`, `check_task_state_links.py --root
+  . --strict`, `generate_session_brief.py --check`, `sync_skills.py --check`,
+  `workflow_evidence.py validate --root .`, `check_root_hygiene.py --root .
+  --strict`.
+
+**Relative build directory — 2026-10-24 (independent Codex review of
+f21ba9425, P2: a relative `--build-dir` was resolved against the caller's cwd,
+while configure and build run with cwd=root).** The preflight now resolves
+`--build-dir` under `--root`; absolute paths are unchanged. New test
+`test_run_checks_relative_build_dir_under_root_not_cwd` runs from another cwd
+with the default relative build directory, no space under root and ample
+elsewhere. It failed before the fix (`7 != 3`) and passes after; the suite
+gives 39 OK. Real path from `/tmp` with `--root <worktree> --min-free-gib
+999999 --run` exits 3 and names `<worktree>/build`. Only the build-dir volume
+is checked; that limit is now commented in code and documented.
+
 **What remains.**
-- Tooling detection covers only `record-command`. Direct `cmake --build` /
-  `ctest` runs and `touched_scope.py` rely on the documented manual `df` check.
-  Whether interactive multi-preset builds should get a tooling preflight is an
-  operator decision.
+- Tooling detection covers `record-command` and `touched_scope.py --run`.
+  Direct `cmake --build` / `ctest` runs and the separate `touched_scope.py
+  --action` steps rely on the documented manual `df` check. Whether more
+  entry points should get a preflight is an operator decision.
 - `tools/ci/time_command.py` writes its CI timing JSON with a plain
   `write_text`; CI-only, and `aggregate_gate_timing.py` rejects malformed JSON.
