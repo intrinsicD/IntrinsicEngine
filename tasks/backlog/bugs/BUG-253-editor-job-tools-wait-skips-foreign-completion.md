@@ -39,6 +39,18 @@ contract_review: Test-only wait predicate fix in a runtime contract test; engine
       failed.
 - [ ] No engine change.
 
+## Resolution
+- 2026-10-24: the post-release `WaitFor` predicate now returns
+  `waited && ran && jobs.IsComplete(foreign)`, the file's sibling pattern. Test-only; no
+  engine file changed.
+- Prediction written before the run: the old predicate shows at least 1 failure in 8000
+  in-process repetitions (expected about 16), all with the 3449/3451 signature.
+- Before (old predicate, `IntrinsicRuntimeContractTests`, `--gtest_repeat=8000`): 5/8000
+  failed, each at `:3449` and `:3451`. After: 0/8000 twice. `EditorKeypointAgent.*` 12/12;
+  `ctest -R` over the file's seven suites 96/96; `check_test_layout --strict` clean.
+- Not checked: the hosted `full-cpu` job on this commit. 0/16000 bounds the residual in-process
+  failure rate below about 0.02% (95%, rule of three); the old rate was 5/8000 (~0.06%).
+
 ## Verification
 ```bash
 cmake --build build/ci --target IntrinsicRuntimeContractTests --parallel 16

@@ -3427,7 +3427,7 @@ TEST_F(EditorKeypointAgent, EditorJobToolsListWaitAndCancelThroughTheSurface)
         Runtime::AgentOperationOutcome out;
         if (!waited && waitForRun.Continuation(context, out)) waited = out;
         if (!ran && run.Continuation(context, out)) ran = out;
-        return waited && ran;
+        return waited && ran && jobs.IsComplete(foreign);
     }));
     AgentJson finished = AgentResult(*waited);
     EXPECT_EQ(finished["finished"], true) << waited->Text;
