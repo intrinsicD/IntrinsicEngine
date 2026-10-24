@@ -46,3 +46,130 @@ DISPLAY=:1 Xephyr :9 -screen 1280x900 -noreset -ac
 DISPLAY=:9 ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.KeypointResidentPreviewDiscardRepeatPagedParity$'
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Diagnosis — 2026-10-24
+
+### Predictions
+H1 and H2 are not in `predictions.txt`. They are recorded only in this note,
+which was first committed at 02:05 (16dd3b5ef), after the runs (01:47–02:03),
+so the artifacts cannot show that they preceded the runs. The backtest,
+iconify, offscreen, cohort, Sandbox and resident LOP predictions are in
+`predictions.txt`, which says each was appended before its run.
+Source: `origin/main` 599f02ff1, fresh `ci-vulkan` tree, RTX 4090 with NVIDIA
+580.159.04 ICD selected. At 01:46 `DISPLAY=:1` was the operator's X desktop,
+DPMS enabled with `Monitor is On`, and at 01:47 the session was locked
+(`LockedHint=yes`). `predictions.txt` gives the desktop as 10240x2880; output
+modes and refresh rates were not recorded. The GPU was in P8.
+Code reading before the runs: `Render.EnableVSync=false` reaches no device.
+Nothing calls `IDevice::SetPresentMode`, so `VulkanDevice` keeps
+`PresentMode::VSync`, and `ToVkPresentMode` returns `VK_PRESENT_MODE_FIFO_KHR`.
+Each frame therefore waits in `vkQueuePresentKHR`
+(`VulkanDevice::Present`, timed as `FramePacingDiagnostics::PresentMicros`)
+and in the swapchain acquire inside `BeginFrame`.
+- H1, display-owned FIFO pacing (the BUG-143 mechanism): presentation on `:1`
+  is slow (about 1 s per frame) when the window is not scanned out. Expected
+  outcomes: on `:1` the case exceeds the 30 s CTest limit; the probe shows
+  `present_micros` + acquire near 1 s per frame and sub-millisecond keypoint
+  work per frame. On `:9` the case passes in 10 ± 4 s with presentation
+  < 20 ms per frame.
+- H1 rejected if `:1` passes in under 20 s with presentation < 20 ms per frame.
+  In that case the 2026-10-01 timeout depended on a display state that is not
+  present now, and the note records that state.
+- H2, job or fixture stall rather than presentation: the frame count on `:1`
+  matches `:9` but the wall time is spent outside present/acquire. The
+  `Started` 50 s bound in `KeypointResidentApp::Frame` cannot fire under the
+  registered 30 s CTest limit, so a stall shows only as a CTest timeout.
+
+### Results
+Raw logs, the probe diff and the display states are in
+`tasks/evidence/BUG-228/2026-10-24/` (ignored by git). Host at run starts:
+1-minute load 0.64–4.24 (`state-*.txt`; 4.24 at the `:9` cohort, 4.10 and 4.01
+at the Sandbox runs). Compiler processes were not recorded. This lane's own
+incremental builds (`build-probe*.log` 01:49–01:54, `build-bug182.log` 01:56,
+about 28 s each) ran between runs; by file times none overlapped a run. Other
+lanes' compiles were not recorded.
+- Task commands, clean binary: `:1` passed in 10.79 s and `:9` in 10.11 s. The
+  display dependence did not reproduce in this state (`Monitor is On`, session
+  locked). The H1 prediction for `:1` (more than 30 s) failed. This matches the
+  stated alternative: the 2026-10-01 timeout needed a display state that is
+  not present now.
+- Temporary probe (`probe.diff`, reverted, never committed): each frame prints
+  `Engine::GetLastFramePacingDiagnostics()` and
+  `GetVulkanFrameLifecycleDiagnosticsSnapshot()`. On both displays the case runs
+  92 operational frames. The first paged transaction reaches `ReadyToAccept` at
+  frame 47 and the accept finishes at frame 91. A frame takes 80–83 ms, of which
+  `render_prepare` is 68–69 ms. Presentation usually takes 0.1–0.5 ms, at most 3.0 ms
+  (13 ms in total on `:1`, 32 ms on `:9`), acquire about 20 µs and the fence wait about 13 µs.
+  The case's wall time is therefore its fixed frame count multiplied by the
+  frame time. Its progress is paced by frames, not by elapsed time.
+- H2 is moot in this state. Its observable (same frame count on both
+  displays, wall time outside present/acquire) is what these monitor-on runs
+  show, but neither display was slow, so there was no slow run to attribute.
+- Backtest against 2026-10-01: the degenerate sibling
+  `KeypointResident4096IdenticalPointsRetainsDevice` runs 8 operational frames
+  and passes in 3.90 s now; its frame loop takes 0.95 s. With 8 frames at about
+  1 s each (BUG-143's display-off present), the expected time is about 10.9 s;
+  2026-10-01 recorded 10.93 s. The cases that timed out on 2026-10-01
+  (`PreviewDiscardRepeatPagedParity`, `SubnormalScores`, `DeletedSlotPreservesBothFronts`)
+  are the 92-frame cases. At about 1 s per frame each would need about 92 s.
+  These numbers fit H1, but the 2026-10-01 display state was not recorded, so
+  this is a fit, not a reproduction.
+- H3 (window minimized, frame phases skipped) is rejected for 2026-10-01.
+  Iconifying the test's own window on `:1` gives a 30.16 s CTest timeout whose
+  last log line matches the 2026-10-01 log, with zero `Frame` calls: minimized
+  frames skip every phase. Under H3 the degenerate case would also hang, but it
+  passed on 2026-10-01.
+- Moving the test's own window outside both outputs did not work; the window
+  manager clamped it to (5056, 2816), so that run tells us nothing.
+- Where the wait is: `Render.EnableVSync=false` has no effect, so the swapchain
+  is always FIFO. `VulkanDevice::Initialize` reads `EnableValidation` but not
+  `EnableVSync`, yet `docs/architecture/engine-config.md` lists VSync as a
+  boot-only toggle. When presentation is slow, the wait is `vkQueuePresentKHR` in
+  `VulkanDevice::Present` (`present_micros`) plus `vkAcquireNextImageKHR` with
+  an `UINT64_MAX` timeout in `VulkanDevice::BeginFrame`. BUG-143 measured
+  about 900 ms of present plus about 100 ms of acquire per frame with
+  `Monitor is Off`. The probe shows both take well under 1 ms while the
+  monitor is on.
+- Untested expectation: Xephyr's presentation does not depend on the host
+  monitors' DPMS state. There was no display-off run on `:9`, and the
+  2026-10-01 display state is unknown. `/usr/bin/Xephyr` does contain the DPMS
+  extension: its strings include `noDPMSExtension` and the option
+  `-dpms disables VESA DPMS monitor control`.
+- Measured with the monitor on, Xephyr presentation is slower, presumably its
+  copy of each frame into the host window. `ExtrinsicSandbox
+  --frame-pacing-report` (32 frames, 1600x900) shows a median `present_micros`
+  of 141 µs on `:1` and 28,108 µs on `:9`. That is 0.2 % and 21.5 % of frame
+  time; the prediction of < 20 ms on `:9` failed. Median `render_prepare` is
+  69 ms on `:1` and 74 ms on `:9`.
+- The fixture's 50 s `Started` bound is longer than the registered 30 s
+  `TIMEOUT`, so it can never fire. A run slowed by the display ends as a CTest
+  kill with no `Step` diagnostic.
+- Re-run of the affected tests in both environments, at 2df2a2837 with BUG-182
+  merged: 21 cases (`Keypoint*`, `NormalNeighborhoods*`,
+  `RUNTIME290/292/293/296/297/298/299`). On `:1` 19 of 21 passed (170.3 s); on
+  `:9` 19 of 21 passed (158.9 s). The slowest case took 14.71 s and nothing
+  timed out. The same two cases fail on both displays with the same failure
+  lines, so the failures do not depend on the display. `predictions.txt`
+  predicted the `KeypointResidentSubnormalScores` failure on both displays;
+  only the `PlanarZero` failure was not predicted. Failure lines in
+  `Test.PointLBVHGpuSmoke.cpp`, the same in `cohort-d1.log` and `cohort-d9.log`:
+  `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` has 8 at `:1981`
+  (`KeypointCount` 5, expected 8, in each of the eight domains) and 8 at
+  `:1989` (keypoint mask differs from the reference).
+  `KeypointResidentSubnormalScores` has 12 mask mismatches at `:2830` (preview)
+  and 12 at `:2849` (after accept), and the saliency L∞ bound fails at both
+  `:2833` and `:2855` (7.58e-42 against 1.12e-44). RUNTIME-291's note (its
+  worktree) records both cases failing with its `src/` change reverted. These
+  failures are separate from this display bug, and no bug file tracks them.
+- Resident LOP, built afterwards: both `PointCloudConsolidationGpuParity.ResidentLop*`
+  cases passed on both displays: `PreviewDiscardAcceptParityAndRepeatInputIo`
+  in 6.00 s on `:1` and 5.29 s on `:9` (limit 30 s), and
+  `MultipleProjectionAndReducePagesMatchCpu` in 24.35 s on `:1` and 24.54 s on
+  `:9` (limit 120 s).
+
+### What remains
+- Reproducing the slow display state on `:1` means switching the operator's
+  monitors off (DPMS), which needs the operator's decision. Choosing the
+  supported display setup is also a policy decision. The options are in the
+  lane report.
+- Acceptance item 3 waits for the operator to choose the environment.

@@ -37,6 +37,49 @@ No source workaround or gate weakening was introduced. Evidence:
 `build/analysis/point-inputs-2026-09-12/vulkan-build-no-cache.log`.
 See [processing cleanup review](../../../docs/reviews/2026-09-11-processing-complexity-review.md).
 
+## Diagnosis — 2026-10-24
+
+This was a bounded attempt to reproduce the crash in an incremental build without
+ccache. Setup: an isolated worktree at `599f02ff1`, `build/ci-vulkan` (Debug,
+ASan+UBSan, Ninja 1.11.1, CMake 4.3.2), `Ubuntu clang version 23.0.0
+(++20260517031631+2f79d41e3e2e…)`, one writer, `--parallel 7`. ccache is not
+installed on this host: `command -v ccache` prints nothing, and the configured
+cache has `CCACHE_PROGRAM-NOTFOUND` with `INTRINSIC_ENABLE_CCACHE=ON`. Every build
+recorded here is therefore cache-free. The expected outcome, written down
+beforehand, was that both rebuilds succeed without a frontend crash.
+
+1. The tree was configured (finished 01:21:48) and built from scratch as the
+   baseline (finished 01:28:01; 1,958 steps, 911 compiles, including
+   `IntrinsicPointLBVHGpuTests`). Configure and build both exited 0
+   (`baseline-configure.log`, `baseline-build.log`, `baseline-rc.txt`). A no-op
+   build afterwards reported `ninja: no work to do`.
+2. A comment-only line was appended to
+   `internal/Runtime.EditorWorkspaceAttachment.Detail.cppm`,
+   `Runtime.EditorWorkspaceSnapshots.Models.cpp` and
+   `internal/Runtime.EditorWorkspaceSession.cpp`, and `IntrinsicPointLBVHGpuTests`
+   was rebuilt. Result: 26 steps, 20 compiles (the three files included), exit 0,
+   28.8 s.
+3. The edits were reverted with `git checkout` and the target rebuilt. Result:
+   20 compiles, exit 0, 28.8 s. A following no-op build reported no work.
+
+Neither rebuild printed `PLEASE submit a bug report`, `Stack dump` or `error:`, and
+no new clang crash reproducer appeared in `/tmp`.
+
+Result: the crash did not reproduce in the incremental, cache-free, single-writer
+build with a stable source. The comparison with ccache enabled versus disabled
+cannot run on this host unless ccache is installed. No second fresh tree was
+compared beyond the baseline.
+
+Unrelated observation, not examined: `/tmp` holds 110 Clang 23.0.0 crash
+reproducer scripts dated 2026-10-19 11:56–11:57. They name main files such as
+`Runtime.SceneDocumentModule.cppm` in a worktree that no longer exists. Their
+cause is unknown, and they cannot be rerun without that tree's module files.
+
+No source, preset or gate changed. Logs are git-ignored under
+`tasks/evidence/BUG-178/` (`baseline-configure.log`, `baseline-build.log`,
+`baseline-rc.txt`, `environment.txt`, `predictions.txt`, `step0-noop.log`,
+`step1-edited.log`, `step2-reverted.log`).
+
 ## Acceptance criteria
 - [ ] Reproduce with one stabilized source surface and exactly one writer per preset tree, comparing enabled/disabled ccache and a fresh tree.
 - [ ] Record the compiler/cache cause or a bounded non-reproduction; preserve the existing strict module/toolchain gates.
