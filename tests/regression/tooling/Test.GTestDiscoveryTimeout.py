@@ -23,6 +23,9 @@ ROOT = Path(__file__).resolve().parents[3]
 CMAKELISTS = ROOT / "tests/CMakeLists.txt"
 HELPER = ROOT / "cmake/IntrinsicTestDiscovery.cmake"
 PROBE = ROOT / "tools/ci/gtest_discovery_probe.py"
+sys.path.insert(0, str(PROBE.parent))
+import gtest_discovery_probe as discovery_probe  # noqa: E402  (shared discovery-file layout)
+sys.path.remove(str(PROBE.parent))
 BUDGET_VARIABLE = "_intrinsic_gtest_discovery_timeout_seconds"
 CASE_COUNT = 40
 
@@ -69,8 +72,9 @@ def run(*args: str, timeout: float = 60, **kwargs) -> subprocess.CompletedProces
 
 
 def parse_include(path: Path) -> dict[str, str]:
+    """Fields of the gtest_discover_tests_impl call in ``path`` (see discovery_probe.discovery_call)."""
     text = path.read_text(encoding="utf-8")
-    fields = dict(re.findall(r"(?m)^\s+([A-Z_]+) \[==\[(.*?)\]==\]\s*$", text))
+    fields = discovery_probe.call_fields(text)
     if text.count("gtest_discover_tests_impl(") != 1 or "TEST_DISCOVERY_TIMEOUT" not in fields:
         raise AssertionError(f"{path.name}: unexpected GoogleTest include layout")
     return fields
@@ -141,10 +145,15 @@ class FakeListerProject:
         run("cmake", "-S", str(self.source), "-B", str(self.build))
 
     def include(self, target: str) -> Path:
-        return self.build / f"{target}[1]_include.cmake"
+        """The file holding the target's discovery call, on this CMake's layout."""
+        try:
+            return discovery_probe.discovery_call(discovery_probe.target_include(self.build, target))
+        except discovery_probe.ProbeError as error:
+            version = ".".join(map(str, ctest_version()))
+            raise AssertionError(f"CMake {version}: {error}") from error
 
     def stale(self, target: str) -> None:
-        (self.build / f"{target}[1]_tests.cmake").unlink(missing_ok=True)
+        Path(parse_include(self.include(target))["CTEST_FILE"]).unlink(missing_ok=True)
 
     def ctest(self, *args: str, env: dict[str, str], timeout: float) -> tuple[subprocess.CompletedProcess[str], float]:
         start = time.monotonic()
@@ -287,13 +296,8 @@ class ProbeSelfTests(unittest.TestCase):
                 time.sleep(0.05)
             self.assertFalse(_alive(pid), "listing child outlived the killed probe")
         # A child whose probe died before PR_SET_PDEATHSIG was registered must not exec.
-        sys.path.insert(0, str(PROBE.parent))
-        try:
-            import gtest_discovery_probe as probe_module
-        finally:
-            sys.path.remove(str(PROBE.parent))
-        self.assertEqual(subprocess.run(["true"], preexec_fn=probe_module._die_with(-1)).returncode, 127)
-        self.assertEqual(subprocess.run(["true"], preexec_fn=probe_module._die_with(os.getpid())).returncode, 0)
+        self.assertEqual(subprocess.run(["true"], preexec_fn=discovery_probe._die_with(-1)).returncode, 127)
+        self.assertEqual(subprocess.run(["true"], preexec_fn=discovery_probe._die_with(os.getpid())).returncode, 0)
 
     def test_planned_sequence_does_not_trip_identity_checks(self) -> None:
         # Run plan order: direct arm, forced-stale C-real, second direct arm, decide.
@@ -347,11 +351,7 @@ class ProbeSelfTests(unittest.TestCase):
             self.assertEqual(never_idle[-1], {"event": "stop", "reason": "deadline"})
 
     def test_process_classifier_ignores_command_lines_that_mention_clang(self) -> None:
-        sys.path.insert(0, str(PROBE.parent))
-        try:
-            import gtest_discovery_probe as probe
-        finally:
-            sys.path.remove(str(PROBE.parent))
+        probe = discovery_probe
         cases = {("/usr/bin/clang++-23", "-c", "a.cpp", "-o", "a.o"): "compile",
                  ("clang", "-c", "a.c"): "compile",
                  ("/usr/bin/clang++-23", "-cc1", "-emit-obj"): None,
@@ -574,16 +574,24 @@ class DecisionRuleTests(unittest.TestCase):
 
 
 class ReconcileTests(unittest.TestCase):
-    def tree(self, root: Path, rows: dict[str, tuple[str, int, int]]) -> Path:
+    def tree(self, root: Path, rows: dict[str, tuple[str, int, int]], layout: str = "3.x") -> Path:
         (root / "tests").mkdir()
         (root / "test-inventories").mkdir()
         lines = ["target\tlabels"]
         for target, (labels, discovery, case) in rows.items():
             lines.append(f"{target}\t{labels}")
-            (root / "tests" / f"{target}[1]_include.cmake").write_text(
-                "    gtest_discover_tests_impl(\n"
-                f"      TEST_PROPERTIES [==[TIMEOUT;{case}]==]\n"
-                f"      TEST_DISCOVERY_TIMEOUT [==[{discovery}]==]\n    )\n")
+            if layout == "3.x":  # CMake < 4.4: the include holds the call
+                (root / "tests" / f"{target}[1]_include.cmake").write_text(
+                    "    gtest_discover_tests_impl(\n"
+                    f"      TEST_PROPERTIES [==[TIMEOUT;{case}]==]\n"
+                    f"      TEST_DISCOVERY_TIMEOUT [==[{discovery}]==]\n    )\n")
+            else:  # CMake 4.4: the include includes _discovery.cmake, lists are separate brackets
+                call = root / "tests" / f"{target}_0123abcd_discovery.cmake"
+                (root / "tests" / f"{target}_0123abcd_include.cmake").write_text(f'    include("{call}")\n')
+                call.write_text("gtest_discover_tests_impl(\n"
+                                f"  TEST_TARGET [==[{target}]==]\n"
+                                f"  TEST_PROPERTIES [==[TIMEOUT]==] [==[{case}]==] [==[LABELS]==] [==[{labels}]==]\n"
+                                f"  TEST_DISCOVERY_TIMEOUT [==[{discovery}]==]\n)\n")
         (root / "test-inventories/RegisteredTestTargets.tsv").write_text("\n".join(lines) + "\n")
         return root
 
@@ -591,14 +599,58 @@ class ReconcileTests(unittest.TestCase):
         budget = declared_budget()
         default_case, slow_case = case_budgets()
         good = {"Fast": ("unit", budget, default_case), "Slow": ("unit,slow", budget, slow_case)}
-        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
-            self.assertIn(f"discovery_timeout={budget}", reconcile(self.tree(Path(directory), good)))
-        for rows, needle in (({**good, "Fast": ("unit", budget + 2, default_case)}, "stale include"),
-                             ({**good, "Slow": ("unit", budget, slow_case)}, f"case TIMEOUT {slow_case}"),
-                             ({"Fast": good["Fast"]}, "need default and slow")):
+        for layout in ("3.x", "4.4"):
             with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
-                with self.assertRaisesRegex(AssertionError, needle):
-                    reconcile(self.tree(Path(directory), rows))
+                self.assertIn(f"discovery_timeout={budget}", reconcile(self.tree(Path(directory), good, layout)))
+            for rows, needle in (({**good, "Fast": ("unit", budget + 2, default_case)}, "stale include"),
+                                 ({**good, "Slow": ("unit", budget, slow_case)}, f"case TIMEOUT {slow_case}"),
+                                 ({"Fast": good["Fast"]}, "need default and slow")):
+                with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
+                    with self.assertRaisesRegex(AssertionError, needle):
+                        reconcile(self.tree(Path(directory), rows, layout))
+
+    def test_unknown_layout_fails_closed(self) -> None:
+        budget = declared_budget()
+        default_case, slow_case = case_budgets()
+        good = {"Fast": ("unit", budget, default_case), "Slow": ("unit,slow", budget, slow_case)}
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
+            tests = self.tree(Path(directory), good) / "tests"
+            (tests / "Other_include.cmake").write_text("")
+            with self.assertRaisesRegex(discovery_probe.ProbeError, "unknown GoogleTest discovery file layout"):
+                reconcile(tests.parent)
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
+            tests = self.tree(Path(directory), good, "4.4") / "tests"
+            (tests / "Fast_0123abcd_include.cmake").write_text("# no discovery include\n")
+            with self.assertRaisesRegex(discovery_probe.ProbeError, "Fast_0123abcd_discovery.cmake"):
+                reconcile(tests.parent)
+
+
+class LayoutTests(unittest.TestCase):
+    """The probe finds one discovery call per target on both layouts and never guesses."""
+
+    def test_finds_the_call_on_both_layouts_and_refuses_to_guess(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-layout-") as directory:
+            tests = Path(directory)
+            old = tests / "Old[1]_include.cmake"
+            old.write_text("")
+            (tests / "Old[2]_include.cmake").write_text("")  # a second call; [1] stays the probe's choice
+            new, call = tests / "New_89abcdef_include.cmake", tests / "New_89abcdef_discovery.cmake"
+            new.write_text(f'include("{call}")\n')
+            self.assertEqual(discovery_probe.target_include(tests, "Old"), old)
+            self.assertEqual(discovery_probe.discovery_call(old), old)
+            self.assertEqual(discovery_probe.target_include(tests, "New"), new)
+            self.assertEqual(discovery_probe.discovery_call(new), call)
+            (tests / "Old_01234567_include.cmake").write_text("")
+            with self.assertRaisesRegex(discovery_probe.ProbeError, "2 GoogleTest discovery includes for Old"):
+                discovery_probe.target_include(tests, "Old")
+            with self.assertRaisesRegex(discovery_probe.ProbeError, "0 GoogleTest discovery includes for Gone"):
+                discovery_probe.target_include(tests, "Gone")
+            for name in ("Old[1]_tests.cmake", "New_89abcdef_tests.cmake"):
+                (tests / name).write_text("")
+            self.assertEqual(set(discovery_probe.tests_files(tests)), {"Old", "New"})
+            (tests / "Odd_tests.cmake").write_text("")
+            with self.assertRaisesRegex(discovery_probe.ProbeError, "unknown GoogleTest discovery file layout"):
+                discovery_probe.tests_files(tests)
 
 
 def reconcile(build_dir: Path) -> str:
@@ -612,8 +664,8 @@ def reconcile(build_dir: Path) -> str:
     seen = {default_case: 0, slow_case: 0}
     errors = []
     for include in includes:
-        target = include.name.split("[", 1)[0]
-        fields = parse_include(include)
+        target = discovery_probe.generated_target(include)
+        fields = parse_include(discovery_probe.discovery_call(include))
         discovery = int(fields["TEST_DISCOVERY_TIMEOUT"])
         if discovery != budget:
             errors.append(f"{include.name}: TEST_DISCOVERY_TIMEOUT {discovery} != declared {budget} "
@@ -641,7 +693,7 @@ if __name__ == "__main__":
     if args.build_dir is not None:
         try:
             print(reconcile(args.build_dir.resolve()))
-        except (AssertionError, OSError, ValueError, KeyError) as error:
+        except (AssertionError, OSError, ValueError, KeyError, discovery_probe.ProbeError) as error:
             print(f"gtest discovery budget: error: {error}", file=sys.stderr)
             raise SystemExit(1)
         raise SystemExit(0)

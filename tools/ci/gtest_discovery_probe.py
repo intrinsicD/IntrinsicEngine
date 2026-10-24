@@ -2,7 +2,9 @@
 """Measure GoogleTest PRE_TEST discovery: direct listings and forced-stale CTest runs (BUG-091).
 
 ``direct`` reruns the exact ``--gtest_list_tests`` command a generated
-``<target>[1]_include.cmake`` would run, cold (page cache evicted) and warm.
+discovery call would run (in ``<target>[1]_include.cmake``; on CMake 4.4+ in the
+``<target>_<sha8>_discovery.cmake`` that ``<target>_<sha8>_include.cmake``
+includes), cold (page cache evicted) and warm.
 ``ctest`` forces rediscovery of chosen targets, runs a CTest command and
 reports which ``_tests.cmake`` files were rewritten. Both write JSON lines
 with host telemetry gathered outside the timed window. ``decide`` applies the
@@ -13,6 +15,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 from datetime import datetime
+import glob
 import hashlib
 import json
 import math
@@ -38,10 +41,53 @@ class ProbeError(RuntimeError):
     pass
 
 
+# Generated PRE_TEST files: <target>[N]_<kind>.cmake before CMake 4.4; 4.4 names them
+# MAKE_C_IDENTIFIER(<target>_<sha8>) (sha8: SHA-256 prefix of the call's arguments) and moves the
+# discovery call from _include.cmake into a _discovery.cmake that the include includes.
+GENERATED = re.compile(r"(.+)(\[\d+\]|_[0-9a-f]{8})_(include|discovery|tests)\.cmake")
+LAYOUTS = "<target>[N]_include.cmake (CMake < 4.4) or <target>_<sha8>_include.cmake (4.4+)"
+
+
+def generated_target(path: Path) -> str:
+    match = GENERATED.fullmatch(path.name)
+    if match is None:
+        raise ProbeError(f"{path}: unknown GoogleTest discovery file layout; known: {LAYOUTS}")
+    return match[1]
+
+
+def target_include(tests_dir: Path, target: str) -> Path:
+    """The target's one generated include ([1] before 4.4); none or several is an error, not a guess."""
+    own = re.compile(rf"{re.escape(target)}(\[1\]|_[0-9a-f]{{8}})_include\.cmake")
+    found = sorted(p for p in tests_dir.glob(f"{glob.escape(target)}*_include.cmake") if own.fullmatch(p.name))
+    if len(found) != 1:
+        raise ProbeError(f"{tests_dir}: {len(found)} GoogleTest discovery includes for {target} "
+                         f"{[p.name for p in found]}; expected one <target>[1]_include.cmake (CMake < 4.4) "
+                         "or <target>_<sha8>_include.cmake (4.4+)")
+    return found[0]
+
+
+def discovery_call(include: Path) -> Path:
+    """The file holding the include's gtest_discover_tests_impl call."""
+    generated_target(include)
+    if include.name.endswith("]_include.cmake"):
+        return include
+    call = include.with_name(include.name.removesuffix("_include.cmake") + "_discovery.cmake")
+    if include.read_text(encoding="utf-8").count(f'include("{call}")') != 1:
+        raise ProbeError(f"{include}: expected one include of {call.name}; unknown GoogleTest include layout")
+    return call
+
+
+def call_fields(text: str) -> dict[str, str]:
+    # CMake 4.4 writes list fields as separate bracket arguments; join them as one CMake list.
+    return {key: value.replace("]==] [==[", ";")
+            for key, value in re.findall(r"(?m)^\s+([A-Z_]+) \[==\[(.*?)\]==\]\s*$", text)}
+
+
 def parse_include(path: Path) -> dict[str, str | bool]:
+    """Fields of the discovery call in ``path`` (see discovery_call)."""
     text = path.read_text(encoding="utf-8")
-    fields: dict[str, str | bool] = dict(re.findall(r"(?m)^\s+([A-Z_]+) \[==\[(.*?)\]==\]\s*$", text))
-    module = re.findall(r'(?m)^\s+include\("([^"]*/GoogleTestAddTests\.cmake)"\)\s*$', text)
+    fields: dict[str, str | bool] = call_fields(text)
+    module = re.findall(r'(?m)^\s*include\("([^"]*/GoogleTestAddTests\.cmake)"\)\s*$', text)
     if text.count("gtest_discover_tests_impl(") != 1 or "TEST_EXECUTABLE" not in fields or len(module) != 1:
         raise ProbeError(f"{path}: unexpected GoogleTest include layout")
     # Fail closed: the rebuilt argv below omits these inputs.
@@ -227,13 +273,14 @@ def _executable_identity(fields: dict[str, dict[str, str]]) -> dict[str, list[in
 
 
 def cmd_direct(args: argparse.Namespace) -> int:
-    includes = {target: args.tests_dir / f"{target}[1]_include.cmake" for target in args.target}
-    fields = {target: parse_include(path) for target, path in includes.items()}
+    includes = {target: target_include(args.tests_dir, target) for target in args.target}
+    calls = {target: discovery_call(path) for target, path in includes.items()}
+    fields = {target: parse_include(path) for target, path in calls.items()}
     output = _open_output(args)
     limit = _deadline(args)
     emit({"event": "start", "schema": SCHEMA, "arm": args.arm, "argv": sys.argv,
           "host": _host_identity(1), "targets": args.target, "tools": _tools(),
-          "include_sha256": {t: hashlib.sha256(p.read_bytes()).hexdigest() for t, p in includes.items()},
+          "include_sha256": {t: hashlib.sha256(p.read_bytes()).hexdigest() for t, p in calls.items()},
           "executable_size_mtime_ns": _executable_identity(fields)}, output)
     stop = "completed"
     for repetition in range(args.repetitions):
@@ -270,7 +317,7 @@ def cmd_direct(args: argparse.Namespace) -> int:
 
 
 def tests_files(tests_dir: Path) -> dict[str, int]:
-    return {path.name.split("[", 1)[0]: path.stat().st_mtime_ns for path in tests_dir.glob("*_tests.cmake")}
+    return {generated_target(path): path.stat().st_mtime_ns for path in tests_dir.glob("*_tests.cmake")}
 
 
 def wait_for_regime(args: argparse.Namespace, limit: float, output) -> dict | None:
@@ -308,9 +355,9 @@ def ctest_once(args: argparse.Namespace, repetition: int, output, limit: float) 
     before_files = tests_files(args.tests_dir)
     resident = {}
     for target in args.force:
-        include = args.tests_dir / f"{target}[1]_include.cmake"
-        os.utime(include)
-        exe = Path(parse_include(include)["TEST_EXECUTABLE"])
+        include = target_include(args.tests_dir, target)
+        os.utime(include)  # the include's own mtime gates rediscovery on every layout
+        exe = Path(parse_include(discovery_call(include))["TEST_EXECUTABLE"])
         if args.evict:
             evict(exe)
         resident[target] = residency(exe)

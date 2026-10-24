@@ -101,3 +101,36 @@ python3 tests/regression/tooling/Test.ConcurrentCTestDiscovery.py -v
 python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py -v
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Resolution — 2026-10-24
+- Operator decision (2026-10-24, verbatim): "jetzt unterstützten". Support for 4.4 lands now;
+  CMake is not pinned.
+- `tools/ci/gtest_discovery_probe.py` owns the layout once: `target_include()` finds exactly one
+  `<target>[1]_include.cmake` or `<target>_<sha8>_include.cmake` (no or several is an error),
+  `discovery_call()` returns the include itself before 4.4 and, on 4.4, the `_discovery.cmake` it
+  must include exactly once, `generated_target()` names the target of an include or `_tests.cmake`
+  and raises on any other name. `call_fields()` joins 4.4's list fields, which 4.4 writes as
+  separate bracket arguments (`TEST_PROPERTIES [==[TIMEOUT]==] [==[30]==]`; before:
+  `[==[TIMEOUT;30]==]`), back into one CMake list. The module-include match allows no indent,
+  as 4.4 writes it at column 0. Both regressions use these helpers; the race probe redirects the
+  module include in the call file and copies `Modules/GoogleTest/` beside its private module
+  when it exists (the lane's Option B).
+- Production helper: unchanged. On 4.4.4 the guarded race cases pass (lock held while A
+  discovers, B never re-enters), and the hermetic budget case passes its exact
+  `IntrinsicTestDiscovery: listing ... failed (...)` assertion, so the `variable_watch` on
+  `result` still fires.
+- Regression first (logs git-ignored in this lane worktree, `tasks/evidence/BUG-251/`):
+  before the change on 4.4.4, `Test.ConcurrentCTestDiscovery.py` `FAILED (failures=3)` and
+  `Test.GTestDiscoveryTimeout.py` `FAILED (failures=4, errors=2)` (missing `Fake[1]_include.cmake`).
+  After: 3/3 and 21/21 pass on 3.28.3, 3.31.6, host 4.3.2 and 4.4.4 (wheels from the BUG-249
+  lane). Not run on 3.31.10, 4.0.3, 4.1.3, 4.2.x or 4.3.4.
+- New checks: `ReconcileTests` runs on a synthetic 4.4 tree too and rejects an unknown include
+  name and a 4.4 include without its `_discovery.cmake`; `LayoutTests` covers both layouts, the
+  several-includes and no-include errors and an unknown `_tests.cmake` name. Mutations on 4.4.4
+  (each restored after): no `GoogleTest/` copy, no `after-write` hook, no `done` hook → race
+  probe fails 3/3; no list-field join, an indent-requiring module match, no `_discovery.cmake`
+  redirect, guessing the first of several includes → the matching tests fail. A forced unknown
+  layout on 4.4.4 fails at once with `CMake 4.4.4: generated discovery include layout changed:
+  ... 0 GoogleTest discovery includes for Fake ...`.
+- Not run: a live `--build-dir` reconcile on a 4.4 engine configure (no engine build in this
+  lane); only the synthetic 4.4 tree is checked.

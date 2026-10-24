@@ -7,7 +7,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 - [BUG-251 — Support the CMake 4.4 GoogleTest discovery include layout](BUG-251-cmake44-gtest-discovery-include-layout.md):
   CMake 4.4 names the PRE_TEST include `<target>_<sha8>_include.cmake`; two regressions and the
-  BUG-091 probe hard-code `<target>[1]_include.cmake`. The race probe fails 3/3 on 4.4.4 with a layout message.
+  BUG-091 probe hard-code `<target>[1]_include.cmake`. Operator chose support now; fixed on a lane branch,
+  passing on 3.28.3, 3.31.6, 4.3.2 and 4.4.4; awaits review.
 
 - [BUG-247 — Local root hygiene rejects existing tool state](BUG-247-local-root-hygiene-state-mismatch.md):
   no longer reproduces on 2026-10-24 (see its note); awaits the operator's confirmation that the current
