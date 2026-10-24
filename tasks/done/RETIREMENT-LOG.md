@@ -1,5 +1,24 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-097 retired by removal after the operator decision
+
+Retired [BUG-097](BUG-097-progressive-model-scene-zero-uv-atlas.md) (`25833a065`, `3fb7ae908`,
+`26ed00a06`), merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as
+`b4812f951`; not yet on `main`, and hosted CI has not run on it.
+
+- Operator decision, verbatim: "Ok dann A." Option A: delete the unreachable progressive model-scene
+  path instead of repairing it; no replacement atlas path has landed.
+- Removed: `ProgressiveRawGeometryFirst`, `ProgressiveJobs`, three never-read counters, the zero-fill
+  helpers `WriteDefaultTexcoords`/`WriteDefaultVectorProperty`, the no-op UV/normal jobs and their
+  helpers. No composition had set the options since `0fdeac008`. BUG-250's `HasResolvedTexcoords`
+  bake gates are unchanged; the `model-handoff` source rule now expects 0 job submissions.
+- Verification on `b4812f951`: `IntrinsicRuntimeContractTests` build exit 0, focused suites 106/106; the
+  full CPU suite (5942, 0 failures) ran on the identical v2 patch, not on the merge.
+- Review: independent Claude review of `0d7b5b4d3..3fb7ae908` `approve` (decided no box); independent
+  Claude review of the merge `approve`, AC2/AC7 "met", AC1 "partially met" (closure rests on the
+  decision), AC3-AC6 and the interim-repair items "not applicable". Ticked: RC1, D1, D3, AC1, AC2, AC7.
+- Open, with no owning task: the shared-atlas creation policy of the 2026-09-05 operator decision.
+
 ## 2026-10-24 — BUG-250 retired after its round-1 reviews
 
 Retired [BUG-250](BUG-250-direct-texture-bakes-skip-seam-atlas-models.md) (`b353492b8`, `9c5b4559e`),

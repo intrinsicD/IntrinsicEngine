@@ -40,12 +40,11 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
-  the default-off path still fabricates UVs. Interim repair requires a current
-  affected-workflow reproduction and coordination with the operator's shared
-  atlas replacement; otherwise verify supersession when that replacement
-  lands. Preserve corner-domain seams, source topology, and stale rejection.
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-097 — Progressive model-scene UV job publishes a zero atlas](../../done/BUG-097-progressive-model-scene-zero-uv-atlas.md).
+  Retired by removal (operator decision A): the unreachable progressive model-scene path, its zero-fill helpers and
+  options are deleted; no composition had set them since `0fdeac008`. Focused suites 106/106 on the merge.
 
 - Closed 2026-10-24: [BUG-250 — Direct texture bakes skip models with a seam atlas](../../done/BUG-250-direct-texture-bakes-skip-seam-atlas-models.md).
   The model-scene direct normal/albedo bake gates read `HasResolvedTexcoords` instead of `v:texcoord` only, so seam-atlas

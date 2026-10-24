@@ -87,66 +87,71 @@ contracts:
   requires a real atlas.
 
 ## Required changes
-- [ ] Satisfy the start gate and record the necessary interim repair versus
+- [x] Satisfy the start gate and record the necessary interim repair versus
       verified replacement/supersession disposition before changing code.
-      The repair checklist below applies only to the interim-repair branch.
-- [ ] Replace the no-op job/zero-fill publication with the existing CPU halfedge
+      The repair checklist below applies only to the interim-repair branch. Operator decision A, 2026-10-24 (see "Operator decision — 2026-10-24").
+- Replace the no-op job/zero-fill publication with the existing CPU halfedge
       materialization/UV-atlas path over an immutable snapshot of positions,
-      topology, and relevant source properties.
-- [ ] Return an explicit success/failure payload containing finite,
+      topology, and relevant source properties. (not applicable: interim-repair branch not taken)
+- Return an explicit success/failure payload containing finite,
       count-matched atlas coordinates and diagnostics/provenance sufficient to
-      distinguish real atlas output from a renderer fallback.
-- [ ] Use canonical corner-over-vertex UV resolution. Publish seam UVs as
+      distinguish real atlas output from a renderer fallback. (not applicable: interim-repair branch not taken)
+- Use canonical corner-over-vertex UV resolution. Publish seam UVs as
       `h:texcoord` mapped back to original source faces/halfedges; keep source
       topology and every element count unchanged. Remove a superseded UV
       authority, not unrelated properties. Unwrapper split vertices are
-      intermediate/GPU-upload data, never replacement ECS topology.
-- [ ] Capture authoritative entity, geometry, source-property, and binding
+      intermediate/GPU-upload data, never replacement ECS topology. (not applicable: interim-repair branch not taken)
+- Capture authoritative entity, geometry, source-property, and binding
       generations at submission and validate all of them on the main thread
-      immediately before publication.
-- [ ] On any generation mismatch, report stale discard and perform no geometry
+      immediately before publication. (not applicable: interim-repair branch not taken)
+- On any generation mismatch, report stale discard and perform no geometry
       or property write. In particular, preserve exact UVs authored after
-      submission and never merge the older atlas into changed topology.
-- [ ] On atlas failure, leave authoritative UVs absent (or preserve a
+      submission and never merge the older atlas into changed topology. (not applicable: interim-repair branch not taken)
+- On atlas failure, leave authoritative UVs absent (or preserve a
       pre-existing valid property), report the failure, and keep dependent
       texture-bake jobs blocked/failed rather than marking the UV dependency
-      ready.
-- [ ] Preserve non-UV source properties and initial raw publication. Worker
+      ready. (not applicable: interim-repair branch not taken)
+- Preserve non-UV source properties and initial raw publication. Worker
       computation stays off the main thread; validated publication stays on
-      the main thread.
+      the main thread. (not applicable: interim-repair branch not taken)
 
 ## Tests
-- [ ] Regression first through the current staged import seam: add
+- [x] Added at retirement, the removal's test disposition: the five items below
+      belong to the interim-repair branch. Unreachable code has no failing-first test;
+      the kept coverage is the focused suites (106/106 on `b4812f951`) and the
+      `RuntimeEngineLayering` rule at count 0 with its injecting self-check, both
+      rerun by the independent reviewer.
+- Regression first through the current staged import seam: add
       `AssetWorkflowModule.ProgressiveUvAtlasPublishesCornerUvsWithoutTopologyChange`
       in `tests/contract/runtime/Test.AssetWorkflowModule.cpp`. Assert canonical
       UV resolution, count/finiteness, real atlas diagnostics, non-degenerate
-      mapped triangles, a seam-bearing fixture, and unchanged source topology.
-- [ ] Add
+      mapped triangles, a seam-bearing fixture, and unchanged source topology. (not applicable: interim-repair branch not taken)
+- Add
       `AssetWorkflowModule.ProgressiveUvAtlasDiscardsCompletionAfterUserUvEdit`.
       Hold completion deterministically, write distinctive user UVs, release
-      it, and assert exact preservation plus a stale-discard status.
-- [ ] Add
+      it, and assert exact preservation plus a stale-discard status. (not applicable: interim-repair branch not taken)
+- Add
       `AssetWorkflowModule.ProgressiveUvAtlasDiscardsCompletionAfterTopologyEdit`
       and assert no old atlas is applied to the newer vertex/topology
-      generation.
-- [ ] Add
+      generation. (not applicable: interim-repair branch not taken)
+- Add
       `AssetWorkflowModule.ProgressiveUvAtlasFailureLeavesBakeDependencyBlocked`
       with a deterministic atlas failure fixture. Assert no zero-filled
       authoritative property, terminal failure diagnostics, and no dependent
-      bake publication.
-- [ ] Retain coverage that the worker executes off the main thread, successful
+      bake publication. (not applicable: interim-repair branch not taken)
+- Retain coverage that the worker executes off the main thread, successful
       publication executes on the main thread exactly once, and initial raw
-      geometry is available before enrichment resolves.
+      geometry is available before enrichment resolves. (not applicable: interim-repair branch not taken)
 
 ## Docs
-- [ ] Correct the runtime progressive-import documentation to distinguish raw
+- [x] Correct the runtime progressive-import documentation to distinguish raw
       renderer UV fallback from authoritative atlas publication and state the
-      generation/failure contract for dependent jobs.
-- [ ] Document that the option remains default-off and that atlas failure
-      leaves dependent bakes blocked rather than fabricating UV readiness.
-- [ ] Update task indexes, session brief, and retirement records when the
+      generation/failure contract for dependent jobs. `docs/architecture/runtime.md` bake-extent sentence corrected; reviewer: met.
+- Document that the option remains default-off and that atlas failure
+      leaves dependent bakes blocked rather than fabricating UV readiness. (not applicable: the option no longer exists.)
+- [x] Update task indexes, session brief, and retirement records when the
       implementation and repeat verification are complete; do not rewrite
-      archived task history.
+      archived task history. Done in the retirement commit.
 
 ## Acceptance criteria
 
@@ -154,39 +159,35 @@ The repair invariants below apply while the progressive path remains. For a
 supersession closure, map each to replacement-path evidence or an explicit
 removed-surface disposition; never require recreation of the deleted path.
 
-- [ ] A currently needed affected path justifies the interim repair, or a
+- [x] A currently needed affected path justifies the interim repair, or a
       landed replacement passes equivalent current-path regressions and
-      supports an explicit supersession closure. A planned method is not proof.
-- [ ] Successful progressive UV enrichment publishes finite, count-matched UVs
+      supports an explicit supersession closure. A planned method is not proof. By operator decision A (removal without a replacement); reviewer: "partially met" on the criterion text, closure rests on the decision.
+- [x] Successful progressive UV enrichment publishes finite, count-matched UVs
       with at least one nonzero-area mapped triangle and real atlas
-      diagnostics; it never calls or retains a zero-fill authoring helper.
-- [ ] Canonical corner-over-vertex resolution reads the one published UV
-      authority; seams do not split authoritative source topology.
-- [ ] Any newer UV, topology, position, entity, source-property, or binding
+      diagnostics; it never calls or retains a zero-fill authoring helper. Reviewer: met.
+- Canonical corner-over-vertex resolution reads the one published UV
+      authority; seams do not split authoritative source topology. (not applicable: removed surface; reviewer decision.)
+- Any newer UV, topology, position, entity, source-property, or binding
       generation causes a no-write stale discard that preserves user state
-      exactly.
-- [ ] Atlas failure is observable, does not fabricate authoritative
+      exactly. (not applicable: removed surface; reviewer decision.)
+- Atlas failure is observable, does not fabricate authoritative
       UVs, and prevents dependent bake work from being reported ready
-      or published.
-- [ ] Raw geometry remains available immediately, while worker and main-thread
-      publication ownership stay deterministic.
-- [ ] The default runtime setting remains unchanged.
+      or published. (not applicable: removed surface; reviewer decision.)
+- Raw geometry remains available immediately, while worker and main-thread
+      publication ownership stay deterministic. (not applicable: removed surface; reviewer decision.)
+- [x] The default runtime setting remains unchanged. Reviewer: met.
 
 ## Verification
+The interim-repair commands that stood here named the four `ProgressiveUvAtlas*`
+tests, which were never written (repair branch not taken). The closure ran, on the
+merged tree:
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests
-ctest --test-dir build/ci --output-on-failure \
-  -R '^AssetWorkflowModule\.ProgressiveUvAtlas(PublishesCornerUvsWithoutTopologyChange|DiscardsCompletionAfterUserUvEdit|DiscardsCompletionAfterTopologyEdit|FailureLeavesBakeDependencyBlocked)$' \
-  --no-tests=error --repeat until-fail:20 --timeout 60
-ctest --test-dir build/ci --output-on-failure \
-  -R '^AssetWorkflowModule\.' --no-tests=error --timeout 60
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure \
-  -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --parallel 12 --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 \
+  -R "^(AssetWorkflowModule|RuntimeAssetImportFormatCoverage|RuntimeAssetImportRecipe|RuntimeTextureBakeModule)\."
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
-python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
@@ -207,7 +208,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - This task has no backend promotion claim; after those CPU contracts pass, no
   `Operational` follow-up is owed. GPU bake execution remains separately owned.
 
-## Proposal — 2026-10-24 (awaiting operator decision)
+## Proposal — 2026-10-24 (operator chose A the same day; text as proposed)
 
 Branch `claude/bug-097-remove-progressive-model-path-v2`, based on the
 integration head `0d7b5b4d3`. It replaces the first proposal branch
@@ -428,3 +429,54 @@ The v1 text is kept as the record; its line numbers refer to v1.
 - The operator's choice of A, B or C.
 - An independent correctness review of the diff.
 - Index and retirement records, which belong to the integrator.
+
+## Operator decision — 2026-10-24
+
+Verbatim (German): "Ok dann A." Option A of the proposal: delete the unreachable
+progressive model-scene path now and retire BUG-097 by removal, without a landed
+replacement. This settles the start gate (Required changes item 1) and is the basis
+for acceptance criterion 1, whose own text names only an interim repair or a landed
+replacement.
+
+## Completion — 2026-10-24
+Completed 2026-10-24 by removal. Commit: `25833a065` (the deletion, cherry-pick of
+`311ad6938` onto `0d7b5b4d3` with BUG-250's gates kept), `3fb7ae908` and `26ed00a06`
+(this note), branch `claude/bug-097-remove-progressive-model-path-v2`, merged into the
+night integration branch `claude/night-2026-10-24-bug-sweep` as `b4812f951`. Not yet on
+`main`; hosted CI has not run on it.
+
+Reviews:
+- Independent Claude review of `0d7b5b4d3..3fb7ae908` (coordinator's local record
+  `wfK.json`, `rebase097/review`, outside the repository): `approve`, no blocking
+  findings. It explicitly decided no checkbox, because the operator had not chosen yet.
+  Its wording finding is fixed in `26ed00a06`.
+- Independent Claude review of the merge `4c30f2b82..b4812f951` after the decision
+  (read-only, 2026-10-24): "VERDICT: approve (code at b4812f951)"; the merged patch has
+  the same patch-id as `0d7b5b4d3..26ed00a06`; BUG-250's `HasResolvedTexcoords` gates are
+  unaltered; no remaining setter or reader of any removed name in `src`, `tests`, `tools`,
+  `benchmarks` or `methods`. Its item decisions: AC1 "partially met" (no needed path, no
+  replacement; closure rests on the operator decision), AC2 and AC7 "met", AC3-AC6 "not
+  applicable (removed surface)"; RC1 "partially met" until the decision was recorded
+  (done above), RC2-RC8 and T1-T5 "not applicable"; D1 "met", D2 "not applicable", D3
+  "not met (yet)" until the index, brief and log were updated (done in the retirement
+  commit). Its blocking items were these two records only.
+
+Boxes: ticked are RC1, D1, D3, AC1 (by the operator decision), AC2 and AC7. The items
+the reviewer rated not applicable are kept as plain bullets with that disposition, not
+ticked.
+
+Verification on the merged tree `b4812f951` (this session, `build/ci`):
+- `IntrinsicRuntimeContractTests` build: exit 0, no warnings.
+- The focused `ctest` above: 106/106 passed (the reviewer reran it: 106/106).
+- The reviewer ran `check_source_rules.py --suite RuntimeEngineLayering` (165 rules,
+  0 problems) and `--self-check` (265 rules, 0 problems).
+- The full CPU suite was not rerun on the merge; it passed on `26ed00a06`'s v2
+  (5942 tests, 0 failures, 1 skip), and the merged patch is identical.
+
+Limits: no replacement atlas path exists; if model scenes need an asynchronous atlas,
+the base to reuse is the direct-mesh deferred atlas job in
+`Runtime.AssetWorkflowRecipePolicies.cpp`. The shared-atlas creation policy of the
+2026-09-05 operator decision has no owning task.
+
+Evidence: the logs cited in the proposal stay in `/tmp` and in the `bug-232` lane
+worktree; no tracked evidence existed and nothing was deleted.
