@@ -178,14 +178,15 @@ ASan test executables compile in `detect_leaks=1`
 (`support/Test_SanitizerConfig.cpp`), and LeakSanitizer's exit-time check
 needs ptrace. The PRE_TEST discovery above runs `--gtest_list_tests` for every
 discovered executable whose binary is newer than its cached list. It does so
-whatever the `-R`/`-L` selection is, and outside the tests' `ENVIRONMENT`. If
+whatever the `-R`/`-L` selection is. It also runs outside the tests'
+`ENVIRONMENT`, which sets `detect_leaks=0` for ordinary cases. If
 an execution context blocks LeakSanitizer's ptrace attach, `ctest` exits 8
 before any test runs. Examples of such contexts are an agent sandbox, or
 `strace`/`gdb` wrapped around `ctest`. The signature is
 `LeakSanitizer has encountered a fatal error`,
 `HINT: LeakSanitizer does not work under ptrace (strace, gdb, etc)`, then
 `GoogleTestAddTests.cmake` "Error running test executable" naming the
-executable. Any test process with leak detection enabled hits the same limit.
+executable. Any test process that enables leak detection hits the same limit.
 Cached lists hide the problem until a rebuild or `touch` of the binary.
 
 This is an execution-context failure, not a sanitizer finding. Rerun the

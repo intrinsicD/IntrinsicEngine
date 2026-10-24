@@ -74,8 +74,10 @@ Covers criterion 2 (documented route) and criterion 3 (nothing weakened). Raw lo
   (`tests/support/Test_SanitizerConfig.cpp`). PRE_TEST GoogleTest discovery
   (`gtest_discover_tests(... DISCOVERY_MODE PRE_TEST)` in `tests/CMakeLists.txt`) runs
   `--gtest_list_tests` for every discovered executable that is newer than its cached list,
-  whatever the `-R`/`-L` selection is, and outside the tests' `ENVIRONMENT`. The exit-time leak
-  check needs ptrace. In the September sessions the sandbox blocked LeakSanitizer's ptrace
+  whatever the `-R`/`-L` selection is. Discovery also runs outside the tests' `ENVIRONMENT`,
+  which sets `ASAN_OPTIONS`/`LSAN_OPTIONS` `detect_leaks=0` for ordinary cases
+  (`_intrinsic_test_env`). So ordinary test runs skip the exit-time leak check; discovery, and any
+  process that enables leak detection, run it, and it needs ptrace. In the September sessions the sandbox blocked LeakSanitizer's ptrace
   attach; the logs show a namespaced PID (`==6==`) but do not isolate the mechanism.
   `GoogleTestAddTests.cmake` then raises a fatal error and `ctest` exits 8 before any test runs.
   Because the lists are cached per binary timestamp, the failure appears only after a rebuild.
