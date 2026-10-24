@@ -472,3 +472,50 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+
+## Disk headroom
+
+Before expensive local verification (a clean configure, reconciling several
+presets such as `ci`, `ci-asan`, `ci-ubsan` and `ci-vulkan`, or a full CPU or
+sanitizer gate), check the space available on the volume that holds the
+repository and its build trees:
+
+```bash
+df -BG --output=avail .
+```
+
+Below 20 GiB, reclaim space as described below before starting. This floor
+catches a nearly full volume; it is not a measured build footprint. One clean
+preset tree can need more, so require more headroom before clean or
+multi-preset builds.
+
+The only automated check is the receipt wrapper
+`tools/agents/workflow_evidence.py record-command` (see
+[Completion evidence](agent/workflow-evidence.md#completion-evidence)). It
+refuses to run a command below the same floor and accepts `--min-free-gib N`
+to change it; `0` or a negative value disables the check. Direct
+`cmake --build`/`ctest` runs and `tools/ci/touched_scope.py` do not check
+headroom. Only the repository volume is checked, not a separate `/tmp` or
+build mount.
+
+A run that hit `No space left on device`, or that could not write its logs or
+result records, is incomplete evidence and never counts as passing. Reclaim
+space, then rerun the command with complete output.
+
+### Reclaiming space
+
+Reclaiming is manual; no tool deletes artifacts automatically.
+
+- Never remove source, tracked files, datasets or assets, caches, logs or
+  diagnostic records. Evidence under `tasks/evidence/` is removed only by
+  [task retirement](agent/task-format.md#retiring-a-task), not to make room.
+- Never touch an active tree: one that a running build or test uses
+  (`pgrep -af 'cmake|ninja|ctest'`), one that belongs to another live worktree
+  or session, or one that a current task names.
+- In a tree confirmed inactive, remove only rebuildable compiler and linker
+  outputs, for example `cmake --build --preset <preset> --target clean`. Keep
+  `CMakeCache.txt`, the configuration and the logs. `clean` may also remove
+  generated test inventories; the next build regenerates them.
+- Deleting a whole build tree or worktree is the operator's decision.
+- Record in the task note which trees were reclaimed and how much space that
+  freed.

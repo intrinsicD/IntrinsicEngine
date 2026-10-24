@@ -285,6 +285,20 @@ and stderr logs. Labels are non-overwriting. Record exploratory or
 development runs with `--optional`; reserve required receipts for the checks
 that gate completion.
 
+Before running the command, the wrapper refuses with an `ERROR:` and exit 2
+when the repository volume has less than `--min-free-gib` (default 20) GiB
+available; nothing is run or written. The floor, its limits and the reclaim
+policy are in [Disk headroom](../build-troubleshooting.md#disk-headroom).
+If a log or the receipt cannot be written (for example `No space left on
+device`), files already written stay in place, each unwritten log is printed to
+its own stream (the message names any log that could not be printed either),
+and the wrapper exits 2 with `incomplete command evidence` naming the command's
+real exit code; if the wrapper's own stdout is unwritable too, Python's failed
+final flush makes the exit 120. The message and the missing `<label>.json`
+identify this case; the exit code alone does not, because a usage error or a
+command that itself exits 2 gives the same code. It is not a receipt: restore
+headroom and rerun under a new label.
+
 Command stdout/stderr logs are preserved as raw hash-bound bytes.
 `tasks/evidence/.gitattributes` marks them as binary so Git does not normalize
 line endings or reinterpret captured tool whitespace.
