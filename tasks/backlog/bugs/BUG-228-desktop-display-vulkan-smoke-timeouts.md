@@ -307,6 +307,26 @@ trap, with `xset q` recorded before, during and after. Logs go to
   cases pass with the monitor on, each in under 10 s (3.1–6.5 s in the `gpu`
   label run), so neither 20 s bound fires.
 
+### Results (evening)
+Runs 14:37–14:44 CEST at 1f73f7aac, `ci-vulkan` reconfigured by the build
+(sanitized: every `TIMEOUT` doubled, 60 s or 240 s for these cases). Session
+locked (`LockedHint=yes`), 1-minute load 0.76–0.99, no compiler running at any
+boundary. `xset q` showed `Monitor is On` before both runs, `Monitor is Off`
+3 s into the monitor-off run (sampled once, at its start) and `Monitor is On`
+after it. Logs, durations and states:
+`tasks/evidence/BUG-228/2026-10-24-vsync-off-acceptance/`.
+- V0 met: no `VSync requested=true` line in either log; 45 swapchain lines
+  with `requested=false` in the 42-case run.
+- V1 met, monitor on: 42 of 42 acceptance cases passed, no skip, summed case
+  time 183.78 s; surface appearance 9.04 s; slowest case
+  `AnalysisMaskSaliencyAndAppearanceRecoveryReachGpu` 11.70 s.
+- V2 met, monitor off: 42 of 42 passed, no skip, summed case time 184.76 s
+  (+0.5 %); surface appearance 10.13 s (71.27 s with VSync on); slowest case
+  11.85 s.
+- B1 met, monitor on, in the same CTest command as V1: the seven
+  `PointLBVHGpuSmoke` cases passed in 2.91–4.93 s; neither 20 s bound fired.
+  No run exercised either bound firing.
+
 ### Stall bounds in `Test.PointLBVHGpuSmoke.cpp`
 Effective `TIMEOUT`s from `ctest --show-only=json-v1`: the registered value in
 an unscaled tree, twice that in this sanitized `ci-vulkan` tree (BUG-240).
