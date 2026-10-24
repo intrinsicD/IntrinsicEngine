@@ -189,12 +189,11 @@ def _run_bounded(command: list[str], cap: float, **kwargs) -> tuple[bytes, int |
 
 def time_listing(target: str, fields: dict[str, str], cap: float) -> dict[str, object]:
     # Same argv, cwd and output directory as GoogleTestAddTests.cmake; stdout captured,
-    # stderr not captured (CMake passes it through).
+    # stderr inherited (CMake passes it through).
     json_out = Path(fields["TEST_WORKING_DIR"]) / f"gtest_discovery_probe_{target}.json"
     json_out.unlink(missing_ok=True)
     command = [fields["TEST_EXECUTABLE"], "--gtest_list_tests", f"--gtest_output=json:{json_out}"]
-    stdout, status, timed_out, wall = _run_bounded(command, cap, cwd=fields["TEST_WORKING_DIR"],
-                                                   stderr=subprocess.DEVNULL)
+    stdout, status, timed_out, wall = _run_bounded(command, cap, cwd=fields["TEST_WORKING_DIR"])
     written = json_out.exists()
     json_out.unlink(missing_ok=True)
     lines = stdout.decode(errors="replace").splitlines()
@@ -242,6 +241,9 @@ def cmd_direct(args: argparse.Namespace) -> int:
                 if condition == "cold":
                     evict(exe)
                 resident = residency(exe)
+                if time.monotonic() >= limit:
+                    stop = "deadline"
+                    break
                 result = time_listing(target, fields[target], args.cap_seconds)
                 ctest_file = Path(fields[target]["CTEST_FILE"])
                 emit({"event": "sample", "arm": args.arm, "repetition": repetition, "target": target,
@@ -270,22 +272,26 @@ def cmd_ctest(args: argparse.Namespace) -> int:
     for repetition in range(args.repetitions):
         if repetition:
             time.sleep(max(0.0, min(args.pace_seconds, limit - time.monotonic())))
-        if time.monotonic() >= limit:
+        if time.monotonic() >= limit or not ctest_once(args, repetition, output, limit):
             stop = "deadline"
             break
-        ctest_once(args, repetition, output)
     emit({"event": "stop", "reason": stop}, output)
     return 0
 
 
-def ctest_once(args: argparse.Namespace, repetition: int, output) -> None:
+def ctest_once(args: argparse.Namespace, repetition: int, output, limit: float) -> bool:
     before_files = tests_files(args.tests_dir)
+    resident = {}
     for target in args.force:
         include = args.tests_dir / f"{target}[1]_include.cmake"
         os.utime(include)
+        exe = Path(parse_include(include)["TEST_EXECUTABLE"])
         if args.evict:
-            evict(Path(parse_include(include)["TEST_EXECUTABLE"]))
+            evict(exe)
+        resident[target] = residency(exe)
     before = telemetry()
+    if time.monotonic() >= limit:
+        return False
     raw, status, timed_out, wall = _run_bounded(args.command, args.cap_seconds, stderr=subprocess.STDOUT)
     text = raw.decode(errors="replace")
     after_files = tests_files(args.tests_dir)
@@ -294,9 +300,13 @@ def ctest_once(args: argparse.Namespace, repetition: int, output) -> None:
           "command": args.command, "forced": args.force, "evicted": args.evict,
           "wall_seconds": round(wall, 6), "exit_status": status, "timed_out": timed_out,
           "enumerated": sorted(t for t, m in after_files.items() if before_files.get(t) != m),
+          # CMake 4.x deletes _tests.cmake before listing; a failed listing leaves it absent.
+          "removed": sorted(t for t in before_files if t not in after_files),
+          "residency_bytes": resident,
           "total_tests": int(total.group(1)) if total else None,
           "discovery_timeout_seen": "Process terminated due to timeout" in text,
           "output_tail": text[-2000:], **before, "wall_clock": time.time()}, output)
+    return True
 
 
 # --- BUG-091 decision rule (frozen with the pre-flight packet) ---------------
@@ -337,30 +347,62 @@ def summarize(values: list[float]) -> dict[str, float | int]:
             "at_or_above_5s": sum(v >= CURRENT_BUDGET for v in values)}
 
 
-def _identity_kills(samples: list[dict], real: list[dict], starts: list[dict]) -> list[str]:
+def _identity_kills(samples: list[dict], real: list[dict], starts: list[dict],
+                    baseline: dict[str, str]) -> list[str]:
     kills = []
     keys = [(s["arm"], s["repetition"], s["target"], s["condition"]) for s in samples]
     keys += [("ctest", r["arm"], r["repetition"]) for r in real]
     if len(keys) != len(set(keys)):
         kills.append("duplicate sample or ctest records (pooled starts)")
+    if len({json.dumps(r.get("tools"), sort_keys=True) for r in starts}) > 1:
+        kills.append("cmake/ctest identity differs between starts")
     for target in sorted({s["target"] for s in samples}):
         own = [s for s in samples if s["target"] == target]
-        if len({s["listing_sha256"] for s in own}) != 1:
+        hashes = {s["listing_sha256"] for s in own}
+        if len(hashes) != 1:
             kills.append(f"listing hash changed for {target}")
-        if len({json.dumps({k: v for k, v in s["mtime_ns"].items() if not k.endswith("_tests.cmake")},
-                           sort_keys=True) for s in own}) != 1:
-            kills.append(f"executable or include changed during the run: {target}")
-        if len({json.dumps(r.get("include_sha256", {}).get(target)) for r in starts
-                if target in r.get("include_sha256", {})}) > 1:
+        elif baseline and hashes != {baseline.get(target)}:
+            kills.append(f"listing differs from the validated baseline: {target}")
+        if not all(s["listed_cases"] > 0 for s in own):
+            kills.append(f"empty listing: {target}")
+        # Include mtimes change by design when C-real forces rediscovery; content is
+        # compared through the start records' include hashes instead.
+        if len({s["mtime_ns"].get(target) for s in own}) != 1:
+            kills.append(f"executable changed during the run: {target}")
+        if len({r["include_sha256"][target] for r in starts if target in r.get("include_sha256", {})}) > 1:
             kills.append(f"include content differs between starts: {target}")
     return kills
+
+
+def _real_run_status(run: dict, args: argparse.Namespace, expected_total: int | None) -> str:
+    """valid | timeout | invalid:<reason> | kill:<reason> for one forced-stale CTest run."""
+    if run.get("timed_out"):
+        return "kill:capped"
+    if run["arm"] == "idle" and not idle(run, args.idle_max_load):
+        return "invalid:not-idle"
+    if run["arm"] == "contention" and run["processes"]["compile"] == 0:
+        return "invalid:no-compile"
+    if run.get("evicted") and any(v != 0 for v in run.get("residency_bytes", {}).values()):
+        return "invalid:residency"
+    if run["discovery_timeout_seen"]:
+        return "timeout"
+    if run["exit_status"] != 0:
+        return "kill:failed without a discovery timeout"
+    if not set(run["forced"]) <= set(run["enumerated"]):
+        return "kill:forced target not relisted"
+    if run["total_tests"] is None or run["total_tests"] != expected_total:
+        return f"kill:selected-test count {run['total_tests']} != {expected_total}"
+    return "valid"
 
 
 def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]:
     samples = [r for r in records if r.get("event") == "sample"]
     real = [r for r in records if r.get("event") == "ctest"]
     starts = [r for r in records if r.get("event") == "start"]
-    kills = _identity_kills(samples, real, starts)
+    baseline = ({r["target"]: r["listing_sha256"] for r in load_records([args.baseline])
+                 if r.get("event") == "sample"} if args.baseline else {})
+    kills = _identity_kills(samples, real, starts, baseline)
+    hash_ok = not any("listing" in kill for kill in kills)
     cells: dict[str, dict] = {}
     for s in samples:
         if s["exit_status"] != 0 or s["timed_out"]:
@@ -384,24 +426,21 @@ def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]
         summary["cells"] += 1
         summary["collected"] += cell["collected"]
         summary["loads"] += cell["loads"]
-    totals = {r["total_tests"] for r in real}
-    if len(totals) > 1:
-        kills.append(f"C-real selected-test count changed: {sorted(map(str, totals))}")
-    for r in real:
-        if r.get("timed_out"):
-            kills.append(f"C-real run capped: {r['arm']} rep {r['repetition']}")
-        elif r["exit_status"] != 0 and not r["discovery_timeout_seen"]:
-            kills.append(f"C-real failed without a discovery timeout: {r['arm']} rep {r['repetition']}")
+    statuses = [_real_run_status(r, args, args.expected_ctest_total) for r in real]
+    kills += sorted({f"C-real {s[5:]}: {r['arm']}" for r, s in zip(real, statuses) if s.startswith("kill:")})
+    gates = dict(gate.split("=", 1) for gate in args.post_arm_gates)
     for arm, summary in arms.items():
         summary["median_load_1m"] = statistics.median(summary.pop("loads"))
-        runs = [r for r in real if r["arm"] == arm]
-        summary["ctest_runs"] = len(runs)
-        summary["ctest_forced_enumerated"] = sum(set(r["forced"]) <= set(r["enumerated"]) for r in runs)
+        own = [s for r, s in zip(real, statuses) if r["arm"] == arm]
+        summary["ctest_runs"] = {status: own.count(status) for status in sorted(set(own))}
+        summary["post_arm_gate"] = gates.get(arm, "missing")
         summary["valid"] = (summary["cells"] == len(args.targets) * 2 and summary["collected"] == summary["cells"]
-                            and len(runs) >= args.min_ctest_runs
-                            and summary["ctest_forced_enumerated"] == len(runs))
+                            and sum(s in ("valid", "timeout") for s in own) >= args.min_ctest_runs
+                            and summary["post_arm_gate"] == "pass")
         if arm == "contention":
             summary["valid"] = summary["valid"] and summary["median_load_1m"] >= args.contention_min_load
+    kills += [f"post-arm manifest gate {gates.get(arm, 'missing')}: {arm}"
+              for arm in args.required_arms if gates.get(arm) != "pass"]
     null = cells.get(f"idle/warm/{args.ecs_target}")
     if null and null["valid"] and statistics.median(null["valid"]) > NULL_PROBE_MAX_MEDIAN:
         kills.append(f"null probe: idle warm {args.ecs_target} median > {NULL_PROBE_MAX_MEDIAN} s")
@@ -409,7 +448,7 @@ def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]
     kills += [f"required arm invalid or not collected: {arm}" for arm in missing]
     valid_walls = [w for c in cells.values() for w in c["valid"]]
     m_obs = max(valid_walls) if valid_walls else None
-    real_timeouts = [r for r in real if r["discovery_timeout_seen"]]
+    real_timeouts = [r for r, s in zip(real, statuses) if s == "timeout"]
     if real_timeouts and (m_obs is None or m_obs < CURRENT_BUDGET):
         kills.append("C-real discovery timeout not reproduced by any direct sample: diagnose")
     if (m_obs is not None and m_obs >= CURRENT_BUDGET) or real_timeouts:
@@ -427,18 +466,19 @@ def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]
         else:
             kills.append(f"3 x max(5, M_obs) = {need:.3f} s exceeds the 60 s ceiling")
     valid_arms = {arm for arm, summary in arms.items() if summary["valid"]}
-    return {"schema": SCHEMA, "rule": "bug-091-budget/v2", "m_obs_seconds": m_obs, "h1": h1,
+    return {"schema": SCHEMA, "rule": "bug-091-budget/v3", "m_obs_seconds": m_obs, "h1": h1,
             "kill_conditions": kills, "chosen_budget_seconds": chosen,
             "decision": (f"set DISCOVERY_TIMEOUT {chosen}" if chosen is not None else
                          "no value chosen: keep explicit 5 s; operator decision"),
             "arms": arms,
             "cells": {name: {**summarize(c["valid"]), "invalid": c["invalid"], "collected": c["collected"]}
                       for name, c in sorted(cells.items())},
-            "hypotheses": {"H3": h3(cells, args.targets, {"contention", "idle"} <= valid_arms),
-                           "H4": h4(cells, args.targets, args.ecs_target)},
-            "ctest_runs": [{k: r.get(k) for k in ("arm", "repetition", "exit_status", "timed_out", "wall_seconds",
-                                                   "enumerated", "total_tests", "discovery_timeout_seen")}
-                           for r in real]}
+            "hypotheses": {"H3": h3(cells, args.targets, {"contention", "idle"} <= valid_arms and hash_ok),
+                           "H4": h4(cells, args.targets, args.ecs_target, "idle" in valid_arms)},
+            "ctest_runs": [{**{k: r.get(k) for k in ("arm", "repetition", "exit_status", "timed_out", "wall_seconds",
+                                                      "enumerated", "removed", "total_tests",
+                                                      "discovery_timeout_seen")}, "status": s}
+                           for r, s in zip(real, statuses)]}
 
 
 def h3(cells: dict, targets: list[str], arms_valid: bool) -> dict[str, object]:
@@ -454,11 +494,11 @@ def h3(cells: dict, targets: list[str], arms_valid: bool) -> dict[str, object]:
     return verdict
 
 
-def h4(cells: dict, targets: list[str], ecs: str) -> dict[str, object]:
+def h4(cells: dict, targets: list[str], ecs: str, idle_valid: bool) -> dict[str, object]:
     verdict = {}
     for condition in ("cold", "warm"):
         outliers = {}
-        for target in targets:
+        for target in targets if idle_valid else ():
             cell = cells.get(f"idle/{condition}/{target}")
             if cell and cell["collected"]:
                 median = statistics.median(cell["valid"])
@@ -537,8 +577,10 @@ def cmd_report(args: argparse.Namespace) -> int:
     t0 = min((r["wall_clock"] for r in stamped), default=0.0)
     t1 = max((r["wall_clock"] for r in stamped), default=1.0)
     marks = []
-    for arm in sorted({r["arm"] for r in stamped}):
-        marks.append((min(r["wall_clock"] for r in stamped if r["arm"] == arm), f"start {arm}"))
+    for arm in sorted({r["arm"] for r in samples}):
+        marks.append((min(r["wall_clock"] for r in samples if r["arm"] == arm), f"direct {arm}"))
+    for arm in sorted({r["arm"] for r in real}):
+        marks.append((min(r["wall_clock"] for r in real if r["arm"] == arm), f"C-real {arm}"))
     refs = [(CURRENT_BUDGET, "current budget 5 s")]
     if verdict["chosen_budget_seconds"]:
         refs.append((float(verdict["chosen_budget_seconds"]), f"chosen {verdict['chosen_budget_seconds']} s"))
@@ -560,15 +602,21 @@ def cmd_report(args: argparse.Namespace) -> int:
     html.append(_svg_scatter("Load average, 1 min (at sample start)",
                              {"load_1m": [(s["wall_clock"], s["load"].get("load_1m", 0.0)) for s in stamped]},
                              t0, t1, False, [], marks))
+    html.append(_svg_scatter("CPU pressure, PSI some avg10 % (at sample start)",
+                             {"psi_cpu": [(s["wall_clock"], s["pressure"]["cpu"] or 0.0) for s in stamped
+                                          if "pressure" in s]}, t0, t1, False, [], marks))
+    html.append(_svg_scatter("IO pressure, PSI some avg10 % (at sample start)",
+                             {"psi_io": [(s["wall_clock"], s["pressure"]["io"] or 0.0) for s in stamped
+                                         if "pressure" in s]}, t0, t1, False, [], marks))
     html.append(_svg_scatter("Concurrent compile processes (at sample start)",
                              {"compile": [(s["wall_clock"], float(s["processes"]["compile"])) for s in stamped]},
                              t0, t1, False, [], marks))
     html.append("<h2>Forced-stale CTest runs</h2><table><tr><th>arm</th><th>exit</th><th>wall s</th>"
-                "<th>enumerated</th><th>total</th><th>timeout seen</th></tr>")
+                "<th>enumerated</th><th>total</th><th>timeout seen</th><th>status</th></tr>")
     for run in verdict["ctest_runs"]:
         html.append(f"<tr><td>{run['arm']}</td><td>{run['exit_status']}</td><td>{run['wall_seconds']}</td>"
                     f"<td>{len(run['enumerated'])}</td><td>{run['total_tests']}</td>"
-                    f"<td>{run['discovery_timeout_seen']}</td></tr>")
+                    f"<td>{run['discovery_timeout_seen']}</td><td>{run['status']}</td></tr>")
     html.append("</table></body>")
     args.html.write_text("".join(html), encoding="utf-8")
     print(json.dumps({"html": str(args.html), "decision": verdict["decision"]}))
@@ -605,6 +653,9 @@ def main(argv: list[str] | None = None) -> int:
         mode.add_argument("--required-arms", nargs="+", default=["contention", "idle"])
         mode.add_argument("--contention-min-load", type=float, default=4.0)
         mode.add_argument("--min-ctest-runs", type=int, default=20)
+        mode.add_argument("--expected-ctest-total", type=int, help="selected-test count of a valid C-real run")
+        mode.add_argument("--baseline", type=Path, help="validated direct run whose listing hashes bind identity")
+        mode.add_argument("--post-arm-gates", nargs="*", default=[], metavar="ARM=pass|fail")
         mode.add_argument("--idle-max-load", type=float, default=2.0)
     sub.choices["report"].add_argument("--html", type=Path, required=True)
     args = parser.parse_args(argv)

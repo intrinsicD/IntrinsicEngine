@@ -153,7 +153,7 @@ def _alive(pid: int) -> bool:
     stat = Path(f"/proc/{pid}/stat")
     try:
         return stat.read_text().rsplit(")", 1)[1].split()[0] != "Z"
-    except (FileNotFoundError, IndexError):
+    except (OSError, IndexError):  # vanished between open and read
         return False
 
 
@@ -235,6 +235,28 @@ class ProbeSelfTests(unittest.TestCase):
             # Rotation: each repetition starts with a different target.
             self.assertEqual([s["target"] for s in samples[::4]], ["Slow", "Instant"])
 
+    def test_planned_sequence_does_not_trip_identity_checks(self) -> None:
+        # Run plan order: direct arm, forced-stale C-real, second direct arm, decide.
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-sequence-") as directory:
+            root = Path(directory)
+            project = FakeListerProject(root, declared_budget(), ("A", "B"))
+            run("ctest", "--test-dir", str(project.build), "-N")
+            common = ("--tests-dir", str(project.build), "--max-minutes", "2", "--cap-seconds", "10")
+            targets = ("--target", "A", "--target", "B", "--repetitions", "2")
+            self.probe("direct", *common, *targets, "--arm", "contention", "--output", str(root / "c.jsonl"))
+            self.probe("ctest", *common, "--arm", "contention", "--force", "A", "--force", "B", "--evict",
+                       "--output", str(root / "r.jsonl"), "--", "ctest", "--test-dir", str(project.build), "-N")
+            self.probe("direct", *common, *targets, "--arm", "idle", "--output", str(root / "i.jsonl"))
+            verdict = json.loads(subprocess.run(
+                [sys.executable, str(PROBE), "decide", str(root / "c.jsonl"), str(root / "r.jsonl"),
+                 str(root / "i.jsonl"), "--targets", "A", "B", "--ecs-target", "A",
+                 "--baseline", str(root / "c.jsonl"), "--expected-ctest-total", str(2 * CASE_COUNT)],
+                text=True, capture_output=True, timeout=60, check=True).stdout)
+            identity = [kill for kill in verdict["kill_conditions"]
+                        if any(word in kill for word in ("changed", "differs", "duplicate", "listing", "C-real"))]
+            self.assertEqual(identity, [])
+            self.assertEqual(verdict["ctest_runs"][0]["status"], "invalid:no-compile")
+
     def test_ctest_mode_caps_a_hung_command_and_keeps_its_record(self) -> None:
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-cap-") as directory:
             project = FakeListerProject(Path(directory), declared_budget())
@@ -295,37 +317,41 @@ class ProbeSelfTests(unittest.TestCase):
 
 class DecisionRuleTests(unittest.TestCase):
     TARGETS = ("IntrinsicECSTests", "IntrinsicCoreTests", "IntrinsicRuntimeContractTests")
+    GATES = ("--post-arm-gates", "contention=pass", "idle=pass", "--expected-ctest-total", "7")
+    REGIMES = {"contention": ({"load_1m": 9.0}, {"compile": 3}), "idle": ({"load_1m": 0.5}, {"compile": 0})}
 
     def records(self, wall: float = 0.1, n: int = 300, **override) -> list[dict]:
         rows = []
-        for arm, load, compile_count in (("contention", 9.0, 3), ("idle", 0.5, 0)):
+        for arm, (load, processes) in self.REGIMES.items():
             for repetition in range(n):
                 for target in self.TARGETS:
                     for condition in ("cold", "warm"):
                         rows.append({"event": "sample", "arm": arm, "repetition": repetition, "target": target,
                                      "condition": condition, "residency_bytes": 0, "wall_seconds": wall,
                                      "exit_status": 0, "timed_out": False, "listing_sha256": target,
-                                     "load": {"load_1m": load}, "processes": {"compile": compile_count},
-                                     "mtime_ns": {"exe": 1, "include": 1}, "wall_clock": float(len(rows))})
+                                     "listed_cases": 10, "json_written": True, "load": load,
+                                     "processes": processes, "wall_clock": float(len(rows)),
+                                     "mtime_ns": {target: 1, f"{target}[1]_include.cmake": 1 + repetition}})
         rows[-1].update(override)
-        for arm in ("contention", "idle"):
+        for arm, (load, processes) in self.REGIMES.items():
             rows += [{"event": "ctest", "arm": arm, "repetition": repetition, "exit_status": 0,
-                      "timed_out": False, "wall_seconds": 1.0, "forced": list(self.TARGETS),
-                      "enumerated": list(self.TARGETS), "total_tests": 7, "discovery_timeout_seen": False,
-                      "load": {"load_1m": 1.0}, "processes": {"compile": 0}, "wall_clock": float(len(rows))}
-                     for repetition in range(20)]
+                      "timed_out": False, "wall_seconds": 1.0, "forced": list(self.TARGETS), "evicted": True,
+                      "residency_bytes": {target: 0 for target in self.TARGETS},
+                      "enumerated": list(self.TARGETS), "removed": [], "total_tests": 7,
+                      "discovery_timeout_seen": False, "load": load, "processes": processes,
+                      "wall_clock": float(len(rows))} for repetition in range(20)]
         return rows
 
-    def decide(self, records: list[dict], *extra: str) -> dict:
+    def decide(self, records: list[dict], *extra: str, gates: tuple[str, ...] = GATES) -> dict:
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-decide-") as directory:
             path = Path(directory) / "samples.jsonl"
             path.write_text("".join(json.dumps(record) + "\n" for record in records))
             html = Path(directory) / "report.html"
-            result = subprocess.run([sys.executable, str(PROBE), "decide", str(path), *extra], text=True,
+            result = subprocess.run([sys.executable, str(PROBE), "decide", str(path), *gates, *extra], text=True,
                                     capture_output=True, timeout=120)
             self.assertEqual(result.returncode, 0, result.stderr)
-            report = subprocess.run([sys.executable, str(PROBE), "report", str(path), "--html", str(html)],
-                                    text=True, capture_output=True, timeout=120)
+            report = subprocess.run([sys.executable, str(PROBE), "report", str(path), "--html", str(html),
+                                     *gates, *extra], text=True, capture_output=True, timeout=120)
             self.assertEqual(report.returncode, 0, report.stderr)
             self.assertIn("Frozen verdicts", html.read_text())
             return json.loads(result.stdout)
@@ -334,11 +360,27 @@ class DecisionRuleTests(unittest.TestCase):
         verdict = self.decide(self.records(wall=0.1))
         self.assertEqual((verdict["h1"], verdict["chosen_budget_seconds"], verdict["kill_conditions"]),
                          ("rejected", None, []))
+        self.assertTrue(verdict["hypotheses"]["H3"]["cold"]["assessed"])
+        self.assertTrue(verdict["hypotheses"]["H4"]["cold"]["assessed"])
 
     def test_tail_at_budget_chooses_ladder_step(self) -> None:
         verdict = self.decide(self.records(wall=0.1, wall_seconds=6.0))
         self.assertEqual((verdict["h1"], verdict["m_obs_seconds"], verdict["chosen_budget_seconds"]),
                          ("supported", 6.0, 20))
+
+    def test_real_discovery_timeout_supports_h1_only_when_direct_reproduces_it(self) -> None:
+        def with_timeout(rows: list[dict]) -> list[dict]:
+            run = [row for row in rows if row["event"] == "ctest"][-1]
+            # CMake 4.x removed the target's _tests.cmake and aborted before printing a total.
+            run.update(exit_status=8, discovery_timeout_seen=True, enumerated=list(self.TARGETS[:2]),
+                       removed=[self.TARGETS[2]], total_tests=None)
+            return rows
+        verdict = self.decide(with_timeout(self.records(wall=0.1, wall_seconds=6.0)))
+        self.assertEqual((verdict["h1"], verdict["chosen_budget_seconds"], verdict["kill_conditions"]),
+                         ("supported", 20, []))
+        verdict = self.decide(with_timeout(self.records(wall=0.1)))
+        self.assertIsNone(verdict["chosen_budget_seconds"])
+        self.assertTrue(any("not reproduced" in kill for kill in verdict["kill_conditions"]))
 
     def test_tail_above_ceiling_is_killed(self) -> None:
         verdict = self.decide(self.records(wall=0.1, wall_seconds=21.0))
@@ -354,19 +396,33 @@ class DecisionRuleTests(unittest.TestCase):
     def test_identity_and_real_path_failures_block_rejection(self) -> None:
         pooled = self.records()
         pooled.append(dict(pooled[0]))
-        changed = self.records(mtime_ns={"exe": 2, "include": 1})
+        relinked = self.records(mtime_ns={"IntrinsicRuntimeContractTests": 2})
         rehashed = self.records(listing_sha256="other")
+        empty = self.records(listed_cases=0)
         failed_real = self.records()
         failed_real[-1].update(exit_status=8)
-        timeout_only = self.records()
-        timeout_only[-1].update(exit_status=8, discovery_timeout_seen=True)
-        for rows, needle in ((pooled, "duplicate"), (changed, "changed during the run"),
-                             (rehashed, "listing hash"), (failed_real, "without a discovery timeout"),
-                             (timeout_only, "not reproduced")):
-            verdict = self.decide(rows)
+        unlisted = self.records()
+        unlisted[-1].update(enumerated=[])
+        recount = self.records()
+        recount[-1].update(total_tests=6)
+        cases = ((pooled, "duplicate", self.GATES), (relinked, "executable changed", self.GATES),
+                 (rehashed, "listing hash", self.GATES), (empty, "empty listing", self.GATES),
+                 (failed_real, "without a discovery timeout", self.GATES),
+                 (unlisted, "not relisted", self.GATES), (recount, "count 6 != 7", self.GATES),
+                 (self.records(), "gate missing", ("--expected-ctest-total", "7")),
+                 (self.records(), "gate fail", ("--post-arm-gates", "contention=pass", "idle=fail",
+                                                 "--expected-ctest-total", "7")))
+        for rows, needle, gates in cases:
+            verdict = self.decide(rows, gates=gates)
             self.assertIsNone(verdict["chosen_budget_seconds"])
             self.assertNotEqual(verdict["h1"], "rejected", needle)
             self.assertTrue(any(needle in kill for kill in verdict["kill_conditions"]), (needle, verdict))
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-baseline-") as directory:
+            baseline = Path(directory) / "baseline.jsonl"
+            baseline.write_text(json.dumps({"event": "sample", "target": self.TARGETS[0],
+                                            "listing_sha256": "validated"}) + "\n")
+            verdict = self.decide(self.records(), "--baseline", str(baseline))
+            self.assertTrue(any("validated baseline" in kill for kill in verdict["kill_conditions"]))
         few_real = [row for row in self.records() if not (row["event"] == "ctest" and row["repetition"] >= 19)]
         self.assertFalse(self.decide(few_real)["arms"]["idle"]["valid"])
 
@@ -377,11 +433,12 @@ class DecisionRuleTests(unittest.TestCase):
     def test_short_or_contaminated_cells_are_not_collected(self) -> None:
         self.assertEqual(self.decide(self.records(n=299))["h1"], "inconclusive")
         rows = self.records()
-        for row in rows[-6 * 16:]:
+        for row in rows[-6 * 16 - 40:-40]:
             row["residency_bytes"] = 4096
         verdict = self.decide(rows)
         self.assertEqual(verdict["h1"], "inconclusive")
         self.assertFalse(verdict["arms"]["idle"]["valid"])
+        self.assertFalse(verdict["hypotheses"]["H4"]["cold"]["assessed"])
         idle_build = self.records()
         for row in idle_build[:6 * 16]:
             row["processes"] = {"compile": 0}
@@ -391,8 +448,17 @@ class DecisionRuleTests(unittest.TestCase):
         for row in quiet:
             if row["arm"] == "contention" and row["event"] == "sample":
                 row["load"] = {"load_1m": 1.0}
-        self.assertFalse(self.decide(quiet)["arms"]["contention"]["valid"])
+        verdict = self.decide(quiet)
+        self.assertFalse(verdict["arms"]["contention"]["valid"])
+        self.assertFalse(verdict["hypotheses"]["H3"]["cold"]["assessed"])
         self.assertEqual(self.decide(quiet, "--required-arms", "idle")["h1"], "rejected")
+        busy_real = self.records()
+        for row in busy_real:
+            if row["event"] == "ctest" and row["arm"] == "idle":
+                row["processes"] = {"compile": 2}
+        verdict = self.decide(busy_real)
+        self.assertEqual(verdict["arms"]["idle"]["ctest_runs"], {"invalid:not-idle": 20})
+        self.assertFalse(verdict["arms"]["idle"]["valid"])
 
 
 def reconcile(build_dir: Path) -> str:
