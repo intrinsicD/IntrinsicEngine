@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-252 — GTestDiscoveryTimeout budget test fails on CMake 4.0.3](BUG-252-gtest-discovery-timeout-budget-cmake403.md):
+  `test_declared_budget_passes_below_and_fails_bounded_above` reports "timed-out lister is still running" on 4.0.3,
+  also before BUG-251. 4.0.3 is outside the supported matrix; CI uses 3.31.6.
+
 - [BUG-251 — Support the CMake 4.4 GoogleTest discovery include layout](BUG-251-cmake44-gtest-discovery-include-layout.md):
   CMake 4.4 names the PRE_TEST include `<target>_<sha8>_include.cmake`; two regressions and the
   BUG-091 probe hard-code `<target>[1]_include.cmake`. Operator chose support now; fixed on a lane branch,
