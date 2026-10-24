@@ -255,6 +255,14 @@ class ProbeSelfTests(unittest.TestCase):
             while _alive(pid) and time.monotonic() < deadline:
                 time.sleep(0.05)
             self.assertFalse(_alive(pid), "listing child outlived the killed probe")
+        # A child whose probe died before PR_SET_PDEATHSIG was registered must not exec.
+        sys.path.insert(0, str(PROBE.parent))
+        try:
+            import gtest_discovery_probe as probe_module
+        finally:
+            sys.path.remove(str(PROBE.parent))
+        self.assertEqual(subprocess.run(["true"], preexec_fn=probe_module._die_with(-1)).returncode, 127)
+        self.assertEqual(subprocess.run(["true"], preexec_fn=probe_module._die_with(os.getpid())).returncode, 0)
 
     def test_planned_sequence_does_not_trip_identity_checks(self) -> None:
         # Run plan order: direct arm, forced-stale C-real, second direct arm, decide.

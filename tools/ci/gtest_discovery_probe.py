@@ -175,17 +175,20 @@ def _tools() -> dict[str, str | None]:
     return found
 
 
-def _die_with_parent() -> None:
-    # The cap lives in this probe; if the probe is killed, the child must not outlive it.
-    if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL) != 0:  # PR_SET_PDEATHSIG
-        os._exit(127)
+def _die_with(parent: int):
+    def bind() -> None:
+        # The cap lives in this probe; if the probe is killed, the child must not outlive it.
+        # Checking the parent after registering closes the fork-to-prctl window.
+        if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL) != 0 or os.getppid() != parent:
+            os._exit(127)  # PR_SET_PDEATHSIG failed, or the probe already died
+    return bind
 
 
 def _run_bounded(command: list[str], cap: float, **kwargs) -> tuple[bytes, int | None, bool, float]:
     """Run in its own session; on timeout kill the whole group so no lister survives."""
     start = time.monotonic()
     process = subprocess.Popen(command, stdout=subprocess.PIPE, start_new_session=True,
-                               preexec_fn=_die_with_parent, **kwargs)
+                               preexec_fn=_die_with(os.getpid()), **kwargs)
     try:
         stdout, _ = process.communicate(timeout=cap)
         timed_out = False
