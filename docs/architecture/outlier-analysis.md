@@ -169,8 +169,8 @@ python3 tools/benchmark/validate_benchmark_results.py --root /tmp/outlier-benchm
 ```
 
 Use a distinct run ID for each invocation. This smoke follows the existing GPU
-cohort's leak setting; [BUG-180](../../tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
-tracks separate leak-enabled investigation. Passing this smoke is no leak-freedom claim.
+cohort's leak setting; [BUG-180](../../tasks/done/BUG-180-framed-icp-leak-enabled-process-retention.md)
+records the separate leak-enabled driver retention. Passing this smoke is no leak-freedom claim.
 
 Supplied-neighbor APIs validate monotonic squared distances in double, promoting
 coordinates before subtraction and breaking exact ties by source ID. Candidate

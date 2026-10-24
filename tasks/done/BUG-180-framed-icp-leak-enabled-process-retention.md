@@ -20,7 +20,7 @@ contract_review: "Existing GPU correctness and sanitizer test policies apply; no
 - The combined ASan/UBSan `ci-vulkan` test completed all registration assertions in 46.715 s, then exited 1 with `SUMMARY: AddressSanitizer: 240 byte(s) leaked in 3 allocation(s)`.
 - Allocation stacks start in unloaded/unknown modules reached through `VulkanDevice::CreatePipeline`; this suggests a driver boundary but does not establish external ownership. Full log: `/tmp/icp-gpu-display-off-diagnostic.log`.
 - The normal general GPU CTest cohort intentionally uses `detect_leaks=0`; dedicated Vulkan shutdown/negative-control tests own leak evidence. The diagnostic instead used `LSAN_OPTIONS=suppressions=.../lsan.supp`, enabling a distinct evidence class. No existing environment or suppression is changed by the ICP implementation.
-- [ICP review](../../../docs/reviews/2026-09-08-icp-spatial-integration.md) records the distinction. `BUG-083` is the existing dedicated shutdown/retention context; `BUG-179` owns present pacing, not these allocations.
+- [ICP review](../../docs/reviews/2026-09-08-icp-spatial-integration.md) records the distinction. `BUG-083` is the existing dedicated shutdown/retention context; `BUG-179` owns present pacing, not these allocations.
 
 - A subsequent read-only CTest discovery inside the filesystem sandbox could not run LeakSanitizer under its ptrace restriction. Repeating discovery outside that sandbox succeeded. This is a separate tooling limitation and supplies no allocation-ownership evidence.
 
@@ -115,9 +115,9 @@ logs are git-ignored under `tasks/evidence/BUG-180/`: run logs `A-…` to `I-…
 `I-cache-growth.txt` and `predictions.txt`.
 
 ## Acceptance criteria
-- [ ] Reproduce with the same executable, working directory, source and leak-enabled environment, comparing against the dedicated Vulkan shutdown control.
-- [ ] Preserve the relevant loaded driver/module identity before unload and classify ownership using allocation/free evidence.
-- [ ] Fix engine-owned retention or document a narrowly evidenced external-retention decision through the existing shutdown contract; retain the engine-allocation negative control.
+- [x] Reproduce with the same executable, working directory, source and leak-enabled environment, comparing against the dedicated Vulkan shutdown control. Reviewer: met (runs A-C; control runs E, G, I and the contract run).
+- [x] Preserve the relevant loaded driver/module identity before unload and classify ownership using allocation/free evidence. Reviewer: met (`C-mapped-frames.txt`, run H, run D api_dump 51/51).
+- [x] Fix engine-owned retention or document a narrowly evidenced external-retention decision through the existing shutdown contract; retain the engine-allocation negative control. Documented narrowly evidenced external retention per operator decision (2026-10-24); reviewer: "partially met" before the decision, which was the only missing part. `lsan.supp` and the negative control are unchanged.
 
 ## Verification
 ```bash
@@ -126,3 +126,37 @@ LSAN_OPTIONS=suppressions="$PWD/lsan.supp" timeout 120s build/ci-vulkan/bin/Intr
 ctest --test-dir build/ci-vulkan --output-on-failure -R 'ExtrinsicSandbox.VulkanShutdownLsanContract' --timeout 180
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Operator decision — 2026-10-24
+
+Verbatim (German): "als treiberproblem aufschreiben und evt beim nächsten Treiber
+nochmal überprüfen" (record it as a driver problem and possibly re-check with the next
+driver). Disposition: retire as external retention in NVIDIA 580.159.04
+`libnvidia-glcore`; no suppression, sanitizer setting or test change.
+
+Re-check trigger: when the NVIDIA driver version on the host changes, re-run this
+task's leak-enabled command (Verification, second line) twice with the same shader
+cache directory (the second run uses the filled cache). A clean second run means the
+driver no longer retains the blocks; a 3×80 B report on the new version keeps this
+classification. The trigger is also recorded in `tests/README.md` beside BUG-229.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `9396405a5` and `d0eb692b5` (diagnosis), the retirement
+commit on the night integration branch `claude/night-2026-10-24-bug-sweep`. Not yet on
+`main`; no source change.
+
+Reviewer decisions (coordinator's local review record `wfB.json`, lane `GPU-LANE`,
+outside the repository): independent Claude review of `d0eb692b5` `approve`; AC1 "met",
+AC2 "met", AC3 "partially met" ("The retire-or-keep decision waits for the operator").
+The operator decision above supplies that part; AC3 is ticked only as documented,
+narrowly evidenced external retention per that decision.
+
+Open questions, kept:
+- Why only this process loses the blocks: the shutdown control loads the same three
+  pipelines from a filled cache and stays clean. Not explained.
+- The 2026-09-13/14 observations (115,869 B and 115,665 B, other executables, libdbus and
+  instance-creation stacks) were not rerun and are not classified by this decision.
+
+Evidence: the raw logs stay git-ignored under `tasks/evidence/BUG-180/` in the `gpu` lane
+worktree; nothing was deleted. The note's summary above is the durable
+record; it is not a rerun.

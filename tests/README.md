@@ -654,6 +654,16 @@ git archive 599f02ff1b34afb96ad34f8d3c3d24f6d2ba6b02 lsan.supp tasks/evidence/BU
 bash "$probe/tasks/evidence/BUG-229/reproduce.sh"
 ```
 
+The same driver also retains 3 × 80 bytes in a direct leak-enabled run of
+`PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve`
+when its pipelines load from a filled NVIDIA shader disk cache (an empty cache is
+clean). The blocks are allocated in `libnvidia-glcore.so.580.159.04` during
+pipeline creation; the engine destroys every pipeline, and the shutdown contract
+stays clean. This is external retention, not a passing sanitizer gate, and no
+suppression covers it ([BUG-180](../tasks/done/BUG-180-framed-icp-leak-enabled-process-retention.md)).
+When the NVIDIA driver version changes, re-run BUG-180's leak-enabled command twice
+with the same shader cache directory; a clean second run retires the observation.
+
 ```bash
 ctest --test-dir build/ci-vulkan --output-on-failure \
   -R '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload)$' \

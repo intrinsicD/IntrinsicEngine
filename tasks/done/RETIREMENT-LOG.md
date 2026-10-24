@@ -1,5 +1,20 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-180 retired as external NVIDIA driver retention
+
+Retired [BUG-180](BUG-180-framed-icp-leak-enabled-process-retention.md) (diagnosis `9396405a5`,
+`d0eb692b5`) on the night integration branch `claude/night-2026-10-24-bug-sweep`; no source change.
+
+- Operator decision, verbatim: "als treiberproblem aufschreiben und evt beim nächsten Treiber nochmal
+  überprüfen". The 3 × 80 B blocks come from `libnvidia-glcore.so.580.159.04+0xa0c0d1` during pipeline
+  creation from a filled shader disk cache; the engine destroys all 51 pipelines; the shutdown contract and
+  its negative control are clean and unchanged. `lsan.supp` and `detect_leaks=0` are unchanged.
+- Review: independent Claude review of `d0eb692b5` `approve`, AC1/AC2 "met", AC3 "partially met" pending
+  the decision; AC3 ticked only as documented external retention per the decision.
+- Re-check trigger: re-run the task's leak-enabled command when the NVIDIA driver version changes (also in
+  `tests/README.md`). Open: why only this process loses the blocks; the 2026-09-13/14 115 kB observations
+  were not rerun. Raw logs stay git-ignored in the `gpu` lane worktree; nothing was deleted.
+
 ## 2026-10-24 — BUG-097 retired by removal after the operator decision
 
 Retired [BUG-097](BUG-097-progressive-model-scene-zero-uv-atlas.md) (`25833a065`, `3fb7ae908`,

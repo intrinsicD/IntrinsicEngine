@@ -31,8 +31,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 
-- [BUG-180 — Leak-enabled framed ICP process reports 240 retained bytes](BUG-180-framed-icp-leak-enabled-process-retention.md).
-
 - [BUG-193 — GPU pacing and watchdog margin](BUG-193-gpu-pacing-and-watchdog-margin.md): controlled follow-up to the corrected Vulkan fixture budgets; preserve finite-work and backend assertions.
 
 
@@ -41,6 +39,10 @@ promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-180 — Leak-enabled framed ICP process reports 240 retained bytes](../../done/BUG-180-framed-icp-leak-enabled-process-retention.md).
+  Recorded as an NVIDIA 580.159.04 `libnvidia-glcore` retention (filled shader cache) per operator decision; no
+  suppression change. Re-check with the leak-enabled command when the driver version changes.
 
 - Closed 2026-10-24: [BUG-097 — Progressive model-scene UV job publishes a zero atlas](../../done/BUG-097-progressive-model-scene-zero-uv-atlas.md).
   Retired by removal (operator decision A): the unreachable progressive model-scene path, its zero-fill helpers and

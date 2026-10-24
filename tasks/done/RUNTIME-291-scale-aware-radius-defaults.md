@@ -290,7 +290,7 @@ Shutdown and LeakSanitizer, from the raw `live/sandbox.log`, `live/s2/sandbox.lo
   (`Graphics.Renderer.cpp:6335`, `:6891`). The stacks go on through `RebuildOperationalResources`,
   `Engine::RunFrame` and `main`. These are startup pipelines, not the density path.
 - Session 3 (`detect_leaks=0`) printed no report and exited with 0.
-- Comparison with [BUG-180](../backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md): its
+- Comparison with [BUG-180](BUG-180-framed-icp-leak-enabled-process-retention.md): its
   2026-10-24 diagnosis is commit 9396405a5 on `claude/night-2026-10-24-bug-sweep`, which is not on
   this branch. It concerns the framed ICP gtest. It attributes 3 x 80 B to `malloc` called from
   `libnvidia-glcore.so.580.159.04+0xa0c0d1`, during pipeline creation from a filled NVIDIA shader
