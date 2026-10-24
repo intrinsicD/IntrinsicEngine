@@ -81,6 +81,7 @@ picking backlog work; theme priorities and rationale live in
 
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)
 - unblocked: `BUG-252` — GTestDiscoveryTimeout budget test fails on CMake 4.0.3 (tasks/backlog/bugs/BUG-252-gtest-discovery-timeout-budget-cmake403.md)
+- unblocked: `BUG-253` — Editor job tools test queries a job it never waited for (tasks/backlog/bugs/BUG-253-editor-job-tools-wait-skips-foreign-completion.md)
 
 ## Theme H — Agentic workflow hardening
 

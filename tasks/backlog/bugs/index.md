@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-253 — Editor job tools test queries a job it never waited for](BUG-253-editor-job-tools-wait-skips-foreign-completion.md):
+  `EditorKeypointAgent.EditorJobToolsListWaitAndCancelThroughTheSurface` waits only for the editor run, not `foreign`;
+  ~0.2% in-process flake, red in hosted `full-cpu` run 40100277575 at `cca289328`.
+
 - [BUG-252 — GTestDiscoveryTimeout budget test fails on CMake 4.0.3](BUG-252-gtest-discovery-timeout-budget-cmake403.md):
   `test_declared_budget_passes_below_and_fails_bounded_above` reports "timed-out lister is still running" on 4.0.3,
   also before BUG-251. 4.0.3 is outside the supported matrix; CI uses 3.31.6.
