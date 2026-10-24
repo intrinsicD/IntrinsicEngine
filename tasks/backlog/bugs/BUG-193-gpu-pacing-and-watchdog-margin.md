@@ -219,9 +219,9 @@ BUG-228; same host and states).
 
 ### Evidence status — 2026-10-24
 Predictions for S1, W1 and W2 were committed beforehand (25550e64e); the
-other runs listed had none. That
-does not make them verification: a run whose numbers informed a keep or
-change choice is decision-bearing.
+other runs listed had none. A committed
+prediction does not by itself make a run verification: a run whose numbers
+informed a keep or change choice is decision-bearing, with or without one.
 - Decision-bearing:
   - S1, the dirty-scan timing (median 67.6 ms). It decided whether to change
     the dirty scan.

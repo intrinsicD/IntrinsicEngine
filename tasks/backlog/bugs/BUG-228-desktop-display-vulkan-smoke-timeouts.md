@@ -262,9 +262,9 @@ running at any run boundary, RTX 4090, NVIDIA 580.159.04. Logs and states:
 ### Evidence status — 2026-10-24
 Predictions for D1–D3, the fix condition and the cohort were committed
 beforehand (25550e64e) or appended to `predictions.txt` before the run; the
-25 s trial and the `gpu` label run had none. That does not make them
-verification: a run whose numbers informed a keep or change choice is
-decision-bearing.
+25 s trial and the `gpu` label run had none. A committed prediction does not
+by itself make a run verification: a run whose numbers informed a keep or
+change choice is decision-bearing, with or without one.
 - Decision-bearing:
   - D1–D3 (monitor-off keypoint timeout, Xephyr pass, Sandbox present 918 ms):
     they located the wait and led to the choice to change the present mode.
@@ -279,3 +279,48 @@ decision-bearing.
 - No experiment pre-flight was run: no frozen packet, no prospective review
   and no HTML report exists for these runs. The operator's pending
   disposition covers every decision-bearing measurement listed above.
+
+## Sandbox acceptance smokes with VSync off — 2026-10-24 (evening)
+
+### Predictions (committed before the runs)
+Operator decision on the open item above (verbatim): "4. Vsync aus und bei den
+offenen: prüfen und neu formulieren". `BootstrapDefaultSandboxAppEngineWithApp`
+in `Test.RuntimeSandboxAcceptanceGpuSmoke.cpp` now sets
+`Render.EnableVSync=false` after `CreateReferenceEngineConfig`, like the other
+`gpu;vulkan` fixtures; validation and every other Sandbox default stay. No gate,
+assertion or `TIMEOUT` changes. Same host (RTX 4090, NVIDIA 580.159.04 ICD via
+`VK_DRIVER_FILES`), `DISPLAY=:1`, `ci-vulkan`, one CTest command per display
+state over every `RuntimeSandboxAcceptanceGpuSmoke.*` case, run serially with
+`-V`; the monitor-off command is bounded and forces DPMS on again in a shell
+trap, with `xset q` recorded before, during and after. Logs go to
+`tasks/evidence/BUG-228/2026-10-24-vsync-off-acceptance/` (ignored by git).
+- V0, the setting reaches the device: no `VSync requested=true` swapchain log
+  line in either run. Rejected by any such line.
+- V1, monitor on: every case passes (42 cases in the `gpu` label run at 3d39d1737);
+  surface appearance takes at most 21 s (17–21 s before, VSync on).
+- V2, monitor off: every case passes; surface appearance takes under 25 s
+  (71.27 s with VSync on); no case takes 30 s or more; the summed case time is
+  at most 30 % above V1's. Rejected if any case fails or times out, or surface
+  appearance takes 30 s or more.
+- B1, the lowered `PointLBVHGpuSmoke` stall bounds (below): the seven
+  `FramedKNearest*`, `FramedRadius*` and `Keypoint{Publishes,Rejects,VulkanCompute}*`
+  cases pass with the monitor on, each in under 10 s (3.1–6.5 s in the `gpu`
+  label run), so neither 20 s bound fires.
+
+### Stall bounds in `Test.PointLBVHGpuSmoke.cpp`
+Effective `TIMEOUT`s from `ctest --show-only=json-v1`: the registered value in
+an unscaled tree, twice that in this sanitized `ci-vulkan` tree (BUG-240).
+- `KnnBatchApp` (`FramedKNearestReusesBuffersAndRejectsStaleTarget`,
+  `FramedRadiusPreservesOverflowExclusionAndBufferReuse`): 40 s bound,
+  `TIMEOUT` 30 s (60 s here). It could not fire in an unscaled tree, and it
+  set `TimedOut` without a message. Now 20 s, with a failure naming the round
+  and frame.
+- `KeypointApp` (the five `Keypoint{Publishes,Rejects,VulkanCompute}*` cases):
+  50 s bound. Four cases are in the 120 s fixup (240 s here), so the bound could
+  fire for them. `KeypointVulkanComputeRejectsStaleCancellationAndIgnoresHybridCapacity`
+  is not: the fixup names `...RejectsStaleCancellationAndOverflow`, which no
+  test has, so that case keeps 30 s (60 s here) and the 50 s bound could not
+  fire in an unscaled tree. The shared bound is now 20 s, with a failure naming
+  the phase, result count and frame. The stale fixup name is left as is:
+  correcting it would raise that case's `TIMEOUT` to 120 s, which is not this
+  change's decision.
