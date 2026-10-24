@@ -48,9 +48,11 @@ cache has `CCACHE_PROGRAM-NOTFOUND` with `INTRINSIC_ENABLE_CCACHE=ON`. Every bui
 recorded here is therefore cache-free. The expected outcome, written down
 beforehand, was that both rebuilds succeed without a frontend crash.
 
-1. The tree was configured and built from scratch at 01:21 as the baseline
-   (1,958 steps, 911 compiles, including `IntrinsicPointLBVHGpuTests`). It exited 0.
-   A no-op build afterwards reported `ninja: no work to do`.
+1. The tree was configured (finished 01:21:48) and built from scratch as the
+   baseline (finished 01:28:01; 1,958 steps, 911 compiles, including
+   `IntrinsicPointLBVHGpuTests`). Configure and build both exited 0
+   (`baseline-configure.log`, `baseline-build.log`, `baseline-rc.txt`). A no-op
+   build afterwards reported `ninja: no work to do`.
 2. A comment-only line was appended to
    `internal/Runtime.EditorWorkspaceAttachment.Detail.cppm`,
    `Runtime.EditorWorkspaceSnapshots.Models.cpp` and
@@ -74,7 +76,8 @@ reproducer scripts dated 2026-10-19 11:56–11:57. They name main files such as
 cause is unknown, and they cannot be rerun without that tree's module files.
 
 No source, preset or gate changed. Logs are git-ignored under
-`tasks/evidence/BUG-178/` (`environment.txt`, `predictions.txt`, `step0-noop.log`,
+`tasks/evidence/BUG-178/` (`baseline-configure.log`, `baseline-build.log`,
+`baseline-rc.txt`, `environment.txt`, `predictions.txt`, `step0-noop.log`,
 `step1-edited.log`, `step2-reverted.log`).
 
 ## Acceptance criteria

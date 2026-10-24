@@ -54,8 +54,10 @@ native `DISPLAY=:1` (DPMS enabled, monitor on, GPU idle in P8 before the runs).
 Every run used the Verification command's executable, gtest filter, repository-root
 working directory and `LSAN_OPTIONS=suppressions=lsan.supp`; the deltas are listed
 below. Expected outcomes were written down before each run. The gtest assertions
-passed in every run (5.5–5.8 s; the original 46.7 s was DPMS-off present pacing,
-BUG-179).
+passed in every run. Runs with a filled shader cache took 5.517–6.054 s; the
+three empty-cache runs (`F-fresh-cache-run1`, `F2-fresh-cache-run1`, `I-icp-run1`)
+were the slower ones at 13.3–13.5 s, presumably cold pipeline compiles. The
+original 46.7 s was DPMS-off present pacing (BUG-179).
 
 | Run | Change to the environment | Exit | LeakSanitizer |
 | --- | --- | --- | --- |
