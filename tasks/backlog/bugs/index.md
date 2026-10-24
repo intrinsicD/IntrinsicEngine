@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-249 — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x](BUG-249-concurrent-ctest-discovery-cmake4.md):
+  the race probe knows only the 3.28/3.31 `file(WRITE)` forms; CMake 4.3's
+  REMOVE+APPEND module fails all three cases. Hosted `ci-docs` (CMake 3.31.6) passes.
+
 - [BUG-248 — Keypoint GPU parity smokes fail on main](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md):
   `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` (5 keypoints, reference 8) and
   `KeypointResidentSubnormalScores` (mask and saliency bound) fail on `ci-vulkan` on any display;

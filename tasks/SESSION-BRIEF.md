@@ -85,6 +85,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)
 - unblocked: `BUG-247` — Local root hygiene rejects existing tool state (tasks/backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md)
 - unblocked: `BUG-248` — Keypoint GPU parity smokes fail on main (tasks/backlog/bugs/BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md)
+- unblocked: `BUG-249` — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x (tasks/backlog/bugs/BUG-249-concurrent-ctest-discovery-cmake4.md)
 - unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
 ## Theme H — Agentic workflow hardening
