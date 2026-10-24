@@ -174,3 +174,127 @@ publication tests passed, no skips or failures (123.13 s total). Logs are in
 UI-037 snapshot-comparison checkpoint. This clears the scoped verification run,
 not BUG-091's unreproduced cold-start cause. Enrollment in the current micro
 workflow moves the original contract-baseline hash unchanged to `consumed`.
+
+## Diagnosis — 2026-10-24
+
+Unattended lane (operator absent until 09:00). No budget value was chosen; the
+value question is the operator's.
+
+**Landed** (branch `claude/bug-091-gtest-discovery-timeout`, commits
+`d14029314`..`b8fb5b50f` plus the commit carrying this note):
+- `tests/CMakeLists.txt` declares `_intrinsic_gtest_discovery_timeout_seconds 5`
+  next to the 30 s / 120 s case budgets and passes it as `DISCOVERY_TIMEOUT`.
+  The generated includes are byte-identical to before (a reconfigure rewrote
+  none of them).
+- `tools/ci/gtest_discovery_probe.py`: `direct` reruns the include's exact
+  `--gtest_list_tests` command cold (`posix_fadvise` eviction, fincore residency
+  0) and warm; `ctest` forces targets stale and records which `_tests.cmake`
+  files were relisted or removed. Both record load, PSI, memory, and
+  compile/link/ninja/ctest counts. Processes are matched by program name, not by
+  `pgrep -f`, which matches its own shell. `decide` holds the frozen rule;
+  `report` writes the HTML report.
+- `tests/regression/tooling/Test.GTestDiscoveryTimeout.py` (17 hermetic tests,
+  plus `--build-dir`): source policy; a slow fake lister passes below the
+  declared budget and fails nonzero at it, with path, timeout result and (CMake
+  4.x) the budget; the lister is gone afterwards (except CTest 3.31, below) and
+  the lock is free; probe, decision-rule and live-reconcile self-checks.
+  Wired into `ci-docs.yml` (hermetic) and `ci-linux-clang.yml` (`--build-dir
+  build/ci`); `touched_scope.py` maps the probe and `collect_test_timing.py` to
+  it. Documented in `tests/README.md` §"GoogleTest discovery and case budgets"
+  (CI-008 and CI-011 cross-linked as related, not prerequisites) and
+  `tools/ci/README.md`.
+
+**Regression first.** Before the change all 4 initial tests failed ("no
+declared discovery budget"), and so did `--build-dir`
+(`tasks/evidence/BUG-091/regression-before.log`). Mutations M1-M19 each fail
+the matching test (`mutations.log`), including a removed helper argument,
+`pgrep -f`-style matching, a fixture budget of B-3, and a missing
+parent-death binding. Non-default value check: with the variable set to 7 and a
+reconfigure, 41/41 includes showed 7 and the live check passed (case budgets
+30 x35 / 120 x6). Removing the argument made it fail. Reverted.
+
+**H2 fan-out (confirmed; predictions written first).** On `build/ci` with 3 of
+41 discovered executables built, `ctest -N -R '^RuntimeModule\.'` relisted:
+all 3 on the first run; none on a second run; exactly ECS after touching its
+include or its executable; none after a no-op reconfigure; all 3 after
+touching all 3 executables or after a budget change. Unbuilt targets (38
+`_NOT_BUILT`) are never listed. A 3-target relist took 0.8 s for the whole
+call; it took 0.09 s without one.
+
+**Distributions (pre-flight Full tier, packet digest
+`ef55536f956a55d85c148bdd1ffc1c6dc7157592159bdc18b620762d1c4e0544`, frozen rule
+`bug-091-budget/v3`).** Both arms collected: 12 cells x 320 listings, >= 311
+valid per cell; 2 x 25 forced-stale cold C-real runs. Both post-arm manifest
+gates passed.
+- Contention arm (03:15-03:34): a lane-owned `nice -n 10 -j5` clean-rebuild
+  loop of `build/ci-fast` plus ambient builds. Median load_1m 5.23; a compile
+  ran at 97 % of sample starts; PSI cpu <= 0.2 %, io <= 8.1 %. This is light
+  contention on 32 CPUs.
+- Idle arm (03:35-03:54): every sample started at load_1m < 2 with no compile
+  (median load 1.04).
+- Listing wall time, cold/warm median (max), seconds:
+
+  | target | contention cold | contention warm | idle cold | idle warm |
+  |---|---|---|---|---|
+  | IntrinsicECSTests (129 cases) | 0.0076 (0.025) | 0.0043 (0.005) | 0.0083 (0.010) | 0.0052 (0.006) |
+  | IntrinsicCoreTests (32) | 0.0046 (0.012) | 0.0028 (0.004) | 0.0052 (0.006) | 0.0036 (0.004) |
+  | IntrinsicRuntimeContractTests (1785) | 0.056 (0.073) | 0.033 (0.038) | 0.058 (0.065) | 0.035 (0.038) |
+
+- M_obs = 0.073 s. No sample was capped or failed. Every target had one listing
+  hash, matching the technical baseline. All 50 C-real runs exited 0, relisted
+  all 3 forced targets and selected 7 tests; they took 0.81-0.90 s.
+- Verdicts: **H1 rejected** under the tested conditions (M_obs < 2.5 s, no
+  kill condition). This matches the written prediction. **H3 not supported**:
+  the contention/idle p99 ratio was 0.97-1.18 cold and 0.88-0.93 warm. The
+  written prediction ("supported for cold") was wrong. **H4 not supported**: 0
+  outliers. Decision: no value chosen; the explicit 5 s stays.
+- Referee recomputation from the raw JSONL agrees
+  (`runs/referee-audit.txt`). The report is `runs/report.html`; its layout was
+  not inspected in a browser.
+- What this does not cover: the two incidents (right after a configure plus
+  build; one on `ci-vulkan`) remain unexplained. Sanitized trees, CI runners and
+  heavy or equal-priority contention were not measured. The samples are
+  serially correlated, so the 0.99^300 tail statement is descriptive only.
+
+**Focused confirmation (predictions written first).** 3 runs of `ctest
+--test-dir build/ci --output-on-failure -R '^RuntimeModule\.' -LE
+'gpu|vulkan|slow|flaky-quarantine' --timeout 60`, each with all 3 targets forced
+stale and evicted: exit 0, 3 targets relisted, "100% tests passed, 0 tests
+failed out of 7", 1.33-1.37 s each.
+
+**CMake portability.** The hermetic suite passes with CMake 4.3.2, 3.28.3 and
+3.31.6. The ci-docs discovery step and `--build-dir` on a tree configured with
+3.31.6 pass as well (`portability.log`). Findings:
+- CTest 3.31.6 returns at the discovery budget (rc 8) but leaves the timed-out
+  lister running. Reproduced with a 30 s fake; 3.28.3 and 4.3.2 kill it. The
+  lister-gone assertion is therefore scoped: on 3.31 the test reaps the lister
+  and prints a note, and the gate bounds are still asserted.
+- The 3.22, 3.28 and 3.31 modules print the path and the timeout result but not
+  the budget; only CMake 4.x prints `Timeout: '<N>'`.
+- `Test.ConcurrentCTestDiscovery.py` fails 3/3 with local CMake 4.3.2 ("CMake
+  flush implementation changed": the 4.3 module uses REMOVE+APPEND). It passes
+  with 3.31.6. This predates the change and is not fixed here.
+
+**Pre-flight reviews** (verbatim under
+`tasks/evidence/BUG-091/preflight/distributions/reviews/`): an independent Codex
+review (thread `01a16b3f-fc98-7582-8371-323cde8b395a`, read-only sandbox;
+recursion protection instruction-only) and an independent Claude review
+(session `23f9b8d2-46a2-4a62-ab4f-2943d75327e1`, Read/Grep/Glob only;
+enforced). They ran 7 rounds, with REVISE until revision 7. Both returned PASS on
+digest `ef55536f…` before either arm started. The plan counter-review's five
+blocking items were implemented. Among them: program-name process matching,
+M_obs from direct samples only, the H1-gated rule, an unconditional
+non-default-value check, and "n < 300 = not collected".
+
+**Chosen defaults** (operator may override): value 5 kept explicit; contention
+source = own niced `-j5` build in a separate tree (lane limit), with a load gate
+of 4; arms in fixed order (contention, then idle); probe children bound by
+`PR_SET_PDEATHSIG`; the CTest 3.31 lister check scoped as above; the touched-scope
+broad C++ build was skipped, because the CMake change is byte-identical in
+generated output.
+
+**Remaining.** Independent code review: the first round returned REVISE; a
+delta review of its fixes is pending at commit time. Whether the evidence
+satisfies acceptance criteria 1-4, especially AC2 (budget in the failure
+message) on CMake < 4, is the reviewers' and operator's call. Index and
+retirement-log updates belong to the integrator.

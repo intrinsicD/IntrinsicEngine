@@ -329,6 +329,7 @@ def ctest_once(args: argparse.Namespace, repetition: int, output, limit: float) 
 
 
 # --- BUG-091 decision rule (frozen with the pre-flight packet) ---------------
+# shortcut: one-off BUG-091 analysis (decide/report); delete it when BUG-091 retires.
 LADDER = (15, 20, 30, 45, 60)
 CURRENT_BUDGET = 5.0
 MIN_CELL_SAMPLES = 300
@@ -646,6 +647,12 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _gate(value: str) -> str:
+    if not re.fullmatch(r"[a-z]+=(pass|fail)", value):
+        raise argparse.ArgumentTypeError(f"expected ARM=pass|fail, got {value!r}")
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -676,10 +683,11 @@ def main(argv: list[str] | None = None) -> int:
         mode.add_argument("--required-arms", nargs="+", default=["contention", "idle"])
         mode.add_argument("--contention-min-load", type=float, default=4.0)
         mode.add_argument("--min-ctest-runs", type=int, default=20)
-        mode.add_argument("--expected-ctest-total", type=int, help="selected-test count of a valid C-real run")
+        mode.add_argument("--expected-ctest-total", type=int, required=True,
+                          help="selected-test count of a valid C-real run")
         mode.add_argument("--baseline", type=Path, required=True,
                           help="validated direct run whose listing hashes bind identity")
-        mode.add_argument("--post-arm-gates", nargs="*", default=[], metavar="ARM=pass|fail")
+        mode.add_argument("--post-arm-gates", nargs="*", default=[], metavar="ARM=pass|fail", type=_gate)
         mode.add_argument("--idle-max-load", type=float, default=2.0)
     sub.choices["report"].add_argument("--html", type=Path, required=True)
     args = parser.parse_args(argv)

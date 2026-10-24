@@ -181,8 +181,9 @@ exact registration, and nested discovery without requiring engine binaries.
   limit for one executable's `--gtest_list_tests` listing during PRE_TEST
   discovery. Generated includes record it as `TEST_DISCOVERY_TIMEOUT`.
 - `_intrinsic_default_test_timeout_seconds` / `_intrinsic_slow_test_timeout_seconds`
-  (30 s / 120 s for `slow` targets): the CTest `TIMEOUT` of each discovered
-  case, passed through `PROPERTIES`.
+  (30 s / 120 s for `slow` targets): the default CTest `TIMEOUT` of each
+  discovered case, passed through `PROPERTIES`. Named-case fixups later in
+  `tests/CMakeLists.txt` raise it for some cases.
 
 The discovery value is the explicit former CMake default. No measured
 distribution has selected a different value yet (BUG-091).
@@ -190,20 +191,18 @@ distribution has selected a different value yet (BUG-091).
 Any CTest call loads every registration file, including `-N` and `-R` calls.
 An executable is listed again when its `_tests.cmake` is missing or older than
 the executable or its `_include.cmake`. A filtered command therefore also lists
-unrelated built executables that are stale. On a `ci` tree with 3 of 41
-executables built, `ctest -N -R '^RuntimeModule\.'` listed exactly the touched
-target after one include or executable was touched. It listed all 3 built
-targets after a first run, after relinking all 3, or after a budget change
-rewrote every include. A reconfigure that changes nothing rewrote nothing.
-Unbuilt targets register a `_NOT_BUILT` placeholder and are not listed. Every
-include embeds `CMAKE_ROOT`, so configuring a tree with a different CMake
-installation rewrites all includes. The next CTest call then lists every built
-executable.
+every unrelated built executable that is stale: after a first configure, after
+relinks, and after any change of include content. CMake rewrites an include
+only when its content changes, so a reconfigure without changes lists nothing.
+Content changes include a new budget value and a different CMake installation,
+because every include embeds `CMAKE_ROOT`. Unbuilt targets register a
+`_NOT_BUILT` placeholder and are never listed.
 
 A listing that exceeds the budget is killed. CTest exits nonzero before any
 test starts, and prints the executable path and `Process terminated due to
-timeout`. CMake 4.x also prints `Timeout: '<budget>'`; older versions such as
-3.22 do not. Nothing retries. `Test.GTestDiscoveryTimeout.py` checks three
+timeout`. CMake 4.x also prints `Timeout: '<budget>'`; the 3.22, 3.28 and 3.31
+modules do not, so on those versions the budget is the include's
+`TEST_DISCOVERY_TIMEOUT`. Nothing retries. `Test.GTestDiscoveryTimeout.py` checks three
 things. It checks the source policy. It runs a slow fake lister in a private
 project: the lister passes below the declared budget and fails at the budget,
 and afterwards the lister is gone and the registry lock is free. It also runs
