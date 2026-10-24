@@ -126,20 +126,34 @@ lists: exit code, wall time, compile steps.
 | Arm | full build | edited rebuild | reverted rebuild | ccache in the step |
 |---|---|---|---|---|
 | (a) on, cold | 0, 185 s, 892 | 0, 32 s, 20 | 0, 15 s, 20 | full: 0 hits / 446 misses / 446 uncacheable; edited: 1 hit / 18 misses / 1 uncacheable; reverted: 19 hits / 1 uncacheable |
-| (b) on, warm, new tree | 0, 64 s, 892 | 0, 15 s, 20 | 0, 15 s, 20 | full: 446 hits / 446 uncacheable; edited: 19 hits; reverted: 19 hits |
+| (b) on, warm, new tree | 0, 64 s, 892 | 0, 15 s, 20 | 0, 15 s, 20 | full: 446 hits / 446 uncacheable; edited: 19 hits / 1 uncacheable; reverted: 19 hits / 1 uncacheable |
 | (c) `CCACHE_DISABLE=1` | (tree from b) | 0, 26 s, 20 | 0, 26 s, 20 | counters unchanged |
 | (d) fresh, no ccache | 0, 127 s, 892 | 0, 26 s, 20 | 0, 26 s, 20 | counters unchanged; `CCACHE_PROGRAM-NOTFOUND` |
 
 In every arm, the no-op builds before and after the scenario printed `[0/2]`. No log
 contains `PLEASE submit a bug report`, `Stack dump` or `error:`, no new
-reproducer appeared in `/tmp`, and `git status` was clean afterwards. Free disk
-never fell below 26 GB. Predictions 1, 2, 3, 5 and 6 held. Prediction 4
-held with one addition: one implementation unit already hit in the edited
-rebuild. The cause of that hit was not examined. All 448 uncacheable
-calls are counted as `Unsupported source language`; they are the module-interface
-compiles, which ccache 4.5.1 passes to the compiler. In (a) and (b), the revert
-rebuild restored 19 importer objects from the cache while the edited interface's BMI
-was regenerated. That is the mix of cached objects and fresh BMIs this bug suspected,
+reproducer appeared in `/tmp`, and `git status` was clean afterwards. The 20 GB disk watchdog never fired
+(free disk sampled at the end of each step was 26 GB or more). Predictions 2,
+5 and 6 held. Prediction 1 held only in part: configure printed
+`Using CCache:` with the wrapper path for (a) and (b), but the scripted
+`launcher_rules` check printed 0 because it searched `CMakeFiles/rules.ninja`,
+while CMake writes `CMAKE_CXX_COMPILER_LAUNCHER` as `LAUNCHER =` into
+`build.ninja`. A manual check during (a) found the `ccache_ci.py launch`
+launcher on 1,378 lines of that tree's `build.ninja`. For (b), launcher use is
+inferred only from the moving ccache counters; the ccache directory holds no
+compiler symlinks, so only the launcher can produce those counts. The trees are
+deleted, so this cannot be rechecked. Prediction 4 held with one addition: one
+implementation unit already hit in the edited rebuild. Most likely ccache's
+preprocessed mode ignored the comment-only edit to `Models.cpp`, because
+comments vanish in preprocessing. Comment-only edits therefore barely
+exercise the cache. Prediction 3 held as far as the counters show. Each of (a)
+and (b) added 448 uncacheable calls. The verbose statistics, read after (a),
+count all 448 as `Unsupported source language`. That they are the
+module-interface compiles is inferred: the full build compiled 442 `.cppm` and
+450 `.cpp` units against 446 uncacheable calls. The 4 extra are probably `.cpp`
+module units; they were not identified. In (a) and (b) the revert rebuild took
+19 implementation-unit objects from the cache, including the two reverted
+`.cpp` files, while the BMI of the edited interface was regenerated. That is the mix of cached objects and fresh BMIs this bug suspected,
 and it built without a crash.
 
 Result: bounded non-reproduction. With a stable source surface and one writer per
@@ -166,8 +180,8 @@ across the layers. By file-name prefix: Runtime 37, Geometry 29, Graphics 20,
 Core 9, Sandbox 6, Asset 2, Backends 2, Platform 2, RHI 2, ECS 1. Examples
 are `Asset.GeometryPayload.cppm` and `Runtime.SceneDocumentModule.cppm`. No single
 file or module is shared by all of them; the most common imported module is
-`Extrinsic.Core.StrongHandle` (74 of 110). The crashes affected almost every unit
-of a whole-tree build within two minutes, including Core. That fits an
+`Extrinsic.Core.StrongHandle` (74 of 110). The crashes hit 110 units across all layers,
+including Core, within two minutes. That fits an
 event on the whole tree (for example, the worktree or its build files disappearing
 during the build) better than a defect in one module, but the crash messages are
 not preserved, so the cause is unknown.
