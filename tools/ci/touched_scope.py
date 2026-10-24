@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -24,6 +25,9 @@ DEFAULT_EXCLUDE_REGEX = "|".join(DEFAULT_EXCLUDE_LABELS)
 TARGET_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.+-]*\Z")
 LABEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]*\Z")
 FOCUSED_SMOKE_ENABLED = False
+# Same floor as workflow_evidence.py record-command; Test.TouchedScope checks.
+DEFAULT_MIN_FREE_GIB = 20
+HEADROOM_DOC = "docs/build-troubleshooting.md#disk-headroom"
 SMOKE_BUDGET = {
     "declared_on": "2026-07-17",
     "minimum_hosted_samples": 5,
@@ -2003,6 +2007,20 @@ def _action_test(args: argparse.Namespace, root: Path) -> int:
 
 
 def _legacy_run(args: argparse.Namespace, root: Path) -> int:
+    build_dir = Path(args.build_dir).resolve()
+    # A fresh build tree does not exist yet; its nearest existing parent decides.
+    volume = next(path for path in (build_dir, *build_dir.parents) if path.exists())
+    free = shutil.disk_usage(volume).free
+    if free < args.min_free_gib * 1024**3:
+        print(
+            "touched_scope: error: insufficient disk headroom: "
+            f"{free / 1024**3:.1f} GiB "
+            f"free on the volume of {volume} (build directory {build_dir}), "
+            f"{args.min_free_gib} GiB required; nothing was run. Reclaim space per "
+            f"{HEADROOM_DOC}, or pass --min-free-gib N to set a different floor",
+            file=sys.stderr,
+        )
+        return 3
     route_path = _route_path(args)
     result = _action_plan(args, root)
     if result:
@@ -2058,6 +2076,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--step-summary")
     parser.add_argument("--print", dest="print_only", action="store_true")
     parser.add_argument("--run", action="store_true")
+    parser.add_argument(
+        "--min-free-gib",
+        type=int,
+        default=DEFAULT_MIN_FREE_GIB,
+        help="With --run, refuse (exit 3) below this free space (GiB) on the "
+        "build directory's volume; 0 disables.",
+    )
     args = parser.parse_args(argv)
     if args.print_only and args.run:
         parser.error("choose only one of --print or --run")

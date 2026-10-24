@@ -79,6 +79,16 @@ def write_registry(
     )
 
 
+def load_workflow_evidence() -> object:
+    path = REPO_ROOT / "tools" / "agents" / "workflow_evidence.py"
+    spec = importlib.util.spec_from_file_location("workflow_evidence_floor", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 class TouchedScopeTests(unittest.TestCase):
     def test_hidden_directory_normalization_is_preserved(self) -> None:
         self.assertEqual(
@@ -1248,6 +1258,51 @@ class TouchedScopeTests(unittest.TestCase):
                 .splitlines(),
                 ["Owner.ExactCase", "Smoke.ExactCase"],
             )
+
+    def test_run_refuses_below_record_command_headroom_floor(self) -> None:
+        # The floor comes from record-command, so a drifted default fails here.
+        floor = load_workflow_evidence().DEFAULT_MIN_FREE_GIB * 1024**3
+        with tempfile.TemporaryDirectory() as tmp:
+            # Not created yet, as before a fresh configure: its nearest
+            # existing ancestor decides the volume.
+            build_dir = Path(tmp) / "build" / "ci-fast"
+            args = [
+                "--root", str(REPO_ROOT),
+                "--changed-file", "src/geometry/Geometry.Mesh.cpp",
+                "--output", str(Path(tmp) / "route.json"),
+                "--build-dir", str(build_dir),
+                "--run",
+            ]
+            # Plan is the first --run step; its sentinel 7 shows the run began.
+            for free, extra, expected in (
+                (floor - 1, [], 3),
+                (floor, [], 7),
+                (0, ["--min-free-gib", "0"], 7),
+            ):
+                with self.subTest(free=free, extra=extra), mock.patch(
+                    "shutil.disk_usage", return_value=mock.Mock(free=free)
+                ) as usage, mock.patch.object(
+                    touched_scope, "_action_plan", return_value=7
+                ) as plan, mock.patch.object(
+                    touched_scope, "_run_command"
+                ) as run, contextlib.redirect_stderr(io.StringIO()) as stderr:
+                    self.assertEqual(touched_scope.main([*args, *extra]), expected)
+                    usage.assert_called_once_with(Path(tmp).resolve())
+                    run.assert_not_called()
+                    if expected == 3:
+                        plan.assert_not_called()
+                        message = stderr.getvalue()
+                        for part in (
+                            "insufficient disk headroom",
+                            str(Path(tmp).resolve() / "build" / "ci-fast"),
+                            "nothing was run",
+                            "docs/build-troubleshooting.md#disk-headroom",
+                            "--min-free-gib",
+                        ):
+                            self.assertIn(part, message)
+                    else:
+                        plan.assert_called_once()
+                        self.assertEqual(stderr.getvalue(), "")
 
 
 class LocalChangeTests(unittest.TestCase):

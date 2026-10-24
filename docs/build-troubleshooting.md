@@ -489,14 +489,21 @@ catches a nearly full volume; it is not a measured build footprint. One clean
 preset tree can need more, so require more headroom before clean or
 multi-preset builds.
 
-The only automated check is the receipt wrapper
-`tools/agents/workflow_evidence.py record-command` (see
-[Completion evidence](agent/workflow-evidence.md#completion-evidence)). It
-refuses to run a command below the same floor and accepts `--min-free-gib N`
-to change it; `0` or a negative value disables the check. Direct
-`cmake --build`/`ctest` runs and `tools/ci/touched_scope.py` do not check
-headroom. Only the repository volume is checked, not a separate `/tmp` or
-build mount.
+Two tools check the same floor automatically and accept `--min-free-gib N` to
+change it; `0` or a negative value disables the check:
+
+- The receipt wrapper `tools/agents/workflow_evidence.py record-command` (see
+  [Completion evidence](agent/workflow-evidence.md#completion-evidence))
+  refuses to run its command (exit 2) when the repository volume is below the
+  floor. It checks only the repository volume, not a separate `/tmp` or build
+  mount.
+- `tools/ci/touched_scope.py --run` refuses before its first step (exit 3,
+  `insufficient disk headroom`, nothing run or written) when the volume of
+  `--build-dir` is below the floor. A build directory that does not exist yet
+  is checked on its nearest existing parent.
+
+Direct `cmake --build`/`ctest` runs and the separate `touched_scope.py
+--action` steps that CI uses do not check headroom.
 
 A run that hit `No space left on device`, or that could not write its logs or
 result records, is incomplete evidence and never counts as passing. Reclaim
