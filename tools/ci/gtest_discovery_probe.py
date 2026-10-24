@@ -193,6 +193,9 @@ def cmd_direct(args: argparse.Namespace) -> int:
     stop = "completed"
     with tempfile.TemporaryDirectory(prefix="gtest-discovery-probe-") as scratch:
         for repetition in range(args.repetitions):
+            if repetition:  # spread repetitions over time instead of one burst
+                time.sleep(max(0.0, min(paced - time.monotonic(), limit - time.monotonic())))
+            paced = time.monotonic() + args.pace_seconds
             shift = repetition % len(args.target)
             for target in args.target[shift:] + args.target[:shift]:
                 exe = Path(fields[target]["TEST_EXECUTABLE"])
@@ -233,6 +236,14 @@ def tests_files(tests_dir: Path) -> dict[str, int]:
 def cmd_ctest(args: argparse.Namespace) -> int:
     if not args.command:
         raise ProbeError("ctest mode needs a command after --")
+    for repetition in range(args.repetitions):
+        if repetition:
+            time.sleep(args.pace_seconds)
+        ctest_once(args)
+    return 0
+
+
+def ctest_once(args: argparse.Namespace) -> None:
     before_files = tests_files(args.tests_dir)
     for target in args.force:
         include = args.tests_dir / f"{target}[1]_include.cmake"
@@ -254,7 +265,6 @@ def cmd_ctest(args: argparse.Namespace) -> int:
           "discovery_timeout_seen": "Process terminated due to timeout" in result.stdout + result.stderr,
           "output_tail": (result.stdout + result.stderr)[-2000:], **before, "wall_clock": time.time()},
          output)
-    return 0
 
 
 
@@ -507,9 +517,10 @@ def main(argv: list[str] | None = None) -> int:
         mode.add_argument("--arm", default="unlabelled")
         mode.add_argument("--output", type=Path, help="append JSON lines here as well as stdout")
         mode.add_argument("--cap-seconds", type=float, default=120.0 if name == "direct" else 600.0)
+        mode.add_argument("--repetitions", type=int, default=1)
+        mode.add_argument("--pace-seconds", type=float, default=0.0, help="minimum spacing of repetitions")
     direct = sub.choices["direct"]
     direct.add_argument("--target", action="append", required=True)
-    direct.add_argument("--repetitions", type=int, default=1)
     direct.add_argument("--max-minutes", type=float, default=35.0)
     direct.add_argument("--deadline", help="ISO time with offset; stop before it")
     direct.add_argument("--wait-idle", action="store_true")
