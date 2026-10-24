@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-248 — Keypoint GPU parity smokes fail on main](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md):
+  `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` (5 keypoints, reference 8) and
+  `KeypointResidentSubnormalScores` (mask and saliency bound) fail on `ci-vulkan` on any display;
+  restore parity without weakening assertions.
+
 - [BUG-247 — Local root hygiene rejects existing tool state](BUG-247-local-root-hygiene-state-mismatch.md):
   local `.aws/` and `.serena/` remain unclassified; preserve both pending an operator setup decision.
 
