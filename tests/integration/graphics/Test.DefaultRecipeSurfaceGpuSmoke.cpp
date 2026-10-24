@@ -652,6 +652,26 @@ void ExpectGpuProfileScopeParity(
 }
 } // namespace
 
+// BUG-228: Render.EnableVSync=false must reach the swapchain. FIFO paces each present
+// on the display (about 1 s with the monitor off), which made frame-paced smokes time out.
+TEST(DefaultRecipeSurfaceGpuSmoke, VSyncOffSelectsImmediatePresentWhenSupported)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(1u);
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    const auto diagnostics = GetVulkanBootstrapDiagnosticsSnapshot();
+    constexpr std::int32_t kImmediate = 0; // VK_PRESENT_MODE_IMMEDIATE_KHR
+    constexpr std::int32_t kFifo = 2;      // VK_PRESENT_MODE_FIFO_KHR
+    const std::int32_t expected = (diagnostics.SupportedPresentModeMask & (1u << kImmediate)) != 0u ? kImmediate : kFifo;
+    EXPECT_FALSE(diagnostics.VSyncRequested);
+    EXPECT_NE(diagnostics.SupportedPresentModeMask, 0u);
+    EXPECT_EQ(diagnostics.SwapchainPresentMode, expected)
+        << "supported mask=0x" << std::hex << diagnostics.SupportedPresentModeMask;
+    bootstrap.EnginePtr->Shutdown();
+}
+
 // GRAPHICS-076 Slice D — canonical default-recipe smoke. It drives one
 // operational frame through the bounded `engine.Run()` helper and asserts that
 // the executor reached the operational Vulkan command stream, that the

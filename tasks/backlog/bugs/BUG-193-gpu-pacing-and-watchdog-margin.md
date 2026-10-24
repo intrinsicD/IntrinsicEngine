@@ -169,3 +169,67 @@ finds nothing at this branch's HEAD.
   it, not a measurement of it),
   the display-off presentation (display policy, BUG-228) and frame-paced job
   apply. Which one to take on is a scope decision for the operator.
+
+## Display-off comparison and dirty-scan timing — 2026-10-24 (afternoon)
+
+### Predictions (committed before the runs)
+Same branch, host and display procedure as BUG-228's afternoon section.
+- W1, `PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures`
+  on `:1` with the monitor off, FIFO (current code): about 264 frames at about
+  1 s each, so it passes in 240–300 s, inside the 300 s internal bound, with
+  under 60 s of margin. A failure at the 300 s bound is also consistent with
+  display pacing; a pass in under 60 s rejects display pacing for this case.
+- W2, after a fix that honours `Render.EnableVSync=false`: the same run with
+  the monitor off passes in under 40 s, close to the 25.5 s monitor-on time.
+- S1, `GpuWorld::SyncFrame` dirty scan: a temporary timer (tagged, reverted)
+  around the `FlushDirtyRuns` calls in the keypoint case on `:1`, monitor on.
+  The hypothesis predicts that the scan takes at least 50 % of the 68–69 ms
+  median `render_prepare` (at least 34 ms per frame). It is rejected if the
+  scan takes under 10 % (under 7 ms). Only a confirmed scan cost is changed.
+
+### Results
+Logs are in `tasks/evidence/BUG-228/2026-10-24-display-off/` (shared with
+BUG-228; same host and states).
+- W1 met: WLOP on `:1` with the monitor off and FIFO passed in 261.75 s,
+  38 s inside its 300 s internal bound (25.5 s with the monitor on this morning).
+  The display-off pacing is consistent with RUNTIME-236's 264 s; the RTX 3050
+  host's frame count was never checked.
+- S1 confirmed: a temporary timer around the five `FlushDirtyRuns` calls
+  (tagged `[DBG-BUG193]`, reverted) gave, over 93 frames of the keypoint case
+  on `:1` with the monitor on, a median of 67.6 ms (min 67.2, max 113.3) for
+  465,536 dirty bits, about 145 ns per bit. That is the whole 68–69 ms median
+  `render_prepare` measured this morning.
+- Fix: the five dirty-flag vectors are `std::vector<std::uint8_t>` instead of
+  `std::vector<bool>`, and `FlushDirtyRuns` finds run starts and ends with
+  `memchr` and clears runs with `memset`. The runs it uploads are unchanged.
+  `GraphicsGpuWorld.SyncFrameUploadsContiguousDirtyRunsOnce` pins them (first
+  frame uploads all 8 slots; dirty slots 1, 2, 5, 7 give runs (1,2), (5,1),
+  (7,1); a clean frame uploads nothing). It passes with the old
+  `vector<bool>` code and with the new code, and fails at two assertions when
+  the `memset` is removed.
+- After both fixes: Sandbox monitor on, FIFO: median `render_prepare` 0.3 ms
+  (69.1 ms this morning), median frame 16.6 ms (89.2 ms), now paced by the
+  display refresh. WLOP on `:1` with the monitor off passed in 6.41 s
+  (W2 met). `LocalDistanceRatio` with the monitor off passed in 3.74 s.
+  Surface appearance passed in 71.27 s with the monitor off because its
+  Sandbox-default fixture keeps VSync on (see BUG-228).
+- CPU gate (`-LE 'gpu|vulkan|slow|flaky-quarantine'`, `-j16`): 5942 of 5943
+  passed. `PropertySmoothingWorkflows.VariationalFitVariantsAndSolverSwitches`
+  timed out at 1-minute load of about 12 and passed alone in 28.52 s.
+
+### Evidence status — 2026-10-24
+Predictions for S1, W1 and W2 were committed beforehand (25550e64e); the
+other runs listed had none. That
+does not make them verification: a run whose numbers informed a keep or
+change choice is decision-bearing.
+- Decision-bearing:
+  - S1, the dirty-scan timing (median 67.6 ms). It decided whether to change
+    the dirty scan.
+  - BUG-228's fix-condition runs and 25 s watchdog trial (listed there).
+- Verification only (no other use of the numbers): W1 (WLOP 261.75 s, monitor
+  off, FIFO), W2 (WLOP 6.41 s after the fix), the monitor-off
+  `LocalDistanceRatio` and surface-appearance runs, the Sandbox monitor-on
+  `render_prepare` after the fix, and the CPU gate.
+- No experiment pre-flight was run: no frozen packet, no prospective review
+  and no HTML report exists for these runs. The operator's pending
+  disposition covers every decision-bearing measurement listed above.

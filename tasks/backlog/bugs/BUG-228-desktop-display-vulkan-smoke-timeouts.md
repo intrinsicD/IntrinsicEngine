@@ -176,3 +176,106 @@ lanes' compiles were not recorded.
   supported display setup is also a policy decision. The options are in the
   lane report.
 - Acceptance item 3 waits for the operator to choose the environment.
+
+## Display-off reproduction — 2026-10-24 (afternoon)
+
+### Predictions (committed before the runs)
+The operator allowed switching the monitor off on `DISPLAY=:1` for bounded
+runs. Each run is one command, DPMS is forced off before it and forced on by a
+shell trap after it; `xset q` and `LockedHint` are recorded before and after.
+Source: branch `claude/bug-228-193-display-off-pacing` at 4c30f2b82 (unchanged
+`src/`), `ci-vulkan`, `VK_DRIVER_FILES` set to the NVIDIA ICD. Raw logs go to
+`tasks/evidence/BUG-228/2026-10-24-display-off/` (ignored by git).
+- D1, keypoint case on `:1`, monitor off, FIFO (current code): CTest kills it
+  at the 30 s limit, with no `Step` diagnostic (the 50 s bound cannot fire).
+  Rejected if it passes in under 20 s.
+- D2, the same case on an owned Xephyr `:9` with the host monitor off: it
+  passes in 10 ± 4 s, because Xephyr does not page-flip to the host outputs.
+  Rejected if it times out or takes more than 20 s.
+- D3, `ExtrinsicSandbox --frame-pacing-report` (32 frames) on `:1` with the
+  monitor off: median `present_micros` + `render_begin_frame_micros` is at
+  least 500 ms per frame (BUG-143: about 900 + 100 ms).
+- Fix condition: the device honours `Render.EnableVSync=false` by choosing an
+  uncapped present mode (IMMEDIATE when supported). The fix is kept only if,
+  after it, D1 with the monitor off passes in under 20 s and the Sandbox with
+  `enable_vsync: false` shows median present + begin below 20 ms with the
+  monitor off, while the Sandbox with `enable_vsync: true` (FIFO) still shows
+  at least 500 ms (control: the present mode, not something else, removes the
+  stall). If IMMEDIATE also blocks with the monitor off, the fix is not made.
+
+### Results
+Runs 12:58–13:16 CEST, one command per monitor-off period; every state file
+shows `Monitor is Off` during the run and `Monitor is On` after it. The
+session stayed locked (`LockedHint=yes`), 1-minute load 1.2–4.3, no compiler
+running at any run boundary, RTX 4090, NVIDIA 580.159.04. Logs and states:
+`tasks/evidence/BUG-228/2026-10-24-display-off/`.
+- D1 met: on `:1` with the monitor off the keypoint case was killed by CTest
+  at 30.5 s (`Timeout`), with no `Step` diagnostic. It passed in 10.8 s with
+  the monitor on this morning. The display dependence is reproduced.
+- D2 met: on an owned Xephyr `:9` with the host monitor off it passed in
+  9.98 s.
+- D3 met: Sandbox, 32 frames, monitor off: median frame 1000 ms, median
+  `present_micros` 918 ms (91 % of frame time), `render_begin_frame` 0.19 ms.
+  The wait is in `vkQueuePresentKHR` with FIFO, not in acquire.
+- Owner: the device ignored `Render.EnableVSync`, so every swapchain was FIFO
+  and every present waited for a display that does not scan out. This NVIDIA
+  X11 surface reports IMMEDIATE, FIFO and FIFO_RELAXED (mask `0xd`), no MAILBOX.
+- Fix: `VulkanDevice::Initialize` maps `EnableVSync=false` to
+  `PresentMode::Uncapped` (IMMEDIATE, FIFO fallback) and records
+  `VSyncRequested`, `SupportedPresentModeMask` and `SwapchainPresentMode` in
+  the bootstrap diagnostics, plus one log line. The `gpu;vulkan` fixtures
+  already set `EnableVSync=false`; none was changed.
+- Fix condition met. After the fix, monitor off: the keypoint case passed in
+  3.74 s; Sandbox with `enable_vsync: false` had a median frame of 4.8 ms and
+  median present + begin of 0.17 ms; the control, Sandbox with the default
+  `enable_vsync: true` (FIFO), still had a 999.9 ms median frame with 991.6 ms
+  present. The present mode alone removes the stall.
+- Regression: `DefaultRecipeSurfaceGpuSmoke.VSyncOffSelectsImmediatePresentWhenSupported`
+  failed with the assignment commented out (actual mode 2 = FIFO, expected 0)
+  and passes with it.
+- Stall bound: `KeypointResidentApp`'s `Started` bound is now 20 s, below the
+  30 s CTest `TIMEOUT`, and its message names the step and frame. With FIFO
+  and the monitor off, an intermediate 25 s bound fired at 28.66 s
+  (`Resident keypoint timeout after 25 s step=1 frame=25`), which left only
+  1.3 s to the kill; that is why it is 20 s. The fixture's frame count is
+  unchanged.
+- Acceptance item 3, after the fix, 23 cases (this morning's 21 plus both
+  `ResidentLop*` cases), `:1`: all 23 passed with the monitor on (92.1 s) and
+  all 23 with the monitor off (91.9 s). The slowest case took 5.72 s (on) and
+  5.63 s (off). The cohort prediction in `predictions.txt` was met.
+- Also seen: `ExtrinsicSandbox` run directly with only `lsan.supp` exits 1 on
+  LeakSanitizer reports from unsymbolized driver frames, libX11 XIM and dbus,
+  with the monitor off before the fix and with it on after the fix. The
+  registered CTest sets `detect_leaks=0`; BUG-180 owns leak findings.
+- Not changed: `RuntimeSandboxAcceptanceGpuSmoke` intentionally keeps the
+  Sandbox defaults, including VSync. With the monitor off its surface-appearance
+  case still passed, but in 71.27 s (17–21 s with the monitor on).
+  Whether those smokes should switch VSync off is an open decision.
+- Whole `gpu` label at 3d39d1737, `:1`, monitor on: of 161 cases 160 passed
+  and one was a capability skip (`METHOD056VulkanCpdEStep.ScalingProfile`), 682 s, at a
+  1-minute load of 3.6–6.0.
+- Review of 3d39d1737: a fresh Claude reviewer that did not write the change
+  read the code only and answered "Verdict: APPROVE", with two nits (a test
+  inserted under another test's comment; loose doc wording) that are fixed in
+  the next commit. No Codex review was run.
+
+### Evidence status — 2026-10-24
+Predictions for D1–D3, the fix condition and the cohort were committed
+beforehand (25550e64e) or appended to `predictions.txt` before the run; the
+25 s trial and the `gpu` label run had none. That does not make them
+verification: a run whose numbers informed a keep or change choice is
+decision-bearing.
+- Decision-bearing:
+  - D1–D3 (monitor-off keypoint timeout, Xephyr pass, Sandbox present 918 ms):
+    they located the wait and led to the choice to change the present mode.
+  - The fix-condition runs: the keypoint case with the monitor off after the
+    fix (3.74 s), Sandbox `enable_vsync: false` with the monitor off (median
+    present + begin 0.17 ms) and the FIFO control (991.6 ms present). They
+    decided whether the present-mode fix was kept.
+  - The 25 s watchdog trial, which fired at 28.66 s, 1.3 s before the CTest
+    kill. It set the final 20 s bound. No run exercised the 20 s bound firing.
+- Verification only (no other use of the numbers): the 23-case cohort with the
+  monitor on and off, and the whole `gpu` label run.
+- No experiment pre-flight was run: no frozen packet, no prospective review
+  and no HTML report exists for these runs. The operator's pending
+  disposition covers every decision-bearing measurement listed above.

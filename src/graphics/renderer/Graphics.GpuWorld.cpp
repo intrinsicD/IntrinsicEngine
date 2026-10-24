@@ -402,11 +402,13 @@ namespace Extrinsic::Graphics
                 device, destination, data, size, offset).Accepted();
         }
 
+        // Dirty flags are bytes so the per-frame scan over the full slot capacity is a
+        // memchr, not a per-bit loop (BUG-193: about 68 ms per frame in the sanitizer build).
         template <class T>
         [[nodiscard]] bool FlushDirtyRuns(RHI::IDevice& device,
                             RHI::BufferHandle dst,
                             std::vector<T>& cpu,
-                            std::vector<bool>& dirty)
+                            std::vector<std::uint8_t>& dirty)
         {
             if (!dst.IsValid() || cpu.empty() || cpu.size() != dirty.size())
             {
@@ -414,21 +416,21 @@ namespace Extrinsic::Graphics
             }
 
             bool flushed = false;
+            std::uint8_t* const flags = dirty.data();
+            const std::size_t size = dirty.size();
             std::size_t i = 0;
-            while (i < dirty.size())
+            while (i < size)
             {
-                if (!dirty[i])
+                const void* next = std::memchr(flags + i, 1, size - i);
+                if (next == nullptr)
                 {
-                    ++i;
-                    continue;
+                    break;
                 }
 
-                const std::size_t begin = i;
-                while (i < dirty.size() && dirty[i])
-                {
-                    dirty[i] = false;
-                    ++i;
-                }
+                const std::size_t begin = static_cast<std::size_t>(static_cast<const std::uint8_t*>(next) - flags);
+                const void* clean = std::memchr(flags + begin, 0, size - begin);
+                i = clean == nullptr ? size : static_cast<std::size_t>(static_cast<const std::uint8_t*>(clean) - flags);
+                std::memset(flags + begin, 0, i - begin);
 
                 const std::size_t count = i - begin;
                 (void)QueueBufferUpload(
@@ -632,11 +634,11 @@ namespace Extrinsic::Graphics
         RHI::GpuSceneTable                   SceneTableCpu{};
         ClusterLightTableDesc                ClusterLights{};
 
-        std::vector<bool> DirtyInstanceStatic;
-        std::vector<bool> DirtyInstanceDynamic;
-        std::vector<bool> DirtyEntityConfig;
-        std::vector<bool> DirtyGeometryRecord;
-        std::vector<bool> DirtyBounds;
+        std::vector<std::uint8_t> DirtyInstanceStatic;
+        std::vector<std::uint8_t> DirtyInstanceDynamic;
+        std::vector<std::uint8_t> DirtyEntityConfig;
+        std::vector<std::uint8_t> DirtyGeometryRecord;
+        std::vector<std::uint8_t> DirtyBounds;
         bool DirtyLights = false;
         bool DirtySceneTable = true;
         bool PendingSceneTableUploadBarrier = false;
