@@ -98,6 +98,16 @@ CI helper scripts and workflow validation tools.
   grouped wrappers it removes stale GoogleTest XML before each sample, requires
   every configured report, and archives the per-producer XML beside the CTest
   JUnit and log.
+- `gtest_discovery_probe.py`: BUG-091 diagnostic for GoogleTest PRE_TEST
+  discovery. `direct` reruns the `--gtest_list_tests` command of a generated
+  `<target>[1]_include.cmake` cold (page cache evicted) and warm, with the argv
+  of the CMake module that include runs (`--gtest_output=json:` only on CMake
+  4.x; only the JSON file name differs);
+  `ctest` forces chosen targets stale, runs a CTest command and reports which
+  `_tests.cmake` files were rewritten. Both emit JSON lines with load, PSI,
+  memory and build/CTest process counts (matched by program name) taken outside
+  the timed window. Local diagnostic; not wired into a workflow. Covered by
+  `tests/regression/tooling/Test.GTestDiscoveryTimeout.py`.
 - `run_repo_hygiene_checks.sh`: warning-mode wrapper running the canonical
   `check_root_hygiene.py` policy check once, followed by `check_doc_links.py`.
   Local convenience; not wired into a workflow.

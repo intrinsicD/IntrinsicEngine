@@ -172,6 +172,70 @@ affected discovery files serially before using such a tree. The synthetic
 `Test.ConcurrentCTestDiscovery.py` regression exercises concurrent writers,
 exact registration, and nested discovery without requiring engine binaries.
 
+## GoogleTest discovery and case budgets
+
+`intrinsic_test_executable()` sets two separate budgets in
+`tests/CMakeLists.txt`:
+
+- `_intrinsic_gtest_discovery_timeout_seconds` (`DISCOVERY_TIMEOUT`, 5 s): the
+  limit for one executable's `--gtest_list_tests` listing during PRE_TEST
+  discovery. Generated includes record it as `TEST_DISCOVERY_TIMEOUT`.
+- `_intrinsic_default_test_timeout_seconds` / `_intrinsic_slow_test_timeout_seconds`
+  (30 s / 120 s for `slow` targets): the default CTest `TIMEOUT` of each
+  discovered case, passed through `PROPERTIES`. Named-case fixups later in
+  `tests/CMakeLists.txt` raise it for some cases.
+
+The discovery value is the explicit former CMake default. No measured
+distribution has selected a different value yet (BUG-091).
+
+Any CTest call loads every registration file, including `-N` and `-R` calls.
+An executable is listed again when its `_tests.cmake` is missing or older than
+the executable or its `_include.cmake`. A filtered command therefore also lists
+every unrelated built executable that is stale: after a first configure, after
+relinks, and after any change of include content. CMake rewrites an include
+only when its content changes, so a reconfigure without changes lists nothing.
+Content changes include a new budget value and a different CMake installation,
+because every include embeds `CMAKE_ROOT`. Unbuilt targets register a
+`_NOT_BUILT` placeholder and are never listed.
+
+When a listing exceeds the budget, CTest stops waiting at the budget and exits
+nonzero before any test starts. It prints the executable path and `Process
+terminated due to timeout` (CMake 4.x also prints `Timeout: '<budget>'`).
+Before that error, `cmake/IntrinsicTestDiscovery.cmake` prints one line on
+every supported CMake version:
+
+```text
+IntrinsicTestDiscovery: listing '<executable>' failed (<result>); its GoogleTest discovery budget (TEST_DISCOVERY_TIMEOUT) is <N> s. See tests/README.md.
+```
+
+The line comes from a CTest-time `variable_watch` on the listing result of
+`GoogleTestAddTests.cmake`. It appears only when a listing fails, so successful
+discovery output stays unchanged; some callers merge stderr into
+`--show-only=json-v1` output. CTest 3.28.3 and 4.3.2 kill the lister. CTest
+3.31.6 leaves it running, so on such hosts each later call that lists the same
+stale target can add another orphaned lister. Nothing retries.
+
+`Test.GTestDiscoveryTimeout.py` checks the source policy. It also runs a slow
+fake lister in a private project: the lister passes below the declared budget
+without the diagnostic line, fails at the budget with that line, and leaves
+the registry lock free. Afterwards the lister must be gone, except on CTest
+3.31, where the test reaps it. The script also runs probe self-checks,
+including that `direct` replays the argv and working directory that this
+CMake's discovery passes to the lister. With `--build-dir`, it checks that every generated
+include of a configured tree carries the declared discovery budget, together
+with its unchanged 30 s or 120 s case budget:
+
+```bash
+python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py
+python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py --build-dir build/ci
+```
+
+`tools/ci/gtest_discovery_probe.py` measures listings directly (`direct`,
+cold and warm) and forced-stale CTest runs (`ctest`), with host load and
+process telemetry. See `tools/ci/README.md`. Related tasks: BUG-091 (this
+budget), CI-008 (CTest process overhead; not a prerequisite) and CI-011 (the
+measured slow-test cohort; it does not own discovery).
+
 ## Sanitizer discovery under ptrace restrictions
 
 ASan test executables compile in `detect_leaks=1`

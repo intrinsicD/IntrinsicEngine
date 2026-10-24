@@ -1068,6 +1068,9 @@ endif()
 
 set(_intrinsic_default_test_timeout_seconds 30)
 set(_intrinsic_slow_test_timeout_seconds 120)
+# Per-executable `--gtest_list_tests` budget for PRE_TEST discovery (BUG-091).
+# Distinct from the case TIMEOUT values above; see tests/README.md.
+set(_intrinsic_gtest_discovery_timeout_seconds 5)
 
 # =============================================================================
 # Helper: create an OBJECT library for a group of test sources.
@@ -1120,6 +1123,7 @@ function(intrinsic_test_executable name)
         # CMake versions serialize list-valued discovery properties
         # differently. The generated fixup below is their canonical writer.
         gtest_discover_tests(${name}
+            DISCOVERY_TIMEOUT ${_intrinsic_gtest_discovery_timeout_seconds}
             PROPERTIES
             TIMEOUT ${_intrinsic_test_timeout}
             DISCOVERY_MODE PRE_TEST

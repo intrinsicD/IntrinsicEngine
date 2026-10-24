@@ -57,7 +57,7 @@ CI_TOOL_REGRESSION_SCRIPTS: dict[str, tuple[str, ...]] = {
         "Test.WorkflowConcurrency.py",
         "Test.WorkflowRouting.py",
     ),
-    "collect_test_timing.py": ("Test.TestTiming.py",),
+    "collect_test_timing.py": ("Test.TestTiming.py", "Test.GTestDiscoveryTimeout.py"),
     "compare_source_coverage.py": ("Test.SourceCoverage.py",),
     "cpu_test_selection.py": (
         "Test.CpuTestSelection.py",
@@ -66,6 +66,7 @@ CI_TOOL_REGRESSION_SCRIPTS: dict[str, tuple[str, ...]] = {
     ),
     "run_source_coverage.py": ("Test.SourceCoverage.py",),
     "source_coverage.py": ("Test.SourceCoverage.py",),
+    "gtest_discovery_probe.py": ("Test.GTestDiscoveryTimeout.py",),
     "time_command.py": ("Test.CiTiming.py",),
     "touched_scope.py": ("Test.TouchedScope.py",),
     "validate_gate_timing_baseline.py": ("Test.CiTiming.py",),
