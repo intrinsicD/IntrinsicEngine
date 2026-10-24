@@ -202,49 +202,129 @@ RTX 4090.
 ## Live check — 2026-10-24
 
 What ran: `ExtrinsicSandbox` from `build/ci-vulkan` (head 0b51444a9, ASan/UBSan Debug) on
-DISPLAY=:1, RTX 4090, driver 580.159.04, Vulkan device operational, 0 validation errors, started
-in an empty directory (no `config/engine.json`, so the reference config with section defaults)
-with `--agent-socket` and `--agent-root` for the Vlasic data. A throwaway socket client
-(`tasks/evidence/RUNTIME-291/live/agent_client.py`) drove it through the agent tools
-(`import_file`, `config_apply`, `run_operation density_weight`, `property_*`, `view_capture`). These
-call the panels' editor commands; the ImGui panel was not clicked. Meshes: `I_crane/meshes/mesh_0060.obj`
-(the operator's mesh: diagonal 2.1409) and `D_march/meshes/mesh_0060.obj` (the path in the lane brief:
-10002 vertices, diagonal 2.2693), both imported as mesh entities, weights on `MeshVertex`.
-Predictions were written first (`live/predictions.txt`). Session 1 ran the full sequence;
-sessions 2 and 3 repeated it with identical values.
+DISPLAY=:1, RTX 4090, driver 580.159.04. `device_status` reported Vulkan operational with 0
+validation errors at the start and the end of every session. The working directory was
+`tasks/evidence/RUNTIME-291/live/`. It held the client scripts, predictions and build logs but no
+`config/engine.json`; `config_get` returned the section defaults, so the reference config was used.
+The Sandbox ran with `--agent-socket` and `--agent-root` for the Vlasic data. A throwaway socket
+client (`live/agent_client.py`) drove it through the agent tools (`import_file`, `config_apply`,
+`run_operation density_weight`, `property_*`, `view_capture`). These use the same editor command
+layer as the panel. For Vulkan the panel opens a manual-accept transaction
+(`StartEditorDensityWeightTransaction`), while `run_operation` accepts automatically. Both paths
+share `Capture`, `Resolve` and `AdmitPointScalarGpu`. The ImGui panel was not clicked.
 
-| Check | I_crane | D_march | Prediction |
-| --- | --- | --- | --- |
-| Default `support_radius` | 0 (backend cpu_kdtree, capacity 256) | same | held |
-| `vulkan_lbvh`, radius 0 | Applied, weights 1.0206 to 9.6770, 10002 finite | Applied, 1.0149 to 6.0159 | held |
-| `cpu_kdtree`, radius 0 | "... support radius 0.04634." | "... support radius 0.04749." | held |
-| Vulkan vs CPU weights | 10002/10002 rows identical, max error 0 | same | held (bound 1e-4) |
-| `vulkan_lbvh`, radius 1.0 | GeometryProcessingFailed: "Radius candidate overflow: support radius 1 is too large (10001 candidates, capacity 256). Use about 0.0256, 0 for automatic, or a CPU backend." | same text | held |
-| Output after the overflow | generation, statistics, CPU equality unchanged | same | held |
+No raw file saved the literal argv, environment or per-session `ASAN_OPTIONS`/`LSAN_OPTIONS`.
+What is recorded:
+- the setup prose in `predictions.txt`;
+- the socket paths in each `sandbox.log` (`live/agent.sock`, `live/s2/agent.sock`,
+  `live/s3/agent.sock`);
+- the leak settings named in the prediction addenda: session 1 `suppressions=lsan.supp`, session 2
+  that plus `fast_unwind_on_malloc=0`, session 3 `detect_leaks=0`.
 
-- The Vulkan agent reply is the GPU snapshot message ("Device scalar accepted; input upload:
-  120024 bytes; ..."). It does not state the radius, as predicted (see Remaining). The equal
-  CPU weights show that Vulkan used the same automatic radius.
-- Viewport capture (`live/icrane_density_weight_vulkan_auto.png`, Viridis legend 1.23 to 4.73)
-  shows the mesh coloured by the Vulkan weights. The surface colours look brighter than the legend
-  strip; not investigated.
+A rerun should save the command lines.
+
+Meshes: `I_crane/meshes/mesh_0060.obj` and `D_march/meshes/mesh_0060.obj`. D_march is the path in
+the lane brief. Both have 10002 vertices, were imported as mesh entities and got their weights on
+`MeshVertex`. The diagonals 2.1409 (I_crane) and 2.2693 (D_march) and all neighbour counts come from
+the SciPy mirror (`repro_vlasic_lop125.log`, `live/mirror_dmarch_lop125.log`), not from engine
+output. That I_crane is the operator's mesh is an inference from matching numbers. The operator gave
+a diagonal of 2.14 and 49 neighbours at radius 0.03. I_crane matches both; D_march has 35
+neighbours.
+
+Predictions were written first in `live/predictions.txt`. The file was created at 04:30:03, and the
+Sandbox started at 04:30:40. The file is git-ignored. It was last modified at 04:37:06, after the
+runs, when the P6b/P6c addenda and a timestamp correction were appended. Nothing pins the text from
+before this commit. From this commit on, two sha256 hashes pin it:
+- lines 1-33 (the pre-run section, P0-P6):
+  `e15d249ea14eda254ee3d1327b619d542471a3cf4ce8d1887fd255ae89c83c55`;
+- the whole file: `3bd41d85f08c68ab93ba65a22dc64513e7af8f5c0b38eee152ff9c313356f0fb`.
+
+Session 1 ran the full sequence. Sessions 2 and 3 repeated it and gave identical density values.
+
+| Prediction (from `predictions.txt`) | Observed | Outcome |
+| --- | --- | --- |
+| P0: default `support_radius` 0, backend cpu_kdtree, capacity 256 | 0, cpu_kdtree, 256 | held |
+| P1: each import creates one mesh entity with 10002 vertices | 10002 and 10002 | held |
+| P2: `vulkan_lbvh` with radius 0 succeeds with no overflow; 10002 finite weights; 1 <= min and max <= mirror max + 1 (100 / 86); I_crane min and max within 1% of 1.0206 and 9.677 | Applied. I_crane 1.0206 to 9.6770, D_march 1.0149 to 6.0159, 10002 finite each | held |
+| P2: the Vulkan reply does not state the radius | "Device scalar accepted; input upload: 120024 bytes; ..." on both meshes | held (known gap) |
+| P3: `cpu_kdtree` with radius 0 ends "support radius 0.04634." (I_crane) and "0.04749." (D_march); Vulkan vs CPU max abs error <= 1e-4 | Both messages as predicted; 10002/10002 rows identical, max error 0, on both meshes | held |
+| P4: `vulkan_lbvh` with radius 1.0 fails with "Radius candidate overflow: support radius 1 is too large (10001 candidates, capacity 256). Use about 0.0256, 0 for automatic, or a CPU backend."; generation and statistics unchanged | That exact text, status GeometryProcessingFailed, on both meshes. Generation (session 1: I_crane 4785, D_march 6399), statistics and CPU equality unchanged | held |
+| P5: `view_capture` writes a PNG inside `live/` | `live/icrane_density_weight_vulkan_auto.png`, 1600x924 | held |
+| P6 (before session 1): after WM_DELETE_WINDOW the process exits with 0 | session 1: `sandbox.exit` = 1 | **not held** |
+| P6b (before session 2): with `fast_unwind_on_malloc=0`, every leak matches `lsan.supp` and the exit status is 0 | session 2: `s2/sandbox.exit` = 1; 3 x 80 B not suppressed | **not held** |
+| P6c (before session 3): with `detect_leaks=0`, exit 0 and the same close line | session 3: `s3/sandbox.exit` = 0; close line present | held |
+
+All density-weight predictions (P0-P5) held. The shutdown predictions under LeakSanitizer (P6, P6b)
+did not. Only P6c held, and it holds because leak detection was switched off.
+
+Shutdown and LeakSanitizer, from the raw `live/sandbox.log`, `live/s2/sandbox.log` and
+`live/s3/sandbox.log`:
+- In all three sessions, the WM_DELETE_WINDOW sent to the Sandbox's own window took the clean path
+  ("Window close requested; stopping Engine::Run loop. source=platform-event").
+- Session 1 (default unwinding) reported 116338 B in 25 allocations. Every stack has one frame after
+  the allocator, so `lsan.supp` matched nothing:
+  - 18 x calloc (113760 B) and 3 x malloc (240 B) from an unknown module;
+  - 408 B from `_XimOpenIM` (libX11);
+  - 184 B direct and 1746 B indirect from libdbus.
+- Session 2 (`fast_unwind_on_malloc=0`) reported the same 25 allocations. `lsan.supp` matched 22 of
+  them:
+  - 18 (113760 B) to `VulkanCommandContext::PushConstants`;
+  - 3 (1930 B) to `dbus_connection_send_with_reply_and_block`;
+  - 1 (408 B) to `_XimRegisterIMInstantiateCallback`.
+- The three direct leaks of 80 B that remain look alike. In each, `malloc` is called from an unknown
+  module, and the calling PC ends in `0d1` (`0x7a8d61a0c0d1` in session 2, `0x78be09c0c0d1` in
+  session 1). Five or six more unknown-module frames follow. Then the stack enters
+  `VulkanDevice::CreatePipeline` (`Backends.Vulkan.Device.cpp:5455`, `:5618`) through
+  `PipelineManager::Create`. The pipelines come from `CullingSystem::Initialize`
+  (`Graphics.CullingSystem.cpp:379`) and `Renderer::InitializeOperationalPassResources`
+  (`Graphics.Renderer.cpp:6335`, `:6891`). The stacks go on through `RebuildOperationalResources`,
+  `Engine::RunFrame` and `main`. These are startup pipelines, not the density path.
+- Session 3 (`detect_leaks=0`) printed no report and exited with 0.
+- Comparison with [BUG-180](../bugs/BUG-180-framed-icp-leak-enabled-process-retention.md): its
+  2026-10-24 diagnosis is commit 9396405a5 on `claude/night-2026-10-24-bug-sweep`, which is not on
+  this branch. It concerns the framed ICP gtest. It attributes 3 x 80 B to `malloc` called from
+  `libnvidia-glcore.so.580.159.04+0xa0c0d1`, during pipeline creation from a filled NVIDIA shader
+  disk cache. Its call sites are the same three lines: `Graphics.CullingSystem.cpp:379`,
+  `Graphics.Renderer.cpp:6335` and `:6891`. Those files are unchanged between that diagnosis's
+  `599f02ff1` and 0b51444a9.
+- What matches: driver version, block size and count, the three call sites, and the low 12 bits of
+  the calling PC (`0d1`). This does not establish identity. In this run the module was not mapped
+  (no `LD_DEBUG=files`, no pinned glcore), the shader-cache state was not recorded, and no api_dump
+  of pipeline destruction exists.
+- One difference: BUG-180's Sandbox control (shutdown-contract environment, 5 frames) stayed clean
+  with a filled cache, but this longer Sandbox session reports the three blocks. So this run is one
+  more observation of a BUG-180-like signature, now in the Sandbox. It is not a classification. No
+  suppression was added.
+
+Other observations:
+- Radius visibility on Vulkan: the agent reply omits the resolved radius (see Remaining). Code
+  reading shows that `FoldGpu` does not overwrite `Result.SupportRadius`. The result field and the
+  panel line therefore keep the value that `Capture`/`Resolve` set; this run did not observe that.
+  The earlier engine check read 0.0463368 directly from the Vulkan result. In this run, the Vulkan
+  radius shows only indirectly, through the rows that are identical to CPU.
+- Persisted configs: this run used the reference config. A Sandbox with a config saved before this
+  task keeps `support_radius` 1.0 (schema stays version 1, decision 5; see Remaining). There the
+  original overflow comes back until 0 is entered.
+- Viewport capture (`live/icrane_density_weight_vulkan_auto.png`): the legend strip is Viridis
+  (dark purple, teal, yellow, range 1.23 to 4.73). The mesh shows magenta, pale cyan and white, with
+  a little yellow at silhouettes. The hues do not match, so this is more than the mesh being
+  brighter. Not investigated, and outside this task.
 - Each overflow run logs `[JobService] Job 'Device point scalar' completion publisher rejected
-  result type ... bool; completion dropped.` at error level. The pre-fix GPU smoke log
-  (`prefix-gpu-densityweight-ctest.log`, old message) has the same line, so it predates this task
-  and is not tracked here.
-- Shutdown: a WM_DELETE_WINDOW sent to the Sandbox's own window took the clean path ("Window close
-  requested; stopping Engine::Run loop. source=platform-event") in all three sessions. Exit status:
-  1 in session 1 (leak report with one-frame stacks that `lsan.supp` cannot match), 1 in session 2
-  (full stacks, `fast_unwind_on_malloc=0`; `lsan.supp` matched 22 allocations, 3 x 80 bytes remain
-  in NVIDIA driver frames under `VulkanDevice::CreatePipeline` from
-  `Renderer::InitializeOperationalPassResources` / `CullingSystem::Initialize`), and 0 in session 3
-  (same steps with `detect_leaks=0`, as the BUG-056 / BUG-092 manual Sandbox runs did). The leaks
-  come from startup pipeline creation, not from density weights. No suppression was added.
+  result type ... bool; completion dropped.` at error level. The GPU smoke log from before the fix
+  (`prefix-gpu-densityweight-ctest.log`, old message) has the same line. So it predates this task,
+  and no task tracks it.
+- All three sessions log `VulkanRequestedButNotOperational status=RequestedButIncompleteGate
+  reason=BarrierValidationFailed` at cold start. The preceding log line describes that state: the
+  backend stays fail-closed until the first clean default-recipe validation. `device_status`
+  reported operational afterwards.
+
+Open for the operator (no task file created here): ownership of the JobService error line, of the
+Sandbox 3 x 80 B observation (BUG-180 or a new task), and of the viewport hue mismatch.
 
 Still missing for Operational (the reviewers decide whether this run counts):
 - The panel path itself: `StartEditorDensityWeightTransaction` with manual Accept/Discard and the
   panel line "Support radius R; query radius Q" on Vulkan. The agent's `run_operation` auto-accepts
-  through `ApplyEditorDensityWeightCommand`. The panel was only covered by
-  `SandboxProcessingPanels` contract tests.
+  through `ApplyEditorDensityWeightCommand`. Only the `SandboxProcessingPanels` contract tests
+  cover the panel.
 - No committed `gpu;vulkan` test runs the Vlasic mesh. The GPU smoke `PointLBVHGpuSmoke.DensityWeight*`
   covers the overflow message on synthetic data.
