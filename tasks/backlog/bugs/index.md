@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-251 — Support the CMake 4.4 GoogleTest discovery include layout](BUG-251-cmake44-gtest-discovery-include-layout.md):
+  CMake 4.4 names the PRE_TEST include `<target>_<sha8>_include.cmake`; two regressions and the
+  BUG-091 probe hard-code `<target>[1]_include.cmake`. The race probe fails 3/3 on 4.4.4 with a layout message.
+
 - [BUG-250 — Direct texture bakes skip models with a seam atlas](BUG-250-direct-texture-bakes-skip-seam-atlas-models.md):
   the direct normal/albedo bake gate checks only `v:texcoord`, but a seam atlas leaves only
   `h:texcoord`. Found by code reading, not reproduced; regression first.
