@@ -228,7 +228,8 @@ Reviewer decisions, base `599f02ff1`:
   `a6e7f705b7fd84f3e`) `approve`, all three criteria `met`
   ("tools/agents/workflow_evidence.py is unchanged between f21ba9425 and
   cb816e606, so the prior 'met' assessment still holds"; the reclaim policy
-  "has not changed"). The boxes above are ticked from this decision.
+  "has not changed"). The boxes above are ticked from this decision and the
+  Claude review of `f21ba9425`.
 Limitations, not changed here:
 - Not run: a real `touched_scope.py --run` with configure/build (C++ builds
   were held back on this host), and the native/sanitizer selectors after the

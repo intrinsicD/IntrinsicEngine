@@ -19,7 +19,7 @@ hosted CI has not run the new `ci-docs` step.
   `0ae36edd…`) `approve`; `--require-complete BUG-149` gave 0 errors, 1 justified skip warning.
 - Open for the operator: keep the explicit-`.json` `--output` form (A, default) or move its three
   callers to directories and drop it (B). Evidence stays git-ignored in the `bug-149` lane worktree;
-  nothing was deleted.
+  nothing was deleted, and the completion review's deletion list (in the note) was not adopted.
 
 ## 2026-10-24 — BUG-182 retired after the GPU-lane run
 

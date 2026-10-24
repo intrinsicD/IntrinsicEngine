@@ -135,10 +135,13 @@ on this change.
 Reviewer decisions:
 - Round 1 on `c11702dc7`: independent Claude review `approve`; criteria 1 and 2 `met`,
   criterion 3 `partially met` (the `ci-vulkan` half had not run).
-- Criterion-3 decision review on `2df2a2837` (verdict `approve`, no blocking findings;
-  structured verdict relayed by the night workflow coordinator; a git-ignored copy is
-  `tasks/evidence/BUG-182/criterion3-review.json` in the integration worktree):
-  all three criteria `met`. Criterion 3: the `ci-vulkan` command above returned rc 0 with
+- Criterion-3 decision review on `2df2a2837`: independent Claude review, night workflow
+  agent `ae261ff459128deb4` (label `182:criterion3`, spawn depth 1), reviewed head
+  `2df2a2837d5a41e5bdc002e83136151c6ae4ffba`, verdict `approve`, no blocking findings.
+  Its result is in the coordinator's local workflow journal (run `wf_ca43d89a-f2e`,
+  `journal.jsonl` line 4); an identical git-ignored copy is
+  `tasks/evidence/BUG-182/criterion3-review.json` in the integration worktree.
+  All three criteria `met`. Criterion 3: the `ci-vulkan` command above returned rc 0 with
   `Passed 4.52 sec` and `[ OK ]` at 4263 ms on the RTX 4090, from a binary rebuilt from
   the merged source. Its optional findings (record the run here, copy the commands and
   the build-log path out of the session record, the 30 s CTest timeout, the relinked

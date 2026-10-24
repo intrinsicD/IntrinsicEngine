@@ -158,10 +158,20 @@ Reviewer decisions:
   ticked from these decisions (see Resolution).
 - Completion chain on `4b43ae0c1`: the standard-profile report (`status: complete`,
   content digest `0ae36edd4f76208505a4232a88a98fb6c20f248069a4187f5efdb6fc1a863db5`,
-  five required receipts) was reviewed with verdict `approve` (relayed by the night
-  workflow coordinator). Before the move, `workflow_evidence.py validate --root <bug-149
+  three required and two optional receipts) had an independent Claude review: night
+  workflow agent `abff48a76f91eede7` (label `149:review`, spawn depth 1), reviewed head
+  `4b43ae0c1ea27f58c56bd3bcb7fa4234ec095fcf`, verdict `approve`, no blocking findings.
+  Its result is in the coordinator's local workflow journal (run `wf_ca43d89a-f2e`,
+  `journal.jsonl` line 7). Before the move, `workflow_evidence.py validate --root <bug-149
   lane> --require-complete BUG-149` gave 0 errors and 1 warning: the justified skip of
   re-receipting strict result validation of the `/tmp` dotted directory.
+  Two of its non-blocking decisions are recorded, not acted on:
+  - Task claim and live work graph: `not met`. This unattended standard lane made no
+    `task_claim.py` claim and no work-graph run; neither can be made after the fact.
+  - Retirement deletion list: `partially met`. Its reviewed list, (a) all of
+    `tasks/evidence/BUG-149/` in the `bug-149` lane and (b) `/tmp/bug149-e2e-after-SxrmVb/`
+    (the only retained dotted result directory, to go only after acceptance), was not
+    adopted. It is left for the operator's evidence-cleanup decision.
 Open for the operator: the `--output` form. A (current default, stated in `--help`):
 keep the explicit-`.json` form, which seals the file's whole parent by contract.
 B: move `IntrinsicBenchmarks`, `IntrinsicUvAtlasRemapSmoke.Run` and nightly-deep to the

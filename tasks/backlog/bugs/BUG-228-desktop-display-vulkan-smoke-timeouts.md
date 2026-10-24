@@ -154,13 +154,15 @@ lanes' compiles were not recorded.
   only the `PlanarZero` failure was not predicted. Failure lines in
   `Test.PointLBVHGpuSmoke.cpp`, the same in `cohort-d1.log` and `cohort-d9.log`:
   `KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` has 8 at `:1981`
-  (`KeypointCount` 5, expected 8, in each of the eight domains) and 8 at
-  `:1989` (keypoint mask differs from the reference).
+  (`KeypointCount` 5, expected 8) and 8 at `:1989` (keypoint mask differs
+  from the reference): 4 of the 8 domains in 2 of the 3 `Phase<3` passes; the
+  log names neither the domains nor the phases.
   `KeypointResidentSubnormalScores` has 12 mask mismatches at `:2830` (preview)
   and 12 at `:2849` (after accept), and the saliency L∞ bound fails at both
   `:2833` and `:2855` (7.58e-42 against 1.12e-44). RUNTIME-291's note (its
   worktree) records both cases failing with its `src/` change reverted. These
-  failures are separate from this display bug, and no bug file tracks them.
+  failures are separate from this display bug;
+  [BUG-248](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md) tracks them.
 - Resident LOP, built afterwards: both `PointCloudConsolidationGpuParity.ResidentLop*`
   cases passed on both displays: `PreviewDiscardAcceptParityAndRepeatInputIo`
   in 6.00 s on `:1` and 5.29 s on `:9` (limit 30 s), and

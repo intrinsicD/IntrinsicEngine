@@ -26,15 +26,21 @@ contracts: [geometry.property-coherence]
 - Line numbers below are at `2df2a2837`. With RUNTIME-291's three-line test addition merged,
   the resident lines are 3 higher (`:2833`, `:2836`, `:2852`, `:2858`).
 - `PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` fails at
-  `Test.PointLBVHGpuSmoke.cpp:1981` 8 times (`KeypointCount` 5, reference 8, in each of the
-  eight domains) and at `:1989` 8 times (`keypoints` mask differs from the reference).
+  `Test.PointLBVHGpuSmoke.cpp:1981` 8 times (`KeypointCount` 5, reference 8) and at `:1989`
+  8 times (`keypoints` mask differs from the reference). The log shows two groups, each of
+  four `:1981` failures followed by four `:1989` failures from the per-domain mask loop: 4 of
+  the 8 domains fail in 2 of the 3 `Phase<3` passes. The log names neither the domains nor
+  the phases. `Config(d)` depends on the phase only through `Phase==2` (radius 0), so phases 0
+  and 1 use the same configuration and are the likely failing pair. Which domains fail
+  matters for diagnosis: with `NumericalEdges`, odd domains are scaled by 1e-4 and `d%4==0`
+  domains are collinear.
 - `PointLBVHGpuSmoke.KeypointResidentSubnormalScores` fails 12 times at `:2830` (preview mask)
   and 12 times at `:2849` (mask after accept). The saliency L∞ bound fails at `:2833` and
   `:2855`: 7.58e-42 against 1.12e-44 (8 × `denorm_min`).
 - RUNTIME-291's note ([RUNTIME-291](../runtime/RUNTIME-291-scale-aware-radius-defaults.md))
   records both cases failing the same way with its `src/` change reverted, so they predate it.
 - CI coverage: the cases are `gpu;vulkan`-labelled, so no CPU gate selects them. The hosted
-  `ci-vulkan` workflow (pull requests and merge queue only, lavapipe, displayless batch)
+  `ci-vulkan` workflow (pull requests, merge queue and manual dispatch; lavapipe, displayless batch)
   includes `IntrinsicPointLBVHGpuTests` in its aggregate; whether these cases skip there was
   not checked, and its last run was on 2026-09-23. The self-hosted nightly GPU job is opt-in.
 - Raw logs (git-ignored): `tasks/evidence/BUG-248/cohort-d1.log` and `cohort-d9.log`, copied
@@ -44,7 +50,7 @@ contracts: [geometry.property-coherence]
 - [ ] Reproduce both failures on `ci-vulkan` at the current integration head and name the root
       cause (GPU kernel, CPU reference or test expectation) with evidence.
 - [ ] Both cases pass on a Vulkan host with every existing assertion kept; any tolerance change
-      is recorded with its reasoning and approved in review before it lands.
+      is recorded with its reasoning and approved by the operator before it lands.
 - [ ] The other keypoint cases in the same selection still pass.
 
 ## Verification
