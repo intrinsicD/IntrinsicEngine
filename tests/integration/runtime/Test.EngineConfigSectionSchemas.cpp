@@ -113,7 +113,7 @@ TEST(EngineConfigSectionSchemas, StrictOwnerLiteralRangesRemainUnchanged)
         {"density_weights", "entity", 0, u32, true},
         {"density_weights", "gpu_query_batch_size", 1, 16384, true},
         {"density_weights", "gpu_radius_capacity", 1, 1024, true},
-        {"density_weights", "support_radius", 0, f32, false, true},
+        {"density_weights", "support_radius", 0, f32, false},
         {"bilateral_filter", "entity", 0, u32, true},
         {"bilateral_filter", "k_neighbors", 0, u32, true},
         {"bilateral_filter", "gpu_query_batch_size", 1, 16384, true},

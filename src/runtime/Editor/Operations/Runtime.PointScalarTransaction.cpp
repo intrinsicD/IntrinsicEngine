@@ -7,6 +7,7 @@ module;
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <limits>
 #include <optional>
@@ -176,9 +177,21 @@ namespace Extrinsic::Runtime
             }
             std::memcpy(&w->Result.Statistics, t.Gpu->Data.data(), sizeof(Graphics::PointScalarGpuStats));
             w->Workspace.reset();
-            if (w->Result.Statistics.Invalid)
+            if (const auto& s = w->Result.Statistics; s.Invalid)
             {
-                Fail(w, "Scalar numerical failure or radius candidate overflow; increase capacity or select CPU.");
+                const auto& p = w->Params;
+                const auto capacity = Graphics::PointScalarNeighborWidth(p, std::uint32_t(w->Result.LiveCount));
+                // R*C/N is an unverified hint: clustered or coincident points can overflow at any radius.
+                if (p.Method == 2 && s.MaximumNeighbors > capacity)
+                    Fail(w,
+                        std::format("Radius candidate overflow: support radius {:.4g} is too large ({} candidates, "
+                                    "capacity {}). Use about {:.4g}, 0 for automatic, or a CPU backend.",
+                            p.SupportRadius,
+                            s.MaximumNeighbors,
+                            capacity,
+                            p.SupportRadius * capacity / s.MaximumNeighbors));
+                else
+                    Fail(w, "Scalar numerical failure or radius candidate overflow; increase capacity or select CPU.");
                 return;
             }
             Typed(w).Back.reset();

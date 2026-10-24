@@ -72,7 +72,7 @@ TEST(DensityWeightConfig, RoundTripAndSharedPreviewApplyRun)
     ASSERT_TRUE(R::ApplyEditorDensityWeightConfig(commands,c).Succeeded());ASSERT_TRUE(R::GetEditorDensityWeightConfig(commands));
     EXPECT_EQ(R::SerializeDensityWeightConfig(*R::GetEditorDensityWeightConfig(commands)),R::SerializeDensityWeightConfig(c));
     ASSERT_TRUE(R::ApplyEditorConfiguredDensityWeight(commands).Succeeded());EXPECT_EQ(previews,1);EXPECT_EQ(applies,1);
-    for(auto payload:{R"({"backend":"vulkan"})",R"({"support_radius":0})",R"({"support_radius":-1})",R"({"support_radius":1e100})",
+    for(auto payload:{R"({"backend":"vulkan"})",R"({"support_radius":-1})",R"({"support_radius":1e100})",
         R"({"kernel":"unknown"})",R"({"mode":"unknown"})",R"({"gpu_query_batch_size":0})",R"({"gpu_radius_capacity":0})",
         R"({"gpu_radius_capacity":1025})",R"({"unknown":1})"})
         EXPECT_FALSE(R::ValidateDensityWeightConfigSection(payload,{},"test").Usable())<<payload;
@@ -80,6 +80,9 @@ TEST(DensityWeightConfig, RoundTripAndSharedPreviewApplyRun)
     bad=c;bad.Weights.Domain=D::GraphEdge;EXPECT_FALSE(R::ValidateDensityWeightConfigSection(R::SerializeDensityWeightConfig(bad),{},"test").Usable());
     c.SupportRadius=-1;EXPECT_FALSE(R::ApplyEditorDensityWeightConfig(commands,c).Succeeded());EXPECT_EQ(applies,1);
     EXPECT_TRUE(R::ValidateDensityWeightConfigSection(R"({"support_radius":1e-310})",{},"test").Usable());
+    // RUNTIME-291: 0 selects the automatic radius and is the default.
+    EXPECT_TRUE(R::ValidateDensityWeightConfigSection(R"({"support_radius":0})",{},"test").Usable());
+    EXPECT_EQ(R::DensityWeightConfig{}.SupportRadius,0);
 }
 TEST(DensityWeightOperations, EveryDomainKernelModeCacheHistoryAndDeletedRows)
 {
@@ -108,6 +111,82 @@ TEST(DensityWeightOperations, EveryDomainKernelModeCacheHistoryAndDeletedRows)
         ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");EXPECT_EQ(indexed.WrittenCount,reference.WrittenCount);
         EXPECT_EQ(indexed.Diagnostics.NeighborContributionCount,reference.Diagnostics.NeighborContributionCount);
         EXPECT_EQ(std::as_const(props).Get<float>(c.Weights.Name).Vector(),expected);EXPECT_TRUE(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).IndexReused);
+    }
+}
+// RUNTIME-291: support_radius 0 derives the radius from the selected positions with one rule for mesh
+// vertices, graph nodes and point clouds; scaling the model by 1000 scales the radius and keeps the weights.
+TEST(DensityWeightOperations, AutomaticSupportRadiusIsScaleInvariantOnMeshGraphAndCloud)
+{
+    // Irregular dyadic positions: x1000 is exact in float and no pair sits on the support boundary.
+    constexpr std::array<glm::vec3, 4> base{{{0, 0, 0}, {1.25f, .5f, 0}, {.25f, 2.75f, .5f}, {2.5f, 3, -.75f}}};
+    for (unsigned kernel = 0; kernel < 3; ++kernel)
+    {
+        SCOPED_TRACE(kernel);
+        double firstRadius = 0;
+        std::vector<float> firstWeights;
+        for (const auto domain : {D::MeshVertex, D::GraphNode, D::PointCloudPoint})
+        for (const auto backend : {R::DensityWeightBackend::CpuKDTree, R::DensityWeightBackend::CpuLBVH})
+        {
+            SCOPED_TRACE(int(domain));
+            SCOPED_TRACE(int(backend));
+            double radius[2]{};
+            std::vector<float> weights[2];
+            for (const int scaled : {0, 1})
+            {
+                R::WorldRegistry worlds;
+                const auto world = worlds.CreateWorld("automatic radius");
+                auto& scene = *worlds.Get(world);
+                R::SpatialIndexCache cache(worlds);
+                const auto entity = Make(scene, domain);
+                auto& props = PointDomainProperties(scene, entity, domain);
+                for (std::size_t i = 0; i < base.size(); ++i)
+                    props.Get<glm::vec3>("samples")[i] = base[i] * (scaled ? 1000.f : 1.f);
+                props.GetOrAdd<float>("weights").Vector().assign(props.Size(), 77);
+                auto c = Config(entity, domain);
+                c.SupportRadius = 0;
+                c.Backend = backend;
+                c.Kernel = decltype(c.Kernel)(kernel);
+                R::EditorCommandHistory history;
+                const R::EditorProcessingContext context{
+                    .Scene = &scene, .World = world, .CommandHistory = &history, .SpatialIndices = &cache};
+                const auto commands = R::BindEditorProcessingCommands(context);
+                EXPECT_TRUE(R::PreviewEditorDensityWeightCommand(commands, c).Enabled);
+                const auto result = R::ApplyEditorDensityWeightCommand(commands, c);
+                ASSERT_TRUE(result.Succeeded()) << result.Message;
+                ASSERT_GT(result.SupportRadius, 0);
+                EXPECT_GE(double(result.QueryRadius), result.SupportRadius);
+                EXPECT_GT(result.MaxWeight, 1.f);
+                radius[scaled] = result.SupportRadius;
+                const auto all = std::as_const(props).Get<float>("weights").Vector();
+                weights[scaled].assign(all.begin(), all.begin() + base.size());
+                if (domain == D::PointCloudPoint)
+                    EXPECT_EQ(all[4], 77); // The deleted row stays untouched.
+                // The reported radius is the one the kernel used.
+                auto manual = c;
+                manual.SupportRadius = result.SupportRadius;
+                manual.Weights.Name = "manual";
+                ASSERT_TRUE(R::ApplyEditorDensityWeightCommand(commands, manual).Succeeded());
+                const auto again = std::as_const(props).Get<float>("manual").Vector();
+                EXPECT_EQ(std::vector<float>(again.begin(), again.begin() + base.size()), weights[scaled]);
+                // An automatic radius that exceeds the candidate budget fails instead of guessing.
+                auto tight = c;
+                tight.GpuRadiusCapacity = 1;
+                const auto refused = R::ApplyEditorDensityWeightCommand(commands, tight);
+                EXPECT_EQ(refused.Status, R::EditorCommandStatus::InvalidProcessingParameters); // As on Vulkan.
+                EXPECT_NE(refused.Message.find("Automatic support radius"), std::string::npos) << refused.Message;
+                EXPECT_EQ(std::as_const(props).Get<float>("weights").Vector(), all);
+            }
+            EXPECT_NEAR(radius[1] / radius[0], 1000.0, 1e-9);
+            for (std::size_t i = 0; i < base.size(); ++i)
+                EXPECT_FLOAT_EQ(weights[1][i], weights[0][i]) << i;
+            if (firstWeights.empty())
+            {
+                firstRadius = radius[0];
+                firstWeights = weights[0];
+            }
+            EXPECT_EQ(radius[0], firstRadius);
+            EXPECT_EQ(weights[0], firstWeights);
+        }
     }
 }
 TEST(DensityWeightOperations, JobsRejectChangedSourceOutputAndCancellation)

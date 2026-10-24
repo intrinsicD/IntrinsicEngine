@@ -199,6 +199,7 @@ contracts:
       - tests/unit/geometry/Test.SupportRadius.cpp
       - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
       - tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+      - tests/contract/runtime/Test.DensityWeightOperations.cpp
   method.engine-integration:
     owner: methods-runtime-app
     source: docs/architecture/method-api-contract.md

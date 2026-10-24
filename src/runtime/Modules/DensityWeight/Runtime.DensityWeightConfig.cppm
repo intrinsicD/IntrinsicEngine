@@ -24,7 +24,7 @@ export namespace Extrinsic::Runtime
         DensityWeightBackend Backend{DensityWeightBackend::CpuKDTree};
         GeometryPropertyRef Positions{.Domain=GeometryElementDomain::Unknown,.Name="v:position",.ValueKind=Geometry::PropertyValueKind::Vec3};
         GeometryPropertyRef Weights{.Domain=GeometryElementDomain::Unknown,.Name="density_weight",.ValueKind=Geometry::PropertyValueKind::Float};
-        double SupportRadius{1};
+        double SupportRadius{0}; // 0 = automatic from the selected positions
         Geometry::PointCloud::Kernels::KernelType Kernel{Geometry::PointCloud::Kernels::KernelType::ThetaLop};
         Geometry::PointCloud::Kernels::DensityWeightMode Mode{Geometry::PointCloud::Kernels::DensityWeightMode::Direct};
         std::uint32_t GpuQueryBatchSize{4096},GpuRadiusCapacity{256};

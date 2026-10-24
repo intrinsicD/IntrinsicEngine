@@ -57,6 +57,7 @@ namespace
             Density.Density.Domain=Spacing.Radii.Domain=Weight.Weights.Domain=R::GeometryElementDomain::PointCloudPoint;
             Density.Density.Name=Spacing.Radii.Name=Weight.Weights.Name="result";
             Density.Backend=R::KernelDensityBackend::VulkanLBVH;Spacing.Backend=R::PointSpacingBackend::VulkanLBVH;Weight.Backend=R::DensityWeightBackend::VulkanLBVH;
+            Weight.SupportRadius=1; // The coincident fixture has no automatic radius (RUNTIME-291).
             (void)Rows().GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
             Context.Scene=&Scene;Context.CommandHistory=&History;Context.Device=&Device;
             Device.TransferQueue.AcceptBufferUploads=true;Jobs.Attach(Context);
@@ -330,6 +331,49 @@ TEST_P(PointScalarTransaction, InitialSubmissionRejectsWithoutCallback)
     const auto result=GetParam()==0 ? R::ApplyEditorKernelDensityCommand(Commands(),Density,[&](auto){++callbacks;}).Status : GetParam()==1 ? R::ApplyEditorPointSpacingCommand(Commands(),Spacing,[&](auto){++callbacks;}).Status : R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}).Status;
     EXPECT_EQ(result,R::EditorCommandStatus::GeometryProcessingFailed);
     EXPECT_EQ(submissions,1u);EXPECT_EQ(callbacks,0u); // One terminal outcome, returned directly.
+    R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
+}
+
+// RUNTIME-291: Vulkan resolves an automatic support radius before admission and submission, to the
+// value the CPU backend reports; a set without an automatic radius refuses without submitting.
+TEST_P(PointScalarTransaction, AutomaticSupportRadiusResolvesBeforeVulkanSubmission)
+{
+    if(GetParam()!=2)return;
+    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
+    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
+    Context.World=worlds.CreateWorld("automatic-radius");Context.Scene=worlds.Get(Context.World);
+    const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
+    auto& rows=Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint);
+    (void)rows.GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
+    Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);Weight.SupportRadius=0;
+    services.BeginRegistration();
+    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
+    R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
+    ASSERT_TRUE(cache.OnRegister(setup).has_value());
+    unsigned submissions=0;
+    Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
+    // Radius-independent Vulkan refusals come before the automatic analysis, which would fail first here.
+    Device.ShaderFloat64=false;
+    const auto refused=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
+    EXPECT_EQ(refused.Status,R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(refused.Message.find("float64"),std::string::npos)<<refused.Message;
+    EXPECT_EQ(submissions,0u);
+    Device.ShaderFloat64=true;
+    const auto coincident=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
+    EXPECT_EQ(coincident.Status,R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(coincident.Message.find("Automatic support radius"),std::string::npos)<<coincident.Message;
+    EXPECT_EQ(submissions,0u);
+    const glm::vec3 spread[]{{0,0,0},{1.25f,.5f,0},{.25f,2.75f,.5f},{2.5f,3,-.75f},{1,1,1}};
+    for(std::size_t i=0;i<rows.Size();++i)rows.Get<glm::vec3>("v:position")[i]=spread[i];
+    const auto gpu=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
+    EXPECT_EQ(gpu.Status,R::EditorCommandStatus::GeometryProcessingFailed)<<gpu.Message; // The mock rejects the submission.
+    EXPECT_EQ(submissions,1u);
+    auto cpu=Weight;cpu.Backend=R::DensityWeightBackend::CpuKDTree;cpu.Weights.Name="cpu";
+    const auto reference=R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands({.Scene=Context.Scene}),cpu);
+    ASSERT_TRUE(reference.Succeeded())<<reference.Message;
+    EXPECT_GT(gpu.SupportRadius,0);
+    EXPECT_EQ(gpu.SupportRadius,reference.SupportRadius);
+    EXPECT_EQ(gpu.QueryRadius,reference.QueryRadius);
     R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
 }
 

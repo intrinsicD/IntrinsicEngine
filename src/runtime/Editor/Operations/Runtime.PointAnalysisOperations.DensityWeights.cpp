@@ -2,6 +2,7 @@ module;
 #include <functional>
 #include <algorithm>
 #include <chrono>
+#include <format>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -23,6 +24,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Graphics.PointScalarAnalysis;
 import Geometry.PointCloud.Utils;
 import Geometry.PointCloud.Kernels;
+import Geometry.SupportRadius;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -55,14 +57,57 @@ namespace Extrinsic::Runtime
         {
             return Detail::PointScalarFieldCurrent(context, w.Entity, w);
         }
-        Graphics::PointScalarGpuParams Params(const DensityWeightConfig& c, float radius)
+        constexpr const char* kLbvhLimits =
+            "LBVH requires the spatial cache, at most 2^24 points, and coordinates/expanded radius within 1e18.";
+        Graphics::PointScalarGpuParams Params(const DensityWeightWork& w)
         {
+            const auto& c = w.Config;
             return {.Method = 2,
                 .Capacity = c.GpuRadiusCapacity,
                 .Kernel = std::uint32_t(c.Kernel),
                 .Inverse = std::uint32_t(c.Mode),
-                .QueryRadius = radius,
-                .SupportRadius = c.SupportRadius};
+                .QueryRadius = w.Result.QueryRadius,
+                .SupportRadius = w.Result.SupportRadius};
+        }
+        // Resolves the support radius (0 derives it from the captured positions) and its conservative query radius.
+        bool Resolve(DensityWeightWork& w, std::string& why)
+        {
+            namespace SR = Geometry::SupportRadius;
+            const auto& c = w.Config;
+            auto support = c.SupportRadius;
+            if (!(support > 0))
+            {
+                // The LOP-family row of docs/architecture/support-radius-policy.md. The Vulkan candidate capacity
+                // is the budget for every backend, so the automatic radius does not depend on the backend.
+                const auto a = SR::Analyze(w.Points,
+                    std::nullopt,
+                    {.NeighborRank = 16,
+                        .Quantile = SR::CoverageQuantile::P75,
+                        .RadiusMultiplier = 1.25,
+                        .MinimumNeighborRank = 4},
+                    {.MaxNeighborsPerSample = c.GpuRadiusCapacity});
+                if (!a.Succeeded())
+                {
+                    why = "Automatic support radius failed (" + std::string(SR::DebugName(a.State)) +
+                        "); set a positive support radius.";
+                    return false;
+                }
+                support = a.Radius;
+            }
+            const auto radius = Kernels::ConservativeQueryRadius(support);
+            if (!radius)
+            {
+                why = "Invalid density support radius.";
+                return false;
+            }
+            if (c.Backend != DensityWeightBackend::CpuKDTree && *radius > Geometry::PointLBVH::CoordinateLimit)
+            {
+                why = kLbvhLimits;
+                return false;
+            }
+            w.Result.SupportRadius = support;
+            w.Result.QueryRadius = *radius;
+            return true;
         }
         enum class Purpose
         {
@@ -101,22 +146,21 @@ namespace Extrinsic::Runtime
             w->Result.LiveCount = w->LiveCount;
             if (!w->Result.LiveCount)
                 return fail("Density weights require at least one live sample.");
-            const auto radius = Kernels::ConservativeQueryRadius(c.SupportRadius);
-            if (!radius)
-                return fail("Invalid density support radius.");
-            w->Result.QueryRadius = *radius;
-            if (c.Backend != DensityWeightBackend::CpuKDTree)
-            {
-                if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24) ||
-                    *radius > Geometry::PointLBVH::CoordinateLimit)
-                    return fail(
-                        "LBVH requires the spatial cache, at most 2^24 points, and coordinates/expanded radius within 1e18.");
-                if (c.Backend == DensityWeightBackend::VulkanLBVH)
-                {
-                    if (!Detail::AdmitPointScalarGpu(context, *w, Params(c, *radius), diagnostic))
-                        return {};
-                }
-            }
+            if (c.Backend != DensityWeightBackend::CpuKDTree &&
+                (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24)))
+                return fail(kLbvhLimits);
+            // CPU backends resolve an automatic radius on the job worker; Vulkan dispatches from this thread.
+            // shortcut: the frame-thread analysis is bounded by Vulkan's 2^20-point admission; move it into a
+            // prepare job, as keypoints do, if large clouds stall the frame.
+            const bool vulkan = c.Backend == DensityWeightBackend::VulkanLBVH;
+            const bool analyze = !(c.SupportRadius > 0) && purpose == Purpose::Execute && vulkan;
+            // Radius-independent Vulkan limits refuse before the analysis; the resolved radius is admitted below.
+            if (analyze && !Detail::AdmitPointScalarGpu(context, *w, Params(*w), diagnostic))
+                return {};
+            if ((c.SupportRadius > 0 || analyze) && !Resolve(*w, diagnostic))
+                return {};
+            if (vulkan && !Detail::AdmitPointScalarGpu(context, *w, Params(*w), diagnostic))
+                return {};
             return w;
         }
         void Compute(DensityWeightWork& w)
@@ -126,9 +170,14 @@ namespace Extrinsic::Runtime
             const auto& c = w.Config;
             r.Status = EditorCommandStatus::GeometryProcessingFailed;
             r.ActualBackend = ToString(c.Backend);
+            if (!(r.SupportRadius > 0) && !Resolve(w, r.Message))
+            {
+                r.Status = EditorCommandStatus::InvalidProcessingParameters; // The status Vulkan reports from Capture.
+                return;
+            }
             Kernels::DensityWeightResult result;
             if (c.Backend == DensityWeightBackend::CpuKDTree)
-                result = Kernels::ComputeDensityWeights(w.Points, c.SupportRadius, c.Kernel, c.Mode);
+                result = Kernels::ComputeDensityWeights(w.Points, r.SupportRadius, c.Kernel, c.Mode);
             else
             {
                 if (c.Backend == DensityWeightBackend::CpuLBVH)
@@ -155,7 +204,7 @@ namespace Extrinsic::Runtime
                     r.MaximumNeighbors = w.Rows.MaximumNeighbors;
                 }
                 result = Kernels::ComputeDensityWeightsFromNeighbors(
-                    w.Points, {w.Rows.Offsets, w.Rows.Indices}, c.SupportRadius, c.Kernel, c.Mode);
+                    w.Points, {w.Rows.Offsets, w.Rows.Indices}, r.SupportRadius, c.Kernel, c.Mode);
             }
             if (!result.Succeeded())
             {
@@ -173,7 +222,8 @@ namespace Extrinsic::Runtime
             r.CpuComputeMilliseconds =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
             r.Message = "Density weights computed with " + r.ActualBackend +
-                " radius candidates and CPU double-precision kernel reduction.";
+                " radius candidates and CPU double-precision kernel reduction; support radius " +
+                std::format("{:.4g}.", r.SupportRadius);
         }
 
         EditorDensityWeightResult Publish(
@@ -234,7 +284,7 @@ namespace Extrinsic::Runtime
                 w->Entity,
                 w->Config.StableEntityId,
                 w->Config.Positions,
-                Params(w->Config, w->Result.QueryRadius),
+                Params(*w),
                 "Estimate density weights",
                 "Density weights",
                 state,

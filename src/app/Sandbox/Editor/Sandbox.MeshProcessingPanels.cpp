@@ -2870,7 +2870,7 @@ namespace Extrinsic::Sandbox::Editor
             config.Backend = Runtime::DensityWeightBackend(backend);
             changed = true;
         }
-        changed |= ImGui::InputDouble("Support radius", &config.SupportRadius);
+        changed |= ImGui::InputDouble("Support radius (0 = automatic)", &config.SupportRadius);
         int kernel = int(config.Kernel), mode = int(config.Mode);
         if (ImGui::Combo("Kernel", &kernel, "Gaussian (sigma = h/4)\0LOP theta\0Wendland C2\0"))
         {
@@ -2889,7 +2889,7 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
             changed |= ImGui::InputScalar("GPU radius capacity", ImGuiDataType_U32, &config.GpuRadiusCapacity);
             ImGui::TextWrapped(
-                "Vulkan collects complete conservative radius candidates. Overflow leaves the previous output unchanged. Subnormal coordinate components are unsupported.");
+                "Vulkan collects complete conservative radius candidates. Overflow fails without changing the output and suggests a smaller radius. Subnormal coordinate components are unsupported.");
         }
         const bool scalarActive = DrawPointScalarTransaction(context.PointAnalysis.Commands,
             WeightTransaction,
@@ -2948,7 +2948,10 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Contributions: %zu; largest candidate row: %zu",
                 result.Diagnostics.NeighborContributionCount,
                 result.MaximumNeighbors);
-            ImGui::Text("Query radius %.5g; GPU batches %zu", double(result.QueryRadius), result.GpuQueryBatches);
+            ImGui::Text("Support radius %.5g; query radius %.5g; GPU batches %zu",
+                result.SupportRadius,
+                double(result.QueryRadius),
+                result.GpuQueryBatches);
             ImGui::Text("Cache reused: %s; CPU %.3f ms; GPU neighborhoods %.3f ms",
                 result.IndexReused ? "yes" : "no",
                 result.CpuComputeMilliseconds,
