@@ -1269,7 +1269,7 @@ namespace Extrinsic::Runtime
                         ++diagnostics->ProgressiveTextureBakeJobsQueued;
                     }
                 }
-                else if (MeshHasVertexTexcoords(primitive.Mesh) &&
+                else if (primitive.HasResolvedTexcoords &&
                          MeshHasVertexProperty(primitive.Mesh, NormalBakePropertyName(options)))
                 {
                     PropertyTextureBakeResult result =
@@ -1365,7 +1365,7 @@ namespace Extrinsic::Runtime
             }
             else if (options.TextureBake != nullptr &&
                 wantsGeneratedAlbedo &&
-                     MeshHasVertexTexcoords(primitive.Mesh))
+                     primitive.HasResolvedTexcoords)
             {
                 PropertyTextureBakeResult result =
                     ScheduleGeneratedPropertyTextureBake(
