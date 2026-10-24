@@ -661,8 +661,23 @@ clean). The blocks are allocated in `libnvidia-glcore.so.580.159.04` during
 pipeline creation; the engine destroys every pipeline, and the shutdown contract
 stays clean. This is external retention, not a passing sanitizer gate, and no
 suppression covers it ([BUG-180](../tasks/done/BUG-180-framed-icp-leak-enabled-process-retention.md)).
-When the NVIDIA driver version changes, re-run BUG-180's leak-enabled command twice
-with the same shader cache directory; a clean second run retires the observation.
+When the NVIDIA driver version changes, possibly re-check it with only the NVIDIA ICD
+selected (otherwise BUG-221's 2 × 256 B Mesa blocks are reported as well), a new empty
+shader cache for run 1 and the same cache for run 2:
+
+```bash
+cache=$(mktemp -d)
+for run in 1 2; do
+  VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json \
+  __GL_SHADER_DISK_CACHE_PATH="$cache" \
+  LSAN_OPTIONS=suppressions="$PWD/lsan.supp" timeout 120s \
+    build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests \
+    --gtest_filter=PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+done
+```
+
+On 580.159.04, run 1 is clean and run 2 reports 240 B in 3 × 80 B allocations; a clean
+run 2 on a new driver means the driver no longer retains them.
 
 ```bash
 ctest --test-dir build/ci-vulkan --output-on-failure \

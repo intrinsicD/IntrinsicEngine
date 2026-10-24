@@ -134,11 +134,28 @@ nochmal überprüfen" (record it as a driver problem and possibly re-check with 
 driver). Disposition: retire as external retention in NVIDIA 580.159.04
 `libnvidia-glcore`; no suppression, sanitizer setting or test change.
 
-Re-check trigger: when the NVIDIA driver version on the host changes, re-run this
-task's leak-enabled command (Verification, second line) twice with the same shader
-cache directory (the second run uses the filled cache). A clean second run means the
-driver no longer retains the blocks; a 3×80 B report on the new version keeps this
-classification. The trigger is also recorded in `tests/README.md` beside BUG-229.
+Re-check (the operator's "evt": possibly re-check when the driver changes): when the
+NVIDIA driver version on the host changes, repeat runs F/F2 from the diagnosis. Select
+only the NVIDIA ICD; without `VK_DRIVER_FILES` the run also reports BUG-221's 2 × 256 B
+Mesa enumeration blocks and is never clean on this host:
+
+```bash
+cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests
+cache=$(mktemp -d)   # new, empty shader cache for run 1; the same directory for run 2
+for run in 1 2; do
+  VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json \
+  __GL_SHADER_DISK_CACHE_PATH="$cache" \
+  LSAN_OPTIONS=suppressions="$PWD/lsan.supp" timeout 120s \
+    build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests \
+    --gtest_filter=PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+  echo "run $run exit $?"
+done
+```
+
+Expected on 580.159.04: run 1 (empty cache) exits 0 with no LeakSanitizer report; run 2
+(filled cache) exits 1 with 240 B in 3 × 80 B allocations. A clean run 2 on a new driver
+means it no longer retains the blocks; the same 3 × 80 B report keeps this
+classification. The recipe is also in `tests/README.md` beside BUG-229.
 
 ## Completion — 2026-10-24
 Completed 2026-10-24. Commit: `9396405a5` and `d0eb692b5` (diagnosis), the retirement
