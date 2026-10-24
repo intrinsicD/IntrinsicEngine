@@ -134,9 +134,12 @@ Raw logs, the probe diff and the display states are in
   `KeypointCount` is 5, not 8, in all eight domains.
   `KeypointResidentSubnormalScores` has 12 mask mismatches and a saliency L∞
   of 7.58e-42, against a bound of 1.12e-44. These failures are separate from
-  this display bug and are not tracked yet. The resident LOP parity
-  executable (`IntrinsicRuntimePointCloudConsolidationGpuParityTests`) is not
-  built in this tree and was not run.
+  this display bug and are not tracked yet.
+- Resident LOP, built afterwards: both `PointCloudConsolidationGpuParity.ResidentLop*`
+  cases passed on both displays: `PreviewDiscardAcceptParityAndRepeatInputIo`
+  in 6.00 s on `:1` and 5.29 s on `:9` (limit 30 s), and
+  `MultipleProjectionAndReducePagesMatchCpu` in 24.35 s on `:1` and 24.54 s on
+  `:9` (limit 120 s).
 
 ### What remains
 - Reproducing the slow display state on `:1` means switching the operator's
