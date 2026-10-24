@@ -175,8 +175,14 @@ Remaining:
   PROC-031/CI-012/CI-013.
 - High-risk completion: the acceptance checkboxes are ticked from the
   round-1 reviews (see Acceptance criteria).
-  - Still owed: an accepted independent review bound to the regenerated
-    complete report's digest, then `validate --require-complete BUG-171` must
-    exit 0.
-  - The review and finalize work-graph nodes are still open, and the
-    integrator does the retirement moves.
+  - Final independent Claude review: verdict `accepted`, revision
+    `bc0cab45854934362c1c1c77d8d53b9b941168c2`, content digest `87e9ab98…`
+    (`reviews.jsonl` seq 1, sha256 `f44705ec…`; report.yaml `757bc73c…`,
+    handoff.jsonl `f2bbe41e…`). The reviewer decided that Required changes
+    1-3, Tests 1-2 and Docs 1 are implemented as written, and left the ticking
+    to the retirement commit.
+  - `validate --root . --require-complete BUG-171` exits 0: 0 errors, and 1
+    warning for the justified skipped check `evidence-validate-bc0cab458`.
+    The work graph `finalize` node succeeded, and the claim is released.
+  - Retirement moves, ticks and index edits are left to the integrator.
+    Operator defaults 1-8 above remain open for the operator's decision.
