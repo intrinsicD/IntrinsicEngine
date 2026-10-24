@@ -6,7 +6,7 @@ workflow_schema: 1
 template: micro
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: Interactive discovery-failure follow-up; command logs and the existing diagnostic plan retain evidence.
+evidence_skip_reason: Micro profile; the Full pre-flight lane's raw evidence stays git-ignored in the bug-091 lane worktree (tasks/evidence/BUG-091/), and this note records its digests, verdicts and results.
 contract_schema: 1
 contracts: []
 contract_review: The catalog has no CTest discovery-timeout contract; this task changes test enumeration policy without changing engine APIs, method contracts or layer ownership.
@@ -88,15 +88,15 @@ contract_review: The catalog has no CTest discovery-timeout contract; this task 
       in generated-registration policy coverage.
 
 ## Tests
-- [x] Add a tooling regression with a controlled slow fake GoogleTest lister
+- [ ] Add a tooling regression with a controlled slow fake GoogleTest lister
       that proves discovery succeeds below the declared budget and fails
       nonzero above it.
 - [ ] Add registration-policy coverage proving the helper emits the selected
       `TEST_DISCOVERY_TIMEOUT` independently of each test's `TIMEOUT` property.
-- [x] Re-run forced rediscovery repeatedly on the configured `ci` tree under
+- [ ] Re-run forced rediscovery repeatedly on the configured `ci` tree under
       idle and controlled-contention conditions; preserve all enumeration
       failures and timings.
-- [x] Run a focused selector whose requested tests are unrelated to ECS and
+- [ ] Run a focused selector whose requested tests are unrelated to ECS and
       confirm stale `IntrinsicECSTests` discovery can no longer cause an
       ordinary-cold-start false failure under the supported budget.
 
@@ -361,8 +361,9 @@ A later independent Codex review of `e2e3bc3c2` (thread
 findings: C-real coverage accepted runs without forced discovery, direct
 replay added `--gtest_output=json` on CMake 3.x, and CMake 3.x printed no
 budget. Fix round 1 (`931ebff5a`, above) answers all three; the independent
-Claude re-review of `931ebff5a` approved it (see Completion). The Kitware
-3.31 orphan check stays open.
+Claude re-review of `931ebff5a` approved it (see Completion). Codex did not
+re-review `931ebff5a`; its round-1 REVISE is resolved only through that Claude
+re-review. The Kitware 3.31 orphan check stays open.
 
 ## Completion — 2026-10-24
 Completed 2026-10-24. Commit: `d14029314` through `931ebff5a` (14 commits on
@@ -387,26 +388,38 @@ Reviewer decisions (coordinator's local review record `wfB.json`, lane
   re-review `approve`, blocking none. AC1-AC4 "met", with limits stated; the
   three round-1 findings resolved; docs claims "partially met"
   (`mutations.log` lacks the assertion lines; the stale Remaining paragraph,
-  fixed in this note).
+  fixed in this note). Codex did not re-review `931ebff5a`; its round-1
+  REVISE is resolved only through this Claude re-review.
 
-Boxes: AC1-AC4 are ticked from round 2. Tests 1, 3 and 4 are ticked from its
-AC2 and AC3 reasons (the fake-lister suite on 3.28.3/3.31.6/4.3.2 with a
-success-path mutation; 50 forced-stale idle/contention runs on `build/ci`;
-focused `RuntimeModule` runs 7/7). No reviewer decided Required changes 1-5,
-Tests 2 or Docs 1-2, so they stay unticked; the micro template gates only the
-acceptance criteria. Round 1's Claude review rated "discovery budget separate
-from case budgets" met on `e2e3bc3c2`; round 2 did not re-decide it.
+Boxes: only AC1-AC4 are ticked, as round 2 decided. Round 2 decided no
+Required changes, Tests or Docs box, so all of them stay unticked; the micro
+template gates only the acceptance criteria. Round 1's Claude review rated
+"discovery budget separate from case budgets" met on `e2e3bc3c2`, and round 2
+rated "docs claims vs evidence" partially met; neither decided a box.
 
 Limits: measured under light contention only (load about 5 on 32 CPUs).
 Sanitized trees, CI runners and heavy or equal-priority contention were not
-measured. The two incidents remain unexplained. The budget value stays 5 s.
-The budget line relies on CMake-internal names (`result`, `arg_TEST_*` or
-`_TEST_*`); re-run the hermetic suite when CI's CMake changes.
+measured. The two incidents remain unexplained. The budget value stays 5 s and
+the generated includes are byte-identical, so the change neither reproduces nor
+fixes the original cold-start failure (round-1 Codex review); passing reruns
+are not proof of a fix. A hung lister was simulated only with a fake, and CTest
+3.31.6 (the CMake the hosted `ci-docs` runner image lists, see the correction
+below) orphans the timed-out lister while the gate stays bounded. The budget line
+relies on CMake-internal names (`result`, `arg_TEST_*` or `_TEST_*`); re-run the
+hermetic suite when CI's CMake changes.
 
-Open: the `shortcut:` in `tools/ci/gtest_discovery_probe.py` says to delete
-`decide`/`report` and their tests when BUG-091 retires; this docs-only
-retirement did not delete them. Also open: the Kitware 3.31 orphan check,
-assertion lines in `mutations.log`, and the CMake 4.x race probe (`BUG-249`).
+Correction 2026-10-24 to "CI installs Ubuntu 24.04's CMake 3.28.3" (CMake
+portability, above; text left as written): it describes the build jobs, whose
+`.github/actions/setup-build/action.yml` apt-installs `cmake`. `ci-docs` does
+not use that action; its `ubuntu-24.04` runner image lists CMake 3.31.6
+(BUG-249, Context). Whether the image's 3.31.6 shadows the apt 3.28.3 on the
+build jobs' `PATH` was not checked.
+
+Open, with no owning task (operator decision): the `shortcut:` in
+`tools/ci/gtest_discovery_probe.py` says to delete `decide`/`report` and their
+tests when BUG-091 retires; this docs-only retirement did not delete them.
+Also open: the Kitware 3.31 orphan check (no owning task either), assertion
+lines in `mutations.log`, and the CMake 4.x race probe (`BUG-249`).
 
 Evidence: the `tasks/evidence/BUG-091/` paths in this note name the
 git-ignored directory in the `bug-091` lane worktree; they are not in the

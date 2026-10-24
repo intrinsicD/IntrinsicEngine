@@ -13,13 +13,18 @@ Retired [BUG-091](BUG-091-gtest-pretest-discovery-cold-timeout.md) (`d14029314` 
 - Measurement (Full pre-flight, digest `ef55536f…`, both pre-flight reviews PASS): H1 rejected
   (max listing 0.073 s), H3 and H4 not supported, H2 fan-out confirmed. Limits: light contention only;
   sanitized trees, CI runners and heavy contention not measured; the two incidents remain unexplained.
+  The budget is unchanged in effect (includes byte-identical, still 5 s), so the change neither
+  reproduces nor fixes the original failure. A hung lister was simulated only with a fake, and CTest 3.31.6 (the CMake
+  the hosted `ci-docs` image lists) orphans the timed-out lister while the gate stays bounded.
 - Review: round 1 on `e2e3bc3c2`, independent Claude review `approve` (AC1-2 "partially met"),
   independent Codex review `revise` (three blocking findings). Fix round 1 `931ebff5a`; the independent
-  Claude re-review of it `approve`, AC1-AC4 "met". Required changes 1-5, Tests 2 and Docs 1-2 stay
-  unticked: no reviewer decided them.
-- Open for the operator: the probe's `decide`/`report` shortcut (delete at retirement; not done in this
-  docs-only pass), the Kitware 3.31 orphan check, and BUG-249 (the race probe on CMake 4.x). Evidence
-  stays git-ignored in the `bug-091` lane worktree; nothing was deleted.
+  Claude re-review of it `approve`, AC1-AC4 "met"; Codex did not re-review `931ebff5a`. Only AC1-AC4
+  are ticked, as round 2 decided; it decided no Required changes, Tests or Docs box, so those stay
+  unticked.
+- Open for the operator, with no owning task: the probe's `decide`/`report` shortcut (delete at
+  retirement; not done in this docs-only pass) and the Kitware 3.31 orphan check. Also open: BUG-249
+  (the race probe on CMake 4.x). Evidence stays git-ignored in the `bug-091` lane worktree; nothing was
+  deleted.
 
 ## 2026-10-24 — BUG-149 retired after its completion review
 

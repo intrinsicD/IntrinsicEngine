@@ -185,8 +185,9 @@ exact registration, and nested discovery without requiring engine binaries.
   discovered case, passed through `PROPERTIES`. Named-case fixups later in
   `tests/CMakeLists.txt` raise it for some cases.
 
-The discovery value is the explicit former CMake default. No measured
-distribution has selected a different value yet (BUG-091).
+The discovery value is the explicit former CMake default. The reviewed BUG-091
+measurement found no listing near it (maximum 0.073 s, light contention on one
+host) and kept 5 s; no task currently plans a new measurement.
 
 Any CTest call loads every registration file, including `-N` and `-R` calls.
 An executable is listed again when its `_tests.cmake` is missing or older than
