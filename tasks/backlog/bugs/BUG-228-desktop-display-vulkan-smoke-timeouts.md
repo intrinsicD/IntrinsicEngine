@@ -251,3 +251,10 @@ running at any run boundary, RTX 4090, NVIDIA 580.159.04. Logs and states:
   Sandbox defaults, including VSync. With the monitor off its surface-appearance
   case still passed, but in 71.27 s (17–21 s with the monitor on).
   Whether those smokes should switch VSync off is an open decision.
+- Whole `gpu` label at 3d39d1737, `:1`, monitor on: 161 of 161 passed (one
+  capability skip, `METHOD056VulkanCpdEStep.ScalingProfile`), 682 s, at a
+  1-minute load of 3.6–6.0.
+- Review of 3d39d1737: a fresh Claude reviewer that did not write the change
+  read the code only and answered "Verdict: APPROVE", with two nits (a test
+  inserted under another test's comment; loose doc wording) that are fixed in
+  the next commit. No Codex review was run.

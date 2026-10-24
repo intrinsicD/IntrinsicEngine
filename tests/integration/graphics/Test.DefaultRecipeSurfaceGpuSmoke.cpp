@@ -652,16 +652,6 @@ void ExpectGpuProfileScopeParity(
 }
 } // namespace
 
-// GRAPHICS-076 Slice D — canonical default-recipe smoke. It drives one
-// operational frame through the bounded `engine.Run()` helper and asserts that
-// the executor reached the operational Vulkan command stream, that the
-// canonical `"Present"` pass recorded its bind+draw, and that the Vulkan
-// fallback / init-failure / validation-error / operational-gate counters did
-// not increment across the operational frame.
-//
-// This fixture is the default-recipe leg of GRAPHICS-076 Slice D. The
-// pixel-readback parity path remains a separate GRAPHICS-076E test below so
-// the command-stream proof cannot be weakened by readback harness changes.
 // BUG-228: Render.EnableVSync=false must reach the swapchain. FIFO paces each present
 // on the display (about 1 s with the monitor off), which made frame-paced smokes time out.
 TEST(DefaultRecipeSurfaceGpuSmoke, VSyncOffSelectsImmediatePresentWhenSupported)
@@ -682,6 +672,16 @@ TEST(DefaultRecipeSurfaceGpuSmoke, VSyncOffSelectsImmediatePresentWhenSupported)
     bootstrap.EnginePtr->Shutdown();
 }
 
+// GRAPHICS-076 Slice D — canonical default-recipe smoke. It drives one
+// operational frame through the bounded `engine.Run()` helper and asserts that
+// the executor reached the operational Vulkan command stream, that the
+// canonical `"Present"` pass recorded its bind+draw, and that the Vulkan
+// fallback / init-failure / validation-error / operational-gate counters did
+// not increment across the operational frame.
+//
+// This fixture is the default-recipe leg of GRAPHICS-076 Slice D. The
+// pixel-readback parity path remains a separate GRAPHICS-076E test below so
+// the command-stream proof cannot be weakened by readback harness changes.
 TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommandStream)
 {
     auto bootstrap = BootstrapEngineForDefaultRecipe();
