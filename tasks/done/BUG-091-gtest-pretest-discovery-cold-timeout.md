@@ -70,43 +70,82 @@ contract_review: The catalog has no CTest discovery-timeout contract; this task 
   discovery path is a harness defect, not a reason to relabel assertions.
 
 ## Required changes
-- [ ] Add a deterministic harness that forces PRE_TEST rediscovery and records
+- [x] Add a deterministic harness that forces PRE_TEST rediscovery and records
       enumeration wall time, exit status, executable timestamp, discovery-file
       timestamp, host load, and concurrent build/CTest processes.
-- [ ] Collect idle warm, idle cold, and controlled-contention distributions for
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: `tools/ci/gtest_discovery_probe.py`
+      `ctest` mode forces rediscovery and records wall time, exit status, the enumerated set and
+      host/process telemetry; `direct` mode records per-listing wall time, exit status and the
+      executable, include and `_tests.cmake` mtimes.
+- [x] Collect idle warm, idle cold, and controlled-contention distributions for
       `IntrinsicECSTests` plus representative core/runtime executables; use
       enough repetitions to report median, p95, p99, and maximum rather than a
       single retry.
-- [ ] Confirm whether filtered CTest inventory construction discovers unrelated
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: `runs/idle` and `runs/contention`
+      `direct.jsonl` hold 1920 samples each (3 targets x cold/warm x 320); `runs/decision.json`
+      reports n, median, p95, p99 and max per cell, which the review recomputed. Light contention,
+      one host.
+- [x] Confirm whether filtered CTest inventory construction discovers unrelated
       stale executables and quantify how many enumerations one focused command
       can trigger after configure and focused/full builds.
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: 8 real `ctest -N -R` records in
+      `fanout/fanout.jsonl` match the predictions written first: every stale built executable is
+      relisted. Builds were emulated with mtime touches; 3 of 41 targets were built.
 - [ ] Choose the smallest evidence-backed correction: set a distinct explicit
       `DISCOVERY_TIMEOUT` in `intrinsic_test_executable()`, eliminate a proven
       pathological startup path, or reduce unnecessary PRE_TEST invalidation/
       fan-out without losing individual test registration.
-- [ ] Keep discovery and test-execution budgets separate and make both visible
+- [x] Keep discovery and test-execution budgets separate and make both visible
       in generated-registration policy coverage.
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: separate variables, `DISCOVERY_TIMEOUT`
+      outside `PROPERTIES`, a source-policy test and the live `--build-dir` reconcile
+      (`includes=41 discovery_timeout=5`). Hosted CI has not run that step.
 
 ## Tests
-- [ ] Add a tooling regression with a controlled slow fake GoogleTest lister
+- [x] Add a tooling regression with a controlled slow fake GoogleTest lister
       that proves discovery succeeds below the declared budget and fails
       nonzero above it.
-- [ ] Add registration-policy coverage proving the helper emits the selected
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: `FakeListerBudgetTests` passes below the
+      budget and fails nonzero above it; re-run 19/19 on CMake 4.3.2 and the fake-lister subset on
+      3.28.3 and 3.31.6; mutation M1 fails.
+- [x] Add registration-policy coverage proving the helper emits the selected
       `TEST_DISCOVERY_TIMEOUT` independently of each test's `TIMEOUT` property.
-- [ ] Re-run forced rediscovery repeatedly on the configured `ci` tree under
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: `SourcePolicyTests` pins the
+      helper's argument outside `PROPERTIES` (mutation M4 fails), and the `--build-dir` reconcile
+      checks every generated include across both case budgets. The one-off value-7 check has no
+      raw log.
+- [x] Re-run forced rediscovery repeatedly on the configured `ci` tree under
       idle and controlled-contention conditions; preserve all enumeration
       failures and timings.
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: 25 + 25 forced-stale, evicted runs
+      (`runs/*/ctest.jsonl`) all exited 0 with no timeout, plus 3840 direct listings; there were no
+      failures to preserve. Light contention; 3 of 41 targets built.
 - [ ] Run a focused selector whose requested tests are unrelated to ECS and
       confirm stale `IntrinsicECSTests` discovery can no longer cause an
       ordinary-cold-start false failure under the supported budget.
 
 ## Docs
-- [ ] Document the distinction between GoogleTest enumeration timeout and CTest
+- [x] Document the distinction between GoogleTest enumeration timeout and CTest
       case timeout, including the evidence-backed budget and failure behavior,
       in `tests/README.md`.
-- [ ] Cross-link `CI-008` as related process-overhead work without making either
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: `tests/README.md` §"GoogleTest discovery
+      and case budgets". Its "every supported CMake version" wording goes beyond the three versions
+      tested.
+- [x] Cross-link `CI-008` as related process-overhead work without making either
       task an artificial prerequisite; update the bug index and retirement log
       when the correction is verified.
+      Met, decided by the independent Claude review, 2026-10-24, night workflow,
+      reviewed_head `8a435096a`: `CI-008` is cross-linked as related, not
+      a prerequisite; the bug index and retirement log are updated. "Verified" means local
+      verification and review only; hosted CI has not confirmed it.
 
 ## Acceptance criteria
 - [x] A deterministic forced-rediscovery loop reproduces the old five-second
@@ -391,11 +430,20 @@ Reviewer decisions (coordinator's local review record `wfB.json`, lane
   fixed in this note). Codex did not re-review `931ebff5a`; its round-1
   REVISE is resolved only through this Claude re-review.
 
-Boxes: only AC1-AC4 are ticked, as round 2 decided. Round 2 decided no
-Required changes, Tests or Docs box, so all of them stay unticked; the micro
-template gates only the acceptance criteria. Round 1's Claude review rated
-"discovery budget separate from case budgets" met on `e2e3bc3c2`, and round 2
-rated "docs claims vs evidence" partially met; neither decided a box.
+Boxes: AC1-AC4 are ticked, as round 2 decided. The other boxes were decided later by an
+independent Claude review, 2026-10-24, night workflow, reviewed_head
+`8a435096a123fef8955db33893c59a3868c7727c` (verdict `approve`, no blocking findings). It rated
+Required changes 1, 2, 3 and 5, Tests 1, 2 and 3, and Docs 1 and 2 "met"; those nine boxes are
+ticked, with that review's reason next to each. It rated two "partially met", and they stay
+unticked:
+- Required changes 4: the explicit 5 s `DISCOVERY_TIMEOUT` is implemented, but the generated
+  includes are byte-identical, H2 fan-out was not reduced and no correction of the observed
+  failure is shown.
+- Tests 4: the three confirmation runs passed, but with the budget unchanged in effect and the
+  failure never reproduced they cannot tell "fixed" from "never failed under these conditions".
+
+Round 1's Claude review rated "discovery budget separate from case budgets" met on
+`e2e3bc3c2`, and round 2 rated "docs claims vs evidence" partially met; neither decided a box.
 
 Limits: measured under light contention only (load about 5 on 32 CPUs).
 Sanitized trees, CI runners and heavy or equal-priority contention were not
@@ -418,8 +466,16 @@ build jobs' `PATH` was not checked.
 Open, with no owning task (operator decision): the `shortcut:` in
 `tools/ci/gtest_discovery_probe.py` says to delete `decide`/`report` and their
 tests when BUG-091 retires; this docs-only retirement did not delete them.
+The review of `8a435096a` points out that BUG-091 has now retired, so the
+comment's own condition is met; it asks for an owning task or a reworded
+condition that is still in the future.
 Also open: the Kitware 3.31 orphan check (no owning task either), assertion
 lines in `mutations.log`, and the CMake 4.x race probe (`BUG-249`).
+Further optional findings of the review of `8a435096a`, not acted on: the
+`tests/README.md` "every supported CMake version" wording goes beyond the
+three versions tested (3.28.3, 3.31.6, 4.3.2); the value-7 check has no raw
+reconcile log; and the probe's `ctest`-mode records carry no before/after
+mtimes.
 
 Evidence: the `tasks/evidence/BUG-091/` paths in this note name the
 git-ignored directory in the `bug-091` lane worktree; they are not in the

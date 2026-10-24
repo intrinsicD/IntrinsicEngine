@@ -66,6 +66,10 @@ Retired [BUG-091](BUG-091-gtest-pretest-discovery-cold-timeout.md) (`d14029314` 
   Claude re-review of it `approve`, AC1-AC4 "met"; Codex did not re-review `931ebff5a`. Only AC1-AC4
   are ticked, as round 2 decided; it decided no Required changes, Tests or Docs box, so those stay
   unticked.
+- Boxes, later: an independent Claude review of `8a435096a` (night workflow, `approve`) decided the
+  rest. Required changes 1, 2, 3 and 5, Tests 1-3 and Docs 1-2 "met" and ticked; Required changes 4
+  and Tests 4 "partially met" and unticked (no behaviour change shown; "fixed" not distinguishable from
+  "never failed").
 - Open for the operator, with no owning task: the probe's `decide`/`report` shortcut (delete at
   retirement; not done in this docs-only pass) and the Kitware 3.31 orphan check. Also open: BUG-249
   (the race probe on CMake 4.x). Evidence stays git-ignored in the `bug-091` lane worktree; nothing was
