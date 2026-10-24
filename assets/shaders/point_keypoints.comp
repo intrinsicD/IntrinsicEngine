@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 #extension GL_ARB_gpu_shader_fp64 : require
 #include "include/point_lbvh.glsl"
+#include "include/pca_eigen_double.glsl"
 
 layout(local_size_x=64) in;
 layout(push_constant,scalar) uniform Push {
@@ -48,42 +49,6 @@ double distanceSquared(dvec3 a,dvec3 b) {
     squared=dvec3(roundedFloat(squared.x),roundedFloat(squared.y),roundedFloat(squared.z));
     return roundedFloat(roundedFloat(squared.x+squared.y)+squared.z);
 }
-// Match the reference's isotropic branch; only eigenvalues are needed here.
-// Jacobi avoids an unavailable GLSL double-precision acos/cos implementation.
-dvec3 eigenvalues(dmat3 a)
-{
-    precise double mean=(a[0][0]+a[1][1]+a[2][2])/3.0lf;
-    precise dvec3 b=dvec3(a[0][0],a[1][1],a[2][2])-mean;
-    precise double p2=(b.x*b.x+b.y*b.y+b.z*b.z+
-        2.0lf*(a[0][1]*a[0][1]+a[0][2]*a[0][2]+a[1][2]*a[1][2]))/6.0lf;
-    double scale=1.0lf;
-    for(uint c=0;c<3;++c)for(uint r=0;r<3;++r)scale=max(scale,abs(a[c][r]));
-    if(!(p2>2.2204460492503131e-16lf*scale*scale))return dvec3(max(mean,0.0lf));
-    for(uint step=0;step<24;++step)
-    {
-        uint p=0,q=1;
-        if(abs(a[0][2])>abs(a[p][q])){p=0;q=2;}
-        if(abs(a[1][2])>abs(a[p][q])){p=1;q=2;}
-        if(abs(a[p][q])<=1e-30lf*scale)break;
-        precise double tau=(a[q][q]-a[p][p])/(2.0lf*a[p][q]);
-        precise double t=(tau>=0.0lf?1.0lf:-1.0lf)/(abs(tau)+sqrt(1.0lf+tau*tau));
-        precise double c=1.0lf/sqrt(1.0lf+t*t),s=t*c;
-        precise double shift=t*a[p][q];
-        a[p][p]-=shift;a[q][q]+=shift;a[p][q]=0.0lf;a[q][p]=0.0lf;
-        for(uint k=0;k<3;++k)if(k!=p && k!=q)
-        {
-            precise double x=a[k][p],y=a[k][q];
-            a[k][p]=c*x-s*y;a[p][k]=a[k][p];
-            a[k][q]=s*x+c*y;a[q][k]=a[k][q];
-        }
-    }
-    dvec3 e=max(dvec3(a[0][0],a[1][1],a[2][2]),dvec3(0.0lf));
-    if(e.x<e.y){double t=e.x;e.x=e.y;e.y=t;}
-    if(e.y<e.z){double t=e.y;e.y=e.z;e.z=t;}
-    if(e.x<e.y){double t=e.x;e.x=e.y;e.y=t;}
-    return e;
-}
-
 
 // Scalar layout stride = 384 bytes. Traversal and covariance persist across
 // completions; a dense row never monopolizes a shader invocation.
@@ -95,7 +60,9 @@ layout(buffer_reference,scalar) buffer States { RowState v[]; };
 
 void finishScore(uint i, inout RowState r)
 {
-    dvec3 e=eigenvalues(r.covariance/double(r.salient+1));
+    // Shared CPU twin (scale-relative isotropic cutoff, GEOM-114); returns e.x>=e.y>=e.z.
+    dmat3 c=r.covariance/double(r.salient+1); dvec3 e; dmat3 vectors;
+    pcaEigen(c[0][0],c[0][1],c[0][2],c[1][1],c[1][2],c[2][2],e,vectors);
     e=dvec3(realFloat(floatBits(e.x)),realFloat(floatBits(e.y)),realFloat(floatBits(e.z)));
     if(any(isnan(e)) || any(isinf(e))){fail(4);return;}
     double roundoff=64.0lf*2.2204460492503131e-16lf*double(e.x);
