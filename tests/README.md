@@ -240,15 +240,16 @@ IntrinsicTestDiscovery: listing '<executable>' failed (<result>); its GoogleTest
 The line comes from a CTest-time `variable_watch` on the listing result of
 `GoogleTestAddTests.cmake`. It appears only when a listing fails, so successful
 discovery output stays unchanged; some callers merge stderr into
-`--show-only=json-v1` output. CTest 3.28.3 and 4.3.2 kill the lister. CTest
-3.31.6 leaves it running, so on such hosts each later call that lists the same
-stale target can add another orphaned lister. Nothing retries.
+`--show-only=json-v1` output. CTest 3.28 and CTest 3.31.10, 4.0.5, 4.1.3 and later
+kill the lister. CTest 3.29.0 to 3.31.9, 4.0.0 to 4.0.4 and 4.1.0 to 4.1.2 leave it
+running (upstream CMake issue 27378, BUG-252), so on such hosts each later call that
+lists the same stale target can add another orphaned lister. Nothing retries.
 
 `Test.GTestDiscoveryTimeout.py` checks the source policy. It also runs a slow
 fake lister in a private project: the lister passes below the declared budget
 without the diagnostic line, fails at the budget with that line, and leaves
-the registry lock free. Afterwards the lister must be gone, except on CTest
-3.31, where the test reaps it. The script also runs probe self-checks,
+the registry lock free. Afterwards the lister must be gone; on the orphaning
+CTest versions above it must still run, and the test reaps it. The script also runs probe self-checks,
 including that `direct` replays the argv and working directory that this
 CMake's discovery passes to the lister. With `--build-dir`, it checks that every generated
 include of a configured tree (its discovery call, on either layout above) carries the

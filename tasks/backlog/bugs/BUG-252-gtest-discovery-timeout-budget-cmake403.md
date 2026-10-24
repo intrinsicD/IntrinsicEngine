@@ -45,3 +45,46 @@ env PATH=/tmp/bug252-cmake/4.0.3/cmake/data/bin:$PATH \
 python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py -v
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Prediction (written before the first run, 2026-10-24)
+- On CMake 4.0.3 the budget case fails at the no-orphan check only: CTest returns bounded at
+  the budget with the repository diagnostic, but the timed-out lister survives, as on 3.31
+  (whose orphan the case already tolerates and reaps). 4.1.3 is expected to share it if the
+  kill arrived later than 4.1; unknown.
+
+## Resolution
+- Reproduced: on CMake 4.0.3 the budget case failed only at "timed-out lister is still
+  running" (prediction held); 4.1.3 passed. A `ps --forest` probe showed the lister as the
+  direct child of `ctest`; after CTest 4.0.3 returned (rc 8, bounded) the lister was
+  reparented and still sleeping, on 4.1.3 it was gone. So CTest leaves it, not the test's
+  process check or the fixture.
+- Cause (upstream, read from source): CMake 3.29 moved `execute_process` to
+  `cmUVProcessChain` (commit 5420639a8d), which stopped terminating the child on `TIMEOUT`.
+  CMake issue 27378 restored it (`chain.Terminate()` after a timeout; commit 22e84c7e7f,
+  in 4.0.5 and 4.1.3, and e2cfc61e5e in 3.31.10); 4.2.0 and
+  later have it. 3.28.x still uses `cmsysProcess` and kills. Orphaning range: 3.29.0-3.31.9,
+  4.0.0-4.0.4, 4.1.0-4.1.2. The case's old `(3, 31)` major.minor exemption missed 4.0.x.
+- Fix: `lister_survives_timeout(version)` encodes that range, and the case now asserts the
+  lister state exactly (dead outside the range, still running inside it, then reaped by the
+  existing cleanup), so a wrong range fails either way. A boundary unit case pins the range.
+  `tests/README.md` states the range instead of single versions.
+- Not run: 3.29.x, 3.30.x, 4.0.4/4.0.5, 4.1.0-4.1.2 (range from source and upstream tags only).
+- Verification 2026-10-24 (full `Test.GTestDiscoveryTimeout.py`, 24 tests, and
+  `Test.ConcurrentCTestDiscovery.py`, 3 tests; `cmake`/`ctest --version` checked per row):
+
+  | CMake | GTestDiscoveryTimeout | orphan reaped | ConcurrentCTestDiscovery |
+  |---|---|---|---|
+  | 3.28.3 | OK | no | OK |
+  | 3.31.6 | OK | yes | OK |
+  | 3.31.10 | OK | no | OK |
+  | 4.0.3 | OK | yes | OK |
+  | 4.1.3 | OK | no | OK |
+  | 4.2.0 | OK | no | OK |
+  | 4.2.3 | OK | no | OK |
+  | 4.3.2 (host) | OK | no | OK |
+  | 4.3.4 | OK | no | OK |
+  | 4.4.4 | OK | no | OK |
+
+- Mutation checks: marking 4.1.3 as orphaning fails the live case on 4.1.3 ("should leave
+  the timed-out lister running") and the boundary case; dropping the 4.0 clause fails the
+  live case on 4.0.3 ("timed-out lister is still running") and the boundary case.

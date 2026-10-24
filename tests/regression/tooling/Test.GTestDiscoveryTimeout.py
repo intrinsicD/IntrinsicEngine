@@ -71,8 +71,13 @@ def lock_timeout() -> int:
     return int(match.group(1))
 
 
-# CTest versions observed to return at the discovery budget without killing the lister.
-LISTER_SURVIVES_TIMEOUT = {(3, 31)}
+def lister_survives_timeout(version: tuple[int, ...]) -> bool:
+    """CTest returns at the budget but leaves the lister running (BUG-252).
+
+    CMake 3.29 moved execute_process to cmUVProcessChain, which stopped terminating
+    the child on TIMEOUT; upstream #27378 restored it in 3.31.10, 4.0.5 and 4.1.3.
+    """
+    return (3, 29) <= version < (3, 31, 10) or (4, 0) <= version < (4, 0, 5) or (4, 1) <= version < (4, 1, 3)
 
 
 def ctest_version() -> tuple[int, ...]:
@@ -187,6 +192,11 @@ def _alive(pid: int) -> bool:
 
 
 class FakeListerBudgetTests(unittest.TestCase):
+    def test_orphaning_ctest_range_matches_the_upstream_fix(self) -> None:
+        survives = [(3, 29, 0), (3, 31, 6), (3, 31, 9), (4, 0, 3), (4, 0, 4), (4, 1, 2)]
+        killed = [(3, 28, 3), (3, 31, 10), (4, 0, 5), (4, 1, 3), (4, 2, 0), (4, 3, 2), (4, 4, 4)]
+        self.assertEqual([v for v in survives + killed if lister_survives_timeout(v)], survives)
+
     def test_declared_budget_passes_below_and_fails_bounded_above(self) -> None:
         budget = declared_budget()
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-budget-") as directory:
@@ -215,7 +225,7 @@ class FakeListerBudgetTests(unittest.TestCase):
                                                        "FAKE_PID_FILE_Fake": str(pid_file)},
                                             timeout=budget + 60)
             pid = int(pid_file.read_text())
-            self.addCleanup(lambda: _alive(pid) and os.kill(pid, 9))  # CTest 3.31 orphan, even on failure
+            self.addCleanup(lambda: _alive(pid) and os.kill(pid, 9))  # upstream CTest orphan, even on failure
             output = result.stdout + result.stderr
             self.assertNotEqual(result.returncode, 0, output)
             self.assertGreaterEqual(elapsed, budget, output)
@@ -229,17 +239,16 @@ class FakeListerBudgetTests(unittest.TestCase):
             deadline = time.monotonic() + 5
             while _alive(pid) and time.monotonic() < deadline:
                 time.sleep(0.05)
-            orphaned = ctest_version()[:2] in LISTER_SURVIVES_TIMEOUT and _alive(pid)
-            if not orphaned:
-                self.assertFalse(_alive(pid), "timed-out lister is still running")
+            orphaned = lister_survives_timeout(ctest_version())
+            self.assertEqual(_alive(pid), orphaned, "timed-out lister is still running" if not orphaned
+                             else "this CTest should leave the timed-out lister running; recheck the version range")
 
             # The registry lock is released after the failed discovery, even with an orphan.
             result, elapsed = project.ctest("-N", env={}, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn(f"Total Tests: {CASE_COUNT}", result.stdout)
             if orphaned:
-                # CTest 3.31 returns at the budget but leaves the timed-out lister running
-                # (BUG-091 diagnosis); the gate is still bounded. The cleanup reaps it.
+                # The gate is still bounded; the cleanup reaps the orphan.
                 print(f"note: CTest {'.'.join(map(str, ctest_version()))} left the timed-out lister running",
                       file=sys.stderr)
 
