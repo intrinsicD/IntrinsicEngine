@@ -138,10 +138,11 @@ reproducer appeared in `/tmp`, and `git status` was clean afterwards. The 20 GB 
 `Using CCache:` with the wrapper path for (a) and (b), but the scripted
 `launcher_rules` check printed 0 because it searched `CMakeFiles/rules.ninja`,
 while CMake writes `CMAKE_CXX_COMPILER_LAUNCHER` as `LAUNCHER =` into
-`build.ninja`. A manual check during (a) found the `ccache_ci.py launch`
-launcher on 1,378 lines of that tree's `build.ninja`. For (b), launcher use is
-inferred only from the moving ccache counters; the ccache directory holds no
-compiler symlinks, so only the launcher can produce those counts. The trees are
+`build.ninja`. An unrecorded manual look at (a)'s `build.ninja` during the run
+reported the `ccache_ci.py launch` launcher on 1,378 lines; no output was saved,
+so it is not evidence. For both (a) and (b), launcher use rests on the configure
+line `Using CCache:` and the moving ccache counters; the ccache directory holds
+no compiler symlinks, so only the launcher can produce those counts. The trees are
 deleted, so this cannot be rechecked. Prediction 4 held with one addition: one
 implementation unit already hit in the edited rebuild. Most likely ccache's
 preprocessed mode ignored the comment-only edit to `Models.cpp`, because
