@@ -17,7 +17,7 @@ follow-up GEOM-117 filed in `66748220a`), all on `main`.
   UBSan `IntrinsicGeometryScalarfieldExtremaTests.Grouped` 208.59 s of 240 s; ASan `IntrinsicGeometryTests.Grouped`
   180.07 s, VariationalFit 43.84 s of 60 s.
 - Review: criterion 1 independent Claude and Codex lane reviews; criterion 2 independent review of `30d1a148d`
-  ("Criterion 2: met."); criterion 3 met by the hosted dispatch, independent confirmation follows.
+  ("Criterion 2: met."); criterion 3 met by the hosted dispatch, confirmed by an independent review of its job logs.
 - Limits: hang detection 2x coarser in sanitizer lanes, `ci-vulkan` included. Raw logs stay git-ignored in the
   `asan` lane worktree; nothing tracked to delete.
 

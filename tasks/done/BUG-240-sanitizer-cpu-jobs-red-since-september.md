@@ -39,14 +39,15 @@ contract_review: Sanitizer test lane failures; no catalog contract covers CI tes
 
 ## Acceptance criteria
 - [x] The ProgressivePoisson panel failure is reproduced (ASan build) and fixed at its root cause.
-      Met: independent Claude and Codex reviews of the BUG-240 lane (coordinator review record,
-      lane `BUG-240+BUG-188`).
+      Met: independent Claude and Codex reviews of the BUG-240 lane (coordinator review records
+      outside the repository: night workflow results, lane `BUG-240+BUG-188`, and the Codex answer
+      of that lane's round 1).
 - [x] Each timeout is either brought within budget or given a diagnosed, documented sanitizer
       budget/lane; no gate weakened without diagnosis. Independent review of `30d1a148d`:
       "Criterion 2: met."
 - [x] A manual `ci-linux-clang` dispatch shows both sanitizer jobs and `cpu-test-selection-parity`
-      green, or every remaining failure has its own task. Met by hosted dispatch 40105034304; an
-      independent reviewer confirms it in the next step.
+      green, or every remaining failure has its own task. Met by hosted dispatch 40105034304,
+      confirmed by the independent review of `2c9073db8` (2026-10-24): "Criterion 3 is met."
 
 ## Verification
 ```bash
@@ -218,6 +219,6 @@ for the noise-level weight search. All on `main`.
 - Margins: see the table above; the UBSan ScalarfieldExtrema producer (208.59 s of 240 s) is the
   thinnest and will tip over first if those producers grow.
 - Limits: hang detection is 2x coarser in every sanitizer lane, `ci-vulkan` (ASan+UBSan) included.
-  Criterion 3 rests on one hosted dispatch; its independent confirmation is the next step.
+  Criterion 3 rests on one hosted dispatch, independently confirmed against its job logs.
 - Raw evidence stays git-ignored in the `asan` lane worktree (`tasks/evidence/BUG-240/`); nothing
   tracked to delete.
