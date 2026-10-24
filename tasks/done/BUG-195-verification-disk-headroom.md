@@ -35,9 +35,13 @@ verification must be rerun with complete output; cleanup does not close the
 missing preflight/recovery behavior.
 
 ## Acceptance criteria
-- [ ] Detect insufficient headroom before expensive local verification, with an actionable diagnosis.
-- [ ] Preserve completed evidence and report failures to write result records explicitly.
-- [ ] Document a conservative policy for reclaiming inactive generated artifacts.
+- [x] Detect insufficient headroom before expensive local verification, with an actionable diagnosis.
+- [x] Preserve completed evidence and report failures to write result records explicitly.
+- [x] Document a conservative policy for reclaiming inactive generated artifacts.
+
+Ticked from the criterion-1 follow-up review of `cb816e606` (verdict
+`approve`; structured verdict relayed by the night workflow coordinator, no
+transcript on disk), which decided all three criteria `met`. See Completion.
 
 ## Verification
 Reproduce a write failure on a bounded temporary filesystem or injected writer,
@@ -82,7 +86,7 @@ the prior route intact. `tools/ci/run_source_coverage.py` already reports
   captured stderr; a log that cannot be printed either is named in the message
   (`could not print <log> either`) instead of claiming it was printed. Python's
   failed final flush on that stdout then makes the exit 120, still nonzero.
-- Docs: canonical [Disk headroom](../../../docs/build-troubleshooting.md#disk-headroom)
+- Docs: canonical [Disk headroom](../../docs/build-troubleshooting.md#disk-headroom)
   section (manual `df` check, the floor and its limits, a run with a failed
   write is never a pass, manual-only reclaim policy for inactive generated
   artifacts). Pointers from `docs/agent/contract.md` §"Verification hygiene"
@@ -111,7 +115,7 @@ the prior route intact. `tools/ci/run_source_coverage.py` already reports
   --root .`, `check_root_hygiene.py --root . --strict` pass.
 - "Re-run the original native/sanitizer selectors": RUNTIME-247 later reran
   full CPU, ASan and UBSan selectors with complete output, all passing
-  ([summary](../../../docs/results/keypoint_compute_verification_2026-09-14.md)).
+  ([summary](../../docs/results/keypoint_compute_verification_2026-09-14.md)).
   Those reruns predate this fix: they re-establish RUNTIME-247's evidence and
   do not exercise the preflight. No selector was weakened.
 
@@ -196,3 +200,36 @@ is checked; that limit is now commented in code and documented.
   entry points should get a preflight is an operator decision.
 - `tools/ci/time_command.py` writes its CI timing JSON with a plain
   `write_text`; CI-only, and `aggregate_gate_timing.py` rejects malformed JSON.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `cb816e606` (head), with `f8eddf657`, `6577e4cf6`
+and `f21ba9425`, merged into the night integration branch
+`claude/night-2026-10-24-bug-sweep`; not yet on `main`, and hosted CI has not
+run on them.
+Reviewer decisions, base `599f02ff1`:
+- Round 1 on `f8eddf657`: independent Claude review `approve` (criterion 1
+  `partially met`, 2 and 3 `met`; the native/sanitizer rerun line of
+  Verification `partially met`); independent Codex review (thread
+  `01a16b2d-a6f9-7880-abf9-56a3715fbf08`) "VERDICT: revise required"
+  (criterion 1 met within the documented coverage, 2 partially met, 3 met).
+  Fixed in `6577e4cf6`.
+- Round 2 on `6577e4cf6`: independent Claude review `approve` (criterion 1
+  `partially met`, 2 and 3 `met`). Option B (`touched_scope.py --run`
+  preflight) followed in `f21ba9425`.
+- On `f21ba9425`: independent Codex review (thread
+  `01a16b75-874d-7032-8254-f3194a783b24`) "VERDICT: revise required"
+  (criterion 1 partially met: a relative `--build-dir` was resolved against
+  the caller's cwd; 2 and 3 met). Fixed in `cb816e606`.
+- Criterion-1 follow-up on `cb816e606`: `approve`, all three criteria `met`
+  ("tools/agents/workflow_evidence.py is unchanged between f21ba9425 and
+  cb816e606, so the prior 'met' assessment still holds"; the reclaim policy
+  "has not changed"). The boxes above are ticked from this decision.
+Limitations, not changed here:
+- Not run: a real `touched_scope.py --run` with configure/build (C++ builds
+  were held back on this host), and the native/sanitizer selectors after the
+  fix; RUNTIME-247's earlier reruns predate it.
+- Direct `cmake`/`ctest` runs and `touched_scope.py --action` steps rely on the
+  documented manual `df` check; whether more entry points get a preflight is
+  an operator decision (What remains).
+No tracked evidence existed. The raw logs stay git-ignored in the `bug-195`
+lane worktree under `tasks/evidence/BUG-195/`.

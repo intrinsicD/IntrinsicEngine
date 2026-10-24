@@ -40,23 +40,29 @@ contract_review: "Completion-evidence command disposition is part of task author
   be removed to satisfy the tool.
 
 ## Required changes
-- [ ] Define and implement a hash-bound append-only supersession record, or an
+- [x] Define and implement a hash-bound append-only supersession record, or an
       equally explicit reviewed reconciliation mechanism. Require the same
       task, normalized command and working directory, a later passing receipt,
       and a substantive reason; preserve the original failure in the report.
-- [ ] Reject missing/tampered receipts, unrelated checks, reversed chronology,
+- [x] Reject missing/tampered receipts, unrelated checks, reversed chronology,
       failed replacements, cycles, and contradictory reconciliation records.
-- [ ] Keep unsuperseded required failures blocking and retain visible history.
+- [x] Keep unsuperseded required failures blocking and retain visible history.
 
 ## Tests
-- [ ] Reproduce failure-then-success retirement with both original receipts
+- [x] Reproduce failure-then-success retirement with both original receipts
       preserved, and test every rejection above.
-- [ ] Verify strict report generation/validation includes the reconciliation
+- [x] Verify strict report generation/validation includes the reconciliation
       and continues to reject ordinary unsuperseded required failures.
 
 ## Docs
-- [ ] Update the evidence policy and CLI documentation in the same change;
+- [x] Update the evidence policy and CLI documentation in the same change;
       synchronize generated skill references.
+
+Ticked from the final independent Claude review (`reviews.jsonl` seq 1,
+verdict `accepted`, revision `bc0cab45854934362c1c1c77d8d53b9b941168c2`,
+content digest `87e9ab98…`): "Required changes 1-3, Tests 1-2 and Docs 1 are
+implemented as written (identical argv/cwd stands in for 'normalized
+command', operator default 1). They may be ticked in the retirement commit."
 
 ## Acceptance criteria
 - [x] A legitimate corrected check can unblock completion without altering or
@@ -186,3 +192,35 @@ Remaining:
     The work graph `finalize` node succeeded, and the claim is released.
   - Retirement moves, ticks and index edits are left to the integrator.
     Operator defaults 1-8 above remain open for the operator's decision.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `3e7c98e27` (implementation, tests, docs), with
+`bc0cab458` (acceptance ticks) and `a56818089` (final-review record), merged into
+the night integration branch `claude/night-2026-10-24-bug-sweep`; not yet on
+`main`, and hosted CI has not run on them.
+Reviewer decisions:
+- Round 1 on `3e7c98e27` (report digest `9d859cd7…`): independent Claude
+  review `approve`, all three acceptance criteria `met`; independent Codex
+  review (thread `01a16b39-2409-7a92-90e9-9728d7b5cbcb`) `approve`, all three
+  `Met`.
+- Final on `bc0cab458`: independent Claude review `accepted` (`reviews.jsonl`
+  seq 1, content digest `87e9ab98…`); Required changes, Tests and Docs ticked
+  above as it decided. `validate --root . --require-complete BUG-171` was
+  rerun in the lane worktree before this move: 0 errors, 1 warning (the
+  justified skipped check `evidence-validate-bc0cab458`).
+Limitations the reviewers named, not changed here:
+- Not exercised: the legacy `seal-report` path with a superseded receipt and
+  concurrent `supersede-command` writers.
+- Optional hardening, no owner yet: `recorded_at` and unknown record fields
+  are unchecked; `schema_version` also accepts `True`; a receipt label is not
+  bound to its file stem or log paths.
+- Supersessions and `report.yaml` are not bound by the handoff/review digest.
+  A record appended after acceptance plus a regenerated report would pass
+  `--require-complete` unseen by a reviewer. Whether they must be
+  review-bound is an operator decision, as are vetoes of defaults 1-8; a
+  veto becomes a follow-up task.
+- METHOD-040 stays blocked until it records a fresh passing receipt with the
+  identical argv and cwd (see Remaining).
+The high-risk report, handoff, review and raw logs are git-ignored and stay
+in the `bug-171` lane worktree under `tasks/evidence/BUG-171/`; this
+retirement deletes nothing.

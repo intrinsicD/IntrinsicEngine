@@ -13,6 +13,7 @@ tasks/evidence/<TASK-ID>/
 │   ├── <label>.json
 │   ├── <label>.stdout.log
 │   └── <label>.stderr.log
+├── supersessions.jsonl    # optional; failed required receipt → later pass
 ├── handoff.jsonl          # high-risk and higher
 ├── reviews.jsonl          # high-risk and higher
 └── experiment/            # claim-grade and protected
@@ -25,7 +26,9 @@ tasks/evidence/<TASK-ID>/
   and one aggregate content digest;
 - touched layers/modules, extension seam, and future-change plan;
 - exact task acceptance criteria and dispositions;
-- command receipt paths and exit evidence;
+- command receipt paths and exit evidence, with `superseded_by` on a failed
+  receipt reconciled through `supersessions.jsonl` (see
+  [Superseding a failed required receipt](../../docs/agent/workflow-evidence.md#superseding-a-failed-required-receipt));
 - changed public contracts, diagnostics/previews, benchmark/parity evidence,
   docs synchronization, residual risks, and justified skipped checks;
 - referenced artifact paths/hashes and self-review answers;

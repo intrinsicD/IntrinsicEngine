@@ -75,7 +75,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [BUG-097](../../tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md) | Keep | Progressive model-scene UV job publishes a zero atlas. |
 | [BUG-149](../../tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md) | Revised | Fix output-root classification; exit-status propagation already exists. |
 | [BUG-160](../../tasks/done/BUG-160-fast-staged-atlas-chart-fragmentation.md) | Keep | FastStaged fixed seed planes fragment smooth meshes into tiny charts. |
-| [BUG-171](../../tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md) | Keep | Required development receipts cannot be superseded by a passing rerun. |
+| [BUG-171](../../tasks/done/BUG-171-required-command-receipt-supersession.md) | Keep | Required development receipts cannot be superseded by a passing rerun. |
 | [BUG-172](../../tasks/done/BUG-172-synchronous-cpu-load-completion-race.md) | Keep | Synchronous CPU completion can observe an unfinished or stale load transition. |
 | [BUG-176](../../tasks/done/BUG-176-concurrent-ctest-discovery.md) | Keep | Concurrent CTest discovery can duplicate generated registrations. |
 | [BUG-178](../../tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md) | Keep | Clang 23 crashes during an incremental module rebuild. |
@@ -83,7 +83,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [BUG-182](../../tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md) | Keep | Framed kNN smoke times out when promoted Vulkan is not compiled. |
 | [BUG-188](../../tasks/done/BUG-188-sandbox-sanitizer-test-discovery.md) | Keep | Sandbox blocks LeakSanitizer during CTest discovery. |
 | [BUG-193](../../tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md) | Keep | Investigate GPU pacing variability and watchdog margin. |
-| [BUG-195](../../tasks/backlog/bugs/BUG-195-verification-disk-headroom.md) | Keep | Verification can exhaust host disk space. |
+| [BUG-195](../../tasks/done/BUG-195-verification-disk-headroom.md) | Keep | Verification can exhaust host disk space. |
 | [GEOM-013](../../tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md) | Keep | Feature-preserving dual contouring. |
 | [GEOM-024](../../tasks/done/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) | Revised | Generalized eigensolver remains; the LDLT prerequisite is already delivered. |
 | [GEOM-059](../../tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md) | Keep | Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam. |

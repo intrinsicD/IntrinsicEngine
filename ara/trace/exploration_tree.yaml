@@ -10930,7 +10930,7 @@ tree:
     - N469
     - O177
     - methods/geometry/curvature_segmentation/boundary_partition_report.md
-    - tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md
+    - tasks/done/BUG-171-required-command-receipt-supersession.md
     status: resolved
   - id: N471
     type: experiment

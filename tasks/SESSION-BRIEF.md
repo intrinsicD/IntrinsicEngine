@@ -217,7 +217,6 @@ picking backlog work; theme priorities and rationale live in
 ## Theme J — Framework24 product convergence
 
 - unblocked: `BENCH-001` — Framework24 golden-workflow comparison harness (tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md)
-- unblocked: `BUG-171` — Required development receipts cannot be superseded by a passing rerun (tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md)
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - unblocked: `GRAPHICS-158` — Rebound position, normal, size and width streams render correctly on Vulkan (tasks/backlog/rendering/GRAPHICS-158-operational-evidence-for-rebound-render-attributes.md)
 - blocked by `BENCH-001`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
@@ -235,7 +234,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-178` — Clang 23 crashes during an incremental module rebuild (tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md)
 - unblocked: `BUG-180` — Leak-enabled framed ICP process reports 240 retained bytes (tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
 - unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
-- unblocked: `BUG-195` — Verification can exhaust host disk space (tasks/backlog/bugs/BUG-195-verification-disk-headroom.md)
 - unblocked: `BUG-220` — Parked-worker wake count flakes under parallel CTest load (tasks/backlog/bugs/BUG-220-parked-worker-wake-count-flake.md)
 - unblocked: `BUG-228` — Vulkan smoke timeout depends on the display environment (tasks/backlog/bugs/BUG-228-desktop-display-vulkan-smoke-timeouts.md)
 - unblocked: `BUILD-012` — Evaluate replacing the ImGui vcpkg overlay port with the registry port (tasks/backlog/process/BUILD-012-imgui-registry-port-evaluation.md)

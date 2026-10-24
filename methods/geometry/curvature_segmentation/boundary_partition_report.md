@@ -186,7 +186,7 @@ and bounded health, not segmentation quality.
   symbolizer. The harness now uses local debug symbols; all twenty complete
   leak/lifetime repetitions pass with unchanged suppressions and time limits.
 - Formal task retirement is blocked independently by
-  [BUG-171](../../../tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md):
+  [BUG-171](../../../tasks/done/BUG-171-required-command-receipt-supersession.md):
   required failed development receipts cannot currently be reconciled with later
   successful checks. Every original receipt remains intact.
 

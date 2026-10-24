@@ -1,5 +1,36 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-171 and BUG-195 retired after night-lane reviews
+
+Retired [BUG-171](BUG-171-required-command-receipt-supersession.md) (`3e7c98e27`, `bc0cab458`,
+`a56818089`) and [BUG-195](BUG-195-verification-disk-headroom.md) (`f8eddf657`, `6577e4cf6`,
+`f21ba9425`, `cb816e606`). The commits are merged into the night integration branch
+`claude/night-2026-10-24-bug-sweep`; they are not yet on `main`, and hosted CI has not run on them.
+
+- BUG-171: `workflow_evidence.py supersede-command` appends to a hash-chained
+  `supersessions.jsonl`. A record binds both receipt hashes and needs the identical argv and cwd, a
+  later required pass and a 20-character reason. The failed entry stays in the report with
+  `superseded_by` and becomes a warning; a completion report must list every receipt on disk.
+  Six new tests fail on the unchanged tool (38 subtests) and pass after it. All 17 mutations are
+  killed. A METHOD-040 dry run on a copy matched 16 of 16 predictions. METHOD-040 itself is still
+  blocked: it needs a fresh passing receipt with the exact failed argv and cwd.
+- BUG-195: `record-command` and `touched_scope.py --run` refuse before running below
+  `--min-free-gib` (default 20). Log and receipt write failures keep the earlier files, print the
+  unwritten logs and exit 2 as incomplete evidence, never as a receipt. The reclaim policy in
+  `docs/build-troubleshooting.md#disk-headroom` is manual only. Write failures were reproduced with
+  RLIMIT_FSIZE; no volume was filled and no real `--run` build ran.
+- Review: BUG-171 round 1 on `3e7c98e27`: independent Claude and independent Codex reviews both
+  "approve", all criteria "met". The final independent Claude review "accepted" `bc0cab458`
+  (content digest `87e9ab98…`) and decided the Required changes, Tests and Docs ticks.
+  `--require-complete BUG-171` gives 0 errors. BUG-195: two rounds of independent Claude and
+  independent Codex reviews ended with criterion 1 "partially met" (a relative `--build-dir`
+  fixed in `cb816e606`). The criterion-1 follow-up review approved `cb816e606` with all three
+  criteria "met".
+- Open for the operator: the BUG-171 defaults 1-8, and whether supersessions and `report.yaml`
+  must be review-bound. Also open: whether more BUG-195 entry points get a preflight, and which
+  METHOD-040 failures to supersede. The git-ignored evidence stays in the `bug-171` and `bug-195`
+  lane worktrees; nothing was deleted.
+
 ## 2026-10-24 — BUG-232 and BUG-188 retired after night-lane reviews
 
 Retired [BUG-232](BUG-232-gpuworld-commit-copy-lost-on-failed-submit.md) (`c2cd2d13c`) and

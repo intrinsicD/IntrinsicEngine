@@ -326,7 +326,7 @@ python3 tools/agents/check_ara_claims.py --root . --strict
   inspected source and exact input conditions. A separate automatic rejection
   prevented transferring private derived viewer screenshots; they remain local.
 - Formal completion-evidence generation is independently blocked by
-  [BUG-171](../backlog/bugs/BUG-171-required-command-receipt-supersession.md): two
+  [BUG-171](../done/BUG-171-required-command-receipt-supersession.md): two
   failed development builds were mistakenly marked required, and the evidence
   tool cannot reconcile them with later passing checks. Both original receipts
   remain intact. Do not delete them, weaken the gate, or mark this task retired
