@@ -166,6 +166,7 @@ jobs:
           python3 tests/regression/tooling/Test.CpuTestSelection.py
           python3 tests/regression/tooling/Test_BenchmarkResultValidator.py
           python3 tests/regression/tooling/Test.BenchmarkComparison.py
+          python3 tests/regression/tooling/Test.BenchmarkRunAndSeal.py
           python3 tests/regression/tooling/Test.CurvatureBoundaryViewer.py
           python3 tests/regression/tooling/Test.PartSeamOracle.py
           python3 tests/regression/tooling/Test.NeckSweep.py
