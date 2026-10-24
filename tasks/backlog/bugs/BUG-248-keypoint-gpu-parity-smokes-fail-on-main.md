@@ -133,3 +133,11 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke\.Key
   - It also wrote, verbatim: "I judge acceptance criteria 1, 2 and 3 met."
   - Its optional findings on evidence claims are addressed in the follow-up commit: the jscpd
     before-log, the glslc log, the exit codes and the phase-2 wording.
+  - Two findings were left alone, and the reviewer accepted both reasons:
+    - The cohort logs belong to the earlier Context section and are outside this change.
+    - `keypoint-analysis.md:43` stays because GLSL fp64 rounding is not guaranteed to match
+      the CPU.
+  - A delta review in the same session of `efb83a73e` (diff sha256
+    `af8a4df3f9ed0e38b245a52afac8ae878beaf495c67b040b8d3893e110d15bc9`) gave, verbatim,
+    "VERDICT: approve".
+  - Packets and answers: `review-*.{md,json}` and `delta-*.{md,json}`.
