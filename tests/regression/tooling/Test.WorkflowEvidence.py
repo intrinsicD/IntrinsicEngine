@@ -14,6 +14,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TOOL = REPO_ROOT / "tools" / "agents" / "workflow_evidence.py"
+CHECK = "test -f fixed.marker"
+GOOD_REASON = "Missing module import fixed; the identical rerun passes."
+sys.path.insert(0, str(TOOL.parent))  # raw ledger appends reuse _append_jsonl
 
 
 def run(
@@ -213,19 +216,97 @@ class Fixture:
     def report(self) -> Path:
         return self.repo / "tasks/evidence/TEST-001/report.yaml"
 
-    def receipt(self, label: str = "ok", executable: str = "/bin/true") -> int:
+    @property
+    def commands(self) -> Path:
+        return self.repo / "tasks/evidence/TEST-001/commands"
+
+    @property
+    def ledger(self) -> Path:
+        return self.repo / "tasks/evidence/TEST-001/supersessions.jsonl"
+
+    def receipt(
+        self,
+        label: str = "ok",
+        executable: str = "/bin/true",
+        *,
+        shell: str | None = None,
+        cwd: str | None = None,
+        optional: bool = False,
+    ) -> int:
+        command = ["record-command", "--root", str(self.repo)]
+        command += ["--task-id", "TEST-001", "--label", label]
+        if cwd:
+            command += ["--cwd", str(self.repo / cwd)]
+        if optional:
+            command.append("--optional")
+        command += ["--shell", shell] if shell else ["--", executable]
+        return run(self.repo, *command).returncode
+
+    def check(
+        self, label: str, passing: bool, *, cwd: str | None = None, optional: bool = False
+    ) -> int:
+        """Record the same argv; the marker decides whether it passes."""
+        marker = self.repo / (cwd or ".") / "fixed.marker"
+        marker.parent.mkdir(exist_ok=True)
+        if passing:
+            marker.touch()
+        else:
+            marker.unlink(missing_ok=True)
+        return self.receipt(label, shell=CHECK, cwd=cwd, optional=optional)
+
+    def edit_receipt(self, label: str, **fields: object) -> None:
+        path = self.commands / f"{label}.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.update(fields)
+        path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+    def backdate(self, label: str) -> None:
+        """Order receipts deterministically without sleeping across a second."""
+        self.edit_receipt(
+            label,
+            started_at="2000-01-01T00:00:00Z",
+            finished_at="2000-01-01T00:00:01Z",
+        )
+
+    def supersede(
+        self, failed: str, replacement: str, reason: str = GOOD_REASON
+    ) -> subprocess.CompletedProcess[str]:
         return run(
             self.repo,
-            "record-command",
+            "supersede-command",
             "--root",
             str(self.repo),
             "--task-id",
             "TEST-001",
-            "--label",
-            label,
-            "--",
-            executable,
-        ).returncode
+            "--failed",
+            failed,
+            "--replacement",
+            replacement,
+            "--reason",
+            reason,
+        )
+
+    def raw_supersession(
+        self, failed: str, replacement: str, reason: str = GOOD_REASON
+    ) -> None:
+        """Append without the CLI guard so validation is tested on its own."""
+        record = {
+            "schema_version": 1,
+            "recorded_at": "2026-01-01T00:00:00Z",
+            "failed": failed,
+            "replacement": replacement,
+            "reason": reason,
+        }
+        for role, label in (("failed", failed), ("replacement", replacement)):
+            path = self.commands / f"{label}.json"
+            record[f"{role}_sha256"] = (
+                hashlib.sha256(path.read_bytes()).hexdigest()
+                if path.is_file()
+                else "0" * 64
+            )
+        import workflow_evidence
+
+        workflow_evidence._append_jsonl(self.ledger, record)
 
     def generate(
         self,
@@ -976,6 +1057,272 @@ class WorkflowEvidenceTests(unittest.TestCase):
             fixture.review()
             result = fixture.validate()
         self.assertEqual(result.returncode, 0, result.stdout)
+
+
+def failed_then_passed(fixture: Fixture) -> None:
+    fixture.check("check-01", passing=False)
+    fixture.backdate("check-01")
+    fixture.check("check-02", passing=True)
+
+
+class SupersessionTests(unittest.TestCase):
+    """BUG-171: append-only reconciliation of a failed required receipt."""
+
+    def receipt_bytes(self, fixture: Fixture) -> dict[str, bytes]:
+        return {path.name: path.read_bytes() for path in fixture.commands.iterdir()}
+
+    def test_identical_passing_rerun_supersedes_failure_and_keeps_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            failed_then_passed(fixture)
+            before = self.receipt_bytes(fixture)
+            superseded = fixture.supersede("check-01", "check-02")
+            fixture.generate()
+            result = fixture.validate()
+            after = self.receipt_bytes(fixture)
+            entries = {
+                Path(entry["receipt"]).stem: entry
+                for entry in fixture.report_data()["commands"]
+            }
+        self.assertEqual(superseded.returncode, 0, superseded.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("superseded required failure", result.stdout)
+        self.assertEqual(before, after)
+        self.assertEqual(set(entries), {"check-01", "check-02"})
+        self.assertEqual(
+            entries["check-01"]["superseded_by"],
+            {
+                "receipt": "tasks/evidence/TEST-001/commands/check-02.json",
+                "reason": GOOD_REASON,
+            },
+        )
+        self.assertNotIn("superseded_by", entries["check-02"])
+
+    def test_unsuperseded_failure_still_blocks_beside_a_valid_supersession(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            for label in ("check-01", "check-02"):
+                fixture.check(label, passing=False)
+                fixture.backdate(label)
+            fixture.check("check-03", passing=True)
+            superseded = fixture.supersede("check-01", "check-03")
+            fixture.generate()
+            result = fixture.validate()
+        self.assertEqual(superseded.returncode, 0, superseded.stdout)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("[WARNING] commands[0]: superseded required failure", result.stdout)
+        self.assertIn("[ERROR] commands[1]: required command failed", result.stdout)
+        self.assertNotIn("[ERROR] commands[0]", result.stdout)
+
+    def test_cli_guard_and_validation_reject_invalid_supersessions(self):
+        def unrelated(fixture: Fixture) -> None:
+            fixture.check("check-01", passing=False)
+            fixture.backdate("check-01")
+            fixture.receipt("check-02", "/bin/true")
+
+        def other_cwd(fixture: Fixture) -> None:
+            fixture.check("check-01", passing=False)
+            fixture.backdate("check-01")
+            fixture.check("check-02", passing=True, cwd="sub")
+
+        def reversed_order(fixture: Fixture) -> None:
+            fixture.check("check-02", passing=True)
+            fixture.check("check-01", passing=False)
+
+        def failed_twice(fixture: Fixture) -> None:
+            fixture.check("check-01", passing=False)
+            fixture.backdate("check-01")
+            fixture.check("check-02", passing=False)
+
+        def optional_pass(fixture: Fixture) -> None:
+            fixture.check("check-01", passing=False)
+            fixture.backdate("check-01")
+            fixture.check("check-02", passing=True, optional=True)
+
+        def passed_twice(fixture: Fixture) -> None:
+            fixture.check("check-01", passing=True)
+            fixture.backdate("check-01")
+            fixture.check("check-02", passing=True)
+
+        def other_task(fixture: Fixture) -> None:
+            failed_then_passed(fixture)
+            fixture.edit_receipt("check-02", task_id="OTHER-002")
+
+        def malformed_time(fixture: Fixture) -> None:
+            failed_then_passed(fixture)
+            fixture.edit_receipt("check-02", started_at="yesterday")
+
+        def accepted_first(fixture: Fixture) -> None:
+            failed_then_passed(fixture)
+            fixture.check("check-03", passing=True)
+            first = fixture.supersede("check-01", "check-02")
+            self.assertEqual(first.returncode, 0, first.stdout)
+
+        replacement_fails = "replacement receipt must be a passing required command"
+        cases = {
+            "missing receipt": (
+                failed_then_passed, "check-01", "absent", GOOD_REASON, 1,
+                "missing replacement receipt: absent",
+            ),
+            "unrelated check": (
+                unrelated, "check-01", "check-02", GOOD_REASON, 1,
+                "replacement runs a different command",
+            ),
+            "different cwd": (
+                other_cwd, "check-01", "check-02", GOOD_REASON, 1,
+                "replacement runs in a different working directory",
+            ),
+            "reversed chronology": (
+                reversed_order, "check-01", "check-02", GOOD_REASON, 1,
+                "replacement must start after the failed receipt finished",
+            ),
+            "failed replacement": (
+                failed_twice, "check-01", "check-02", GOOD_REASON, 1,
+                replacement_fails,
+            ),
+            "optional replacement": (
+                optional_pass, "check-01", "check-02", GOOD_REASON, 1,
+                replacement_fails,
+            ),
+            "passing receipt superseded": (
+                passed_twice, "check-01", "check-02", GOOD_REASON, 1,
+                "superseded receipt must be a failed required command",
+            ),
+            "self supersession": (
+                failed_then_passed, "check-01", "check-01", GOOD_REASON, 1,
+                replacement_fails,
+            ),
+            "other task receipt": (
+                other_task, "check-01", "check-02", GOOD_REASON, 1,
+                "replacement receipt is invalid: task_id does not match report",
+            ),
+            "malformed timestamp": (
+                malformed_time, "check-01", "check-02", GOOD_REASON, 1,
+                "replacement receipt has malformed started_at",
+            ),
+            "path outside commands": (
+                failed_then_passed, "../../OTHER-002/commands/check-01", "check-02",
+                GOOD_REASON, 1, "failed must be a receipt label",
+            ),
+            "short reason": (
+                failed_then_passed, "check-01", "check-02", "fixed it now", 1,
+                "reason must contain at least 20 non-blank characters",
+            ),
+            "blank reason": (
+                failed_then_passed, "check-01", "check-02", " " * 30, 1,
+                "reason must contain at least 20 non-blank characters",
+            ),
+            "cycle": (
+                accepted_first, "check-02", "check-01", GOOD_REASON, 2,
+                "superseded receipt must be a failed required command",
+            ),
+            "contradictory": (
+                accepted_first, "check-01", "check-03", GOOD_REASON, 2,
+                "contradictory records supersede check-01 more than once",
+            ),
+        }
+        for name, (build, failed, replacement, reason, line, message) in cases.items():
+            for mode in ("cli", "raw"):
+                with self.subTest(case=name, mode=mode), tempfile.TemporaryDirectory() as tmp:
+                    fixture = Fixture(Path(tmp))
+                    build(fixture)
+                    if mode == "cli":
+                        result = fixture.supersede(failed, replacement, reason)
+                        self.assertEqual(result.returncode, 2, result.stdout)
+                        self.assertIn(message, result.stdout)
+                        continue
+                    fixture.raw_supersession(failed, replacement, reason)
+                    fixture.generate()
+                    result = fixture.validate()
+                    self.assertEqual(result.returncode, 1, result.stdout)
+                    self.assertIn(f"supersessions.jsonl:{line}: {message}", result.stdout)
+
+    def test_validation_rejects_evidence_tampered_after_supersession(self):
+        def delete_replacement(fixture: Fixture) -> None:
+            (fixture.commands / "check-02.json").unlink()
+
+        def edit_failed(fixture: Fixture) -> None:
+            with (fixture.commands / "check-01.json").open("a") as handle:
+                handle.write("\n")
+
+        def edit_ledger(fixture: Fixture) -> None:
+            lines = fixture.ledger.read_text(encoding="utf-8").splitlines()
+            lines[0] = lines[0].replace("identical rerun", "unrelated rerun")
+            fixture.ledger.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        cases = {
+            "replacement deleted": (
+                delete_replacement,
+                "supersessions.jsonl:1: missing replacement receipt: check-02",
+            ),
+            "failed receipt edited": (
+                edit_failed, "supersessions.jsonl:1: failed receipt hash mismatch"
+            ),
+            "non-final ledger record edited": (
+                edit_ledger, "previous-entry hash chain is broken"
+            ),
+        }
+        for name, (tamper, message) in cases.items():
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as tmp:
+                fixture = Fixture(Path(tmp))
+                failed_then_passed(fixture)
+                fixture.check("check-03", passing=False)
+                fixture.backdate("check-03")
+                for failed in ("check-01", "check-03"):
+                    accepted = fixture.supersede(failed, "check-02")
+                    self.assertEqual(accepted.returncode, 0, accepted.stdout)
+                tamper(fixture)
+                fixture.generate()
+                result = fixture.validate()
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn(message, result.stdout)
+                self.assertIn("required command failed", result.stdout)
+
+    def test_report_cannot_omit_a_recorded_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Fixture(Path(tmp))
+            failed_then_passed(fixture)
+            fixture.generate()
+            report = fixture.report_data()
+            report["commands"] = [
+                entry for entry in report["commands"]
+                if not entry["receipt"].endswith("check-01.json")
+            ]
+            fixture.report.write_text(yaml.safe_dump(report), encoding="utf-8")
+            result = fixture.validate()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(
+            "report omits recorded receipt(s): "
+            "tasks/evidence/TEST-001/commands/check-01.json",
+            result.stdout,
+        )
+
+    def test_report_supersession_must_match_the_ledger(self):
+        def stale(fixture: Fixture) -> None:
+            fixture.generate()
+            accepted = fixture.supersede("check-01", "check-02")
+            self.assertEqual(accepted.returncode, 0, accepted.stdout)
+
+        def forged(fixture: Fixture) -> None:
+            fixture.generate()
+            report = fixture.report_data()
+            report["commands"][0]["superseded_by"] = {
+                "receipt": "tasks/evidence/TEST-001/commands/check-02.json",
+                "reason": GOOD_REASON,
+            }
+            fixture.report.write_text(yaml.safe_dump(report), encoding="utf-8")
+
+        for name, edit in (("stale", stale), ("forged", forged)):
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as tmp:
+                fixture = Fixture(Path(tmp))
+                failed_then_passed(fixture)
+                edit(fixture)
+                result = fixture.validate()
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn(
+                    "report supersession does not match supersessions.jsonl",
+                    result.stdout,
+                )
 
 
 if __name__ == "__main__":

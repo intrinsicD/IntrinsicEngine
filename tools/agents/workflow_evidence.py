@@ -74,6 +74,15 @@ SEAL_FIELDS = {
     "generated_by",
 }
 SEAL_RECORD_FIELDS = {"path", "sha256"}
+SUPERSESSION_FIELDS = {
+    "schema_version",
+    "recorded_at",
+    "failed",
+    "failed_sha256",
+    "replacement",
+    "replacement_sha256",
+    "reason",
+}
 ACCEPTANCE_DISPOSITIONS = {
     "satisfied",
     "deferred",
@@ -918,10 +927,15 @@ def _atomic_write(path: Path, payload: bytes, replace: bool = False) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _append_jsonl(path: Path, record: dict[str, Any]) -> None:
+def _append_jsonl(
+    path: Path, record: dict[str, Any], guard: Callable[[], None] | None = None
+) -> None:
+    """Append under an exclusive lock; ``guard`` may refuse inside that lock."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        if guard is not None:
+            guard()
         handle.seek(0)
         prior_lines = [line for line in handle.read().splitlines() if line.strip()]
         previous_hash = (
@@ -1072,6 +1086,129 @@ def record_command(args: argparse.Namespace) -> int:
     return result.returncode
 
 
+def _receipt_time(receipt: dict[str, Any], role: str, key: str) -> datetime:
+    try:
+        return datetime.strptime(receipt[key], "%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{role} receipt has malformed {key}") from exc
+
+
+def _check_supersession(
+    repo_root: Path, task_id: str, record: dict[str, Any]
+) -> tuple[str, dict[str, str]]:
+    """Return (failed receipt path, report projection) or raise the first defect."""
+    missing = sorted(SUPERSESSION_FIELDS - record.keys())
+    if missing:
+        raise ValueError(f"missing fields: {', '.join(missing)}")
+    if record["schema_version"] != SCHEMA_VERSION:
+        raise ValueError("schema_version must equal 1")
+    paths: dict[str, str] = {}
+    receipts: dict[str, dict[str, Any]] = {}
+    for role in ("failed", "replacement"):
+        label = record[role]
+        if not isinstance(label, str) or not LABEL_RE.fullmatch(label):
+            raise ValueError(f"{role} must be a receipt label")
+        paths[role] = f"tasks/evidence/{task_id}/commands/{label}.json"
+        path = resolve_repo_path(repo_root, paths[role])
+        if not path.is_file():
+            raise ValueError(f"missing {role} receipt: {label}")
+        if sha256_file(path) != record[f"{role}_sha256"]:
+            raise ValueError(f"{role} receipt hash mismatch: {label}")
+        data, problems = validate_receipt(repo_root, task_id, paths[role])
+        if problems or data is None:  # data is None only alongside a problem
+            raise ValueError(f"{role} receipt is invalid: {problems[0].message}")
+        receipts[role] = data
+    failed, replacement = receipts["failed"], receipts["replacement"]
+    if failed["required"] is not True or failed["exit_code"] == 0:
+        raise ValueError("superseded receipt must be a failed required command")
+    if replacement["required"] is not True or replacement["exit_code"] != 0:
+        raise ValueError("replacement receipt must be a passing required command")
+    if replacement["command"] != failed["command"]:
+        raise ValueError("replacement runs a different command")
+    if replacement["cwd"] != failed["cwd"]:
+        raise ValueError("replacement runs in a different working directory")
+    # Receipts have one-second resolution; an ambiguous same-second order fails.
+    if _receipt_time(replacement, "replacement", "started_at") <= _receipt_time(
+        failed, "failed", "finished_at"
+    ):
+        raise ValueError("replacement must start after the failed receipt finished")
+    reason = record["reason"]
+    if not isinstance(reason, str) or len("".join(reason.split())) < 20:
+        raise ValueError("reason must contain at least 20 non-blank characters")
+    return paths["failed"], {"receipt": paths["replacement"], "reason": reason}
+
+
+def _evaluate_supersessions(
+    repo_root: Path, task_id: str, records: list[dict[str, Any]]
+) -> tuple[dict[str, dict[str, str]], list[Finding]]:
+    location = f"tasks/evidence/{task_id}/supersessions.jsonl"
+    failed_labels = [record.get("failed") for record in records]
+    valid: dict[str, dict[str, str]] = {}
+    findings: list[Finding] = []
+    for index, record in enumerate(records, start=1):
+        try:
+            label = record.get("failed")
+            if isinstance(label, str) and failed_labels.count(label) > 1:
+                raise ValueError(
+                    f"contradictory records supersede {label} more than once"
+                )
+            failed, projection = _check_supersession(repo_root, task_id, record)
+            valid[failed] = projection
+        except ValueError as exc:
+            findings.append(Finding("error", f"{location}:{index}", str(exc)))
+    return valid, findings
+
+
+def _supersessions(
+    repo_root: Path, task_id: str
+) -> tuple[dict[str, dict[str, str]], list[Finding]]:
+    """Valid ledger records by failed receipt path; every defect is an error."""
+    path = evidence_root(repo_root, task_id) / "supersessions.jsonl"
+    if not path.exists():
+        return {}, []
+    try:
+        records = load_jsonl(path)
+    except ValueError as exc:
+        return {}, [Finding("error", relative_path(repo_root, path), str(exc))]
+    return _evaluate_supersessions(repo_root, task_id, records)
+
+
+def supersede_command(args: argparse.Namespace) -> int:
+    repo_root = repo_root_from(args.root)
+    _, metadata = load_task_metadata(find_task(repo_root, args.task_id))
+    if metadata.get("workflow_schema") != SCHEMA_VERSION:
+        raise ValueError(f"{args.task_id} is not enrolled in workflow schema v1")
+    record: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "recorded_at": utc_now(),
+        "failed": args.failed,
+        "replacement": args.replacement,
+        "reason": args.reason,
+    }
+    commands = evidence_root(repo_root, args.task_id) / "commands"
+    for role in ("failed", "replacement"):
+        receipt = commands / f"{record[role]}.json"
+        valid = LABEL_RE.fullmatch(record[role]) and receipt.is_file()
+        # An unusable label or missing file is reported by the guard below.
+        record[f"{role}_sha256"] = sha256_file(receipt) if valid else None
+    path = evidence_root(repo_root, args.task_id) / "supersessions.jsonl"
+
+    def guard() -> None:
+        prior = load_jsonl(path)
+        _, findings = _evaluate_supersessions(
+            repo_root, args.task_id, [*prior, record]
+        )
+        if findings:
+            raise ValueError("; ".join(finding.message for finding in findings))
+
+    _append_jsonl(path, record, guard)
+    print(
+        f"Recorded {args.failed} superseded by {args.replacement} in "
+        f"{relative_path(repo_root, path)}."
+    )
+    return 0
+
+
 def is_temporary_evidence(repo_root: Path, task_id: str, value: object) -> bool:
     """Ignored task artifacts bind local bytes even when source is committed."""
     if not isinstance(value, str) or not value.startswith(
@@ -1103,6 +1240,8 @@ def generate_report(args: argparse.Namespace) -> int:
         relative_path(repo_root, path)
         for path in (evidence_root(repo_root, args.task_id) / "commands").glob("*.json")
     )
+    # Invalid ledger records project nothing; validation reports them.
+    superseded, _ = _supersessions(repo_root, args.task_id)
     acceptance = [
         {
             "criterion": text,
@@ -1156,7 +1295,12 @@ def generate_report(args: argparse.Namespace) -> int:
         "extension_seam": args.extension_seam,
         "future_change_plan": args.future_change_plan,
         "acceptance": acceptance,
-        "commands": [{"receipt": value} for value in receipts],
+        "commands": [
+            {"receipt": value, "superseded_by": superseded[value]}
+            if value in superseded
+            else {"receipt": value}
+            for value in receipts
+        ],
         "changed_public_contracts": list(args.public_contract),
         "diagnostics_and_previews": list(args.diagnostic),
         "benchmark_or_parity_evidence": list(args.benchmark_evidence),
@@ -1661,24 +1805,67 @@ def validate_report(
                 )
             )
 
+    completion_required = require_complete or status == "complete"
     commands = _require_list(report.get("commands"), "commands", findings)
+    superseded, ledger_findings = _supersessions(repo_root, task_id)
+    findings.extend(ledger_findings)
     required_receipt_count = 0
     for index, value in enumerate(commands):
         entry = _require_mapping(value, f"commands[{index}]", findings)
-        receipt, receipt_findings = validate_receipt(
-            repo_root, task_id, entry.get("receipt")
+        receipt_value = entry.get("receipt")
+        replacement = (
+            superseded.get(receipt_value) if isinstance(receipt_value, str) else None
         )
+        if entry.get("superseded_by") != replacement:
+            findings.append(
+                Finding(
+                    "error",
+                    f"commands[{index}]",
+                    "report supersession does not match supersessions.jsonl; "
+                    "regenerate the report",
+                )
+            )
+        receipt, receipt_findings = validate_receipt(repo_root, task_id, receipt_value)
         findings.extend(receipt_findings)
         if receipt and receipt.get("required") is True:
             required_receipt_count += 1
-            if receipt.get("exit_code") != 0:
+            exit_code = receipt.get("exit_code")
+            if exit_code != 0 and replacement is not None:
+                findings.append(
+                    Finding(
+                        "warning",
+                        f"commands[{index}]",
+                        f"superseded required failure (exit {exit_code}) by "
+                        f"{replacement['receipt']}: {replacement['reason']}",
+                    )
+                )
+            elif exit_code != 0:
                 findings.append(
                     Finding(
                         "error",
                         f"commands[{index}]",
-                        f"required command failed with exit {receipt.get('exit_code')}",
+                        f"required command failed with exit {exit_code}",
                     )
                 )
+    if completion_required:
+        listed = {
+            entry["receipt"]
+            for entry in commands
+            if isinstance(entry, dict) and isinstance(entry.get("receipt"), str)
+        }
+        omitted = sorted(
+            relative_path(repo_root, path)
+            for path in (evidence_root(repo_root, task_id) / "commands").glob("*.json")
+            if relative_path(repo_root, path) not in listed
+        )
+        if omitted:
+            findings.append(
+                Finding(
+                    "error",
+                    "commands",
+                    f"report omits recorded receipt(s): {', '.join(omitted)}",
+                )
+            )
     if status == "complete" and required_receipt_count == 0:
         findings.append(
             Finding(
@@ -1774,7 +1961,6 @@ def validate_report(
                 )
             )
 
-    completion_required = require_complete or status == "complete"
     if profile in PROFILE_ORDER and PROFILE_ORDER[profile] >= 2:
         findings.extend(
             validate_high_risk_records(
@@ -2129,6 +2315,18 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument("--shell")
     record.add_argument("command", nargs=argparse.REMAINDER)
     record.set_defaults(handler=record_command)
+
+    supersede = subparsers.add_parser(
+        "supersede-command",
+        help="Append a hash-bound record reconciling a failed required receipt "
+        "with a later passing run of the same argv and cwd.",
+    )
+    supersede.add_argument("--root", type=Path, default=Path("."))
+    supersede.add_argument("--task-id", required=True)
+    supersede.add_argument("--failed", required=True, metavar="LABEL")
+    supersede.add_argument("--replacement", required=True, metavar="LABEL")
+    supersede.add_argument("--reason", required=True)
+    supersede.set_defaults(handler=supersede_command)
 
     generate = subparsers.add_parser("generate-report", help="Generate report.yaml.")
     generate.add_argument("--root", type=Path, default=Path("."))

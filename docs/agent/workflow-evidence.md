@@ -281,7 +281,9 @@ python3 tools/agents/workflow_evidence.py record-command \
 
 The receipt records exact argv, repository-relative working directory,
 timestamps, duration, exit code, required/optional status, and hashed stdout
-and stderr logs. Labels are non-overwriting.
+and stderr logs. Labels are non-overwriting. Record exploratory or
+development runs with `--optional`; reserve required receipts for the checks
+that gate completion.
 
 Command stdout/stderr logs are preserved as raw hash-bound bytes.
 `tasks/evidence/.gitattributes` marks them as binary so Git does not normalize
@@ -317,11 +319,59 @@ python3 tools/agents/workflow_evidence.py validate \
 The ordinary repository scan validates reports that remain, including complete
 reports for `tasks/done/`. It does not require removed retired reports.
 `--require-complete` requires the report and applies the retirement gate while a
-task remains active, before cleanup. Missing or failed required receipts, unchecked or
+task remains active, before cleanup. Missing receipts, unsuperseded failed
+required receipts, a completion report that omits a recorded receipt, unchecked or
 unaddressed acceptance criteria, task/profile mismatch, changed source
 surface, stale artifact hashes, missing reasons, and absent profile-specific
 records are blocking errors. A justified skipped check is an explicit warning
 and remains visible in the report.
+
+### Superseding a failed required receipt
+
+A failed required receipt is never edited, deleted, or relabeled. When the same
+check later passes, reconcile the two with an append-only record:
+
+```bash
+python3 tools/agents/workflow_evidence.py supersede-command \
+  --task-id PROC-999 --failed build-01 --replacement build-03 \
+  --reason "Missing module import fixed in the implementation; identical rerun passes."
+```
+
+The command appends to the hash-chained `tasks/evidence/<ID>/supersessions.jsonl`
+under an exclusive lock, and refuses (exit 2) unless every record, including the
+new one, is valid. A record names both receipt labels in the task's own
+`commands/` directory, binds the SHA-256 of both receipt files, and carries the
+reason. It is valid only when:
+
+- both receipts exist, still match their recorded hashes, and pass ordinary
+  receipt validation (task ID, log hashes);
+- the failed receipt is required with a nonzero exit, and the replacement is
+  required with exit 0;
+- both have the identical recorded argv list and working directory; flag
+  spellings are not normalized, so `-j 4` and `-j4` are different checks;
+- the replacement started strictly after the failed receipt finished, at the
+  receipts' one-second resolution (a same-second order is rejected);
+- the reason has at least 20 non-blank characters;
+- no other record supersedes the same failed receipt. One passing replacement
+  may cover several earlier failures.
+
+These rules also reject self-supersession and cycles: a receipt cannot be
+both the failure and the pass, and time cannot loop. `generate-report` keeps
+every receipt in `commands` and adds `superseded_by: {receipt, reason}` to each
+validly superseded entry. Validation recomputes that projection from the ledger
+and reports a mismatch as an error; regenerate the report after appending a
+record. A validly superseded failure becomes a visible warning; every other
+failure, and every ledger defect, stays a blocking error. A completion report
+must list every `commands/*.json` on disk, so editing the report cannot hide a
+failure. As for `handoff.jsonl` and `reviews.jsonl`, the chain detects an edit
+to any record that has a successor; the newest record is protected only by its
+own rule checks, and truncating it re-exposes the failure. An invalid record
+cannot be removed; it keeps the task blocked until a human decides.
+
+Residual risk: receipts bind neither the source revision nor the environment
+or build-tree state. A replacement proves that the same argv and working
+directory later passed, not that it passed on the final source or under the
+same environment. Source binding belongs to `PROC-031`, `CI-012`, and `CI-013`.
 
 The aggregate content digest is always recomputed from the recorded surface,
 including the valid empty-surface case. An empty diff therefore has one
