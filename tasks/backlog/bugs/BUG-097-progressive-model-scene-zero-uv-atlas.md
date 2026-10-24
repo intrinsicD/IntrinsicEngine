@@ -395,7 +395,11 @@ The v1 text is kept as the record; its line numbers refer to v1.
     intends; the condition is BUG-250's `primitive.HasResolvedTexcoords`,
     unchanged.
   - `MeshHasVertexTexcoords` is removed as well. After BUG-250 its only
-    caller was the deleted progressive early return.
+    caller was the deleted progressive UV-job guard
+    (`if (hasProgressiveJobs && !MeshHasVertexTexcoords(primitive.Mesh))`).
+  - The one extra focused test against v1 (110 vs 109) is
+    `RuntimeAssetImportFormatCoverage.ModelSceneSeamAtlasRequestsGeneratedTextureBakes`
+    (checked by name by the independent review of `3fb7ae908`).
 - Verification (this session, `build/ci`):
   - `IntrinsicRuntimeContractTests` build: exit 0. No warnings in
     `AssetWorkflow` files; the warnings in the log are in unrelated files.
