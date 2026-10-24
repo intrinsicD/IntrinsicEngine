@@ -51,6 +51,11 @@ cmake --preset ci && CCACHE_DISABLE=1 cmake --build --preset ci --target <failin
 rm -rf build/ci && cmake --preset ci && cmake --build --preset ci --target <failing-target>
 ```
 
+Keep the source surface stable while any rung runs: exactly one writer (one
+build command, no agent or editor saving sources) per build tree, and never
+share a tree between concurrent builds. A crash on a tree whose sources
+changed during the build is not a compiler reproducer (evidence: `BUG-178`).
+
 Re-run the failing test after each rung. The clean-preset rebuild rule is
 documented as the authoritative prevention in `src/graphics/rhi/README.md`
 (mandatory after RHI interface/vtable changes) — cite that section rather than

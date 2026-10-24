@@ -80,6 +80,113 @@ No source, preset or gate changed. Logs are git-ignored under
 `baseline-rc.txt`, `environment.txt`, `predictions.txt`, `step0-noop.log`,
 `step1-edited.log`, `step2-reverted.log`).
 
+## ccache comparison — 2026-10-24 (second session)
+
+The operator decided: "ccache installieren und nochmal testen". ccache was installed
+without root from the Ubuntu jammy package (`ccache 4.5.1-1` plus its
+`libhiredis0.14` dependency, unpacked with `dpkg -x` under `~/.local/opt/ccache`,
+called through a small wrapper that sets `LD_LIBRARY_PATH`). It was on `PATH` only
+for this session's commands. CI uses ccache 4.9.1, so this host tests an older
+ccache. The cache directory is a dedicated `CCACHE_DIR`
+(`IntrinsicEngine-night/_state/ccache-bug178`), so the user's default cache is
+untouched. Source surface: commit `4c30f2b82`, clean worktree, one writer per
+tree, preset `ci-vulkan` (Clang 23, Debug, ASan+UBSan), `nice -n 10`,
+`--parallel 16`, target `IntrinsicPointLBVHGpuTests`. Each arm runs the scenario
+from the first diagnosis: a full build, a no-op check, then one comment line
+appended to the three named runtime files and a rebuild, then a `git checkout`
+revert and a rebuild. A watchdog stops the build if free disk falls below 20 GB.
+
+Arms:
+- (a) ccache on, cold cache: new tree `build/ci-vulkan-ccache`, empty `CCACHE_DIR`.
+- (b) ccache on, warm cache: delete and reconfigure the same tree, keep the cache.
+- (c) `CCACHE_DISABLE=1` in the ccache-configured tree from (b).
+- (d) fresh tree without ccache on `PATH` (`build/ci-vulkan-fresh`).
+
+Predictions, written before any build:
+1. Configure prints `Using CCache:` with the wrapper path for (a) and (b), and the
+   compile rules carry the `tools/ci/ccache_ci.py launch` launcher.
+2. All four arms build with exit 0 in every step. No log prints
+   `PLEASE submit a bug report`, `Stack dump` or `error:`, and no new
+   reproducer appears in `/tmp`.
+3. ccache 4.5.1 does not cache the module-interface compiles (it does not know
+   `-x c++-module` / `-fmodule-output`); they are counted as uncacheable and
+   always run the compiler. Implementation units are cached.
+4. (a): the full build is almost all misses. The revert rebuild hits the cache
+   for the reverted implementation units, because their preprocessed content
+   equals the full build's.
+5. (b): the full build hits for most implementation units and is faster than (a).
+6. (c) and (d): ccache statistics do not change.
+Kill condition: a frontend crash stops the arm. Its logs and reproducer are kept,
+and the failing command is rerun alone with and without ccache.
+
+Results (13:17–13:28, after the GPU-timing measurement had finished; tree commit
+`12e9f6c19`, which differs from `4c30f2b82` only in this note). Each step
+lists: exit code, wall time, compile steps.
+
+| Arm | full build | edited rebuild | reverted rebuild | ccache in the step |
+|---|---|---|---|---|
+| (a) on, cold | 0, 185 s, 892 | 0, 32 s, 20 | 0, 15 s, 20 | full: 0 hits / 446 misses / 446 uncacheable; edited: 1 hit / 18 misses / 1 uncacheable; reverted: 19 hits / 1 uncacheable |
+| (b) on, warm, new tree | 0, 64 s, 892 | 0, 15 s, 20 | 0, 15 s, 20 | full: 446 hits / 446 uncacheable; edited: 19 hits / 1 uncacheable; reverted: 19 hits / 1 uncacheable |
+| (c) `CCACHE_DISABLE=1` | (tree from b) | 0, 26 s, 20 | 0, 26 s, 20 | counters unchanged |
+| (d) fresh, no ccache | 0, 127 s, 892 | 0, 26 s, 20 | 0, 26 s, 20 | counters unchanged; `CCACHE_PROGRAM-NOTFOUND` |
+
+In every arm, the no-op builds before and after the scenario printed `[0/2]`. No log
+contains `PLEASE submit a bug report`, `Stack dump` or `error:`, no new
+reproducer appeared in `/tmp`, and `git status` was clean afterwards. The 20 GB disk watchdog never fired
+(free disk sampled at the end of each step was 26 GB or more). Predictions 2,
+5 and 6 held. Prediction 1 held only in part: configure printed
+`Using CCache:` with the wrapper path for (a) and (b), but the scripted
+`launcher_rules` check printed 0 because it searched `CMakeFiles/rules.ninja`,
+while CMake writes `CMAKE_CXX_COMPILER_LAUNCHER` as `LAUNCHER =` into
+`build.ninja`. An unrecorded manual look at (a)'s `build.ninja` during the run
+reported the `ccache_ci.py launch` launcher on 1,378 lines; no output was saved,
+so it is not evidence. For both (a) and (b), launcher use rests on the configure
+line `Using CCache:` and the moving ccache counters; the ccache directory holds
+no compiler symlinks, so only the launcher can produce those counts. The trees are
+deleted, so this cannot be rechecked. Prediction 4 held with one addition: one
+implementation unit already hit in the edited rebuild. Most likely ccache's
+preprocessed mode ignored the comment-only edit to `Models.cpp`, because
+comments vanish in preprocessing. Comment-only edits therefore barely
+exercise the cache. Prediction 3 held as far as the counters show. Each of (a)
+and (b) added 448 uncacheable calls. The verbose statistics, read after (a),
+count all 448 as `Unsupported source language`. That they are the
+module-interface compiles is inferred: the full build compiled 442 `.cppm` and
+450 `.cpp` units against 446 uncacheable calls. The 4 extra are probably `.cpp`
+module units; they were not identified. In (a) and (b) the revert rebuild took
+19 implementation-unit objects from the cache, including the two reverted
+`.cpp` files, while the BMI of the edited interface was regenerated. That is the mix of cached objects and fresh BMIs this bug suspected,
+and it built without a crash.
+
+Result: bounded non-reproduction. With a stable source surface and one writer per
+tree, the incremental scenario does not crash on this host. That holds with
+ccache on (cold or warm), with ccache disabled, and on a fresh tree. No compiler or
+cache cause is established. Limits: ccache 4.5.1 instead of CI's 4.9.1, one
+target, comment-only edits, a single repetition per arm. Concurrent writers and
+source edits during a build (present in the 2026-09-12 incident) were
+deliberately not tested. The strict module/toolchain gates are unchanged. Because
+nothing reproduced, no tooling fix is needed. The build discipline goes into the
+stale-build triage skill (`tools/agents/skills/intrinsicengine-stale-build-triage/SKILL.md`).
+Both trees I created were deleted afterwards.
+The cache (about 0.2 GB) remains under `_state/ccache-bug178`. Logs, ccache statistics
+before and after each step, and `summary.txt` per arm are git-ignored under
+`tasks/evidence/BUG-178/{a,b,c,d}/`.
+
+The 110 reproducers in `/tmp` from 2026-10-19 (11:55:10–11:57:04), examined
+read-only: all come from one deleted worktree,
+`IntrinsicEngine/.claude/worktrees/admiring-lewin-336fda`, built with the
+`ci-coverage-cpu` tree. They are coverage-instrumented (`-fprofile-instr-generate
+-fcoverage-mapping`), without sanitizers, and not `ci-vulkan`. There are 110 distinct
+main files (88 module interfaces with `-fmodule-output`, 22 implementation units)
+across the layers. By file-name prefix: Runtime 37, Geometry 29, Graphics 20,
+Core 9, Sandbox 6, Asset 2, Backends 2, Platform 2, RHI 2, ECS 1. Examples
+are `Asset.GeometryPayload.cppm` and `Runtime.SceneDocumentModule.cppm`. No single
+file or module is shared by all of them; the most common imported module is
+`Extrinsic.Core.StrongHandle` (74 of 110). The crashes hit 110 units across all layers,
+including Core, within two minutes. That fits an
+event on the whole tree (for example, the worktree or its build files disappearing
+during the build) better than a defect in one module, but the crash messages are
+not preserved, so the cause is unknown.
+
 ## Acceptance criteria
 - [ ] Reproduce with one stabilized source surface and exactly one writer per preset tree, comparing enabled/disabled ccache and a fresh tree.
 - [ ] Record the compiler/cache cause or a bounded non-reproduction; preserve the existing strict module/toolchain gates.
