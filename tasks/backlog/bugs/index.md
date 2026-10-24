@@ -10,9 +10,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   BUG-091 probe hard-code `<target>[1]_include.cmake`. The race probe fails 3/3 on 4.4.4 with a layout message.
 
 - [BUG-247 — Local root hygiene rejects existing tool state](BUG-247-local-root-hygiene-state-mismatch.md):
-  checked 2026-10-24 in the main checkout at 599f02ff1: `.aws/` is absent, `.serena/` is an ignored local
-  entry in `root_allowlist.yaml` since f849aafb1; strict root hygiene passes and `Test.RootHygiene.py` 13/13.
-  Awaits the operator's confirmation that this is the agreed setup.
+  no longer reproduces on 2026-10-24 (see its note); awaits the operator's confirmation that the current
+  local setup is the agreed one.
 
 - [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](BUG-240-sanitizer-cpu-jobs-red-since-september.md):
   sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
@@ -23,8 +22,9 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   FIFO. Reproducing the monitor-off state and choosing the supported display setup await the operator.
 
 - [BUG-220 — Parked-worker wake count flakes under parallel CTest load](BUG-220-parked-worker-wake-count-flake.md):
-  no lost wakeup; the exact count was overstated. Test-only fix landed (15c9fb5ea, b7506b39e), proven by
-  forced gdb interleavings; AC3 (passes under incident-like load) is not demonstrated, its wording awaits the operator.
+  no lost wakeup; the exact count was overstated. Test-only fix on this branch (15c9fb5ea, b7506b39e), proven by
+  forced gdb interleavings. AC1/AC3 (reproduce and pass under load) are not demonstrated under incident-like load;
+  whether the deterministic gdb reproduction meets them awaits the operator.
 
 
 

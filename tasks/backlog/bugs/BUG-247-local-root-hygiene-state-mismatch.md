@@ -30,6 +30,14 @@ maintained tracked/new files passes all 13 methods. This is a local setup issue;
 no hosted-CI failure or engine behavior defect is inferred. Both directories are
 preserved. Raw evidence: `tasks/evidence/BUG-247/root-hygiene.log`.
 
+On 2026-10-24, in the main checkout at `599f02ff1`, the failure no longer
+reproduces: `.aws/` is absent (its contents were never read), and `.serena/` is
+an exact ignored local entry in `tools/repo/root_allowlist.yaml` since
+`f849aafb1` (2026-10-23). Strict root hygiene exits 0 and `Test.RootHygiene.py`
+passes 13 of 13. Nothing records whether `f849aafb1` was the operator's decision
+for criterion 1 or how `.aws/` disappeared, so criterion 1 still awaits the
+operator.
+
 ## Verification
 ```bash
 python3 tools/repo/check_root_hygiene.py --root . --strict
