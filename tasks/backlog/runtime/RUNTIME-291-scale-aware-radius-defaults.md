@@ -97,10 +97,11 @@ radius), so the support-radius helper does not apply trivially; they are left fo
 - `support_radius` 0 is the new default and is accepted by validation; positive values are
   unchanged. `EditorDensityWeightResult::SupportRadius` reports the resolved radius; the CPU
   completion message appends it; the panel shows "Support radius R; query radius Q".
-- CPU backends resolve on the job worker (`Compute`). Vulkan resolves in `Capture` before
-  admission because its dispatch starts on the frame thread (a `shortcut:` comment marks it).
-  Readiness does not resolve an automatic radius. Radius-independent LBVH checks and
-  `AdmitPointScalarGpu` stay in `Capture`; admission and submission use the same resolved params.
+- CPU backends resolve on the job worker (`Compute`). Vulkan resolves in `Capture` because its
+  dispatch starts on the frame thread (a `shortcut:` comment marks it): radius-independent
+  `AdmitPointScalarGpu` first, then the analysis, then admission of the resolved radius (review
+  fix round 1). Readiness does not resolve an automatic radius. Admission and submission use the
+  same resolved params.
 - Vulkan overflow now fails with, for example (real GPU run, phase 12 of the smoke):
   "Radius candidate overflow: support radius 2 is too large (1029 candidates, capacity 1024).
   Use about 1.99, 0 for automatic, or a CPU backend." Other GPU scalar failures keep the old text.
@@ -111,7 +112,8 @@ radius), so the support-radius helper does not apply trivially; they are left fo
 2. `gpu_radius_capacity` is the neighbour budget for every backend, so the radius does not
    depend on the backend.
 3. Fewer than two live samples, a zero-extent set or an over-budget minimum rank fails in
-   automatic mode ("Automatic support radius failed (status); set a positive support radius.").
+   automatic mode with `InvalidProcessingParameters` on every backend ("Automatic support radius
+   failed (status); set a positive support radius.").
    Behaviour change: with the default, one-sample and all-coincident inputs used to succeed
    (weight 1, or the coincident count) and now fail; readiness says Enabled for an automatic
    radius even when execution will fail.
@@ -161,6 +163,29 @@ RTX 4090.
   They fail the same way with this change's `src/` reverted, so they predate it and are not
   part of this task.
 
+**Review fix round 1 (after independent Claude and Codex reviews of d49d0dd85).**
+- Blocking finding (Codex review): automatic Vulkan ran the KD-tree analysis on the frame
+  thread before `AdmitPointScalarGpu`, so requests Vulkan refuses anyway (over 2^20 points,
+  neighbour workspace over 2^24 entries, no float64 device) still paid for it. Fixed in
+  `Capture`; manual radii keep their order.
+- Adopted optional findings: the CPU automatic-radius failure now returns
+  `InvalidProcessingParameters` like Vulkan (was `GeometryProcessingFailed`); the overflow-hint
+  comment calls R*C/N unverified; `support-radius-policy.md` states the manual-density exception
+  and that `gpu_radius_capacity` budgets only the automatic radius; `density-weights.md` says
+  the sampled budget (at most 2048 rows) is not a guarantee on Vulkan; GPU smoke phase 12 also
+  asserts "Use about 1.99," (2*1024/1029).
+- Failing first (predictions in `tasks/evidence/RUNTIME-291/fix1-predictions.txt`, all held):
+  with the new assertions and the old `src/`, `.../AutomaticSupportRadiusResolvesBeforeVulkanSubmission/2`
+  reported "Automatic support radius failed (degenerate_neighborhood); ..." for a float64-less
+  device instead of the admission text, and the scale test saw `GeometryProcessingFailed` 36
+  times. Mutation: the unscaled suggestion ("Use about 2,") fails the GPU smoke.
+- After the fix: `ctest --test-dir build/ci -j 4 -R '<task selector>|PointScalarTransaction|EditorPointReadiness|EditorQueuedPointJobs|SandboxEditorSession|QueuedEditorJob|RuntimeReuseDriftGuard|AgentOperations|EditorKeypointAgent|PointCloudConsolidationModule|EngineConfigSectionSchemas|SandboxConfigSections|SandboxAgentServer|CompilationLocality|RuntimeRenderExtraction' -LE 'gpu|vulkan|slow|flaky-quarantine'`:
+  520/520 pass (task selector alone: 143 tests). `ci-vulkan` `PointLBVHGpuSmoke.DensityWeight*`
+  3/3, `KernelDensity*` and `RUNTIME298PointScalarResidency` 2/2 pass. `build/ci` was rebuilt
+  after the mutation restore, so its mtimes are consistent (CompilationLocality passes).
+- Not re-run: the one-off Vlasic engine check (its success path passes both admissions the
+  same way; covered by the transaction test's CPU/Vulkan radius equality).
+
 **Remaining.**
 - The live Sandbox check (Operational) on the Vlasic mesh through the panel is not done; it
   needs the operator at the display. The engine run above used the same runtime command on a
@@ -168,3 +193,8 @@ RTX 4090.
   `support_radius` 1.0, so enter 0 for that check.
 - Agent results carry only the message: for `vulkan_lbvh` the message comes from the GPU
   snapshot, so agents do not see the resolved radius there (the panel and result field do).
+- The overflow message always offers "0 for automatic", also when the request already was
+  automatic (sampled budget, denser unsampled row). Dropping it there needs the automatic flag
+  in the generic scalar transaction; left as is.
+- `MakeEditorDensityWeightTransactionForTest` injects values and never resolves an automatic
+  radius; its Sandbox caller now shows radius 0. Harmless, not changed.
