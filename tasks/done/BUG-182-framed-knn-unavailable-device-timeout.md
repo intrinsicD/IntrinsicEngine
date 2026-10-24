@@ -129,7 +129,9 @@ Host: NVIDIA GeForce RTX 4090, driver 580.159.04, `DISPLAY=:1`, `Monitor is On` 
 Completed 2026-10-24. Commit: `c11702dc7` (test fix, parent `599f02ff1`), merged into
 the night integration branch `claude/night-2026-10-24-bug-sweep` in `af1585ddf`; the
 `ci-vulkan` run used the merge `2df2a2837` (GPU lane, merged in `74c47272a`). Not yet on
-`main`; hosted CI never selects this `gpu;vulkan` case.
+`main`. No CPU gate selects this `gpu;vulkan` case; the hosted `ci-vulkan` workflow (pull
+requests, merge queue or dispatch; displayless lavapipe) aggregates its executable but has not run
+on this change.
 Reviewer decisions:
 - Round 1 on `c11702dc7`: independent Claude review `approve`; criteria 1 and 2 `met`,
   criterion 3 `partially met` (the `ci-vulkan` half had not run).

@@ -24,8 +24,8 @@ hosted CI has not run the new `ci-docs` step.
 ## 2026-10-24 — BUG-182 retired after the GPU-lane run
 
 Retired [BUG-182](BUG-182-framed-knn-unavailable-device-timeout.md) (`c11702dc7`, merged in
-`af1585ddf`; `ci-vulkan` run on the merge `2df2a2837`). Not yet on `main`; hosted CI never selects
-this `gpu;vulkan` case.
+`af1585ddf`; `ci-vulkan` run on the merge `2df2a2837`). Not yet on `main`. No CPU gate selects this
+`gpu;vulkan` case; the hosted `ci-vulkan` workflow (PRs, merge queue, dispatch) has not run on it.
 
 - Fix (test only): `FramedKNearestReusesBuffersAndRejectsStaleTarget` skips after `Initialize()` and
   before `Run()` unless `ReadDeviceStatus().ActualBackend` is `"vulkan"`, then on the Keypoint-case
