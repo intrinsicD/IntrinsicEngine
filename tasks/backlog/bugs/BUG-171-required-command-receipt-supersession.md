@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "night-bug171"
+branch: "claude/bug-171-receipt-supersession"
+worktree: "/home/alex/Documents/IntrinsicEngine-night/bug-171"
+claimed_at: "2026-10-23T23:47:10Z"
 contract_schema: 1
 contracts: [repo.task-contract-discovery]
 contract_review: "Completion-evidence command disposition is part of task authoring and retirement. This task does not change work-graph topology, actor separation, retry budgets, or source binding."
@@ -75,3 +75,101 @@ python3 tools/agents/sync_skills.py --check
 ## Forbidden changes
 - Deleting or editing failed receipts, silently omitting them from generated
   evidence, accepting unrelated successful commands, or weakening custody gates.
+
+## Resolution — 2026-10-24
+
+Root cause (reproduced at `599f02ff1`): `validate_report` made every required
+receipt with a nonzero exit an error, nothing linked a failure to a later
+passing run, and `generate_report` lists every `commands/*.json`. Second gap:
+validation never checked that a report lists every receipt on disk, so
+dropping the failed entry from `report.yaml` gave `validate --require-complete`
+exit 0. Logs: `tasks/evidence/BUG-171/repro-defect-599f02ff1.log`,
+`repro-report-omission-599f02ff1.log`.
+
+Change, all in `tools/agents/workflow_evidence.py`:
+- `supersede-command --task-id --failed LABEL --replacement LABEL --reason`
+  appends to the hash-chained `tasks/evidence/<ID>/supersessions.jsonl`. It
+  reuses `_append_jsonl`, whose new optional `guard` re-checks the whole ledger
+  inside the existing lock; the other callers are unchanged.
+- The CLI, the generator and the validator share one checker. A record binds
+  the SHA-256 of both receipt files. The checker rejects:
+  - missing or tampered receipts, and receipts that fail receipt validation
+    (task ID, log hashes);
+  - a non-label path;
+  - a failed receipt that is not a required failure;
+  - a replacement that is not a required pass;
+  - a different argv or cwd;
+  - a replacement that did not start after the failure finished;
+  - a reason under 20 non-blank characters;
+  - a second record for the same failed receipt.
+  Self-supersession and cycles fall to the status and time rules.
+- The generator adds `superseded_by: {receipt, reason}` to the failed entry. The
+  validator:
+  - turns a validly superseded failure into a visible warning;
+  - reports ledger defects and a report projection that differs from the
+    ledger as errors;
+  - requires a completion report to list every receipt on disk.
+- Docs: `docs/agent/workflow-evidence.md` §"Superseding a failed required
+  receipt", a line telling agents to record development runs with
+  `--optional`, and the regenerated skill mirror.
+
+Chosen defaults (the operator may veto them at review):
+1. The same check means an identical recorded argv list and cwd. Flags are not
+   normalized, so `-j 4` and `-j4` are different checks.
+2. Later means the replacement's `started_at` is strictly after the failed
+   receipt's `finished_at`. Receipts have one-second resolution, and an order
+   within the same second fails closed.
+3. A substantive reason has at least 20 non-blank characters.
+4. Each failed receipt can have one record. One passing replacement may cover
+   several failures.
+5. A record has no actor field and no `task_id`. Its location and the receipts'
+   own `task_id` checks bind the task.
+6. The generator never refuses an invalid ledger. The validator is the single
+   gate.
+7. New completion-only gate: "report omits recorded receipt(s)". Draft reports
+   are unaffected. It follows from the Forbidden changes ("silently omitting")
+   and acceptance criterion 2.
+8. Because the ledger is append-only, an invalid record cannot be removed. It
+   keeps the task blocked until a human decides.
+
+Verification, run 2026-10-24 (logs under `tasks/evidence/BUG-171/`):
+- New tests run against the unchanged tool: 6 tests, 38 subtests, all
+  `FAILED (failures=38)` (`new-tests-before-fix.log`).
+- After the fix, `Test.WorkflowEvidence.py` passes 44 tests in 22.5 s. Before,
+  it ran 38 tests in 12.4 s.
+- `mutate.sh` disables one check at a time in a temporary mirror. All 17
+  mutations are killed: argv, cwd, chronology, replacement pass,
+  failed-is-failure, receipt hash, receipt existence, receipt validation,
+  label, duplicate, reason length, CLI guard, ledger findings, completeness,
+  projection match, warning downgrade and generator projection.
+- `Test.TaskClaim.py` (3 s), `Test.ExperimentCustody.py` (15 s) and
+  `Test.AgentWorkGraph.py` (35 s) pass.
+- METHOD-040 dry run on a temporary copy (`method040-dry-run.sh`): 16 of 16
+  asserted predictions pass.
+  - Accepted: asan-ctest-final and asan-ctest-serial → asan-ctest-local-symbols,
+    and cpu-ctest-final → cpu-ctest-reviewed.
+  - Rejected: build-geometry-01 → cpu-build-final (different command) and
+    build-geometry-01 → build-geometry-02 (failed replacement).
+  - The draft report lists all 21 receipts. Command findings are exactly 2
+    errors (build-geometry-01/02) and 3 warnings.
+  - The original receipts match the hashes recorded beforehand.
+
+Remaining:
+- This change alone does not unblock METHOD-040. No receipt with argv
+  `cmake --build --preset ci --target IntrinsicGeometryTests -j 4` and cwd `.`
+  ever passed. METHOD-040 needs a fresh required receipt of exactly that argv
+  and cwd on its final source, then one record per failure.
+  - Which failures to supersede, and with what reasons, is for METHOD-040's
+    owner and the operator to decide. This matters most for cpu-ctest-final
+    (exit 8), which is tied to the open BUG-172 race. The dry-run reasons are
+    illustrative only.
+- Residual risk: receipts bind neither the source revision nor the
+  environment or build-tree state. The lane that owns that is
+  PROC-031/CI-012/CI-013.
+- High-risk completion: the acceptance checkboxes stay unticked.
+  - The independent correctness review and the ponytail review decide them.
+  - After that: regenerate the report with `--complete --replace`, append a
+    handoff and an accepted independent review bound to the final digest, and
+    get `validate --require-complete BUG-171` to exit 0.
+  - The review and finalize work-graph nodes are still open, and the
+    integrator does the retirement moves.
