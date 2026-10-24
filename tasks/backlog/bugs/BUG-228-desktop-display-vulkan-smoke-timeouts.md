@@ -176,3 +176,29 @@ lanes' compiles were not recorded.
   supported display setup is also a policy decision. The options are in the
   lane report.
 - Acceptance item 3 waits for the operator to choose the environment.
+
+## Display-off reproduction — 2026-10-24 (afternoon)
+
+### Predictions (committed before the runs)
+The operator allowed switching the monitor off on `DISPLAY=:1` for bounded
+runs. Each run is one command, DPMS is forced off before it and forced on by a
+shell trap after it; `xset q` and `LockedHint` are recorded before and after.
+Source: branch `claude/bug-228-193-display-off-pacing` at 4c30f2b82 (unchanged
+`src/`), `ci-vulkan`, `VK_DRIVER_FILES` set to the NVIDIA ICD. Raw logs go to
+`tasks/evidence/BUG-228/2026-10-24-display-off/` (ignored by git).
+- D1, keypoint case on `:1`, monitor off, FIFO (current code): CTest kills it
+  at the 30 s limit, with no `Step` diagnostic (the 50 s bound cannot fire).
+  Rejected if it passes in under 20 s.
+- D2, the same case on an owned Xephyr `:9` with the host monitor off: it
+  passes in 10 ± 4 s, because Xephyr does not page-flip to the host outputs.
+  Rejected if it times out or takes more than 20 s.
+- D3, `ExtrinsicSandbox --frame-pacing-report` (32 frames) on `:1` with the
+  monitor off: median `present_micros` + `render_begin_frame_micros` is at
+  least 500 ms per frame (BUG-143: about 900 + 100 ms).
+- Fix condition: the device honours `Render.EnableVSync=false` by choosing an
+  uncapped present mode (IMMEDIATE when supported). The fix is kept only if,
+  after it, D1 with the monitor off passes in under 20 s and the Sandbox with
+  `enable_vsync: false` shows median present + begin below 20 ms with the
+  monitor off, while the Sandbox with `enable_vsync: true` (FIFO) still shows
+  at least 500 ms (control: the present mode, not something else, removes the
+  stall). If IMMEDIATE also blocks with the monitor off, the fix is not made.

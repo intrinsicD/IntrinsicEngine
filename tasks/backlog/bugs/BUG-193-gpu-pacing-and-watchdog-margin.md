@@ -169,3 +169,20 @@ finds nothing at this branch's HEAD.
   it, not a measurement of it),
   the display-off presentation (display policy, BUG-228) and frame-paced job
   apply. Which one to take on is a scope decision for the operator.
+
+## Display-off comparison and dirty-scan timing — 2026-10-24 (afternoon)
+
+### Predictions (committed before the runs)
+Same branch, host and display procedure as BUG-228's afternoon section.
+- W1, `PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures`
+  on `:1` with the monitor off, FIFO (current code): about 264 frames at about
+  1 s each, so it passes in 240–300 s, inside the 300 s internal bound, with
+  under 60 s of margin. A failure at the 300 s bound is also consistent with
+  display pacing; a pass in under 60 s rejects display pacing for this case.
+- W2, after a fix that honours `Render.EnableVSync=false`: the same run with
+  the monitor off passes in under 40 s, close to the 25.5 s monitor-on time.
+- S1, `GpuWorld::SyncFrame` dirty scan: a temporary timer (tagged, reverted)
+  around the `FlushDirtyRuns` calls in the keypoint case on `:1`, monitor on.
+  The hypothesis predicts that the scan takes at least 50 % of the 68–69 ms
+  median `render_prepare` (at least 34 ms per frame). It is rejected if the
+  scan takes under 10 % (under 7 ms). Only a confirmed scan cost is changed.
