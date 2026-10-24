@@ -172,6 +172,56 @@ affected discovery files serially before using such a tree. The synthetic
 `Test.ConcurrentCTestDiscovery.py` regression exercises concurrent writers,
 exact registration, and nested discovery without requiring engine binaries.
 
+## GoogleTest discovery and case budgets
+
+`intrinsic_test_executable()` sets two separate budgets in
+`tests/CMakeLists.txt`:
+
+- `_intrinsic_gtest_discovery_timeout_seconds` (`DISCOVERY_TIMEOUT`, 5 s): the
+  limit for one executable's `--gtest_list_tests` listing during PRE_TEST
+  discovery. Generated includes record it as `TEST_DISCOVERY_TIMEOUT`.
+- `_intrinsic_default_test_timeout_seconds` / `_intrinsic_slow_test_timeout_seconds`
+  (30 s / 120 s for `slow` targets): the CTest `TIMEOUT` of each discovered
+  case, passed through `PROPERTIES`.
+
+The discovery value is the explicit former CMake default. No measured
+distribution has selected a different value yet (BUG-091).
+
+Any CTest call loads every registration file, including `-N` and `-R` calls.
+An executable is listed again when its `_tests.cmake` is missing or older than
+the executable or its `_include.cmake`. A filtered command therefore also lists
+unrelated built executables that are stale. On a `ci` tree with 3 of 41
+executables built, `ctest -N -R '^RuntimeModule\.'` listed exactly the touched
+target after one include or executable was touched. It listed all 3 built
+targets after a first run, after relinking all 3, or after a budget change
+rewrote every include. A reconfigure that changes nothing rewrote nothing.
+Unbuilt targets register a `_NOT_BUILT` placeholder and are not listed. Every
+include embeds `CMAKE_ROOT`, so configuring a tree with a different CMake
+installation rewrites all includes. The next CTest call then lists every built
+executable.
+
+A listing that exceeds the budget is killed. CTest exits nonzero before any
+test starts, and prints the executable path and `Process terminated due to
+timeout`. CMake 4.x also prints `Timeout: '<budget>'`; older versions such as
+3.22 do not. Nothing retries. `Test.GTestDiscoveryTimeout.py` checks three
+things. It checks the source policy. It runs a slow fake lister in a private
+project: the lister passes below the declared budget and fails at the budget,
+and afterwards the lister is gone and the registry lock is free. It also runs
+probe self-checks. With `--build-dir`, it checks that every generated include
+of a configured tree carries the declared discovery budget, together with its
+unchanged 30 s or 120 s case budget:
+
+```bash
+python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py
+python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py --build-dir build/ci
+```
+
+`tools/ci/gtest_discovery_probe.py` measures listings directly (`direct`,
+cold and warm) and forced-stale CTest runs (`ctest`), with host load and
+process telemetry. See `tools/ci/README.md`. Related tasks: BUG-091 (this
+budget), CI-008 (CTest process overhead; not a prerequisite) and CI-011 (the
+measured slow-test cohort; it does not own discovery).
+
 ## Grouped CTest execution and worker budgets
 
 `INTRINSIC_GROUP_PURE_CTEST` defaults to `OFF`, so a normal local `ci`

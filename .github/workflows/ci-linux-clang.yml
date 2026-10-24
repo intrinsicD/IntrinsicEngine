@@ -114,6 +114,9 @@ jobs:
             --build-dir build/ci \
             --aggregate IntrinsicCpuTests
 
+      - name: Reconcile GoogleTest discovery budget
+        run: python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py --build-dir build/ci
+
       - name: Capture CPU test selection
         id: cpu-selection
         run: |
