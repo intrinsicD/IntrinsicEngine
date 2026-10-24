@@ -65,3 +65,54 @@ restriction (`/tmp/property-smoothing-asan-tests.log`). The unchanged serial
 selector then passed all 3,322 registrations with host access
 (`/tmp/property-smoothing-asan-host-tests.log`; two native-window checks skipped
 in the Null/headless configuration). No sanitizer flags or suppressions changed.
+
+## Resolution — 2026-10-24
+Covers criterion 2 (documented route) and criterion 3 (nothing weakened). Raw logs are in
+`tasks/evidence/BUG-188/` (git-ignored).
+
+- **Cause.** The ASan test executables compile in `detect_leaks=1`
+  (`tests/support/Test_SanitizerConfig.cpp`). PRE_TEST GoogleTest discovery
+  (`gtest_discover_tests(... DISCOVERY_MODE PRE_TEST)` in `tests/CMakeLists.txt`) runs
+  `--gtest_list_tests` for every discovered executable that is newer than its cached list,
+  whatever the `-R`/`-L` selection is, and outside the tests' `ENVIRONMENT`. The exit-time leak
+  check needs ptrace. In the September sessions the sandbox blocked LeakSanitizer's ptrace
+  attach; the logs show a namespaced PID (`==6==`) but do not isolate the mechanism.
+  `GoogleTestAddTests.cmake` then raises a fatal error and `ctest` exits 8 before any test runs.
+  Because the lists are cached per binary timestamp, the failure appears only after a rebuild.
+- **This session's two contexts.** Both the default Bash context and the
+  `dangerouslyDisableSandbox` context showed the same host namespaces (pid 4026531836,
+  mnt 4026531841, user 4026531837), Seccomp 0, `yama/ptrace_scope` 1, and an allowed write
+  outside the worktree. So **no sandbox isolation was active in this session; the restriction
+  was not exercised**. In both contexts, a fresh discovery (`touch` of
+  `IntrinsicRuntimeIntegrationTests`, after which its cached list was rewritten) with the
+  unchanged selector `-LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+  --parallel 1 -N` exited 0 and listed 4101 tests.
+- **Simulated restriction** (host, `strace -f -o /dev/null ctest --test-dir build/ci-asan -N
+  -R '^CoreIndexedHeap\.PopsInNonDecreasingKeyOrder$'`), with predictions fixed beforehand:
+  - `touch bin/IntrinsicCoreTests`: rc 8, `LeakSanitizer has encountered a fatal error`,
+    `HINT: LeakSanitizer does not work under ptrace`, "Error running test executable". This
+    matches the September signature.
+  - Control, `touch` plus `ASAN_OPTIONS=detect_leaks=0`: rc 0. This confirms that the
+    compiled-in leak check is the trigger. It is not documented as a route.
+  - Control, cached lists: predicted rc 0, observed rc 8 on the first try. The reason was that
+    `IntrinsicRuntimeContractTests` had been rebuilt minutes earlier, so its discovery ran under
+    strace even though `-R` selected another executable. Once every list was fresh, the rerun
+    gave rc 0. This shows that discovery is not limited by the selector.
+- **Change (documentation).** A new `tests/README.md` §"Sanitizer discovery under ptrace
+  restrictions" records the signature, the cause, the route and the host reproduction. The route
+  is to rerun the unchanged command in a host context (Claude Code Bash `dangerouslyDisableSandbox`,
+  or a Codex escalated command) and record both outcomes; it is not a sanitizer finding. The
+  section forbids changing ASan/LSan options, suppressions, selectors, labels or the ptrace
+  policy. One sentence and a link were added to the sanitizer bullet of `docs/agent/contract.md`,
+  plus its synchronized skill mirror. The section holds the signature and lesson from the
+  `/tmp` logs above, which will not survive.
+- **Chosen default: documentation only.** A probe in `TEST_INCLUDE_FILES` was rejected because
+  it would also fail cached sandbox runs that pass today. Discovery-time `detect_leaks=0` is a
+  sanitizer-setting change and is left to the operator.
+- **Unchanged:** selectors, labels, `__asan_default_options`/LSan options, suppressions and
+  `kernel.yama.ptrace_scope`.
+- **Verification:** `python3 tools/agents/sync_skills.py --write` then `--check` (13 files, in
+  sync); `python3 tools/docs/check_doc_links.py --root .` (clean);
+  `python3 tools/docs/check_docs_sync.py --root .` (satisfied);
+  `python3 tools/agents/check_task_policy.py --root . --strict` (0 findings).
+- **Remaining:** reviewer decision on criteria 2 and 3, then retirement by the integrator.

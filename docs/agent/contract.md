@@ -390,7 +390,9 @@ For each change:
   Required CPU variants use replacement-only grouped registration for the audited pure cohort. Sanitizer CTest
   execution remains explicitly serial with `--parallel 1`; do not raise that budget without matched sanitizer
   evidence. Tests that intentionally create multiple scheduler workers carry case-specific CTest `PROCESSORS`
-  reservations.
+  reservations. If ASan discovery exits before any test runs with LeakSanitizer's ptrace hint, that is a
+  restricted execution context rather than a sanitizer finding. Follow
+  [`tests/README.md` §"Sanitizer discovery under ptrace restrictions"](../../tests/README.md#sanitizer-discovery-under-ptrace-restrictions).
 - Promoted Vulkan opt-in verification uses the `ci-vulkan` preset plus GPU/Vulkan label intersection. Among required
   CI gates, this is the only one that retains combined ASan+UBSan instrumentation because the Vulkan shutdown contract
   owns explicit LeakSanitizer evidence:
