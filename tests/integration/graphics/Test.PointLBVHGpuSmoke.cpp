@@ -2579,6 +2579,7 @@ namespace
                         EXPECT_NE(Results.back().Message.find("overflow"),std::string::npos);
                         // RUNTIME-291: the overflow names the radius as too large and suggests a value.
                         EXPECT_NE(Results.back().Message.find("too large"),std::string::npos)<<Results.back().Message;
+                        EXPECT_NE(Results.back().Message.find("Use about 1.99,"),std::string::npos)<<Results.back().Message; // 2*1024/1029
                         EXPECT_GT(Results.back().MaximumNeighbors,1024);EXPECT_GT(Results.back().GpuQueryBatches,0);
                     }
                     if(Phase==13)

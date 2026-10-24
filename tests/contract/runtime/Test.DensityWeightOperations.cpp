@@ -172,7 +172,7 @@ TEST(DensityWeightOperations, AutomaticSupportRadiusIsScaleInvariantOnMeshGraphA
                 auto tight = c;
                 tight.GpuRadiusCapacity = 1;
                 const auto refused = R::ApplyEditorDensityWeightCommand(commands, tight);
-                EXPECT_FALSE(refused.Succeeded());
+                EXPECT_EQ(refused.Status, R::EditorCommandStatus::InvalidProcessingParameters); // As on Vulkan.
                 EXPECT_NE(refused.Message.find("Automatic support radius"), std::string::npos) << refused.Message;
                 EXPECT_EQ(std::as_const(props).Get<float>("weights").Vector(), all);
             }

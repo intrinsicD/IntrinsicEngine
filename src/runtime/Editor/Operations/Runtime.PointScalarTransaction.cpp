@@ -181,7 +181,7 @@ namespace Extrinsic::Runtime
             {
                 const auto& p = w->Params;
                 const auto capacity = Graphics::PointScalarNeighborWidth(p, std::uint32_t(w->Result.LiveCount));
-                // Candidates grow at least linearly with the radius, so R*C/N is a safe hint, not a parameter.
+                // R*C/N is an unverified hint: clustered or coincident points can overflow at any radius.
                 if (p.Method == 2 && s.MaximumNeighbors > capacity)
                     Fail(w,
                         std::format("Radius candidate overflow: support radius {:.4g} is too large ({} candidates, "

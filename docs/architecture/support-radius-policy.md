@@ -54,9 +54,9 @@ heuristics rather than quality claims:
 | anisotropic WLOP, EAR | 24 | 4 | P75 | 1.25 |
 | Compact density weights (`support_radius` 0) | 16 | 4 | P75 | 1.25 |
 
-Compact density weights use `gpu_radius_capacity` as `max_support_neighbors`
-for every backend and no contribution limit. They match automatic isotropic
-WLOP only when neither method's neighbour budget binds.
+In automatic mode, compact density weights use `gpu_radius_capacity` as
+`max_support_neighbors` for every backend and no contribution limit. They match
+automatic isotropic WLOP only when neither method's neighbour budget binds.
 
 The factor puts the selected neighbor inside the compact-support cutoff rather
 than exactly on its zero-weight boundary. These defaults are operational
@@ -66,7 +66,9 @@ through a scoped method task with correctness evidence.
 Manual mode preserves the positive finite world-unit radius exactly. It skips
 the k-distance recommendation and automatic backoff but still runs the same
 sampled occupancy and workload checks, so a manual value is an override, not a
-safety bypass.
+safety bypass. Exception: manual compact density radii skip the sampled check;
+on Vulkan the complete-support overflow is the exact guard, and the CPU
+backends have no candidate cap.
 
 ## Workload preview and failure
 
@@ -112,8 +114,9 @@ construction is `O(N log N + S(log N + K))` plus `S` exact radius queries for
 the requested radius and, only after an over-budget result, at most a bounded
 binary search over the rank interval. The analysis stores `O(N)` index data and
 runs on the existing job worker rather than the frame thread. Exception:
-Vulkan compact density weights resolve on the frame thread before device
-admission, bounded by Vulkan's 2^20-point admission (a `shortcut:` in
+Vulkan compact density weights resolve on the frame thread after the
+radius-independent device admission, so the analysis is bounded by Vulkan's
+2^20-point and workspace limits (a `shortcut:` in
 `Runtime.PointAnalysisOperations.DensityWeights.cpp`). The CPU reference
 and Vulkan backend consume the same resolved positive radius and workload
 decision. Backends may use different acceleration structures for their

@@ -352,6 +352,13 @@ TEST_P(PointScalarTransaction, AutomaticSupportRadiusResolvesBeforeVulkanSubmiss
     ASSERT_TRUE(cache.OnRegister(setup).has_value());
     unsigned submissions=0;
     Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
+    // Radius-independent Vulkan refusals come before the automatic analysis, which would fail first here.
+    Device.ShaderFloat64=false;
+    const auto refused=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
+    EXPECT_EQ(refused.Status,R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(refused.Message.find("float64"),std::string::npos)<<refused.Message;
+    EXPECT_EQ(submissions,0u);
+    Device.ShaderFloat64=true;
     const auto coincident=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
     EXPECT_EQ(coincident.Status,R::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_NE(coincident.Message.find("Automatic support radius"),std::string::npos)<<coincident.Message;

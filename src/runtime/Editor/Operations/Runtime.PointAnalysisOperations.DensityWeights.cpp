@@ -152,12 +152,14 @@ namespace Extrinsic::Runtime
             // CPU backends resolve an automatic radius on the job worker; Vulkan dispatches from this thread.
             // shortcut: the frame-thread analysis is bounded by Vulkan's 2^20-point admission; move it into a
             // prepare job, as keypoints do, if large clouds stall the frame.
-            const bool resolveNow =
-                c.SupportRadius > 0 || (purpose == Purpose::Execute && c.Backend == DensityWeightBackend::VulkanLBVH);
-            if (resolveNow && !Resolve(*w, diagnostic))
+            const bool vulkan = c.Backend == DensityWeightBackend::VulkanLBVH;
+            const bool analyze = !(c.SupportRadius > 0) && purpose == Purpose::Execute && vulkan;
+            // Radius-independent Vulkan limits refuse before the analysis; the resolved radius is admitted below.
+            if (analyze && !Detail::AdmitPointScalarGpu(context, *w, Params(*w), diagnostic))
                 return {};
-            if (c.Backend == DensityWeightBackend::VulkanLBVH &&
-                !Detail::AdmitPointScalarGpu(context, *w, Params(*w), diagnostic))
+            if ((c.SupportRadius > 0 || analyze) && !Resolve(*w, diagnostic))
+                return {};
+            if (vulkan && !Detail::AdmitPointScalarGpu(context, *w, Params(*w), diagnostic))
                 return {};
             return w;
         }
@@ -169,7 +171,10 @@ namespace Extrinsic::Runtime
             r.Status = EditorCommandStatus::GeometryProcessingFailed;
             r.ActualBackend = ToString(c.Backend);
             if (!(r.SupportRadius > 0) && !Resolve(w, r.Message))
+            {
+                r.Status = EditorCommandStatus::InvalidProcessingParameters; // The status Vulkan reports from Capture.
                 return;
+            }
             Kernels::DensityWeightResult result;
             if (c.Backend == DensityWeightBackend::CpuKDTree)
                 result = Kernels::ComputeDensityWeights(w.Points, r.SupportRadius, c.Kernel, c.Mode);
