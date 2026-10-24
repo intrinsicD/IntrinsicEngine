@@ -1,5 +1,26 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-149 retired after its completion review
+
+Retired [BUG-149](BUG-149-benchmark-sealer-dotted-output-directory.md) (`771f95368`, `4b43ae0c1`),
+merged into the night integration branch `claude/night-2026-10-24-bug-sweep`; not yet on `main`, and
+hosted CI has not run the new `ci-docs` step.
+
+- `tools/benchmark/run_and_seal.py` chose its seal root by `Path.suffix`, so a dotted output directory
+  made the sealer walk and rewrite every JSON in the parent. It now seals an existing directory
+  exactly and an existing `.json` file's parent; anything else is refused before the sealer with the
+  producer rc or 2. Exit propagation (sealer first, then producer) is unchanged.
+- `Test.BenchmarkRunAndSeal.py` (8 cases, sealable and malformed sibling JSON) fails 6 of 8 on the
+  unfixed wrapper and passes after it; five mutations fail exactly the predicted cases. Real
+  `IntrinsicBenchmarkSmoke` and `IntrinsicUvAtlasRemapSmoke` runs sealed 41/41/1 files with strict
+  validation passing and siblings unchanged.
+- Review: round 1 on `771f95368`, independent Claude and independent Codex reviews both `approve`, all
+  acceptance criteria `met`. Completion chain on `4b43ae0c1` (standard report, content digest
+  `0ae36edd…`) `approve`; `--require-complete BUG-149` gave 0 errors, 1 justified skip warning.
+- Open for the operator: keep the explicit-`.json` `--output` form (A, default) or move its three
+  callers to directories and drop it (B). Evidence stays git-ignored in the `bug-149` lane worktree;
+  nothing was deleted.
+
 ## 2026-10-24 — BUG-182 retired after the GPU-lane run
 
 Retired [BUG-182](BUG-182-framed-knn-unavailable-device-timeout.md) (`c11702dc7`, merged in

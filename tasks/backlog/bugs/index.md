@@ -26,12 +26,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
-  `run_and_seal.py` interprets a dotted directory name as a file, seals its
-  parent (observed as all of `/tmp`), and can return zero after the sealer
-  reports failure. Resolve the exact output type/root and propagate both stage
-  statuses without touching sibling JSON.
-
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off path still fabricates UVs. Interim repair requires a current
   affected-workflow reproduction and coordination with the operator's shared
@@ -43,6 +37,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-149 — Benchmark sealer escapes dotted output directories](../../done/BUG-149-benchmark-sealer-dotted-output-directory.md).
+  `run_and_seal.py` seals an existing output directory exactly and an existing `.json` file's parent;
+  a missing output or non-JSON file is refused before sealing. Exit propagation unchanged and regression-tested.
 
 - Closed 2026-10-24: [BUG-182 — Framed kNN smoke times out when promoted Vulkan is not compiled](../../done/BUG-182-framed-knn-unavailable-device-timeout.md).
   The case skips before its framed wait unless the runtime selected Vulkan; the post-run skip is a hard

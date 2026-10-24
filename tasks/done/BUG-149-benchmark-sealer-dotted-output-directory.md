@@ -145,3 +145,25 @@ python3 tools/agents/check_task_policy.py --root . --strict
     narrowed after the review. Not adopted: the `run_and_seal.py` refusal hint
     names the dotted-directory case for every refusal; this section was not
     shortened; the `ara` heuristic H12 code-ref list omits the new test.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `4b43ae0c1` (head, review record), with `771f95368`
+(fix, regression, `ci-docs` step), parent `599f02ff1`, merged into the night integration
+branch `claude/night-2026-10-24-bug-sweep` in `630d0f980` and `cafa5cb90`. Not yet
+on `main`; hosted CI has not run the new `ci-docs` step.
+Reviewer decisions:
+- Round 1 on `771f95368`: independent Claude review `approve` (every required change,
+  the test, the docs item and all three acceptance criteria `met`); independent Codex
+  review "VERDICT: approve", all three acceptance criteria **Met**. The boxes above are
+  ticked from these decisions (see Resolution).
+- Completion chain on `4b43ae0c1`: the standard-profile report (`status: complete`,
+  content digest `0ae36edd4f76208505a4232a88a98fb6c20f248069a4187f5efdb6fc1a863db5`,
+  five required receipts) was reviewed with verdict `approve` (relayed by the night
+  workflow coordinator). Before the move, `workflow_evidence.py validate --root <bug-149
+  lane> --require-complete BUG-149` gave 0 errors and 1 warning: the justified skip of
+  re-receipting strict result validation of the `/tmp` dotted directory.
+Open for the operator: the `--output` form. A (current default, stated in `--help`):
+keep the explicit-`.json` form, which seals the file's whole parent by contract.
+B: move `IntrinsicBenchmarks`, `IntrinsicUvAtlasRemapSmoke.Run` and nightly-deep to the
+directory form and drop file outputs. The report, receipts and raw logs stay git-ignored
+in the `bug-149` lane worktree under `tasks/evidence/BUG-149/`; nothing was deleted.

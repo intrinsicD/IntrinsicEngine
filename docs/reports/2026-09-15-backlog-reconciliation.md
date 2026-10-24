@@ -73,7 +73,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [BENCH-001](../../tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md) | Keep | Framework24 golden-workflow comparison harness. |
 | [BUG-091](../../tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md) | Keep | GoogleTest PRE_TEST discovery times out on a cold start. |
 | [BUG-097](../../tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md) | Keep | Progressive model-scene UV job publishes a zero atlas. |
-| [BUG-149](../../tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md) | Revised | Fix output-root classification; exit-status propagation already exists. |
+| [BUG-149](../../tasks/done/BUG-149-benchmark-sealer-dotted-output-directory.md) | Revised | Fix output-root classification; exit-status propagation already exists. |
 | [BUG-160](../../tasks/done/BUG-160-fast-staged-atlas-chart-fragmentation.md) | Keep | FastStaged fixed seed planes fragment smooth meshes into tiny charts. |
 | [BUG-171](../../tasks/done/BUG-171-required-command-receipt-supersession.md) | Keep | Required development receipts cannot be superseded by a passing rerun. |
 | [BUG-172](../../tasks/done/BUG-172-synchronous-cpu-load-completion-race.md) | Keep | Synchronous CPU completion can observe an unfinished or stale load transition. |
