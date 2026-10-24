@@ -1,5 +1,17 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-247 retired after the operator decision on local tool state
+
+Retired [BUG-247](BUG-247-local-root-hygiene-state-mismatch.md) on the night integration branch
+`claude/night-2026-10-24-bug-sweep`; no source or policy change (the `.serena/` entry dates from `f849aafb1`).
+
+- Operator decision, verbatim: ".serena und .aws nicht ins git". `.serena/` stays git-ignored and
+  classified as ignored local tool state; `.aws/` stays unclassified so strict root hygiene fails if it
+  reappears. How `.aws/` disappeared is unknown.
+- Rerun read-only in the main checkout at `599f02ff1`: strict root hygiene exit 0, `Test.RootHygiene.py`
+  13/13. No independent review. The ignored `tasks/evidence/BUG-247/root-hygiene.log` in the main checkout
+  stays; nothing was deleted.
+
 ## 2026-10-24 — BUG-180 retired as external NVIDIA driver retention
 
 Retired [BUG-180](BUG-180-framed-icp-leak-enabled-process-retention.md) (diagnosis `9396405a5`,
@@ -420,7 +432,7 @@ UI-037 closes only its current slice 7; its other readiness work remains open.
   All 13 root-hygiene regression methods pass on the maintained-file snapshot.
   The actual local checkout passes 12/13; the remaining method's two subtests
   reject existing `.aws/` and `.serena/`, tracked separately in
-  [BUG-247](../backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md).
+  [BUG-247](BUG-247-local-root-hygiene-state-mismatch.md).
   Neither directory nor their classification changed. The final whole-repository
   jscpd CLI scan retains 1,034 clones; its only changed match is UI-037 task prose,
   with no new code duplication.

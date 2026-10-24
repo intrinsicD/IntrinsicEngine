@@ -9,10 +9,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   CMake 4.4 names the PRE_TEST include `<target>_<sha8>_include.cmake`; two regressions and the
   BUG-091 probe hard-code `<target>[1]_include.cmake`. The race probe fails 3/3 on 4.4.4 with a layout message.
 
-- [BUG-247 — Local root hygiene rejects existing tool state](BUG-247-local-root-hygiene-state-mismatch.md):
-  no longer reproduces on 2026-10-24 (see its note); awaits the operator's confirmation that the current
-  local setup is the agreed one.
-
 - [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](BUG-240-sanitizer-cpu-jobs-red-since-september.md):
   sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
   assertion failure under ASan, one timeout under UBSan.
@@ -39,6 +35,10 @@ promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-247 — Local root hygiene rejects existing tool state](../../done/BUG-247-local-root-hygiene-state-mismatch.md).
+  Operator decision: `.serena/` stays ignored local state, `.aws/` never enters the repository and stays
+  unclassified. Strict root hygiene and `Test.RootHygiene.py` (13/13) pass on the main checkout.
 
 - Closed 2026-10-24: [BUG-180 — Leak-enabled framed ICP process reports 240 retained bytes](../../done/BUG-180-framed-icp-leak-enabled-process-retention.md).
   Recorded as an NVIDIA 580.159.04 `libnvidia-glcore` retention (filled shader cache) per operator decision; no
