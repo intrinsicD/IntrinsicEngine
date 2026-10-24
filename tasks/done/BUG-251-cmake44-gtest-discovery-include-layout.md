@@ -164,7 +164,7 @@ Limits:
 - On 4.4 a change to the `gtest_discover_tests` arguments leaves old-hash files in a reused
   build tree, which fails `target_include` and `reconcile` until the tree is cleaned
   (documented in `tests/README.md`).
-- `Test.GTestDiscoveryTimeout.py` fails on CMake 4.0.3, also at the base; filed as [BUG-252](../backlog/bugs/BUG-252-gtest-discovery-timeout-budget-cmake403.md).
+- `Test.GTestDiscoveryTimeout.py` fails on CMake 4.0.3, also at the base; filed as [BUG-252](BUG-252-gtest-discovery-timeout-budget-cmake403.md).
 
 Evidence: the logs cited in the Resolution stay git-ignored in the `bug-149` lane worktree
 (`tasks/evidence/BUG-251/`); nothing was deleted.

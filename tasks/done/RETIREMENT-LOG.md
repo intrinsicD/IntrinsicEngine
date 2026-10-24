@@ -1,5 +1,20 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-252 retired after its independent review
+
+Retired [BUG-252](BUG-252-gtest-discovery-timeout-budget-cmake403.md) (`548a653b5`) on the night integration
+branch `claude/night-2026-10-24-bug-sweep`. Not yet on `main`; hosted CI has not run on it.
+
+- Cause: CMake 3.29 moved `execute_process` to `cmUVProcessChain`, which stopped terminating the child on
+  `TIMEOUT`; upstream issue 27378 restored it in 3.31.10, 4.0.5, 4.1.3 (4.2.0 and later have it). The case's old
+  `(3, 31)` exemption missed 4.0.x. Test-only fix: the case asserts the exact lister state per version.
+- Verification: `Test.GTestDiscoveryTimeout.py` and `Test.ConcurrentCTestDiscovery.py` pass on 3.28.3, 3.31.6,
+  3.31.10, 4.0.3, 4.1.3, 4.2.0, 4.2.3, 4.3.2, 4.3.4 and 4.4.4; mutation checks on both range boundaries.
+- Review: independent Claude review of `548a653b5` (relayed by the coordinator, not on disk) approve, all three
+  criteria "met"; it reran 3.28.3, 3.31.6, 4.3.2 and 4.4.4 and confirmed the range from upstream source at each tag.
+- Limits: 3.29.x, 3.30.x, 4.0.4, 4.0.5 and 4.1.0-4.1.2 not run (range from source and tags); the issue page 27378
+  was not opened by the reviewer. No evidence to delete.
+
 ## 2026-10-24 — BUG-240 retired after the green hosted sanitizer dispatch
 
 Retired [BUG-240](BUG-240-sanitizer-cpu-jobs-red-since-september.md) (`dd65adee6`, `30d1a148d`, `dde5776d6`;

@@ -6,7 +6,7 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: observed by the BUG-251 independent review on CMake 4.0.3 and not reproduced in this filing session; the first run under this task is the next evidence
+evidence_skip_reason: test-only change verified by the regression scripts across 10 CMake versions; no results-bearing run
 contract_schema: 1
 contracts: []
 contract_review: Private CMake test instrumentation regression only; the catalog has no CTest discovery contract, and engine behavior stays unchanged.
@@ -30,11 +30,11 @@ contract_review: Private CMake test instrumentation regression only; the catalog
   listing's process tree differently.
 
 ## Acceptance criteria
-- [ ] Reproduce the failure on CMake 4.0.3 and identify whether CTest, the test's own process
+- [x] Reproduce the failure on CMake 4.0.3 and identify whether CTest, the test's own process
       check, or the lister fixture leaves the lister running.
-- [ ] Either the case passes on 4.0.3 with its bounded-timeout and no-orphan checks intact, or
+- [x] Either the case passes on 4.0.3 with its bounded-timeout and no-orphan checks intact, or
       the supported CMake range in `tests/README.md` excludes 4.0.x with the recorded reason.
-- [ ] `Test.GTestDiscoveryTimeout.py` still passes on 3.28.3, 3.31.6, 4.3.2 and 4.4.4.
+- [x] `Test.GTestDiscoveryTimeout.py` still passes on 3.28.3, 3.31.6, 4.3.2 and 4.4.4.
 
 ## Verification
 ```bash
@@ -88,3 +88,25 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Mutation checks: marking 4.1.3 as orphaning fails the live case on 4.1.3 ("should leave
   the timed-out lister running") and the boundary case; dropping the 4.0 clause fails the
   live case on 4.0.3 ("timed-out lister is still running") and the boundary case.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `548a653b5` on the night integration branch
+`claude/night-2026-10-24-bug-sweep`. Not yet on `main`; hosted CI has not run on it.
+
+Reviewer decisions: independent Claude review of `548a653b5`, 2026-10-24, relayed verbatim by
+the coordinator; the record is not on disk. Verdict approve, with criterion 1 "met. The
+`ps --forest` probe in the note, the source diff and my 30 s timing on 4.0.3 all point to
+CTest."; criterion 2 "met. The no-orphan check now asserts the exact state per version, which
+is stricter than before."; criterion 3 "met. I have now run it myself on all four versions in
+this review session." (3.28.3, 3.31.6, 4.3.2, 4.4.4; both scripts passed). It confirmed the
+version range from upstream `cmExecuteProcessCommand.cxx` at each tag (3.29.0-3.31.9,
+4.0.0-4.0.4 and 4.1.0-4.1.2 lack `chain.Terminate()`; 3.31.10, 4.0.5, 4.1.3 and 4.2.0 have it).
+Its one required fix, the stale front-matter `evidence_skip_reason`, is applied in the
+retirement commit. All three boxes are ticked from these decisions.
+
+Limits:
+- 3.29.x, 3.30.x, 4.0.4, 4.0.5 and 4.1.0-4.1.2 were not run; the range comes from source and
+  upstream tags only.
+- The upstream issue page 27378 was not opened by the reviewer.
+
+Evidence: no files under `tasks/evidence/BUG-252/`; nothing to delete.

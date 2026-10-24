@@ -5,15 +5,15 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-252 — GTestDiscoveryTimeout budget test fails on CMake 4.0.3](BUG-252-gtest-discovery-timeout-budget-cmake403.md):
-  `test_declared_budget_passes_below_and_fails_bounded_above` reports "timed-out lister is still running" on 4.0.3,
-  also before BUG-251. 4.0.3 is outside the supported matrix; CI uses 3.31.6.
-
 The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-252 — GTestDiscoveryTimeout budget test fails on CMake 4.0.3](../../done/BUG-252-gtest-discovery-timeout-budget-cmake403.md).
+  CTest 3.29.0-3.31.9, 4.0.0-4.0.4 and 4.1.0-4.1.2 leave a timed-out `execute_process` child running (upstream
+  issue 27378); the case now asserts the lister state per version (test-only). Passes on 10 CMake versions.
 
 - Closed 2026-10-24: [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](../../done/BUG-240-sanitizer-cpu-jobs-red-since-september.md).
   Poisson panel test on a fixed 1/60 s UI clock; sanitizer-tree test budgets x2 by operator policy (60/240 s).
