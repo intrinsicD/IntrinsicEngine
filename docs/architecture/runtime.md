@@ -907,7 +907,7 @@ The producer owns source fingerprints, GPU work and generated assets; callers
 do not duplicate its raster path or texture lifetime.
 
 Automatic property bakes resolve their output width and height from the
-materialized UV-atlas diagnostics. If an authored-UV or progressive path has no
+materialized UV-atlas diagnostics. If an authored-UV path has no
 atlas extent to report, it uses the atlas-scale 1024x1024 fallback rather than
 the former 64x64 downsample. Generated normals use two gutter texels at this
 matching resolution, equal to the default atlas chart margin. The Sandbox

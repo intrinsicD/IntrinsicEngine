@@ -17,7 +17,6 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.AssetWorkflowTextureResidency;
-import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -29,12 +28,6 @@ export namespace Extrinsic::Runtime
         bool RequestEmbeddedTextureUploads{true};
         bool GenerateMissingNormalTextures{true};
         bool GenerateMissingAlbedoTextures{true};
-        bool ProgressiveRawGeometryFirst{false};
-        // Optional execution service for the progressive enrichment chain
-        // (UV atlas / vertex normals, then the dependent texture bakes).
-        // Null in every non-test composition today; when null the enrichment
-        // jobs are simply not queued.
-        JobService* ProgressiveJobs{nullptr};
         WorldHandle World{DefaultWorldHandle};
         std::uint64_t BindingEpoch{0u};
         std::function<bool()> BindingValid{};
@@ -65,10 +58,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t GeneratedTextureBakeFailures{0};
         std::uint64_t GeneratedNormalTextureBakeFailures{0};
         std::uint64_t GeneratedAlbedoTextureBakeFailures{0};
-        std::uint64_t ProgressiveRawPrimitiveEntitiesPublished{0};
         std::uint64_t GeometryPresentationRecipesCreated{0};
-        std::uint64_t ProgressiveUvAtlasJobsQueued{0};
-        std::uint64_t ProgressiveNormalJobsQueued{0};
         std::uint64_t ProgressiveTextureBakeJobsQueued{0};
         std::uint64_t AuthoredUvPrimitives{0};
         std::uint64_t GeneratedUvAtlasPrimitives{0};
