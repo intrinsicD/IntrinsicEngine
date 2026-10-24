@@ -5,12 +5,13 @@
 Retired [BUG-247](BUG-247-local-root-hygiene-state-mismatch.md) on the night integration branch
 `claude/night-2026-10-24-bug-sweep`; no source or policy change (the `.serena/` entry dates from `f849aafb1`).
 
-- Operator decision, verbatim: ".serena und .aws nicht ins git". `.serena/` stays git-ignored and
-  classified as ignored local tool state; `.aws/` stays unclassified so strict root hygiene fails if it
-  reappears. How `.aws/` disappeared is unknown.
-- Rerun read-only in the main checkout at `599f02ff1`: strict root hygiene exit 0, `Test.RootHygiene.py`
-  13/13. No independent review. The ignored `tasks/evidence/BUG-247/root-hygiene.log` in the main checkout
-  stays; nothing was deleted.
+- Operator decision, verbatim: ".serena und .aws nicht ins git". Current state (agent's reading, not the
+  operator's words): `.serena/` is git-ignored and classified as ignored local tool state; `.aws/` is absent
+  and unclassified, so strict root hygiene would fail if it reappeared. Whether `.aws/` should instead be
+  listed in `.gitignore` is open with the operator. How `.aws/` disappeared is unknown.
+- Criterion 2: the independent review of `4c30f2b82..972b7c8d9` reran it read-only in the main checkout at
+  `599f02ff1` (strict root hygiene exit 0, `Test.RootHygiene.py` 13 OK) and decided "met". The ignored
+  `tasks/evidence/BUG-247/root-hygiene.log` in the main checkout stays; nothing was deleted.
 
 ## 2026-10-24 — BUG-180 retired as external NVIDIA driver retention
 

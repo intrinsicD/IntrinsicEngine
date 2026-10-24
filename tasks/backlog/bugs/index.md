@@ -37,8 +37,9 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 ## Verified / Closed
 
 - Closed 2026-10-24: [BUG-247 — Local root hygiene rejects existing tool state](../../done/BUG-247-local-root-hygiene-state-mismatch.md).
-  Operator decision: `.serena/` stays ignored local state, `.aws/` never enters the repository and stays
-  unclassified. Strict root hygiene and `Test.RootHygiene.py` (13/13) pass on the main checkout.
+  Operator decision: ".serena und .aws nicht ins git". Currently `.serena/` is ignored local state and `.aws/` is
+  absent and unclassified; whether `.aws/` belongs in `.gitignore` is open with the operator. Strict root hygiene and
+  `Test.RootHygiene.py` (13/13) pass on the main checkout (independent review: met).
 
 - Closed 2026-10-24: [BUG-180 — Leak-enabled framed ICP process reports 240 retained bytes](../../done/BUG-180-framed-icp-leak-enabled-process-retention.md).
   Recorded as an NVIDIA 580.159.04 `libnvidia-glcore` retention (filled shader cache) per operator decision; no

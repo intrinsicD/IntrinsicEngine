@@ -19,7 +19,7 @@ without changing unrelated local directories or weakening the root policy.
 
 ## Acceptance criteria
 - [x] Resolve ownership of the existing `.aws/` and `.serena/` directories with the operator before changing policy or local state. Operator decision 2026-10-24: ".serena und .aws nicht ins git".
-- [x] The agreed local setup passes strict root hygiene and its existing regression tests without broad exclusions. Rerun 2026-10-24 on the main checkout (see Completion): exit 0 and 13/13.
+- [x] The agreed local setup passes strict root hygiene and its existing regression tests without broad exclusions. Independent review of `4c30f2b82..972b7c8d9`: "met" (see Completion).
 
 ## Evidence and limits
 On 2026-10-17 at `a13948cc5`, with the two intended formatter roots explicitly
@@ -47,11 +47,15 @@ python3 tests/regression/tooling/Test.RootHygiene.py
 ## Operator decision — 2026-10-24
 
 Verbatim (German): ".serena und .aws nicht ins git" (.serena and .aws not into git).
-This is the criterion-1 decision:
-- `.serena/` stays local, git-ignored (`.gitignore`) and classified as an ignored
-  local entry in `tools/repo/root_allowlist.yaml`, as since `f849aafb1`.
-- `.aws/` must never be in the repository. It stays unclassified (neither in
-  `.gitignore` nor in the allowlist), so strict root hygiene fails if it reappears.
+This is the criterion-1 decision.
+
+Current state and the agent's reading (not part of the operator's words):
+- `.serena/` is local, git-ignored (`.gitignore`) and classified as an ignored local
+  entry in `tools/repo/root_allowlist.yaml`, as since `f849aafb1`.
+- `.aws/` is absent and unclassified (neither in `.gitignore` nor in the allowlist),
+  so strict root hygiene would fail if it reappeared.
+- Open question put to the operator on 2026-10-24: should `.aws/` instead be listed
+  in `.gitignore`? Not answered at retirement.
 - How `.aws/` disappeared from the main checkout is unknown; the operator did not say.
 
 ## Completion — 2026-10-24
@@ -59,16 +63,11 @@ Completed 2026-10-24. Commit: the retirement commit on the night integration bra
 `claude/night-2026-10-24-bug-sweep`; the policy state it relies on is `f849aafb1`. No
 source or policy change.
 
-Criterion 2, rerun read-only on 2026-10-24 in the main checkout
-`/home/alex/Documents/IntrinsicEngine` at `599f02ff1` with `PYTHONDONTWRITEBYTECODE=1`
-(nothing written there; `git status` unchanged before and after):
-- `python3 tools/repo/check_root_hygiene.py --root . --strict`: exit 0, "Root entries
-  match repository-owned policy."; `.serena/` listed under ignored named local entries;
-  `.aws/` absent.
-- `python3 tests/regression/tooling/Test.RootHygiene.py`: 13 tests, OK.
-
-No independent review was run; this micro note retires on the operator decision and the
-rerun checks above.
+Criterion 2: independent review of `4c30f2b82..972b7c8d9` (2026-10-24, relayed verbatim
+by the coordinator; the record is outside the repository), decision verbatim:
+"BUG-247 criterion 2 reproduces. I reran it read-only in /home/alex/Documents/IntrinsicEngine at 599f02ff1 with python3 -B, and git status was unchanged: .aws is absent and .serena is present; check_root_hygiene --strict exits 0; Test.RootHygiene.py: 13 tests OK. My decision on criterion 2: met."
+The integrator's own earlier read-only rerun (`PYTHONDONTWRITEBYTECODE=1`, same checkout
+and revision) gave the same results.
 
 Evidence: the ignored file `tasks/evidence/BUG-247/root-hygiene.log` in the main checkout
 stays; the main checkout is not touched by this retirement. The integration worktree has
