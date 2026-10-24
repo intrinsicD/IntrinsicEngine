@@ -80,7 +80,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [BUG-176](../../tasks/done/BUG-176-concurrent-ctest-discovery.md) | Keep | Concurrent CTest discovery can duplicate generated registrations. |
 | [BUG-178](../../tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md) | Keep | Clang 23 crashes during an incremental module rebuild. |
 | [BUG-180](../../tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md) | Keep | Leak-enabled framed ICP process reports 240 retained bytes. |
-| [BUG-182](../../tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md) | Keep | Framed kNN smoke times out when promoted Vulkan is not compiled. |
+| [BUG-182](../../tasks/done/BUG-182-framed-knn-unavailable-device-timeout.md) | Keep | Framed kNN smoke times out when promoted Vulkan is not compiled. |
 | [BUG-188](../../tasks/done/BUG-188-sandbox-sanitizer-test-discovery.md) | Keep | Sandbox blocks LeakSanitizer during CTest discovery. |
 | [BUG-193](../../tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md) | Keep | Investigate GPU pacing variability and watchdog margin. |
 | [BUG-195](../../tasks/done/BUG-195-verification-disk-headroom.md) | Keep | Verification can exhaust host disk space. |

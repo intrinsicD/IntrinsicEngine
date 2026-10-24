@@ -44,6 +44,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-10-24: [BUG-182 — Framed kNN smoke times out when promoted Vulkan is not compiled](../../done/BUG-182-framed-knn-unavailable-device-timeout.md).
+  The case skips before its framed wait unless the runtime selected Vulkan; the post-run skip is a hard
+  `IsOperational` assert. `ci` skips in 0.06 s (was a 30 s Timeout); `ci-vulkan` passed in 4.52 s on an RTX 4090.
+
 - Closed 2026-10-24: [BUG-171 — Required development receipts cannot be superseded by a passing rerun](../../done/BUG-171-required-command-receipt-supersession.md).
   `supersede-command` appends a hash-bound record linking a failed required receipt to a later identical
   passing one; both stay in the report, every other required failure still blocks. METHOD-040 still needs a fresh receipt.

@@ -1,5 +1,23 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-182 retired after the GPU-lane run
+
+Retired [BUG-182](BUG-182-framed-knn-unavailable-device-timeout.md) (`c11702dc7`, merged in
+`af1585ddf`; `ci-vulkan` run on the merge `2df2a2837`). Not yet on `main`; hosted CI never selects
+this `gpu;vulkan` case.
+
+- Fix (test only): `FramedKNearestReusesBuffersAndRejectsStaleTarget` skips after `Initialize()` and
+  before `Run()` unless `ReadDeviceStatus().ActualBackend` is `"vulkan"`, then on the Keypoint-case
+  bootstrap check; the post-run skip became `ASSERT_TRUE(IsOperational())`. Query assertions unchanged.
+- `ci`: Timeout 30.04 s before, Skipped 0.06 s after; a guard-removed mutant skips on the other line.
+  `ci-vulkan` (RTX 4090, driver 580.159.04, `DISPLAY=:1`): build rc 0, `Passed 4.52 sec`, gtest
+  `[ OK ]` 4263 ms. CTest applied the case's 30 s TIMEOUT, not `--timeout 120`.
+- Review: round 1 on `c11702dc7`, independent Claude review `approve`, criteria 1-2 `met`, 3
+  `partially met`; the criterion-3 decision review of `2df2a2837` `approve`, all three `met`.
+- Open for the operator: decisions 1-3 in the note (12 Null siblings, the unchecked
+  `GetVulkanDeviceOperationalInputs` cast, the 40 s fixture budget against the 30 s CTest timeout).
+  Raw logs stay git-ignored in the `bug-182` and `gpu` lane worktrees; nothing was deleted.
+
 ## 2026-10-24 — BUG-171 and BUG-195 retired after night-lane reviews
 
 Retired [BUG-171](BUG-171-required-command-receipt-supersession.md) (`3e7c98e27`, `bc0cab458`,

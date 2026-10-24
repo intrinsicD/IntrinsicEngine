@@ -22,9 +22,13 @@ contract_review: "Existing capability-test skip/timeout policy applies; no engin
 - The corrected CPU-only selector passed all five selected geometry cases. Real GPU verification belongs to `ci-vulkan`; this does not indicate a query regression or justify weakening that lane.
 
 ## Acceptance criteria
-- [ ] Capability-skip the unsupported compile/backend case before entering the framed wait.
-- [ ] Retain hard failures after actual Vulkan execution and preserve the current query assertions.
-- [ ] Verify the non-promoted skip and the actual `ci-vulkan` case.
+- [x] Capability-skip the unsupported compile/backend case before entering the framed wait.
+- [x] Retain hard failures after actual Vulkan execution and preserve the current query assertions.
+- [x] Verify the non-promoted skip and the actual `ci-vulkan` case.
+
+Criteria 1 and 2 are ticked from the round-1 independent Claude review of `c11702dc7`
+(both `met`); criterion 3 from the criterion-3 decision review of `2df2a2837` (`met`).
+See Completion.
 
 ## Verification
 ```bash
@@ -83,10 +87,28 @@ unchanged.
 - I left these unchanged (decision 1). The CPU gate does not select them, because the
   whole executable is labelled `gpu;vulkan`.
 
-**Pending (GPU lane).** The `ci-vulkan` half has not run yet:
-`ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.FramedKNearestReusesBuffersAndRejectsStaleTarget$' -L gpu -L vulkan --timeout 120`.
-Expected result: Passed, with host GPU and driver recorded. The `ci-vulkan` compile of
-this change was also not run here.
+**Verification on `ci-vulkan` (GPU lane, 2026-10-24).** Source: the merge `2df2a2837`
+of this fix into `claude/bug-gpu-diagnostics` (test file byte-identical to `c11702dc7`).
+Host: NVIDIA GeForce RTX 4090, driver 580.159.04, `DISPLAY=:1`, `Monitor is On` at
+01:56:01 CEST.
+
+| Check | Command | Result |
+|---|---|---|
+| Build | `nice -n 10 cmake --build --preset ci-vulkan --parallel 7 --target IntrinsicPointLBVHGpuTests` | rc 0, 28.3 s; only the test object recompiled, binary linked 01:56:01 |
+| Case | `ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.FramedKNearestReusesBuffersAndRejectsStaleTarget$' -L gpu -L vulkan --timeout 120` | `ctest_rc=0`, `Passed 4.52 sec`, 100% |
+| Verbose rerun | the same with `-V` | rc 0, `[       OK ] ... (4263 ms)`, `[  PASSED  ] 1 test.`, no SKIPPED line |
+
+- Raw logs (git-ignored, `gpu` lane worktree): `tasks/evidence/BUG-182-gpu/`
+  (`ctest.log`, `ctest-V.log`, `state.txt`); the build log is
+  `tasks/evidence/BUG-228/2026-10-24/build-bug182.log`. The command lines and return
+  codes above were copied from the GPU-lane session record, which the logs do not hold.
+- The cold-start warning `RequestedButIncompleteGate reason=BarrierValidationFailed` is
+  routine; the hard post-run `IsOperational` assert passed.
+- CTest used a 30 s timeout (`Test timeout computed to be: 30`): the test's TIMEOUT
+  property overrides `--timeout 120`. The case passed in 4.3 s, so this run is
+  unaffected; the 40 s fixture budget stays open as decision 3.
+- Later BUG-228 probe and revert builds relinked `build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests`
+  (02:08, 02:34), so the binary of this run no longer exists unchanged. Rebuild before a re-run.
 
 **Open operator decisions.** Each has the default I took:
 1. **The 12 siblings that fail fast on Null.** Default: unchanged. They are a different
@@ -102,3 +124,23 @@ this change was also not run here.
    framed siblings get 120 s in `tests/CMakeLists.txt`. Default: no timeout change. A
    device that bootstraps but never becomes operational in kNN mode still ends as a CTest
    Timeout rather than the fixture's own assert: still red, not hidden.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `c11702dc7` (test fix, parent `599f02ff1`), merged into
+the night integration branch `claude/night-2026-10-24-bug-sweep` in `af1585ddf`; the
+`ci-vulkan` run used the merge `2df2a2837` (GPU lane, merged in `74c47272a`). Not yet on
+`main`; hosted CI never selects this `gpu;vulkan` case.
+Reviewer decisions:
+- Round 1 on `c11702dc7`: independent Claude review `approve`; criteria 1 and 2 `met`,
+  criterion 3 `partially met` (the `ci-vulkan` half had not run).
+- Criterion-3 decision review on `2df2a2837` (verdict `approve`, no blocking findings;
+  structured verdict relayed by the night workflow coordinator; a git-ignored copy is
+  `tasks/evidence/BUG-182/criterion3-review.json` in the integration worktree):
+  all three criteria `met`. Criterion 3: the `ci-vulkan` command above returned rc 0 with
+  `Passed 4.52 sec` and `[ OK ]` at 4263 ms on the RTX 4090, from a binary rebuilt from
+  the merged source. Its optional findings (record the run here, copy the commands and
+  the build-log path out of the session record, the 30 s CTest timeout, the relinked
+  binary) are applied in the `ci-vulkan` section above.
+Limitations: open operator decisions 1-3 above keep their defaults. Raw logs stay
+git-ignored in the `bug-182` (`tasks/evidence/BUG-182/`) and `gpu`
+(`tasks/evidence/BUG-182-gpu/`) lane worktrees; nothing was deleted.
