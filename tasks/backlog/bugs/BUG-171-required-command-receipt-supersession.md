@@ -59,10 +59,17 @@ contract_review: "Completion-evidence command disposition is part of task author
       synchronize generated skill references.
 
 ## Acceptance criteria
-- [ ] A legitimate corrected check can unblock completion without altering or
+- [x] A legitimate corrected check can unblock completion without altering or
       concealing its failed development attempts.
-- [ ] A different successful check cannot bypass a required failure.
-- [ ] Existing custody and retirement regression tests remain passing.
+- [x] A different successful check cannot bypass a required failure.
+- [x] Existing custody and retirement regression tests remain passing.
+
+Ticked from the round-1 reviews of `3e7c98e27793dd51fcb44a1460b37e99dd82aee4`
+(report digest `9d859cd7…`). An independent Claude review and an independent
+Codex review (thread `01a16b39-2409-7a92-90e9-9728d7b5cbcb`) both returned
+`approve` and decided all three criteria `met`. They are recorded in the night
+coordinator's review ledger, lane BUG-171, round 1. The ticks change the
+reviewed surface, so the final independent review must bind the new digest.
 
 ## Verification
 ```bash
@@ -135,8 +142,8 @@ Chosen defaults (the operator may veto them at review):
 Verification, run 2026-10-24 (logs under `tasks/evidence/BUG-171/`):
 - New tests run against the unchanged tool: 6 tests, 38 subtests, all
   `FAILED (failures=38)` (`new-tests-before-fix.log`).
-- After the fix, `Test.WorkflowEvidence.py` passes 44 tests in 22.5 s. Before,
-  it ran 38 tests in 12.4 s.
+- After the fix, `Test.WorkflowEvidence.py` passes 44 tests in 23.2 s
+  (`tests-after-fix.log`). Before, it ran 38 tests in 12.4 s.
 - `mutate.sh` disables one check at a time in a temporary mirror. All 17
   mutations are killed: argv, cwd, chronology, replacement pass,
   failed-is-failure, receipt hash, receipt existence, receipt validation,
@@ -166,10 +173,10 @@ Remaining:
 - Residual risk: receipts bind neither the source revision nor the
   environment or build-tree state. The lane that owns that is
   PROC-031/CI-012/CI-013.
-- High-risk completion: the acceptance checkboxes stay unticked.
-  - The independent correctness review and the ponytail review decide them.
-  - After that: regenerate the report with `--complete --replace`, append a
-    handoff and an accepted independent review bound to the final digest, and
-    get `validate --require-complete BUG-171` to exit 0.
+- High-risk completion: the acceptance checkboxes are ticked from the
+  round-1 reviews (see Acceptance criteria).
+  - Still owed: an accepted independent review bound to the regenerated
+    complete report's digest, then `validate --require-complete BUG-171` must
+    exit 0.
   - The review and finalize work-graph nodes are still open, and the
     integrator does the retirement moves.
