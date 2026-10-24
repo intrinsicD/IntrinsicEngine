@@ -80,6 +80,45 @@ No source, preset or gate changed. Logs are git-ignored under
 `baseline-rc.txt`, `environment.txt`, `predictions.txt`, `step0-noop.log`,
 `step1-edited.log`, `step2-reverted.log`).
 
+## ccache comparison — 2026-10-24 (second session)
+
+The operator decided: "ccache installieren und nochmal testen". ccache was installed
+without root from the Ubuntu jammy package (`ccache 4.5.1-1` plus its
+`libhiredis0.14` dependency, unpacked with `dpkg -x` under `~/.local/opt/ccache`,
+called through a small wrapper that sets `LD_LIBRARY_PATH`). It was on `PATH` only
+for this session's commands. CI uses ccache 4.9.1, so this host tests an older
+ccache. The cache directory is a dedicated `CCACHE_DIR`
+(`IntrinsicEngine-night/_state/ccache-bug178`), so the user's default cache is
+untouched. Source surface: commit `4c30f2b82`, clean worktree, one writer per
+tree, preset `ci-vulkan` (Clang 23, Debug, ASan+UBSan), `nice -n 10`,
+`--parallel 16`, target `IntrinsicPointLBVHGpuTests`. Each arm runs the scenario
+from the first diagnosis: a full build, a no-op check, then one comment line
+appended to the three named runtime files and a rebuild, then a `git checkout`
+revert and a rebuild. A watchdog stops the build if free disk falls below 20 GB.
+
+Arms:
+- (a) ccache on, cold cache: new tree `build/ci-vulkan-ccache`, empty `CCACHE_DIR`.
+- (b) ccache on, warm cache: delete and reconfigure the same tree, keep the cache.
+- (c) `CCACHE_DISABLE=1` in the ccache-configured tree from (b).
+- (d) fresh tree without ccache on `PATH` (`build/ci-vulkan-fresh`).
+
+Predictions, written before any build:
+1. Configure prints `Using CCache:` with the wrapper path for (a) and (b), and the
+   compile rules carry the `tools/ci/ccache_ci.py launch` launcher.
+2. All four arms build with exit 0 in every step. No log prints
+   `PLEASE submit a bug report`, `Stack dump` or `error:`, and no new
+   reproducer appears in `/tmp`.
+3. ccache 4.5.1 does not cache the module-interface compiles (it does not know
+   `-x c++-module` / `-fmodule-output`); they are counted as uncacheable and
+   always run the compiler. Implementation units are cached.
+4. (a): the full build is almost all misses. The revert rebuild hits the cache
+   for the reverted implementation units, because their preprocessed content
+   equals the full build's.
+5. (b): the full build hits for most implementation units and is faster than (a).
+6. (c) and (d): ccache statistics do not change.
+Kill condition: a frontend crash stops the arm. Its logs and reproducer are kept,
+and the failing command is rerun alone with and without ccache.
+
 ## Acceptance criteria
 - [ ] Reproduce with one stabilized source surface and exactly one writer per preset tree, comparing enabled/disabled ccache and a fresh tree.
 - [ ] Record the compiler/cache cause or a bounded non-reproduction; preserve the existing strict module/toolchain gates.
