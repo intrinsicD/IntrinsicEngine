@@ -51,12 +51,12 @@ contracts: [geometry.element-domain-sources]
   branch.
 
 ## Acceptance criteria
-- [ ] Regression first: a seam-bearing model-scene import that must request the normal and
+- [x] Regression first: a seam-bearing model-scene import that must request the normal and
       albedo bakes fails before the fix, and the failure is recorded.
-- [ ] The fix is made once at the canonical owner of the bake gate. Vertex-UV and no-UV
+- [x] The fix is made once at the canonical owner of the bake gate. Vertex-UV and no-UV
       primitives keep their current behaviour, and the existing direct-mesh bake test still
       passes.
-- [ ] No unrelated changes.
+- [x] No unrelated changes.
 
 ## Verification
 ```bash
@@ -140,3 +140,43 @@ python3 tools/agents/check_task_policy.py --root . --strict
   - An independent correctness review of the change.
   - A ponytail review.
   - The operator decision on COLOR_0 import (see the lane report).
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `b353492b8` (filing, with the regression test's name fixed
+before the fix), `9c5b4559e` (the fix and its test, on `b353492b8`, branch
+`claude/bug-250-seam-atlas-bake-gate`), merged into the night integration branch
+`claude/night-2026-10-24-bug-sweep` as `de1fbb832`. Not yet on `main`; hosted CI has not run on
+these commits, and nothing was built or run at the merge.
+
+Reviewer decisions (coordinator's local review record `wfI.json`, lane `BUG-250`, outside the
+repository), round 1 on `9c5b4559ea10f18633b2c0237337eb22a51ba07c` (`b353492b8..9c5b4559e`):
+- Independent Claude review `approve`, no blocking findings; AC1, AC2 and AC3 "met". It accepts
+  the non-finite `v:texcoord` change within AC2. It reran four `RuntimeAssetImportFormatCoverage`
+  cases (4/4 passed) and reports the three owning suites at 100/100 on the existing build tree.
+- Independent Codex review (thread `01a16c1c-e79a-7a82-a1ec-11350060fc6b`) `approve`, no
+  blocking findings, ending "VERDICT: approve". Its table rates all three criteria "**Met**".
+  It ran no builds or tests.
+
+Boxes: all three are ticked, as both round-1 reviews decided.
+
+Limits:
+- The test proves that the CPU-side bake request is made, not that a GPU bake of a model-scene
+  seam atlas succeeds. No `ci-vulkan` smoke was run.
+- In the `ProgressiveRawGeometryFirst` branch (`:538-540`), `HasResolvedTexcoords` is valid
+  `v:texcoord` or an `h:texcoord` existence check. No production composition sets that option,
+  and the progressive path belongs to BUG-097.
+- The rejected-atlas OBJ text in the test is still inline twice (`:2095`, `:2223`).
+- Context and `evidence_skip_reason` are the filing record ("not reproduced"); the Resolution
+  records the reproduction.
+- The duplication check covered `tests/contract/runtime` and `src/runtime/AssetWorkflow`, not
+  the whole repository.
+
+Open for the operator:
+- The deliberate behaviour change: a primitive whose `v:texcoord` is present but non-finite no
+  longer gets a bake request. Both reviewers accept it within AC2.
+- COLOR_0 import: the glTF decoder imports only POSITION, NORMAL and TEXCOORD_0, so the
+  model-scene albedo bake is unreachable from glTF files. Nothing was filed.
+- Whether an Operational `ci-vulkan` seam-atlas bake smoke is wanted.
+
+Evidence: the logs cited in the Resolution stay git-ignored in the `bug-220` lane worktree
+(`tasks/evidence/BUG-250/`); the integration worktree has none. Nothing was deleted.

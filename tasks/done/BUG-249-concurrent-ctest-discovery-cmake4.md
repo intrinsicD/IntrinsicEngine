@@ -45,15 +45,15 @@ contract_review: Private CMake test instrumentation only; the catalog has no CTe
   coverage and `ci-docs` red on a 4.x image, and the task could still retire.
 
 ## Acceptance criteria
-- [ ] On CMake 4.3.2 the three cases (unlocked duplicate-append control,
+- [x] On CMake 4.3.2 the three cases (unlocked duplicate-append control,
       guarded serialization with nested CTest, genuine-duplicate
       preservation) run and pass, or the probe fails at once with a message
       naming the CMake version and the unrecognised module form. An unknown
       form stays a hard failure, never a skip or a pass.
-- [ ] On each recognised form the unlocked control still shows the duplicated
+- [x] On each recognised form the unlocked control still shows the duplicated
       registrations, and a mutation that drops the instrumentation fails the
       matching case.
-- [ ] The cases still pass on CMake 3.28.3 and 3.31.6. Installed CMake modules
+- [x] The cases still pass on CMake 3.28.3 and 3.31.6. Installed CMake modules
       and `cmake/IntrinsicTestDiscovery.cmake` stay unchanged.
 
 ## Verification
@@ -147,3 +147,38 @@ python3 tools/agents/check_task_policy.py --root . --strict
     not filed (bug-ID allocation and the bug index belong to the integrator).
   - The `ci-docs` remote run (ubuntu-24.04, CMake 3.31.6) was not repeated;
     the local 3.31.6 run covers that version.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `b937202a3` and `8a435096a` (filing and the cited `ci-docs` run),
+`dc67373eb` (the fix, on `b353492b8`, branch `claude/bug-249-concurrent-discovery-cmake4`),
+merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as `73a447bae`.
+After the merge, `python3 tests/regression/tooling/Test.ConcurrentCTestDiscovery.py` gave `OK`
+(3 tests) on the host's CMake 4.3.2. Not yet on `main`; hosted CI has not run on these commits.
+
+Reviewer decisions (coordinator's local review record `wfI.json`, lane `BUG-249`, outside the
+repository), round 1 on `dc67373eb2474f3c7e62bca910cf5622f9a998ed` (`b353492b8..dc67373eb`):
+- Independent Claude review `approve`, no blocking findings; criteria 1, 2 and 3 "met". It
+  reran the test at `dc67373eb` on a clean tree: OK 3/3 on the host 4.3.2 and on the 3.28.3,
+  3.31.6 and 4.2.0 wheels.
+- Independent Codex review (thread `01a16c1a-fdf4-76a0-b657-e568b46571d4`) `approve`, no
+  blocking findings, ending "VERDICT: approve". Its table rates criteria 1, 2 and 3 "**Met**".
+  It ran no tests or builds.
+
+Boxes: all three are ticked, as both round-1 reviews decided.
+
+Limits:
+- CMake 4.4 is not supported: 4.4.4 fails 3/3 with the layout message. Moved to
+  [BUG-251](../backlog/bugs/BUG-251-cmake44-gtest-discovery-include-layout.md), which also covers
+  `Test.GTestDiscoveryTimeout.py:144` and `tools/ci/gtest_discovery_probe.py:230,311`. The
+  production-lock claims for 4.4 are inferred from source.
+- Only PyPI `cmake` wheels were run; no distro-packaged CMake. The hosted `ci-docs` run was
+  not repeated; the local 3.31.6 run covers its listed version.
+- The duplication check covered `tests/regression/tooling`, not the whole repository.
+- The Resolution's "proposed to the operator, not filed" line predates BUG-251's filing.
+
+Open for the operator: the 4.4 choice carried into BUG-251 (support it now or pin CMake in CI).
+The review's optional cosmetic findings (duplicated write literals, presets in the form
+selection, the reused message for the function-entry count) were left as they are.
+
+Evidence: the logs cited in the Resolution stay git-ignored in the `bug-149` lane worktree
+(`tasks/evidence/BUG-249/`); the integration worktree has none. Nothing was deleted.

@@ -83,8 +83,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)
 - unblocked: `BUG-247` — Local root hygiene rejects existing tool state (tasks/backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md)
-- unblocked: `BUG-249` — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x (tasks/backlog/bugs/BUG-249-concurrent-ctest-discovery-cmake4.md)
-- unblocked: `BUG-250` — Direct texture bakes skip models with a seam atlas (tasks/backlog/bugs/BUG-250-direct-texture-bakes-skip-seam-atlas-models.md)
 - unblocked: `BUG-251` — Support the CMake 4.4 GoogleTest discovery include layout (tasks/backlog/bugs/BUG-251-cmake44-gtest-discovery-include-layout.md)
 
 ## Theme H — Agentic workflow hardening

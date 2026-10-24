@@ -9,15 +9,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   CMake 4.4 names the PRE_TEST include `<target>_<sha8>_include.cmake`; two regressions and the
   BUG-091 probe hard-code `<target>[1]_include.cmake`. The race probe fails 3/3 on 4.4.4 with a layout message.
 
-- [BUG-250 — Direct texture bakes skip models with a seam atlas](BUG-250-direct-texture-bakes-skip-seam-atlas-models.md):
-  the direct normal/albedo bake gate checks only `v:texcoord`, but a seam atlas leaves only
-  `h:texcoord`. Found by code reading, not reproduced; regression first.
-
-- [BUG-249 — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x](BUG-249-concurrent-ctest-discovery-cmake4.md):
-  the race probe knows only the 3.28/3.31 `file(WRITE)` forms; CMake 4.3's
-  REMOVE+APPEND module fails all three cases. Hosted `ci-docs` passed on `main` `599f02ff1`
-  (run 39957196726).
-
 - [BUG-247 — Local root hygiene rejects existing tool state](BUG-247-local-root-hygiene-state-mismatch.md):
   local `.aws/` and `.serena/` remain unclassified; preserve both pending an operator setup decision.
 
@@ -45,6 +36,15 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   atlas replacement; otherwise verify supersession when that replacement
   lands. Preserve corner-domain seams, source topology, and stale rejection.
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-250 — Direct texture bakes skip models with a seam atlas](../../done/BUG-250-direct-texture-bakes-skip-seam-atlas-models.md).
+  The model-scene direct normal/albedo bake gates read `HasResolvedTexcoords` instead of `v:texcoord` only, so seam-atlas
+  and corner-UV primitives get bake requests (2 of the 6 expected requests before, 6 after). CPU request only; no GPU bake run.
+
+- Closed 2026-10-24: [BUG-249 — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x](../../done/BUG-249-concurrent-ctest-discovery-cmake4.md).
+  The race probe recognises the CMake 4.2+ REMOVE+APPEND form and checks that its hooks ran; OK on nine CMake
+  versions from 3.28.3 to 4.3.4.
+  CMake 4.4 still fails hard on its new include layout (BUG-251).
 
 - Closed 2026-10-24: [BUG-248 — Keypoint GPU parity smokes fail on main](../../done/BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md).
   The keypoint kernel kept a private Jacobi with the absolute isotropic floor that GEOM-114 removed on the CPU;

@@ -1,5 +1,45 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-250 retired after its round-1 reviews
+
+Retired [BUG-250](BUG-250-direct-texture-bakes-skip-seam-atlas-models.md) (`b353492b8`, `9c5b4559e`),
+merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as `de1fbb832`; not yet
+on `main`, and hosted CI has not run on it.
+
+- Root cause: the model-scene direct normal and albedo bake requests were gated on
+  `MeshHasVertexTexcoords` (`v:texcoord` only), while a seam atlas and seam-bearing authored corner UVs
+  leave `h:texcoord` as the only UV channel. Fix: both gates read `PreparedPrimitive::HasResolvedTexcoords`
+  (two tokens); the progressive branch is left to BUG-097.
+- `ModelSceneSeamAtlasRequestsGeneratedTextureBakes` failed first (2 of 6 requests), passes after the fix;
+  forcing both gates open fails its no-UV control (8 requests). Owning suites 100/100 on `ci`.
+- Review: round 1 on `9c5b4559e`, independent Claude review and independent Codex review both `approve`,
+  all three criteria "met"; all three boxes ticked.
+- Limits: CPU request only, no GPU bake of a seam atlas run. Open for the operator: the non-finite
+  `v:texcoord` behaviour change (no request any more; both reviewers accept it within AC2), COLOR_0 import
+  for glTF albedo bakes, and whether an Operational `ci-vulkan` smoke is wanted. Evidence stays
+  git-ignored in the `bug-220` lane worktree; nothing was deleted.
+
+## 2026-10-24 — BUG-249 retired after its round-1 reviews
+
+Retired [BUG-249](BUG-249-concurrent-ctest-discovery-cmake4.md) (`b937202a3`, `8a435096a`, `dc67373eb`),
+merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as `73a447bae`; not yet
+on `main`, and hosted CI has not run on it.
+
+- Root cause: `Test.ConcurrentCTestDiscovery.py` knew the 3.28 and 3.31-4.1 `file(WRITE)` forms of
+  `GoogleTestAddTests.cmake`; CMake 4.2+ removes the CTest file once and appends, so all three cases
+  failed (`0 != 2`). Fix: the form is chosen explicitly from `CMAKE_VERSION`, the 4.2+ form is
+  instrumented, unknown forms and a missing include fail with version-named messages, and every
+  expected hook marker must exist.
+- OK 3/3 on CMake 3.28.3, 3.31.6, 3.31.10, 4.0.3, 4.1.3, 4.2.0, 4.2.3, 4.3.2 and 4.3.4 (PyPI wheels and
+  the host), and on the host 4.3.2 after the merge. Hook-removal mutants fail only with the new marker
+  check. Installed modules and `cmake/IntrinsicTestDiscovery.cmake` unchanged.
+- Review: round 1 on `dc67373eb`, independent Claude review and independent Codex review both `approve`,
+  all three criteria "met"; all three boxes ticked.
+- Limits: CMake 4.4 fails hard on its new include layout; moved to
+  [BUG-251](../backlog/bugs/BUG-251-cmake44-gtest-discovery-include-layout.md) with the operator's
+  choice to support it or pin CMake in CI. No distro-packaged CMake run. Evidence stays git-ignored in
+  the `bug-149` lane worktree; nothing was deleted.
+
 ## 2026-10-24 — RUNTIME-291 retired at Operational after its final re-review
 
 Retired [RUNTIME-291](RUNTIME-291-scale-aware-radius-defaults.md) (`54e216269` through `cb9f0b481`,

@@ -19,7 +19,8 @@ contract_review: Private CMake test instrumentation and a CI diagnostic only; th
   unknown layout a hard failure.
 
 ## Context
-- Split from BUG-249, which made
+- Split from [BUG-249](../../done/BUG-249-concurrent-ctest-discovery-cmake4.md) (retired
+  2026-10-24), which made
   `tests/regression/tooling/Test.ConcurrentCTestDiscovery.py` support the CMake 4.2+
   REMOVE+APPEND write form and left 4.4 out of its scope. BUG-249's independent Claude review
   asked for this follow-up to be filed before retirement.
