@@ -40,9 +40,10 @@ class ConcurrentDiscoveryTests(unittest.TestCase):
         build = root / "build"
         # Copy only the discovery implementation. Never edit the installed module.
         probe = source / "locate.cmake"
-        probe.write_text('file(WRITE "${CMAKE_CURRENT_LIST_DIR}/cmake-root.txt" "${CMAKE_ROOT}")\n')
+        probe.write_text('file(WRITE "${CMAKE_CURRENT_LIST_DIR}/cmake.txt" "${CMAKE_ROOT}\\n${CMAKE_VERSION}")\n')
         run("cmake", "-P", str(probe))
-        module = Path((source / "cmake-root.txt").read_text()) / "Modules/GoogleTestAddTests.cmake"
+        cmake_root, version = (source / "cmake.txt").read_text().split("\n")
+        module = Path(cmake_root) / "Modules/GoogleTestAddTests.cmake"
         original = module.read_text()
         sync = source / "sync.py"
         sync.write_text('''import os, pathlib, sys, time
@@ -65,27 +66,49 @@ if os.environ.get("DISCOVERY_RACE") == "1":
         def call(stage: str) -> str:
             return (f'execute_process(COMMAND "{sys.executable}" "{sync}" {stage}'
                     ' COMMAND_ERROR_IS_FATAL ANY)\n')
-        # CMake 3.28 flushes through a macro; 3.31 inlines its two write sites.
-        # Instrument only the initial WRITE in either implementation, preserving
-        # APPEND chunks and the production discovery lock unchanged.
-        write = 'file(${flush_tests_MODE} "${_CTEST_FILE}" "${script}")'
-        mode = "flush_tests_MODE"
-        final_flush = "  # Write CTest script\n  flush_script()"
-        write_count = 1
-        if write not in original:
+        # Instrument only the initial truncating write and the final flush,
+        # preserving later APPEND chunks and the production discovery lock.
+        # CMake 3.28 flushes through a macro and 3.31-4.1 inline two write
+        # sites, each switching a mode variable from WRITE to APPEND. CMake
+        # 4.2+ removes the file once, then only appends: REMOVE plus the first
+        # APPEND form its initial write.
+        changed = (f"CMake {version}: unrecognised CTest-file write form in {module}; the probe "
+                   "knows 3.28 (flush_tests_MODE macro), 3.31/4.0-4.1 (two file_write_mode sites) "
+                   "and 4.2+ (one REMOVE, two APPEND sites). Extend its instrumentation.")
+        remove = 'file(REMOVE "${arg_CTEST_FILE}")'
+        mode = None
+        write_count = 2
+        if 'file(${flush_tests_MODE} "${_CTEST_FILE}" "${script}")' in original:
+            write = 'file(${flush_tests_MODE} "${_CTEST_FILE}" "${script}")'
+            mode = "flush_tests_MODE"
+            final_flush = "  # Write CTest script\n  flush_script()"
+            write_count = 1
+        elif 'file(${file_write_mode} "${arg_CTEST_FILE}" "${script}")' in original:
             write = 'file(${file_write_mode} "${arg_CTEST_FILE}" "${script}")'
             mode = "file_write_mode"
             final_flush = "  # Write remaining content to the CTest script\n  " + write
-            write_count = 2
-        self.assertEqual(original.count(write), write_count, "CMake flush implementation changed")
-        self.assertEqual(original.count(final_flush), 1, "CMake final flush implementation changed")
+        elif remove in original:
+            write = 'file(APPEND "${arg_CTEST_FILE}" "${script}")'
+            final_flush = "  # Write remaining content to the CTest script\n  " + write
+            self.assertEqual(original.count(remove), 1, changed)
+        else:
+            self.fail(changed)
+        self.assertEqual(original.count(write), write_count, changed)
+        self.assertEqual(original.count(final_flush), 1, changed)
         instrumented = original.replace(final_flush, final_flush + "\n" + call("done"))
-        instrumented = instrumented.replace(write,
-            f'if({mode} STREQUAL "WRITE")\n' + call("before-write") + 'endif()\n'
-            + write + f'\nif({mode} STREQUAL "WRITE")\n'
-            + call("after-write") + 'endif()')
+        if mode:
+            instrumented = instrumented.replace(write,
+                f'if({mode} STREQUAL "WRITE")\n' + call("before-write") + 'endif()\n'
+                + write + f'\nif({mode} STREQUAL "WRITE")\n'
+                + call("after-write") + 'endif()')
+        else:
+            # Macros share the function scope, so both APPEND sites see the flag.
+            instrumented = instrumented.replace(remove, call("before-write") + remove
+                                                + "\nset(_intrinsic_probe_first_write ON)")
+            instrumented = instrumented.replace(write, write + "\nif(_intrinsic_probe_first_write)\n"
+                + call("after-write") + "set(_intrinsic_probe_first_write OFF)\nendif()")
         entry = "function(gtest_discover_tests_impl)\n"
-        self.assertEqual(instrumented.count(entry), 1)
+        self.assertEqual(instrumented.count(entry), 1, changed)
         instrumented = instrumented.replace(entry, entry + call("enter"))
         private_module = source / "GoogleTestAddTests.cmake"
         private_module.write_text(instrumented)
@@ -112,11 +135,13 @@ set_tests_properties(NestedRegistry PROPERTIES TIMEOUT 10)
         # Newer CMake ignores the private-script variable above. Redirect only
         # this fixture's generated include and verify the instrumented path.
         discovery = build / "Fake[1]_include.cmake"
+        self.assertTrue(discovery.exists(), f"CMake {version}: generated discovery include layout "
+                        f"changed, no {discovery.name}; extend this probe")
         generated = discovery.read_text()
         installed_include = f'include("{module}")'
         private_include = f'include("{private_module}")'
         self.assertEqual(generated.count(installed_include) + generated.count(private_include), 1,
-                         "CMake discovery include changed")
+                         f"CMake {version}: discovery include changed")
         discovery.write_text(generated.replace(installed_include, private_include))
         # Startup marker runs before the production lock, demonstrating the
         # second CTest reached registry parsing while the first owns discovery.
@@ -159,6 +184,10 @@ set_tests_properties(NestedRegistry PROPERTIES TIMEOUT 10)
                 output = handle.read()
                 self.assertEqual(code, 0, output)
                 documents.append(json.loads(output))
+            expected = {f"{role}-{stage}" for role in (("a", "b") if race else ("a",))
+                        for stage in ("before-write", "after-write", "done")}
+            missing = expected - {path.name for path in barriers.iterdir()}
+            self.assertFalse(missing, f"instrumented discovery hooks did not run: {sorted(missing)}")
             if not race:
                 self.assertFalse((barriers / "b-enter").exists(), "second reader repeated discovery")
             return tuple(documents)
