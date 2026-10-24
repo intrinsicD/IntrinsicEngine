@@ -40,6 +40,9 @@ contract_review: Private CMake test instrumentation only; the catalog has no CTe
   the 4.x versions.
 - Related: BUG-176 (this regression and the production lock), BUG-214 (the 3.31
   form), BUG-091 (found it).
+- Open choice (operator): the unsupported-version branch of the first criterion
+  keeps the regression a hard failure, but it leaves CMake 4.x without race
+  coverage and `ci-docs` red on a 4.x image, and the task could still retire.
 
 ## Acceptance criteria
 - [ ] On CMake 4.3.2 the three cases (unlocked duplicate-append control,
