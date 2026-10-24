@@ -38,11 +38,15 @@ contract_review: Sanitizer test lane failures; no catalog contract covers CI tes
   `full-cpu`; locally 6.5 s became 0.7 s + 3.0 s. Its ASan timing is not re-measured.
 
 ## Acceptance criteria
-- [ ] The ProgressivePoisson panel failure is reproduced (ASan build) and fixed at its root cause.
-- [ ] Each timeout is either brought within budget or given a diagnosed, documented sanitizer
-      budget/lane; no gate weakened without diagnosis.
-- [ ] A manual `ci-linux-clang` dispatch shows both sanitizer jobs and `cpu-test-selection-parity`
-      green, or every remaining failure has its own task.
+- [x] The ProgressivePoisson panel failure is reproduced (ASan build) and fixed at its root cause.
+      Met: independent Claude and Codex reviews of the BUG-240 lane (coordinator review record,
+      lane `BUG-240+BUG-188`).
+- [x] Each timeout is either brought within budget or given a diagnosed, documented sanitizer
+      budget/lane; no gate weakened without diagnosis. Independent review of `30d1a148d`:
+      "Criterion 2: met."
+- [x] A manual `ci-linux-clang` dispatch shows both sanitizer jobs and `cpu-test-selection-parity`
+      green, or every remaining failure has its own task. Met by hosted dispatch 40105034304; an
+      independent reviewer confirms it in the next step.
 
 ## Verification
 ```bash
@@ -138,7 +142,7 @@ Covers criterion 1 and the diagnosis for criterion 2. Raw logs are in
 ### Sanitizer case budgets (criterion 2): operator policy applied
 - **Decision (2026-10-24, verbatim):** "ok dann Faktor 2 und variations fit als eigenen Produkt
   task." That is the sanitizer-only budget policy with factor 2, plus a product task for the
-  noise-level weight search ([GEOM-117](../geometry/GEOM-117-cheaper-variational-fit-noise-level-search.md)).
+  noise-level weight search ([GEOM-117](../backlog/geometry/GEOM-117-cheaper-variational-fit-noise-level-search.md)).
 - **Which lanes.** A tree is a sanitizer lane when its resolved `INTRINSIC_SANITIZER_IDENTITY`
   (from `INTRINSIC_SANITIZER_MODE`/`INTRINSIC_ENABLE_SANITIZERS`) is not `none`: `ci-asan`,
   `ci-ubsan`, `ci-vulkan` (ASan+UBSan) and the `dev` presets. `ci`, `ci-fast`, `ci-release`,
@@ -177,6 +181,43 @@ Covers criterion 1 and the diagnosis for criterion 2. Raw logs are in
   `--self-test` pass. `tools/ci/source_coverage.py` keeps its 120 s pin because coverage and
   sanitizers are mutually exclusive.
 
-### Remaining
-- Criterion 3 needs the coordinator's integrated `ci-linux-clang` dispatch. BUG-240 stays open
-  until that dispatch is green, or until every remaining failure has its own task.
+### Hosted CI (criterion 3)
+- `ci-linux-clang` `workflow_dispatch` run 40105034304 on `main` `dde5776d6`: conclusion
+  success; jobs `full-cpu`, `sanitizer-tests (asan, ci-asan)`, `sanitizer-tests (ubsan, ci-ubsan)`
+  and `cpu-test-selection-parity` all success. Push run 40105035007 on the same commit: `full-cpu`
+  success.
+- CTest totals: ASan 4110/4110 passed, 7 skipped (display/locale), 2232.93 s; UBSan 4110/4110
+  passed, the same 7 skipped, 957.87 s.
+- Previously failing cases, CI duration against the new budget (cases 60 s, grouped wrappers
+  240 s):
+
+  | Case | ASan | UBSan |
+  |---|---|---|
+  | `PropertySmoothingWorkflows.VariationalFitVariantsAndSolverSwitches` | 43.84 s / 60 | 14.20 s / 60 |
+  | CPD `...UseTheAutomaticLowRank` / `...KeepTheFullKernelWhenExactIsAsked` | 3.67 / 14.65 s | 2.39 / 8.83 s |
+  | `SandboxAgentServer.KMeansProgressFollowsTheRunsOwnJob` | 31.43 s / 60 | 14.17 s / 60 |
+  | `SandboxAgentServer.SceneSaveProgressNamesTheSceneJob` | 31.19 s / 60 | 7.71 s / 60 |
+  | `IntrinsicGeometryTests.Grouped` | 180.07 s / 240 | 73.59 s / 240 |
+  | `IntrinsicGeometryScalarfieldExtremaTests.Grouped` | 183.91 s / 240 | 208.59 s / 240 |
+  | `SandboxProcessingPanels.ProgressivePoissonManualAndDebouncedRunsShareConfigApply` | 7.02 s | 1.15 s |
+
+- Thinnest margin: UBSan `IntrinsicGeometryScalarfieldExtremaTests.Grouped` at 208.59 s of 240 s
+  (87%), matching the predicted about 210 s. ASan `VariationalFit` (73% of 60 s) is owned by
+  GEOM-117.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commits: `dd65adee6` (Poisson panel fixed-step UI clock), `30d1a148d`
+(sanitizer case budgets x2), `dde5776d6` (routing checker follows the tree scale); follow-up
+`66748220a` files [GEOM-117](../backlog/geometry/GEOM-117-cheaper-variational-fit-noise-level-search.md)
+for the noise-level weight search. All on `main`.
+- Operator decision on the budget policy (verbatim): "ok dann Faktor 2 und variations fit als
+  eigenen Produkt task."
+- Two CI-only regressions surfaced on the way and were fixed: the routing baseline missed a new
+  BUG-193 case (`b233910ad`), and `Test.TestGateRouting.py` pinned grouped wrappers to 120 s in
+  scaled sanitizer trees (`dde5776d6`, after dispatch 40099074759).
+- Margins: see the table above; the UBSan ScalarfieldExtrema producer (208.59 s of 240 s) is the
+  thinnest and will tip over first if those producers grow.
+- Limits: hang detection is 2x coarser in every sanitizer lane, `ci-vulkan` (ASan+UBSan) included.
+  Criterion 3 rests on one hosted dispatch; its independent confirmation is the next step.
+- Raw evidence stays git-ignored in the `asan` lane worktree (`tasks/evidence/BUG-240/`); nothing
+  tracked to delete.

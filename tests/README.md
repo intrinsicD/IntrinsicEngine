@@ -186,7 +186,7 @@ exact registration, and nested discovery without requiring engine binaries.
   `tests/CMakeLists.txt` raise it for some cases.
 
 Sanitized trees scale the case budgets
-([BUG-240](../tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)).
+([BUG-240](../tasks/done/BUG-240-sanitizer-cpu-jobs-red-since-september.md)).
 A tree is sanitized when its resolved `INTRINSIC_SANITIZER_IDENTITY` is not
 `none`, i.e. `INTRINSIC_SANITIZER_MODE`/`INTRINSIC_ENABLE_SANITIZERS` select a
 sanitizer: `ci-asan`, `ci-ubsan`, `ci-vulkan` (ASan+UBSan) and the `dev`

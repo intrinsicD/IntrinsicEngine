@@ -1,5 +1,26 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-240 retired after the green hosted sanitizer dispatch
+
+Retired [BUG-240](BUG-240-sanitizer-cpu-jobs-red-since-september.md) (`dd65adee6`, `30d1a148d`, `dde5776d6`;
+follow-up GEOM-117 filed in `66748220a`), all on `main`.
+
+- Poisson panel: the debounce ran on real UI time, so slow ASan frames fired the auto-run before the test armed
+  its rejection; the test now uses a fixed 1/60 s UI clock (test-only).
+- Budgets: the workflow's `--timeout 60` never applied (every case carries a `TIMEOUT`). By operator decision
+  ("ok dann Faktor 2 und variations fit als eigenen Produkt task.") sanitizer trees double every test `TIMEOUT`
+  (cases 60 s, grouped wrappers 240 s); the VariationalFit weight search is GEOM-117.
+- CI-only regressions fixed on the way: routing baseline (`b233910ad`) and grouped-wrapper routing scale
+  (`dde5776d6`).
+- Hosted `ci-linux-clang` dispatch 40105034304 on `dde5776d6`: `full-cpu`, ASan and UBSan (4110/4110 each, 7
+  skipped) and `cpu-test-selection-parity` success; push run 40105035007 `full-cpu` success. Thinnest margin:
+  UBSan `IntrinsicGeometryScalarfieldExtremaTests.Grouped` 208.59 s of 240 s; ASan `IntrinsicGeometryTests.Grouped`
+  180.07 s, VariationalFit 43.84 s of 60 s.
+- Review: criterion 1 independent Claude and Codex lane reviews; criterion 2 independent review of `30d1a148d`
+  ("Criterion 2: met."); criterion 3 met by the hosted dispatch, independent confirmation follows.
+- Limits: hang detection 2x coarser in sanitizer lanes, `ci-vulkan` included. Raw logs stay git-ignored in the
+  `asan` lane worktree; nothing tracked to delete.
+
 ## 2026-10-24 — BUG-253 retired after its independent review
 
 Retired [BUG-253](BUG-253-editor-job-tools-wait-skips-foreign-completion.md) (`411ca6ecc`, `c2bd44899`) on the

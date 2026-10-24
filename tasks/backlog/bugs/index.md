@@ -9,16 +9,16 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   `test_declared_budget_passes_below_and_fails_bounded_above` reports "timed-out lister is still running" on 4.0.3,
   also before BUG-251. 4.0.3 is outside the supported matrix; CI uses 3.31.6.
 
-- [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](BUG-240-sanitizer-cpu-jobs-red-since-september.md):
-  sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
-  assertion failure under ASan, one timeout under UBSan. Panel fixed; sanitizer case budgets
-  doubled by operator policy; the integrated dispatch is still owed.
-
 The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](../../done/BUG-240-sanitizer-cpu-jobs-red-since-september.md).
+  Poisson panel test on a fixed 1/60 s UI clock; sanitizer-tree test budgets x2 by operator policy (60/240 s).
+  Hosted dispatch 40105034304 on `dde5776d6`: both sanitizer jobs 4110/4110 and selection parity green; thinnest
+  margin UBSan `IntrinsicGeometryScalarfieldExtremaTests.Grouped` 208.59 s of 240 s.
 
 - Closed 2026-10-24: [BUG-253 — Editor job tools test queries a job it never waited for](../../done/BUG-253-editor-job-tools-wait-skips-foreign-completion.md).
   The test's post-release wait now also waits for `foreign` (test-only). The measured in-process rate varied between
