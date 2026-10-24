@@ -229,7 +229,6 @@ picking backlog work; theme priorities and rationale live in
 ## Unthemed
 
 - unblocked: `BUG-178` — Clang 23 crashes during an incremental module rebuild (tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md)
-- unblocked: `BUG-220` — Parked-worker wake count flakes under parallel CTest load (tasks/backlog/bugs/BUG-220-parked-worker-wake-count-flake.md)
 - unblocked: `BUG-228` — Vulkan smoke timeout depends on the display environment (tasks/backlog/bugs/BUG-228-desktop-display-vulkan-smoke-timeouts.md)
 - unblocked: `BUILD-012` — Evaluate replacing the ImGui vcpkg overlay port with the registry port (tasks/backlog/process/BUILD-012-imgui-registry-port-evaluation.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)

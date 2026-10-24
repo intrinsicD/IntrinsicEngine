@@ -1,5 +1,24 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-220 retired by operator decision on its load criteria
+
+Retired [BUG-220](BUG-220-parked-worker-wake-count-flake.md) (`15c9fb5ea`, `b7506b39e`), merged into the night
+integration branch `claude/night-2026-10-24-bug-sweep` as `c733d6483`. It is not yet on `main`, and hosted CI
+has not run on it.
+
+- Root cause: no lost wakeup. `WorkerWakeNotifications` counts only dispatches whose parked-count load still sees
+  the park, so the exact 512 was overstated. Test-only fix: each dispatch waits until the worker sleeps in the park
+  futex (`/proc/self/task/<tid>/syscall`). The test requires 512 counted wakes and tolerates one out-of-protocol
+  uncounted wake per run.
+- Operator decision, verbatim: "ja retire ihn". It accepts the deterministic gdb forced-interleaving reproduction
+  (A/B, and D on `15c9fb5ea`) as AC1/AC3 evidence, together with the implemented tolerance.
+- Reviews: Claude round 2 on `b7506b39e`: approve (AC2 met, AC1 partially met, AC3 not met as written). Codex
+  round 1 on `15c9fb5ea`: revise. Its exact-count finding is addressed by `b7506b39e`, and its AC3 finding is
+  settled by the operator. Codex did not re-review `b7506b39e`.
+- Limits: no natural loaded reproduction (even the ungated mutant passed 10,300 load runs); the full CPU gate
+  was not run locally; Linux-only probe. Raw evidence stays git-ignored in the `bug-220` lane worktree, and
+  nothing was deleted. The gdb recipe is kept in the task file.
+
 ## 2026-10-24 — BUG-251 retired after its independent review
 
 Retired [BUG-251](BUG-251-cmake44-gtest-discovery-include-layout.md) (`cca518f55`, follow-ups `7f0e75abd`),

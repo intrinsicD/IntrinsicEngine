@@ -18,11 +18,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   not reproduced on 2026-10-24 with the monitor on (`:1` 10.79 s, `:9` 10.11 s); the swapchain is always
   FIFO. Reproducing the monitor-off state and choosing the supported display setup await the operator.
 
-- [BUG-220 — Parked-worker wake count flakes under parallel CTest load](BUG-220-parked-worker-wake-count-flake.md):
-  no lost wakeup; the exact count was overstated. Test-only fix on this branch (15c9fb5ea, b7506b39e), proven by
-  forced gdb interleavings. AC1/AC3 (reproduce and pass under load) are not demonstrated under incident-like load;
-  whether the deterministic gdb reproduction meets them awaits the operator.
-
 
 
 

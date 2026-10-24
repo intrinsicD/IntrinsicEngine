@@ -220,9 +220,20 @@ calls for focused verification; PR/merge CI runs the full gate.
   the deadline message instead of hanging.
 
 ## Acceptance criteria
-- [ ] Reproduce under load (e.g. repeated runs alongside a parallel CTest) and confirm or refute the hypothesis.
-- [ ] Fix the scheduler or the assertion; the test still proves repeated progress of a parked worker.
-- [ ] The test passes repeatedly under the loaded reproduction.
+- [x] Reproduce under load (e.g. repeated runs alongside a parallel CTest) and confirm or refute the hypothesis.
+      Met by operator decision (2026-10-24, verbatim: "ja retire ihn"), which accepts the
+      deterministic gdb forced-interleaving reproduction (variants A/B on the pre-change test,
+      D on `15c9fb5ea`) in place of a load reproduction. Independent Claude review of
+      `b7506b39e` (round 2): "partially met" (hypothesis confirmed by forced interleavings,
+      never reproduced under load).
+- [x] Fix the scheduler or the assertion; the test still proves repeated progress of a parked worker.
+      Independent Claude review of `b7506b39e` (round 2): "met" (test-only fix, production
+      code unchanged, 512 counted notified wakes of the sleeping worker required).
+- [x] The test passes repeatedly under the loaded reproduction.
+      Met by the same operator decision, with the implemented tolerance (one out-of-protocol
+      uncounted wake per run) and the focused stress runs above. Independent Claude review of
+      `b7506b39e` (round 2): "not met" as written, because no loaded reproduction of the
+      original failure exists.
 
 ## Verification
 ```bash
@@ -230,3 +241,18 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci -R 'CoreTasks\.' --repeat until-fail:200 --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j8
 ```
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `15c9fb5ea` and `b7506b39e` (the test change), merged as `c733d6483`.
+- Retired on the night integration branch `claude/night-2026-10-24-bug-sweep`. It is not yet on `main`, and hosted CI has
+  not run on it.
+- Operator decision, verbatim: "ja retire ihn". This accepts the gdb forced-interleaving
+  reproduction as the AC1/AC3 evidence and the implemented tolerance of one out-of-protocol
+  uncounted wake per run.
+- Reviews: independent Claude review, round 2 on `b7506b39e`: approve (AC1 partially met, AC2 met,
+  AC3 not met as written). Independent Codex review, round 1 on `15c9fb5ea`: revise. Its finding 1
+  (the exact count survives no outside wake) is addressed by `b7506b39e`'s tolerance. Its finding 2
+  (AC3 load evidence) is settled by the operator decision. Codex did not re-review `b7506b39e`.
+- Not run: the full CPU gate in Verification (`-LE 'gpu|vulkan|slow|flaky-quarantine' -j8`); PR/merge
+  CI owns it. Raw logs and gdb scripts stay git-ignored in the `bug-220` lane worktree
+  (`tasks/evidence/BUG-220/`), and nothing was deleted. The recipe above is the durable record.
