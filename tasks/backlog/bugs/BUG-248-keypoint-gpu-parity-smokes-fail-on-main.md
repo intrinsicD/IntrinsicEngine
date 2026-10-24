@@ -6,7 +6,7 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: bug filed from GPU-lane diagnosis runs of the 2026-10-24 night; no implementation in this slice
+evidence_skip_reason: one-file shader fix; the diff, the recorded before/revert/after GPU runs and the backtest retain evidence
 contract_schema: 1
 contracts: [geometry.property-coherence]
 ---
@@ -60,3 +60,65 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.Keyp
 ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.KeypointResidentSubnormalScores$' -L gpu -L vulkan --timeout 120
 ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke\.Keypoint' -L gpu -L vulkan --timeout 120
 ```
+
+## Resolution — 2026-10-24
+- Root cause is on the kernel side. HARDEN-090/GEOM-114 (`ffe7e8372`, 2026-10-16) changed
+  `Geometry::PCADetail::Eigen` and its GLSL twin `pcaEigen`
+  (`assets/shaders/include/pca_eigen_double.glsl`): both now divide by the largest absolute
+  covariance coefficient before the isotropic rank test, so that test is scale-relative.
+  `point_keypoints.comp` had its own Jacobi `eigenvalues()`, which kept the old absolute floor
+  `scale=max(1,|a_ij|)`. On covariances scaled by 1e-4 that floor sent planar rows to the
+  isotropic branch. Those rows got three equal mean eigenvalues, so their score was the mean.
+  The CPU reference returns a plane for them: score 0, ties broken by lowest index. On the tiny
+  fixture the same branch replaced the subnormal lambda3 with the mean. Unit-scale fixtures
+  pass the rank test under both rules, and the hybrid path scores on the CPU, so only these two
+  cases failed. GEOM-114 listed keypoints as affected, but its GPU run selected only normals
+  cases.
+- Backtest: a standalone harness (`tasks/evidence/BUG-248/probe/`, `backtest-output.txt`)
+  replayed both fixtures under the old floor and under the normalized rule.
+  - Planar fixture: masks differ only for d = 1, 3, 5, 7 (the 1e-4-scaled domains), in phases
+    0 and 1, with 5 keypoints against 8. Phase 2 (automatic radius) gives 1 keypoint under both
+    rules. This is the observed 4 domains × 2 phases.
+  - Tiny fixture: 12 mask mismatches and L∞ 7.5810246919972604e-42, bit for bit the observed
+    failure.
+- Change: `point_keypoints.comp` now includes `include/pca_eigen_double.glsl` and calls
+  `pcaEigen` in `finishScore`. The private `eigenvalues()` is deleted (4 lines added,
+  37 deleted).
+  - Unchanged: the binary32 rounding of eigenvalues, the NaN/Inf `fail(4)`, the roundoff
+    zeroing and the gamma tests.
+  - `pcaEigen` returns descending eigenvalues on every path: the closed form sorts, the
+    isotropic and zero paths return equal values, and `pcaStable` sorts too. So the deleted
+    sort is not needed.
+  - `docs/architecture/keypoint-analysis.md` now states the shared eigensolver's work bound and
+    the scale-relative cutoff.
+  - No CPU, test, tolerance or timeout change.
+- Reuse decision: call the shared CPU twin rather than patch the private copy. jscpd
+  (`--min-tokens 40`, the two shader files) found 2 clones (13 lines) between the keypoint
+  Jacobi and `pcaStable` before the change and 0 after (`jscpd-after.log`). The prepared
+  fallback, wrapping the old Jacobi in a normalization like `PCADetail::Eigen`, was not needed.
+- Verification ran on an RTX 4090 with the NVIDIA ICD and `DISPLAY=:1` in `build/ci-vulkan`.
+  Logs are in `tasks/evidence/BUG-248/`.
+  - Before, at `45efeaf7d`: `ctest ... -R '^PointLBVHGpuSmoke\.Keypoint'` passed 9 of 11
+    (`baseline-keypoint-all.log`). Planar failures: `:1981` ×8 (`KeypointCount` 5 vs 8) and
+    `:1989` ×8. Resident subnormal failures: `:2833` ×12 and `:2852` ×12, plus `:2836` and
+    `:2858` with Delta 7.5810246919972604e-42 against the bound 1.1210387714598537e-44.
+  - After: the incremental `IntrinsicPointLBVHGpuTests` build exits 0 and recompiles
+    `point_keypoints.comp.spv` (`build-fix.log`). glslc prints two `precise` warnings from the
+    unchanged include, and prints the same two for `point_normals.comp`. Both cases pass
+    (`fix-two-cases.log`). All 11 `Keypoint*` cases report gtest `[  PASSED  ]`, with none
+    skipped (`fix-keypoint-all.log`).
+  - Revert check: with only the shader change reverted and rebuilt, ctest exits 8 and shows
+    the baseline signature again (`revert-two-cases.log`): `:1981`/`:1989`/`:2833`/`:2852`
+    ×8/8/12/12, "Which is: 5" ×8, and Delta 7.5810246919972604e-42 ×2. With the change restored
+    and rebuilt, all 11 cases pass (`restore-keypoint-all.log`).
+  - `python3 tools/repo/check_shader_outputs.py --dir build/ci-vulkan/bin/shaders --require
+    point_keypoints.comp.spv` passes (100 outputs).
+  - `check_docs_sync.py --strict` on the three touched files triggers 0 rules.
+    `check_task_policy.py --strict` and `check_doc_links.py` pass.
+- Remains:
+  - No regular gate selects these `gpu;vulkan` cases, and nobody has checked whether they skip
+    on hosted lavapipe `ci-vulkan`. This slice does not change that.
+  - The test name `...IsotropicFloor` still describes the pre-GEOM-114 rule. It is kept here;
+    renaming it is for the operator to decide.
+  - The GPU divides the covariance by the count, while the CPU multiplies by `1/count`. This
+    is pre-existing and left alone: the accumulation order already differs.
