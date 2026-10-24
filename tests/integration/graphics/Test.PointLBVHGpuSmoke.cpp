@@ -2792,7 +2792,9 @@ namespace
         }
         void Frame(double,double) override
         {
-            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(50)) {ADD_FAILURE()<<"Resident keypoint timeout step="<<Step;Kernel().RequestExit();return;}
+            // Well below the registered 30 s CTest TIMEOUT (startup and shutdown take a few seconds),
+            // so a stall fails with its step and frame instead of a CTest kill.
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(20)) {ADD_FAILURE()<<"Resident keypoint timeout after 20 s step="<<Step<<" frame="<<Kernel().GetLastFramePacingDiagnostics().FrameIndex;Kernel().RequestExit();return;}
             if(!Kernel().GetDevice().IsOperational())return;
             if(Step==0){Start();Step=1;return;}
             if(Degenerate) {

@@ -1461,6 +1461,10 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
 
     VulkanBootstrapDiagnosticsSnapshot diagnostics{};
     diagnostics.ValidationRequested = config.EnableValidation;
+    // BUG-228: FIFO waits on the display (about 1 s per present with the monitor off),
+    // so EnableVSync=false must reach the swapchain as an uncapped request.
+    m_PresentMode = config.EnableVSync ? RHI::PresentMode::VSync : RHI::PresentMode::Uncapped;
+    diagnostics.VSyncRequested = config.EnableVSync;
     VulkanServiceDiagnosticsSnapshot serviceDiagnostics{};
     PublishServiceDiagnostics(serviceDiagnostics);
 
@@ -2032,6 +2036,14 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         const VkPresentModeKHR presentMode = ToVkPresentMode(m_PresentMode, presentModes);
         const VkExtent2D swapchainExtent = ChooseSwapchainExtent(surfaceCapabilities,
                                                                  desc.InitialFramebufferExtent);
+        for (const VkPresentModeKHR mode : presentModes)
+        {
+            if (static_cast<std::uint32_t>(mode) < 32u)
+                diagnostics.SupportedPresentModeMask |= 1u << static_cast<std::uint32_t>(mode);
+        }
+        diagnostics.SwapchainPresentMode = static_cast<std::int32_t>(presentMode);
+        Core::Log::Info("[VulkanDevice::Initialize] Swapchain present mode: VSync requested={} actual VkPresentModeKHR={}",
+                        config.EnableVSync, static_cast<std::int32_t>(presentMode));
 
         const std::array<std::uint32_t, 2> queueFamilyIndices{m_GraphicsFamily, m_PresentFamily};
         const VkSwapchainCreateInfoKHR swapchainInfo = MakeSwapchainCreateInfo(

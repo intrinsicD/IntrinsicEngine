@@ -49,6 +49,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   `BeginFrame`, `EndFrame`, `Present`, `Resize`, backbuffer extent/handle access,
   present-mode selection, and graphics-context lookup) are defined in
   `Backends.Vulkan.Device.cpp`.
+- `Initialize()` maps `RenderConfig::EnableVSync` to the present-mode request:
+  `true` is `PresentMode::VSync` (FIFO), `false` is `PresentMode::Uncapped`
+  (IMMEDIATE, FIFO when unsupported). The bootstrap diagnostics record the
+  request, the surface's supported modes and the chosen `VkPresentModeKHR`.
 - `Initialize()` performs only the guarded bootstrap/probe plus logical-device,
   queue, allocator, per-frame command/sync acquisition, and swapchain image/view/handle registration listed above. It keeps `IsOperational() == false`;
   renderers must continue to gate GPU command

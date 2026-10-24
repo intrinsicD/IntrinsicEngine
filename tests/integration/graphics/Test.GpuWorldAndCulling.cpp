@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cstdio>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -178,6 +179,61 @@ TEST(GraphicsGpuWorld, Smoke_AllocateUploadSyncShutdown)
 
     world.Shutdown();
     EXPECT_FALSE(world.IsInitialized());
+}
+
+// BUG-193: SyncFrame uploads each contiguous run of dirty slots once, including a
+// run that ends at the last slot, and nothing when no slot is dirty.
+TEST(GraphicsGpuWorld, SyncFrameUploadsContiguousDirtyRunsOnce)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    Graphics::GpuWorld world;
+
+    Graphics::GpuWorld::InitDesc init{};
+    init.MaxInstances = 8;
+    init.MaxGeometryRecords = 8;
+    init.MaxLights = 1;
+    init.VertexBufferBytes = 1ull << 20;
+    init.IndexBufferBytes = 1ull << 20;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, init));
+
+    std::vector<decltype(world.AllocateInstance(0u))> instances;
+    for (std::uint32_t i = 0; i < init.MaxInstances; ++i)
+    {
+        instances.push_back(world.AllocateInstance(100u + i));
+        ASSERT_TRUE(instances.back().IsValid());
+    }
+
+    const RHI::BufferHandle dynamicBuffer = world.GetInstanceDynamicBuffer();
+    constexpr std::uint64_t kStride = sizeof(RHI::GpuInstanceDynamic);
+    const auto dynamicWrites = [&] {
+        std::vector<std::pair<std::uint64_t, std::uint64_t>> writes;
+        for (const auto& write : device.BufferWrites)
+        {
+            if (write.Handle == dynamicBuffer)
+                writes.emplace_back(write.Offset / kStride, write.Data.size() / kStride);
+        }
+        return writes;
+    };
+
+    world.SyncFrame();
+    using Runs = std::vector<std::pair<std::uint64_t, std::uint64_t>>;
+    EXPECT_EQ(dynamicWrites(), (Runs{{0u, init.MaxInstances}}));
+
+    device.BufferWrites.clear();
+    for (const std::uint32_t slot : {1u, 2u, 5u, 7u})
+    {
+        ASSERT_EQ(instances[slot].Index, slot);
+        world.SetInstanceTransform(instances[slot], glm::mat4{2.0f}, glm::mat4{1.0f});
+    }
+    world.SyncFrame();
+    EXPECT_EQ(dynamicWrites(), (Runs{{1u, 2u}, {5u, 1u}, {7u, 1u}}));
+
+    device.BufferWrites.clear();
+    world.SyncFrame();
+    EXPECT_TRUE(dynamicWrites().empty());
+
+    world.Shutdown();
 }
 
 TEST(GraphicsGpuWorld, GeometryRebindSubmitsUploadBarriersBeforeNextConsumers)

@@ -186,3 +186,32 @@ Same branch, host and display procedure as BUG-228's afternoon section.
   The hypothesis predicts that the scan takes at least 50 % of the 68–69 ms
   median `render_prepare` (at least 34 ms per frame). It is rejected if the
   scan takes under 10 % (under 7 ms). Only a confirmed scan cost is changed.
+
+### Results
+Logs are in `tasks/evidence/BUG-228/2026-10-24-display-off/` (shared with
+BUG-228; same host and states).
+- W1 met: WLOP on `:1` with the monitor off and FIFO passed in 261.75 s,
+  38 s inside its 300 s internal bound (25.5 s with the monitor on this morning).
+  The display-off pacing explains RUNTIME-236's 264 s.
+- S1 confirmed: a temporary timer around the five `FlushDirtyRuns` calls
+  (tagged `[DBG-BUG193]`, reverted) gave, over 93 frames of the keypoint case
+  on `:1` with the monitor on, a median of 67.6 ms (min 67.2, max 113.3) for
+  465,536 dirty bits, about 145 ns per bit. That is the whole 68–69 ms median
+  `render_prepare` measured this morning.
+- Fix: the five dirty-flag vectors are `std::vector<std::uint8_t>` instead of
+  `std::vector<bool>`, and `FlushDirtyRuns` finds run starts and ends with
+  `memchr` and clears runs with `memset`. The runs it uploads are unchanged.
+  `GraphicsGpuWorld.SyncFrameUploadsContiguousDirtyRunsOnce` pins them (first
+  frame uploads all 8 slots; dirty slots 1, 2, 5, 7 give runs (1,2), (5,1),
+  (7,1); a clean frame uploads nothing). It passes with the old
+  `vector<bool>` code and with the new code, and fails at two assertions when
+  the `memset` is removed.
+- After both fixes: Sandbox monitor on, FIFO: median `render_prepare` 0.3 ms
+  (69.1 ms this morning), median frame 16.6 ms (89.2 ms), now paced by the
+  display refresh. WLOP on `:1` with the monitor off passed in 6.41 s
+  (W2 met). `LocalDistanceRatio` with the monitor off passed in 3.74 s.
+  Surface appearance passed in 71.27 s with the monitor off because its
+  Sandbox-default fixture keeps VSync on (see BUG-228).
+- CPU gate (`-LE 'gpu|vulkan|slow|flaky-quarantine'`, `-j16`): 5942 of 5943
+  passed. `PropertySmoothingWorkflows.VariationalFitVariantsAndSolverSwitches`
+  timed out at 1-minute load of about 12 and passed alone in 28.52 s.

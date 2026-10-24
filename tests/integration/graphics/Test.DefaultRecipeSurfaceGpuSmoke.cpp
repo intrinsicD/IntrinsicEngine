@@ -662,6 +662,26 @@ void ExpectGpuProfileScopeParity(
 // This fixture is the default-recipe leg of GRAPHICS-076 Slice D. The
 // pixel-readback parity path remains a separate GRAPHICS-076E test below so
 // the command-stream proof cannot be weakened by readback harness changes.
+// BUG-228: Render.EnableVSync=false must reach the swapchain. FIFO paces each present
+// on the display (about 1 s with the monitor off), which made frame-paced smokes time out.
+TEST(DefaultRecipeSurfaceGpuSmoke, VSyncOffSelectsImmediatePresentWhenSupported)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(1u);
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    const auto diagnostics = GetVulkanBootstrapDiagnosticsSnapshot();
+    constexpr std::int32_t kImmediate = 0; // VK_PRESENT_MODE_IMMEDIATE_KHR
+    constexpr std::int32_t kFifo = 2;      // VK_PRESENT_MODE_FIFO_KHR
+    const std::int32_t expected = (diagnostics.SupportedPresentModeMask & (1u << kImmediate)) != 0u ? kImmediate : kFifo;
+    EXPECT_FALSE(diagnostics.VSyncRequested);
+    EXPECT_NE(diagnostics.SupportedPresentModeMask, 0u);
+    EXPECT_EQ(diagnostics.SwapchainPresentMode, expected)
+        << "supported mask=0x" << std::hex << diagnostics.SupportedPresentModeMask;
+    bootstrap.EnginePtr->Shutdown();
+}
+
 TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommandStream)
 {
     auto bootstrap = BootstrapEngineForDefaultRecipe();

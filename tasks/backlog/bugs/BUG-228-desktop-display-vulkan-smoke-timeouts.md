@@ -202,3 +202,52 @@ Source: branch `claude/bug-228-193-display-off-pacing` at 4c30f2b82 (unchanged
   monitor off, while the Sandbox with `enable_vsync: true` (FIFO) still shows
   at least 500 ms (control: the present mode, not something else, removes the
   stall). If IMMEDIATE also blocks with the monitor off, the fix is not made.
+
+### Results
+Runs 12:58–13:16 CEST, one command per monitor-off period; every state file
+shows `Monitor is Off` during the run and `Monitor is On` after it. The
+session stayed locked (`LockedHint=yes`), 1-minute load 1.2–4.3, no compiler
+running at any run boundary, RTX 4090, NVIDIA 580.159.04. Logs and states:
+`tasks/evidence/BUG-228/2026-10-24-display-off/`.
+- D1 met: on `:1` with the monitor off the keypoint case was killed by CTest
+  at 30.5 s (`Timeout`), with no `Step` diagnostic. It passed in 10.8 s with
+  the monitor on this morning. The display dependence is reproduced.
+- D2 met: on an owned Xephyr `:9` with the host monitor off it passed in
+  9.98 s.
+- D3 met: Sandbox, 32 frames, monitor off: median frame 1000 ms, median
+  `present_micros` 918 ms (91 % of frame time), `render_begin_frame` 0.19 ms.
+  The wait is in `vkQueuePresentKHR` with FIFO, not in acquire.
+- Owner: the device ignored `Render.EnableVSync`, so every swapchain was FIFO
+  and every present waited for a display that does not scan out. This NVIDIA
+  X11 surface reports IMMEDIATE, FIFO and FIFO_RELAXED (mask `0xd`), no MAILBOX.
+- Fix: `VulkanDevice::Initialize` maps `EnableVSync=false` to
+  `PresentMode::Uncapped` (IMMEDIATE, FIFO fallback) and records
+  `VSyncRequested`, `SupportedPresentModeMask` and `SwapchainPresentMode` in
+  the bootstrap diagnostics, plus one log line. The `gpu;vulkan` fixtures
+  already set `EnableVSync=false`; none was changed.
+- Fix condition met. After the fix, monitor off: the keypoint case passed in
+  3.74 s; Sandbox with `enable_vsync: false` had a median frame of 4.8 ms and
+  median present + begin of 0.17 ms; the control, Sandbox with the default
+  `enable_vsync: true` (FIFO), still had a 999.9 ms median frame with 991.6 ms
+  present. The present mode alone removes the stall.
+- Regression: `DefaultRecipeSurfaceGpuSmoke.VSyncOffSelectsImmediatePresentWhenSupported`
+  failed with the assignment commented out (actual mode 2 = FIFO, expected 0)
+  and passes with it.
+- Stall bound: `KeypointResidentApp`'s `Started` bound is now 20 s, below the
+  30 s CTest `TIMEOUT`, and its message names the step and frame. With FIFO
+  and the monitor off, an intermediate 25 s bound fired at 28.66 s
+  (`Resident keypoint timeout after 25 s step=1 frame=25`), which left only
+  1.3 s to the kill; that is why it is 20 s. The fixture's frame count is
+  unchanged.
+- Acceptance item 3, after the fix, 23 cases (this morning's 21 plus both
+  `ResidentLop*` cases), `:1`: all 23 passed with the monitor on (92.1 s) and
+  all 23 with the monitor off (91.9 s). The slowest case took 5.72 s (on) and
+  5.63 s (off). The cohort prediction in `predictions.txt` was met.
+- Also seen: `ExtrinsicSandbox` run directly with only `lsan.supp` exits 1 on
+  LeakSanitizer reports from unsymbolized driver frames, libX11 XIM and dbus,
+  with the monitor off before the fix and with it on after the fix. The
+  registered CTest sets `detect_leaks=0`; BUG-180 owns leak findings.
+- Not changed: `RuntimeSandboxAcceptanceGpuSmoke` intentionally keeps the
+  Sandbox defaults, including VSync. With the monitor off its surface-appearance
+  case still passed, but in 71.27 s (17–21 s with the monitor on).
+  Whether those smokes should switch VSync off is an open decision.

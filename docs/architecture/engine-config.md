@@ -202,7 +202,7 @@ against independent literal boundaries and wire-format controls.
 | `render` | `backend` | `Vulkan` |
 | `render` | `enable_promoted_vulkan_device` | Boolean |
 | `render` | `enable_validation` | Boolean |
-| `render` | `enable_vsync` | Boolean |
+| `render` | `enable_vsync` | Boolean; `true` presents with FIFO; `false` requests IMMEDIATE and falls back to FIFO when the surface lacks it |
 | `render` | `enable_gpu_profiling` | Boolean; default `false` |
 | `render` | `frames_in_flight` | Integer in `[1, 8]` |
 | `render` | `default_recipe_config_path` | String path; empty disables startup/live recipe loading |
@@ -346,7 +346,13 @@ The schema is primarily a boot config. Runtime reads it before constructing
 - graphics backend selection and promoted-Vulkan opt-in;
 - frames-in-flight and synchronous extraction mode;
 - GPU property residency idle timeout and byte budget;
-- validation and VSync toggles;
+- validation and VSync toggles. The promoted Vulkan device reads
+  `enable_vsync` once when it creates the swapchain. It logs the requested
+  value and the actual `VkPresentModeKHR`, and the bootstrap diagnostics record
+  `VSyncRequested`, `SwapchainPresentMode` and `SupportedPresentModeMask`.
+  FIFO waits for the display, so with the monitor off each present takes
+  about 1 s (BUG-228); `gpu;vulkan` smokes therefore set `enable_vsync` to
+  `false`;
 - scheduler worker-thread count;
 - window title, size, resizable flag, and platform backend override;
 - reference-content and initial camera-controller selection. Both are

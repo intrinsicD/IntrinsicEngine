@@ -224,6 +224,11 @@ namespace Extrinsic::Backends::Vulkan
         std::uint32_t SwapchainImageHandleCount = 0;
         std::uint32_t SwapchainWidth = 0;
         std::uint32_t SwapchainHeight = 0;
+        // VkPresentModeKHR chosen at initialization; -1 until a swapchain is created.
+        std::int32_t SwapchainPresentMode = -1;
+        // Bit n set when the surface reports VkPresentModeKHR n (core modes are 0..3).
+        std::uint32_t SupportedPresentModeMask = 0;
+        bool VSyncRequested = false;
         bool NativeWindowAvailable = false;
         bool VolkInitialized = false;
         bool ValidationRequested = false;
