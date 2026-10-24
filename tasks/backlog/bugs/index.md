@@ -14,23 +14,24 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   assertion failure under ASan, one timeout under UBSan. Panel fixed; sanitizer case budgets
   doubled by operator policy; the integrated dispatch is still owed.
 
-- [BUG-228 — Vulkan smoke timeout depends on the display environment](BUG-228-desktop-display-vulkan-smoke-timeouts.md):
-  not reproduced on 2026-10-24 with the monitor on (`:1` 10.79 s, `:9` 10.11 s); the swapchain is always
-  FIFO. Reproducing the monitor-off state and choosing the supported display setup await the operator.
-
-
-
-
-- [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
-
-- [BUG-193 — GPU pacing and watchdog margin](BUG-193-gpu-pacing-and-watchdog-margin.md): controlled follow-up to the corrected Vulkan fixture budgets; preserve finite-work and backend assertions.
-
-
 The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-228 — Vulkan smoke timeout depends on the display environment](../../done/BUG-228-desktop-display-vulkan-smoke-timeouts.md).
+  The device ignored `Render.EnableVSync`, so every present was FIFO (about 1 s per frame with the monitor off);
+  `EnableVSync=false` now selects IMMEDIATE, and the Sandbox acceptance smokes run with VSync off (42/42 with the
+  monitor on and off). FIFO fallback and VSync-on apps can still stall with the monitor off.
+
+- Closed 2026-10-24: [BUG-193 — GPU pacing and watchdog margin](../../done/BUG-193-gpu-pacing-and-watchdog-margin.md).
+  The full-capacity `GpuWorld::SyncFrame` dirty scan (median 67.6 ms) is a byte scan now (`render_prepare` 0.3 ms);
+  with BUG-228's present-mode fix, monitor-off WLOP takes 6.41 s instead of 261.75 s.
+
+- Closed 2026-10-24: [BUG-178 — Clang 23 crashes during an incremental module rebuild](../../done/BUG-178-clang23-incremental-module-ice.md).
+  Bounded non-reproduction with ccache 4.5.1 cold/warm, ccache disabled and a fresh tree; no cause established,
+  no gate changed. CI's ccache 4.9.1 and concurrent writers were not tested.
 
 - Closed 2026-10-24: [BUG-251 — Support the CMake 4.4 GoogleTest discovery include layout](../../done/BUG-251-cmake44-gtest-discovery-include-layout.md).
   The discovery regressions and the probe accept the 4.4 `<target>_<sha8>_*` layout beside `[N]` and fail on any other;

@@ -404,7 +404,7 @@ Verification:
 - `ci-vulkan` configured with Clang 23 and ASan+UBSan. Its initial cached rebuild
   crashed in two compiler units while include edits overlapped the build. The
   stabilized retry with `CCACHE_DISABLE=1` passed. Root cause remains unisolated
-  under [BUG-178](../../tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md);
+  under [BUG-178](../../tasks/done/BUG-178-clang23-incremental-module-ice.md);
   no source workaround or verification weakening was applied.
 - All **nine affected Vulkan GPU integration cases passed**, no skips or failures
   (121.29 s), with ASan+UBSan instrumentation. These cover outlier/distance-ratio,

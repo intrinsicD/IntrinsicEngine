@@ -37,12 +37,17 @@ failure. Source/host display-state controls remain necessary here. Full local
 logs: `build/analysis/bug194-saliency-followup-2026-09-14/dragon-ui-pacing.log`.
 
 ## Acceptance criteria
-- [ ] Reproduce serially with no concurrent compilation, fixed source and recorded
+- [x] Reproduce serially with no concurrent compilation, fixed source and recorded
   GPU/display/power state; compare display states when supported.
-- [ ] Separate presentation pacing, asynchronous job progress and fixture scheduling
+  Independent Codex review, round 2 on `535f2e5eb`: "Met for recorded conditions".
+- [x] Separate presentation pacing, asynchronous job progress and fixture scheduling
   using bounded diagnostics and finite-work/timeout reasons.
-- [ ] Repair the confirmed owner and verify finite progress with adequate measured
+  Independent Codex review, round 2 on `535f2e5eb`: "Met".
+- [x] Repair the confirmed owner and verify finite progress with adequate measured
   margin while preserving pixel, history, backend and sanitizer assertions.
+  Independent Codex review, round 2 on `535f2e5eb`: "Partially met" ("evidence
+  disposition remains pending"). Met by the operator decision "2. A)" (2026-10-24),
+  which settles that disposition.
 
 ## Verification
 Use the supported ci-vulkan preset and exact registered surface-appearance,
@@ -231,5 +236,31 @@ informed a keep or change choice is decision-bearing, with or without one.
   `LocalDistanceRatio` and surface-appearance runs, the Sandbox monitor-on
   `render_prepare` after the fix, and the CPU gate.
 - No experiment pre-flight was run: no frozen packet, no prospective review
-  and no HTML report exists for these runs. The operator's pending
-  disposition covers every decision-bearing measurement listed above.
+  and no HTML report exists for these runs.
+- Disposition, operator decision 2026-10-24 (verbatim): "2. A)". It accepts
+  the decision-bearing measurements listed above, which ran without
+  experiment pre-flight, as engineering diagnosis.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `25550e64e`, `3d39d1737`, `d626b8b51`, `535f2e5eb`,
+`23dc16de7`, merged as `eb8a8a58b`; the Sandbox acceptance VSync follow-up `1f73f7aac`,
+`318121ccb`, merged as `ab2317ed6`.
+- Retired on the night integration branch `claude/night-2026-10-24-bug-sweep`. It is not
+  yet on `main`, and hosted CI has not run on it.
+- Owners repaired: the `GpuWorld::SyncFrame` dirty scan (`std::vector<bool>` → byte flags
+  with `memchr`/`memset`; median `render_prepare` 69.1 → 0.3 ms) and the display-off FIFO
+  present (BUG-228). WLOP with the monitor off: 261.75 s before, 6.41 s after. With VSync
+  off, surface appearance took 10.13 s with the monitor off (71.27 s with VSync on).
+- Operator decision, verbatim: "2. A)" (the decision-bearing measurements in the
+  evidence status above are accepted as engineering diagnosis without experiment
+  pre-flight).
+- Reviews: a fresh Claude reviewer of `3d39d1737` (code only): "Verdict: APPROVE". Independent
+  Codex review, round 1 on `d626b8b51`: revise; round 2 on `535f2e5eb`: "VERDICT: revise
+  required" on the classification, criteria as recorded above. `23dc16de7` reclassifies the
+  measurements; Codex did not re-review it. The follow-ups have no independent review.
+- Limits: the Xephyr `:9` runs were made only before the fixes. A surface without
+  IMMEDIATE, or any fixture that keeps VSync on, still falls back to FIFO and can stall
+  with the monitor off. Frame-paced job apply (BUG-191) was not changed. The leak reports
+  from direct `ExtrinsicSandbox` runs belong to BUG-180.
+- Raw logs stay git-ignored under `tasks/evidence/BUG-193/` and `tasks/evidence/BUG-228/`
+  in the `gpu` lane worktree; nothing was deleted.

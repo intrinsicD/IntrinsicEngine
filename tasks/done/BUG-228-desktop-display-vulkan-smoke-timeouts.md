@@ -25,16 +25,21 @@ CTest case passed in 10.06 seconds on an owned Xephyr `:9` server. This comparis
 isolates a display-environment dependency; it does not identify the compositor,
 Vulkan presentation, or driver as the cause. No timeout was raised.
 
-The [desktop log](../../evidence/BUG-228/2026-10-01-desktop-display.log) records an
+The [desktop log](../evidence/BUG-228/2026-10-01-desktop-display.log) records an
 interrupted focused run, not a full suite verdict. The
-[isolated-display log](../../evidence/BUG-228/2026-10-01-xephyr-display.log) records
+[isolated-display log](../evidence/BUG-228/2026-10-01-xephyr-display.log) records
 the completed single-case comparison. Other timeouts in the earlier broad run
 were mixed with build/render load and are not sufficient to attribute a cause.
 
 ## Acceptance criteria
-- [ ] Reproduce the display dependence and locate the presentation/frame wait responsible.
-- [ ] Document or implement the supported display setup without weakening timeout or validation gates.
-- [ ] Re-run the affected keypoint, scalar, normals, sampling and resident LOP tests in that environment.
+- [x] Reproduce the display dependence and locate the presentation/frame wait responsible.
+      Independent Codex review, round 2 on `535f2e5eb`: "Met" (desktop/Xephyr results and
+      present-time measurements).
+- [x] Document or implement the supported display setup without weakening timeout or validation gates.
+      Independent Codex review, round 2 on `535f2e5eb`: "Met" (config mapping correct, gates
+      unchanged).
+- [x] Re-run the affected keypoint, scalar, normals, sampling and resident LOP tests in that environment.
+      Independent Codex review, round 2 on `535f2e5eb`: "Met" (both 23-case cohorts passed).
 
 ## Verification
 ```bash
@@ -162,7 +167,7 @@ lanes' compiles were not recorded.
   `:2833` and `:2855` (7.58e-42 against 1.12e-44). RUNTIME-291's note (its
   worktree) records both cases failing with its `src/` change reverted. These
   failures are separate from this display bug;
-  [BUG-248](../../done/BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md) fixed them
+  [BUG-248](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md) fixed them
   in the keypoint kernel (retired 2026-10-24).
 - Resident LOP, built afterwards: both `PointCloudConsolidationGpuParity.ResidentLop*`
   cases passed on both displays: `PreviewDiscardAcceptParityAndRepeatInputIo`
@@ -277,8 +282,10 @@ change choice is decision-bearing, with or without one.
 - Verification only (no other use of the numbers): the 23-case cohort with the
   monitor on and off, and the whole `gpu` label run.
 - No experiment pre-flight was run: no frozen packet, no prospective review
-  and no HTML report exists for these runs. The operator's pending
-  disposition covers every decision-bearing measurement listed above.
+  and no HTML report exists for these runs.
+- Disposition, operator decision 2026-10-24 (verbatim): "2. A)". It accepts
+  the decision-bearing measurements listed above, which ran without
+  experiment pre-flight, as engineering diagnosis.
 
 ## Sandbox acceptance smokes with VSync off — 2026-10-24 (evening)
 
@@ -344,3 +351,32 @@ an unscaled tree, twice that in this sanitized `ci-vulkan` tree (BUG-240).
   the phase, result count and frame. The stale fixup name is left as is:
   correcting it would raise that case's `TIMEOUT` to 120 s, which is not this
   change's decision.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `25550e64e`, `3d39d1737`, `d626b8b51`, `535f2e5eb`,
+`23dc16de7`, merged as `eb8a8a58b`; follow-ups `1f73f7aac`, `318121ccb`, merged as
+`ab2317ed6`.
+- Retired on the night integration branch `claude/night-2026-10-24-bug-sweep`. It is not
+  yet on `main`, and hosted CI has not run on it.
+- Owner: the device ignored `Render.EnableVSync`, so every swapchain was FIFO and waited
+  about 1 s per present with the monitor off. `EnableVSync=false` now selects IMMEDIATE
+  (FIFO fallback). The Sandbox acceptance smokes now also run with VSync off.
+- Operator decisions, verbatim: "2. A)" (the decision-bearing measurements in the
+  evidence status above are accepted as engineering diagnosis without experiment
+  pre-flight) and "4. Vsync aus und bei den offenen: prüfen und neu formulieren"
+  (the evening section).
+- Reviews: a fresh Claude reviewer of `3d39d1737` (code only): "Verdict: APPROVE", two nits
+  fixed in `d626b8b51`. Independent Codex review, round 1 on `d626b8b51`: revise; round 2 on
+  `535f2e5eb`: findings 1 and 2 resolved, finding 3 (measurement classification and the
+  pending disposition) not resolved, "VERDICT: revise required", all three criteria
+  "Met". `23dc16de7` reclassifies the measurements as finding 3 asked; the operator decision
+  "2. A)" settles the disposition. Codex did not re-review `23dc16de7`. The follow-ups
+  `1f73f7aac` and `318121ccb` have no independent review.
+- Limits: the Xephyr `:9` runs (D2, monitor off) were made only before the fix. A
+  surface without IMMEDIATE falls back to FIFO, and fixtures or apps that keep VSync on
+  (the Sandbox default) still wait about 1 s per frame with the monitor off. No run
+  exercised a 20 s stall bound firing. The LeakSanitizer reports from direct
+  `ExtrinsicSandbox` runs belong to BUG-180. The stale `...RejectsStaleCancellationAndOverflow`
+  name in the 120 s fixup is unchanged.
+- Raw logs stay git-ignored under `tasks/evidence/BUG-228/` in the `gpu` lane worktree;
+  nothing was deleted.

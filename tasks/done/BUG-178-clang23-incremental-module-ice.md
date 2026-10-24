@@ -19,7 +19,7 @@ contract_review: "No new engine contract is proposed; this note investigates the
 ## Evidence
 - Intermediate cached builds crashed while serializing `std::basic_string_view<char>` in `Runtime.EditorWorkspaceAttachment.Detail.cppm`, `Runtime.EditorWorkspaceSnapshots.Models.cpp`, and `Runtime.EditorWorkspaceSession.cpp`. Logs: `/tmp/icp-build2.log`; Clang emitted `/tmp/Runtime-2331a4.cpp` and its shell reproducer.
 - A subsequent preset rebuild with `CCACHE_DISABLE=1` passed, followed by the full CPU cohort and real Vulkan registration checks. No speculative source workaround was added. The precise cache-versus-build-input cause is not established.
-- [ICP review](../../../docs/reviews/2026-09-08-icp-spatial-integration.md) records the successful verification and bounded diagnosis.
+- [ICP review](../../docs/reviews/2026-09-08-icp-spatial-integration.md) records the successful verification and bounded diagnosis.
 
 
 ### 2026-09-12 processing cleanup observation
@@ -35,7 +35,7 @@ review records the commands and outcomes.
 No source workaround or gate weakening was introduced. Evidence:
 `build/analysis/point-inputs-2026-09-12/vulkan-build-cached-failure.log` and
 `build/analysis/point-inputs-2026-09-12/vulkan-build-no-cache.log`.
-See [processing cleanup review](../../../docs/reviews/2026-09-11-processing-complexity-review.md).
+See [processing cleanup review](../../docs/reviews/2026-09-11-processing-complexity-review.md).
 
 ## Diagnosis — 2026-10-24
 
@@ -188,9 +188,15 @@ during the build) better than a defect in one module, but the crash messages are
 not preserved, so the cause is unknown.
 
 ## Acceptance criteria
-- [ ] Reproduce with one stabilized source surface and exactly one writer per preset tree, comparing enabled/disabled ccache and a fresh tree.
-- [ ] Record the compiler/cache cause or a bounded non-reproduction; preserve the existing strict module/toolchain gates.
-- [ ] Apply a regression-backed tooling fix only if the isolated evidence requires one; otherwise document the verified build discipline.
+- [x] Reproduce with one stabilized source surface and exactly one writer per preset tree, comparing enabled/disabled ccache and a fresh tree.
+      Independent re-review of `588b75c97`: met (relayed by the coordinator; the review
+      record is not on disk).
+- [x] Record the compiler/cache cause or a bounded non-reproduction; preserve the existing strict module/toolchain gates.
+      Independent re-review of `588b75c97`: met (same relay). Operator decision 2026-10-24
+      (verbatim): "3. Ja" (retire as a bounded non-reproduction).
+- [x] Apply a regression-backed tooling fix only if the isolated evidence requires one; otherwise document the verified build discipline.
+      Independent re-review of `588b75c97`: met (same relay; the discipline is in the
+      stale-build triage skill).
 
 ## Verification
 ```bash
@@ -199,3 +205,22 @@ CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCpuTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `12e9f6c19`, `1b81c0794`, `588b75c97`, `ef4ba9090`, merged as
+`26b6b9d29`.
+- Retired on the night integration branch `claude/night-2026-10-24-bug-sweep`. It is not
+  yet on `main`, and hosted CI has not run on it.
+- Result: bounded non-reproduction. No crash in the incremental scenario with ccache on
+  (cold and warm), ccache disabled, or a fresh tree. No compiler or cache cause is
+  established; no source, preset or gate changed.
+- Operator decision, verbatim: "3. Ja" (retire as a bounded non-reproduction).
+- Review: the independent re-reviewer of `588b75c97` decided AC1, AC2 and AC3 met. The
+  decision was relayed by the coordinator; the review record is not on disk. `ef4ba9090`,
+  after that review, only labels the manual `build.ninja` launcher check as unrecorded.
+- Limits: ccache 4.5.1 on this host versus 4.9.1 in CI; one target, comment-only edits and
+  one run per arm; concurrent writers and edits during a build were not tested. The manual
+  launcher check is unrecorded and is not evidence. The cause of the 110 coverage-tree
+  reproducers of 2026-10-19 is unknown.
+- Raw logs stay git-ignored under `tasks/evidence/BUG-178/`; the cache remains under
+  `_state/ccache-bug178`. Nothing else was deleted.

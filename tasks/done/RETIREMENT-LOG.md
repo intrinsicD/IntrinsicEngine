@@ -1,5 +1,39 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-228 and BUG-193 retired by operator decision on the evidence disposition
+
+Retired [BUG-228](BUG-228-desktop-display-vulkan-smoke-timeouts.md) and
+[BUG-193](BUG-193-gpu-pacing-and-watchdog-margin.md) (`25550e64e`, `3d39d1737`, `d626b8b51`, `535f2e5eb`,
+`23dc16de7`, merged as `eb8a8a58b`; follow-ups `1f73f7aac`, `318121ccb`, merged as `ab2317ed6`) on the night
+integration branch `claude/night-2026-10-24-bug-sweep`. Not yet on `main`; hosted CI has not run on it.
+
+- Owners: the device ignored `Render.EnableVSync`, so presents were FIFO and waited about 1 s per frame with the
+  monitor off (`EnableVSync=false` now selects IMMEDIATE, FIFO fallback); the `GpuWorld::SyncFrame` dirty scan took
+  67.6 ms per frame (now a byte scan, `render_prepare` 0.3 ms). The Sandbox acceptance smokes now run with VSync
+  off: 42/42 with the monitor on (183.78 s) and off (184.76 s).
+- Operator decisions, verbatim: "2. A)" accepts the decision-bearing measurements that ran without experiment
+  pre-flight (listed in both Evidence status sections) as engineering diagnosis; "4. Vsync aus und bei den
+  offenen: prüfen und neu formulieren".
+- Reviews: fresh Claude reviewer of `3d39d1737`: approve. Codex round 2 on `535f2e5eb`: "revise required" on the
+  measurement classification; BUG-228 AC1–3 met, BUG-193 AC1 met for recorded conditions, AC2 met, AC3 partially
+  met pending the disposition, which "2. A)" settles. `23dc16de7` and the follow-ups were not re-reviewed.
+- Limits: Xephyr reruns only before the fix; the FIFO fallback and VSync-on apps can still stall with the monitor
+  off; no run fired a 20 s stall bound; leak reports belong to BUG-180. Raw logs stay git-ignored in the `gpu`
+  lane worktree; nothing was deleted.
+
+## 2026-10-24 — BUG-178 retired as a bounded non-reproduction
+
+Retired [BUG-178](BUG-178-clang23-incremental-module-ice.md) (`12e9f6c19`, `1b81c0794`, `588b75c97`, `ef4ba9090`,
+merged as `26b6b9d29`) on the night integration branch. Not yet on `main`; hosted CI has not run on it.
+
+- No crash in the incremental scenario with ccache on (cold, warm), disabled, or on a fresh tree; no cause
+  established; no source, preset or gate changed; the build discipline is in the stale-build triage skill.
+- Operator decision, verbatim: "3. Ja".
+- Review: the re-reviewer of `588b75c97` decided AC1–3 met (relayed by the coordinator; the record is not on
+  disk). `ef4ba9090` labels the unrecorded manual launcher check.
+- Limits: ccache 4.5.1 versus CI's 4.9.1; one run per arm; concurrent writers untested. Raw logs stay
+  git-ignored under `tasks/evidence/BUG-178/`; nothing was deleted.
+
 ## 2026-10-24 — BUG-220 retired by operator decision on its load criteria
 
 Retired [BUG-220](BUG-220-parked-worker-wake-count-flake.md) (`15c9fb5ea`, `b7506b39e`), merged into the night

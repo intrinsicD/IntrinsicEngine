@@ -32,7 +32,7 @@ not the reported failure. The fixture already disables VSync and uses a 64x64 wi
 The fixture was unchanged by RUNTIME-270 before this correction. That task's
 consolidation edit removes UI name-based normal guessing; this test supplies
 explicit normals and deliberately resets them only for the estimation phase.
-[BUG-193](../backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md) retains the broader controlled
+[BUG-193](BUG-193-gpu-pacing-and-watchdog-margin.md) retains the broader controlled
 GPU/display pacing investigation; this task makes no engine pacing or speed claim.
 
 ## Acceptance criteria
