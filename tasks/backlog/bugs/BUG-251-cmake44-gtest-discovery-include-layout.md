@@ -37,8 +37,22 @@ contract_review: Private CMake test instrumentation and a CI diagnostic only; th
     Multi-config generators add `_<CONFIG>`.
   - `GoogleTestAddTests.cmake:5` includes the new `GoogleTest/ParseTestList.cmake`, which holds
     part of the former module.
-- Hard-coded `[1]_include.cmake` sites (the line numbers are at the BUG-249 merge). None was run
-  on 4.4; their failure there is inferred from source.
+  - The module include and the `gtest_discover_tests_impl(` call move into `_discovery.cmake`
+    (`GoogleTest.cmake:703-725`); `_include.cmake` only includes `_discovery.cmake` and
+    `_tests.cmake` (`:727-758`). So finding the renamed file is not enough. Inferred from source,
+    not run: `parse_include` requires the impl call in the file it reads
+    (`Test.GTestDiscoveryTimeout.py:71-76`, `tools/ci/gtest_discovery_probe.py:41-47`); the
+    redirect in `Test.ConcurrentCTestDiscovery.py:140-145` needs exactly one module include in
+    that file; `reconcile()` (`Test.GTestDiscoveryTimeout.py:609-616`, the `ci-linux-clang`
+    `--build-dir` path) globs `*_include.cmake` and takes the target as `name.split('[')[0]`,
+    which on 4.4 is the whole file name. `tests_files()` (`gtest_discovery_probe.py:273`) keys
+    `_tests.cmake` mtimes the same way.
+  - Lane report, no kept log: the BUG-249 lane's prototype redirect on 4.4 still failed on the
+    relative include of `GoogleTest/ParseTestList.cmake` (`GoogleTestAddTests.cmake:5` resolves
+    it from `CMAKE_CURRENT_LIST_DIR`). A private module copy therefore also needs the
+    `GoogleTest/` directory beside it (the lane's Option B).
+- Hard-coded `[1]_include.cmake` sites (the line numbers are at the BUG-249 merge). Only the first
+  was run on 4.4; the failure of the others there is inferred from source.
   - `tests/regression/tooling/Test.ConcurrentCTestDiscovery.py:137` (the observed failure).
   - `tests/regression/tooling/Test.GTestDiscoveryTimeout.py:144` (`include()`), together with
     the `[1]_tests.cmake` name at `:147` (`stale()`). `:401` and `:583` write synthetic trees.
@@ -62,9 +76,13 @@ contract_review: Private CMake test instrumentation and a CI diagnostic only; th
       fails at once with a message naming the CMake version.
 - [ ] With CMake 4.4.4, `Test.GTestDiscoveryTimeout.py` passes and still checks what it checks
       on 4.3.2, or it fails at once with a message naming the version and the layout. A live
-      `--build-dir` run on a 4.4 configure is recorded, or recorded as not run.
-- [ ] `tools/ci/gtest_discovery_probe.py` finds a target's generated include on both layouts,
-      without guessing between several matching files.
+      `--build-dir` run on a 4.4 configure is recorded, or recorded as not run. Either way,
+      `reconcile()` reads a 4.4-layout tree (a synthetic one is enough) with the right target
+      names and the discovery call's fields, and still rejects an unknown layout.
+- [ ] `tools/ci/gtest_discovery_probe.py` finds a target's generated discovery call on both
+      layouts (in `_include.cmake` before 4.4, in the `_discovery.cmake` it includes on 4.4) and
+      parses it in `cmd_direct` and `ctest_once`, without guessing between several matching
+      files. An unknown layout still raises.
 - [ ] The three tools still pass on CMake 3.28.3, 3.31.6 and the host's 4.3.2. Installed CMake
       modules and `cmake/IntrinsicTestDiscovery.cmake` stay unchanged, unless a 4.4 run shows
       that the production lock or watch is affected; any such change is recorded with that run.
