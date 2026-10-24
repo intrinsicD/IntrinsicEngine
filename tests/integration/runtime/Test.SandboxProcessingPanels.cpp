@@ -1938,6 +1938,8 @@ TEST(SandboxProcessingPanels, ProgressivePoissonManualAndDebouncedRunsShareConfi
     std::uint64_t jobsBefore = 0;
     bool completed = false;
     h.Driver->OnFrame = [&](R::Engine& engine) {
+        // Fixed 1/60 s UI clock: slow (sanitizer) frames must not let the debounce fire early.
+        ImGui::GetCurrentContext()->Time += 1. / 60. - ImGui::GetIO().DeltaTime;
         if (++frame > 400) { ADD_FAILURE() << "Poisson panel did not complete"; engine.RequestExit(); return; }
         auto* window = ImGui::FindWindowByName("PointCloud / Processing / Progressive Poisson");
         if (!window) return;
