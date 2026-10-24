@@ -315,6 +315,12 @@ class DecisionRuleTests(unittest.TestCase):
         self.assertIsNone(verdict["chosen_budget_seconds"])
         self.assertTrue(any("ceiling" in kill for kill in verdict["kill_conditions"]))
 
+    def test_slow_idle_warm_null_probe_blocks_a_value(self) -> None:
+        verdict = self.decide(self.records(wall=0.6, wall_seconds=6.0))
+        self.assertEqual(verdict["h1"], "supported")
+        self.assertIsNone(verdict["chosen_budget_seconds"])
+        self.assertTrue(any("null probe" in kill for kill in verdict["kill_conditions"]))
+
     def test_failed_sample_blocks_a_value(self) -> None:
         verdict = self.decide(self.records(wall=0.1, wall_seconds=6.0, exit_status=1))
         self.assertIsNone(verdict["chosen_budget_seconds"])

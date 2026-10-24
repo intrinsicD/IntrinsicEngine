@@ -273,6 +273,7 @@ LADDER = (15, 20, 30, 45, 60)
 CURRENT_BUDGET = 5.0
 MIN_CELL_SAMPLES = 300
 MAX_INVALID_SHARE = 0.05
+NULL_PROBE_MAX_MEDIAN = 0.5
 
 
 def load_records(paths: list[Path]) -> list[dict]:
@@ -343,6 +344,9 @@ def evaluate(records: list[dict], args: argparse.Namespace) -> dict[str, object]
         if arm == "contention":
             summary["valid"] = (summary["valid"] and summary["median_load_1m"] >= args.contention_min_load
                                 and summary["compile_active_share"] >= 0.8)
+    null = cells.get(f"idle/warm/{args.ecs_target}")
+    if null and null["valid"] and statistics.median(null["valid"]) > NULL_PROBE_MAX_MEDIAN:
+        kills.append(f"null probe: idle warm {args.ecs_target} median > {NULL_PROBE_MAX_MEDIAN} s")
     missing = [arm for arm in args.required_arms if not arms.get(arm, {}).get("valid")]
     kills += [f"required arm invalid or not collected: {arm}" for arm in missing]
     valid_walls = [w for c in cells.values() for w in c["valid"]]
