@@ -147,10 +147,24 @@ RTX 4090.
   `tests/contract/repo/layering_fixtures`; `check_doc_links.py`: no broken links.
 - jscpd (`--min-lines 5 --format cpp src/runtime`, no project config, `.cppm` not scanned):
   no clone overlaps the new `Resolve` or overflow-message lines.
+- One-off engine run on the operator's mesh (`vlasic/I_crane/meshes/mesh_0060.obj`, 10002
+  vertices, diagonal 2.1409) through an uncommitted gtest in `build/ci-vulkan` (RTX 4090); the
+  positions went into a point-cloud entity. Predictions were written first
+  (`tasks/evidence/RUNTIME-291/vlasic-engine-check-predictions.txt`); all held:
+  `vulkan_lbvh` with `support_radius` 0 succeeded with radius 0.0463368, at most 99 candidates
+  per row (capacity 256) and weights 1.02 to 9.68. `cpu_kdtree` resolved the same radius
+  bit for bit. The old default 1.0 failed with "Radius candidate overflow: support radius 1 is
+  too large (10001 candidates, capacity 256). Use about 0.0256, 0 for automatic, or a CPU
+  backend." and left the weights unchanged.
+- `PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor` and
+  `KeypointResidentSubnormalScores` fail in `build/ci-vulkan` (keypoint count 5 instead of 8).
+  They fail the same way with this change's `src/` reverted, so they predate it and are not
+  part of this task.
 
 **Remaining.**
-- Criterion 2's "on the Vlasic mesh it runs without overflow" has only the SciPy mirror above,
-  no engine run on that mesh. The live Sandbox check (Operational) needs a display and the
-  operator. Persisted Sandbox configs keep `support_radius` 1.0, so enter 0 for that check.
+- The live Sandbox check (Operational) on the Vlasic mesh through the panel is not done; it
+  needs the operator at the display. The engine run above used the same runtime command on a
+  point-cloud entity, not the Sandbox panel on the mesh entity. Persisted Sandbox configs keep
+  `support_radius` 1.0, so enter 0 for that check.
 - Agent results carry only the message: for `vulkan_lbvh` the message comes from the GPU
   snapshot, so agents do not see the resolved radius there (the panel and result field do).
