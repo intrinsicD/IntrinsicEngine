@@ -61,8 +61,7 @@ def target_include(tests_dir: Path, target: str) -> Path:
     found = sorted(p for p in tests_dir.glob(f"{glob.escape(target)}*_include.cmake") if own.fullmatch(p.name))
     if len(found) != 1:
         raise ProbeError(f"{tests_dir}: {len(found)} GoogleTest discovery includes for {target} "
-                         f"{[p.name for p in found]}; expected one <target>[1]_include.cmake (CMake < 4.4) "
-                         "or <target>_<sha8>_include.cmake (4.4+)")
+                         f"{[p.name for p in found]}; expected exactly one of {LAYOUTS}")
     return found[0]
 
 

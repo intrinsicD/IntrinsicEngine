@@ -207,7 +207,10 @@ the include includes. Read from the 4.4.4 module source, not run: there a new
 budget gives new file names and so a new include, while a different CMake
 installation changes only `_discovery.cmake` and does not relist. The
 discovery regressions and `tools/ci/gtest_discovery_probe.py` accept both
-layouts and fail on any other.
+layouts and fail on any other. On 4.4, any change to the
+`gtest_discover_tests` arguments (the budget, a case `TIMEOUT`) leaves the old-hash
+files behind, so in a reused 4.4 build tree `target_include` fails ("2 includes") and
+reconcile fails ("stale include") until the tree is cleaned.
 
 When a listing exceeds the budget, CTest stops waiting at the budget and exits
 nonzero before any test starts. It prints the executable path and `Process
