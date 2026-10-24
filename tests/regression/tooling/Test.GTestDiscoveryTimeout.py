@@ -51,6 +51,19 @@ def case_budgets() -> tuple[int, int]:
             _set_value(text, "_intrinsic_slow_test_timeout_seconds"))
 
 
+def sanitizer_scale() -> int:
+    return _set_value(CMAKELISTS.read_text(encoding="utf-8"), "_intrinsic_sanitizer_test_timeout_scale")
+
+
+def tree_scale(build_dir: Path) -> int:
+    """Case TIMEOUT factor a configured tree must carry (BUG-240: sanitized trees only)."""
+    cache = (build_dir / "CMakeCache.txt").read_text(encoding="utf-8")
+    match = re.search(r"(?m)^INTRINSIC_SANITIZER_IDENTITY:INTERNAL=(.*)$", cache)
+    if match is None:
+        raise AssertionError(f"{build_dir / 'CMakeCache.txt'} has no INTRINSIC_SANITIZER_IDENTITY")
+    return 1 if match.group(1) == "none" else sanitizer_scale()
+
+
 def lock_timeout() -> int:
     match = re.search(r"GUARD PROCESS TIMEOUT (\d+)", HELPER.read_text(encoding="utf-8"))
     if match is None:
@@ -107,6 +120,9 @@ class SourcePolicyTests(unittest.TestCase):
         properties = tokens[tokens.index("PROPERTIES") + 1:]
         self.assertEqual(properties[:2], ["TIMEOUT", "${_intrinsic_test_timeout}"])
         self.assertNotIn("DISCOVERY_TIMEOUT", properties, "discovery budget must not be a case property")
+
+    def test_sanitizer_lanes_scale_case_budgets_by_the_operator_factor(self) -> None:
+        self.assertEqual(sanitizer_scale(), 2, "BUG-240 operator decision: factor 2")
 
 
 class FakeListerProject:
@@ -574,8 +590,10 @@ class DecisionRuleTests(unittest.TestCase):
 
 
 class ReconcileTests(unittest.TestCase):
-    def tree(self, root: Path, rows: dict[str, tuple[str, int, int]], layout: str = "3.x") -> Path:
+    def tree(self, root: Path, rows: dict[str, tuple[str, int, int]], layout: str = "3.x",
+             identity: str = "none") -> Path:
         (root / "tests").mkdir()
+        (root / "CMakeCache.txt").write_text(f"INTRINSIC_SANITIZER_IDENTITY:INTERNAL={identity}\n")
         (root / "test-inventories").mkdir()
         lines = ["target\tlabels"]
         for target, (labels, discovery, case) in rows.items():
@@ -608,6 +626,29 @@ class ReconcileTests(unittest.TestCase):
                 with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
                     with self.assertRaisesRegex(AssertionError, needle):
                         reconcile(self.tree(Path(directory), rows, layout))
+
+    def test_sanitized_tree_needs_scaled_case_budgets(self) -> None:
+        budget = declared_budget()
+        default_case, slow_case = case_budgets()
+        scale = sanitizer_scale()
+        scaled = {"Fast": ("unit", budget, default_case * scale), "Slow": ("unit,slow", budget, slow_case * scale)}
+        unscaled = {"Fast": ("unit", budget, default_case), "Slow": ("unit,slow", budget, slow_case)}
+        for identity, rows, needle in (("asan", scaled, None), ("ubsan", scaled, None),
+                                       ("asan-ubsan", unscaled, f"case TIMEOUT {default_case} != {default_case * scale}"),
+                                       ("none", scaled, f"case TIMEOUT {default_case * scale} != {default_case}")):
+            with self.subTest(identity=identity), \
+                    tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
+                tree = self.tree(Path(directory), rows, identity=identity)
+                if needle is None:
+                    self.assertIn(f"timeout_scale={scale}", reconcile(tree))
+                else:
+                    with self.assertRaisesRegex(AssertionError, needle):
+                        reconcile(tree)
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-live-") as directory:
+            tree = self.tree(Path(directory), unscaled)
+            (tree / "CMakeCache.txt").write_text("CMAKE_BUILD_TYPE:STRING=Debug\n")
+            with self.assertRaisesRegex(AssertionError, "no INTRINSIC_SANITIZER_IDENTITY"):
+                reconcile(tree)
 
     def test_unknown_layout_fails_closed(self) -> None:
         budget = declared_budget()
@@ -655,7 +696,8 @@ class LayoutTests(unittest.TestCase):
 
 def reconcile(build_dir: Path) -> str:
     budget = declared_budget()
-    default_case, slow_case = case_budgets()
+    scale = tree_scale(build_dir)
+    default_case, slow_case = (budget_ * scale for budget_ in case_budgets())
     with (build_dir / "test-inventories/RegisteredTestTargets.tsv").open(encoding="utf-8") as handle:
         labels = {row["target"]: row["labels"].split(",") for row in csv.DictReader(handle, delimiter="\t")}
     includes = sorted((build_dir / "tests").glob("*_include.cmake"))
@@ -683,7 +725,7 @@ def reconcile(build_dir: Path) -> str:
     if errors:
         raise AssertionError("\n".join(errors))
     return (f"gtest discovery budget: ok: includes={len(includes)} discovery_timeout={budget} "
-            f"case_timeouts={seen}")
+            f"timeout_scale={scale} case_timeouts={seen}")
 
 
 if __name__ == "__main__":

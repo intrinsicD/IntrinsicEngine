@@ -1068,6 +1068,14 @@ endif()
 
 set(_intrinsic_default_test_timeout_seconds 30)
 set(_intrinsic_slow_test_timeout_seconds 120)
+# BUG-240: sanitized trees (INTRINSIC_SANITIZER_IDENTITY other than none:
+# ci-asan, ci-ubsan, ci-vulkan, dev) scale every case TIMEOUT registered in this
+# directory, including the discovery fixups; see tests/README.md.
+set(_intrinsic_sanitizer_test_timeout_scale 2)
+set(_intrinsic_test_timeout_scale 1)
+if(NOT INTRINSIC_SANITIZER_IDENTITY STREQUAL "none")
+    set(_intrinsic_test_timeout_scale ${_intrinsic_sanitizer_test_timeout_scale})
+endif()
 # Per-executable `--gtest_list_tests` budget for PRE_TEST discovery (BUG-091).
 # Distinct from the case TIMEOUT values above; see tests/README.md.
 set(_intrinsic_gtest_discovery_timeout_seconds 5)
@@ -1100,6 +1108,7 @@ function(intrinsic_test_executable name)
     if(NOT _intrinsic_slow_label_index EQUAL -1)
         set(_intrinsic_test_timeout ${_intrinsic_slow_test_timeout_seconds})
     endif()
+    math(EXPR _intrinsic_test_timeout "${_intrinsic_test_timeout} * ${_intrinsic_test_timeout_scale}")
     add_executable(${name})
     set_target_properties(${name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
     target_compile_options(${name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
@@ -3001,6 +3010,15 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoGroupDragAndUndoReachSameFramePixels RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoOrthographicSplitViewportDragAndUndo RuntimeSandboxAcceptanceGpuSmoke.ImGuizmoScaleAxisDragAndUndo PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
     )
+    # BUG-240: scale each literal fixup TIMEOUT (last match first; no lazy regex in CMake).
+    set(_intrinsic_fixup_rest "${_intrinsic_property_fixup_script}")
+    set(_intrinsic_fixup_scaled "")
+    while(_intrinsic_fixup_rest MATCHES "^(.*)TIMEOUT ([0-9]+)(.*)$")
+        math(EXPR _intrinsic_fixup_timeout "${CMAKE_MATCH_2} * ${_intrinsic_test_timeout_scale}")
+        set(_intrinsic_fixup_scaled "TIMEOUT ${_intrinsic_fixup_timeout}${CMAKE_MATCH_3}${_intrinsic_fixup_scaled}")
+        set(_intrinsic_fixup_rest "${CMAKE_MATCH_1}")
+    endwhile()
+    set(_intrinsic_property_fixup_script "${_intrinsic_fixup_rest}${_intrinsic_fixup_scaled}")
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")
     file(GENERATE OUTPUT "${_intrinsic_property_fixup_file}" CONTENT "${_intrinsic_property_fixup_script}")
     set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${_intrinsic_property_fixup_file}")
@@ -3026,6 +3044,20 @@ if(Python3_Interpreter_FOUND)
     intrinsic_add_source_rules_test(RuntimeEngineLayering contract runtime)
 else()
     message(WARNING "Python3 not found: source-structure rule CTests are not registered (ci-docs still runs them).")
+endif()
+
+# BUG-240: scale the TIMEOUT of every test registered with add_test above.
+if(NOT _intrinsic_test_timeout_scale EQUAL 1)
+    get_property(_intrinsic_registered_tests DIRECTORY PROPERTY TESTS)
+    foreach(_intrinsic_registered_test IN LISTS _intrinsic_registered_tests)
+        get_test_property("${_intrinsic_registered_test}" TIMEOUT _intrinsic_registered_timeout)
+        if(_intrinsic_registered_timeout)
+            math(EXPR _intrinsic_registered_timeout
+                "${_intrinsic_registered_timeout} * ${_intrinsic_test_timeout_scale}")
+            set_tests_properties("${_intrinsic_registered_test}" PROPERTIES
+                TIMEOUT ${_intrinsic_registered_timeout})
+        endif()
+    endforeach()
 endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/IntrinsicTestDiscovery.cmake)

@@ -11,7 +11,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 - [BUG-240 — ASan and UBSan CPU jobs have been red since 2026-09-05](BUG-240-sanitizer-cpu-jobs-red-since-september.md):
   sanitizer jobs run only on PRs/manual dispatch; six timeouts and one ProgressivePoisson panel
-  assertion failure under ASan, one timeout under UBSan.
+  assertion failure under ASan, one timeout under UBSan. Panel fixed; sanitizer case budgets
+  doubled by operator policy; the integrated dispatch is still owed.
 
 - [BUG-228 — Vulkan smoke timeout depends on the display environment](BUG-228-desktop-display-vulkan-smoke-timeouts.md):
   not reproduced on 2026-10-24 with the monitor on (`:1` 10.79 s, `:9` 10.11 s); the swapchain is always

@@ -185,6 +185,21 @@ exact registration, and nested discovery without requiring engine binaries.
   discovered case, passed through `PROPERTIES`. Named-case fixups later in
   `tests/CMakeLists.txt` raise it for some cases.
 
+Sanitized trees scale the case budgets
+([BUG-240](../tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)).
+A tree is sanitized when its resolved `INTRINSIC_SANITIZER_IDENTITY` is not
+`none`, i.e. `INTRINSIC_SANITIZER_MODE`/`INTRINSIC_ENABLE_SANITIZERS` select a
+sanitizer: `ci-asan`, `ci-ubsan`, `ci-vulkan` (ASan+UBSan) and the `dev`
+presets. There every `TIMEOUT` registered in `tests/CMakeLists.txt` is
+multiplied by `_intrinsic_sanitizer_test_timeout_scale` (2, an operator
+decision): discovered cases (30 s -> 60 s, `slow` 120 s -> 240 s), grouped
+wrappers (120 s -> 240 s), every `add_test` case and every literal `TIMEOUT` of
+the generated discovery fixups. Unsanitized trees keep the values above, and
+the 5 s discovery budget is the same in both. Hang detection in sanitizer lanes
+is coarser by the same factor. The CTest `--timeout` flag does not override
+these per-case `TIMEOUT` properties. It applies only to tests without one.
+Benchmark smokes registered in `benchmarks/CMakeLists.txt` are not scaled.
+
 The discovery value is the explicit former CMake default. The reviewed BUG-091
 measurement found no listing near it (maximum 0.073 s, light contention on one
 host) and kept 5 s; no task currently plans a new measurement.
@@ -238,11 +253,13 @@ including that `direct` replays the argv and working directory that this
 CMake's discovery passes to the lister. With `--build-dir`, it checks that every generated
 include of a configured tree (its discovery call, on either layout above) carries the
 declared discovery budget, together
-with its unchanged 30 s or 120 s case budget:
+with its 30 s or 120 s case budget, times the scale factor when the tree's
+`CMakeCache.txt` names a sanitizer identity:
 
 ```bash
 python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py
 python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py --build-dir build/ci
+python3 tests/regression/tooling/Test.GTestDiscoveryTimeout.py --build-dir build/ci-asan
 ```
 
 `tools/ci/gtest_discovery_probe.py` measures listings directly (`direct`,
@@ -300,7 +317,7 @@ execution-status parity between plans.
 
 Curvature tensor and feature/partition fixtures use separate pure producers so
 each fixture-heavy cohort and the remaining geometry tests retain the same
-120-second sanitizer hang-detection budget. The feature producer owns
+120-second wrapper hang-detection budget (240 s in sanitized trees). The feature producer owns
 `Test.CurvaturePatchContract.cpp` and `Test.CurvatureBoundaryPartition.cpp`;
 the extremum producer owns `Test.ScalarfieldExtrema.cpp`. Keeping multi-scale
 extremum fixtures separate prevents their added runtime from exceeding the
@@ -317,7 +334,7 @@ fixtures own filesystem and process-static temporary-path state.
 logging writers for the same reason.
 
 Grouped wrappers reserve one CTest processor and use a 120-second wrapper
-timeout. Required full CPU execution uses the evidence-backed
+timeout (240 s in sanitized trees, see "GoogleTest discovery and case budgets"). Required full CPU execution uses the evidence-backed
 `--parallel 4` workflow budget. It was the fastest absolute grouped plan across
 matched one-, two-, and four-slot evidence even though grouping itself improved
 the one- and two-slot A/B results but regressed the four-slot A/B result. ASan
@@ -329,7 +346,7 @@ four, and the two Release architecture-SLO cases reserve eight. Do not replace
 these budgets with independently inferred host-core counts. The curvature
 retriangulation and refinement scenarios are separate discovered cases. Only the
 single-threaded, dominant `ScalarfieldExtrema.RefinementRetainsCenterCurve` is
-`RUN_SERIAL` and has a case-only 60-second `TIMEOUT`, because it exceeded 30 s
+`RUN_SERIAL` and has a case-only 60-second `TIMEOUT` (120 s in sanitized trees), because it exceeded 30 s
 alone on a slow hosted Debug runner
 ([BUG-218](../tasks/done/BUG-218-curvature-refinement-scenario-split.md)).
 

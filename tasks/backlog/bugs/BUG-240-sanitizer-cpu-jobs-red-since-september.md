@@ -85,7 +85,7 @@ Covers criterion 1 and the diagnosis for criterion 2. Raw logs are in
   - With the fix: the plain run passed (3.38 s); 3 of 3 contention runs passed (13.9-14.1 s);
     `-R '^SandboxProcessingPanels\.'` passed 85 of 85 (228.7 s, serial).
 
-### Timeouts (criterion 2): diagnosis, no budget changed
+### Timeouts (criterion 2): diagnosis
 - **The workflow's `--timeout 60` has no effect.** CTest's `--timeout` applies only to tests
   without a `TIMEOUT` property. Every case discovered via `intrinsic_test` carries 30 s
   (`tests/CMakeLists.txt` `_intrinsic_default_test_timeout_seconds`), and every grouped wrapper
@@ -135,19 +135,37 @@ Covers criterion 1 and the diagnosis for criterion 2. Raw logs are in
   `NamedMeshOutputsUseAppearanceWithoutRecomputing` 24.89 s,
   `ShowButtonsApplyAppearancePropertiesOnMeshGraphAndCloud` 24.11 s.
 
+### Sanitizer case budgets (criterion 2): operator policy applied
+- **Decision (2026-10-24, verbatim):** "ok dann Faktor 2 und variations fit als eigenen Produkt
+  task." That is the sanitizer-only budget policy with factor 2, plus a product task for the
+  noise-level weight search ([GEOM-117](../geometry/GEOM-117-cheaper-variational-fit-noise-level-search.md)).
+- **Which lanes.** A tree is a sanitizer lane when its resolved `INTRINSIC_SANITIZER_IDENTITY`
+  (from `INTRINSIC_SANITIZER_MODE`/`INTRINSIC_ENABLE_SANITIZERS`) is not `none`: `ci-asan`,
+  `ci-ubsan`, `ci-vulkan` (ASan+UBSan) and the `dev` presets. `ci`, `ci-fast`, `ci-release`,
+  `ci-coverage-cpu` and `ci-vulkan-release` are unsanitized and unchanged.
+- **Change.** `tests/CMakeLists.txt` declares `_intrinsic_sanitizer_test_timeout_scale 2` and
+  multiplies, in sanitizer trees only: the discovered-case `TIMEOUT` (30 -> 60 s, `slow`
+  120 -> 240 s), every `add_test` `TIMEOUT` in the directory, including grouped wrappers
+  (120 -> 240 s), and every literal `TIMEOUT` of the generated discovery fixups (for example
+  Refinement 60 -> 120 s). The 5 s discovery budget is unchanged. Benchmark smokes in
+  `benchmarks/CMakeLists.txt` are not scaled. `tests/README.md` documents the policy.
+- **Regression.** `Test.GTestDiscoveryTimeout.py` reads the tree's `INTRINSIC_SANITIZER_IDENTITY`
+  from `CMakeCache.txt` and requires scaled case budgets in a sanitizer tree and unscaled ones
+  otherwise; a missing identity fails closed. Its new hermetic checks failed before the CMake
+  change (no declared scale) and pass after it.
+- **Verification (this session).** A sanitizer tree configured as
+  `cmake --preset ci -B build/ci-asan-bug240 -DINTRINSIC_ENABLE_SANITIZERS=ON -DINTRINSIC_SANITIZER_MODE=address`
+  (the `ci-asan` cache values on the already installed `ci` vcpkg tree; configure only):
+  before the change its includes carried 35 x 30 s and 6 x 120 s. After it, `--build-dir` reconcile
+  reported `timeout_scale=2 case_timeouts={60: 35, 240: 6}`. All 98 `add_test` timeouts of
+  `tests/` doubled (`ctest -N --show-only=json-v1`, before/after diff). The 8 benchmark smokes
+  were unchanged, and the fixup file's literals doubled. `cmake --preset ci` reconcile still
+  reports `timeout_scale=1 case_timeouts={30: 35, 120: 6}`. The full
+  `Test.GTestDiscoveryTimeout.py` passes.
+- **What this does not settle.** Hang detection in sanitizer lanes is coarser by 2x. The diagnosed
+  producers need about 160-210 s on CI against the new 240 s wrapper budget, so their margin is
+  small. KMeans/SceneSave (about 20 s locally, 1.6-1.9x on CI) fit the new 60 s case budget.
+
 ### Remaining
-- Criterion 2 needs an operator decision. No budget, label or grouping was changed. If no
-  decision is taken, everything stays as it is and the listed cases stay red on CI. Options:
-  - Policy: either split case by case (the CPD precedent), or a sanitizer-only budget, i.e. a
-    `ci-asan`/`ci-ubsan` cache variable that scales the 30 s/120 s `TIMEOUT` properties. The
-    budget covers all items below at once. Hang detection would get coarser by the same factor.
-  - VariationalFit: three-way split (about 2 s / 15 s / 5.7 s locally; the noise-level part has
-    no margin on CI), or a cheaper noise-level weight search in the product (warm start or
-    tolerance; this changes numerics and needs its own task and review).
-  - KMeans/SceneSave: a test seam for a job held by a gate instead of the 300 000-point cloud
-    (production seam, own task), or a smaller cloud (a timing-derived parameter, results-bearing).
-  - Grouped producers: split them following the `tests/README.md` precedent, together with
-    parity and inventory updates, or a longer wrapper timeout for the sanitizer lanes only.
-  - The `slow` label is not recommended: it removes the cases from every required CPU lane.
 - Criterion 3 needs the coordinator's integrated `ci-linux-clang` dispatch. BUG-240 stays open
   until that dispatch is green, or until every remaining failure has its own task.
