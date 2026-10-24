@@ -1,5 +1,29 @@
 # Retirement Log
 
+## 2026-10-24 — RUNTIME-291 retired at Operational after its final re-review
+
+Retired [RUNTIME-291](RUNTIME-291-scale-aware-radius-defaults.md) (`54e216269` through `cb9f0b481`,
+6 commits), merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as
+`833ae60fe` and `aeffa219d`; not yet on `main`, and hosted CI has not run on it.
+
+- Compact Density Weights: `support_radius` 0 (the new default) derives the radius from the captured
+  live positions through `Geometry::SupportRadius::Analyze` (LOP-family row), the same rule for mesh
+  vertices, graph nodes and point clouds; the result reports it. A Vulkan candidate overflow now says
+  the radius is too large and suggests one. The survey of the other absolute radius/sigma fields is in
+  the note; only Density Weights changed.
+- Verification: contract tests failing first, mutation checks, 520/520 focused `ci` cases,
+  `PointLBVHGpuSmoke.DensityWeight*` 3/3 on an RTX 4090, and an agent-driven `ExtrinsicSandbox` live
+  check on two Vlasic meshes (automatic radius 0.04634 / 0.04749 on CPU, Vulkan rows identical,
+  overflow text as predicted). The shutdown predictions under LeakSanitizer failed (exit 1, 3 x 80 B).
+- Review: round 1 on `d49d0dd85` (independent Claude `approve`, independent Codex `revise`), round 2
+  on `0b51444a9` (Claude `approve`), live-check review of `4ba353cb4` (Claude `revise`), final
+  re-review of `cb9f0b481` (Claude `approve`, all four criteria and the Operational target "met").
+  All four boxes ticked; maturity `Operational`.
+- Open for the operator: whether a hand-clicked panel check is still wanted, the agent-chosen defaults
+  1-3 (and 4-6), ownership of the Sandbox 3 x 80 B LSan observation, of the JobService
+  "completion publisher rejected result type ... bool" error line and of the viewport hue mismatch.
+  Evidence stays git-ignored in the `runtime-291` lane worktree; nothing was deleted.
+
 ## 2026-10-24 — BUG-248 retired after its round-1 reviews
 
 Retired [BUG-248](BUG-248-keypoint-gpu-parity-smokes-fail-on-main.md) (`1852942c9`, `efb83a73e`,

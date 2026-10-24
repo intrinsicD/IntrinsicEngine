@@ -31,20 +31,28 @@ contracts: [geometry.element-domain-sources, geometry.support-radius-policy]
   "radius too large" with the suggested value.
 
 ## Acceptance criteria
-- [ ] Survey every radius, sigma and bandwidth field of the point panels (Density Weights,
+- [x] Survey every radius, sigma and bandwidth field of the point panels (Density Weights,
       Outlier Analysis radius mode, Normal Estimation radius mode, Smooth Property, Bilateral,
       Point Construction) and record which are absolute and what each scales with.
-- [ ] Compact Density Weights (at least) defaults to an entity-derived radius: `support_radius`
+- [x] Compact Density Weights (at least) defaults to an entity-derived radius: `support_radius`
       0 = automatic, reported in the result. On the Vlasic mesh it runs without overflow.
-- [ ] The automatic rule is the same for mesh vertices, graph nodes and point clouds
+- [x] The automatic rule is the same for mesh vertices, graph nodes and point clouds
       (`geometry.element-domain-sources`) and does not change under uniform scaling of the
       model (a contract test scales one fixture by 1000 and gets the same weights).
-- [ ] An overflow message suggests a smaller radius instead of silently keeping the old output.
+- [x] An overflow message suggests a smaller radius instead of silently keeping the old output.
 
 ## Verification
 ```bash
 ctest --test-dir build/ci --output-on-failure -R 'DensityWeight|KernelDensity|PointSpacing|OutlierAnalysis|SandboxProcessingPanels' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 ```
+
+Operational run (cited at retirement, per `docs/agent/task-maturity.md`): the agent-driven
+Sandbox live check in "Live check — 2026-10-24" below. `ExtrinsicSandbox` from
+`build/ci-vulkan` at `0b51444a9` ran `Engine::Run()` with the section defaults (no
+`config/engine.json`) on an RTX 4090; `device_status` reported Vulkan operational with 0
+validation errors, and `run_operation density_weight` with `support_radius` 0 succeeded on both
+Vlasic meshes. The committed `gpu;vulkan` smokes `PointLBVHGpuSmoke.DensityWeight*` (3/3) ran
+on the same host. The hand-clicked panel path (manual Accept/Discard) did not run.
 
 ## Resolution — 2026-10-24
 
@@ -187,10 +195,10 @@ RTX 4090.
   same way; covered by the transaction test's CPU/Vulkan radius equality).
 
 **Remaining.**
-- The live Sandbox check (Operational) on the Vlasic mesh through the panel is not done; it
-  needs the operator at the display. The engine run above used the same runtime command on a
-  point-cloud entity, not the Sandbox panel on the mesh entity. Persisted Sandbox configs keep
-  `support_radius` 1.0, so enter 0 for that check.
+- The hand-clicked Sandbox panel check on the Vlasic mesh did not run; the agent-driven live
+  check below ran the same runtime command on the mesh entities instead (updated at
+  retirement). Persisted Sandbox configs keep `support_radius` 1.0, so enter 0 for a panel
+  check.
 - Agent results carry only the message: for `vulkan_lbvh` the message comes from the GPU
   snapshot, so agents do not see the resolved radius there (the panel and result field do).
 - The overflow message always offers "0 for automatic", also when the request already was
@@ -225,15 +233,17 @@ A rerun should save the command lines.
 
 Meshes: `I_crane/meshes/mesh_0060.obj` and `D_march/meshes/mesh_0060.obj`. D_march is the path in
 the lane brief. Both have 10002 vertices, were imported as mesh entities and got their weights on
-`MeshVertex`. The diagonals 2.1409 (I_crane) and 2.2693 (D_march) and all neighbour counts come from
-the SciPy mirror (`repro_vlasic_lop125.log`, `live/mirror_dmarch_lop125.log`), not from engine
-output. That I_crane is the operator's mesh is an inference from matching numbers. The operator gave
+`MeshVertex`. The diagonals 2.1409 (I_crane) and 2.2693 (D_march) and the neighbour counts that describe the
+meshes (49 and 35 at radius 0.03, at most 99 and 85 at the automatic radius) come from the SciPy
+mirror (`repro_vlasic_lop125.log`, `live/mirror_dmarch_lop125.log`), not from engine output; the
+10001 candidates in the overflow message are engine output (wording corrected at retirement). That I_crane is the operator's mesh is an inference from matching numbers. The operator gave
 a diagonal of 2.14 and 49 neighbours at radius 0.03. I_crane matches both; D_march has 35
 neighbours.
 
 Predictions were written first in `live/predictions.txt`. The file was created at 04:30:03, and the
-Sandbox started at 04:30:40. The file is git-ignored. It was last modified at 04:37:06, after the
-runs, when the P6b/P6c addenda and a timestamp correction were appended. Nothing pins the text from
+Sandbox started at 04:30:40. The file is git-ignored. By its own account, the P6b/P6c addenda were
+appended between sessions (the second one saved at 04:35:33); the last write, at 04:37:06,
+appended a timestamp correction (wording corrected at retirement). Nothing pins the text from
 before this commit. From this commit on, two sha256 hashes pin it:
 - lines 1-33 (the pre-run section, P0-P6):
   `e15d249ea14eda254ee3d1327b619d542471a3cf4ce8d1887fd255ae89c83c55`;
@@ -248,7 +258,7 @@ Session 1 ran the full sequence. Sessions 2 and 3 repeated it and gave identical
 | P2: `vulkan_lbvh` with radius 0 succeeds with no overflow; 10002 finite weights; 1 <= min and max <= mirror max + 1 (100 / 86); I_crane min and max within 1% of 1.0206 and 9.677 | Applied. I_crane 1.0206 to 9.6770, D_march 1.0149 to 6.0159, 10002 finite each | held |
 | P2: the Vulkan reply does not state the radius | "Device scalar accepted; input upload: 120024 bytes; ..." on both meshes | held (known gap) |
 | P3: `cpu_kdtree` with radius 0 ends "support radius 0.04634." (I_crane) and "0.04749." (D_march); Vulkan vs CPU max abs error <= 1e-4 | Both messages as predicted; 10002/10002 rows identical, max error 0, on both meshes | held |
-| P4: `vulkan_lbvh` with radius 1.0 fails with "Radius candidate overflow: support radius 1 is too large (10001 candidates, capacity 256). Use about 0.0256, 0 for automatic, or a CPU backend."; generation and statistics unchanged | That exact text, status GeometryProcessingFailed, on both meshes. Generation (session 1: I_crane 4785, D_march 6399), statistics and CPU equality unchanged | held |
+| P4: `vulkan_lbvh` with radius 1.0 fails with "Radius candidate overflow: support radius 1 is too large (10001 candidates, capacity 256). Use about 0.0256, 0 for automatic, or a CPU backend."; generation and statistics unchanged | That exact text, status GeometryProcessingFailed, on both meshes. Generation (session 1: I_crane 4785, D_march 6399) and CPU equality unchanged; `property_stats` re-read after the overflow unchanged for D_march in session 1 and both meshes in sessions 2 and 3 (I_crane session 1: inferred from the rows still equal to CPU) | held |
 | P5: `view_capture` writes a PNG inside `live/` | `live/icrane_density_weight_vulkan_auto.png`, 1600x924 | held |
 | P6 (before session 1): after WM_DELETE_WINDOW the process exits with 0 | session 1: `sandbox.exit` = 1 | **not held** |
 | P6b (before session 2): with `fast_unwind_on_malloc=0`, every leak matches `lsan.supp` and the exit status is 0 | session 2: `s2/sandbox.exit` = 1; 3 x 80 B not suppressed | **not held** |
@@ -280,7 +290,7 @@ Shutdown and LeakSanitizer, from the raw `live/sandbox.log`, `live/s2/sandbox.lo
   (`Graphics.Renderer.cpp:6335`, `:6891`). The stacks go on through `RebuildOperationalResources`,
   `Engine::RunFrame` and `main`. These are startup pipelines, not the density path.
 - Session 3 (`detect_leaks=0`) printed no report and exited with 0.
-- Comparison with [BUG-180](../bugs/BUG-180-framed-icp-leak-enabled-process-retention.md): its
+- Comparison with [BUG-180](../backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md): its
   2026-10-24 diagnosis is commit 9396405a5 on `claude/night-2026-10-24-bug-sweep`, which is not on
   this branch. It concerns the framed ICP gtest. It attributes 3 x 80 B to `malloc` called from
   `libnvidia-glcore.so.580.159.04+0xa0c0d1`, during pipeline creation from a filled NVIDIA shader
@@ -328,3 +338,61 @@ Still missing for Operational (the reviewers decide whether this run counts):
   cover the panel.
 - No committed `gpu;vulkan` test runs the Vlasic mesh. The GPU smoke `PointLBVHGpuSmoke.DensityWeight*`
   covers the overflow message on synthetic data.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `54e216269` through `cb9f0b481` (6 commits on `599f02ff1`,
+branch `claude/runtime-291-scale-aware-radius`), merged into the night integration branch
+`claude/night-2026-10-24-bug-sweep` as `833ae60fe` and `aeffa219d`. Not yet on `main`; hosted
+CI has not run on these commits.
+
+Reviewer decisions (coordinator's local review records, outside the repository):
+- Round 1 on `d49d0dd85` (`wfA.json`, lane `RUNTIME-291`): independent Claude review
+  `approve`, criteria 1, 3 and 4 "met", criterion 2 "partially met" (Vlasic checked only on a
+  point-cloud entity). Independent Codex review (thread
+  `01a16b54-6ccb-7c00-9b6e-fb3a27c64de0`) `revise`: one blocking finding (Vulkan admission
+  after the frame-thread analysis), criterion 2 "Partially met"; fixed in `2d328f67b`.
+- Round 2 on `0b51444a9` (`wfA.json`): independent Claude review `approve`, criterion 2 still
+  "partially met".
+- Live-check review of `4ba353cb4` (`wfE.json`, lane `RUNTIME-291-live`): independent Claude
+  review `revise`, one blocking finding (the failed shutdown predictions P6/P6b were left out of
+  the record), all five criteria "met"; fixed in `cb9f0b481`.
+- Final re-review of `cb9f0b481360ea84ea37e4c9f3f3d08feb4620a9` (`wfG.json`): independent
+  Claude review `approve`, no blocking findings, all five criteria "met", including the
+  maturity target. Codex did not re-review after round 1; its REVISE is resolved only through
+  the later Claude reviews.
+
+Boxes: all four acceptance criteria are ticked, as the final re-review of `cb9f0b481` decided.
+
+Maturity: `Operational`, as the final re-review decided ("met" against
+`docs/agent/task-maturity.md`: the canonical `ExtrinsicSandbox` `main -> Engine::Run ->
+RunFrame` path with section defaults, `device_status` breadcrumbs, and the committed
+`PointLBVHGpuSmoke.DensityWeight*` smokes). The run is cited under Verification. Not run live:
+the panel's manual Accept/Discard transaction (not changed here) and the panel line (covered by
+the `SandboxProcessingPanels` contract tests).
+
+At retirement, the final re-review's optional wording findings were applied to the Live check
+(neighbour-count source, predictions-file history, P4 statistics reads; the last checked against
+`live/step6_dmarch.txt` and `live/s2/summary.txt`), the stale first Remaining bullet was updated,
+and the Operational run was cited under Verification. These edits were not re-reviewed.
+
+Limits: everything under "Remaining" and "Still missing for Operational" above stands. The
+Vulkan agent reply omits the resolved radius; persisted configs keep `support_radius` 1.0; the
+literal argv, environment and sanitizer options of the live sessions were not saved; no
+committed `gpu;vulkan` test runs the Vlasic mesh.
+
+Open for the operator (no task file created):
+- Whether the agent-socket live run is enough Operational evidence, or a hand-clicked panel
+  check of the manual Accept path and the radius line is still wanted.
+- The defaults chosen by the agent, recorded above as defaults 1-3 (LOP-family policy row,
+  `gpu_radius_capacity` as the budget for every backend, automatic-mode failure on degenerate
+  input), plus 4-6.
+- Ownership of the Sandbox 3 x 80 B LeakSanitizer observation (exit 1 under LSan): BUG-180 or a
+  new task.
+- Ownership of the JobService "completion publisher rejected result type ... bool" error line.
+  The final re-review found the same line for "Consolidation Vulkan neighborhoods" in earlier
+  committed evidence, so it is not specific to density weights.
+- Whether the viewport hue mismatch (Viridis legend, magenta/pale cyan/white mesh) is worth a
+  task.
+
+Evidence: the `tasks/evidence/RUNTIME-291/` paths in this note name the git-ignored directory in
+the `runtime-291` lane worktree; they are not in the repository. Nothing was deleted.

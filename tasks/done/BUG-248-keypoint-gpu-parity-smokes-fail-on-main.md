@@ -37,7 +37,7 @@ contracts: [geometry.property-coherence]
 - `PointLBVHGpuSmoke.KeypointResidentSubnormalScores` fails 12 times at `:2830` (preview mask)
   and 12 times at `:2849` (mask after accept). The saliency L∞ bound fails at `:2833` and
   `:2855`: 7.58e-42 against 1.12e-44 (8 × `denorm_min`).
-- RUNTIME-291's note ([RUNTIME-291](../backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md))
+- RUNTIME-291's note ([RUNTIME-291](RUNTIME-291-scale-aware-radius-defaults.md))
   records both cases failing the same way with its `src/` change reverted, so they predate it.
 - CI coverage: the cases are `gpu;vulkan`-labelled, so no CPU gate selects them. The hosted
   `ci-vulkan` workflow (pull requests, merge queue and manual dispatch; lavapipe, displayless batch)
@@ -143,7 +143,7 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke\.Key
   - Packets and answers: `review-*.{md,json}` and `delta-*.{md,json}`.
 
 ## Completion — 2026-10-24
-Completed 2026-10-24. Commits: `1852942c9` (the fix), `efb83a73e` and `7f122a51c` (evidence
+Completed 2026-10-24. Commit: `1852942c9` (the fix), `efb83a73e` and `7f122a51c` (evidence
 and review records), on `45efeaf7d`, branch `claude/bug-248-keypoint-gpu-parity`, merged into
 the night integration branch `claude/night-2026-10-24-bug-sweep` as `6cec3dcb0`. Not yet on
 `main`; hosted CI has not run on these commits.

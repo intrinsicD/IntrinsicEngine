@@ -84,7 +84,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)
 - unblocked: `BUG-247` — Local root hygiene rejects existing tool state (tasks/backlog/bugs/BUG-247-local-root-hygiene-state-mismatch.md)
 - unblocked: `BUG-249` — Test.ConcurrentCTestDiscovery.py fails on CMake 4.x (tasks/backlog/bugs/BUG-249-concurrent-ctest-discovery-cmake4.md)
-- unblocked: `RUNTIME-291` — Scale-aware default radii for point operations (tasks/backlog/runtime/RUNTIME-291-scale-aware-radius-defaults.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -181,7 +180,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-055`: `METHOD-060` — Vulkan coupled eta-sieve (tasks/backlog/methods/METHOD-060-vulkan-coupled-eta-sieve.md)
 - unblocked: `METHOD-061` — Vulkan flat beta-greedy / implicit MIS sampling (tasks/backlog/methods/METHOD-061-vulkan-flat-beta-greedy.md)
 - unblocked: `METHOD-062` — Vulkan lazy greedy sampling over the point LBVH (tasks/backlog/methods/METHOD-062-vulkan-lazy-greedy-lbvh.md)
-- blocked by `RUNTIME-291`: `METHOD-064` — Heat-kernel Gram matrix as the positive-definite geodesic Gaussian (tasks/backlog/methods/METHOD-064-geodesic-gaussian-kernel.md)
+- unblocked: `METHOD-064` — Heat-kernel Gram matrix as the positive-definite geodesic Gaussian (tasks/backlog/methods/METHOD-064-geodesic-gaussian-kernel.md)
 - blocked by `METHOD-064`: `METHOD-065` — Selectable deformation regularizer for nonrigid CPD and BCPD (tasks/backlog/methods/METHOD-065-cpd-regularizer-axis.md)
 - unblocked: `METHOD-066` — RobustPCA point-cloud patch denoising and outlier scoring (tasks/backlog/methods/METHOD-066-robust-pca-point-cloud-patch-denoising.md)
 - unblocked: `METHOD-067` — RobustPCA cleanup and compression of fixed-topology mesh sequences (tasks/backlog/methods/METHOD-067-robust-pca-mesh-sequence-cleanup-compression.md)
