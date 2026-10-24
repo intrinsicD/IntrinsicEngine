@@ -88,15 +88,15 @@ contract_review: The catalog has no CTest discovery-timeout contract; this task 
       in generated-registration policy coverage.
 
 ## Tests
-- [ ] Add a tooling regression with a controlled slow fake GoogleTest lister
+- [x] Add a tooling regression with a controlled slow fake GoogleTest lister
       that proves discovery succeeds below the declared budget and fails
       nonzero above it.
 - [ ] Add registration-policy coverage proving the helper emits the selected
       `TEST_DISCOVERY_TIMEOUT` independently of each test's `TIMEOUT` property.
-- [ ] Re-run forced rediscovery repeatedly on the configured `ci` tree under
+- [x] Re-run forced rediscovery repeatedly on the configured `ci` tree under
       idle and controlled-contention conditions; preserve all enumeration
       failures and timings.
-- [ ] Run a focused selector whose requested tests are unrelated to ECS and
+- [x] Run a focused selector whose requested tests are unrelated to ECS and
       confirm stale `IntrinsicECSTests` discovery can no longer cause an
       ordinary-cold-start false failure under the supported budget.
 
@@ -109,14 +109,14 @@ contract_review: The catalog has no CTest discovery-timeout contract; this task 
       when the correction is verified.
 
 ## Acceptance criteria
-- [ ] A deterministic forced-rediscovery loop reproduces the old five-second
+- [x] A deterministic forced-rediscovery loop reproduces the old five-second
       failure or provides sufficient cold/contention evidence to reject that
       hypothesis before any fix is selected.
-- [ ] GoogleTest enumeration remains bounded and a genuinely hung lister fails
+- [x] GoogleTest enumeration remains bounded and a genuinely hung lister fails
       the gate with an actionable executable name and budget.
-- [ ] Repeated cold and contended focused runs stay inside the declared
+- [x] Repeated cold and contended focused runs stay inside the declared
       discovery budget without retries, skips, or label exclusions.
-- [ ] Individual `gtest_discover_tests` cases and focused `ctest -R` filtering
+- [x] Individual `gtest_discover_tests` cases and focused `ctest -R` filtering
       remain available with unchanged selected-case counts.
 
 ## Verification
@@ -355,7 +355,59 @@ both fixed in the following commits; round 3 on `5d90ef934`: "VERDICT:
 approve", blocking none (`tasks/evidence/BUG-091/code-review/`, final delta round).
 Its open optional items were an `addCleanup` for the CTest 3.31 reap (done in
 fix round 1), checking the 3.31 orphan on Kitware's binary as well as the PyPI wheel, and a separate
-BUG task for `Test.ConcurrentCTestDiscovery.py` on CMake 4. Whether the evidence
-satisfies acceptance criteria 1-4, especially AC2 (budget in the failure
-message) on CMake < 4, is the reviewers' and operator's call. Index and
-retirement-log updates belong to the integrator.
+BUG task for `Test.ConcurrentCTestDiscovery.py` on CMake 4 (now `BUG-249`).
+A later independent Codex review of `e2e3bc3c2` (thread
+`01a16baf-207b-74d1-b530-9be1e98a1d79`) returned REVISE with three blocking
+findings: C-real coverage accepted runs without forced discovery, direct
+replay added `--gtest_output=json` on CMake 3.x, and CMake 3.x printed no
+budget. Fix round 1 (`931ebff5a`, above) answers all three; the independent
+Claude re-review of `931ebff5a` approved it (see Completion). The Kitware
+3.31 orphan check stays open.
+
+## Completion — 2026-10-24
+Completed 2026-10-24. Commit: `d14029314` through `931ebff5a` (14 commits on
+`599f02ff1`, branch `claude/bug-091-gtest-discovery-timeout`), merged into the
+night integration branch `claude/night-2026-10-24-bug-sweep` as `3e490d055`.
+Not yet on `main`; hosted CI has not run on these commits.
+
+Pre-flight: Full tier, packet digest
+`ef55536f956a55d85c148bdd1ffc1c6dc7157592159bdc18b620762d1c4e0544`, rule
+`bug-091-budget/v3`. The independent Codex review (thread
+`01a16b3f-fc98-7582-8371-323cde8b395a`) and the independent Claude review
+(session `23f9b8d2-46a2-4a62-ab4f-2943d75327e1`) both returned PASS on that
+digest at revision 7, before either arm started.
+
+Reviewer decisions (coordinator's local review record `wfB.json`, lane
+`BUG-091`, outside the repository):
+- Round 1 on `e2e3bc3c2`: independent Claude review `approve`, AC1-AC2
+  "partially met", AC3-AC4 "met". Independent Codex review (thread
+  `01a16baf-207b-74d1-b530-9be1e98a1d79`) `revise`: three blocking findings
+  (see Remaining), AC2 "partially met".
+- Round 2 on `931ebff5ad7a96d4e5496ab8e9bf1a7ef8ba036d`: independent Claude
+  re-review `approve`, blocking none. AC1-AC4 "met", with limits stated; the
+  three round-1 findings resolved; docs claims "partially met"
+  (`mutations.log` lacks the assertion lines; the stale Remaining paragraph,
+  fixed in this note).
+
+Boxes: AC1-AC4 are ticked from round 2. Tests 1, 3 and 4 are ticked from its
+AC2 and AC3 reasons (the fake-lister suite on 3.28.3/3.31.6/4.3.2 with a
+success-path mutation; 50 forced-stale idle/contention runs on `build/ci`;
+focused `RuntimeModule` runs 7/7). No reviewer decided Required changes 1-5,
+Tests 2 or Docs 1-2, so they stay unticked; the micro template gates only the
+acceptance criteria. Round 1's Claude review rated "discovery budget separate
+from case budgets" met on `e2e3bc3c2`; round 2 did not re-decide it.
+
+Limits: measured under light contention only (load about 5 on 32 CPUs).
+Sanitized trees, CI runners and heavy or equal-priority contention were not
+measured. The two incidents remain unexplained. The budget value stays 5 s.
+The budget line relies on CMake-internal names (`result`, `arg_TEST_*` or
+`_TEST_*`); re-run the hermetic suite when CI's CMake changes.
+
+Open: the `shortcut:` in `tools/ci/gtest_discovery_probe.py` says to delete
+`decide`/`report` and their tests when BUG-091 retires; this docs-only
+retirement did not delete them. Also open: the Kitware 3.31 orphan check,
+assertion lines in `mutations.log`, and the CMake 4.x race probe (`BUG-249`).
+
+Evidence: the `tasks/evidence/BUG-091/` paths in this note name the
+git-ignored directory in the `bug-091` lane worktree; they are not in the
+repository. Nothing was deleted.

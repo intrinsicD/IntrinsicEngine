@@ -79,7 +79,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Theme G — Active bugs
 
-- unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
 - unblocked: `BUG-240` — ASan and UBSan CPU jobs have been red since 2026-09-05 (tasks/backlog/bugs/BUG-240-sanitizer-cpu-jobs-red-since-september.md)

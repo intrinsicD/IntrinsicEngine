@@ -1748,7 +1748,7 @@ needing a distinct acquisition contract before reconsideration.
 
 The pre-build Vulkan `ctest -N` discovery timed out in the existing BUG-091
 harness path before any selected tests ran. The occurrence is recorded in
-`tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md`; keep the
+`tasks/done/BUG-091-gtest-pretest-discovery-cold-timeout.md`; keep the
 normal budgets and diagnose after the target rebuild. This is distinct from
 the introduced-and-fixed guard source-path error in the preceding slice.
 

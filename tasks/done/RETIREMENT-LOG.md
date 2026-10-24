@@ -1,5 +1,26 @@
 # Retirement Log
 
+## 2026-10-24 — BUG-091 retired after its re-review
+
+Retired [BUG-091](BUG-091-gtest-pretest-discovery-cold-timeout.md) (`d14029314` through `931ebff5a`,
+14 commits), merged into the night integration branch `claude/night-2026-10-24-bug-sweep` as
+`3e490d055`; not yet on `main`, and hosted CI has not run on it.
+
+- `tests/CMakeLists.txt` passes an explicit 5 s `DISCOVERY_TIMEOUT` (the former default, generated
+  includes unchanged), separate from the 30 s / 120 s case budgets. A failure-only watch prints the
+  executable and budget on every supported CMake. `Test.GTestDiscoveryTimeout.py` covers it with a fake
+  lister on 3.28.3, 3.31.6 and 4.3.2, plus a live `--build-dir` check.
+- Measurement (Full pre-flight, digest `ef55536f…`, both pre-flight reviews PASS): H1 rejected
+  (max listing 0.073 s), H3 and H4 not supported, H2 fan-out confirmed. Limits: light contention only;
+  sanitized trees, CI runners and heavy contention not measured; the two incidents remain unexplained.
+- Review: round 1 on `e2e3bc3c2`, independent Claude review `approve` (AC1-2 "partially met"),
+  independent Codex review `revise` (three blocking findings). Fix round 1 `931ebff5a`; the independent
+  Claude re-review of it `approve`, AC1-AC4 "met". Required changes 1-5, Tests 2 and Docs 1-2 stay
+  unticked: no reviewer decided them.
+- Open for the operator: the probe's `decide`/`report` shortcut (delete at retirement; not done in this
+  docs-only pass), the Kitware 3.31 orphan check, and BUG-249 (the race probe on CMake 4.x). Evidence
+  stays git-ignored in the `bug-091` lane worktree; nothing was deleted.
+
 ## 2026-10-24 — BUG-149 retired after its completion review
 
 Retired [BUG-149](BUG-149-benchmark-sealer-dotted-output-directory.md) (`771f95368`, `4b43ae0c1`),

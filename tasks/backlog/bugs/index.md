@@ -40,12 +40,11 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   affected-workflow reproduction and coordination with the operator's shared
   atlas replacement; otherwise verify supersession when that replacement
   lands. Preserve corner-domain seams, source topology, and stale rejection.
-- [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
-  CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
-  an unrelated cold sanitizer binary enumerates tests, before the selected
-  tests run; collect cold/warm/contention evidence and set an explicit,
-  evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-10-24: [BUG-091 — GoogleTest PRE_TEST discovery times out on a cold start](../../done/BUG-091-gtest-pretest-discovery-cold-timeout.md).
+  The 5 s discovery budget is explicit and separate from case budgets; a failed listing prints the executable and budget
+  (checked on CMake 3.28.3, 3.31.6, 4.3.2). Cold/warm listings under light contention took at most 0.073 s; the two incidents remain unexplained.
 
 - Closed 2026-10-24: [BUG-149 — Benchmark sealer escapes dotted output directories](../../done/BUG-149-benchmark-sealer-dotted-output-directory.md).
   `run_and_seal.py` seals an existing output directory exactly and an existing `.json` file's parent;

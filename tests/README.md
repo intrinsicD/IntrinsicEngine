@@ -459,8 +459,9 @@ candidate coverage population; with `--test-cohort-transition`, the supplied
 manifest declares the only permitted additions, the retained fast sentinels.
 
 Slow-cohort classification does not own timeout defects. GoogleTest PRE_TEST
-enumeration remains independently owned by
-[`BUG-091`](../tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md);
+enumeration has its own budget (see "GoogleTest discovery and case budgets"
+above), set independently by
+[`BUG-091`](../tasks/done/BUG-091-gtest-pretest-discovery-cold-timeout.md);
 the benchmark-smoke execution budget and dedicated lane were independently
 resolved by
 [`BUG-088`](../tasks/done/BUG-088-benchmark-smoke-hard-timeout-host-contention.md).
