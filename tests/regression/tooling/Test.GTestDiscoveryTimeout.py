@@ -215,7 +215,7 @@ class ProbeSelfTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-probe-") as directory:
             project = FakeListerProject(Path(directory), declared_budget(), ("Slow", "Instant"))
             records = self.probe("direct", "--tests-dir", str(project.build), "--target", "Slow",
-                                 "--target", "Instant", "--repetitions", "2", "--max-minutes", "2",
+                                 "--target", "Instant", "--repetitions", "2", "--max-minutes", "2", "--cap-seconds", "10",
                                  env={"FAKE_DELAY_Slow": "1.0"})
             samples = [record for record in records if record.get("event") == "sample"]
             self.assertEqual(len(samples), 8)
@@ -234,6 +234,28 @@ class ProbeSelfTests(unittest.TestCase):
                     self.assertLess(sample["wall_seconds"], 0.5)
             # Rotation: each repetition starts with a different target.
             self.assertEqual([s["target"] for s in samples[::4]], ["Slow", "Instant"])
+
+    def test_ctest_mode_caps_a_hung_command_and_keeps_its_record(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="intrinsic-discovery-cap-") as directory:
+            project = FakeListerProject(Path(directory), declared_budget())
+            project.stale("Fake")
+            pid_file = Path(directory) / "pid"
+            start = time.monotonic()
+            records = self.probe("ctest", "--tests-dir", str(project.build), "--cap-seconds", "1",
+                                 "--repetitions", "2", "--max-minutes", "1", "--",
+                                 "ctest", "--test-dir", str(project.build), "-N",
+                                 env={"FAKE_DELAY_Fake": "60", "FAKE_PID_FILE_Fake": str(pid_file)})
+            self.assertLess(time.monotonic() - start, 10)
+            runs = [record for record in records if record["event"] == "ctest"]
+            self.assertEqual([run["timed_out"] for run in runs], [True, True])
+            self.assertEqual(records[-1], {"event": "stop", "reason": "completed"})
+            deadline = time.monotonic() + 5
+            while _alive(int(pid_file.read_text())) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertFalse(_alive(int(pid_file.read_text())), "capped CTest left its lister running")
+            stopped = self.probe("ctest", "--tests-dir", str(project.build), "--cap-seconds", "1",
+                                 "--max-minutes", "0.01", "--", "ctest", "--test-dir", str(project.build), "-N")
+            self.assertEqual(stopped[-1], {"event": "stop", "reason": "deadline"})
 
     def test_process_classifier_ignores_command_lines_that_mention_clang(self) -> None:
         sys.path.insert(0, str(PROBE.parent))
@@ -260,11 +282,13 @@ class ProbeSelfTests(unittest.TestCase):
             project = FakeListerProject(Path(directory), declared_budget(), ("A", "B"))
             run("ctest", "--test-dir", str(project.build), "-N")
             command = ["--", "ctest", "--test-dir", str(project.build), "-N", "-R", r"^A\."]
-            forced, = self.probe("ctest", "--tests-dir", str(project.build), "--force", "B", *command)
+            start, forced, stop = self.probe("ctest", "--tests-dir", str(project.build), "--force", "B", *command)
+            self.assertEqual((start["event"], stop), ("start", {"event": "stop", "reason": "completed"}))
+            self.assertFalse(forced["timed_out"])
             self.assertEqual(forced["exit_status"], 0, forced)
             self.assertEqual(forced["enumerated"], ["B"])
             self.assertEqual(forced["total_tests"], CASE_COUNT)
-            fresh, = self.probe("ctest", "--tests-dir", str(project.build), *command)
+            _, fresh, _ = self.probe("ctest", "--tests-dir", str(project.build), *command)
             self.assertEqual(fresh["enumerated"], [])
             self.assertEqual(fresh["total_tests"], CASE_COUNT)
 
@@ -282,8 +306,14 @@ class DecisionRuleTests(unittest.TestCase):
                                      "condition": condition, "residency_bytes": 0, "wall_seconds": wall,
                                      "exit_status": 0, "timed_out": False, "listing_sha256": target,
                                      "load": {"load_1m": load}, "processes": {"compile": compile_count},
-                                     "wall_clock": float(len(rows))})
+                                     "mtime_ns": {"exe": 1, "include": 1}, "wall_clock": float(len(rows))})
         rows[-1].update(override)
+        for arm in ("contention", "idle"):
+            rows += [{"event": "ctest", "arm": arm, "repetition": repetition, "exit_status": 0,
+                      "timed_out": False, "wall_seconds": 1.0, "forced": list(self.TARGETS),
+                      "enumerated": list(self.TARGETS), "total_tests": 7, "discovery_timeout_seen": False,
+                      "load": {"load_1m": 1.0}, "processes": {"compile": 0}, "wall_clock": float(len(rows))}
+                     for repetition in range(20)]
         return rows
 
     def decide(self, records: list[dict], *extra: str) -> dict:
@@ -321,6 +351,25 @@ class DecisionRuleTests(unittest.TestCase):
         self.assertIsNone(verdict["chosen_budget_seconds"])
         self.assertTrue(any("null probe" in kill for kill in verdict["kill_conditions"]))
 
+    def test_identity_and_real_path_failures_block_rejection(self) -> None:
+        pooled = self.records()
+        pooled.append(dict(pooled[0]))
+        changed = self.records(mtime_ns={"exe": 2, "include": 1})
+        rehashed = self.records(listing_sha256="other")
+        failed_real = self.records()
+        failed_real[-1].update(exit_status=8)
+        timeout_only = self.records()
+        timeout_only[-1].update(exit_status=8, discovery_timeout_seen=True)
+        for rows, needle in ((pooled, "duplicate"), (changed, "changed during the run"),
+                             (rehashed, "listing hash"), (failed_real, "without a discovery timeout"),
+                             (timeout_only, "not reproduced")):
+            verdict = self.decide(rows)
+            self.assertIsNone(verdict["chosen_budget_seconds"])
+            self.assertNotEqual(verdict["h1"], "rejected", needle)
+            self.assertTrue(any(needle in kill for kill in verdict["kill_conditions"]), (needle, verdict))
+        few_real = [row for row in self.records() if not (row["event"] == "ctest" and row["repetition"] >= 19)]
+        self.assertFalse(self.decide(few_real)["arms"]["idle"]["valid"])
+
     def test_failed_sample_blocks_a_value(self) -> None:
         verdict = self.decide(self.records(wall=0.1, wall_seconds=6.0, exit_status=1))
         self.assertIsNone(verdict["chosen_budget_seconds"])
@@ -333,9 +382,14 @@ class DecisionRuleTests(unittest.TestCase):
         verdict = self.decide(rows)
         self.assertEqual(verdict["h1"], "inconclusive")
         self.assertFalse(verdict["arms"]["idle"]["valid"])
+        idle_build = self.records()
+        for row in idle_build[:6 * 16]:
+            row["processes"] = {"compile": 0}
+        self.assertEqual(self.decide(idle_build)["cells"]["contention/cold/IntrinsicECSTests"]["invalid"],
+                         {"no-compile": 16})
         quiet = self.records()
         for row in quiet:
-            if row["arm"] == "contention":
+            if row["arm"] == "contention" and row["event"] == "sample":
                 row["load"] = {"load_1m": 1.0}
         self.assertFalse(self.decide(quiet)["arms"]["contention"]["valid"])
         self.assertEqual(self.decide(quiet, "--required-arms", "idle")["h1"], "rejected")
