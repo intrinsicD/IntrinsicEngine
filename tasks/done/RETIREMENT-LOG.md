@@ -45,7 +45,7 @@ Retired [BUG-097](BUG-097-progressive-model-scene-zero-uv-atlas.md) (`25833a065`
   full CPU suite (5942, 0 failures) ran on the identical v2 patch, not on the merge.
 - Review: independent Claude review of `0d7b5b4d3..3fb7ae908` `approve` (decided no box); independent
   Claude review of the merge `approve`, AC2/AC7 "met", AC1 "partially met" (closure rests on the
-  decision), AC3-AC6 and the interim-repair items "not applicable". Ticked: RC1, D1, D3, AC1, AC2, AC7.
+  decision), AC3-AC6 and the interim-repair items "not applicable". Ticked: RC1, D1, D3, AC1, AC2, AC7 and the Tests disposition box (independent re-review: met).
 - Open, with no owning task: the shared-atlas creation policy of the 2026-09-05 operator decision.
 
 ## 2026-10-24 — BUG-250 retired after its round-1 reviews

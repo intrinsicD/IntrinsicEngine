@@ -116,7 +116,7 @@ contracts:
       the main thread. (not applicable: interim-repair branch not taken)
 
 ## Tests
-- [x] Added at retirement, the removal's test disposition: the five items below
+- [x] Added at retirement (independent Claude re-review of 972b7c8d9..47d6d24b5 decided this box 'met'), the removal's test disposition: the five items below
       belong to the interim-repair branch. Unreachable code has no failing-first test;
       the kept coverage is the focused suites (106/106 on `b4812f951`) and the
       `RuntimeEngineLayering` rule at count 0 with its injecting self-check, both
@@ -462,7 +462,7 @@ Reviews:
   "not met (yet)" until the index, brief and log were updated (done in the retirement
   commit). Its blocking items were these two records only.
 
-Boxes: ticked are RC1, D1, D3, AC1 (by the operator decision), AC2 and AC7. The items
+Boxes: ticked are RC1, D1, D3, AC1 (by the operator decision), AC2, AC7 and the Tests disposition box (independent re-review: met). The items
 the reviewer rated not applicable are kept as plain bullets with that disposition, not
 ticked.
 
