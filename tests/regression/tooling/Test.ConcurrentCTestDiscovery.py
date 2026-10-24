@@ -7,6 +7,7 @@ from collections import Counter
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 HELPER = ROOT / "cmake/IntrinsicTestDiscovery.cmake"
+sys.path.insert(0, str(ROOT / "tools/ci"))
+import gtest_discovery_probe as discovery_probe  # noqa: E402  (shared discovery-file layout)
+sys.path.remove(str(ROOT / "tools/ci"))
 CASE_COUNT = 600
 
 
@@ -112,6 +116,10 @@ if os.environ.get("DISCOVERY_RACE") == "1":
         instrumented = instrumented.replace(entry, entry + call("enter"))
         private_module = source / "GoogleTestAddTests.cmake"
         private_module.write_text(instrumented)
+        # CMake 4.4 splits parsing into GoogleTest/ParseTestList.cmake, which the module
+        # includes relative to its own directory.
+        if (module.parent / "GoogleTest").is_dir():
+            shutil.copytree(module.parent / "GoogleTest", source / "GoogleTest")
         fake = source / "fake-gtest.py"
         fake.write_text(f'#!{sys.executable}\nimport sys\nif "--gtest_list_tests" in sys.argv:\n'
                         f'    print("Synthetic.")\n    for i in range({CASE_COUNT}): print("  Case" + str(i))\n'
@@ -133,10 +141,12 @@ set_tests_properties(NestedRegistry PROPERTIES TIMEOUT 10)
         (source / "CMakeLists.txt").write_text(body)
         run("cmake", "-S", str(source), "-B", str(build))
         # Newer CMake ignores the private-script variable above. Redirect only
-        # this fixture's generated include and verify the instrumented path.
-        discovery = build / "Fake[1]_include.cmake"
-        self.assertTrue(discovery.exists(), f"CMake {version}: generated discovery include layout "
-                        f"changed, no {discovery.name}; extend this probe")
+        # this fixture's generated discovery call (in _include.cmake before
+        # CMake 4.4, in the _discovery.cmake it includes on 4.4+).
+        try:
+            discovery = discovery_probe.discovery_call(discovery_probe.target_include(build, "Fake"))
+        except discovery_probe.ProbeError as error:
+            self.fail(f"CMake {version}: generated discovery include layout changed: {error}; extend this probe")
         generated = discovery.read_text()
         installed_include = f'include("{module}")'
         private_include = f'include("{private_module}")'

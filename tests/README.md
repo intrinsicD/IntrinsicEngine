@@ -179,7 +179,7 @@ exact registration, and nested discovery without requiring engine binaries.
 
 - `_intrinsic_gtest_discovery_timeout_seconds` (`DISCOVERY_TIMEOUT`, 5 s): the
   limit for one executable's `--gtest_list_tests` listing during PRE_TEST
-  discovery. Generated includes record it as `TEST_DISCOVERY_TIMEOUT`.
+  discovery. The generated discovery call records it as `TEST_DISCOVERY_TIMEOUT`.
 - `_intrinsic_default_test_timeout_seconds` / `_intrinsic_slow_test_timeout_seconds`
   (30 s / 120 s for `slow` targets): the default CTest `TIMEOUT` of each
   discovered case, passed through `PROPERTIES`. Named-case fixups later in
@@ -195,9 +195,22 @@ the executable or its `_include.cmake`. A filtered command therefore also lists
 every unrelated built executable that is stale: after a first configure, after
 relinks, and after any change of include content. CMake rewrites an include
 only when its content changes, so a reconfigure without changes lists nothing.
-Content changes include a new budget value and a different CMake installation,
-because every include embeds `CMAKE_ROOT`. Unbuilt targets register a
+Before CMake 4.4, content changes include a new budget value and a different
+CMake installation, because every include embeds `CMAKE_ROOT`. Unbuilt targets register a
 `_NOT_BUILT` placeholder and are never listed.
+
+Generated file names: before CMake 4.4, `<target>[1]_include.cmake` holds the
+discovery call and writes `<target>[1]_tests.cmake`. CMake 4.4 names the files
+`<target>_<sha8>_*`, where `<sha8>` hashes the call's arguments, and moves the
+call and the `CMAKE_ROOT` include into `<target>_<sha8>_discovery.cmake`, which
+the include includes. Read from the 4.4.4 module source, not run: there a new
+budget gives new file names and so a new include, while a different CMake
+installation changes only `_discovery.cmake` and does not relist. The
+discovery regressions and `tools/ci/gtest_discovery_probe.py` accept both
+layouts and fail on any other. On 4.4, any change to the
+`gtest_discover_tests` arguments (the budget, a case `TIMEOUT`) leaves the old-hash
+files behind, so in a reused 4.4 build tree `target_include` fails ("2 includes") and
+reconcile fails ("stale include") until the tree is cleaned.
 
 When a listing exceeds the budget, CTest stops waiting at the budget and exits
 nonzero before any test starts. It prints the executable path and `Process
@@ -223,7 +236,8 @@ the registry lock free. Afterwards the lister must be gone, except on CTest
 3.31, where the test reaps it. The script also runs probe self-checks,
 including that `direct` replays the argv and working directory that this
 CMake's discovery passes to the lister. With `--build-dir`, it checks that every generated
-include of a configured tree carries the declared discovery budget, together
+include of a configured tree (its discovery call, on either layout above) carries the
+declared discovery budget, together
 with its unchanged 30 s or 120 s case budget:
 
 ```bash
