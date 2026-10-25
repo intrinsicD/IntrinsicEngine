@@ -9,6 +9,10 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
+- Opened 2026-10-25: [BUG-254 — A click on a point or edge line with no surface behind it misses on Vulkan](BUG-254-gpu-pick-misses-points-and-lines.md).
+  The pick ID pipelines test depth-equal against a surface-only depth prepass, and nothing sets
+  `GpuRender_Selectable` for the point pick bucket; found by the UI-083 slice 3a smoke on an RTX 4090.
+
 ## Verified / Closed
 
 - Closed 2026-10-24: [BUG-252 — GTestDiscoveryTimeout budget test fails on CMake 4.0.3](../../done/BUG-252-gtest-discovery-timeout-budget-cmake403.md).

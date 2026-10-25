@@ -52,6 +52,13 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
   grey-white. The starting uniform color is grey-white instead of orange.
 - Arrow length = uniform Length × per-arrow property value. Per-arrow color works like the
   Color rows: a scalar goes through the colormap, vec3/vec4 is RGB(A).
+- Selection with per-lane positions (operator, 2026-10-25): the goal is that points, edges,
+  faces and entities can all be selected. A selection stays element-based (domain and
+  canonical index, no lane); it is highlighted on every drawn lane that shows the element
+  (vertex: surface, edges, points; edge: surface, edges; face: surface; graph node: edges,
+  points), one highlight per distinct position source. The clicked lane only decides how a
+  click is refined (slice 3a). Making points and edge lines with no surface behind them
+  clickable is BUG-254.
 
 ## Defaults chosen by the planning session (veto in review)
 - A uniform color/size/width field (and the arrow color) stays visible but greyed out while its
@@ -262,7 +269,17 @@ Every position reader in the shaders (forward, id, depth passes) reads its own i
     `Test.SceneDocumentModule.cpp`).
   - Agent `bind_attribute` with `lane`.
 - `gpu;vulkan` smoke: points drawn at a bound position while the surface stays canonical, and a
-  pick at the displayed point pixel returns the canonical vertex id.
+  pick at the displayed point pixel returns the canonical vertex id. The pick half moved to
+  BUG-254 (on Vulkan a click on a point or edge line with no surface behind it misses).
+
+### Slice 3c — highlight a selection on every drawn lane (~150 lines)
+- Operator decision 2026-10-25 (see Operator decisions). Replace the single highlight lane
+  (`SelectionLaneFor` in `Runtime.SceneInteractionModule.Selection.cpp`) by every drawn lane
+  whose row shows the selection's domain (`DisplayedPositionLanes`), deduplicated by displayed
+  source. Follows BUG-254, so the highlighted primitives can also be clicked.
+- Tests: a vertex selection on a mesh with surface and points at different positions yields
+  markers at both places; the same source on two lanes yields one marker; faces stay
+  surface-only.
 
 ### Slice 3b — Normal on the point lane (~250 lines, new shader read)
 - `assets/shaders/forward/point.vert:103` sets the view normal to +Z for every point, so Surfel
@@ -567,3 +584,26 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
     Vulkan smoke prevents an Operational claim until it runs or its deferral/handoff is recorded.
   - After the fixes: all tests of the five owning executables pass (2798 passed, 2 native-window
     skips).
+- 2026-10-25: Slice 3a merged to main and pushed (`b8bdf73c5`, fast-forward). `build/ci-vulkan`
+  rebuilt (it was a month old); the slice 2 smoke sources compile.
+  - Vulkan runs (host `hochvogel`, NVIDIA GeForce RTX 4090, driver 580.159.04, X11 `:1`,
+    1920x1080 window, VSync off): `IntrinsicPointLBVHGpuTests` 55 passed, 1 skipped;
+    `IntrinsicRuntimePointCloudConsolidationGpuParityTests` 10 passed;
+    `IntrinsicGraphicsVulkanSmokeTests` 36 passed; `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests`
+    42 passed (the new test filtered out).
+  - New smoke `RuntimeSandboxAcceptanceGpuSmoke.BoundPointPositionsDrawWhileTheSurfaceStaysCanonical`:
+    binds the ReferenceTriangle's points lane through `ApplyEditorAttributeBindingCommand` to
+    positions shifted +1 in x; red points appear at all three shifted vertices, none at the
+    canonical apex, the surface's centroid stays covered and the shifted centroid stays
+    background. Passed twice (about 4 s each). With the vertex view reading the surface lane
+    (mutation of `Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp`) it fails at the shifted
+    apex, the shifted bottom-right vertex and the canonical apex; reverted.
+  - The planned click half fails before lane-aware pick refinement is reached: the click reads back no hit
+    (`hits=0 noHits=1`). Cause and evidence are in BUG-254. Operator decision on selection
+    highlights recorded above; Slice 3c added.
+- 2026-10-25: Review of the smoke, BUG-254 and this log (Claude author → Codex reviewer, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a1738b-56cd-7642-969d-eeec5a957c9c`;
+  recursion protection instruction-only). Round 1: "revise required"; the smoke had no blocking finding,
+  BUG-254 named the wrong cause (the pick ID pipelines' depth-equal test against the surface-only depth
+  prepass was missing) and overstated "never hits". Round 2 on diff `dd36933d…`: "approve", "No remaining
+  findings."

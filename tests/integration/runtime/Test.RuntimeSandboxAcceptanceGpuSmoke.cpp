@@ -122,6 +122,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -9448,4 +9449,162 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImGuizmoScaleAxisDragAndUndo)
         .Size = 0.3f,
         .ScaleAxis = 0,
     });
+}
+
+// --- UI-083 slice 3a: a primitive drawn at its own bound positions ---
+
+namespace
+{
+// The points lane is bound to the ReferenceTriangle's positions shifted right; the
+// surface keeps the canonical ones. Both stay inside the reference camera frustum,
+// and the shifted centroid lies outside the canonical triangle.
+    constexpr glm::vec3 kUi083PointShift{1.0f, 0.0f, 0.0f};
+    constexpr glm::vec3 kUi083CanonicalApex{0.0f, 0.5f, 0.0f};
+    constexpr glm::vec3 kUi083CanonicalCentroid{0.0f, -1.0f / 6.0f, 0.0f};
+
+    [[nodiscard]] bool IsUi083PointPixel(const RgbaPixel pixel) noexcept
+    {
+        return pixel.R > 120u && pixel.R > pixel.G + 60u && pixel.R > pixel.B + 60u;
+    }
+
+    [[nodiscard]] std::uint32_t CountUi083PointPixels(const std::vector<std::uint8_t>& bytes,
+        const Extrinsic::RHI::Format format,
+        const std::uint32_t bytesPerPixel,
+        const Extrinsic::Core::Extent2D extent,
+        const std::pair<std::uint32_t, std::uint32_t> center,
+        const std::uint32_t radius)
+    {
+        std::uint32_t count = 0u;
+        for (std::uint32_t y = center.second > radius ? center.second - radius : 0u;
+            y <= std::min<std::uint32_t>(extent.Height - 1u, center.second + radius);
+            ++y)
+        {
+            for (std::uint32_t x = center.first > radius ? center.first - radius : 0u;
+                x <= std::min<std::uint32_t>(extent.Width - 1u, center.first + radius);
+                ++x)
+            {
+                if (IsUi083PointPixel(ReadPixel(bytes, format, bytesPerPixel, extent, x, y)))
+                    ++count;
+            }
+        }
+        return count;
+    }
+} // namespace
+
+// Binding the points lane's Position (through the attribute command) draws the points at
+// the bound positions while the surface stays at the canonical ones. Clicking such a point
+// is not covered: a click on a point with no surface behind it does not hit yet (BUG-254).
+TEST(RuntimeSandboxAcceptanceGpuSmoke, BoundPointPositionsDrawWhileTheSurfaceStaysCanonical)
+{
+    EntityHandle triangle{Extrinsic::ECS::InvalidEntityHandle};
+    Extrinsic::RHI::BufferHandle readback{};
+    bool bound = false;
+    bool commandFailed = false;
+    const auto ready = [&](Engine& engine)
+    {
+        if (!engine.GetDevice().IsOperational())
+            return false;
+        if (!bound)
+        {
+            auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+            Intrinsic::Tests::EditorFeatureTestContext context{
+                .Scene = &scene,
+                .World = engine.ActiveWorld(),
+                .Selection = &Selection(engine),
+                .CommandHistory = engine.Services().Find<RT::EditorCommandHistory>(),
+            };
+            context.VisualizationCommandsAvailable = true;
+            commandFailed = RT::ApplyEditorAttributeBindingCommand(context,
+                                RT::EditorAttributeBindingCommand{
+                                    .StableEntityId = RT::SelectionController::ToStableEntityId(triangle),
+                                    .Lane = RT::GeometryRenderLane::Points,
+                                    .Attribute = RT::RenderAttribute::Position,
+                                    .Domain = RT::GeometryElementDomain::MeshVertex,
+                                    .PropertyName = "v:ui083_moved",
+                                }) != RT::EditorCommandStatus::Applied;
+            engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readback);
+            bound = true;
+        }
+        return true;
+    };
+    // Four frames after the bind cover the upload and the readback latency.
+    auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 4u, 120u, std::chrono::seconds{60}, false);
+    ExitWhenReadyApp& readyProbe = *readyApp;
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    Engine& engine = *bootstrap.EnginePtr;
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    triangle = FindEntityByName(scene, "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(scene, triangle));
+
+    auto& raw = scene.Raw();
+    auto& vertices = raw.get<gs::Vertices>(triangle).Properties;
+    std::vector<glm::vec3> moved = vertices.Get<glm::vec3>("v:position").Vector();
+    for (glm::vec3& p : moved)
+        p += kUi083PointShift;
+    vertices.GetOrAdd<glm::vec3>("v:ui083_moved", glm::vec3{0.0f}).Vector() = moved;
+    raw.emplace_or_replace<G::RenderPoints>(
+        triangle, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = 18.0f});
+    G::VisualizationConfig redPoints{};
+    redPoints.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    redPoints.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+    G::VisualizationLaneOverrides laneOverrides{};
+    laneOverrides.Points = redPoints;
+    raw.emplace_or_replace<G::VisualizationLaneOverrides>(triangle, std::move(laneOverrides));
+
+    auto& device = engine.GetDevice();
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    const Extrinsic::RHI::Format format = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(format);
+    ASSERT_GE(bytesPerPixel, 4u);
+    const std::uint64_t byteCount = std::uint64_t(extent.Width) * extent.Height * bytesPerPixel;
+    readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = byteCount,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.UI083.PerLanePositions.Readback",
+    });
+    ASSERT_TRUE(readback.IsValid());
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    SCOPED_TRACE(readyProbe.ExitSummary());
+    engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+    ASSERT_TRUE(run.DeviceOperational);
+    ASSERT_TRUE(bound);
+    EXPECT_FALSE(commandFailed) << "the points-lane Position binding was refused";
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(byteCount), 0u);
+    device.ReadBuffer(readback, bytes.data(), byteCount, 0u);
+    const RgbaPixel background =
+        ReadPixel(bytes, format, bytesPerPixel, extent, (extent.Width * 15u) / 16u, extent.Height / 16u);
+    const auto pixelAt = [&](const glm::vec3 world)
+    {
+        const auto [x, y] = ProjectReferenceCameraPixel(world, extent);
+        return ReadPixel(bytes, format, bytesPerPixel, extent, x, y);
+    };
+
+    // The points are drawn at the bound positions ...
+    for (const glm::vec3& point : moved)
+    {
+        EXPECT_GE(
+            CountUi083PointPixels(bytes, format, bytesPerPixel, extent, ProjectReferenceCameraPixel(point, extent), 4u),
+            9u)
+            << "no point drawn at the bound position (" << point.x << ", " << point.y << ")";
+    }
+    // ... and not at the canonical apex, where only the surface's tip remains.
+    EXPECT_EQ(CountUi083PointPixels(
+                  bytes, format, bytesPerPixel, extent, ProjectReferenceCameraPixel(kUi083CanonicalApex, extent), 6u),
+        0u)
+        << "a point is still drawn at the canonical apex";
+    // The surface stays canonical: its centroid is covered, the shifted centroid is background.
+    const RgbaPixel surface = pixelAt(kUi083CanonicalCentroid);
+    EXPECT_GT(RgbDistance(surface, background), 60) << PixelText(surface) << " vs " << PixelText(background);
+    EXPECT_FALSE(IsUi083PointPixel(surface)) << PixelText(surface);
+    const RgbaPixel shiftedCentroid = pixelAt(kUi083CanonicalCentroid + kUi083PointShift);
+    EXPECT_LT(RgbDistance(shiftedCentroid, background), 30)
+        << "the surface moved with the points: " << PixelText(shiftedCentroid);
+
+    device.DestroyBuffer(readback);
+    engine.Shutdown();
 }
