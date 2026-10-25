@@ -436,7 +436,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
   - Not covered: the render graph still emits no barrier between same-state attachment writes (line
     → point depth, and `SceneColorHDR` between all overlay passes), `DepthWrite` maps to write
     access only, and later `DepthRead` attachment passes keep the read-only-layout mismatch with
-    the backend's attachment layout; raised with the operator as separate work.
+    the backend's attachment layout; raised with the operator, now BUG-255.
   - jscpd: the first draft copied the footprint smoke's readback setup (~70 lines); it moved into
     `Bug254ClickCapture` next to `Bug254ClickDriver` (both footprint and line-depth smokes use it;
     all four click smokes passed again). Left: the 40-line test prologue (bootstrap, scene, pixel

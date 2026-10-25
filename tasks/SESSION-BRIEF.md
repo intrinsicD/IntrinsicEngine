@@ -80,6 +80,7 @@ picking backlog work; theme priorities and rationale live in
 ## Theme G — Active bugs
 
 - unblocked: `BUG-254` — A click on a point or edge line with no surface behind it misses on Vulkan (tasks/backlog/bugs/BUG-254-gpu-pick-misses-points-and-lines.md)
+- unblocked: `BUG-255` — Default-recipe frames have synchronization hazards on SceneDepth (tasks/backlog/bugs/BUG-255-render-graph-depth-synchronization-hazards.md)
 
 ## Theme H — Agentic workflow hardening
 
