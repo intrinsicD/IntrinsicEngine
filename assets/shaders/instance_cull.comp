@@ -226,9 +226,10 @@ void main() {
                        slot);
 
         if (selectable) {
+            // BUG-254: point quads like `Points`, so a pick covers the drawn point.
             emitNonIndexedSelection(buckets.SelectionPoints,
-                                    geo.PointVertexCount,
-                                    geo.PointFirstVertex,
+                                    geo.PointVertexCount * 6u,
+                                    geo.PointFirstVertex * 6u,
                                     slot);
         }
     }

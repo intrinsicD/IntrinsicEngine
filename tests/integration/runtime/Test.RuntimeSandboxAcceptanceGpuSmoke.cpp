@@ -9699,6 +9699,104 @@ namespace
         std::optional<RT::PrimitiveSelectionResult> Refined{};
         std::vector<std::uint32_t> Selected{};
     };
+
+    // Issues the clicks one at a time through the selection controller, after `Settle`
+    // frames, and records what each readback selected and refined.
+    struct Bug254ClickDriver
+    {
+        std::vector<Bug254Click> Clicks{};
+        std::vector<Bug254ClickResult> Results{};
+        std::size_t Next{0u};
+        std::uint32_t Settle{4u};
+        bool Waiting{false};
+        RT::SelectionControllerDiagnostics Before{};
+        std::uint64_t GenerationBefore{0u};
+
+        // The ready predicate: true once every click has read back.
+        [[nodiscard]] bool Step(Engine& engine)
+        {
+            if (!engine.GetDevice().IsOperational())
+                return false;
+            if (Settle > 0u)
+            {
+                --Settle;
+                return false;
+            }
+            Results.resize(Clicks.size());
+            auto& selection = Selection(engine);
+            auto& interaction = Interaction(engine);
+            if (Waiting)
+            {
+                const RT::SelectionControllerDiagnostics now = selection.GetDiagnostics();
+                if (now.ReadbacksConsumed == Before.ReadbacksConsumed)
+                    return false;
+                Bug254ClickResult& result = Results[Next];
+                result.Completed = true;
+                result.Hits = now.Hits - Before.Hits;
+                if (interaction.LastRefinedPrimitiveGeneration() != GenerationBefore)
+                    result.Refined = interaction.LastRefinedPrimitive();
+                const auto ids = selection.SelectedStableIds();
+                result.Selected.assign(ids.begin(), ids.end());
+                Waiting = false;
+                ++Next;
+            }
+            if (Next == Clicks.size())
+                return true;
+            Before = selection.GetDiagnostics();
+            GenerationBefore = interaction.LastRefinedPrimitiveGeneration();
+            selection.GetConfig().Interaction.Target = Clicks[Next].Target;
+            selection.RequestClickPick(Clicks[Next].Pixel.first, Clicks[Next].Pixel.second);
+            Waiting = true;
+            return false;
+        }
+
+        [[nodiscard]] RT::PrimitiveSelectionResult Refined(const std::size_t index) const
+        {
+            return Results[index].Refined.value_or(RT::PrimitiveSelectionResult{});
+        }
+
+        [[nodiscard]] std::string Describe(const std::size_t index) const
+        {
+            const RT::PrimitiveSelectionResult r = Refined(index);
+            return Clicks[index].Name + ": hits=" + std::to_string(Results[index].Hits) +
+                " kind=" + std::to_string(int(r.Kind)) + " entity=" + std::to_string(r.EntityId) +
+                " vertex=" + std::to_string(r.VertexId) + " edge=" + std::to_string(r.EdgeId) +
+                " face=" + std::to_string(r.FaceId) + " point=" + std::to_string(r.PointId);
+        }
+
+        // The click hit `entity`, refined to `kind`, selected only it and, with `cursorZ`,
+        // reports a hit position at that depth.
+        void ExpectPick(const std::size_t index,
+            const std::uint32_t entity,
+            const RT::RefinedPrimitiveKind kind,
+            const std::optional<float> cursorZ = std::nullopt,
+            const float cursorTolerance = 0.05f) const
+        {
+            SCOPED_TRACE(Describe(index));
+            const Bug254ClickResult& result = Results[index];
+            ASSERT_TRUE(result.Completed);
+            EXPECT_EQ(result.Hits, 1u) << "the click did not hit";
+            ASSERT_TRUE(result.Refined.has_value()) << "no refined primitive";
+            EXPECT_TRUE(result.Refined->Resolved());
+            EXPECT_EQ(result.Refined->EntityId, entity);
+            EXPECT_EQ(result.Refined->Kind, kind);
+            EXPECT_EQ(result.Selected, (std::vector<std::uint32_t>{entity}));
+            if (cursorZ.has_value())
+            {
+                ASSERT_TRUE(result.Refined->CursorFromDepth);
+                EXPECT_NEAR(result.Refined->WorldCursor.z, *cursorZ, cursorTolerance)
+                    << "the hit depth is not the picked primitive's";
+            }
+        }
+
+        void ExpectMiss(const std::size_t index) const
+        {
+            SCOPED_TRACE(Describe(index));
+            ASSERT_TRUE(Results[index].Completed);
+            EXPECT_EQ(Results[index].Hits, 0u) << "the click hit something";
+            EXPECT_TRUE(Results[index].Selected.empty());
+        }
+    };
 } // namespace
 
 // The selection modes' clicks on every lane, through the real pick path (pick passes,
@@ -9710,47 +9808,10 @@ namespace
 TEST(RuntimeSandboxAcceptanceGpuSmoke, ClicksPickTheNearestDrawnPrimitiveOfTheSelectionMode)
 {
     using Target = RT::SelectionTarget;
-    std::vector<Bug254Click> clicks{};
-    std::vector<Bug254ClickResult> results{};
-    std::size_t next = 0u;
-    bool waiting = false;
-    std::uint32_t settle = 4u;
-    RT::SelectionControllerDiagnostics before{};
-    std::uint64_t generationBefore = 0u;
+    Bug254ClickDriver driver{};
     const auto ready = [&](Engine& engine)
     {
-        if (!engine.GetDevice().IsOperational())
-            return false;
-        if (settle > 0u)
-        {
-            --settle;
-            return false;
-        }
-        auto& selection = Selection(engine);
-        auto& interaction = Interaction(engine);
-        if (waiting)
-        {
-            const RT::SelectionControllerDiagnostics now = selection.GetDiagnostics();
-            if (now.ReadbacksConsumed == before.ReadbacksConsumed)
-                return false;
-            Bug254ClickResult& result = results[next];
-            result.Completed = true;
-            result.Hits = now.Hits - before.Hits;
-            if (interaction.LastRefinedPrimitiveGeneration() != generationBefore)
-                result.Refined = interaction.LastRefinedPrimitive();
-            const auto ids = selection.SelectedStableIds();
-            result.Selected.assign(ids.begin(), ids.end());
-            waiting = false;
-            ++next;
-        }
-        if (next == clicks.size())
-            return true;
-        before = selection.GetDiagnostics();
-        generationBefore = interaction.LastRefinedPrimitiveGeneration();
-        selection.GetConfig().Interaction.Target = clicks[next].Target;
-        selection.RequestClickPick(clicks[next].Pixel.first, clicks[next].Pixel.second);
-        waiting = true;
-        return false;
+        return driver.Step(engine);
     };
     auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 1u, 600u, std::chrono::seconds{120}, false);
     ExitWhenReadyApp& readyProbe = *readyApp;
@@ -9869,7 +9930,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClicksPickTheNearestDrawnPrimitiveOfTheSe
     const float bandMid = float(kBug254BandRows / 2u);
     const float bandX = 0.10f * w, overlapBandX = 0.30f * w;
     const auto [apexX, apexY] = ProjectReferenceCameraPixel(shiftedApex, extent);
-    clicks = {
+    driver.Clicks = {
         {"cloud point, Entity", Target::Entity, pixel(cloudX, cloudY)},
         {"cloud point, Vertex", Target::Vertex, pixel(cloudX, cloudY)},
         {"graph node, Entity", Target::Entity, pixel(cloudX, nodeY)},
@@ -9892,57 +9953,26 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClicksPickTheNearestDrawnPrimitiveOfTheSe
         {"near band last, Edge", Target::Edge, pixel(overlapBandX, b2y + bandMid)},
         {"background", Target::Entity, pixel(0.95f * w, 0.95f * h)},
     };
-    results.assign(clicks.size(), Bug254ClickResult{});
 
     const auto run = DriveAcceptanceAndCapture(engine);
-    SCOPED_TRACE(readyProbe.ExitSummary() + " clicks done=" + std::to_string(next));
+    SCOPED_TRACE(readyProbe.ExitSummary() + " clicks done=" + std::to_string(driver.Next));
     ASSERT_TRUE(run.DeviceOperational);
-    ASSERT_EQ(next, clicks.size()) << "not every click read back";
-    const auto describe = [&](const std::size_t index)
-    {
-        const RT::PrimitiveSelectionResult r = results[index].Refined.value_or(RT::PrimitiveSelectionResult{});
-        return clicks[index].Name + ": hits=" + std::to_string(results[index].Hits) +
-            " kind=" + std::to_string(int(r.Kind)) + " entity=" + std::to_string(r.EntityId) +
-            " vertex=" + std::to_string(r.VertexId) + " edge=" + std::to_string(r.EdgeId) +
-            " face=" + std::to_string(r.FaceId) + " point=" + std::to_string(r.PointId);
-    };
-    const auto expectPick = [&](const std::size_t index,
-                                const EntityHandle entity,
-                                const RT::RefinedPrimitiveKind kind,
-                                const std::optional<float> cursorZ = std::nullopt)
-    {
-        SCOPED_TRACE(describe(index));
-        const Bug254ClickResult& result = results[index];
-        ASSERT_TRUE(result.Completed);
-        EXPECT_EQ(result.Hits, 1u) << "the click did not hit";
-        ASSERT_TRUE(result.Refined.has_value()) << "no refined primitive";
-        EXPECT_TRUE(result.Refined->Resolved());
-        EXPECT_EQ(result.Refined->EntityId, id(entity));
-        EXPECT_EQ(result.Refined->Kind, kind);
-        EXPECT_EQ(result.Selected, (std::vector<std::uint32_t>{id(entity)}));
-        if (cursorZ.has_value())
-        {
-            ASSERT_TRUE(result.Refined->CursorFromDepth);
-            EXPECT_NEAR(result.Refined->WorldCursor.z, *cursorZ, 0.05f)
-                << "the hit depth is not the picked primitive's";
-        }
-    };
+    ASSERT_EQ(driver.Next, driver.Clicks.size()) << "not every click read back";
     using Kind = RT::RefinedPrimitiveKind;
-    expectPick(0, cloud, Kind::Point, 0.0f);
-    expectPick(1, cloud, Kind::Point);
-    EXPECT_EQ(results[1].Refined.value_or(RT::PrimitiveSelectionResult{}).PointId, 0u);
-    expectPick(2, graph, Kind::Vertex);
-    expectPick(3, graph, Kind::Vertex);
-    EXPECT_EQ(results[3].Refined.value_or(RT::PrimitiveSelectionResult{}).VertexId, 2u * kBug254BandRows);
+    driver.ExpectPick(0, id(cloud), Kind::Point, 0.0f);
+    driver.ExpectPick(1, id(cloud), Kind::Point);
+    EXPECT_EQ(driver.Refined(1).PointId, 0u);
+    driver.ExpectPick(2, id(graph), Kind::Vertex);
+    driver.ExpectPick(3, id(graph), Kind::Vertex);
+    EXPECT_EQ(driver.Refined(3).VertexId, 2u * kBug254BandRows);
     // The clicked edge is drawn under the clicked pixel: the graph band's middle row
     // (edge `kBug254BandRows / 2`), and for the strip (whose diagonals pass between two
     // rows) an edge of its bound positions within one pixel of the click.
     const std::uint32_t middleEdge = kBug254BandRows / 2u;
     for (const std::size_t index : {4u, 5u})
     {
-        expectPick(index, graph, Kind::Edge);
-        EXPECT_EQ(results[index].Refined.value_or(RT::PrimitiveSelectionResult{}).EdgeId, middleEdge)
-            << describe(index);
+        driver.ExpectPick(index, id(graph), Kind::Edge);
+        EXPECT_EQ(driver.Refined(index).EdgeId, middleEdge) << driver.Describe(index);
     }
     const auto pixelDistanceToStripEdge =
         [&](const std::uint32_t edge, const std::pair<std::uint32_t, std::uint32_t> click)
@@ -9967,55 +9997,246 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClicksPickTheNearestDrawnPrimitiveOfTheSe
     };
     for (const std::size_t index : {6u, 7u})
     {
-        expectPick(index, strip, Kind::Edge);
-        EXPECT_LT(pixelDistanceToStripEdge(
-                      results[index].Refined.value_or(RT::PrimitiveSelectionResult{}).EdgeId, clicks[index].Pixel),
-            1.0f)
-            << describe(index);
+        driver.ExpectPick(index, id(strip), Kind::Edge);
+        EXPECT_LT(pixelDistanceToStripEdge(driver.Refined(index).EdgeId, driver.Clicks[index].Pixel), 1.0f)
+            << driver.Describe(index);
     }
-    expectPick(8, shifted, Kind::Vertex);
-    const RT::PrimitiveSelectionResult shiftedPick = results[8].Refined.value_or(RT::PrimitiveSelectionResult{});
+    driver.ExpectPick(8, id(shifted), Kind::Vertex);
+    const RT::PrimitiveSelectionResult shiftedPick = driver.Refined(8);
     EXPECT_EQ(shiftedPick.VertexId, 2u);
     EXPECT_LT(glm::length(shiftedPick.LocalHit - shiftedApex), 1e-3f) << "not refined against the points lane";
-    expectPick(9, shifted, Kind::Vertex);
-    expectPick(10, triangle, Kind::Vertex);
-    EXPECT_EQ(results[10].Refined.value_or(RT::PrimitiveSelectionResult{}).VertexId, 1u);
+    driver.ExpectPick(9, id(shifted), Kind::Vertex);
+    driver.ExpectPick(10, id(triangle), Kind::Vertex);
+    EXPECT_EQ(driver.Refined(10).VertexId, 1u);
     // Edge and Face picks pass through the vertex's point and keep their hints.
     {
-        SCOPED_TRACE(describe(11));
-        const RT::PrimitiveSelectionResult edgePick = results[11].Refined.value_or(RT::PrimitiveSelectionResult{});
-        EXPECT_EQ(results[11].Hits, 1u);
+        SCOPED_TRACE(driver.Describe(11));
+        const RT::PrimitiveSelectionResult edgePick = driver.Refined(11);
+        EXPECT_EQ(driver.Results[11].Hits, 1u);
         EXPECT_NE(edgePick.EdgeId, RT::kInvalidPrimitiveIndex) << "an Edge-mode click got no edge";
         EXPECT_EQ(edgePick.EntityId, id(triangle));
     }
     {
-        SCOPED_TRACE(describe(12));
-        const RT::PrimitiveSelectionResult facePick = results[12].Refined.value_or(RT::PrimitiveSelectionResult{});
-        EXPECT_EQ(results[12].Hits, 1u);
+        SCOPED_TRACE(driver.Describe(12));
+        const RT::PrimitiveSelectionResult facePick = driver.Refined(12);
+        EXPECT_EQ(driver.Results[12].Hits, 1u);
         EXPECT_EQ(facePick.FaceId, 0u) << "a Face-mode click got no face";
         EXPECT_EQ(facePick.EntityId, id(triangle));
     }
     {
-        SCOPED_TRACE(describe(13));
-        EXPECT_EQ(results[13].Selected, (std::vector<std::uint32_t>{id(triangle)}));
+        SCOPED_TRACE(driver.Describe(13));
+        EXPECT_EQ(driver.Results[13].Selected, (std::vector<std::uint32_t>{id(triangle)}));
     }
-    expectPick(14, front, Kind::Point, 0.5f);
+    driver.ExpectPick(14, id(front), Kind::Point, 0.5f);
     {
-        SCOPED_TRACE(describe(15));
-        EXPECT_EQ(results[15].Selected, (std::vector<std::uint32_t>{id(triangle)})) << "a point behind the surface won";
-        EXPECT_NE(results[15].Refined.value_or(RT::PrimitiveSelectionResult{}).EntityId, id(behind));
+        SCOPED_TRACE(driver.Describe(15));
+        EXPECT_EQ(driver.Results[15].Selected, (std::vector<std::uint32_t>{id(triangle)}))
+            << "a point behind the surface won";
+        EXPECT_NE(driver.Refined(15).EntityId, id(behind));
     }
-    expectPick(16, nearPointFirst, Kind::Point, 0.5f);
-    expectPick(17, nearPointLast, Kind::Point, 0.5f);
-    expectPick(18, nearBandFirst, Kind::Edge, 0.5f);
-    expectPick(19, nearBandLast, Kind::Edge, 0.5f);
+    driver.ExpectPick(16, id(nearPointFirst), Kind::Point, 0.5f);
+    driver.ExpectPick(17, id(nearPointLast), Kind::Point, 0.5f);
+    driver.ExpectPick(18, id(nearBandFirst), Kind::Edge, 0.5f);
+    driver.ExpectPick(19, id(nearBandLast), Kind::Edge, 0.5f);
     for (const std::size_t index : {18u, 19u})
-        EXPECT_EQ(results[index].Refined.value_or(RT::PrimitiveSelectionResult{}).EdgeId, middleEdge)
-            << describe(index);
+        EXPECT_EQ(driver.Refined(index).EdgeId, middleEdge) << driver.Describe(index);
+    driver.ExpectMiss(20);
+
+    engine.Shutdown();
+}
+
+// BUG-254 slice B: a click hits a point or an edge line exactly where it is drawn: the
+// drawn line width (uniform or per edge), point size (uniform or per point), disc shape
+// and sphere depth. Every click lies 2 px or more inside or outside a drawn boundary, and
+// the backbuffer pixel under it shows whether something is drawn there.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickFootprintIsTheDrawnLineWidthAndPointShape)
+{
+    using Target = RT::SelectionTarget;
+    Bug254ClickDriver driver{};
+    Extrinsic::RHI::BufferHandle readback{};
+    bool readbackBound = false;
+    const auto ready = [&](Engine& engine)
     {
-        SCOPED_TRACE(describe(20));
-        EXPECT_EQ(results[20].Hits, 0u) << "the background click hit something";
-        EXPECT_TRUE(results[20].Selected.empty());
+        if (!readbackBound && engine.GetDevice().IsOperational())
+        {
+            engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readback);
+            readbackBound = true;
+        }
+        return driver.Step(engine);
+    };
+    // Four frames after the last click cover the readback latency.
+    auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 4u, 600u, std::chrono::seconds{120}, false);
+    ExitWhenReadyApp& readyProbe = *readyApp;
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    Engine& engine = *bootstrap.EnginePtr;
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    auto& device = engine.GetDevice();
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    ASSERT_GT(extent.Width, 0);
+    ASSERT_GT(extent.Height, 0);
+    const float w = static_cast<float>(extent.Width);
+    const float h = static_cast<float>(extent.Height);
+    const auto col = [&](const float fraction)
+    {
+        return std::floor(fraction * w);
+    };
+    const auto row = [&](const float fraction)
+    {
+        return std::floor(fraction * h);
+    };
+    const auto pixel = [](const float x, const float y)
+    {
+        return std::pair{static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)};
+    };
+    const auto id = [](const EntityHandle entity)
+    {
+        return RT::SelectionController::ToStableEntityId(entity);
+    };
+    G::VisualizationConfig red{};
+    red.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    red.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+
+    // Red horizontal edges on the given pixel rows, spanning columns [x0, x1] at depth 0.
+    const float x0 = col(0.05f), x1 = col(0.20f), edgeClickX = col(0.12f);
+    const auto addEdges = [&](const std::vector<float>& rows, const G::RenderEdges& render)
+    {
+        const EntityHandle entity = scene.Create();
+        StampBug254Selectable(scene, entity);
+        raw.emplace<G::RenderEdges>(entity, render);
+        raw.emplace<G::VisualizationConfig>(entity, red);
+        Geometry::Graph::Graph graph{};
+        for (const float y : rows)
+        {
+            const auto a = graph.AddVertex(Bug254WorldAtPixel(x0, y, 0.0f, extent));
+            const auto b = graph.AddVertex(Bug254WorldAtPixel(x1, y, 0.0f, extent));
+            (void)graph.AddEdge(a, b);
+        }
+        gs::PopulateFromGraph(raw, entity, graph);
+        return entity;
+    };
+    const auto addPoints =
+        [&](const std::vector<std::pair<float, float>>& pixels, const float z, const G::RenderPoints& render)
+    {
+        std::vector<glm::vec3> points{};
+        for (const auto& [x, y] : pixels)
+            points.push_back(Bug254WorldAtPixel(x, y, z, extent));
+        const EntityHandle entity = AddBug254Points(scene, points);
+        raw.emplace_or_replace<G::RenderPoints>(entity, render);
+        raw.emplace<G::VisualizationConfig>(entity, red);
+        return entity;
+    };
+
+    // A graph edge of uniform width 12 px.
+    const float wideY = row(0.15f);
+    const EntityHandle wide = addEdges({wideY}, G::RenderEdges{.Width = 12.0f});
+
+    // Two graph edges of uniform width 1 with per-edge widths {12, 1}.
+    const float perEdgeY0 = row(0.30f), perEdgeY1 = row(0.45f);
+    const EntityHandle perEdge =
+        addEdges({perEdgeY0, perEdgeY1}, G::RenderEdges{.Width = 1.0f, .WidthProperty = "e:bug254_width"});
+    raw.get<gs::Edges>(perEdge).Properties.GetOrAdd<float>("e:bug254_width", 1.0f).Vector() = {12.0f, 1.0f};
+
+    // A Flat point of uniform size 16 (radius 8).
+    const float uniformX = col(0.70f), uniformY = row(0.15f);
+    const EntityHandle uniform = addPoints(
+        {{uniformX, uniformY}}, 0.0f, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = 16.0f});
+
+    // Two Flat points of uniform size 4 with per-point sizes {24, 4}.
+    const float sizedY = row(0.35f), sized0X = col(0.70f), sized1X = col(0.85f);
+    const EntityHandle sized = addPoints({{sized0X, sizedY}, {sized1X, sizedY}},
+        0.0f,
+        G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = 4.0f, .SizeProperty = "v:bug254_size"});
+    raw.get<gs::Vertices>(sized).Properties.GetOrAdd<float>("v:bug254_size", 4.0f).Vector() = {24.0f, 4.0f};
+
+    // A Sphere point of 32 px whose centre lies 0.4 R behind a selectable quad at depth 0, R
+    // its view radius (`forward/point.vert`: R = (size / height) * view depth / proj[1][1]).
+    const float sphereX = col(0.80f), sphereY = row(0.70f);
+    const float k = (32.0f / h) * std::tan(glm::radians(45.0f) * 0.5f);
+    const float sphereRadius = 3.0f * k / (1.0f - 0.4f * k);
+    const EntityHandle quad = scene.Create();
+    {
+        StampBug254Selectable(scene, quad);
+        raw.emplace<G::RenderSurface>(quad);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a = mesh.AddVertex(Bug254WorldAtPixel(sphereX - 50.0f, sphereY - 50.0f, 0.0f, extent));
+        const auto b = mesh.AddVertex(Bug254WorldAtPixel(sphereX - 50.0f, sphereY + 50.0f, 0.0f, extent));
+        const auto c = mesh.AddVertex(Bug254WorldAtPixel(sphereX + 50.0f, sphereY + 50.0f, 0.0f, extent));
+        const auto d = mesh.AddVertex(Bug254WorldAtPixel(sphereX + 50.0f, sphereY - 50.0f, 0.0f, extent));
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c).has_value());
+        ASSERT_TRUE(mesh.AddTriangle(a, c, d).has_value());
+        gs::PopulateFromMesh(raw, quad, mesh);
+    }
+    const EntityHandle sphere = addPoints({{sphereX, sphereY}},
+        -0.4f * sphereRadius,
+        G::RenderPoints{.Type = G::RenderPoints::RenderType::Sphere, .Size = 32.0f});
+
+    driver.Clicks = {
+        {"wide edge, 4 px off", Target::Edge, pixel(edgeClickX, wideY + 4.0f)},
+        {"wide edge, 9 px off", Target::Entity, pixel(edgeClickX, wideY + 9.0f)},
+        {"per-edge wide edge, 4 px off", Target::Edge, pixel(edgeClickX, perEdgeY0 + 4.0f)},
+        {"per-edge thin edge, 4 px off", Target::Entity, pixel(edgeClickX, perEdgeY1 + 4.0f)},
+        {"uniform point, 6 px right", Target::Vertex, pixel(uniformX + 6.0f, uniformY)},
+        {"uniform point, 10 px right", Target::Entity, pixel(uniformX + 10.0f, uniformY)},
+        {"per-point large point, 8 px right", Target::Vertex, pixel(sized0X + 8.0f, sizedY)},
+        {"per-point small point, 8 px right", Target::Entity, pixel(sized1X + 8.0f, sizedY)},
+        {"large point, square corner outside the disc", Target::Entity, pixel(sized0X + 10.0f, sizedY + 10.0f)},
+        {"sphere cap in front of the surface", Target::Vertex, pixel(sphereX, sphereY)},
+        {"background", Target::Entity, pixel(0.95f * w, 0.95f * h)},
+    };
+
+    const Extrinsic::RHI::Format format = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(format);
+    ASSERT_GE(bytesPerPixel, 4u);
+    const std::uint64_t byteCount = std::uint64_t(extent.Width) * extent.Height * bytesPerPixel;
+    readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = byteCount,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.BUG254.ClickFootprint.Readback",
+    });
+    ASSERT_TRUE(readback.IsValid());
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    SCOPED_TRACE(readyProbe.ExitSummary() + " clicks done=" + std::to_string(driver.Next));
+    engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+    ASSERT_TRUE(run.DeviceOperational);
+    ASSERT_EQ(driver.Next, driver.Clicks.size()) << "not every click read back";
+
+    using Kind = RT::RefinedPrimitiveKind;
+    driver.ExpectPick(0, id(wide), Kind::Edge);
+    EXPECT_EQ(driver.Refined(0).EdgeId, 0u) << driver.Describe(0);
+    driver.ExpectMiss(1);
+    driver.ExpectPick(2, id(perEdge), Kind::Edge);
+    EXPECT_EQ(driver.Refined(2).EdgeId, 0u) << driver.Describe(2);
+    driver.ExpectMiss(3);
+    driver.ExpectPick(4, id(uniform), Kind::Point);
+    driver.ExpectMiss(5);
+    driver.ExpectPick(6, id(sized), Kind::Point);
+    EXPECT_EQ(driver.Refined(6).PointId, 0u) << driver.Describe(6);
+    driver.ExpectMiss(7);
+    driver.ExpectMiss(8);
+    // The drawn cap's depth (0.6 R); the quad's own depth would be -0.4 R, behind the surface.
+    driver.ExpectPick(9, id(sphere), Kind::Point, 0.6f * sphereRadius, 0.25f * sphereRadius);
+    driver.ExpectMiss(10);
+
+    // The same pixels in the last frame: red where a click hit, background where it missed.
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(byteCount), 0u);
+    device.ReadBuffer(readback, bytes.data(), byteCount, 0u);
+    device.DestroyBuffer(readback);
+    const RgbaPixel background =
+        ReadPixel(bytes, format, bytesPerPixel, extent, (extent.Width * 15u) / 16u, extent.Height / 16u);
+    for (std::size_t index = 0u; index < driver.Clicks.size(); ++index)
+    {
+        const auto [x, y] = driver.Clicks[index].Pixel;
+        const RgbaPixel drawn = ReadPixel(bytes, format, bytesPerPixel, extent, x, y);
+        SCOPED_TRACE(driver.Describe(index) + " pixel " + PixelText(drawn));
+        if (driver.Results[index].Hits > 0u)
+            EXPECT_TRUE(IsUi083PointPixel(drawn)) << "a hit where nothing red is drawn";
+        else
+            EXPECT_LT(RgbDistance(drawn, background), 30) << "a miss where something is drawn";
     }
 
     engine.Shutdown();

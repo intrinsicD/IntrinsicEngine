@@ -5,6 +5,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/gpu_scene.glsl"
+#include "common/point_quad.glsl"
 
 layout(set = 0, binding = 0) uniform sampler2D globalTextures[];
 
@@ -37,14 +38,6 @@ vec4 ResolvePointVisualizationColor(GpuEntityConfig cfg, uint pointElementId) {
         : GpuResolveVisualizationColorFallback(cfg, elementColor, vec4(1.0));
 }
 
-float ResolvePointSizePx(GpuEntityConfig cfg, uint pointElementId) {
-    float pointSizePx = cfg.Point.PointSize;
-    if (cfg.Point.PointSizeBDA != uint64_t(0)) {
-        pointSizePx = GpuFloatBufferRef(cfg.Point.PointSizeBDA).Data[pointElementId];
-    }
-    return clamp(pointSizePx, 0.5, 32.0);
-}
-
 invariant gl_Position;
 
 void main() {
@@ -61,44 +54,13 @@ void main() {
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
-    const uint firstPointQuadVertex = geo.PointFirstVertex * 6u;
-    const uint vertexIndex = uint(gl_VertexIndex) - firstPointQuadVertex;
-    const uint sourceVertexIndex = vertexIndex / 6u;
-    const uint vertexInQuad = vertexIndex % 6u;
-    const vec3 pointPosition = GpuReadPackedVec3(geo.VertexBufferBDA, sourceVertexIndex);
-
-    const uint cornerIndex = uint[6](0u, 1u, 2u, 0u, 2u, 3u)[vertexInQuad];
-    const vec2 localOffset = vec2[4](
-        vec2(-1.0, -1.0),
-        vec2( 1.0, -1.0),
-        vec2( 1.0,  1.0),
-        vec2(-1.0,  1.0))[cornerIndex];
-
-    const vec4 localPos = vec4(pointPosition, 1.0);
-    const vec4 worldPos = dyn.Model * localPos;
-    const vec4 viewCenter4 = scene.CameraView * worldPos;
-    const vec4 centerClip = scene.CameraViewProj * dyn.Model * localPos;
-
-    const float pointSizePx = ResolvePointSizePx(cfg, sourceVertexIndex);
-    const float radiusPx = pointSizePx * 0.5;
-    const float viewportWidth = max(scene.CameraViewportWidth, 1.0);
-    const float viewportHeight = max(scene.CameraViewportHeight, 1.0);
-    const vec2 clipOffset = localOffset *
-        vec2((2.0 * radiusPx) / viewportWidth, (2.0 * radiusPx) / viewportHeight) *
-        centerClip.w;
-
-    gl_Position = centerClip + vec4(clipOffset, 0.0, 0.0);
+    // BUG-254 — the point pick draws the same quad.
+    const GpuPointQuadCorner corner = GpuPointQuadCornerAt(scene, dyn, geo, cfg, uint(gl_VertexIndex));
+    gl_Position = corner.ClipPosition;
     vPointMode = cfg.Point.PointMode;
-    vDiscUV = localOffset;
-    vViewCenter = viewCenter4.xyz;
-
-    const float projectionScaleY = abs(scene.CameraProj[1][1]);
-    const float depth = max(abs(viewCenter4.z), 1.0e-4);
-    const float ndcRadiusY = (2.0 * radiusPx) / viewportHeight;
-    vViewRadius = projectionScaleY > 1.0e-6
-        ? max((ndcRadiusY * depth) / projectionScaleY, 1.0e-5)
-        : 1.0e-3;
-
-    vColor = ResolvePointVisualizationColor(cfg, sourceVertexIndex);
-    vViewNormal = vec3(0.0, 0.0, 1.0);
+    vDiscUV = corner.DiscUV;
+    vViewCenter = corner.ViewCenter;
+    vViewRadius = corner.ViewRadius;
+    vColor = ResolvePointVisualizationColor(cfg, corner.PointIndex);
+    vViewNormal = corner.ViewNormal;
 }

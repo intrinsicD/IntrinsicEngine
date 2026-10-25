@@ -4896,10 +4896,10 @@ namespace Extrinsic::Graphics
         // D32_FLOAT depth target) so all four pipelines can be bound inside
         // the same recipe-declared `PickingPass` render pass. Faces test
         // depth-equal against the entity pass's depth; edges and points
-        // test less-equal and write it (BUG-254). They differ otherwise
-        // only in:
+        // test less-equal and write it (BUG-254). All draw triangle lists:
+        // faces the surface, edges and points the forward line and point
+        // quads. They differ otherwise only in:
         //   - shader pair (`selection/{face,edge,point}_id.{vert,frag}`),
-        //   - primitive topology (TriangleList / LineList / PointList),
         //   - cull mode (Back for faces, None for edges/points; mirrors
         //     `BuildForwardLinePipelineDesc` / `BuildForwardPointPipelineDesc`),
         //   - debug name.
@@ -4938,7 +4938,8 @@ namespace Extrinsic::Graphics
                 "shaders/selection/edge_id.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/selection/edge_id.frag.spv");
-            desc.PrimitiveTopology = RHI::Topology::LineList;
+            // BUG-254: the drawn line quads (`LineQuads`), so a click hits the drawn width.
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::None;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
@@ -4966,7 +4967,8 @@ namespace Extrinsic::Graphics
                 "shaders/selection/point_id.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/selection/point_id.frag.spv");
-            desc.PrimitiveTopology = RHI::Topology::PointList;
+            // BUG-254: the drawn point quads, so a click hits the drawn size and shape.
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::None;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;

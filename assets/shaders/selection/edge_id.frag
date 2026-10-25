@@ -12,10 +12,11 @@
 //     forwarded from `fragEntityID` (vertex shader read `inst.EntityID` from
 //     the GpuScene table; value `0` is reserved for "no hit").
 //   - location 1 -> PrimitiveId (R32_UINT): `EncodeSelectionId(Edge,
-//     edgeIndex)` per GRAPHICS-012Q, where `edgeIndex` is taken from
-//     `gl_PrimitiveID` — the per-draw-call line-segment index over the
-//     `Lines` cull bucket. High 4 bits encode `Edge = 3`, low 28 bits
-//     carry the edge index masked to `PayloadMask`.
+//     edgeIndex)` per GRAPHICS-012Q, where `edgeIndex` is the line-segment
+//     index within its geometry, passed flat by the vertex shader (each
+//     `LineQuads` segment is two triangles, so `gl_PrimitiveID` is not it).
+//     High 4 bits encode `Edge = 3`, low 28 bits carry the edge index masked
+//     to `PayloadMask`.
 
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
@@ -26,6 +27,7 @@ layout(push_constant, scalar) uniform ScenePC {
 } pc;
 
 layout(location = 0) flat in uint fragEntityID;
+layout(location = 1) flat in uint fragEdgeIndex;
 
 layout(location = 0) out uint outEntityID;
 layout(location = 1) out uint outPrimitiveID;
@@ -37,5 +39,5 @@ const uint kSelectionPayloadMask = (1u << 28u) - 1u;
 
 void main() {
     outEntityID = fragEntityID;
-    outPrimitiveID = kSelectionDomainEdge | (uint(gl_PrimitiveID) & kSelectionPayloadMask);
+    outPrimitiveID = kSelectionDomainEdge | (fragEdgeIndex & kSelectionPayloadMask);
 }

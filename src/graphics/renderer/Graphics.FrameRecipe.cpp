@@ -585,7 +585,7 @@ namespace Extrinsic::Graphics
         // BUG-254 — a pending pick draws into its own depth; outline-only
         // frames test against the prepass depth.
         std::vector<std::string_view> pickingWrites{"EntityId"};
-        std::vector<std::string_view> pickingReads{"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"};
+        std::vector<std::string_view> pickingReads{"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"};
         if (pickingActive)
         {
             pickingWrites.push_back("PrimitiveId");
@@ -2008,8 +2008,8 @@ namespace Extrinsic::Graphics
                     builder.Read(depth, TextureUsage::DepthRead);
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
-                builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
-                builder.Read(lineDrawCount, BufferUsage::IndirectRead);
+                builder.Read(lineQuadDrawIndirect, BufferUsage::IndirectRead);
+                builder.Read(lineQuadDrawCount, BufferUsage::IndirectRead);
                 builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
                 builder.Read(pointDrawCount, BufferUsage::IndirectRead);
                 builder.Write(entityId, TextureUsage::ColorAttachmentWrite);

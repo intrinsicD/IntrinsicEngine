@@ -5,14 +5,12 @@
 
 // GRAPHICS-074 Slice B — GpuScene-aware EdgeId picking vertex shader.
 //
-// Pairs with `selection/edge_id.frag`. Mirrors `selection/entity_id.vert`
-// exactly so the EdgeId selection pipeline reuses the same GpuScene-aware
-// vertex-fetch chain. EdgeIdPass dispatches against the `Lines` cull
-// bucket through `DrawIndexedIndirectCount`, so this shader sees
-// line-list indexed draws over the same managed vertex stream as the
-// forward line pipeline. The fragment shader writes
-// `EncodeSelectionId(Edge, edgeIndex)` where `edgeIndex` is sourced from
-// `gl_PrimitiveID` per GRAPHICS-012Q.
+// Pairs with `selection/edge_id.frag`. EdgeIdPass dispatches against the
+// `LineQuads` cull bucket through `DrawIndirectCount` (non-indexed, six
+// vertices per segment). BUG-254 — the quad comes from the same helper as
+// `forward/line.vert` (uniform or per-edge width), so the pick covers the
+// pixels the visible line covers. The segment index is passed flat: the
+// fragment shader writes `EncodeSelectionId(Edge, segmentIndex)`.
 //
 // Push-constant compatibility: the block below MUST mirror
 // `RHI::GpuScenePushConstants` exactly. `EdgeIdPass::Execute` pushes those
@@ -21,6 +19,7 @@
 // compatibility policy" section in `src/graphics/renderer/README.md`.
 
 #include "../common/gpu_scene.glsl"
+#include "../common/line_quad.glsl"
 
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
@@ -31,6 +30,7 @@ layout(push_constant, scalar) uniform ScenePC {
 } pc;
 
 layout(location = 0) flat out uint fragEntityID;
+layout(location = 1) flat out uint fragEdgeIndex;
 
 invariant gl_Position;
 
@@ -39,13 +39,10 @@ void main() {
     const GpuInstanceStatic inst = GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[gl_InstanceIndex];
     const GpuInstanceDynamic dyn = GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[gl_InstanceIndex];
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
+    const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[inst.ConfigSlot];
 
-    // The culling indirect command supplies firstIndex + vertexOffset, so
-    // gl_VertexIndex is already in managed-buffer vertex units. Channel BDAs
-    // point at this geometry's first element, so fetch with the local index.
-    const uint localVertexIndex = uint(gl_VertexIndex) - geo.VertexOffset;
-    const vec3 localPosition = GpuReadPackedVec3(geo.VertexBufferBDA, localVertexIndex);
-
-    gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
+    const GpuLineQuadCorner corner = GpuLineQuadCornerAt(scene, dyn, geo, cfg, uint(gl_VertexIndex));
+    gl_Position = corner.ClipPosition;
     fragEntityID = inst.EntityID;
+    fragEdgeIndex = corner.SegmentIndex;
 }

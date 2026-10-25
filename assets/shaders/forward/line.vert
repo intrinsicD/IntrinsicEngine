@@ -4,6 +4,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 #include "common/gpu_scene.glsl"
+#include "common/line_quad.glsl"
 
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
@@ -33,45 +34,13 @@ void main() {
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
-    GpuUIntBufferRef indices = GpuUIntBufferRef(geo.IndexBufferBDA);
-
-    const uint firstLineQuadVertex = (geo.LineFirstIndex / 2u) * 6u;
-    const uint vertexIndex = uint(gl_VertexIndex) - firstLineQuadVertex;
-    const uint segmentIndex = vertexIndex / 6u;
-    const uint vertexInQuad = vertexIndex % 6u;
-    const uint cornerIndex = uint[6](0u, 1u, 2u, 0u, 2u, 3u)[vertexInQuad];
-    const uint lineIndexBase = geo.LineFirstIndex + segmentIndex * 2u;
-    const uint localEndpointA = indices.Data[lineIndexBase];
-    const uint localEndpointB = indices.Data[lineIndexBase + 1u];
-    const vec3 a = GpuReadPackedVec3(geo.VertexBufferBDA, localEndpointA);
-    const vec3 b = GpuReadPackedVec3(geo.VertexBufferBDA, localEndpointB);
-
-    const vec4 clipA = scene.CameraViewProj * dyn.Model * vec4(a, 1.0);
-    const vec4 clipB = scene.CameraViewProj * dyn.Model * vec4(b, 1.0);
-    const bool useEnd = cornerIndex >= 2u;
-    const float side = (cornerIndex == 0u || cornerIndex == 3u) ? -1.0 : 1.0;
-    const vec4 centerClip = useEnd ? clipB : clipA;
-
-    const vec2 ndcA = clipA.xy / max(abs(clipA.w), 1.0e-6);
-    const vec2 ndcB = clipB.xy / max(abs(clipB.w), 1.0e-6);
-    const vec2 direction = ndcB - ndcA;
-    const float directionLength = length(direction);
-    const vec2 tangent = directionLength > 1.0e-6 ? direction / directionLength : vec2(1.0, 0.0);
-    const vec2 normal = vec2(-tangent.y, tangent.x);
-    const vec2 viewport = max(vec2(scene.CameraViewportWidth, scene.CameraViewportHeight), vec2(1.0));
-    float lineWidthPx = cfg.Line.LineWidth;
-    if (cfg.Line.LineWidthBDA != uint64_t(0)) {
-        lineWidthPx = GpuFloatBufferRef(cfg.Line.LineWidthBDA).Data[segmentIndex];
-    }
-    const float halfWidthPx = clamp(lineWidthPx, 0.5, 32.0) * 0.5;
-    const vec2 clipOffset = normal * side * vec2((2.0 * halfWidthPx) / viewport.x,
-                                                 (2.0 * halfWidthPx) / viewport.y) * centerClip.w;
-
-    gl_Position = centerClip + vec4(clipOffset, 0.0, 0.0);
+    // BUG-254 — the edge pick draws the same quad.
+    const GpuLineQuadCorner corner = GpuLineQuadCornerAt(scene, dyn, geo, cfg, uint(gl_VertexIndex));
+    gl_Position = corner.ClipPosition;
 
     const uint elementId = cfg.VisDomain == GpuVisualizationDomain_Vertex
-        ? (useEnd ? localEndpointB : localEndpointA)
-        : segmentIndex;
+        ? corner.EndpointVertex
+        : corner.SegmentIndex;
     vConfigSlot = inst.ConfigSlot;
     vVisualizationScalar = GpuVisualizationReadScalar(cfg, elementId, cfg.ScalarRangeMin);
     vVisualizationColor = GpuVisualizationReadColor(cfg, elementId, vec4(1.0));

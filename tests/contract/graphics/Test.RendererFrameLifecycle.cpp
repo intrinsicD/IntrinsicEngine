@@ -630,12 +630,11 @@ TEST(RendererFrameLifecycle, ActiveGpuSceneVertexShadersUseSceneTableCameraViewP
     constexpr std::string_view kCameraAwareVertexShaders[] = {
         "forward/default_debug_surface.vert",
         "depth_prepass.vert",
-        "forward/line.vert",
-        "forward/point.vert",
         "selection/entity_id.vert",
         "selection/face_id.vert",
-        "selection/edge_id.vert",
-        "selection/point_id.vert",
+        // The forward and pick line/point quads (BUG-254).
+        "common/line_quad.glsl",
+        "common/point_quad.glsl",
     };
 
     for (const std::string_view shader : kCameraAwareVertexShaders)
@@ -2850,22 +2849,21 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
     const std::string pointVertex = ReadShaderSource("forward/point.vert");
     const std::string pointFragment = ReadShaderSource("forward/point.frag");
     const std::string cullShader = ReadShaderSource("instance_cull.comp");
+    // The quad, size and coverage live in the include shared with the point pick (BUG-254).
+    const std::string pointQuad = ReadShaderSource("common/point_quad.glsl");
 
-    EXPECT_NE(pointVertex.find("/ 6u"), std::string::npos);
-    EXPECT_NE(pointVertex.find("ResolvePointSizePx"), std::string::npos);
-    EXPECT_NE(pointVertex.find("float pointSizePx = cfg.Point.PointSize"),
-              std::string::npos);
-    EXPECT_NE(pointVertex.find("cfg.Point.PointSizeBDA != uint64_t(0)"),
-              std::string::npos);
-    EXPECT_NE(pointVertex.find(
-                  "GpuFloatBufferRef(cfg.Point.PointSizeBDA).Data[pointElementId]"),
-              std::string::npos);
-    EXPECT_NE(pointVertex.find("clamp(pointSizePx, 0.5, 32.0)"),
-              std::string::npos);
+    EXPECT_NE(pointVertex.find("GpuPointQuadCornerAt("), std::string::npos);
+    EXPECT_NE(pointFragment.find("GpuPointFragmentCoverage("), std::string::npos);
+    EXPECT_NE(pointQuad.find("/ 6u"), std::string::npos);
+    EXPECT_NE(pointQuad.find("GpuPointSizePx"), std::string::npos);
+    EXPECT_NE(pointQuad.find("float pointSizePx = cfg.Point.PointSize"), std::string::npos);
+    EXPECT_NE(pointQuad.find("cfg.Point.PointSizeBDA != uint64_t(0)"), std::string::npos);
+    EXPECT_NE(pointQuad.find("GpuFloatBufferRef(cfg.Point.PointSizeBDA).Data[pointIndex]"), std::string::npos);
+    EXPECT_NE(pointQuad.find("clamp(pointSizePx, 0.5, 32.0)"), std::string::npos);
     EXPECT_NE(pointVertex.find("vDiscUV"), std::string::npos);
     // The ray cast lives in the impostor include shared with the transient debug spheres (UI-067).
     const std::string impostor = ReadShaderSource("common/point_sphere_impostor.glsl");
-    EXPECT_NE(pointFragment.find("ShadeSphereImpostor("), std::string::npos);
+    EXPECT_NE(pointQuad.find("ShadeSphereImpostor("), std::string::npos);
     EXPECT_NE(impostor.find("surfaceViewPos"), std::string::npos);
     EXPECT_NE(pointFragment.find("gl_FragDepth = depth"), std::string::npos);
     EXPECT_NE(ReadShaderSource("transient_debug_sphere.frag").find("ShadeSphereImpostor("), std::string::npos);
@@ -3838,7 +3836,8 @@ TEST(RendererFrameLifecycle, EdgeIdPickingPipelineSurvivesOperationalRebuild)
         EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
             "shaders/selection/edge_id.frag.spv"))
             << initialDesc.FragmentShaderPath;
-        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::LineList);
+        // BUG-254 slice B: the drawn line quads, so a click hits the drawn width.
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
         EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
         EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
         // BUG-254: no surface needed behind an edge or point; the nearest wins.
@@ -3867,7 +3866,8 @@ TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
         EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
             "shaders/selection/point_id.frag.spv"))
             << initialDesc.FragmentShaderPath;
-        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::PointList);
+        // BUG-254 slice B: the drawn point quads, so a click hits the drawn size and shape.
+        EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
         EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
         EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
         // BUG-254: no surface needed behind an edge or point; the nearest wins.

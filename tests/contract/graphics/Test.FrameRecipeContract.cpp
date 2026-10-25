@@ -2289,7 +2289,9 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     EXPECT_TRUE(Contains(picking->Writes, "Picking.Depth"));
     EXPECT_FALSE(Contains(picking->Reads, "SceneDepth"));
     EXPECT_TRUE(Contains(picking->Reads, "Cull.SurfaceOpaque.IndexedArgs"));
-    EXPECT_TRUE(Contains(picking->Reads, "Cull.Lines.IndexedArgs"));
+    // BUG-254 slice B: edge IDs draw the line quads.
+    EXPECT_TRUE(Contains(picking->Reads, "Cull.LineQuads.NonIndexedArgs"));
+    EXPECT_FALSE(Contains(picking->Reads, "Cull.Lines.IndexedArgs"));
     EXPECT_TRUE(Contains(picking->Reads, "Cull.Points.NonIndexedArgs"));
 
     const auto* outline = FindPass(description, FrameRecipePassKind::SelectionOutline);

@@ -50,17 +50,17 @@ namespace Extrinsic::Graphics
         {
             return;
         }
-        const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Lines);
-        if (!bucket.Indexed || !bucket.IndexedArgsBuffer.IsValid() ||
+        // BUG-254: the drawn line quads, so a click hits the drawn width.
+        const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::LineQuads);
+        if (bucket.Indexed || !bucket.NonIndexedArgsBuffer.IsValid() ||
             !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
         {
             return;
         }
 
         cmd.BindPipeline(m_Pipeline);
-        cmd.BindIndexBuffer(gpuWorld.GetManagedIndexBuffer(), 0, RHI::IndexType::Uint32);
-        PushSceneConstants(cmd, gpuWorld, frameIndex, RHI::GpuDrawBucketKind::Lines);
-        cmd.DrawIndexedIndirectCount(bucket.IndexedArgsBuffer, 0, bucket.CountBuffer, 0, bucket.Capacity);
+        PushSceneConstants(cmd, gpuWorld, frameIndex, RHI::GpuDrawBucketKind::LineQuads);
+        cmd.DrawIndirectCount(bucket.NonIndexedArgsBuffer, 0, bucket.CountBuffer, 0, bucket.Capacity);
     }
 
     void PointIdPass::Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO&, const GpuWorld& gpuWorld,

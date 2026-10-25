@@ -28,7 +28,9 @@ contract_review: Reviewed the catalog. Shader-quality change inside the existing
   varying; `forward/line.frag` only resolves the visualization color, with no
   edge filter.
 - Keep the active SceneTable/BDA ABI and per-element width binding
-  (RUNTIME-315/GRAPHICS-158). Line picking quads are GRAPHICS-158's scope.
+  (RUNTIME-315/GRAPHICS-158). Since BUG-254 slice B the line quad lives in
+  `common/line_quad.glsl`, which the edge pick draws too: extended ends there
+  extend the click footprint as well.
 
 ## Acceptance criteria
 - [ ] `forward/line.vert` emits a pixel-space center-line distance and extends segment ends by half the width.

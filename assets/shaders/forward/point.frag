@@ -4,7 +4,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 #include "common/gpu_scene.glsl"
-#include "common/point_sphere_impostor.glsl"
+#include "common/point_quad.glsl"
 
 layout(location = 0) in vec4 vColor;
 layout(location = 1) flat in uint vPointMode;
@@ -22,38 +22,21 @@ layout(push_constant, scalar) uniform ScenePC {
     uint _pad0;
 } pc;
 
-float DiscMetric(vec2 uv) {
-    if (vPointMode != 2u) {
-        return dot(uv, uv);
-    }
-
-    vec3 n = normalize(vViewNormal);
-    float nz = max(abs(n.z), 0.15);
-    float lifted = dot(n.xy, uv) / nz;
-    return dot(uv, uv) + lifted * lifted;
-}
-
 void main() {
-    vec2 uv = vDiscUV;
-    float r2 = DiscMetric(uv);
-    if (r2 > 1.0) {
+    // BUG-254 — the point pick keeps and discards the same fragments, at the same depth.
+    vec3 color = vColor.rgb;
+    float r2;
+    float depth;
+    if (!GpuPointFragmentCoverage(vPointMode, vViewNormal, vDiscUV, vViewCenter, vViewRadius,
+                                  pc.SceneTableBDA, gl_FragCoord.z, color, r2, depth)) {
         discard;
     }
-
-    gl_FragDepth = gl_FragCoord.z;
+    gl_FragDepth = depth;
 
     float edge = sqrt(max(r2, 0.0));
     float alpha = 1.0 - smoothstep(0.85, 1.0, edge);
-    vec3 color = vColor.rgb;
 
-    if (vPointMode == 1u) {
-        const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
-        float depth;
-        if (!ShadeSphereImpostor(uv, vViewCenter, vViewRadius, scene.CameraProj, color, depth)) {
-            discard;
-        }
-        gl_FragDepth = depth;
-    } else if (vPointMode == 2u) {
+    if (vPointMode == GpuPointMode_Surfel) {
         vec3 n = normalize(vViewNormal);
         float facing = abs(n.z);
         color *= 0.7 + 0.3 * facing;

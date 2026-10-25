@@ -27,8 +27,10 @@ maturity_target: Operational
   extent, Mahalanobis alpha with a 3-sigma cutoff, flat-disk fallback.
   Shared math still lives in `assets/shaders/common/point_splat.glsl`.
 - The active path lacks this: `forward/point.vert` expands camera-facing pixel
-  quads and sets a constant view normal (`vViewNormal = vec3(0, 0, 1)`);
-  `forward/point.frag` has disc/sphere and a simplified surfel branch, no EWA.
+  quads and sets a constant view normal (`GpuPointQuadCornerAt` in
+  `common/point_quad.glsl`); `forward/point.frag` has disc/sphere and a simplified
+  surfel branch (`GpuPointFragmentCoverage`), no EWA. The point pick uses the same
+  two helpers (BUG-254 slice B), so a footprint changed there is picked as drawn.
 - Do not copy the old Camera-UBO/push-constant ABI; use the SceneTable/BDA
   contract. EWA here is not 3D Gaussian splatting (no anisotropic 3D
   covariance, no view-dependent color).

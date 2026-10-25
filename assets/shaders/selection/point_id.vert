@@ -5,25 +5,12 @@
 
 // GRAPHICS-074 Slice B — GpuScene-aware PointId picking vertex shader.
 //
-// Pairs with `selection/point_id.frag`. Mirrors `selection/entity_id.vert`
-// for the position fetch chain and `assets/shaders/forward/point.vert` for
-// the `gl_PointSize` write. PointIdPass dispatches against the `SelectionPoints`
-// cull bucket through `DrawIndirectCount` (non-indexed), so this shader
-// sees point-list draws over the managed vertex stream. The fragment
-// shader writes `EncodeSelectionId(Point, pointIndex)` where `pointIndex`
-// is sourced from `gl_PrimitiveID` per GRAPHICS-012Q.
-//
-// Point-size publication: `BuildSelectionPointIdPipelineDesc()` configures
-// the pipeline with `Topology::PointList`, which requires the vertex stage
-// to emit a valid `gl_PointSize` — without it Vulkan pipeline creation can
-// fail point-size validation, and even when accepted the rasterizer falls
-// back to 1-pixel points and picking misses every entity rendered with a
-// larger configured point size. `forward/point.vert` already publishes the
-// clamped configured point size, so picking must match for the
-// visible point to be hittable. This shader therefore reads
-// `GpuEntityConfig::Point.PointSize` through `scene.EntityConfigBDA` indexed by
-// `inst.ConfigSlot` (the same chain `forward/point.vert` uses) and writes
-// the same `gl_PointSize` value.
+// Pairs with `selection/point_id.frag`. PointIdPass dispatches against the
+// `SelectionPoints` cull bucket through `DrawIndirectCount` (non-indexed,
+// six vertices per point like `Points`). BUG-254 — the quad comes from the
+// same helper as `forward/point.vert` (uniform or per-point size), so the
+// pick covers the pixels the visible point covers; the fragment shader
+// applies the visible point's coverage and depth.
 //
 // Push-constant compatibility: the block below MUST mirror
 // `RHI::GpuScenePushConstants` exactly. `PointIdPass::Execute` pushes
@@ -33,6 +20,7 @@
 // `src/graphics/renderer/README.md`.
 
 #include "../common/gpu_scene.glsl"
+#include "../common/point_quad.glsl"
 
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
@@ -43,6 +31,12 @@ layout(push_constant, scalar) uniform ScenePC {
 } pc;
 
 layout(location = 0) flat out uint fragEntityID;
+layout(location = 1) flat out uint fragPointIndex;
+layout(location = 2) flat out uint fragPointMode;
+layout(location = 3) out vec2 fragDiscUV;
+layout(location = 4) out vec3 fragViewCenter;
+layout(location = 5) out float fragViewRadius;
+layout(location = 6) out vec3 fragViewNormal;
 
 invariant gl_Position;
 
@@ -53,15 +47,13 @@ void main() {
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[inst.ConfigSlot];
 
-    // The culling indirect command supplies firstVertex, so gl_VertexIndex is
-    // already in managed-buffer vertex units. Channel BDAs point at this
-    // geometry's first element, so fetch with the local point index.
-    const uint localVertexIndex = uint(gl_VertexIndex) - geo.PointFirstVertex;
-    const vec3 localPosition = GpuReadPackedVec3(geo.VertexBufferBDA, localVertexIndex);
-
-    gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
-    // Match `forward/point.vert`'s point-size publication so the picking
-    // footprint covers the same pixels the visible point covers.
-    gl_PointSize = clamp(cfg.Point.PointSize, 0.5, 32.0);
+    const GpuPointQuadCorner corner = GpuPointQuadCornerAt(scene, dyn, geo, cfg, uint(gl_VertexIndex));
+    gl_Position = corner.ClipPosition;
     fragEntityID = inst.EntityID;
+    fragPointIndex = corner.PointIndex;
+    fragPointMode = cfg.Point.PointMode;
+    fragDiscUV = corner.DiscUV;
+    fragViewCenter = corner.ViewCenter;
+    fragViewRadius = corner.ViewRadius;
+    fragViewNormal = corner.ViewNormal;
 }

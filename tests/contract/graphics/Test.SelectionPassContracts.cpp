@@ -125,14 +125,14 @@ TEST(GraphicsSelectionPassContracts, EdgeAndPointIdPassesDrawLineAndPointBuckets
     edgePass.SetPipeline(RHI::PipelineHandle{703u, 1u});
     MockCommandContext edgeCmd;
     edgePass.Execute(edgeCmd, camera, world, culling, 5u);
-    const auto& lineBucket = culling.GetBucket(RHI::GpuDrawBucketKind::Lines);
-    ASSERT_EQ(edgeCmd.Events.size(), 4u);
+    // BUG-254 slice B: the drawn line quads, not native lines.
+    const auto& lineBucket = culling.GetBucket(RHI::GpuDrawBucketKind::LineQuads);
+    ASSERT_EQ(edgeCmd.Events.size(), 3u);
     EXPECT_EQ(edgeCmd.Events[0], EventKind::BindPipeline);
-    EXPECT_EQ(edgeCmd.Events[1], EventKind::BindIndexBuffer);
-    EXPECT_EQ(edgeCmd.Events[2], EventKind::PushConstants);
-    EXPECT_EQ(edgeCmd.Events[3], EventKind::DrawIndexedIndirectCount);
-    EXPECT_EQ(edgeCmd.LastDrawIndexedIndirectCount.ArgumentBuffer, lineBucket.IndexedArgsBuffer);
-    ExpectScenePushConstants(edgeCmd, world, RHI::GpuDrawBucketKind::Lines, 5u);
+    EXPECT_EQ(edgeCmd.Events[1], EventKind::PushConstants);
+    EXPECT_EQ(edgeCmd.Events[2], EventKind::DrawIndirectCount);
+    EXPECT_EQ(edgeCmd.LastDrawIndirectCount.ArgumentBuffer, lineBucket.NonIndexedArgsBuffer);
+    ExpectScenePushConstants(edgeCmd, world, RHI::GpuDrawBucketKind::LineQuads, 5u);
 
     Graphics::PointIdPass pointPass{selection};
     pointPass.SetPipeline(RHI::PipelineHandle{704u, 1u});
