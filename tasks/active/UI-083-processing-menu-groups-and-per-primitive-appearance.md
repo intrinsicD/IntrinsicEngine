@@ -505,3 +505,65 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
     - C1 and C2 each got a regression test that fails with its fix removed.
   - Round 2: verdict verbatim "approve. Still blocking: none. New findings: none".
   - Full CPU suite 5876/5876 after the fixes.
+- 2026-10-25: Slice 3a implemented (independent Position per primitive) on base `d3bec9527`.
+  - `VertexChannelBindingSet` holds `Surface`/`Edges`/`Points` slots (`VertexChannelLaneBindings`).
+    `ResolveDisplayedPositions`, `FindVertexChannelSourceBinding` and the plan builders take the
+    lane; `PrimaryLaneFor`, `SelectionLaneFor` and `DisplayedPositionLanes` (the drawn lanes, or the
+    primary lane when none is drawn) carry the lane rules. Default clears the lane's own slot.
+  - Graph: while the points lane displays other positions than the edges lane, the point
+    instance draws its own points-only upload (residency sub-key 1, rebuilt on revision or
+    binding change, fail-closed). Accept on such a graph is not acknowledged and goes through
+    the ordinary upload.
+  - Position fronts are observed per displayed lane (a shared source once) and handed only to
+    that lane's blocks. When one lane's preview ends, all blocks are restored and the remaining
+    lanes are handed their front again; the graph point upload is rebuilt on restore.
+  - Picking: face/edge/point hints refine against Surface/Edges/Points; a missing hint uses
+    the vertex rule (`SelectionLaneFor`). Highlights use the stored selection's domain. The
+    pick stamp records every lane's displayed revision.
+  - Culling bounds, F framing and the gizmo pivot use the union of the displayed lanes, cached
+    by `DisplayedPositionsSignature` (empty, so never trusted, while a source has revision 0).
+    Vector-field anchors, glyph order and the default arrow length use the primary lane.
+  - Scene keys: bare `position`/`normal`/`texcoord` for the primary lane, `edges.position`,
+    `points.position`, `points.normal` (and any `<lane>.<attribute>` of a row) for the others;
+    an unknown or duplicate slot rejects the document. Scene version stays 6.
+  - `AnyVertexChannelBindingEnabled` and the asset signature cover every lane slot.
+  - Deviations: no separate spike (the separated-lane pick fixture is the test); preview
+    bounds stay entity-wide (unbounded while any lane previews); a point upload created during
+    a preview gets its front one frame later (`shortcut:` comment in `Runtime.RenderExtraction.cpp`).
+  - Tests: per-lane variants of the mesh and graph extraction tests (independence, union culling,
+    own point upload and its reuse), two fronts with partial restore, graph point upload restored
+    after a preview, separated-lane refinement (face, point, missing hint with and without
+    points), highlight lane, pick stamp of a secondary lane, focus/pivot union, lane scene keys
+    (round trip, older bare-key scene, duplicate and invalid keys), agent `bind_attribute`
+    leaving the points lane canonical.
+  - Mutation checks: ten mechanisms each removed (per-lane fronts, union bounds, hit-lane
+    refinement, all-lane stamp, duplicate-key rejection, all-lane `AnyVertexChannelBindingEnabled`,
+    graph point split, highlight lane, focus/pivot union, point upload restore); each makes its
+    test fail.
+  - Verification: all tests of `IntrinsicRuntimeContractTests`, `IntrinsicRuntimeGraphicsCpuTests`,
+    `IntrinsicGraphicsContractCpuTests`, `IntrinsicGraphicsContractTests` and
+    `IntrinsicSandboxEditorIntegrationTests` pass (2798 passed, 2 native-window tests skipped).
+    Task policy, doc links, layering, test layout, root hygiene, docs sync and SourceRules pass;
+    jscpd finds no exact clone (≥ 6 lines) in the changed lines.
+  - Not done: the slice's `gpu;vulkan` smoke (points at a bound position, surface canonical,
+    pick at the point pixel) and the live Sandbox check. The slice is CPU-contracted only.
+- 2026-10-25: Slice 3a code review (Claude author → Codex reviewer, `codex exec`, codex-cli
+  0.163.0, requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread
+  `01a17080-6083-7341-8c0e-6e374141e0b0`; recursion protection instruction-only).
+  - Ponytail (author): `PositionPreview` duplicated the per-lane flags (which let Accept leave a
+    stale lane flag); it is now derived from them.
+  - Round 1 on diff sha256 `413dd41e…`: "revise required", four blocking findings. B1: a missing
+    hint ignored the issuing selection's target lane; `PickReadbackContext::TargetDomain` now
+    carries it. B2: a hidden primary lane widened bounds, framing, pivot and preview state;
+    `DisplayedPositionLanes` now returns the drawn lanes (primary only when none is drawn). B3:
+    prefixed keys aliased primary slots; they are rejected. B4: the preview test checked only
+    aggregate counters and no graph Accept; it now uses a seam-split surface so row counts tell the
+    routing, and Accept on a split graph is asserted `NotOneToOne`. Optional ponytail: the bounds
+    cache reuses `ComputeEntityLocalDisplayBounds`. Each fix has a mutation check that fails its test.
+  - Round 2 on `56060d1f…`: B1-B3 resolved; B4 still blocking (the surface could take the points
+    front unnoticed). Fixed with a surface-only three-row front step; mutation-checked.
+  - Round 3 on `c070cc52…`: verdict verbatim "approve" ("Approval covers the CPU-contracted slice";
+    "Remaining blocking findings: none. New findings: none."). The reviewer notes that the missing
+    Vulkan smoke prevents an Operational claim until it runs or its deferral/handoff is recorded.
+  - After the fixes: all tests of the five owning executables pass (2798 passed, 2 native-window
+    skips).

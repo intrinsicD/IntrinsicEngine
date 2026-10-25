@@ -552,10 +552,8 @@ TEST(RuntimeRenderExtraction, RotatedBoundPositionsUseAnEnclosingWorldAabb)
     auto& vertices = raw.get<ECS::Components::GeometrySources::Vertices>(entity).Properties;
     vertices.GetOrAdd<glm::vec3>("v:display", glm::vec3{0.f}).Vector() = {
         {-4.f, -1.f, -2.f}, {4.f, 1.f, 2.f}, {0.f, 0.f, 0.f}};
-    raw.emplace<Runtime::VertexChannelBindingSet>(entity).Position = {
-        .Enabled = true,
-        .Property = {Runtime::GeometryElementDomain::MeshVertex,
-                     "v:display", Geometry::PropertyValueKind::Vec3}};
+    raw.emplace<Runtime::VertexChannelBindingSet>(entity).Surface.Position = {.Enabled = true,
+        .Property = {Runtime::GeometryElementDomain::MeshVertex, "v:display", Geometry::PropertyValueKind::Vec3}};
     ASSERT_FALSE(raw.any_of<ECS::Components::Culling::World::Bounds>(entity));
 
     (void)fixture.Extract(scene);

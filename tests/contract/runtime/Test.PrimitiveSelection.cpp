@@ -12,6 +12,7 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -284,16 +285,21 @@ TEST(PrimitiveSelection, HighlightFollowsBoundPositions)
     for (glm::vec3& p : lifted)
         p.z += 3.0f;
     vertices.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = lifted;
-    h.Scene.Raw().emplace<R::VertexChannelBindingSet>(
-        h.Entity, R::VertexChannelBindingSet{
-                      .Position = {.Enabled = true,
-                                   .Property = {D::MeshVertex, "v:lifted",
-                                                Geometry::PropertyValueKind::Vec3}}});
+    h.Scene.Raw().emplace<R::VertexChannelBindingSet>(h.Entity,
+        R::VertexChannelBindingSet{
+            .Surface = {.Position = {.Enabled = true,
+                            .Property = {D::MeshVertex, "v:lifted", Geometry::PropertyValueKind::Vec3}}}});
     ASSERT_TRUE(h.Change(Edit::Replace, {2}).Usable());
-    const auto snapshot =
-        R::BuildPrimitiveSelectionRenderSnapshot(h.Scene, h.Selection, R::DefaultWorldHandle);
+    auto snapshot = R::BuildPrimitiveSelectionRenderSnapshot(h.Scene, h.Selection, R::DefaultWorldHandle);
     ASSERT_EQ(snapshot.DebugPoints.size(), 1u);
     EXPECT_EQ(snapshot.DebugPoints[0].Position, glm::vec3(1, 1, 3));
+
+    // UI-083: once the entity draws points, selected vertices are highlighted on
+    // the points lane, which still shows the canonical positions.
+    h.Scene.Raw().emplace<Extrinsic::Graphics::Components::RenderPoints>(h.Entity);
+    snapshot = R::BuildPrimitiveSelectionRenderSnapshot(h.Scene, h.Selection, R::DefaultWorldHandle);
+    ASSERT_EQ(snapshot.DebugPoints.size(), 1u);
+    EXPECT_EQ(snapshot.DebugPoints[0].Position, glm::vec3(1, 1, 0));
 }
 // RUNTIME-315: a pick read back after the Position binding changed was rendered
 // from other positions, so its stamp differs and the pick is discarded, even
@@ -308,16 +314,25 @@ TEST(PrimitiveSelection, PickStampChangesWithThePositionBindingGeneration)
     ASSERT_FALSE(unbound.empty());
     EXPECT_EQ(R::BuildPrimitivePickStamp(h.Scene, h.Id, false), unbound);
 
-    auto& bindings = h.Scene.Raw().emplace<R::VertexChannelBindingSet>(
-        h.Entity, R::VertexChannelBindingSet{
-                      .Position = {.Enabled = true,
-                                   .Property = {D::MeshVertex, "v:a", Geometry::PropertyValueKind::Vec3}},
-                      .BindingGeneration = 1u});
+    auto& bindings = h.Scene.Raw().emplace<R::VertexChannelBindingSet>(h.Entity,
+        R::VertexChannelBindingSet{
+            .Surface = {.Position = {.Enabled = true,
+                            .Property = {D::MeshVertex, "v:a", Geometry::PropertyValueKind::Vec3}}},
+            .BindingGeneration = 1u});
     const auto bound = R::BuildPrimitivePickStamp(h.Scene, h.Id, false);
     EXPECT_NE(bound, unbound);
 
     bindings.BindingGeneration = 2u;  // rebound; the displayed source's revision is unchanged
-    EXPECT_NE(R::BuildPrimitivePickStamp(h.Scene, h.Id, false), bound);
+    const auto rebound = R::BuildPrimitivePickStamp(h.Scene, h.Id, false);
+    EXPECT_NE(rebound, bound);
+
+    // UI-083: an edit of the positions only another lane displays also changes the stamp.
+    vertices.GetOrAdd<glm::vec3>("v:b", glm::vec3{0.0f}).Vector() = canonical;
+    bindings.Points.Position = {.Enabled = true, .Property = {D::MeshVertex, "v:b", Geometry::PropertyValueKind::Vec3}};
+    const auto withPoints = R::BuildPrimitivePickStamp(h.Scene, h.Id, false);
+    EXPECT_NE(withPoints, rebound);
+    vertices.Get<glm::vec3>("v:b").Vector()[0].z = 1.0f;
+    EXPECT_NE(R::BuildPrimitivePickStamp(h.Scene, h.Id, false), withPoints);
     EXPECT_NE(R::BuildPrimitivePickStamp(h.Scene, h.Id, true), R::BuildPrimitivePickStamp(h.Scene, h.Id, false));
     EXPECT_TRUE(R::BuildPrimitivePickStamp(h.Scene, h.Id + 1000u, false).empty());
 }

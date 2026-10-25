@@ -93,9 +93,14 @@ namespace Extrinsic::Runtime
         const D positionDomain = PositionDomainOf(command.Domain);
         const auto* positionSet = ResolveGeometryPropertySet(availability, positionDomain);
         const auto* bindings = context.Scene->Raw().try_get<VertexChannelBindingSet>(*entity);
+        // The primary lane's displayed positions, where the arrows are anchored (UI-083).
+        const GeometryRenderLane anchorLane =
+            PrimaryLaneFor(availability.Sources.ProvenanceDomain, RenderAttribute::Position)
+                .value_or(GeometryRenderLane::Points);
         const GeometryPropertyRef positions{positionDomain,
-            positionSet != nullptr ? std::string{ResolveDisplayedPositions(*positionSet, positionDomain, bindings).Name}
-                                   : std::string{ECS::Components::GeometrySources::PropertyNames::kPosition},
+            positionSet != nullptr
+                ? std::string{ResolveDisplayedPositions(*positionSet, positionDomain, bindings, anchorLane).Name}
+                : std::string{ECS::Components::GeometrySources::PropertyNames::kPosition},
             Geometry::PropertyValueKind::Vec3};
         GP::PointInputCapture samples;
         std::string diagnostic;

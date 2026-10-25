@@ -795,7 +795,8 @@ TEST(SceneDocumentModule, QueuedSavePreservesAttributeBindings)
         .Enabled = true,
         .Property = {Runtime::GeometryElementDomain::PointCloudPoint, "v:custom_normal", Geometry::PropertyValueKind::Vec3},
     };
-    scene.Raw().emplace<Runtime::VertexChannelBindingSet>(entity, Runtime::VertexChannelBindingSet{.Normal = normal});
+    scene.Raw().emplace<Runtime::VertexChannelBindingSet>(
+        entity, Runtime::VertexChannelBindingSet{.Points = {.Normal = normal}});
     const auto queued = documents.QueueSceneSaveToPath(file.Path.string());
     ASSERT_TRUE(queued.has_value());
     ASSERT_TRUE(DrainUntilTerminal(engine.Jobs(), engine.Events(), queued->Task));
@@ -809,7 +810,7 @@ TEST(SceneDocumentModule, QueuedSavePreservesAttributeBindings)
     for (const auto loadedEntity : bound)
     {
         EXPECT_TRUE(loaded.Raw().all_of<Extrinsic::Graphics::Components::RenderBounds>(loadedEntity));
-        EXPECT_EQ(bound.get<const Runtime::VertexChannelBindingSet>(loadedEntity).Normal, normal);
+        EXPECT_EQ(bound.get<const Runtime::VertexChannelBindingSet>(loadedEntity).Points.Normal, normal);
         const auto& restored = bound.get<const ECSC::GeometrySources::Vertices>(loadedEntity).Properties;
         const auto values = restored.Get<glm::vec3>("v:custom_normal");
         ASSERT_TRUE(values);

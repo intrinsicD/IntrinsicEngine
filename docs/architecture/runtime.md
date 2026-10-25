@@ -1301,7 +1301,11 @@ selection eligibility, render hints, visualization configs, authored
 `GeometryPresentationRecipe` values, structural render-attribute bindings
 (`attributeBindings`, RUNTIME-315; an optional key, with
 sources that do not resolve on load kept, drawn from the default and counted in
-`StaleAttributeBindings`), and mesh/graph/point-cloud `GeometrySources`
+`StaleAttributeBindings`; one key per lane slot since UI-083: the bare
+`position`/`normal`/`texcoord` names the entity's primary lane for the
+attribute, as every older scene stored it, and `edges.position`,
+`points.position`, `points.normal` name the other lanes; an unknown key, a
+prefixed key for the primary lane or a duplicate slot rejects the document), and mesh/graph/point-cloud `GeometrySources`
 including their typed property tables. The
 next incompatible format change bumps `kSceneDocumentVersion`. The writer emits only `geometryPresentation`; the reader
 also accepts the retired `progressiveRenderData` key and creates a fresh default

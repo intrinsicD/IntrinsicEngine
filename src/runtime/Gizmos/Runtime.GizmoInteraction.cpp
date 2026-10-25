@@ -424,21 +424,18 @@ namespace Extrinsic::Runtime
     glm::vec3 GizmoInteraction::LocalBoundsCenter(const Registry& registry, const EntityHandle entity) const
     {
         const auto resolved = ResolveEntityDisplayedPositions(registry.Raw(), entity);
-        if (!resolved.Positions.Bound || resolved.Positions.Values.empty())
+        if (!resolved.AnyBound())
         {
             m_BoundsPivotCache.erase(entity);
             const auto box = ComputeEntityLocalDisplayBounds(registry.Raw(), entity);
             return box && IsFinite(box->Min) && IsFinite(box->Max) ? box->GetCenter() : glm::vec3{0.0f};
         }
         auto& cached = m_BoundsPivotCache[entity];
-        const auto revision = resolved.Vertices->FindPropertyRevision(resolved.Positions.Name).value_or(0u);
-        if (revision == 0u || cached.Owner != resolved.Vertices || cached.Data != resolved.Positions.Values.data() ||
-            cached.Revision != revision || cached.Name != resolved.Positions.Name)
+        std::string signature = DisplayedPositionsSignature(resolved);
+        if (signature.empty() || cached.Owner != resolved.Vertices || cached.Signature != signature)
         {
             cached.Owner = resolved.Vertices;
-            cached.Data = resolved.Positions.Values.data();
-            cached.Revision = revision;
-            cached.Name = resolved.Positions.Name;
+            cached.Signature = std::move(signature);
             const auto box = ComputeEntityLocalDisplayBounds(registry.Raw(), entity);
             cached.Center = box && IsFinite(box->Min) && IsFinite(box->Max) ? box->GetCenter() : glm::vec3{0.0f};
         }

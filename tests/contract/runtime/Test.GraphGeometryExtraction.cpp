@@ -23,6 +23,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -1126,9 +1127,9 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
     engine.Shutdown();
 }
 
-// RUNTIME-315: graph nodes draw a bound Position source through the same
-// binding table and resolver as meshes and point clouds.
-TEST(GraphGeometryExtraction, BoundPositionSourceIsDrawnForNodesAndEdges)
+// RUNTIME-315/UI-083: graph nodes draw bound Position sources through the same
+// binding table and resolver as meshes and point clouds, one slot per lane.
+TEST(GraphGeometryExtraction, BoundPositionSourcesAreDrawnForNodesAndEdgesPerLane)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
@@ -1136,33 +1137,96 @@ TEST(GraphGeometryExtraction, BoundPositionSourceIsDrawnForNodesAndEdges)
     const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
     scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:moved", glm::vec3{0.0f}).Vector() =
         {{0.0f, 0.0f, 4.0f}, {1.0f, 0.0f, 4.0f}, {0.0f, 1.0f, 4.0f}};
-    scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
-        entity, Extrinsic::Runtime::VertexChannelBindingSet{
-                    .Position = {.Enabled = true,
-                                 .Property = {Extrinsic::Runtime::GeometryElementDomain::GraphNode, "v:moved",
-                                              Geometry::PropertyValueKind::Vec3}}});
+    const Extrinsic::Runtime::VertexChannelSourceBinding moved{.Enabled = true,
+        .Property = {
+            Extrinsic::Runtime::GeometryElementDomain::GraphNode, "v:moved", Geometry::PropertyValueKind::Vec3}};
+    const std::uint64_t movedPrint =
+        Extrinsic::Tests::GeometryFloat32Fingerprint({0.0f, 0.0f, 4.0f, 1.0f, 0.0f, 4.0f, 0.0f, 1.0f, 4.0f});
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    (void)extraction.ExtractAndSubmit(scene, engine.GetRenderer(),
-                                      &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
-    const auto view = extraction.FindRenderableSidecarForTest(
-        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
-    ASSERT_TRUE(view.has_value());
-    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
-    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(view->GraphGeometry, residency));
-    EXPECT_EQ(residency.PositionFingerprint,
-              Extrinsic::Tests::GeometryFloat32Fingerprint(
-                  {0.0f, 0.0f, 4.0f, 1.0f, 0.0f, 4.0f, 0.0f, 1.0f, 4.0f}));
-    EXPECT_EQ(residency.Record.LineIndexCount, 4u);
-
-    // Both the line instance and the split point lane are culled by the
-    // displayed positions (z = 4), not the canonical ones (z = 0).
-    auto world = engine.GetRenderer().ExtractRenderWorld({});
-    engine.GetRenderer().PrepareFrame(world);
-    ASSERT_TRUE(view->HasGraphPointLaneInstance);
-    for (const auto instance : {view->Instance, view->GraphPointLaneInstance})
+    Extrinsic::Runtime::RuntimeRenderExtractionStats stats{};
+    const auto extract = [&]
     {
-        const auto bounds = engine.GetRenderer().GetGpuWorld().GetBoundsForTest(instance);
+        stats = extraction.ExtractAndSubmit(
+            scene, engine.GetRenderer(), &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+        const auto view =
+            extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+        EXPECT_TRUE(view.has_value());
+        return view.value_or(Extrinsic::Runtime::RenderExtractionCache::RenderableSidecarView{});
+    };
+    const auto residencyOf = [&](const Extrinsic::Graphics::GpuGeometryHandle geometry)
+    {
+        Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+        EXPECT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(geometry, residency));
+        return residency;
+    };
+    const auto expectCulledAtZ = [&](const auto& view, const float centre, const float lowest)
+    {
+        auto world = engine.GetRenderer().ExtractRenderWorld({});
+        engine.GetRenderer().PrepareFrame(world);
+        ASSERT_TRUE(view.HasGraphPointLaneInstance);
+        for (const auto instance : {view.Instance, view.GraphPointLaneInstance})
+        {
+            const auto bounds = engine.GetRenderer().GetGpuWorld().GetBoundsForTest(instance);
+            EXPECT_FLOAT_EQ(bounds.WorldSphere.z, centre);
+            EXPECT_FLOAT_EQ(bounds.WorldAabbMin.z, lowest);
+        }
+    };
+    const std::uint64_t canonicalPrint = residencyOf(extract().GraphGeometry).PositionFingerprint;
+    ASSERT_NE(canonicalPrint, movedPrint);
+
+    // Only the edges are moved: the lines draw `v:moved`, the point lane gets its
+    // own points-only upload of the canonical positions, and both instances are
+    // culled by the union (z 0 to 4).
+    scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
+        entity, Extrinsic::Runtime::VertexChannelBindingSet{.Edges = {.Position = moved}, .BindingGeneration = 2u});
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(scene.Raw(), entity);  // as the bind command does
+    auto view = extract();
+    auto lines = residencyOf(view.GraphGeometry);
+    EXPECT_EQ(lines.PositionFingerprint, movedPrint);
+    EXPECT_EQ(lines.Record.LineIndexCount, 4u);
+    ASSERT_TRUE(view.GraphPointGeometry.IsValid());
+    auto points = residencyOf(view.GraphPointGeometry);
+    EXPECT_EQ(points.PositionFingerprint, canonicalPrint);
+    EXPECT_EQ(points.Record.LineIndexCount, 0u);
+    expectCulledAtZ(view, 2.0f, 0.0f);
+
+    // A steady frame uploads nothing.
+    const auto pointGeometry = view.GraphPointGeometry;
+    view = extract();
+    EXPECT_EQ(view.GraphPointGeometry, pointGeometry);
+    EXPECT_EQ(stats.GraphGeometryUploads, 0u);
+    EXPECT_EQ(stats.GraphGeometryReuploads, 0u);
+
+    // Both lanes moved: one shared upload again, culled by the displayed positions.
+    scene.Raw().replace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{
+            .Edges = {.Position = moved}, .Points = {.Position = moved}, .BindingGeneration = 3u});
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(scene.Raw(), entity);  // as the bind command does
+    view = extract();
+    EXPECT_EQ(residencyOf(view.GraphGeometry).PositionFingerprint, movedPrint);
+    EXPECT_FALSE(view.GraphPointGeometry.IsValid());
+    expectCulledAtZ(view, 4.0f, 4.0f);
+
+    // Only the points moved: the lines are canonical, the point lane draws `v:moved`.
+    scene.Raw().replace<Extrinsic::Runtime::VertexChannelBindingSet>(
+        entity, Extrinsic::Runtime::VertexChannelBindingSet{.Points = {.Position = moved}, .BindingGeneration = 4u});
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(scene.Raw(), entity);  // as the bind command does
+    view = extract();
+    EXPECT_EQ(residencyOf(view.GraphGeometry).PositionFingerprint, canonicalPrint);
+    ASSERT_TRUE(view.GraphPointGeometry.IsValid());
+    EXPECT_EQ(residencyOf(view.GraphPointGeometry).PositionFingerprint, movedPrint);
+
+    // Hiding the edges leaves one points-only upload of the points lane; the hidden
+    // edges' canonical positions no longer widen the culling bounds.
+    scene.Raw().remove<Extrinsic::Graphics::Components::RenderEdges>(entity);
+    view = extract();
+    EXPECT_EQ(residencyOf(view.GraphGeometry).PositionFingerprint, movedPrint);
+    EXPECT_FALSE(view.GraphPointGeometry.IsValid());
+    {
+        auto world = engine.GetRenderer().ExtractRenderWorld({});
+        engine.GetRenderer().PrepareFrame(world);
+        const auto bounds = engine.GetRenderer().GetGpuWorld().GetBoundsForTest(view.Instance);
         EXPECT_FLOAT_EQ(bounds.WorldSphere.z, 4.0f);
         EXPECT_FLOAT_EQ(bounds.WorldAabbMin.z, 4.0f);
     }

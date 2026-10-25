@@ -444,6 +444,8 @@ export namespace Extrinsic::Runtime
             bool HasGraphResidency = false;
             Graphics::GpuInstanceHandle GraphPointLaneInstance{};
             bool HasGraphPointLaneInstance = false;
+            // UI-083: the point lane's own upload while its positions differ from the edges'.
+            Graphics::GpuGeometryHandle GraphPointGeometry{};
             // RUNTIME-087 — runtime-authored point-cloud-source residency. The
             // single handle the coordinator owns and retires for a
             // point-cloud-domain entity (point positions as the vertex buffer);

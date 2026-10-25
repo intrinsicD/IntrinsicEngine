@@ -1623,17 +1623,53 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        // Structural attribute bindings (RUNTIME-315), keyed by attribute.
-        [[nodiscard]] json AttributeBindingsToJson(const VertexChannelBindingSet& bindings)
+        // Structural attribute bindings (RUNTIME-315), one key per lane slot
+        // (UI-083): the bare attribute names the entity's primary lane for it
+        // (all that scenes before UI-083 stored), any other lane is
+        // `<lane>.<attribute>` (`edges.position`, `points.normal`, ...).
+        constexpr std::array<std::string_view, 3> kAttributeBindingLanePrefixes{"surface.", "edges.", "points."};
+
+        [[nodiscard]] std::string AttributeBindingKey(
+            const GeometryRenderLane lane, const RenderAttribute attribute, const GS::Domain provenance)
+        {
+            std::string key{ToString(attribute)};
+            if (PrimaryLaneFor(provenance, attribute) == lane)
+                return key;
+            return std::string{kAttributeBindingLanePrefixes[std::size_t(lane)]} + key;
+        }
+
+        [[nodiscard]] VertexChannelSourceBinding* FindAttributeBindingSlot(
+            VertexChannelBindingSet& bindings, const std::string_view key, const GS::Domain provenance)
+        {
+            for (std::size_t lane = 0; lane < kAttributeBindingLanePrefixes.size(); ++lane)
+            {
+                RenderAttribute attribute{};
+                if (key.starts_with(kAttributeBindingLanePrefixes[lane]) &&
+                    TryParseRenderAttribute(key.substr(kAttributeBindingLanePrefixes[lane].size()), attribute))
+                {
+                    // The primary lane's slot is spelled with the bare key only.
+                    if (PrimaryLaneFor(provenance, attribute) == GeometryRenderLane(lane))
+                        return nullptr;
+                    return FindVertexChannelSourceBinding(bindings, GeometryRenderLane(lane), attribute);
+                }
+            }
+            RenderAttribute attribute{};
+            if (!TryParseRenderAttribute(key, attribute))
+                return nullptr;
+            const std::optional<GeometryRenderLane> primary = PrimaryLaneFor(provenance, attribute);
+            return primary.has_value() ? FindVertexChannelSourceBinding(bindings, *primary, attribute) : nullptr;
+        }
+
+        [[nodiscard]] json AttributeBindingsToJson(const VertexChannelBindingSet& bindings, const GS::Domain provenance)
         {
             json out = json::object();
-            for (const RenderAttribute attribute :
-                 {RenderAttribute::Position, RenderAttribute::Normal, RenderAttribute::Texcoord})
+            for (const RenderLaneAttributeRow& row : RenderLaneAttributeRows())
             {
                 const VertexChannelSourceBinding* binding =
-                    FindVertexChannelSourceBinding(bindings, attribute);
+                    FindVertexChannelSourceBinding(bindings, row.Lane, row.Attribute);
                 if (binding != nullptr && IsVertexChannelBindingEnabled(*binding))
-                    out[std::string{ToString(attribute)}] = GeometryPropertyRefToJson(binding->Property);
+                    out[AttributeBindingKey(row.Lane, row.Attribute, provenance)] =
+                        GeometryPropertyRefToJson(binding->Property);
             }
             return out;
         }
@@ -1641,6 +1677,8 @@ namespace Extrinsic::Runtime
         // Applies after geometry so each binding is checked against the loaded
         // properties. A source that no longer resolves stays authored (the
         // renderer draws the default) and is counted and logged, never dropped.
+        // An unknown key, a prefixed key for the primary lane, or two keys naming
+        // one slot is a malformed document.
         [[nodiscard]] bool TryApplyAttributeBindingsFromJson(
             entt::registry& raw,
             const ECS::EntityHandle entity,
@@ -1649,15 +1687,13 @@ namespace Extrinsic::Runtime
         {
             if (!value.is_object())
                 return false;
+            const GeometryEntityAvailability availability = BuildGeometryAvailability(raw, entity);
+            const GS::Domain provenance = availability.Sources.ProvenanceDomain;
             VertexChannelBindingSet bindings{};
             for (const auto& [key, refJson] : value.items())
             {
-                RenderAttribute attribute{};
-                if (!TryParseRenderAttribute(key, attribute))
-                    return false;
-                VertexChannelSourceBinding* binding =
-                    FindVertexChannelSourceBinding(bindings, attribute);
-                if (binding == nullptr || !TryReadGeometryPropertyRef(refJson, binding->Property) ||
+                VertexChannelSourceBinding* binding = FindAttributeBindingSlot(bindings, key, provenance);
+                if (binding == nullptr || binding->Enabled || !TryReadGeometryPropertyRef(refJson, binding->Property) ||
                     !binding->Property.HasName())
                 {
                     return false;
@@ -1667,23 +1703,23 @@ namespace Extrinsic::Runtime
             if (bindings == VertexChannelBindingSet{})
                 return true;
 
-            const GeometryEntityAvailability availability = BuildGeometryAvailability(raw, entity);
-            for (const RenderAttribute attribute :
-                 {RenderAttribute::Position, RenderAttribute::Normal, RenderAttribute::Texcoord})
+            for (const RenderLaneAttributeRow& row : RenderLaneAttributeRows())
             {
                 const VertexChannelSourceBinding* binding =
-                    FindVertexChannelSourceBinding(bindings, attribute);
-                if (!IsVertexChannelBindingEnabled(*binding))
+                    FindVertexChannelSourceBinding(bindings, row.Lane, row.Attribute);
+                if (binding == nullptr || !IsVertexChannelBindingEnabled(*binding))
                     continue;
                 const GeometryPropertyResolution resolution = ResolveRenderAttributeSource(
-                    availability, attribute, binding->Property.Domain, binding->Property.Name);
+                    availability, row.Attribute, binding->Property.Domain, binding->Property.Name);
                 if (resolution.Resolved())
                     continue;
                 ++stats.StaleAttributeBindings;
-                Core::Log::Warn(
-                    "[Runtime] Scene load: {} source '{}' on {} is {}; drawing the default source",
-                    ToString(attribute), binding->Property.Name,
-                    ToString(binding->Property.Domain), ToString(resolution.Status));
+                Core::Log::Warn("[Runtime] Scene load: {} {} source '{}' on {} is {}; drawing the default source",
+                    ToString(row.Lane),
+                    ToString(row.Attribute),
+                    binding->Property.Name,
+                    ToString(binding->Property.Domain),
+                    ToString(resolution.Status));
             }
             raw.emplace_or_replace<VertexChannelBindingSet>(entity, bindings);
             ++stats.AttributeBindingEntities;
@@ -3066,7 +3102,8 @@ namespace Extrinsic::Runtime
 
             if (const auto* bindings = raw.try_get<VertexChannelBindingSet>(entity))
             {
-                json attributeBindings = AttributeBindingsToJson(*bindings);
+                json attributeBindings =
+                    AttributeBindingsToJson(*bindings, BuildGeometryAvailability(raw, entity).Sources.ProvenanceDomain);
                 if (!attributeBindings.empty())
                 {
                     entityJson["attributeBindings"] = std::move(attributeBindings);

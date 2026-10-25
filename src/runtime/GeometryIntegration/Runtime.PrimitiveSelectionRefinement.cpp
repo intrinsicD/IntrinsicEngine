@@ -17,6 +17,8 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -832,10 +834,28 @@ namespace Extrinsic::Runtime
             ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
         if (view.VertexSource != nullptr)
         {
-            request.PositionProperty = std::string{ResolveDisplayedPositions(
-                view.VertexSource->Properties,
-                DisplayedPositionDomainFor(BuildSourceAvailability(view).ProvenanceDomain),
-                scene.Raw().try_get<VertexChannelBindingSet>(entity)).Name};
+            // UI-083: measure against the positions of the lane that was hit; a
+            // missing hint searches the lane the issuing target is shown on.
+            using HintDomain = Extrinsic::Graphics::SelectionPrimitiveDomain;
+            const GeometryElementDomain vertexDomain =
+                DisplayedPositionDomainFor(BuildSourceAvailability(view).ProvenanceDomain);
+            GeometryRenderLane lane{};
+            switch (request.Hint.Domain())
+            {
+            case HintDomain::Face:  lane = GeometryRenderLane::Surface; break;
+            case HintDomain::Edge:  lane = GeometryRenderLane::Edges; break;
+            case HintDomain::Point: lane = GeometryRenderLane::Points; break;
+            default:
+                lane = SelectionLaneFor(scene.Raw(),
+                    entity,
+                    context != nullptr && context->TargetDomain != GeometryElementDomain::Unknown
+                        ? context->TargetDomain
+                        : vertexDomain);
+                break;
+            }
+            const auto* bindings = scene.Raw().try_get<VertexChannelBindingSet>(entity);
+            request.PositionProperty = std::string{
+                ResolveDisplayedPositions(view.VertexSource->Properties, vertexDomain, bindings, lane).Name};
         }
         PrimitiveSelectionResult result = RefinePrimitiveSelection(view, request);
         if (request.HasLocalHit && worldCursor.has_value())

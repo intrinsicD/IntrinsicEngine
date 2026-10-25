@@ -197,9 +197,7 @@ export namespace Extrinsic::Runtime
         struct BoundsPivotCache
         {
             const void* Owner{nullptr};
-            const glm::vec3* Data{nullptr};
-            std::uint64_t Revision{0};
-            std::string Name{};
+            std::string Signature{};  // `DisplayedPositionsSignature`
             glm::vec3 Center{0.0f};
         };
         void PruneBoundsPivotCache(const Registry& registry, std::span<const EntityHandle> selected) const;

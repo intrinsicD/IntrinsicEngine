@@ -32,20 +32,19 @@ namespace Extrinsic::Runtime
         const std::size_t vertexCount,
         VertexChannelStreams& channels)
     {
-        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
+        // Normals are drawn by the points lane only (lines are unlit).
+        const VertexChannelSourceBinding* normal =
+            channelBindings != nullptr ? &channelBindings->Points.Normal : nullptr;
+        if (normal != nullptr && IsVertexChannelBindingEnabled(*normal))
         {
             const std::optional<AttributeSourceType> sourceType =
-                channelBindings->Normal.Property.Domain == domain
-                    ? ToAttributeSourceType(
-                          channelBindings->Normal.Property.ValueKind)
-                    : std::nullopt;
+                normal->Property.Domain == domain ? ToAttributeSourceType(normal->Property.ValueKind) : std::nullopt;
             std::vector<glm::vec3> normals(vertexCount);
             const VertexAttributeBinding normalBinding{
                 .Channel = VertexChannel::Normal,
                 .SourceType = sourceType.value_or(AttributeSourceType::Vec3),
-                .SourceProperty = sourceType == AttributeSourceType::Vec3
-                    ? std::string_view{channelBindings->Normal.Property.Name}
-                    : std::string_view{},
+                .SourceProperty = sourceType == AttributeSourceType::Vec3 ? std::string_view{normal->Property.Name}
+                                                                          : std::string_view{},
                 .AllowFallback = false,
                 .Normalize = true,
                 .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
@@ -116,8 +115,12 @@ namespace Extrinsic::Runtime
         {
             return Failure(GraphPackStatus::MissingNodes, outBuffer);
         }
-        const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
-            view.VertexSource->Properties, GeometryElementDomain::GraphNode, channelBindings).Values;
+        // A geometry with lines draws the edges lane's positions; a points-only
+        // one (alone or split from the lines) the points lane's.
+        const GeometryRenderLane lane = wantLines ? GeometryRenderLane::Edges : GeometryRenderLane::Points;
+        const DisplayedPositions displayed = ResolveDisplayedPositions(
+            view.VertexSource->Properties, GeometryElementDomain::GraphNode, channelBindings, lane);
+        const std::span<const glm::vec3> positions = displayed.Values;
         if (positions.empty() && !view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition))
         {
             return Failure(GraphPackStatus::MissingNodes, outBuffer);

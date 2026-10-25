@@ -68,8 +68,11 @@ namespace Extrinsic::Runtime
         {
             return Failure(PointCloudPackStatus::MissingPositions, outBuffer);
         }
-        const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
-            view.VertexSource->Properties, GeometryElementDomain::PointCloudPoint, channelBindings).Values;
+        const DisplayedPositions displayed = ResolveDisplayedPositions(view.VertexSource->Properties,
+            GeometryElementDomain::PointCloudPoint,
+            channelBindings,
+            GeometryRenderLane::Points);
+        const std::span<const glm::vec3> positions = displayed.Values;
         if (positions.empty() && !view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition))
         {
             return Failure(PointCloudPackStatus::MissingPositions, outBuffer);

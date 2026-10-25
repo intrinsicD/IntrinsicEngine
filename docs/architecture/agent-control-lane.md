@@ -264,7 +264,7 @@ stack ends the requested batch successfully; it does not mask a failed command.
   panel's `ApplyEditorAttributeBindingCommand` (one undoable step on the attribute's owner: structural stream, the
   lane's Color overlay or point/line render hint; canonical data is never written) and replies with the resulting
   row; `domain` is needed only when the lane reads that property name on several element domains. Position,
-  Normal and Texcoord are still one source per entity shared by every lane. A refusal ends with the command status in snake case as error
+  Normal and Texcoord bind the named lane's own slot (UI-083); no other lane changes. A refusal ends with the command status in snake case as error
   code (`unsupported_render_attribute`, `attribute_source_missing`, `attribute_source_type_mismatch`,
   `attribute_source_count_mismatch`, `attribute_source_non_finite`, `stale_entity`; `ErrorCodeFor`) and the
   candidate's reason from the model; malformed arguments end with `invalid_params`. Point sizes and line widths

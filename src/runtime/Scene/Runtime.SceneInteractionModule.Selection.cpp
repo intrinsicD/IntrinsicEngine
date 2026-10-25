@@ -31,11 +31,14 @@ namespace Extrinsic::Runtime
             const auto source = GS::BuildConstView(scene.Raw(), entity);
             if (!source.VertexSource)
                 continue;
-            // Highlights sit on the displayed positions (RUNTIME-315).
-            const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
-                source.VertexSource->Properties,
+            // Highlights sit on the displayed positions (RUNTIME-315) of the lane the
+            // selected elements are shown on (UI-083).
+            const auto* bindings = scene.Raw().try_get<VertexChannelBindingSet>(entity);
+            const DisplayedPositions displayed = ResolveDisplayedPositions(source.VertexSource->Properties,
                 DisplayedPositionDomainFor(GS::BuildSourceAvailability(source).ProvenanceDomain),
-                scene.Raw().try_get<VertexChannelBindingSet>(entity)).Values;
+                bindings,
+                SelectionLaneFor(scene.Raw(), entity, selected.Domain));
+            const std::span<const glm::vec3> positions = displayed.Values;
             if (positions.empty())
                 continue;
             const auto* worldMatrix =

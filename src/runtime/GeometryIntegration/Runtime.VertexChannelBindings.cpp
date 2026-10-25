@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 
 #include <glm/glm.hpp>
@@ -15,6 +16,7 @@ module Extrinsic.Runtime.VertexChannelBindings;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.GeometryAvailability;
 
 namespace Extrinsic::Runtime
@@ -101,24 +103,18 @@ namespace Extrinsic::Runtime
         constexpr std::array kPointVertices{D::MeshVertex, D::GraphNode, D::PointCloudPoint};
 
         using L = GeometryRenderLane;
-        // Position and Normal are one structural stream per entity until each
-        // lane gets its own slot, so their rows say the binding is shared.
         constexpr std::array kLaneRows{
-            RenderLaneAttributeRow{L::Surface, A::Position, kMeshVertex, "v:position; shared by all primitives"},
-            RenderLaneAttributeRow{L::Surface,
-                A::Normal,
-                kSurfaceCorner,
-                "h:normal corners, else v:normal, else +Z; shared by all primitives"},
+            RenderLaneAttributeRow{L::Surface, A::Position, kMeshVertex, kPosition},
+            RenderLaneAttributeRow{L::Surface, A::Normal, kSurfaceCorner, "h:normal corners, else v:normal, else +Z"},
             RenderLaneAttributeRow{
                 L::Surface, A::Texcoord, kSurfaceCorner, "h:texcoord corners, else v:texcoord, else zero"},
             RenderLaneAttributeRow{
                 L::Surface, A::Color, kSurfaceColor, "material or texture, v:color when present, else grey-white"},
-            RenderLaneAttributeRow{L::Edges, A::Position, kEdgeVertices, "v:position; shared by all primitives"},
+            RenderLaneAttributeRow{L::Edges, A::Position, kEdgeVertices, kPosition},
             RenderLaneAttributeRow{L::Edges, A::Color, kEdgeColor, "v:color when present, else dark lane color"},
             RenderLaneAttributeRow{L::Edges, A::LineWidth, kEdgeElements, "uniform line width (px)"},
-            RenderLaneAttributeRow{L::Points, A::Position, kPointVertices, "v:position; shared by all primitives"},
-            RenderLaneAttributeRow{
-                L::Points, A::Normal, kPointVertices, "v:normal, not yet read by points; shared by all primitives"},
+            RenderLaneAttributeRow{L::Points, A::Position, kPointVertices, kPosition},
+            RenderLaneAttributeRow{L::Points, A::Normal, kPointVertices, "v:normal, not yet read by points"},
             RenderLaneAttributeRow{
                 L::Points, A::Color, kPointVertices, "v:color or p:color when present, else dark lane color"},
             RenderLaneAttributeRow{L::Points, A::PointSize, kPointVertices, "uniform point size (px)"},
@@ -271,16 +267,35 @@ namespace Extrinsic::Runtime
         return resolution;
     }
 
-    DisplayedPositions ResolveDisplayedPositions(
-        const Geometry::PropertySet& vertices,
+    VertexChannelLaneBindings& LaneBindings(VertexChannelBindingSet& bindings, const GeometryRenderLane lane) noexcept
+    {
+        switch (lane)
+        {
+        case GeometryRenderLane::Surface: return bindings.Surface;
+        case GeometryRenderLane::Edges:   return bindings.Edges;
+        case GeometryRenderLane::Points:  return bindings.Points;
+        }
+        return bindings.Surface;
+    }
+
+    const VertexChannelLaneBindings& LaneBindings(
+        const VertexChannelBindingSet& bindings, const GeometryRenderLane lane) noexcept
+    {
+        return LaneBindings(const_cast<VertexChannelBindingSet&>(bindings), lane);
+    }
+
+    DisplayedPositions ResolveDisplayedPositions(const Geometry::PropertySet& vertices,
         const GeometryElementDomain vertexDomain,
-        const VertexChannelBindingSet* bindings) noexcept
+        const VertexChannelBindingSet* bindings,
+        const GeometryRenderLane lane) noexcept
     {
         const Geometry::ConstPropertySet properties{vertices};
-        if (bindings != nullptr && IsVertexChannelBindingEnabled(bindings->Position) &&
-            bindings->Position.Property.Domain == vertexDomain)
+        const VertexChannelSourceBinding* position =
+            bindings != nullptr ? &LaneBindings(*bindings, lane).Position : nullptr;
+        if (position != nullptr && IsVertexChannelBindingEnabled(*position) &&
+            position->Property.Domain == vertexDomain)
         {
-            const std::string_view name = bindings->Position.Property.Name;
+            const std::string_view name = position->Property.Name;
             const auto bound = properties.Get<glm::vec3>(name);
             if (bound.IsValid() && bound.Size() == vertices.Size() &&
                 GeometryPropertyValuesAreFinite(vertices, name))
@@ -310,6 +325,60 @@ namespace Extrinsic::Runtime
         return D::Unknown;
     }
 
+    std::optional<GeometryRenderLane> PrimaryLaneFor(
+        const ECS::Components::GeometrySources::Domain provenance, const RenderAttribute attribute) noexcept
+    {
+        using SourceDomain = ECS::Components::GeometrySources::Domain;
+        const GeometryElementDomain vertexDomain = DisplayedPositionDomainFor(provenance);
+        if (provenance != SourceDomain::Mesh && provenance != SourceDomain::Graph &&
+            provenance != SourceDomain::PointCloud)
+            return std::nullopt;
+        for (const GeometryRenderLane lane :
+            {GeometryRenderLane::Surface, GeometryRenderLane::Edges, GeometryRenderLane::Points})
+        {
+            if (RenderLaneReadsDomain(lane, attribute, vertexDomain))
+                return lane;
+        }
+        return std::nullopt;
+    }
+
+    GeometryRenderLane SelectionLaneFor(
+        const entt::registry& registry, const entt::entity entity, const GeometryElementDomain domain)
+    {
+        namespace G = Graphics::Components;
+        namespace GS = ECS::Components::GeometrySources;
+        if (domain == D::MeshFace)
+            return GeometryRenderLane::Surface;
+        if (domain == D::MeshEdge || domain == D::GraphEdge)
+            return registry.all_of<G::RenderEdges>(entity) || domain == D::GraphEdge ? GeometryRenderLane::Edges
+                                                                                     : GeometryRenderLane::Surface;
+        if (registry.all_of<G::RenderPoints>(entity))
+            return GeometryRenderLane::Points;
+        return PrimaryLaneFor(
+            GS::BuildSourceAvailability(GS::BuildConstView(registry, entity)).ProvenanceDomain, A::Position)
+            .value_or(GeometryRenderLane::Points);
+    }
+
+    DisplayedLaneMask DisplayedPositionLanes(const entt::registry& registry,
+        const entt::entity entity,
+        const ECS::Components::GeometrySources::Domain provenance)
+    {
+        namespace G = Graphics::Components;
+        using SourceDomain = ECS::Components::GeometrySources::Domain;
+        DisplayedLaneMask lanes{};
+        const std::optional<GeometryRenderLane> primary = PrimaryLaneFor(provenance, A::Position);
+        if (!primary.has_value())
+            return lanes;
+        lanes[std::size_t(GeometryRenderLane::Surface)] =
+            provenance == SourceDomain::Mesh && registry.all_of<G::RenderSurface>(entity);
+        lanes[std::size_t(GeometryRenderLane::Edges)] =
+            provenance != SourceDomain::PointCloud && registry.all_of<G::RenderEdges>(entity);
+        lanes[std::size_t(GeometryRenderLane::Points)] = registry.all_of<G::RenderPoints>(entity);
+        if (lanes == DisplayedLaneMask{})
+            lanes[std::size_t(*primary)] = true;  // drawing nothing, it is still framed by its primary lane
+        return lanes;
+    }
+
     EntityDisplayedPositions ResolveEntityDisplayedPositions(
         const entt::registry& registry, const entt::entity entity)
     {
@@ -320,26 +389,60 @@ namespace Extrinsic::Runtime
         const GS::ConstSourceView view = GS::BuildConstView(registry, entity);
         if (view.VertexSource == nullptr)
             return {};
-        return EntityDisplayedPositions{
-            .Positions = ResolveDisplayedPositions(
-                view.VertexSource->Properties,
-                DisplayedPositionDomainFor(GS::BuildSourceAvailability(view).ProvenanceDomain),
-                bindings),
-            .Vertices = &view.VertexSource->Properties};
+        const GS::Domain provenance = GS::BuildSourceAvailability(view).ProvenanceDomain;
+        const GeometryElementDomain vertexDomain = DisplayedPositionDomainFor(provenance);
+        const DisplayedLaneMask lanes = DisplayedPositionLanes(registry, entity, provenance);
+        EntityDisplayedPositions displayed{.Vertices = &view.VertexSource->Properties};
+        for (const GeometryRenderLane lane :
+            {GeometryRenderLane::Surface, GeometryRenderLane::Edges, GeometryRenderLane::Points})
+        {
+            if (!lanes[std::size_t(lane)])
+                continue;
+            const DisplayedPositions positions =
+                ResolveDisplayedPositions(view.VertexSource->Properties, vertexDomain, bindings, lane);
+            if (std::ranges::none_of(displayed.Sources,
+                    [&](const DisplayedPositions& source)
+                    {
+                        return source.Name == positions.Name;
+                    }))
+                displayed.Sources.push_back(positions);
+        }
+        return displayed;
+    }
+
+    std::string DisplayedPositionsSignature(const EntityDisplayedPositions& displayed)
+    {
+        std::string signature;
+        for (const DisplayedPositions& source : displayed.Sources)
+        {
+            const Geometry::PropertyRevision revision =
+                displayed.Vertices != nullptr ? displayed.Vertices->FindPropertyRevision(source.Name).value_or(0u) : 0u;
+            if (revision == 0u)
+                return {};
+            signature += source.Name;
+            signature += '#';
+            signature += std::to_string(revision);
+            signature += ';';
+        }
+        return signature;
     }
 
     std::optional<Geometry::AABB> ComputeEntityLocalDisplayBounds(const entt::registry& raw, entt::entity entity)
     {
-        const auto displayed = ResolveEntityDisplayedPositions(raw, entity).Positions;
-        if (displayed.Bound && !displayed.Values.empty())
+        const EntityDisplayedPositions displayed = ResolveEntityDisplayedPositions(raw, entity);
+        if (displayed.AnyBound())
         {
             Geometry::AABB box{};
-            for (const auto& point : displayed.Values)
+            for (const DisplayedPositions& source : displayed.Sources)
             {
-                box.Min = glm::min(box.Min, point);
-                box.Max = glm::max(box.Max, point);
+                for (const auto& point : source.Values)
+                {
+                    box.Min = glm::min(box.Min, point);
+                    box.Max = glm::max(box.Max, point);
+                }
             }
-            return box;
+            if (box.IsValid())
+                return box;
         }
         if (const auto* bounds = raw.try_get<ECS::Components::Culling::Local::Bounds>(entity);
             bounds && bounds->LocalBoundingAABB.IsValid())
@@ -348,13 +451,16 @@ namespace Extrinsic::Runtime
     }
 
     VertexChannelSourceBinding* FindVertexChannelSourceBinding(
-        VertexChannelBindingSet& bindings, const RenderAttribute attribute) noexcept
+        VertexChannelBindingSet& bindings, const GeometryRenderLane lane, const RenderAttribute attribute) noexcept
     {
+        if (FindRenderLaneAttributeRow(lane, attribute) == nullptr)
+            return nullptr;
+        VertexChannelLaneBindings& slots = LaneBindings(bindings, lane);
         switch (attribute)
         {
-        case A::Position: return &bindings.Position;
-        case A::Normal: return &bindings.Normal;
-        case A::Texcoord: return &bindings.Texcoord;
+        case A::Position:  return &slots.Position;
+        case A::Normal:    return &slots.Normal;
+        case A::Texcoord:  return &slots.Texcoord;
         case A::Color:
         case A::PointSize:
         case A::LineWidth: break;
@@ -362,10 +468,10 @@ namespace Extrinsic::Runtime
         return nullptr;
     }
 
-    const VertexChannelSourceBinding* FindVertexChannelSourceBinding(
-        const VertexChannelBindingSet& bindings, const RenderAttribute attribute) noexcept
+    const VertexChannelSourceBinding* FindVertexChannelSourceBinding(const VertexChannelBindingSet& bindings,
+        const GeometryRenderLane lane,
+        const RenderAttribute attribute) noexcept
     {
-        return FindVertexChannelSourceBinding(
-            const_cast<VertexChannelBindingSet&>(bindings), attribute);
+        return FindVertexChannelSourceBinding(const_cast<VertexChannelBindingSet&>(bindings), lane, attribute);
     }
 }

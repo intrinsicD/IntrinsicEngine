@@ -3,10 +3,14 @@
 // command, model and consumer validates against.
 module;
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include <glm/vec3.hpp>
 
@@ -33,21 +37,41 @@ export namespace Extrinsic::Runtime
             const VertexChannelSourceBinding&) = default;
     };
 
-    // One authored source per structural stream. `Property.Domain` names the
-    // element domain the source lives on (a vertex domain, or mesh corners for
-    // normals/texcoords). A binding that no longer resolves is kept as authored
-    // intent; consumers draw the canonical source instead.
-    struct VertexChannelBindingSet
+    // The structural sources of one render lane. Only the attributes of the
+    // lane's row (`RenderLaneAttributeRows()`) are ever set: surface Position,
+    // Normal and Texcoord; edges Position; points Position and Normal.
+    struct VertexChannelLaneBindings
     {
         VertexChannelSourceBinding Position{};
         VertexChannelSourceBinding Normal{};
         VertexChannelSourceBinding Texcoord{};
+
+        [[nodiscard]] friend bool operator==(
+            const VertexChannelLaneBindings&, const VertexChannelLaneBindings&) = default;
+    };
+
+    // One authored source per render lane and structural stream, so each
+    // primitive can be drawn from its own positions (UI-083). `Property.Domain`
+    // names the element domain the source lives on (a vertex domain, or mesh
+    // corners for surface normals/texcoords). An unset slot draws the canonical
+    // property; no lane reads another lane's slot. A binding that no longer
+    // resolves is kept as authored intent; consumers draw the canonical source.
+    struct VertexChannelBindingSet
+    {
+        VertexChannelLaneBindings Surface{};
+        VertexChannelLaneBindings Edges{};
+        VertexChannelLaneBindings Points{};
         std::uint64_t BindingGeneration = 1u;
 
         [[nodiscard]] friend bool operator==(
             const VertexChannelBindingSet&,
             const VertexChannelBindingSet&) = default;
     };
+
+    [[nodiscard]] VertexChannelLaneBindings& LaneBindings(
+        VertexChannelBindingSet& bindings, GeometryRenderLane lane) noexcept;
+    [[nodiscard]] const VertexChannelLaneBindings& LaneBindings(
+        const VertexChannelBindingSet& bindings, GeometryRenderLane lane) noexcept;
 
     [[nodiscard]] inline bool IsVertexChannelBindingEnabled(
         const VertexChannelSourceBinding& binding) noexcept
@@ -142,48 +166,88 @@ export namespace Extrinsic::Runtime
         GeometryElementDomain domain,
         std::string_view propertyName) noexcept;
 
-    // The positions a vertex domain is displayed from: drawn, culled (bounds
-    // come from them), picked and used as vector-field anchors. The bound
-    // Position source when it resolves on `vertexDomain` (vec3, one value per
-    // element, all finite), otherwise canonical `v:position`; `Values` is empty
-    // when neither exists. Every consumer resolves through this one function,
-    // so the displayed and the picked geometry cannot diverge. Spatial indices
-    // of geometry methods keep their own input slots (canonical by default).
+    // The positions a render lane is displayed from: drawn, culled (bounds
+    // come from them), picked and highlighted. The lane's bound Position source
+    // when it resolves on `vertexDomain` (vec3, one value per element, all
+    // finite), otherwise canonical `v:position`; `Values` is empty when neither
+    // exists. Every consumer resolves through this one function, so the
+    // displayed and the picked geometry of a lane cannot diverge. Spatial
+    // indices of geometry methods keep their own input slots (canonical by default).
     struct DisplayedPositions
     {
         std::string_view Name{};
         std::span<const glm::vec3> Values{};
         bool Bound{false};
     };
-    [[nodiscard]] DisplayedPositions ResolveDisplayedPositions(
-        const Geometry::PropertySet& vertices,
+    // The positions `lane` displays: its bound Position source when it
+    // resolves on `vertexDomain`, otherwise canonical `v:position`.
+    [[nodiscard]] DisplayedPositions ResolveDisplayedPositions(const Geometry::PropertySet& vertices,
         GeometryElementDomain vertexDomain,
-        const VertexChannelBindingSet* bindings) noexcept;
+        const VertexChannelBindingSet* bindings,
+        GeometryRenderLane lane) noexcept;
 
     // The vertex domain whose positions an entity of `provenance` displays.
     [[nodiscard]] GeometryElementDomain DisplayedPositionDomainFor(
         ECS::Components::GeometrySources::Domain provenance) noexcept;
 
+    // The first lane, in Surface, Edges, Points order, that an entity of
+    // `provenance` draws and whose row has `attribute`: mesh Surface; graph
+    // Edges for Position and Points for Normal; point cloud Points. Its slot
+    // is the one scene files store under the attribute's bare key, and the
+    // positions vector fields and glyph orders anchor to.
+    [[nodiscard]] std::optional<GeometryRenderLane> PrimaryLaneFor(
+        ECS::Components::GeometrySources::Domain provenance, RenderAttribute attribute) noexcept;
+
+    // The lane a selected element of `domain` is shown on (highlights, the
+    // missing-hint pick fallback): faces the surface; edges the edges lane when
+    // the entity draws edges, else the surface; vertices, nodes and points the
+    // points lane when the entity draws points, else its primary lane.
+    [[nodiscard]] GeometryRenderLane SelectionLaneFor(
+        const entt::registry& registry, entt::entity entity, GeometryElementDomain domain);
+
+    // The lanes whose positions an entity of `provenance` displays, indexed by
+    // `GeometryRenderLane`: each lane whose render hint is present, or its
+    // primary lane when it draws none. All false for an unsupported provenance.
+    using DisplayedLaneMask = std::array<bool, 3>;
+    [[nodiscard]] DisplayedLaneMask DisplayedPositionLanes(
+        const entt::registry& registry, entt::entity entity, ECS::Components::GeometrySources::Domain provenance);
+
     // The entity-level resolution shared by every consumer that only has the
-    // registry (culling, camera focus/framing): the displayed positions of the
-    // entity's vertex source and that source's property set (for revisions).
-    // Empty when the entity has no bindings or no vertex source.
+    // registry (culling, camera focus/framing, gizmo pivot): each distinct
+    // source of the `DisplayedPositionLanes`, in lane order, and the vertex
+    // property set (for revisions). Empty when the entity has no bindings or
+    // no vertex source.
     struct EntityDisplayedPositions
     {
-        DisplayedPositions Positions{};
+        std::vector<DisplayedPositions> Sources{};
         const Geometry::PropertySet* Vertices{nullptr};
+
+        [[nodiscard]] bool AnyBound() const noexcept
+        {
+            return std::ranges::any_of(Sources,
+                [](const DisplayedPositions& source)
+                {
+                    return source.Bound;
+                });
+        }
     };
     [[nodiscard]] EntityDisplayedPositions ResolveEntityDisplayedPositions(
         const entt::registry& registry, entt::entity entity);
 
-    // Local display bounds; canonical bounds need no position traversal.
+    // Names and revisions of the displayed sources, for caches that must
+    // follow any of them. Empty when a source has no revision (untracked
+    // storage), which no cache may trust.
+    [[nodiscard]] std::string DisplayedPositionsSignature(const EntityDisplayedPositions& displayed);
+
+    // Local display bounds: the union of the drawn lanes' displayed positions;
+    // canonical bounds need no position traversal.
     [[nodiscard]] std::optional<Geometry::AABB> ComputeEntityLocalDisplayBounds(
         const entt::registry& registry, entt::entity entity);
 
-    // The structural binding slot for Position/Normal/Texcoord; nullptr for
-    // attributes that are not stored in `VertexChannelBindingSet`.
+    // The structural binding slot of (`lane`, `attribute`); nullptr when the
+    // lane's row has no such structural attribute.
     [[nodiscard]] VertexChannelSourceBinding* FindVertexChannelSourceBinding(
-        VertexChannelBindingSet& bindings, RenderAttribute attribute) noexcept;
+        VertexChannelBindingSet& bindings, GeometryRenderLane lane, RenderAttribute attribute) noexcept;
     [[nodiscard]] const VertexChannelSourceBinding* FindVertexChannelSourceBinding(
-        const VertexChannelBindingSet& bindings, RenderAttribute attribute) noexcept;
+        const VertexChannelBindingSet& bindings, GeometryRenderLane lane, RenderAttribute attribute) noexcept;
 }

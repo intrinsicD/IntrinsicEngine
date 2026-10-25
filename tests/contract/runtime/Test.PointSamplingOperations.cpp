@@ -830,8 +830,8 @@ TEST(PointSamplingOperations, GlyphOrderUsesTheDisplayedPositions)
     vertices.GetOrAdd<glm::vec3>("v:shown", glm::vec3{0.0f}).Vector() = shown;
     s.Registry.Raw().emplace<R::VertexChannelBindingSet>(cloud,
         R::VertexChannelBindingSet{
-            .Position = {
-                .Enabled = true, .Property = {D::PointCloudPoint, "v:shown", Geometry::PropertyValueKind::Vec3}}});
+            .Points = {.Position = {.Enabled = true,
+                           .Property = {D::PointCloudPoint, "v:shown", Geometry::PropertyValueKind::Vec3}}}});
     const auto result =
         R::ApplyEditorGlyphOrderCommand(s.Commands(), {.StableEntityId = Id(cloud), .Domain = D::PointCloudPoint});
     ASSERT_TRUE(result.Succeeded()) << result.Message;

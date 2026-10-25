@@ -173,16 +173,19 @@ namespace Extrinsic::Runtime
         if (!id || !scene.IsValid(entity)) return {};
         stamp.push_back(uncommittedPositions ? 1u : 0u);
         const auto source = ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
-        // The displayed positions (RUNTIME-315) and which source they come from.
+        // Every lane's displayed positions (RUNTIME-315, UI-083) and which sources they come from.
         const auto* bindings = scene.Raw().try_get<VertexChannelBindingSet>(entity);
         stamp.push_back(bindings != nullptr ? bindings->BindingGeneration : 0u);
-        stamp.push_back(source.VertexSource
-            ? source.VertexSource->Properties.FindPropertyRevision(ResolveDisplayedPositions(
-                  source.VertexSource->Properties,
-                  DisplayedPositionDomainFor(
-                      ECS::Components::GeometrySources::BuildSourceAvailability(source).ProvenanceDomain),
-                  bindings).Name).value_or(0)
-            : 0);
+        const auto* vertices = source.VertexSource ? &source.VertexSource->Properties : nullptr;
+        const GeometryElementDomain vertexDomain = DisplayedPositionDomainFor(
+            ECS::Components::GeometrySources::BuildSourceAvailability(source).ProvenanceDomain);
+        for (const GeometryRenderLane lane :
+            {GeometryRenderLane::Surface, GeometryRenderLane::Edges, GeometryRenderLane::Points})
+        {
+            const auto name =
+                vertices ? ResolveDisplayedPositions(*vertices, vertexDomain, bindings, lane).Name : std::string_view{};
+            stamp.push_back(vertices ? vertices->FindPropertyRevision(name).value_or(0) : 0);
+        }
         const auto* world = scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
         const auto matrix = world ? world->Matrix : glm::mat4{1.f};
         for (int column = 0; column < 4; ++column)
@@ -710,10 +713,15 @@ namespace Extrinsic::Runtime
                         (void)Selection.DiscardInFlightPick(result->Sequence);
                         continue;
                     }
+                    // UI-083: a missing hint searches the lane the issuing target is shown on.
+                    std::optional<PickReadbackContext> refineContext = pickContext.Context;
+                    const auto pickedEntity = SelectionController::ToEntityHandle(result->StableEntityId);
+                    if (refineContext && primitiveTarget && result->Hit && BoundRegistry->Raw().valid(pickedEntity))
+                        refineContext->TargetDomain = ResolveSelectionTargetDomain(
+                            BuildGeometryAvailability(BoundRegistry->Raw(), pickedEntity), pickContext.Target);
                     const auto refined = uncommittedPositions
                         ? std::nullopt
-                        : RefinePickReadbackResult(
-                              *BoundRegistry, *result, pickContext.Context ? &*pickContext.Context : nullptr);
+                        : RefinePickReadbackResult(*BoundRegistry, *result, refineContext ? &*refineContext : nullptr);
                     std::optional<PrimitiveSelectionHit> primitive;
                     if (refined && IsResolved(refined->Status) && primitiveTarget)
                     {

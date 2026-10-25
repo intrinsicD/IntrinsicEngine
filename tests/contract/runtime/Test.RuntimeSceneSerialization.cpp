@@ -1542,16 +1542,18 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
         std::string{PN::kNormal}, glm::vec3{0.0f, 0.0f, 1.0f});
     (void)source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
         "v:scratch", glm::vec3{1.0f, 0.0f, 0.0f});  // processed property (RUNTIME-319)
+    const auto vec3 = [](const char* name)
+    {
+        return RT::VertexChannelSourceBinding{.Enabled = true,
+            .Property = {RT::GeometryElementDomain::MeshVertex, name, Geometry::PropertyValueKind::Vec3}};
+    };
     const RT::VertexChannelBindingSet authored{
-        .Position = {.Enabled = true,
-                     .Property = {RT::GeometryElementDomain::MeshVertex, "v:normal",
-                                  Geometry::PropertyValueKind::Vec3}},
-        .Normal = {.Enabled = true,
-                   .Property = {RT::GeometryElementDomain::MeshVertex, "v:scratch",
-                                Geometry::PropertyValueKind::Vec3}},
-        .Texcoord = {.Enabled = true,
-                     .Property = {RT::GeometryElementDomain::MeshVertex, "v:texcoord",
-                                  Geometry::PropertyValueKind::Vec2}},
+        .Surface = {.Position = vec3("v:normal"),
+            .Normal = vec3("v:scratch"),
+            .Texcoord = {.Enabled = true,
+                .Property = {RT::GeometryElementDomain::MeshVertex, "v:texcoord", Geometry::PropertyValueKind::Vec2}}},
+        .Edges = {.Position = vec3("v:position")},
+        .Points = {.Position = vec3("v:normal"), .Normal = vec3("v:normal")},
         .BindingGeneration = 9u,
     };
     source.Raw().emplace<RT::VertexChannelBindingSet>(mesh, authored);
@@ -1563,8 +1565,14 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
     const nlohmann::json parsed = nlohmann::json::parse(backend.Text("bindings.json"));
     const auto& bindingsJson = parsed["entities"][0]["attributeBindings"];
     ASSERT_TRUE(bindingsJson.is_object());
-    EXPECT_EQ(bindingsJson.size(), 3u);
+    // UI-083: the surface (a mesh's primary lane) keeps the bare keys older scenes
+    // used; the other lanes are prefixed.
+    EXPECT_EQ(bindingsJson.size(), 6u);
     EXPECT_EQ(bindingsJson["position"]["name"], "v:normal");
+    EXPECT_EQ(bindingsJson["normal"]["name"], "v:scratch");
+    EXPECT_EQ(bindingsJson["edges.position"]["name"], "v:position");
+    EXPECT_EQ(bindingsJson["points.position"]["name"], "v:normal");
+    EXPECT_EQ(bindingsJson["points.normal"]["name"], "v:normal");
 
     ECS::Scene::Registry loaded;
     const auto result = RT::LoadSceneDocument(loaded, "bindings.json", backend);
@@ -1575,9 +1583,9 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
     ASSERT_NE(loadedMesh, ECS::InvalidEntityHandle);
     const auto* bindings = loaded.Raw().try_get<RT::VertexChannelBindingSet>(loadedMesh);
     ASSERT_NE(bindings, nullptr);
-    EXPECT_EQ(bindings->Position, authored.Position);
-    EXPECT_EQ(bindings->Normal, authored.Normal);  // kept as authored intent
-    EXPECT_EQ(bindings->Texcoord, authored.Texcoord);
+    EXPECT_EQ(bindings->Surface, authored.Surface);  // Normal kept as authored intent
+    EXPECT_EQ(bindings->Edges, authored.Edges);
+    EXPECT_EQ(bindings->Points, authored.Points);
 
     // Saving the loaded scene reproduces the same bindings document.
     const auto resaved = RT::SaveSceneDocument(loaded, "again.json", backend);
@@ -1595,29 +1603,56 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
     const auto* staleBindings =
         stale.Raw().try_get<RT::VertexChannelBindingSet>(FindEntityByName(stale, "Mesh Entity"));
     ASSERT_NE(staleBindings, nullptr);
-    EXPECT_EQ(staleBindings->Normal, authored.Normal);  // kept as authored intent
+    EXPECT_EQ(staleBindings->Surface.Normal, authored.Surface.Normal);  // kept as authored intent
+
+    // A scene written before UI-083 (bare keys only) binds the primary lanes.
+    nlohmann::json legacy = parsed;
+    legacy["entities"][0]["attributeBindings"] = {{"position", bindingsJson["position"]}};
+    ECS::Scene::Registry legacyLoaded;
+    ASSERT_TRUE(RT::DeserializeSceneDocument(legacyLoaded, legacy.dump()).has_value());
+    const auto* legacyBindings =
+        legacyLoaded.Raw().try_get<RT::VertexChannelBindingSet>(FindEntityByName(legacyLoaded, "Mesh Entity"));
+    ASSERT_NE(legacyBindings, nullptr);
+    EXPECT_EQ(legacyBindings->Surface.Position, authored.Surface.Position);
+    EXPECT_EQ(legacyBindings->Edges, RT::VertexChannelLaneBindings{});
+    EXPECT_EQ(legacyBindings->Points, RT::VertexChannelLaneBindings{});
 }
 
 TEST(RuntimeSceneSerialization, InvalidAttributeBindingsRejectTheDocument)
 {
     ECS::Scene::Registry source;
     const ECS::EntityHandle mesh = AddMeshEntity(source);
-    source.Raw().emplace<Runtime::VertexChannelBindingSet>(
-        mesh, Runtime::VertexChannelBindingSet{
-                  .Normal = {.Enabled = true,
-                             .Property = {Runtime::GeometryElementDomain::MeshVertex, "v:texcoord",
-                                          Geometry::PropertyValueKind::Vec2}}});
+    source.Raw().emplace<Runtime::VertexChannelBindingSet>(mesh,
+        Runtime::VertexChannelBindingSet{.Surface = {.Normal = {.Enabled = true,
+                                                         .Property = {Runtime::GeometryElementDomain::MeshVertex,
+                                                             "v:texcoord",
+                                                             Geometry::PropertyValueKind::Vec2}}}});
     MemoryIOBackend backend;
     ASSERT_TRUE(Runtime::SaveSceneDocument(source, "ok.json", backend).has_value());
     nlohmann::json document = nlohmann::json::parse(backend.Text("ok.json"));
 
-    for (const char* key : {"color", "point_size", "bogus"})
+    // UI-083: a lane prefix names a structural slot of that lane's row only, and the
+    // primary lane (the surface on a mesh) is spelled with the bare key only.
+    for (const char* key : {"color",
+             "point_size",
+             "bogus",
+             "edges.normal",
+             "points.texcoord",
+             "faces.normal",
+             "edges.color",
+             "surface.normal"})
     {
         nlohmann::json bad = document;
         bad["entities"][0]["attributeBindings"] = {{key, bad["entities"][0]["attributeBindings"]["normal"]}};
         ECS::Scene::Registry loaded;
         EXPECT_FALSE(Runtime::DeserializeSceneDocument(loaded, bad.dump()).has_value()) << key;
     }
+    // Two keys naming one slot (the bare key is the surface's on a mesh).
+    nlohmann::json duplicate = document;
+    duplicate["entities"][0]["attributeBindings"]["surface.normal"] =
+        duplicate["entities"][0]["attributeBindings"]["normal"];
+    ECS::Scene::Registry duplicateLoaded;
+    EXPECT_FALSE(Runtime::DeserializeSceneDocument(duplicateLoaded, duplicate.dump()).has_value());
     nlohmann::json unnamed = document;
     unnamed["entities"][0]["attributeBindings"]["normal"]["name"] = "";
     ECS::Scene::Registry loaded;

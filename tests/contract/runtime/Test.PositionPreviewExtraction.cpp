@@ -5,10 +5,13 @@
 // during the preview shows after Discard. Null device: the block bytes are the CPU shadow.
 #include <limits>
 #include <cstddef>
+#include <algorithm>
+#include <map>
 #include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <entt/entity/entity.hpp>
@@ -37,6 +40,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
+import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 
@@ -71,8 +75,10 @@ namespace
     {
         Extrinsic::Runtime::Engine Engine{HeadlessConfig()};
         RenderExtractionCache Extraction{};
-        // The front the fake residency serves for `v:position` refs, and the refs asked.
+        // The front the fake residency serves for vec3 refs, and the refs asked. While
+        // `FrontsByName` is not empty it serves those fronts by property name instead.
         std::optional<RenderExtractionCache::GpuPropertyFront> Front{};
+        std::map<std::string, RenderExtractionCache::GpuPropertyFront> FrontsByName{};
         std::vector<GeometryPropertyRef> Asked{};
 
         Fixture()
@@ -85,7 +91,10 @@ namespace
                     -> std::optional<RenderExtractionCache::GpuPropertyFront> {
                     Asked.push_back(ref);
                     if (ref.ValueKind != Geometry::PropertyValueKind::Vec3) return std::nullopt;
-                    return Front;
+                    if (FrontsByName.empty())
+                        return Front;
+                    const auto named = FrontsByName.find(ref.Name);
+                    return named != FrontsByName.end() ? std::optional{named->second} : std::nullopt;
                 });
         }
         ~Fixture()
@@ -235,6 +244,141 @@ TEST(PositionPreviewExtraction, MeshesObserveTheMeshVertexPositionsAndHandTheSea
     EXPECT_TRUE(sidecar->HasMeshVertexView);
 }
 
+// UI-083: each lane previews the front of the positions it displays. A mesh whose
+// points lane draws a bound source hands that source's front to the vertex view
+// only; when one lane's front ends while the other's continues, the blocks are
+// restored and the remaining lane keeps previewing.
+TEST(PositionPreviewExtraction, EachLanePreviewsTheFrontOfItsOwnDisplayedPositions)
+{
+    Fixture f;
+    namespace E = Extrinsic::ECS::Components;
+    namespace G = Extrinsic::Graphics::Components;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0});
+    const auto c = mesh.AddVertex({1, 1, 0}), d = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    ASSERT_TRUE(mesh.AddTriangle(a, c, d));
+    auto& scene = f.Scene();
+    const EntityHandle entity = scene.Create();
+    scene.Raw().emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    scene.Raw().emplace<G::RenderSurface>(entity);
+    scene.Raw().emplace<G::RenderPoints>(entity);
+    gs::PopulateFromMesh(scene.Raw(), entity, mesh);
+    // Flat corner normals split the shared vertices, so the surface reads its front
+    // through a gather map and fits any front of at least four rows, while the 1:1
+    // vertex view fits exactly four: the row counts tell which block got which front.
+    auto& corners = scene.Raw().get<gs::Halfedges>(entity).Properties;
+    const std::vector<std::uint32_t> cornerFaces = corners.Get<std::uint32_t>(std::string{pn::kHalfedgeFace}).Vector();
+    auto cornerNormals = corners.GetOrAdd<glm::vec3>("h:normal", glm::vec3{0.f, 0.f, 1.f});
+    for (std::size_t h = 0; h < cornerFaces.size(); ++h)
+        cornerNormals[h] = cornerFaces[h] == 1u ? glm::vec3{0.f, 1.f, 0.f} : glm::vec3{0.f, 0.f, 1.f};
+    scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f, 0.f, 5.f});
+    scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{
+            .Points = {
+                .Position = {.Enabled = true,
+                    .Property = {GeometryElementDomain::MeshVertex, "v:offset", Geometry::PropertyValueKind::Vec3}}}});
+    const auto id = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+
+    // Only the bound source has a front (five rows): only the vertex view is handed it
+    // and refuses it; the surface, which would fit it, shows its committed positions.
+    f.FrontsByName = {{"v:offset", Fixture::FrontFor(5u, 1u)}};
+    auto stats = f.Extract();
+    EXPECT_EQ(stats.PositionPreviewsObserved, 1u);
+    EXPECT_EQ(stats.PositionPreviewBlocksRejected, 1u);
+    EXPECT_TRUE(f.Extraction.ShowsUncommittedPositions(id));
+    const auto asked = [&](const std::string_view name)
+    {
+        return std::ranges::any_of(f.Asked,
+            [&](const GeometryPropertyRef& ref)
+            {
+                return ref.Name == name;
+            });
+    };
+    EXPECT_TRUE(asked("v:position"));
+    EXPECT_TRUE(asked("v:offset"));
+
+    // Only the surface's source has a front, three rows, too short for the surface's
+    // gather map: the surface is handed it and refuses it, the vertex view gets none.
+    f.FrontsByName = {{"v:position", Fixture::FrontFor(3u, 2u)}};
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionPreviewsObserved, 1u);
+    EXPECT_EQ(stats.PositionPreviewBlocksRejected, 1u);
+
+    // Five rows for the surface's source, four for the points': the 1:1 vertex view
+    // fits only its own four-row front.
+    f.FrontsByName = {{"v:position", Fixture::FrontFor(5u, 2u)}, {"v:offset", Fixture::FrontFor(4u, 3u)}};
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionPreviewBlocksRejected, 0u);
+    EXPECT_EQ(stats.PositionPreviewRestores, 0u);
+
+    // The points lane's preview ends: the blocks are restored, the surface keeps previewing.
+    f.FrontsByName.erase("v:offset");
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionPreviewRestores, 1u);
+    EXPECT_EQ(stats.PositionPreviewsObserved, 1u);
+    EXPECT_EQ(stats.PositionPreviewBlocksRejected, 0u);
+    EXPECT_TRUE(f.Extraction.ShowsUncommittedPositions(id));
+
+    // The last preview ends.
+    f.FrontsByName = {{"none", Fixture::FrontFor(4u, 4u)}};
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionPreviewRestores, 1u);
+    EXPECT_FALSE(f.Extraction.ShowsUncommittedPositions(id));
+}
+
+// UI-083: a graph whose point lane draws other positions than its edges has a second,
+// points-only upload. When its preview ends, that block is rebuilt from the current CPU
+// positions too, although its source revisions did not change.
+TEST(PositionPreviewExtraction, AGraphPointLaneUploadIsRestoredWhenItsPreviewEnds)
+{
+    Fixture f;
+    namespace E = Extrinsic::ECS::Components;
+    namespace G = Extrinsic::Graphics::Components;
+    auto& scene = f.Scene();
+    const EntityHandle entity = scene.Create();
+    scene.Raw().emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    scene.Raw().emplace<G::RenderEdges>(entity);
+    scene.Raw().emplace<G::RenderPoints>(entity);
+    Geometry::Graph::Graph graph{};
+    const auto v0 = graph.AddVertex({0.f, 0.f, 0.f}), v1 = graph.AddVertex({1.f, 0.f, 0.f});
+    const auto v2 = graph.AddVertex({0.f, 1.f, 0.f});
+    (void)graph.AddEdge(v0, v1);
+    (void)graph.AddEdge(v1, v2);
+    gs::PopulateFromGraph(scene.Raw(), entity, graph);
+    scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f, 0.f, 5.f});
+    scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{
+            .Points = {
+                .Position = {.Enabled = true,
+                    .Property = {GeometryElementDomain::GraphNode, "v:offset", Geometry::PropertyValueKind::Vec3}}}});
+    const auto id = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    auto stats = f.Extract();
+    ASSERT_TRUE(f.Extraction.FindRenderableSidecarForTest(id)->GraphPointGeometry.IsValid());
+
+    f.FrontsByName = {{"v:offset", Fixture::FrontFor(3u, 1u)}};
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionPreviewsObserved, 1u);
+    EXPECT_EQ(stats.PositionPreviewBlocksRejected, 0u);
+    EXPECT_EQ(stats.GraphGeometryUploads, 0u);
+
+    // Accept is not acknowledged while the point lane has its own upload: the ordinary
+    // upload applies instead of writing the accepted rows into one of the two blocks.
+    const std::vector<glm::vec3> rows{{0.f, 0.f, 6.f}, {1.f, 0.f, 6.f}, {0.f, 1.f, 6.f}};
+    EXPECT_EQ(f.Extraction.CommitAcceptedPositions(RenderExtractionCache::AcceptedPositions{.StableEntityId = id,
+                  .PositionBytes = std::as_bytes(std::span<const glm::vec3>{rows}),
+                  .RowCount = 3u,
+                  .Revision = 1u,
+                  .Front = Fixture::FrontFor(3u, 1u)}),
+        RenderExtractionCache::PositionCommitStatus::NotOneToOne);
+
+    f.FrontsByName = {{"none", Fixture::FrontFor(3u, 2u)}};
+    stats = f.Extract();
+    EXPECT_EQ(stats.PositionPreviewRestores, 1u);
+    EXPECT_EQ(stats.GraphGeometryUploads, 1u) << "the point lane's own upload is rebuilt";
+    EXPECT_FALSE(f.Extraction.ShowsUncommittedPositions(id));
+}
+
 // RUNTIME-293 (ADR 0030 decision 6): after Accept, extraction acknowledges the new
 // `v:position` revision of a point cloud without a position upload (the block keeps the
 // copied front; the shadow is patched for the position channel only) and without a
@@ -353,11 +497,11 @@ TEST(PositionPreviewExtraction, ABoundPositionSourceIsDrawnBoundedAndPreviewedIn
     const auto id = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     auto& properties = f.Scene().Raw().get<gs::Vertices>(entity).Properties;
     properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f}).Vector() = offset;
-    f.Scene().Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
-        entity, Extrinsic::Runtime::VertexChannelBindingSet{
-                    .Position = {.Enabled = true,
-                                 .Property = {GeometryElementDomain::PointCloudPoint, "v:offset",
-                                              Geometry::PropertyValueKind::Vec3}}});
+    f.Scene().Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{.Points = {.Position = {.Enabled = true,
+                                                                   .Property = {GeometryElementDomain::PointCloudPoint,
+                                                                       "v:offset",
+                                                                       Geometry::PropertyValueKind::Vec3}}}});
 
     auto stats = f.Extract();
     EXPECT_EQ(stats.PointCloudGeometryUploads, 1u);

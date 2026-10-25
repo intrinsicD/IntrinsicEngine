@@ -90,11 +90,10 @@ namespace Extrinsic::Runtime
                    binding.Property.ValueKind == Geometry::PropertyValueKind::Vec3;
         }
 
-        [[nodiscard]] RenderExtractionGeometrySourceRevisions
-        CaptureVertexChannelRevisions(
-            const ConstSourceView& view,
+        [[nodiscard]] RenderExtractionGeometrySourceRevisions CaptureVertexChannelRevisions(const ConstSourceView& view,
             const VertexChannelBindingSet* bindings,
             const GeometryElementDomain expectedDomain,
+            const GeometryRenderLane lane,
             const bool meshDefaults) noexcept
         {
             RenderExtractionGeometrySourceRevisions snapshot{};
@@ -105,8 +104,7 @@ namespace Extrinsic::Runtime
                 view.VertexSource->Properties;
             snapshot.VertexCount = properties.Size();
             // The displayed positions (bound or canonical) are what is drawn.
-            const DisplayedPositions displayed =
-                ResolveDisplayedPositions(properties, expectedDomain, bindings);
+            const DisplayedPositions displayed = ResolveDisplayedPositions(properties, expectedDomain, bindings, lane);
             snapshot.PositionCount = displayed.Values.size();
             snapshot.Position = PropertyRevisionOf(properties, displayed.Name);
             if (bindings != nullptr)
@@ -126,9 +124,9 @@ namespace Extrinsic::Runtime
                 snapshot.Texcoord = revisionOf(shading.CornerTexcoord, shading.VertexTexcoord);
                 snapshot.Normal = revisionOf(shading.CornerNormal, shading.VertexNormal);
             }
-            else if (bindings != nullptr && BindingMatches(bindings->Normal, expectedDomain))
+            else if (bindings != nullptr && BindingMatches(bindings->Points.Normal, expectedDomain))
             {
-                snapshot.Normal = PropertyRevisionOf(properties, bindings->Normal.Property.Name);
+                snapshot.Normal = PropertyRevisionOf(properties, bindings->Points.Normal.Property.Name);
             }
             if (meshDefaults)
             {
@@ -153,12 +151,8 @@ namespace Extrinsic::Runtime
             const ConstSourceView& view,
             const VertexChannelBindingSet* bindings) noexcept
         {
-            RenderExtractionGeometrySourceRevisions snapshot =
-                CaptureVertexChannelRevisions(
-                    view,
-                    bindings,
-                    GeometryElementDomain::MeshVertex,
-                    true);
+            RenderExtractionGeometrySourceRevisions snapshot = CaptureVertexChannelRevisions(
+                view, bindings, GeometryElementDomain::MeshVertex, GeometryRenderLane::Surface, true);
             if (view.HalfedgeSource != nullptr)
             {
                 const Geometry::PropertySet& properties =
@@ -190,12 +184,11 @@ namespace Extrinsic::Runtime
             const VertexChannelBindingSet* bindings,
             const bool wantLines) noexcept
         {
-            RenderExtractionGeometrySourceRevisions snapshot =
-                CaptureVertexChannelRevisions(
-                    view,
-                    bindings,
-                    GeometryElementDomain::GraphNode,
-                    false);
+            RenderExtractionGeometrySourceRevisions snapshot = CaptureVertexChannelRevisions(view,
+                bindings,
+                GeometryElementDomain::GraphNode,
+                wantLines ? GeometryRenderLane::Edges : GeometryRenderLane::Points,
+                false);
             if (wantLines && view.EdgeSource != nullptr)
             {
                 const Geometry::PropertySet& properties =
@@ -214,10 +207,7 @@ namespace Extrinsic::Runtime
             const VertexChannelBindingSet* bindings) noexcept
         {
             return CaptureVertexChannelRevisions(
-                view,
-                bindings,
-                GeometryElementDomain::PointCloudPoint,
-                false);
+                view, bindings, GeometryElementDomain::PointCloudPoint, GeometryRenderLane::Points, false);
         }
 
         [[nodiscard]] RenderExtractionGeometrySourceRevisions
@@ -228,12 +218,11 @@ namespace Extrinsic::Runtime
         {
             // Primitive views draw the entity's displayed positions only; the
             // binding generation also tracks a rebind of the Position source.
-            RenderExtractionGeometrySourceRevisions snapshot =
-                CaptureVertexChannelRevisions(
-                    view,
-                    bindings,
-                    GeometryElementDomain::MeshVertex,
-                    false);
+            RenderExtractionGeometrySourceRevisions snapshot = CaptureVertexChannelRevisions(view,
+                bindings,
+                GeometryElementDomain::MeshVertex,
+                edgeView ? GeometryRenderLane::Edges : GeometryRenderLane::Points,
+                false);
             snapshot.Normal = 0u;
             if (edgeView && view.EdgeSource != nullptr)
             {
@@ -677,7 +666,7 @@ namespace Extrinsic::Runtime
                 return;
             }
             (void)ReleaseGeometryResidency(residencyKey);
-            ReleaseGraphPointLaneInstance(sidecar, renderer, stats);
+            ReleaseGraphPointLaneInstance(sidecar, stableId, renderer, stats);
             renderer.GetGpuWorld().SetInstanceGeometry(
                 sidecar.Instance,
                 Graphics::GpuGeometryHandle{});
@@ -1220,8 +1209,7 @@ namespace Extrinsic::Runtime
         return RenderableSidecarView{
             .Instance = it->second.Instance,
             .Geometry = it->second.Geometry,
-            .HasProceduralResidency =
-                it->second.ProceduralKey.has_value(),
+            .HasProceduralResidency = it->second.ProceduralKey.has_value(),
             .HasSourceAsset = it->second.GpuSlot.HasSourceAsset(),
             .GeometrySlot = it->second.GpuSlot.GeometrySlot,
             .GeometryGeneration = it->second.GpuSlot.GeometryGeneration,
@@ -1230,8 +1218,8 @@ namespace Extrinsic::Runtime
             .GraphGeometry = it->second.GraphGeometry,
             .HasGraphResidency = it->second.GraphGeometry.IsValid(),
             .GraphPointLaneInstance = it->second.GraphPointLaneInstance,
-            .HasGraphPointLaneInstance =
-                it->second.GraphPointLaneInstance.IsValid(),
+            .HasGraphPointLaneInstance = it->second.GraphPointLaneInstance.IsValid(),
+            .GraphPointGeometry = it->second.GraphPointGeometry,
             .PointCloudGeometry = it->second.PointCloudGeometry,
             .HasPointCloudResidency = it->second.PointCloudGeometry.IsValid(),
             .MeshEdgeViewInstance = it->second.MeshEdgeViewInstance,
@@ -1243,7 +1231,7 @@ namespace Extrinsic::Runtime
             .MaterialHandle = it->second.Material.Lease.GetHandle(),
             .MaterialSlot = it->second.Material.EffectiveSlot,
             .HasMaterialLease = it->second.Material.Lease.IsValid(),
-            .ShowsUncommittedPositions = it->second.PositionPreview,
+            .ShowsUncommittedPositions = it->second.PositionPreview(),
         };
     }
 
@@ -1251,7 +1239,7 @@ namespace Extrinsic::Runtime
         const std::uint32_t stableEntityId) const noexcept
     {
         const auto it = m_State->m_Renderables.find(stableEntityId);
-        return it != m_State->m_Renderables.end() && it->second.PositionPreview;
+        return it != m_State->m_Renderables.end() && it->second.PositionPreview();
     }
 
     RenderExtractionCache::PositionCommitStatus RenderExtractionCache::CommitAcceptedPositions(
@@ -1264,10 +1252,11 @@ namespace Extrinsic::Runtime
         State::RenderableSidecar& sidecar = it->second;
         // A mesh surface may be seam-split and its lanes share one position revision, so a
         // mesh commits through the ordinary revision-delta upload (RUNTIME-295 routes it
-        // through the residency). Point clouds and graphs hold one 1:1 block each.
+        // through the residency). Point clouds and graphs hold one 1:1 block each, unless
+        // a graph's point lane has its own upload (UI-083).
         const bool pointCloud = sidecar.PointCloudGeometry.IsValid();
         const bool graph = sidecar.GraphGeometry.IsValid();
-        if (sidecar.MeshGeometry.IsValid() || pointCloud == graph)
+        if (sidecar.MeshGeometry.IsValid() || pointCloud == graph || sidecar.GraphPointGeometry.IsValid())
             return PositionCommitStatus::NotOneToOne;
         RenderExtractionGeometrySourceRevisions& revisions =
             pointCloud ? sidecar.PointCloudSourceRevisions : sidecar.GraphSourceRevisions;
@@ -1290,7 +1279,7 @@ namespace Extrinsic::Runtime
         // The revision is acknowledged as if this extraction had uploaded it, and the
         // preview is over without a restore: the block holds the accepted bytes.
         revisions.Position = accepted.Revision;
-        sidecar.PositionPreview = false;
+        sidecar.PositionPreviewLanes = {};
         ++state.m_PositionCommits;
         return status == Status::Committed ? PositionCommitStatus::Acknowledged
                                            : PositionCommitStatus::AcknowledgedCopyPending;
@@ -1536,15 +1525,62 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    bool RenderExtractionCache::State::EnsureGraphPointLaneInstance(
-        RenderableSidecar& sidecar,
+    bool RenderExtractionCache::State::EnsureGraphPointLaneInstance(RenderableSidecar& sidecar,
         const std::uint32_t stableId,
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* bindings,
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
     {
-        if (!sidecar.GraphGeometry.IsValid())
+        if (!sidecar.GraphGeometry.IsValid() || view.VertexSource == nullptr)
         {
             return false;
+        }
+
+        Graphics::GpuGeometryHandle geometry = sidecar.GraphGeometry;
+        const Geometry::PropertySet& nodes = view.VertexSource->Properties;
+        constexpr GeometryElementDomain kNode = GeometryElementDomain::GraphNode;
+        if (ResolveDisplayedPositions(nodes, kNode, bindings, GeometryRenderLane::Points).Name ==
+            ResolveDisplayedPositions(nodes, kNode, bindings, GeometryRenderLane::Edges).Name)
+        {
+            ReleaseGraphPointGeometry(sidecar, stableId);
+        }
+        else
+        {
+            // UI-083: the shared upload carries the edge lane's positions, so the
+            // point lane gets a points-only upload of its own, rebuilt when its
+            // sources' revisions or the bindings change.
+            const RenderExtractionGeometrySourceRevisions revisions =
+                CaptureGraphSourceRevisions(view, bindings, false);
+            if (!sidecar.GraphPointGeometry.IsValid() || revisions != sidecar.GraphPointSourceRevisions)
+            {
+                GraphPlanBuildResult pack = BuildGraphGeometryPlan(view,
+                    false,
+                    true,
+                    bindings,
+                    GeometryPlanBuildRequest{
+                        .Key = BuildRenderExtractionGeometryResidencyKey(
+                            RenderExtractionGeometryResidencyKind::Graph, stableId, 1u),
+                        .Generation = IssueGeometryPlanGeneration(),
+                        .UpdateClass = Graphics::GeometryUploadUpdateClass::FullReplacement,
+                    },
+                    m_GraphPack);
+                const Graphics::GeometryResidencyResult residency =
+                    pack.Status == GraphPackStatus::Success && pack.Plan.has_value()
+                    ? EnsureGeometryResidency(renderer).Reconcile(*pack.Plan)
+                    : Graphics::GeometryResidencyResult{};
+                if (!residency.Succeeded())
+                {
+                    // Fail closed: never draw the edge lane's positions as points.
+                    ++stats.GraphGeometryFailedPack;
+                    ReleaseGraphPointLaneInstance(sidecar, stableId, renderer, stats);
+                    return false;
+                }
+                ++stats.GraphGeometryUploads;
+                sidecar.GraphPointGeometry = residency.Handle;
+                sidecar.GraphPointSourceRevisions = revisions;
+            }
+            geometry = sidecar.GraphPointGeometry;
         }
 
         if (!sidecar.GraphPointLaneInstance.IsValid())
@@ -1557,17 +1593,29 @@ namespace Extrinsic::Runtime
             }
             ++stats.AllocatedInstanceCount;
         }
-        renderer.GetGpuWorld().SetInstanceGeometry(
-            sidecar.GraphPointLaneInstance,
-            sidecar.GraphGeometry);
+        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.GraphPointLaneInstance, geometry);
         return true;
     }
 
-    void RenderExtractionCache::State::ReleaseGraphPointLaneInstance(
-        RenderableSidecar& sidecar,
+    void RenderExtractionCache::State::ReleaseGraphPointGeometry(
+        RenderableSidecar& sidecar, const std::uint32_t stableId)
+    {
+        if (!sidecar.GraphPointGeometry.IsValid())
+        {
+            return;
+        }
+        (void)ReleaseGeometryResidency(
+            BuildRenderExtractionGeometryResidencyKey(RenderExtractionGeometryResidencyKind::Graph, stableId, 1u));
+        sidecar.GraphPointGeometry = {};
+        sidecar.GraphPointSourceRevisions = {};
+    }
+
+    void RenderExtractionCache::State::ReleaseGraphPointLaneInstance(RenderableSidecar& sidecar,
+        const std::uint32_t stableId,
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
     {
+        ReleaseGraphPointGeometry(sidecar, stableId);
         if (!sidecar.GraphPointLaneInstance.IsValid())
         {
             return;
@@ -1657,10 +1705,7 @@ namespace Extrinsic::Runtime
                         it->first));
                 ++stats.GraphGeometryReleases;
             }
-            ReleaseGraphPointLaneInstance(
-                it->second,
-                renderer,
-                stats);
+            ReleaseGraphPointLaneInstance(it->second, it->first, renderer, stats);
             if (it->second.PointCloudGeometry.IsValid())
             {
                 (void)ReleaseGeometryResidency(

@@ -3878,14 +3878,16 @@ TEST(SandboxEditorUi, DirectMeshPostProcessDiscardsCompletionAfterBindingChange)
         MeshVertexPositions(scene, *meshEntity);
 
     const Runtime::VertexChannelBindingSet expectedBindings{
-        .Normal = Runtime::VertexChannelSourceBinding{
-            .Enabled = true,
-            .Property = Runtime::GeometryPropertyRef{
-                .Domain = Runtime::GeometryElementDomain::MeshVertex,
-                .Name = "v:binding-only",
-                .ValueKind = Geometry::PropertyValueKind::Vec3,
-            },
-        },
+        .Surface = {.Normal =
+                        Runtime::VertexChannelSourceBinding{
+                            .Enabled = true,
+                            .Property =
+                                Runtime::GeometryPropertyRef{
+                                    .Domain = Runtime::GeometryElementDomain::MeshVertex,
+                                    .Name = "v:binding-only",
+                                    .ValueKind = Geometry::PropertyValueKind::Vec3,
+                                },
+                        }},
         .BindingGeneration = 17u,
     };
     scene.Raw().emplace_or_replace<Runtime::VertexChannelBindingSet>(
@@ -3905,9 +3907,8 @@ TEST(SandboxEditorUi, DirectMeshPostProcessDiscardsCompletionAfterBindingChange)
     ASSERT_NE(finalBindings, nullptr);
     EXPECT_EQ(finalBindings->BindingGeneration,
               expectedBindings.BindingGeneration);
-    EXPECT_EQ(finalBindings->Normal.Enabled, expectedBindings.Normal.Enabled);
-    EXPECT_EQ(finalBindings->Normal.Property,
-              expectedBindings.Normal.Property);
+    EXPECT_EQ(finalBindings->Surface.Normal.Enabled, expectedBindings.Surface.Normal.Enabled);
+    EXPECT_EQ(finalBindings->Surface.Normal.Property, expectedBindings.Surface.Normal.Property);
 
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(
         scene,

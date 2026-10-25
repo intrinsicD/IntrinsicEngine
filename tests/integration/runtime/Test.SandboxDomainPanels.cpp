@@ -1412,8 +1412,9 @@ TEST(SandboxDomainPanels, AttributeSelectorBindsOneUndoStepRefusesIncompatibleAn
 
     const auto positionSource = [&]() -> std::string {
         const auto* bindings = raw.try_get<Runtime::VertexChannelBindingSet>(entity);
-        return bindings != nullptr && Runtime::IsVertexChannelBindingEnabled(bindings->Position)
-            ? bindings->Position.Property.Name : std::string{};
+        return bindings != nullptr && Runtime::IsVertexChannelBindingEnabled(bindings->Surface.Position)
+            ? bindings->Surface.Position.Property.Name
+            : std::string{};
     };
     const auto label = [](const char* name, const Geometry::PropertyValueKind kind) {
         return std::string{name} + " (" + Runtime::DebugNameForGeometryPropertyValueKind(kind) + ", 3)";

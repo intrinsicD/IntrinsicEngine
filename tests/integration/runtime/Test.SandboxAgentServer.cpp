@@ -1825,6 +1825,10 @@ TEST(SandboxAgentServer, BindAttributeRebindsRefusesAndRestoresTheDefault)
                 bound["row"]["using_fallback"] == false,
             "bind position to offset, reply carries the row: " + bound.dump());
         rig.Check(undoCount() == before + 1, "one undo step");
+        const auto pointsRow =
+            c.Tool("attribute_bindings", {{"entity", mesh}, {"lane", "points"}, {"attribute", "position"}}, &isError);
+        rig.Check(!isError && pointsRow["lanes"][0]["attributes"][0]["bound"] == false,
+            "UI-083: the points lane keeps its own, canonical position: " + pointsRow.dump());
         const auto label = c.Tool("history")["undo_label"].get<std::string>();
         rig.Check(label.starts_with("Agent: "), "agent history label: " + label);
 

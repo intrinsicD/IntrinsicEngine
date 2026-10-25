@@ -317,9 +317,12 @@ namespace {
         [[nodiscard]] bool AnyVertexChannelBindingEnabled(
             const VertexChannelBindingSet& bindings) noexcept
         {
-            return IsVertexChannelBindingEnabled(bindings.Position) ||
-                   IsVertexChannelBindingEnabled(bindings.Normal) ||
-                   IsVertexChannelBindingEnabled(bindings.Texcoord);
+            return std::ranges::any_of(std::array{&bindings.Surface, &bindings.Edges, &bindings.Points},
+                [](const VertexChannelLaneBindings* lane)
+                {
+                    return IsVertexChannelBindingEnabled(lane->Position) ||
+                        IsVertexChannelBindingEnabled(lane->Normal) || IsVertexChannelBindingEnabled(lane->Texcoord);
+                });
         }
 
         [[nodiscard]] bool SameOptionalVertexChannelBindingSet(
@@ -1833,16 +1836,16 @@ ApplyEditorRenderHintCommand(
             const std::optional<VertexChannelBindingSet> before =
                 StoredVertexChannelBindingSet(raw, entity);
             VertexChannelBindingSet after = before.value_or(VertexChannelBindingSet{});
-            VertexChannelSourceBinding& target =
-                *FindVertexChannelSourceBinding(after, command.Attribute);
+            VertexChannelSourceBinding* const slot =
+                FindVertexChannelSourceBinding(after, command.Lane, command.Attribute);
+            if (slot == nullptr)
+                return EditorCommandStatus::UnsupportedRenderAttribute;
+            VertexChannelSourceBinding& target = *slot;
             if (command.PropertyName.empty())
             {
-                // Default only clears a binding this lane row draws.
-                if (!IsVertexChannelBindingEnabled(target) ||
-                    !RenderLaneReadsDomain(command.Lane, command.Attribute, target.Property.Domain))
-                {
+                // Default clears this lane's own slot only.
+                if (!IsVertexChannelBindingEnabled(target))
                     return EditorCommandStatus::NoChange;
-                }
                 target = {};
             }
             else
@@ -2203,8 +2206,8 @@ ApplyEditorRenderHintCommand(
         }
 
         // Default glyph length: 2% of the bounding-box diagonal of the
-        // domain's displayed anchor positions (RUNTIME-315: a bound Position
-        // source when it resolves), so a new field is legible at the scale it
+        // domain's displayed anchor positions (RUNTIME-315: the primary lane's
+        // bound Position source when it resolves), so a new field is legible at the scale it
         // is drawn at. Falls back to 1 for empty or degenerate geometry.
         [[nodiscard]] float DefaultVectorFieldLength(
             const GeometryEntityAvailability& availability,
@@ -2222,8 +2225,11 @@ ApplyEditorRenderHintCommand(
                 ResolveGeometryPropertySet(availability, positionDomain);
             if (properties == nullptr)
                 return 1.0f;
-            const DisplayedPositions positions =
-                ResolveDisplayedPositions(*properties, positionDomain, bindings);
+            const DisplayedPositions positions = ResolveDisplayedPositions(*properties,
+                positionDomain,
+                bindings,
+                PrimaryLaneFor(availability.Sources.ProvenanceDomain, RenderAttribute::Position)
+                    .value_or(GeometryRenderLane::Points));
             glm::vec3 lo{std::numeric_limits<float>::max()};
             glm::vec3 hi{-std::numeric_limits<float>::max()};
             bool any = false;

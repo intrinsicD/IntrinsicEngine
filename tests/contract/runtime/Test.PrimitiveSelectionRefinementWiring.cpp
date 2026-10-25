@@ -29,6 +29,7 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -655,11 +656,12 @@ TEST(PrimitiveSelectionRefinementWiring, BoundPositionsDriveRefinementAndKeepCan
     auto& points = registry.Raw().get<Vertices>(entity).Properties;
     points.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = {
         {0.0f, 0.0f, 10.0f}, {1.0f, 1.0f, 11.0f}, {2.0f, 2.0f, 12.0f}};
-    registry.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
-        entity, Extrinsic::Runtime::VertexChannelBindingSet{
-                    .Position = {.Enabled = true,
-                                 .Property = {Extrinsic::Runtime::GeometryElementDomain::PointCloudPoint,
-                                              "v:lifted", Geometry::PropertyValueKind::Vec3}}});
+    registry.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{
+            .Points = {.Position = {.Enabled = true,
+                           .Property = {Extrinsic::Runtime::GeometryElementDomain::PointCloudPoint,
+                               "v:lifted",
+                               Geometry::PropertyValueKind::Vec3}}}});
 
     // A point hint reports the displayed position of the canonical row.
     std::optional<PrimitiveSelectionResult> result =
@@ -689,4 +691,73 @@ TEST(PrimitiveSelectionRefinementWiring, BoundPositionsDriveRefinementAndKeepCan
     result = RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::Point, 1u));
     ASSERT_TRUE(result.has_value());
     EXPECT_FLOAT_EQ(result->LocalHit.z, 1.0f);
+}
+
+// UI-083: each lane draws its own positions, so a pick is refined against the
+// lane that was hit: a face hint against the surface, a point hint against
+// the points lane, and a missing hint against the lane vertices are shown on.
+TEST(PrimitiveSelectionRefinementWiring, SeparatedLanePositionsRefineAgainstTheHitLane)
+{
+    Registry registry{};
+    const EntityHandle entity = registry.Create();
+    EmplaceTriangleMesh(registry, entity);
+    auto& vertices = registry.Raw().get<Vertices>(entity).Properties;
+    vertices.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = {
+        {0.0f, 0.0f, 5.0f}, {1.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 5.0f}};
+    registry.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{
+            .Surface = {.Position = {.Enabled = true,
+                            .Property = {Extrinsic::Runtime::GeometryElementDomain::MeshVertex,
+                                "v:lifted",
+                                Geometry::PropertyValueKind::Vec3}}}});
+
+    std::optional<PrimitiveSelectionResult> result =
+        RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::Face, 0u));
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->HasHitPosition);
+    EXPECT_FLOAT_EQ(result->LocalHit.z, 5.0f);
+
+    result = RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::Point, 2u));
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->VertexId, 2u);
+    ASSERT_TRUE(result->HasHitPosition);
+    EXPECT_FLOAT_EQ(result->LocalHit.z, 0.0f);
+
+    // Without a hint the ray searches the vertices where they are shown: on
+    // the surface, or on the points lane once the entity draws points.
+    const Extrinsic::Runtime::PickReadbackContext context{
+        .HasWorldRay = true,
+        .WorldRayOrigin = {1.0f, 0.0f, 100.0f},
+        .WorldRayDirection = {0.0f, 0.0f, -1.0f},
+        .WorldUnitsPerPixelAtUnitDepth = 0.001f,
+        .PickRadiusPixels = 4.0f,
+    };
+    result = RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::None, 0u), &context);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->VertexId, 1u);
+    EXPECT_FLOAT_EQ(result->LocalHit.z, 5.0f);
+    registry.Raw().emplace<Extrinsic::Graphics::Components::RenderPoints>(entity);
+    result = RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::None, 0u), &context);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->VertexId, 1u);
+    EXPECT_FLOAT_EQ(result->LocalHit.z, 0.0f);
+
+    // The issuing selection's target picks the lane instead: edges where the edges
+    // are drawn (their own positions), faces on the surface.
+    vertices.GetOrAdd<glm::vec3>("v:raised", glm::vec3{0.0f}).Vector() = {
+        {0.0f, 0.0f, 7.0f}, {1.0f, 0.0f, 7.0f}, {0.0f, 1.0f, 7.0f}};
+    registry.Raw().get<Extrinsic::Runtime::VertexChannelBindingSet>(entity).Edges.Position = {.Enabled = true,
+        .Property = {
+            Extrinsic::Runtime::GeometryElementDomain::MeshVertex, "v:raised", Geometry::PropertyValueKind::Vec3}};
+    registry.Raw().emplace<Extrinsic::Graphics::Components::RenderEdges>(entity);
+    for (const auto& [target, z] : {std::pair{Extrinsic::Runtime::GeometryElementDomain::MeshEdge, 7.0f},
+             std::pair{Extrinsic::Runtime::GeometryElementDomain::MeshFace, 5.0f},
+             std::pair{Extrinsic::Runtime::GeometryElementDomain::MeshVertex, 0.0f}})
+    {
+        auto targeted = context;
+        targeted.TargetDomain = target;
+        result = RefinePickReadbackResult(registry, Hit(entity, SelectionPrimitiveDomain::None, 0u), &targeted);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_FLOAT_EQ(result->LocalHit.z, z) << Extrinsic::Runtime::ToString(target);
+    }
 }

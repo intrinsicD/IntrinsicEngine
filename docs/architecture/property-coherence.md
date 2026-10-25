@@ -338,9 +338,11 @@ Runtime extraction is one independent revision consumer per resident render
 lane. Its private sidecar remembers only the revisions and counts used by that
 lane:
 
-- mesh, graph, and point-cloud displayed positions: the bound Position
-  source when it resolves (`ResolveDisplayedPositions`, RUNTIME-315), else
-  `v:position`;
+- mesh, graph, and point-cloud displayed positions: the lane's bound
+  Position source when it resolves (`ResolveDisplayedPositions`, RUNTIME-315;
+  one slot per lane, UI-083), else `v:position`. A graph whose point lane
+  displays other positions than its edge lane gets a second, points-only
+  upload with its own revisions;
 - resolved texcoord, normal, and color channel properties. Resolved texcoords
   follow `h:texcoord` then `v:texcoord`; resolved normals follow `h:normal`
   then `v:normal`, as defined in [geometry API

@@ -90,12 +90,18 @@ namespace Extrinsic::Runtime
         };
 
         MeshShadingSources sources{};
-        pick(channelBindings != nullptr ? &channelBindings->Normal : nullptr,
-             ECS::Components::GeometrySources::PropertyNames::kNormal, "h:normal",
-             sources.VertexNormal, sources.CornerNormal, glm::vec3{});
-        pick(channelBindings != nullptr ? &channelBindings->Texcoord : nullptr,
-             "v:texcoord", "h:texcoord",
-             sources.VertexTexcoord, sources.CornerTexcoord, glm::vec2{});
+        pick(channelBindings != nullptr ? &channelBindings->Surface.Normal : nullptr,
+            ECS::Components::GeometrySources::PropertyNames::kNormal,
+            "h:normal",
+            sources.VertexNormal,
+            sources.CornerNormal,
+            glm::vec3{});
+        pick(channelBindings != nullptr ? &channelBindings->Surface.Texcoord : nullptr,
+            "v:texcoord",
+            "h:texcoord",
+            sources.VertexTexcoord,
+            sources.CornerTexcoord,
+            glm::vec2{});
         return sources;
     }
 
@@ -132,8 +138,11 @@ namespace Extrinsic::Runtime
 
         // Displayed positions: the bound Position source or canonical
         // `v:position` (RUNTIME-315); bounds below follow the same span.
-        const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
-            view.VertexSource->Properties, GeometryElementDomain::MeshVertex, channelBindings).Values;
+        const DisplayedPositions displayed = ResolveDisplayedPositions(view.VertexSource->Properties,
+            GeometryElementDomain::MeshVertex,
+            channelBindings,
+            GeometryRenderLane::Surface);
+        const std::span<const glm::vec3> positions = displayed.Values;
         if (positions.empty() && !view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition))
         {
             return Failure(MeshPackStatus::MissingPositions, outBuffer);

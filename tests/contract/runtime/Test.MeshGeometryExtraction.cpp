@@ -1736,18 +1736,18 @@ TEST(MeshGeometryExtraction, ExplicitNormalBindingOverridesCornerNormalsAndTheir
                                    "v:override_normal",
                                    glm::vec3{1.0f, 0.0f, 0.0f});
     overrideNormals.Vector().assign(4u, glm::vec3{1.0f, 0.0f, 0.0f});
-    raw.emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
-        entity,
+    raw.emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
         Extrinsic::Runtime::VertexChannelBindingSet{
-            .Normal = Extrinsic::Runtime::VertexChannelSourceBinding{
-                .Enabled = true,
-                .Property = Extrinsic::Runtime::GeometryPropertyRef{
-                    .Domain =
-                        Extrinsic::Runtime::GeometryElementDomain::MeshVertex,
-                    .Name = "v:override_normal",
-                    .ValueKind = Geometry::PropertyValueKind::Vec3,
-                },
-            },
+            .Surface = {.Normal =
+                            Extrinsic::Runtime::VertexChannelSourceBinding{
+                                .Enabled = true,
+                                .Property =
+                                    Extrinsic::Runtime::GeometryPropertyRef{
+                                        .Domain = Extrinsic::Runtime::GeometryElementDomain::MeshVertex,
+                                        .Name = "v:override_normal",
+                                        .ValueKind = Geometry::PropertyValueKind::Vec3,
+                                    },
+                            }},
             .BindingGeneration = 2u,
         });
 
@@ -1807,9 +1807,9 @@ namespace
                      const Extrinsic::Runtime::VertexChannelSourceBinding texcoord)
     {
         static std::uint64_t generation = 100u;
-        scene.Raw().emplace_or_replace<Extrinsic::Runtime::VertexChannelBindingSet>(
-            entity, Extrinsic::Runtime::VertexChannelBindingSet{
-                        .Normal = normal, .Texcoord = texcoord, .BindingGeneration = ++generation});
+        scene.Raw().emplace_or_replace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+            Extrinsic::Runtime::VertexChannelBindingSet{
+                .Surface = {.Normal = normal, .Texcoord = texcoord}, .BindingGeneration = ++generation});
         Extrinsic::ECS::Components::DirtyTags::MarkVertexNormalsDirty(scene.Raw(), entity);
         Extrinsic::ECS::Components::DirtyTags::MarkVertexTexcoordsDirty(scene.Raw(), entity);
     }
@@ -1913,9 +1913,10 @@ TEST(MeshGeometryExtraction, ShadingBindingsFeedNormalAndTexcoordStreamsOnVertex
     engine.Shutdown();
 }
 
-// RUNTIME-315: the surface and both primitive views draw a bound Position
-// source; the canonical positions stay untouched and Default restores them.
-TEST(MeshGeometryExtraction, BoundPositionSourceFeedsTheSurfaceAndBothPrimitiveViews)
+// RUNTIME-315/UI-083: the surface and both primitive views each draw their
+// own bound Position source; the canonical positions stay untouched and
+// Default restores them.
+TEST(MeshGeometryExtraction, BoundPositionSourcesFeedTheSurfaceAndBothPrimitiveViewsPerLane)
 {
     namespace G = Extrinsic::Graphics::Components;
     Extrinsic::Runtime::Engine engine(HeadlessConfig());
@@ -1963,28 +1964,16 @@ TEST(MeshGeometryExtraction, BoundPositionSourceFeedsTheSurfaceAndBothPrimitiveV
     EXPECT_EQ(before[1], fingerprint(canonical));
     EXPECT_EQ(before[2], fingerprint(canonical));
 
-    raw.emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
-        entity, Extrinsic::Runtime::VertexChannelBindingSet{
-                    .Position = {.Enabled = true,
-                                 .Property = {Extrinsic::Runtime::GeometryElementDomain::MeshVertex,
-                                              "v:lifted", Geometry::PropertyValueKind::Vec3}},
-                    .BindingGeneration = 2u});
-    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
-    const auto bound = extract();
-    EXPECT_EQ(bound[0], fingerprint(lifted));
-    EXPECT_EQ(bound[1], fingerprint(lifted));
-    EXPECT_EQ(bound[2], fingerprint(lifted));
-    EXPECT_EQ(vertices.Get<glm::vec3>("v:position").Vector(), canonical);
-
-    // The surface and both primitive views are culled by the displayed box.
-    glm::vec3 lo{std::numeric_limits<float>::max()};
-    glm::vec3 hi{std::numeric_limits<float>::lowest()};
-    for (const glm::vec3& p : lifted)
+    // Every instance is culled by the box of all the positions the lanes draw.
+    const auto expectCulledBy = [&](const std::vector<glm::vec3>& drawn)
     {
-        lo = glm::min(lo, p);
-        hi = glm::max(hi, p);
-    }
-    {
+        glm::vec3 lo{std::numeric_limits<float>::max()};
+        glm::vec3 hi{std::numeric_limits<float>::lowest()};
+        for (const glm::vec3& p : drawn)
+        {
+            lo = glm::min(lo, p);
+            hi = glm::max(hi, p);
+        }
         auto world = engine.GetRenderer().ExtractRenderWorld({});
         engine.GetRenderer().PrepareFrame(world);
         const auto view = extraction.FindRenderableSidecarForTest(
@@ -1995,8 +1984,39 @@ TEST(MeshGeometryExtraction, BoundPositionSourceFeedsTheSurfaceAndBothPrimitiveV
             const auto bounds = engine.GetRenderer().GetGpuWorld().GetBoundsForTest(instance);
             EXPECT_NEAR(bounds.WorldSphere.z, 0.5f * (lo.z + hi.z), 1e-5f);
             EXPECT_NEAR(bounds.WorldAabbMax.z, hi.z, 1e-5f);
+            EXPECT_NEAR(bounds.WorldAabbMin.z, lo.z, 1e-5f);
         }
-    }
+    };
+
+    // UI-083: each lane draws its own Position slot. Binding the surface
+    // leaves both primitive views on the canonical positions, and the
+    // culling box spans both sources.
+    const Extrinsic::Runtime::VertexChannelSourceBinding liftedSource{.Enabled = true,
+        .Property = {
+            Extrinsic::Runtime::GeometryElementDomain::MeshVertex, "v:lifted", Geometry::PropertyValueKind::Vec3}};
+    raw.emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{.Surface = {.Position = liftedSource}, .BindingGeneration = 2u});
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
+    const auto surfaceOnly = extract();
+    EXPECT_EQ(surfaceOnly[0], fingerprint(lifted));
+    EXPECT_EQ(surfaceOnly[1], fingerprint(canonical));
+    EXPECT_EQ(surfaceOnly[2], fingerprint(canonical));
+    std::vector<glm::vec3> both = canonical;
+    both.insert(both.end(), lifted.begin(), lifted.end());
+    expectCulledBy(both);
+
+    raw.replace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{.Surface = {.Position = liftedSource},
+            .Edges = {.Position = liftedSource},
+            .Points = {.Position = liftedSource},
+            .BindingGeneration = 3u});
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
+    const auto bound = extract();
+    EXPECT_EQ(bound[0], fingerprint(lifted));
+    EXPECT_EQ(bound[1], fingerprint(lifted));
+    EXPECT_EQ(bound[2], fingerprint(lifted));
+    EXPECT_EQ(vertices.Get<glm::vec3>("v:position").Vector(), canonical);
+    expectCulledBy(lifted);
 
     // A bound source whose count no longer matches the vertex domain (a topology
     // change it did not follow) is never drawn: every lane falls back to canonical.

@@ -116,12 +116,13 @@ namespace Extrinsic::Runtime
                 : FaceRingOutcome::Triangulate;
         }
 
-        // Resolve and validate the displayed mesh vertex positions shared by
-        // both views (the bound Position source or canonical `v:position`).
-        // On failure, returns nullopt and fills `status`.
+        // Resolve and validate the mesh vertex positions `lane` displays (its
+        // bound Position source or canonical `v:position`). On failure,
+        // returns nullopt and fills `status`.
         [[nodiscard]] std::optional<std::span<const glm::vec3>> ResolvePositions(
             const ECS::Components::GeometrySources::ConstSourceView& view,
             const VertexChannelBindingSet* channelBindings,
+            const GeometryRenderLane lane,
             MeshPrimitiveViewStatus& status) noexcept
         {
             using namespace ECS::Components::GeometrySources;
@@ -138,8 +139,9 @@ namespace Extrinsic::Runtime
                 status = MeshPrimitiveViewStatus::MissingPositions;
                 return std::nullopt;
             }
-            const std::span<const glm::vec3> positions = ResolveDisplayedPositions(
-                view.VertexSource->Properties, GeometryElementDomain::MeshVertex, channelBindings).Values;
+            const DisplayedPositions displayed = ResolveDisplayedPositions(
+                view.VertexSource->Properties, GeometryElementDomain::MeshVertex, channelBindings, lane);
+            const std::span<const glm::vec3> positions = displayed.Values;
             if (positions.empty())
             {
                 status = MeshPrimitiveViewStatus::EmptyMesh;
@@ -339,7 +341,7 @@ namespace Extrinsic::Runtime
 
         MeshPrimitiveViewStatus status = MeshPrimitiveViewStatus::Success;
         const std::optional<std::span<const glm::vec3>> positions =
-            ResolvePositions(view, channelBindings, status);
+            ResolvePositions(view, channelBindings, GeometryRenderLane::Edges, status);
         if (!positions.has_value())
         {
             return Failure(status, outBuffer);
@@ -445,7 +447,7 @@ namespace Extrinsic::Runtime
 
         MeshPrimitiveViewStatus status = MeshPrimitiveViewStatus::Success;
         const std::optional<std::span<const glm::vec3>> positions =
-            ResolvePositions(view, channelBindings, status);
+            ResolvePositions(view, channelBindings, GeometryRenderLane::Points, status);
         if (!positions.has_value())
         {
             return Failure(status, outBuffer);

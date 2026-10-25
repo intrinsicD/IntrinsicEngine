@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -83,6 +84,9 @@ namespace Extrinsic::Runtime
         std::size_t TopologyElementCount1{0u};
         std::size_t TopologyElementCount2{0u};
         std::uint64_t BindingGeneration{0u};
+
+        [[nodiscard]] friend bool operator==(
+            const RenderExtractionGeometrySourceRevisions&, const RenderExtractionGeometrySourceRevisions&) = default;
     };
 
     struct RenderExtractionGeometryDirtyPlan
@@ -146,10 +150,9 @@ namespace Extrinsic::Runtime
 
         struct RenderableSidecar
         {
-            // RUNTIME-315: local box of a bound Position source, cached by the
-            // source's name and content revision (culling follows it).
-            std::string DisplayedBoundsSource{};
-            Geometry::PropertyRevision DisplayedBoundsRevision{0u};
+            // RUNTIME-315: local box of the lanes' bound Position sources, cached
+            // by their names and content revisions (culling follows them).
+            std::string DisplayedBoundsSignature{};
             glm::vec3 DisplayedBoundsMin{0.0f};
             glm::vec3 DisplayedBoundsMax{0.0f};
 
@@ -179,6 +182,10 @@ namespace Extrinsic::Runtime
             bool GraphPackedLines{false};
             bool GraphPackedPoints{false};
             Graphics::GpuInstanceHandle GraphPointLaneInstance{};
+            // UI-083: the point lane's own points-only upload while its displayed
+            // positions differ from the edge lane's; invalid while it shares GraphGeometry.
+            Graphics::GpuGeometryHandle GraphPointGeometry{};
+            RenderExtractionGeometrySourceRevisions GraphPointSourceRevisions{};
             Graphics::GpuGeometryHandle PointCloudGeometry{};
             RenderExtractionGeometrySourceRevisions PointCloudSourceRevisions{};
             Graphics::GpuInstanceHandle MeshEdgeViewInstance{};
@@ -187,8 +194,13 @@ namespace Extrinsic::Runtime
             Graphics::GpuInstanceHandle MeshVertexViewInstance{};
             Graphics::GpuGeometryHandle MeshVertexViewGeometry{};
             RenderExtractionGeometrySourceRevisions MeshVertexViewSourceRevisions{};
-            // GRAPHICS-156: the blocks show a position ring front (ADR 0030 decision 5).
-            bool PositionPreview{false};
+            // GRAPHICS-156: the blocks show a position ring front (ADR 0030 decision 5),
+            // per lane (`GeometryRenderLane` index) for the lanes that do.
+            std::array<bool, 3> PositionPreviewLanes{};
+            [[nodiscard]] bool PositionPreview() const noexcept
+            {
+                return PositionPreviewLanes[0] || PositionPreviewLanes[1] || PositionPreviewLanes[2];
+            }
         };
 
         enum class MeshPrimitiveViewKind : std::uint8_t
@@ -242,15 +254,21 @@ namespace Extrinsic::Runtime
             RenderableSidecar& sidecar,
             Graphics::IRenderer& renderer,
             RuntimeRenderExtractionStats& stats);
-        [[nodiscard]] bool EnsureGraphPointLaneInstance(
-            RenderableSidecar& sidecar,
+        // The graph point lane's instance: drawn from the shared graph upload, or
+        // from its own points-only upload while its displayed positions differ
+        // from the edge lane's (UI-083). False when no point geometry is bound.
+        [[nodiscard]] bool EnsureGraphPointLaneInstance(RenderableSidecar& sidecar,
+            std::uint32_t stableId,
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            const VertexChannelBindingSet* bindings,
+            Graphics::IRenderer& renderer,
+            RuntimeRenderExtractionStats& stats);
+        // Frees the point lane instance and its own points-only upload.
+        void ReleaseGraphPointLaneInstance(RenderableSidecar& sidecar,
             std::uint32_t stableId,
             Graphics::IRenderer& renderer,
             RuntimeRenderExtractionStats& stats);
-        void ReleaseGraphPointLaneInstance(
-            RenderableSidecar& sidecar,
-            Graphics::IRenderer& renderer,
-            RuntimeRenderExtractionStats& stats);
+        void ReleaseGraphPointGeometry(RenderableSidecar& sidecar, std::uint32_t stableId);
         [[nodiscard]] bool BindPointCloudGeometry(
             entt::registry& registry,
             entt::entity entity,

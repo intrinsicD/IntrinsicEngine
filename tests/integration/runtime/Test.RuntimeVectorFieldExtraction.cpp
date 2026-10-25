@@ -490,10 +490,10 @@ TEST(RuntimeVectorFieldExtraction, AnchorsFollowABoundPositionSource)
     for (glm::vec3& p : lifted)
         p.z += 2.0f;
     vertices.GetOrAdd<glm::vec3>("v:lifted", glm::vec3{0.0f}).Vector() = lifted;
-    raw.emplace<Runtime::VertexChannelBindingSet>(
-        entity, Runtime::VertexChannelBindingSet{
-                    .Position = {.Enabled = true,
-                                 .Property = {D::MeshVertex, "v:lifted", Geometry::PropertyValueKind::Vec3}}});
+    raw.emplace<Runtime::VertexChannelBindingSet>(entity,
+        Runtime::VertexChannelBindingSet{
+            .Surface = {.Position = {.Enabled = true,
+                            .Property = {D::MeshVertex, "v:lifted", Geometry::PropertyValueKind::Vec3}}}});
 
     auto frame = fixture.Extract();
     const auto* vertex = FindPacket(frame.World, ":v:dir");

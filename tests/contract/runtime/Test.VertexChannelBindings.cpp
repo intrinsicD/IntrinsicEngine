@@ -255,7 +255,7 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     EXPECT_EQ(position->ExpectedType, "vec3");
     ASSERT_EQ(position->Domains.size(), 1u);
     EXPECT_EQ(position->Domains.front().ElementCount, 3u);
-    EXPECT_EQ(position->DefaultSource, "v:position; shared by all primitives");
+    EXPECT_EQ(position->DefaultSource, "v:position");
     const auto* offset = FindCandidate(*position, "v:offset");
     ASSERT_NE(offset, nullptr);
     EXPECT_TRUE(offset->Compatible);
@@ -270,14 +270,12 @@ TEST(VertexChannelBindings, ModelListsRowsCandidatesAndCurrentSourcesForEveryEnt
     EXPECT_EQ(FindCandidate(*FindRow(model, A::LineWidth, D::MeshEdge), "e:v0"), nullptr);
 
     // Current sources come from the storage that owns each attribute.
-    registry.Raw().emplace<Runtime::VertexChannelBindingSet>(
-        mesh, Runtime::VertexChannelBindingSet{
-                  .Position = {.Enabled = true,
-                               .Property = {.Domain = D::MeshVertex, .Name = "v:offset",
-                                            .ValueKind = Kind::Vec3}},
-                  .Normal = {.Enabled = true,
-                             .Property = {.Domain = D::MeshVertex, .Name = "v:gone",
-                                          .ValueKind = Kind::Vec3}}});
+    registry.Raw().emplace<Runtime::VertexChannelBindingSet>(mesh,
+        Runtime::VertexChannelBindingSet{
+            .Surface = {.Position = {.Enabled = true,
+                            .Property = {.Domain = D::MeshVertex, .Name = "v:offset", .ValueKind = Kind::Vec3}},
+                .Normal = {.Enabled = true,
+                    .Property = {.Domain = D::MeshVertex, .Name = "v:gone", .ValueKind = Kind::Vec3}}}});
     G::VisualizationConfig color{};
     color.Source = G::VisualizationConfig::ColorSource::ScalarField;
     color.ScalarFieldName = "v:temperature";
@@ -423,7 +421,8 @@ TEST(VertexChannelBindings, StructuralBindingAndDefaultAreOneUndoableStepOnEvery
         ASSERT_EQ(f.Bind(entity, A::Normal, domain, "v:n2"), Cmd::Applied);
         EXPECT_EQ(f.History.UndoCount(), undoBefore + 1u);
         const auto& bindings = f.Registry.Raw().get<Runtime::VertexChannelBindingSet>(entity);
-        EXPECT_EQ(bindings.Normal.Property, (Runtime::GeometryPropertyRef{domain, "v:n2", Kind::Vec3}));
+        EXPECT_EQ(Runtime::FindVertexChannelSourceBinding(bindings, LaneFor(A::Normal, domain), A::Normal)->Property,
+            (Runtime::GeometryPropertyRef{domain, "v:n2", Kind::Vec3}));
         EXPECT_TRUE(f.Registry.Raw().all_of<Dirty::DirtyVertexNormals>(entity));
         EXPECT_EQ(f.Bind(entity, A::Normal, domain, "v:n2"), Cmd::NoChange);
         EXPECT_EQ(f.Row(entity, A::Normal, domain).Source.Name, "v:n2");
@@ -473,14 +472,22 @@ TEST(VertexChannelBindings, PositionBindingIsOneUndoableStepOnEveryEntityKindAnd
 
         ASSERT_EQ(f.Bind(entity, A::Position, domain, "v:offset"), Cmd::Applied);
         EXPECT_EQ(f.History.UndoCount(), undoBefore + 1u);
-        EXPECT_EQ(f.Registry.Raw().get<Runtime::VertexChannelBindingSet>(entity).Position.Property,
-                  (Runtime::GeometryPropertyRef{domain, "v:offset", Kind::Vec3}));
+        const auto* bindings = f.Registry.Raw().try_get<Runtime::VertexChannelBindingSet>(entity);
+        ASSERT_NE(bindings, nullptr);
+        const L lane = LaneFor(A::Position, domain);
+        EXPECT_EQ(Runtime::FindVertexChannelSourceBinding(*bindings, lane, A::Position)->Property,
+            (Runtime::GeometryPropertyRef{domain, "v:offset", Kind::Vec3}));
         EXPECT_TRUE(f.Registry.Raw().all_of<Dirty::DirtyVertexPositions>(entity));
         EXPECT_EQ(properties.Get<glm::vec3>("v:position").Vector(), canonical);  // never copied
-        const auto displayed = Runtime::ResolveDisplayedPositions(
-            properties, domain, f.Registry.Raw().try_get<Runtime::VertexChannelBindingSet>(entity));
+        const auto displayed = Runtime::ResolveDisplayedPositions(properties, domain, bindings, lane);
         EXPECT_TRUE(displayed.Bound);
         EXPECT_EQ(displayed.Name, "v:offset");
+        // UI-083: only the bound lane moves; every other lane keeps the canonical positions.
+        for (const L other : {L::Surface, L::Edges, L::Points})
+        {
+            if (other != lane)
+                EXPECT_EQ(Runtime::ResolveDisplayedPositions(properties, domain, bindings, other).Name, "v:position");
+        }
 
         ASSERT_EQ(f.Bind(entity, A::Position, domain), Cmd::Applied);  // Default
         EXPECT_FALSE(f.Row(entity, A::Position, domain).Bound);
@@ -497,20 +504,20 @@ TEST(VertexChannelBindings, DisplayedPositionsFallBackToCanonicalWhenTheBoundSou
     auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
     SetProperty<glm::vec3>(properties, "v:offset", std::vector<glm::vec3>(3u, glm::vec3{0, 0, 2}));
     Runtime::VertexChannelBindingSet bindings{
-        .Position = {.Enabled = true, .Property = {D::MeshVertex, "v:offset", Kind::Vec3}}};
-    EXPECT_TRUE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings).Bound);
+        .Surface = {.Position = {.Enabled = true, .Property = {D::MeshVertex, "v:offset", Kind::Vec3}}}};
+    EXPECT_TRUE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings, L::Surface).Bound);
 
     properties.Get<glm::vec3>("v:offset").Vector()[1].x = std::numeric_limits<float>::infinity();
-    auto displayed = Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings);
+    auto displayed = Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings, L::Surface);
     EXPECT_FALSE(displayed.Bound);  // never draws garbage
     EXPECT_EQ(displayed.Name, "v:position");
     EXPECT_EQ(displayed.Values.size(), 3u);
 
-    bindings.Position.Property.Name = "v:gone";
-    EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings).Bound);
-    bindings.Position.Property = {D::GraphNode, "v:offset", Kind::Vec3};  // other domain
-    EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings).Bound);
-    EXPECT_EQ(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, nullptr).Name, "v:position");
+    bindings.Surface.Position.Property.Name = "v:gone";
+    EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings, L::Surface).Bound);
+    bindings.Surface.Position.Property = {D::GraphNode, "v:offset", Kind::Vec3};  // other domain
+    EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings, L::Surface).Bound);
+    EXPECT_EQ(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, nullptr, L::Surface).Name, "v:position");
 }
 
 TEST(VertexChannelBindings, CameraFocusAndDefaultVectorFieldLengthFollowTheDisplayedPositions)
@@ -568,6 +575,26 @@ TEST(VertexChannelBindings, CameraFocusAndDefaultVectorFieldLengthFollowTheDispl
     const auto unchanged = gizmo.ComputeFrame(
         f.Registry, entities, Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::BoundsCenters);
     EXPECT_EQ(unchanged.Pivot, updated.Pivot);
+
+    // UI-083: with the surface and the points drawn (the points still canonical), focus
+    // and the gizmo pivot span both drawn sources (canonical z 0, surface z 200).
+    raw.emplace<G::RenderSurface>(mesh);
+    raw.emplace<G::RenderPoints>(mesh);
+    const auto both = Runtime::ComputeFocusTargetForEntities(f.Registry, entities);
+    ASSERT_TRUE(both.has_value());
+    EXPECT_NEAR(both->Center.z, 100.0f, 1e-3f);
+    const auto spanning = gizmo.ComputeFrame(
+        f.Registry, entities, Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::BoundsCenters);
+    EXPECT_NEAR(spanning.Pivot.z, 100.0f, 1e-3f);
+
+    // A hidden surface no longer counts: only the drawn, canonical points are framed.
+    raw.remove<G::RenderSurface>(mesh);
+    const auto pointsOnly = Runtime::ComputeFocusTargetForEntities(f.Registry, entities);
+    ASSERT_TRUE(pointsOnly.has_value());
+    EXPECT_NEAR(pointsOnly->Center.z, 0.0f, 1e-3f);
+    const auto pointsPivot = gizmo.ComputeFrame(
+        f.Registry, entities, Runtime::GizmoOrientation::Global, Runtime::GizmoPivotMode::BoundsCenters);
+    EXPECT_NEAR(pointsPivot.Pivot.z, 0.0f, 1e-3f);
 }
 
 TEST(VertexChannelBindings, NormalAndTexcoordBindOnVertexOrCornerDomainsThroughOneSlot)
@@ -591,8 +618,8 @@ TEST(VertexChannelBindings, NormalAndTexcoordBindOnVertexOrCornerDomainsThroughO
     EXPECT_FALSE(f.Row(mesh, A::Normal, D::MeshHalfedge).Bound);
     f.Registry.Raw().remove<Dirty::DirtyVertexTexcoords>(mesh);
     ASSERT_EQ(f.Bind(mesh, A::Texcoord, D::MeshHalfedge, "h:uv2"), Cmd::Applied);
-    EXPECT_EQ(f.Registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh).Texcoord.Property.Domain,
-              D::MeshHalfedge);
+    EXPECT_EQ(
+        f.Registry.Raw().get<Runtime::VertexChannelBindingSet>(mesh).Surface.Texcoord.Property.Domain, D::MeshHalfedge);
     EXPECT_TRUE(f.Registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
     EXPECT_EQ(f.History.UndoCount(), 4u);
 }

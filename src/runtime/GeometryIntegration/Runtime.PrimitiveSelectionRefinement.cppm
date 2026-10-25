@@ -12,6 +12,7 @@ export module Extrinsic.Runtime.PrimitiveSelectionRefinement;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Runtime.GeometryProperty.Types;
 
 extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
@@ -188,6 +189,10 @@ export namespace Extrinsic::Runtime
         float WorldUnitsPerPixelAtUnitDepth{0.0f};
         float PickRadiusPixels{12.0f};
         bool OrthographicProjection{false};
+        // UI-083: the element domain the issuing selection targets, so a missing
+        // hint searches the lane that target is shown on; `Unknown` searches
+        // the lane the vertices are shown on.
+        GeometryElementDomain TargetDomain{GeometryElementDomain::Unknown};
     };
 
     // True when `projection` has no perspective divide on view-space z (the

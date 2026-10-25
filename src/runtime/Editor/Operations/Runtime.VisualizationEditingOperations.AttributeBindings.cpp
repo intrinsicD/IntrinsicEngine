@@ -175,8 +175,8 @@ namespace Extrinsic::Runtime
         std::map<SourceScanKey, GeometryPropertyResolution> g_SourceScans;
 
         // The property `lane` draws `rule.Attribute` from on `rule.Domain`, if
-        // one is authored there. Position/Normal/Texcoord are still one
-        // structural slot per entity, read by every lane.
+        // one is authored there. Position/Normal/Texcoord come from the lane's
+        // own structural slot.
         [[nodiscard]] std::optional<std::string> BoundSourceName(const entt::registry& raw,
             const ECS::EntityHandle entity,
             const GeometryRenderLane lane,
@@ -190,7 +190,7 @@ namespace Extrinsic::Runtime
                 if (const auto* bindings = raw.try_get<VertexChannelBindingSet>(entity))
                 {
                     const VertexChannelSourceBinding* binding =
-                        FindVertexChannelSourceBinding(*bindings, rule.Attribute);
+                        FindVertexChannelSourceBinding(*bindings, lane, rule.Attribute);
                     if (binding != nullptr && IsVertexChannelBindingEnabled(*binding) &&
                         binding->Property.Domain == rule.Domain)
                     {

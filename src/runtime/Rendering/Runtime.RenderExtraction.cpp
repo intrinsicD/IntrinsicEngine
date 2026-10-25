@@ -9,6 +9,7 @@ module;
 #include <limits>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
@@ -456,9 +457,9 @@ namespace Extrinsic::Runtime
             return bounds;
         }
 
-        // RUNTIME-315: an entity drawn from a bound Position source is culled by
-        // the bounds of what is drawn, not by its canonical bounds component.
-        // The box is recomputed only when the bound source's revision changes.
+        // RUNTIME-315: an entity drawn from bound Position sources is culled by
+        // the union of what its lanes draw, not by its canonical bounds component.
+        // The box is recomputed only when a displayed source or its revision changes.
         template <class Sidecar>  // the extraction cache's private sidecar
         [[nodiscard]] RHI::GpuBounds ExtractDisplayedBounds(const entt::registry& registry,
                                                             const entt::entity entity,
@@ -466,29 +467,23 @@ namespace Extrinsic::Runtime
                                                             Sidecar& sidecar)
         {
             const EntityDisplayedPositions resolved = ResolveEntityDisplayedPositions(registry, entity);
-            const DisplayedPositions& displayed = resolved.Positions;
-            if (!displayed.Bound || displayed.Values.empty())
+            if (!resolved.AnyBound())
             {
-                sidecar.DisplayedBoundsSource.clear();
-                sidecar.DisplayedBoundsRevision = 0u;
+                sidecar.DisplayedBoundsSignature.clear();
                 return ExtractBounds(registry, entity, model);
             }
-            const Geometry::PropertyRevision revision =
-                resolved.Vertices->FindPropertyRevision(displayed.Name).value_or(0u);
-            if (revision == 0u || revision != sidecar.DisplayedBoundsRevision ||
-                sidecar.DisplayedBoundsSource != displayed.Name)
+            std::string signature = DisplayedPositionsSignature(resolved);
+            if (signature.empty() || signature != sidecar.DisplayedBoundsSignature)
             {
-                glm::vec3 lo{std::numeric_limits<float>::max()};
-                glm::vec3 hi{std::numeric_limits<float>::lowest()};
-                for (const glm::vec3& p : displayed.Values)
+                const std::optional<Geometry::AABB> box = ComputeEntityLocalDisplayBounds(registry, entity);
+                if (!box.has_value())
                 {
-                    lo = glm::min(lo, p);
-                    hi = glm::max(hi, p);
+                    sidecar.DisplayedBoundsSignature.clear();
+                    return ExtractBounds(registry, entity, model);
                 }
-                sidecar.DisplayedBoundsSource = std::string{displayed.Name};
-                sidecar.DisplayedBoundsRevision = revision;
-                sidecar.DisplayedBoundsMin = lo;
-                sidecar.DisplayedBoundsMax = hi;
+                sidecar.DisplayedBoundsSignature = std::move(signature);
+                sidecar.DisplayedBoundsMin = box->Min;
+                sidecar.DisplayedBoundsMax = box->Max;
             }
             ECS::Components::Culling::Local::Bounds local{};
             local.LocalBoundingAABB = Geometry::AABB{sidecar.DisplayedBoundsMin, sidecar.DisplayedBoundsMax};
@@ -520,27 +515,61 @@ namespace Extrinsic::Runtime
             return bounds;
         }
 
-        // GRAPHICS-156: the entity's position ring front for the frame being built, from
-        // the residency observer. One definition serves extraction and the pre-extraction
+        // GRAPHICS-156: the position ring fronts for the frame being built, from the
+        // residency observer. One definition serves extraction and the pre-extraction
         // hooks, so a pick request or highlight snapshot sees the state its frame renders.
-        // RUNTIME-315: the front of the displayed position property (bound or canonical).
-        [[nodiscard]] std::optional<RenderExtractionCache::GpuPropertyFront> ObservePositionFront(
+        // RUNTIME-315/UI-083: each displayed lane previews the front of its own displayed
+        // position property (bound or canonical); a shared source is observed once.
+        struct LanePositionFronts
+        {
+            std::array<std::optional<RenderExtractionCache::GpuPropertyFront>, 3> ByLane{};
+
+            [[nodiscard]] bool Any() const noexcept
+            {
+                return std::ranges::any_of(ByLane,
+                    [](const auto& front)
+                    {
+                        return front.has_value();
+                    });
+            }
+            [[nodiscard]] const std::optional<RenderExtractionCache::GpuPropertyFront>& For(
+                const GeometryRenderLane lane) const noexcept
+            {
+                return ByLane[std::size_t(lane)];
+            }
+        };
+
+        [[nodiscard]] LanePositionFronts ObservePositionFronts(
             const RenderExtractionCache::GpuPropertyObserver& observer,
             const WorldHandle world,
+            const entt::registry& registry,
             const entt::entity entity,
-            const GeometryEntityAvailability& availability,
-            const VertexChannelBindingSet* bindings)
+            const GeometryEntityAvailability& availability)
         {
-            const GeometryElementDomain domain =
-                DisplayedPositionDomainFor(availability.Sources.ProvenanceDomain);
+            LanePositionFronts fronts{};
+            const ECS::Components::GeometrySources::Domain provenance = availability.Sources.ProvenanceDomain;
+            const GeometryElementDomain domain = DisplayedPositionDomainFor(provenance);
             const Geometry::PropertySet* vertices = ResolveGeometryPropertySet(availability, domain);
             if (!observer || vertices == nullptr)
-                return std::nullopt;
-            const GeometryPropertyRef positionRef{
-                .Domain = domain,
-                .Name = std::string{ResolveDisplayedPositions(*vertices, domain, bindings).Name},
-                .ValueKind = Geometry::PropertyValueKind::Vec3};
-            return observer(world, entity, positionRef);
+                return fronts;
+            const auto* bindings = registry.try_get<VertexChannelBindingSet>(entity);
+            const DisplayedLaneMask lanes = DisplayedPositionLanes(registry, entity, provenance);
+            std::array<std::string_view, 3> names{};
+            for (std::size_t lane = 0; lane < lanes.size(); ++lane)
+            {
+                if (!lanes[lane])
+                    continue;
+                names[lane] = ResolveDisplayedPositions(*vertices, domain, bindings, GeometryRenderLane(lane)).Name;
+                const auto shared = std::ranges::find(names.begin(), names.begin() + lane, names[lane]);
+                fronts.ByLane[lane] = shared != names.begin() + lane
+                    ? fronts.ByLane[std::size_t(shared - names.begin())]
+                    : observer(world,
+                          entity,
+                          GeometryPropertyRef{.Domain = domain,
+                              .Name = std::string{names[lane]},
+                              .ValueKind = Geometry::PropertyValueKind::Vec3});
+            }
+            return fronts;
         }
 
         struct GeometryDirtyPlan
@@ -1684,9 +1713,9 @@ namespace Extrinsic::Runtime
         bool graphLaneReadyThisFrame = false;
         bool presentationRecipesProjected = false;
         std::optional<GeometryEntityAvailability> availabilityThisFrame{};
-        // GRAPHICS-156: the entity's position ring front this frame, if a GPU method is
-        // writing its positions (ADR 0030 decision 5).
-        std::optional<GpuPropertyFront> positionFront{};
+        // GRAPHICS-156: each displayed lane's position ring front this frame, if a GPU
+        // method is writing the positions it displays (ADR 0030 decision 5).
+        LanePositionFronts positionFronts{};
         if (sourceEligible)
         {
             namespace GS = ECS::Components::GeometrySources;
@@ -1694,21 +1723,30 @@ namespace Extrinsic::Runtime
             const GeometryEntityAvailability availability =
                 BuildGeometryAvailability(registry, entity);
             const auto& view = availability.SourceView;
-            positionFront = ObservePositionFront(
-                m_GpuPropertyObserver, m_World, entity, availability,
-                registry.try_get<VertexChannelBindingSet>(entity));
-            if (!positionFront.has_value() && sidecar->PositionPreview)
+            positionFronts = ObservePositionFronts(m_GpuPropertyObserver, m_World, registry, entity, availability);
+            const bool previewLaneEnded =
+                std::ranges::any_of(std::views::iota(std::size_t{0}, positionFronts.ByLane.size()),
+                    [&](const std::size_t lane)
+                    {
+                        return sidecar->PositionPreviewLanes[lane] && !positionFronts.ByLane[lane].has_value();
+                    });
+            if (previewLaneEnded)
             {
-                // The preview ended (Discard, cancel or Accept): the blocks are restored
+                // A preview ended (Discard, cancel or Accept): the blocks are restored
                 // from the current CPU positions by this frame's forced channel upload,
-                // never from the stale shadow (ADR 0030 decision 7).
+                // never from the stale shadow (ADR 0030 decision 7). Lanes still
+                // previewing are handed their front again below.
                 registry.emplace_or_replace<D::DirtyVertexPositions>(entity);
-                sidecar->PositionPreview = false;
+                // The graph point lane's own upload follows revisions, not dirty tags.
+                sidecar->GraphPointSourceRevisions = {};
+                sidecar->PositionPreviewLanes = {};
                 ++stats.PositionPreviewRestores;
-                for (const Graphics::GpuGeometryHandle handle :
-                     {sidecar->MeshGeometry, sidecar->MeshEdgeViewGeometry,
-                      sidecar->MeshVertexViewGeometry, sidecar->GraphGeometry,
-                      sidecar->PointCloudGeometry})
+                for (const Graphics::GpuGeometryHandle handle : {sidecar->MeshGeometry,
+                         sidecar->MeshEdgeViewGeometry,
+                         sidecar->MeshVertexViewGeometry,
+                         sidecar->GraphGeometry,
+                         sidecar->GraphPointGeometry,
+                         sidecar->PointCloudGeometry})
                 {
                     if (handle.IsValid())
                         renderer.GetGpuWorld().ClearGeometryPositionPreview(handle);
@@ -1781,7 +1819,7 @@ namespace Extrinsic::Runtime
                 {
                     const auto* meshChannelBindings =
                         registry.try_get<VertexChannelBindingSet>(entity);
-                    const RHI::GpuBounds viewBounds = positionFront.has_value()
+                    const RHI::GpuBounds viewBounds = positionFronts.Any()
                         ? UnboundedPreviewBounds(ExtractBounds(registry, entity, worldMatrix))
                         : ExtractDisplayedBounds(registry, entity, worldMatrix, *sidecar);
                     meshViewsResident = true;
@@ -1883,27 +1921,29 @@ namespace Extrinsic::Runtime
             }
         }
 
-        // GRAPHICS-156: hand the observed front to every lane block. The 1:1 lanes
+        // GRAPHICS-156: hand each lane block its lane's observed front. The 1:1 lanes
         // (point clouds, graphs, canonical mesh views) copy it; the seam-split surface
         // gathers through its vertex remap keyed by the remap revision.
-        sidecar->PositionPreview = positionFront.has_value();
-        if (positionFront.has_value())
+        for (std::size_t lane = 0; lane < positionFronts.ByLane.size(); ++lane)
+            sidecar->PositionPreviewLanes[lane] = positionFronts.ByLane[lane].has_value();
+        if (sidecar->PositionPreview())
         {
             ++stats.PositionPreviewsObserved;
             Graphics::GpuWorld& gpuWorld = renderer.GetGpuWorld();
             const auto show = [&](const Graphics::GpuGeometryHandle handle,
+                                  const GeometryRenderLane lane,
                                   const std::span<const std::uint32_t> gather,
                                   const std::uint64_t gatherStamp)
             {
-                if (!handle.IsValid())
+                const std::optional<GpuPropertyFront>& front = positionFronts.For(lane);
+                if (!handle.IsValid() || !front.has_value())
                     return;
-                const auto status = gpuWorld.SetGeometryPositionPreview(
-                    handle,
+                const auto status = gpuWorld.SetGeometryPositionPreview(handle,
                     Graphics::GpuWorld::GeometryPositionPreviewDesc{
-                        .Source = positionFront->Buffer,
+                        .Source = front->Buffer,
                         .SourceOffsetBytes = 0u,
-                        .SourceRowCount = positionFront->Count,
-                        .Stamp = positionFront->Stamp,
+                        .SourceRowCount = front->Count,
+                        .Stamp = front->Stamp,
                         .GatherMap = gather,
                         .GatherStamp = gatherStamp,
                     });
@@ -1911,12 +1951,19 @@ namespace Extrinsic::Runtime
                     ++stats.PositionPreviewBlocksRejected;
             };
             show(sidecar->MeshGeometry,
-                 std::span<const std::uint32_t>{sidecar->MeshSourceVertexForGpuVertex},
-                 sidecar->MeshSourceVertexForGpuVertex.empty() ? 0u : sidecar->MeshVertexRemapRevision);
-            show(sidecar->MeshEdgeViewGeometry, {}, 0u);
-            show(sidecar->MeshVertexViewGeometry, {}, 0u);
-            show(sidecar->GraphGeometry, {}, 0u);
-            show(sidecar->PointCloudGeometry, {}, 0u);
+                GeometryRenderLane::Surface,
+                std::span<const std::uint32_t>{sidecar->MeshSourceVertexForGpuVertex},
+                sidecar->MeshSourceVertexForGpuVertex.empty() ? 0u : sidecar->MeshVertexRemapRevision);
+            show(sidecar->MeshEdgeViewGeometry, GeometryRenderLane::Edges, {}, 0u);
+            show(sidecar->MeshVertexViewGeometry, GeometryRenderLane::Points, {}, 0u);
+            show(sidecar->GraphGeometry,
+                sidecar->GraphPackedLines ? GeometryRenderLane::Edges : GeometryRenderLane::Points,
+                {},
+                0u);
+            // shortcut: a graph point-lane upload made later this frame (EnsureGraphPointLaneInstance)
+            // shows its front from the next frame on; move this block after it if that frame matters.
+            show(sidecar->GraphPointGeometry, GeometryRenderLane::Points, {}, 0u);
+            show(sidecar->PointCloudGeometry, GeometryRenderLane::Points, {}, 0u);
         }
 
         // Project property-backed presentation after geometry reconciliation
@@ -2039,7 +2086,7 @@ namespace Extrinsic::Runtime
                 BuildRenderExtractionGeometryResidencyKey(
                     RenderExtractionGeometryResidencyKind::Graph,
                     stableId));
-            ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
+            ReleaseGraphPointLaneInstance(*sidecar, stableId, renderer, stats);
             if (!proceduralBound && !meshBoundThisFrame && !pointCloudBoundThisFrame)
             {
                 renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
@@ -2201,19 +2248,17 @@ namespace Extrinsic::Runtime
                 }
                 return std::string{};
             };
-        const bool splitGraphPointLane =
-            graphDomainThisFrame &&
-            graphBoundThisFrame &&
-            renderEdges != nullptr &&
-            renderPoints != nullptr &&
-            EnsureGraphPointLaneInstance(
-                *sidecar,
+        const bool splitGraphPointLane = graphDomainThisFrame && graphBoundThisFrame && renderEdges != nullptr &&
+            renderPoints != nullptr && availabilityThisFrame.has_value() &&
+            EnsureGraphPointLaneInstance(*sidecar,
                 stableId,
+                availabilityThisFrame->SourceView,
+                registry.try_get<VertexChannelBindingSet>(entity),
                 renderer,
                 stats);
         if (!splitGraphPointLane)
         {
-            ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
+            ReleaseGraphPointLaneInstance(*sidecar, stableId, renderer, stats);
         }
 
         std::string pointSizeKey{};
@@ -2515,7 +2560,7 @@ namespace Extrinsic::Runtime
                         nullptr,
                         renderPoints));
             }
-            const RHI::GpuBounds instanceBounds = sidecar->PositionPreview
+            const RHI::GpuBounds instanceBounds = sidecar->PositionPreview()
                 ? UnboundedPreviewBounds(ExtractBounds(registry, entity, worldMatrix))
                 : ExtractDisplayedBounds(registry, entity, worldMatrix, *sidecar);
             m_Transforms.push_back(Graphics::TransformSyncRecord{
@@ -2565,9 +2610,7 @@ namespace Extrinsic::Runtime
             registry.try_get<ECS::Components::AssetInstance::Source>(entity) != nullptr)
             return false;
         const GeometryEntityAvailability availability = BuildGeometryAvailability(registry, entity);
-        return ObservePositionFront(m_State->m_GpuPropertyObserver, world, entity, availability,
-                                    registry.try_get<VertexChannelBindingSet>(entity))
-            .has_value();
+        return ObservePositionFronts(m_State->m_GpuPropertyObserver, world, registry, entity, availability).Any();
     }
 
     void RenderExtractionCache::State::FinalizeAndSubmitSnapshot(
@@ -2668,7 +2711,7 @@ namespace Extrinsic::Runtime
         Graphics::IRenderer& renderer)
     {
         RuntimeRenderExtractionStats stats{};
-        for (auto& [_, sidecar] : m_Renderables)
+        for (auto& [stableId, sidecar] : m_Renderables)
         {
             if (sidecar.ProceduralKey.has_value())
             {
@@ -2682,7 +2725,7 @@ namespace Extrinsic::Runtime
             {
                 ++stats.GraphGeometryReleases;
             }
-            ReleaseGraphPointLaneInstance(sidecar, renderer, stats);
+            ReleaseGraphPointLaneInstance(sidecar, stableId, renderer, stats);
             if (sidecar.PointCloudGeometry.IsValid())
             {
                 ++stats.PointCloudGeometryReleases;

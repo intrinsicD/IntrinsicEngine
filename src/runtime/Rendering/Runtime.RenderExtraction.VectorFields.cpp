@@ -176,6 +176,13 @@ namespace Extrinsic::Runtime
             std::vector<std::size_t> Counts{};
         };
 
+        // UI-083: anchors sit on the primary lane's displayed positions.
+        [[nodiscard]] GeometryRenderLane AnchorLane(const GeometryEntityAvailability& availability) noexcept
+        {
+            return PrimaryLaneFor(availability.Sources.ProvenanceDomain, RenderAttribute::Position)
+                .value_or(GeometryRenderLane::Points);
+        }
+
         // Collects everything the anchors of `domain` depend on. Any source
         // change moves at least one revision (revisions are global and never
         // reused), so equal revisions and counts mean an unchanged cache.
@@ -190,8 +197,9 @@ namespace Extrinsic::Runtime
                 IsPointDomain(domain) ? domain : PositionDomainFor(domain);
             sources.Positions = ResolveGeometryPropertySet(availability, positionDomain);
             // Anchors sit on the displayed positions (RUNTIME-315).
+            const GeometryRenderLane lane = AnchorLane(availability);
             sources.PositionName = sources.Positions != nullptr
-                ? std::string{ResolveDisplayedPositions(*sources.Positions, positionDomain, bindings).Name}
+                ? std::string{ResolveDisplayedPositions(*sources.Positions, positionDomain, bindings, lane).Name}
                 : std::string{PN::kPosition};
 
             sources.Revisions.push_back(RevisionOf(sources.Positions, sources.PositionName));
@@ -589,7 +597,7 @@ namespace Extrinsic::Runtime
 
             // Point domains borrow their own displayed positions.
             const std::span<const glm::vec3> anchorValues = anchors->BorrowPositions
-                ? ResolveDisplayedPositions(*properties, request.Domain, bindings).Values
+                ? ResolveDisplayedPositions(*properties, request.Domain, bindings, AnchorLane(availability)).Values
                 : std::span<const glm::vec3>{anchors->Anchors};
             const std::span<const glm::vec3> vectorValues = payload->Borrow
                 ? properties->Get<glm::vec3>(request.Property).Span()
