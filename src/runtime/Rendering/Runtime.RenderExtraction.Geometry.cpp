@@ -965,6 +965,7 @@ namespace Extrinsic::Runtime
         const Graphics::Components::RenderPoints* points,
         const Graphics::Components::VisualizationConfig* visualization,
         bool meshDirty,
+        const bool selectable,
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
     {
@@ -1033,7 +1034,8 @@ namespace Extrinsic::Runtime
                 .RenderFlags =
                     RHI::GpuRender_Visible
                     | RHI::GpuRender_Opaque
-                    | laneFlag,
+                    | laneFlag
+                    | (selectable ? RHI::GpuRender_Selectable : 0u),
                 .Bounds = bounds,
                 .MaterialSlot = materialSlot,
                 .HasMaterialSlot = true,

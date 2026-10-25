@@ -31,6 +31,7 @@ import :Internal;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform;
@@ -333,6 +334,9 @@ namespace Extrinsic::Runtime
                 flags |= RHI::GpuRender_Line | RHI::GpuRender_Unlit;
             if (registry.all_of<G::RenderPoints>(entity))
                 flags |= RHI::GpuRender_Point | RHI::GpuRender_Unlit;
+            // BUG-254: the culling fills the point pick bucket only for selectable instances.
+            if (registry.all_of<ECS::Components::Selection::SelectableTag>(entity))
+                flags |= RHI::GpuRender_Selectable;
             return flags;
         }
 
@@ -1819,6 +1823,7 @@ namespace Extrinsic::Runtime
                 {
                     const auto* meshChannelBindings =
                         registry.try_get<VertexChannelBindingSet>(entity);
+                    const bool meshViewsSelectable = registry.all_of<ECS::Components::Selection::SelectableTag>(entity);
                     const RHI::GpuBounds viewBounds = positionFronts.Any()
                         ? UnboundedPreviewBounds(ExtractBounds(registry, entity, worldMatrix))
                         : ExtractDisplayedBounds(registry, entity, worldMatrix, *sidecar);
@@ -1837,6 +1842,7 @@ namespace Extrinsic::Runtime
                                                    nullptr,
                                                    edgeVisualization,
                                                    meshDirtyThisFrame,
+                                                   meshViewsSelectable,
                                                    renderer,
                                                    stats);
                     const bool pointSubmitted =
@@ -1853,6 +1859,7 @@ namespace Extrinsic::Runtime
                                                    pointHint,
                                                    pointVisualization,
                                                    meshDirtyThisFrame,
+                                                   meshViewsSelectable,
                                                    renderer,
                                                    stats);
                     if (!wantsSurface &&
@@ -2587,7 +2594,8 @@ namespace Extrinsic::Runtime
                     .RenderFlags = RHI::GpuRender_Visible |
                                    RHI::GpuRender_Opaque |
                                    RHI::GpuRender_Point |
-                                   RHI::GpuRender_Unlit,
+                                   RHI::GpuRender_Unlit |
+                                   (renderFlags & RHI::GpuRender_Selectable),
                     .Bounds = instanceBounds,
                     .MaterialSlot = sidecar->Material.EffectiveSlot,
                     .HasMaterialSlot = true,

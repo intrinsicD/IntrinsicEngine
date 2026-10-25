@@ -1,6 +1,8 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
+#include <utility>
 #include <string>
 
 #include <glm/glm.hpp>
@@ -12,6 +14,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -24,6 +27,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.SceneHandles;
+import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -1229,6 +1233,51 @@ TEST(GraphGeometryExtraction, BoundPositionSourcesAreDrawnForNodesAndEdgesPerLan
         const auto bounds = engine.GetRenderer().GetGpuWorld().GetBoundsForTest(view.Instance);
         EXPECT_FLOAT_EQ(bounds.WorldSphere.z, 4.0f);
         EXPECT_FLOAT_EQ(bounds.WorldAabbMin.z, 4.0f);
+    }
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// BUG-254: a selectable graph flags both its line instance and its split point
+// lane instance selectable (the point pick bucket is filled only for those); a
+// non-selectable graph flags neither.
+TEST(GraphGeometryExtraction, SelectableGraphFlagsTheLineAndPointLaneInstancesSelectable)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle selectable = MakeLineAndPointGraphRenderable(scene);
+    const EntityHandle plain = MakeLineAndPointGraphRenderable(scene);
+    scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Selection::SelectableTag>(selectable);
+    scene.Raw().remove<Extrinsic::ECS::Components::Selection::SelectableTag>(plain);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    (void)extraction.ExtractAndSubmit(
+        scene, engine.GetRenderer(), &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    const auto world = engine.GetRenderer().ExtractRenderWorld({});
+    const auto flagsOf = [&](const Extrinsic::Graphics::GpuInstanceHandle instance) -> std::optional<std::uint32_t>
+    {
+        for (const auto& renderable : world.Renderables)
+        {
+            if (renderable.Instance == instance)
+                return renderable.RenderFlags;
+        }
+        return std::nullopt;
+    };
+    for (const auto& [entity, expected] : {std::pair{selectable, true}, std::pair{plain, false}})
+    {
+        SCOPED_TRACE(expected ? "selectable" : "not selectable");
+        const auto view =
+            extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+        ASSERT_TRUE(view.has_value());
+        ASSERT_TRUE(view->HasGraphPointLaneInstance);
+        for (const auto instance : {view->Instance, view->GraphPointLaneInstance})
+        {
+            const auto flags = flagsOf(instance);
+            ASSERT_TRUE(flags.has_value());
+            EXPECT_EQ((*flags & Extrinsic::RHI::GpuRender_Selectable) != 0u, expected);
+        }
     }
 
     extraction.Shutdown(engine.GetRenderer());

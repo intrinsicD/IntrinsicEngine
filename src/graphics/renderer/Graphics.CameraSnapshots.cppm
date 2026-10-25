@@ -39,6 +39,15 @@ namespace Extrinsic::Graphics
         bool ExplicitCameraTransition{false};
     };
 
+    // BUG-254: the primitive ID sub-passes a pick records besides the surface's
+    // entity and face IDs, chosen by the selection mode (Entity and Vertex: both,
+    // Edge: edges, Face: neither). All by default.
+    export struct PickPrimitiveLanes
+    {
+        bool Edges{true};
+        bool Points{true};
+    };
+
     export struct PickPixelRequest
     {
         std::uint32_t X{0u};
@@ -52,6 +61,7 @@ namespace Extrinsic::Graphics
         // renderer publishes completed slots out of issue order. 0 means the
         // pick is uncorrelated (no runtime controller wired).
         std::uint64_t Sequence{0u};
+        PickPrimitiveLanes Lanes{};
     };
 
     export struct CameraViewSnapshot

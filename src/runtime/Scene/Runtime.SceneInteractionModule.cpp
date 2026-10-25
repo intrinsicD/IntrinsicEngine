@@ -163,6 +163,15 @@ namespace Extrinsic::Runtime
                     renderInput.Camera.Projection);
             return context;
         }
+
+        // BUG-254: the primitive lanes a pick of `target` competes on. Entity and Vertex
+        // picks take the nearest surface, edge or point; Edge picks pass through points;
+        // Face picks see surfaces only, so they always get a face hint.
+        [[nodiscard]] Graphics::PickPrimitiveLanes PickLanesFor(const SelectionTarget target) noexcept
+        {
+            return {.Edges = target != SelectionTarget::Face,
+                .Points = target == SelectionTarget::Entity || target == SelectionTarget::Vertex};
+        }
     }
 
     std::vector<std::uint64_t> BuildPrimitivePickStamp(const ECS::Scene::Registry& scene, const std::uint32_t id,
@@ -575,6 +584,7 @@ namespace Extrinsic::Runtime
                                 .Y = pick->PixelY,
                                 .Pending = true,
                                 .Sequence = pick->Sequence,
+                                .Lanes = PickLanesFor(pick->Target),
                             };
                         Renderer->GetSelectionSystem().RequestPick(
                             Graphics::PickRequest{

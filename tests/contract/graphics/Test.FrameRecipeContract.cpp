@@ -799,10 +799,9 @@ TEST(FrameRecipeContract, DefaultRecipeDoesNotDepthTransitionColorResources)
 
             ASSERT_LT(barrier.TextureIndex, compiled->TextureNames.size());
             const std::string& name = compiled->TextureNames[barrier.TextureIndex];
-            EXPECT_TRUE(name == "SceneDepth" || name == "ShadowAtlas")
-                << "Texture \"" << name << "\" received a depth barrier in pass index "
-                << packet.PassIndex << ": before=" << static_cast<int>(barrier.Before)
-                << " after=" << static_cast<int>(barrier.After);
+            EXPECT_TRUE(name == "SceneDepth" || name == "ShadowAtlas" || name == "Picking.Depth")
+                << "Texture \"" << name << "\" received a depth barrier in pass index " << packet.PassIndex
+                << ": before=" << static_cast<int>(barrier.Before) << " after=" << static_cast<int>(barrier.After);
         }
     }
 }
@@ -2285,10 +2284,10 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     EXPECT_TRUE(Contains(picking->Writes, "EntityId"));
     EXPECT_TRUE(Contains(picking->Writes, "PrimitiveId"));
     EXPECT_TRUE(Contains(picking->Writes, "Picking.Readback"));
-    // GRAPHICS-074 recipe-side follow-up — picking samples the
-    // depth-prepass-populated SceneDepth so the depth-equal pipeline picks
-    // the nearest-surface fragment per pixel instead of last-fragment-winning.
-    EXPECT_TRUE(Contains(picking->Reads, "SceneDepth"));
+    // BUG-254 — a pending pick draws into its own depth, so the nearest
+    // surface, edge or point wins per pixel; the prepass depth is not read.
+    EXPECT_TRUE(Contains(picking->Writes, "Picking.Depth"));
+    EXPECT_FALSE(Contains(picking->Reads, "SceneDepth"));
     EXPECT_TRUE(Contains(picking->Reads, "Cull.SurfaceOpaque.IndexedArgs"));
     EXPECT_TRUE(Contains(picking->Reads, "Cull.Lines.IndexedArgs"));
     EXPECT_TRUE(Contains(picking->Reads, "Cull.Points.NonIndexedArgs"));
@@ -2845,15 +2844,25 @@ TEST(FrameRecipeContract, PickingPassClearsSelectionIdTargetsToZero)
         << "PickingPass must declare exactly the EntityId + PrimitiveId color targets.";
 }
 
-// BUG-026: when picking readback is active the PickingPass executor copies the
-// pick pixel out of SceneDepth (world-space cursor reconstruction), so the
-// depth target must carry transfer-source usage; without active picking the
-// depth target keeps its lean usage set.
-TEST(FrameRecipeContract, SceneDepthGainsTransferSrcUsageWhenPickingActive)
+// BUG-026/254: while a pick is pending the PickingPass draws into its own
+// `Picking.Depth`, cleared per pick, and the executor copies the pick pixel's
+// depth out of it (world-space cursor reconstruction), so it is a transfer
+// source. Outline-only frames have no `Picking.Depth` and load the prepass
+// `SceneDepth`, which never needs transfer-source usage.
+TEST(FrameRecipeContract, PickingDrawsIntoItsOwnClearedDepthOnlyWhilePicking)
 {
-    const auto sceneDepthUsage = [](const bool enablePicking) {
+    struct Depth
+    {
+        std::string Name{};
+        RHI::LoadOp Load{RHI::LoadOp::DontCare};
+        RHI::TextureUsage Usage{};
+        RHI::TextureUsage SceneDepthUsage{};
+    };
+    const auto pickingDepth = [](const bool enablePicking)
+    {
         FrameRecipeFeatures features{};
         features.EnablePicking = enablePicking;
+        features.EnableSelectionOutline = true;
         FrameRecipeImports imports = MakeImports();
         if (enablePicking)
         {
@@ -2868,15 +2877,37 @@ TEST(FrameRecipeContract, SceneDepthGainsTransferSrcUsageWhenPickingActive)
         EXPECT_TRUE(build.Succeeded) << build.Diagnostic;
         const auto compiled = graph.Compile();
         EXPECT_TRUE(compiled.has_value());
-        const std::uint32_t depthIndex = TextureIndexByName(*compiled, "SceneDepth");
-        EXPECT_LT(depthIndex, compiled->TextureNames.size());
-        const TextureResourceDesc* desc = graph.GetTextureDescByIndex(depthIndex);
-        EXPECT_NE(desc, nullptr);
-        return desc != nullptr ? desc->Desc.Usage : RHI::TextureUsage{};
+        Depth depth{};
+        const std::uint32_t pickingIndex = PassIndexByName(*compiled, "PickingPass");
+        EXPECT_LT(pickingIndex, compiled->PassNames.size());
+        for (const CompiledRenderPassAttachment& attachment : compiled->RenderPassAttachments)
+        {
+            if (attachment.PassIndex == pickingIndex && attachment.IsDepthAttachment)
+            {
+                depth.Name = compiled->TextureNames[attachment.ResourceIndex];
+                depth.Load = attachment.Load;
+                const TextureResourceDesc* desc = graph.GetTextureDescByIndex(attachment.ResourceIndex);
+                EXPECT_NE(desc, nullptr);
+                depth.Usage = desc != nullptr ? desc->Desc.Usage : RHI::TextureUsage{};
+            }
+        }
+        const TextureResourceDesc* scene = graph.GetTextureDescByIndex(TextureIndexByName(*compiled, "SceneDepth"));
+        EXPECT_NE(scene, nullptr);
+        depth.SceneDepthUsage = scene != nullptr ? scene->Desc.Usage : RHI::TextureUsage{};
+        return depth;
     };
 
-    EXPECT_TRUE(HasTextureUsage(sceneDepthUsage(true), RHI::TextureUsage::TransferSrc));
-    EXPECT_FALSE(HasTextureUsage(sceneDepthUsage(false), RHI::TextureUsage::TransferSrc));
+    const Depth picking = pickingDepth(true);
+    EXPECT_EQ(picking.Name, "Picking.Depth");
+    EXPECT_EQ(picking.Load, RHI::LoadOp::Clear);
+    EXPECT_TRUE(HasTextureUsage(picking.Usage, RHI::TextureUsage::DepthTarget));
+    EXPECT_TRUE(HasTextureUsage(picking.Usage, RHI::TextureUsage::TransferSrc));
+    EXPECT_FALSE(HasTextureUsage(picking.SceneDepthUsage, RHI::TextureUsage::TransferSrc));
+
+    const Depth outline = pickingDepth(false);
+    EXPECT_EQ(outline.Name, "SceneDepth");
+    EXPECT_EQ(outline.Load, RHI::LoadOp::Load);
+    EXPECT_FALSE(HasTextureUsage(outline.SceneDepthUsage, RHI::TextureUsage::TransferSrc));
 }
 
 // This producer imports FrameRecipe directly, without Renderer or RenderRecipeConfig.

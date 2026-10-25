@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -16,6 +18,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -27,9 +30,11 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Types;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.Runtime.Engine;
@@ -2030,6 +2035,57 @@ TEST(MeshGeometryExtraction, BoundPositionSourcesFeedTheSurfaceAndBothPrimitiveV
     raw.remove<Extrinsic::Runtime::VertexChannelBindingSet>(entity);
     Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
     EXPECT_EQ(extract(), before);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// BUG-254: the culling fills the point pick bucket only for instances flagged
+// selectable, so every instance of a selectable mesh (the surface and both
+// primitive views) carries the flag and a non-selectable mesh's instances do not.
+TEST(MeshGeometryExtraction, SelectableMeshFlagsTheSurfaceAndBothPrimitiveViewsSelectable)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle selectable = MakeQuadMeshRenderable(scene);
+    const EntityHandle plain = MakeQuadMeshRenderable(scene);
+    for (const EntityHandle entity : {selectable, plain})
+    {
+        raw.emplace<G::RenderEdges>(entity);
+        raw.emplace<G::RenderPoints>(entity);
+    }
+    raw.emplace_or_replace<Extrinsic::ECS::Components::Selection::SelectableTag>(selectable);
+    raw.remove<Extrinsic::ECS::Components::Selection::SelectableTag>(plain);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    (void)extraction.ExtractAndSubmit(
+        scene, engine.GetRenderer(), &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    const auto world = engine.GetRenderer().ExtractRenderWorld({});
+    const auto flagsOf = [&](const Extrinsic::Graphics::GpuInstanceHandle instance) -> std::optional<std::uint32_t>
+    {
+        for (const auto& renderable : world.Renderables)
+        {
+            if (renderable.Instance == instance)
+                return renderable.RenderFlags;
+        }
+        return std::nullopt;
+    };
+    for (const auto& [entity, expected] : {std::pair{selectable, true}, std::pair{plain, false}})
+    {
+        SCOPED_TRACE(expected ? "selectable" : "not selectable");
+        const auto view =
+            extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+        ASSERT_TRUE(view.has_value());
+        for (const auto instance : {view->Instance, view->MeshEdgeViewInstance, view->MeshVertexViewInstance})
+        {
+            const auto flags = flagsOf(instance);
+            ASSERT_TRUE(flags.has_value());
+            EXPECT_EQ((*flags & Extrinsic::RHI::GpuRender_Selectable) != 0u, expected);
+        }
+    }
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

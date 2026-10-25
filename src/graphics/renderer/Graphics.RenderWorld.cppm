@@ -40,6 +40,7 @@ namespace Extrinsic::Graphics
         // RUNTIME-089 — selection correlation token carried from
         // RenderFrameInput::Pick to the picking slot (see PickPixelRequest).
         std::uint64_t Sequence{0u};
+        PickPrimitiveLanes Lanes{};
     };
 
     export struct SelectionSnapshot

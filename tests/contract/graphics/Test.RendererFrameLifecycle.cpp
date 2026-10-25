@@ -3742,11 +3742,11 @@ TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
         EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
         EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
         EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
-        // Render-pass compatibility with the recipe-declared depth-read
-        // PickingPass: depth-test on, depth-equal, depth-write off, D32_FLOAT.
+        // BUG-254: a pending pick draws into the PickingPass's own cleared
+        // D32_FLOAT depth, so the entity pass writes the nearest surface's depth.
         EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::LessEqual);
         EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
         EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
         EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
@@ -3841,9 +3841,10 @@ TEST(RendererFrameLifecycle, EdgeIdPickingPipelineSurvivesOperationalRebuild)
         EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::LineList);
         EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
         EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+        // BUG-254: no surface needed behind an edge or point; the nearest wins.
         EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::LessEqual);
         EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
         EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
         EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
@@ -3869,9 +3870,10 @@ TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
         EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::PointList);
         EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
         EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+        // BUG-254: no surface needed behind an edge or point; the nearest wins.
         EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
-        EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+        EXPECT_TRUE(initialDesc.DepthStencil.DepthWriteEnable);
+        EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::LessEqual);
         EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
         EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
         EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
@@ -5354,7 +5356,81 @@ TEST(RendererFrameLifecycle, PickingReadbackCopyRecordedWhenPickPending)
         << "Picking readback must restore EntityId and PrimitiveId to "
         << "ColorAttachment after the copies so downstream barriers stay valid.";
 
+    // BUG-254: the pick depth comes from the PickingPass's own depth attachment,
+    // not from the prepass `SceneDepth` (read-only there).
+    std::uint32_t depthToTransfer = 0u;
+    std::uint32_t transferToDepth = 0u;
+    for (const auto& barrier : device.CommandContext.TextureBarrierCalls)
+    {
+        depthToTransfer += barrier.Before == Extrinsic::RHI::TextureLayout::DepthAttachment &&
+            barrier.After == Extrinsic::RHI::TextureLayout::TransferSrc;
+        transferToDepth += barrier.Before == Extrinsic::RHI::TextureLayout::TransferSrc &&
+            barrier.After == Extrinsic::RHI::TextureLayout::DepthAttachment;
+        EXPECT_FALSE(barrier.Before == Extrinsic::RHI::TextureLayout::DepthReadOnly &&
+            barrier.After == Extrinsic::RHI::TextureLayout::TransferSrc)
+            << "the pick depth must not be copied out of the prepass depth";
+    }
+    EXPECT_EQ(depthToTransfer, 1u);
+    EXPECT_EQ(transferToDepth, 1u);
+    // ... and the pick pixel of that texture is copied into the readback buffer.
+    const auto depthBarrier = std::ranges::find_if(device.CommandContext.TextureBarrierCalls,
+        [](const auto& barrier)
+        {
+            return barrier.Before == Extrinsic::RHI::TextureLayout::DepthAttachment &&
+                barrier.After == Extrinsic::RHI::TextureLayout::TransferSrc;
+        });
+    ASSERT_NE(depthBarrier, device.CommandContext.TextureBarrierCalls.end());
+    const auto depthCopies = std::ranges::count_if(device.CommandContext.CopyTextureToBufferRecords,
+        [&](const auto& copy)
+        {
+            return copy.Source == depthBarrier->Texture &&
+                copy.SourceLayout == Extrinsic::RHI::TextureLayout::TransferSrc && copy.Destination == pickingBuffer &&
+                copy.X == 17u && copy.Y == 23u;
+        });
+    EXPECT_EQ(depthCopies, 1);
+
     renderer->Shutdown();
+}
+
+// BUG-254 — the pick's lanes (from the selection mode) decide which primitive ID
+// sub-passes record: an Edge-mode pick skips points, a Face-mode pick skips edges
+// and points, so their hints never replace an edge or face hint.
+TEST(RendererFrameLifecycle, PickingPassRecordsOnlyThePickLanesSubPasses)
+{
+    struct Case
+    {
+        Extrinsic::Graphics::PickPrimitiveLanes Lanes;
+        std::uint32_t ExpectedSubPasses;
+    };
+    for (const Case& c : {Case{{.Edges = true, .Points = true}, 4u},
+             Case{{.Edges = true, .Points = false}, 3u},
+             Case{{.Edges = false, .Points = false}, 2u}})
+    {
+        SCOPED_TRACE("subpasses=" + std::to_string(c.ExpectedSubPasses));
+        Extrinsic::Tests::MockDevice device;
+        device.Operational = true;
+        device.BackbufferHandle = Extrinsic::RHI::TextureHandle{295u, 1u};
+        std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+        renderer->Initialize(device);
+        Extrinsic::RHI::FrameHandle frame{};
+        ASSERT_TRUE(renderer->BeginFrame(frame));
+        const Extrinsic::Graphics::RenderFrameInput input{
+            .Viewport = {.Width = 320, .Height = 240},
+            .HasPendingPick = true,
+            .Pick = Extrinsic::Graphics::PickPixelRequest{.X = 17u, .Y = 23u, .Pending = true, .Lanes = c.Lanes},
+        };
+        Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+        EXPECT_EQ(world.PickRequest.Lanes.Edges, c.Lanes.Edges);
+        EXPECT_EQ(world.PickRequest.Lanes.Points, c.Lanes.Points);
+        renderer->PrepareFrame(world);
+        renderer->ExecuteFrame(frame, world);
+        const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+        EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+        EXPECT_EQ(CountCommandPass(stats, "PickingPass"), c.ExpectedSubPasses);
+        EXPECT_EQ(stats.SelectionPrimitiveIdPassCount, 1u);
+        EXPECT_EQ(stats.PickingReadbackCopyCount, 1u);
+        renderer->Shutdown();
+    }
 }
 
 // GRAPHICS-074 Slice D.2 — when no pick is pending, the recipe drops the

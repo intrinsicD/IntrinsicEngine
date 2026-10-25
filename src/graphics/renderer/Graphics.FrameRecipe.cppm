@@ -205,6 +205,9 @@ namespace Extrinsic::Graphics
         // GRAPHICS-122 — retained sampled color target owned by the UV-view
         // graphics module. Appended to preserve every existing resource id.
         UvViewColor,
+        // BUG-254 — the pick pass's own depth while a pick is pending, so the
+        // nearest drawn surface, edge or point wins and its depth is read back.
+        PickingDepth,
     };
 
     export [[nodiscard]] constexpr FrameResourceId ToFrameResourceId(const FrameRecipeResourceKind kind) noexcept

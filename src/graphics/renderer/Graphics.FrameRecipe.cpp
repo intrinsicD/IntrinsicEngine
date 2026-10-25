@@ -409,6 +409,7 @@ namespace Extrinsic::Graphics
         case FrameRecipeResourceKind::ReconstructionHistoryCurrent: return "Reconstruction.HistoryCurrent";
         case FrameRecipeResourceKind::ReconstructionResolvedHDR: return "Reconstruction.ResolvedHDR";
         case FrameRecipeResourceKind::UvViewColor: return "UvViewColor";
+        case FrameRecipeResourceKind::PickingDepth:                  return "Picking.Depth";
         }
         return "UnknownResource";
     }
@@ -581,15 +582,23 @@ namespace Extrinsic::Graphics
         // GRAPHICS-113 — click picking and outline-only selection share the
         // EntityId producer, but PrimitiveId and host readback are active only
         // for a pending pick request.
+        // BUG-254 — a pending pick draws into its own depth; outline-only
+        // frames test against the prepass depth.
         std::vector<std::string_view> pickingWrites{"EntityId"};
+        std::vector<std::string_view> pickingReads{"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"};
         if (pickingActive)
         {
             pickingWrites.push_back("PrimitiveId");
+            pickingWrites.push_back("Picking.Depth");
             pickingWrites.push_back("Picking.Readback");
+        }
+        else
+        {
+            pickingReads.insert(pickingReads.begin(), "SceneDepth");
         }
         AddPassWithVectors(out, FrameRecipePassKind::Picking, "PickingPass",
                            selectionIdActive, false,
-                           {"SceneDepth", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
+                           std::move(pickingReads),
                            std::move(pickingWrites));
         AddPass(out, FrameRecipePassKind::Shadow, "ShadowPass", features.EnableShadows, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"ShadowAtlas"});
@@ -740,6 +749,7 @@ namespace Extrinsic::Graphics
         // outline-only frames use the one-target EntityId pass variant.
         AddResource(out, FrameRecipeResourceKind::EntityId, "EntityId", selectionIdActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PrimitiveId, "PrimitiveId", pickingActive, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PickingDepth, "Picking.Depth", pickingActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneNormal, "SceneNormal", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Albedo, "Albedo", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
@@ -1598,19 +1608,13 @@ namespace Extrinsic::Graphics
         const auto pointDrawIndirect = importBuffer("Cull.Points.NonIndexedArgs", imports.PointsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsNonIndexedArgs);
         const auto pointDrawCount = importBuffer("Cull.Points.Count", imports.PointsCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsCount);
 
-        // BUG-026 — when picking readback is active the PickingPass executor
-        // copies the pick pixel out of SceneDepth (cursor world-position
-        // reconstruction), so the depth target must be a valid transfer source.
-        RHI::TextureDesc sceneDepthDesc =
-            DepthTargetDesc(inputWidth, inputHeight, sizing.DepthFormat, "SceneDepth");
-        if (pickingActive)
-        {
-            sceneDepthDesc.Usage = sceneDepthDesc.Usage | RHI::TextureUsage::TransferSrc;
-        }
-        const auto depth = createTexture("SceneDepth", sceneDepthDesc, FrameRecipeResourceKind::SceneDepth);
+        const auto depth = createTexture("SceneDepth",
+            DepthTargetDesc(inputWidth, inputHeight, sizing.DepthFormat, "SceneDepth"),
+            FrameRecipeResourceKind::SceneDepth);
         const auto hdr = createTexture("SceneColorHDR", ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"), FrameRecipeResourceKind::SceneColorHDR);
         TextureRef entityId{};
         TextureRef primitiveId{};
+        TextureRef pickingDepth{};
         TextureRef sceneNormal{};
         TextureRef albedo{};
         TextureRef material0{};
@@ -1702,6 +1706,10 @@ namespace Extrinsic::Graphics
             primitiveId = createTexture("PrimitiveId",
                                         primitiveIdDesc,
                                         FrameRecipeResourceKind::PrimitiveId);
+            // BUG-026/254 — the executor copies the pick pixel's depth out of it.
+            RHI::TextureDesc pickingDepthDesc = DepthTargetDesc(width, height, sizing.DepthFormat, "Picking.Depth");
+            pickingDepthDesc.Usage = pickingDepthDesc.Usage | RHI::TextureUsage::TransferSrc;
+            pickingDepth = createTexture("Picking.Depth", pickingDepthDesc, FrameRecipeResourceKind::PickingDepth);
         }
         if (pickingActive)
         {
@@ -1991,7 +1999,13 @@ namespace Extrinsic::Graphics
         if (selectionIdActive)
         {
             addRecipePass(FrameRecipePassKind::Picking, "PickingPass", [=](RenderGraphBuilder& builder) {
-                builder.Read(depth, TextureUsage::DepthRead);
+                // BUG-254 — a pending pick draws into its own cleared depth, so
+                // the nearest surface, edge or point wins; outline-only frames
+                // test against the prepass depth.
+                if (pickingActive)
+                    builder.Write(pickingDepth, TextureUsage::DepthWrite);
+                else
+                    builder.Read(depth, TextureUsage::DepthRead);
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
@@ -2010,8 +2024,9 @@ namespace Extrinsic::Graphics
                     .ColorTargets = SelectionIdColorAttachments(pickingActive),
                     .Depth = RHI::DepthAttachment{
                         .Target = RenderPassAttachmentToken(),
-                        .Load = RHI::LoadOp::Load,
+                        .Load = pickingActive ? RHI::LoadOp::Clear : RHI::LoadOp::Load,
                         .Store = RHI::StoreOp::Store,
+                        .ClearDepth = 1.0f,
                     },
                 });
                 builder.SideEffect();
@@ -2414,6 +2429,7 @@ namespace Extrinsic::Graphics
             case FrameRecipeResourceKind::ReconstructionHistoryCurrent: return reconstructionHistoryCurrent;
             case FrameRecipeResourceKind::ReconstructionResolvedHDR: return reconstructionResolvedHDR;
             case FrameRecipeResourceKind::UvViewColor: return uvViewColor;
+            case FrameRecipeResourceKind::PickingDepth:                  return pickingDepth;
             case FrameRecipeResourceKind::SelectionOutline:
             case FrameRecipeResourceKind::SceneTable:
             case FrameRecipeResourceKind::InstanceStatic:

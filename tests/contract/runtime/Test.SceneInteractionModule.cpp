@@ -2568,3 +2568,42 @@ TEST(SceneInteractionModule, ClickPickUsesSceneRectangleLocalPixels)
     EXPECT_EQ(pick->PixelX, 25u);
     EXPECT_EQ(pick->PixelY, 40u);
 }
+
+// BUG-254: the issuing selection mode decides which primitive lanes the GPU pick
+// records, and that choice reaches the render world the renderer draws from:
+// Entity and Vertex picks see edges and points, Edge picks pass through points,
+// Face picks see surfaces only.
+TEST(SceneInteractionModule, PickLanesFollowTheSelectionTargetIntoTheRenderWorld)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+    Runtime::SelectionController& selection = *harness.Services.Find<Runtime::SelectionController>();
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+    struct Case
+    {
+        Runtime::SelectionTarget Target;
+        bool Edges;
+        bool Points;
+    };
+    for (const Case& c : {Case{Runtime::SelectionTarget::Entity, true, true},
+             Case{Runtime::SelectionTarget::Vertex, true, true},
+             Case{Runtime::SelectionTarget::Edge, true, false},
+             Case{Runtime::SelectionTarget::Face, false, false}})
+    {
+        SCOPED_TRACE(static_cast<int>(c.Target));
+        selection.GetConfig().Interaction.Target = c.Target;
+        selection.RequestClickPick(7u, 9u);
+        Graphics::RenderFrameInput input{};
+        harness.InvokeViewportHook(0u, input, capture);
+        harness.InvokeFrameHook(0u, capture, pacing);
+        ASSERT_TRUE(input.HasPendingPick);
+        EXPECT_EQ(input.Pick.Lanes.Edges, c.Edges);
+        EXPECT_EQ(input.Pick.Lanes.Points, c.Points);
+        const Graphics::RenderWorld world = harness.Renderer->ExtractRenderWorld(input);
+        EXPECT_EQ(world.PickRequest.Lanes.Edges, c.Edges);
+        EXPECT_EQ(world.PickRequest.Lanes.Points, c.Points);
+        (void)harness.Renderer->GetSelectionSystem().ConsumePick();
+    }
+}

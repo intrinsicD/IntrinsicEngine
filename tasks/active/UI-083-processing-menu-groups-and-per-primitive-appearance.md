@@ -607,3 +607,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   BUG-254 named the wrong cause (the pick ID pipelines' depth-equal test against the surface-only depth
   prepass was missing) and overstated "never hits". Round 2 on diff `dd36933d…`: "approve", "No remaining
   findings."
+- 2026-10-25: The click half of the slice 3a smoke is covered by BUG-254 slice A: in
+  `RuntimeSandboxAcceptanceGpuSmoke.ClicksPickTheNearestDrawnPrimitiveOfTheSelectionMode` a
+  Vertex-mode click on a mesh point drawn from a bound Points position resolves to the canonical
+  vertex 2 with its hit at the bound position, and a mesh drawn from bound edge positions is
+  picked where its edges are drawn (RTX 4090, driver 580.159.04).

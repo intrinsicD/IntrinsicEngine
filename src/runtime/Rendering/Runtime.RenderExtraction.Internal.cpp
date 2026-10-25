@@ -291,6 +291,7 @@ namespace Extrinsic::Runtime
             const Graphics::Components::RenderPoints* points,
             const Graphics::Components::VisualizationConfig* visualization,
             bool meshDirty,
+            bool selectable,
             Graphics::IRenderer& renderer,
             RuntimeRenderExtractionStats& stats);
         void ReleaseMeshPrimitiveView(

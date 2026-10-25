@@ -9608,3 +9608,415 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, BoundPointPositionsDrawWhileTheSurfaceSta
     device.DestroyBuffer(readback);
     engine.Shutdown();
 }
+
+// --- BUG-254: clicks on points and edge lines, with or without a surface behind ---
+
+namespace
+{
+    constexpr float kBug254PointSizePx = 18.0f;
+    constexpr std::uint32_t kBug254BandRows = 5u;
+
+// The world point at depth `z` that the reference camera projects onto the centre of
+// pixel (px, py); the inverse of `ProjectReferenceCameraPixel`. Geometry placed this
+// way puts one-pixel edge lines on exact pixel rows.
+    [[nodiscard]] glm::vec3 Bug254WorldAtPixel(
+        const float px, const float py, const float z, const Extrinsic::Core::Extent2D extent) noexcept
+    {
+        const float aspect = static_cast<float>(extent.Width) / static_cast<float>(extent.Height);
+        const float tanHalfFovY = std::tan(glm::radians(45.0f) * 0.5f);
+        const float viewDepth = 3.0f - z;
+        const float ndcX = (px + 0.5f) / static_cast<float>(extent.Width) * 2.0f - 1.0f;
+        const float ndcY = (py + 0.5f) / static_cast<float>(extent.Height) * 2.0f - 1.0f;
+        return {ndcX * tanHalfFovY * aspect * viewDepth, -ndcY * tanHalfFovY * viewDepth, z};
+    }
+
+    void StampBug254Selectable(Registry& scene, const EntityHandle entity)
+    {
+        auto& raw = scene.Raw();
+        raw.emplace<ECSC::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.0f};
+        raw.emplace<ECSC::Selection::SelectableTag>(entity);
+    }
+
+    [[nodiscard]] EntityHandle AddBug254Points(Registry& scene, const std::vector<glm::vec3>& points)
+    {
+        const EntityHandle entity = scene.Create();
+        StampBug254Selectable(scene, entity);
+        scene.Raw().emplace<G::RenderPoints>(
+            entity, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = kBug254PointSizePx});
+        Geometry::PointCloud::Cloud cloud;
+        for (const glm::vec3& point : points)
+            (void)cloud.AddPoint(point);
+        gs::PopulateFromCloud(scene.Raw(), entity, cloud);
+        return entity;
+    }
+
+// A band of `kBug254BandRows` horizontal edges on consecutive pixel rows from `row`,
+// spanning pixel columns [x0, x1] at depth `z`, plus optional isolated nodes.
+    [[nodiscard]] EntityHandle AddBug254EdgeBand(Registry& scene,
+        const Extrinsic::Core::Extent2D extent,
+        const float x0,
+        const float x1,
+        const float row,
+        const float z,
+        const std::vector<glm::vec3>& isolatedNodes = {})
+    {
+        const EntityHandle entity = scene.Create();
+        StampBug254Selectable(scene, entity);
+        scene.Raw().emplace<G::RenderEdges>(entity);
+        if (!isolatedNodes.empty())
+            scene.Raw().emplace<G::RenderPoints>(
+                entity, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = kBug254PointSizePx});
+        Geometry::Graph::Graph graph{};
+        for (std::uint32_t k = 0u; k < kBug254BandRows; ++k)
+        {
+            const auto a = graph.AddVertex(Bug254WorldAtPixel(x0, row + float(k), z, extent));
+            const auto b = graph.AddVertex(Bug254WorldAtPixel(x1, row + float(k), z, extent));
+            (void)graph.AddEdge(a, b);
+        }
+        for (const glm::vec3& node : isolatedNodes)
+            (void)graph.AddVertex(node);
+        gs::PopulateFromGraph(scene.Raw(), entity, graph);
+        return entity;
+    }
+
+    [[nodiscard]] Extrinsic::Runtime::VertexChannelSourceBinding Bug254Bound(const char* name)
+    {
+        return {.Enabled = true,
+            .Property = {RT::GeometryElementDomain::MeshVertex, name, Geometry::PropertyValueKind::Vec3}};
+    }
+
+    struct Bug254Click
+    {
+        std::string Name{};
+        RT::SelectionTarget Target{RT::SelectionTarget::Entity};
+        std::pair<std::uint32_t, std::uint32_t> Pixel{};
+    };
+
+    struct Bug254ClickResult
+    {
+        bool Completed{false};
+        std::uint32_t Hits{0u};
+        std::optional<RT::PrimitiveSelectionResult> Refined{};
+        std::vector<std::uint32_t> Selected{};
+    };
+} // namespace
+
+// The selection modes' clicks on every lane, through the real pick path (pick passes,
+// readback, refinement, selection): points and edge lines with no surface behind them,
+// a mesh drawn from bound edge and point positions, a surface-backed vertex/edge/face in
+// every mode, a point in front of and behind a surface, and overlapping points and edges
+// at different depths in both creation orders (the nearer one is picked, with its depth).
+// The selection target is set on the controller's config; the clicks are synthetic.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ClicksPickTheNearestDrawnPrimitiveOfTheSelectionMode)
+{
+    using Target = RT::SelectionTarget;
+    std::vector<Bug254Click> clicks{};
+    std::vector<Bug254ClickResult> results{};
+    std::size_t next = 0u;
+    bool waiting = false;
+    std::uint32_t settle = 4u;
+    RT::SelectionControllerDiagnostics before{};
+    std::uint64_t generationBefore = 0u;
+    const auto ready = [&](Engine& engine)
+    {
+        if (!engine.GetDevice().IsOperational())
+            return false;
+        if (settle > 0u)
+        {
+            --settle;
+            return false;
+        }
+        auto& selection = Selection(engine);
+        auto& interaction = Interaction(engine);
+        if (waiting)
+        {
+            const RT::SelectionControllerDiagnostics now = selection.GetDiagnostics();
+            if (now.ReadbacksConsumed == before.ReadbacksConsumed)
+                return false;
+            Bug254ClickResult& result = results[next];
+            result.Completed = true;
+            result.Hits = now.Hits - before.Hits;
+            if (interaction.LastRefinedPrimitiveGeneration() != generationBefore)
+                result.Refined = interaction.LastRefinedPrimitive();
+            const auto ids = selection.SelectedStableIds();
+            result.Selected.assign(ids.begin(), ids.end());
+            waiting = false;
+            ++next;
+        }
+        if (next == clicks.size())
+            return true;
+        before = selection.GetDiagnostics();
+        generationBefore = interaction.LastRefinedPrimitiveGeneration();
+        selection.GetConfig().Interaction.Target = clicks[next].Target;
+        selection.RequestClickPick(clicks[next].Pixel.first, clicks[next].Pixel.second);
+        waiting = true;
+        return false;
+    };
+    auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 1u, 600u, std::chrono::seconds{120}, false);
+    ExitWhenReadyApp& readyProbe = *readyApp;
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    Engine& engine = *bootstrap.EnginePtr;
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const Extrinsic::Core::Extent2D extent = engine.GetDevice().GetBackbufferExtent();
+    ASSERT_GT(extent.Width, 0);
+    ASSERT_GT(extent.Height, 0);
+    const float w = static_cast<float>(extent.Width);
+    const float h = static_cast<float>(extent.Height);
+    const auto pixel = [](const float x, const float y)
+    {
+        return std::pair{static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)};
+    };
+    const auto id = [](const EntityHandle entity)
+    {
+        return RT::SelectionController::ToStableEntityId(entity);
+    };
+
+    // A point cloud point and a graph's isolated node and edge band on background.
+    const float cloudX = 0.10f * w, cloudY = 0.15f * h;
+    const EntityHandle cloud = AddBug254Points(scene, {Bug254WorldAtPixel(cloudX, cloudY, 0.0f, extent)});
+    const float nodeY = 0.30f * h, bandY = 0.45f * h;
+    const EntityHandle graph = AddBug254EdgeBand(
+        scene, extent, 0.05f * w, 0.15f * w, bandY, 0.0f, {Bug254WorldAtPixel(cloudX, nodeY, 0.0f, extent)});
+
+    // A mesh strip (one quad per band row) whose surface stays canonical at the bottom
+    // while its edges lane draws bound positions higher up, on background.
+    const float stripCanonicalY = 0.85f * h, stripBoundY = 0.65f * h;
+    const EntityHandle strip = scene.Create();
+    {
+        StampBug254Selectable(scene, strip);
+        raw.emplace<G::RenderSurface>(strip);
+        raw.emplace<G::RenderEdges>(strip);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        std::vector<Geometry::VertexHandle> left{}, right{};
+        for (std::uint32_t k = 0u; k <= kBug254BandRows; ++k)
+        {
+            left.push_back(mesh.AddVertex(Bug254WorldAtPixel(0.05f * w, stripCanonicalY + float(k), 0.0f, extent)));
+            right.push_back(mesh.AddVertex(Bug254WorldAtPixel(0.15f * w, stripCanonicalY + float(k), 0.0f, extent)));
+        }
+        for (std::uint32_t k = 0u; k < kBug254BandRows; ++k)
+        {
+            ASSERT_TRUE(mesh.AddTriangle(left[k], left[k + 1u], right[k + 1u]).has_value());
+            ASSERT_TRUE(mesh.AddTriangle(left[k], right[k + 1u], right[k]).has_value());
+        }
+        gs::PopulateFromMesh(raw, strip, mesh);
+        auto& vertices = raw.get<gs::Vertices>(strip).Properties;
+        std::vector<glm::vec3> raised = vertices.Get<glm::vec3>("v:position").Vector();
+        const float lift = Bug254WorldAtPixel(0.0f, stripBoundY, 0.0f, extent).y -
+            Bug254WorldAtPixel(0.0f, stripCanonicalY, 0.0f, extent).y;
+        for (glm::vec3& p : raised)
+            p.y += lift;
+        vertices.GetOrAdd<glm::vec3>("v:raised", glm::vec3{0.0f}).Vector() = raised;
+        raw.emplace<RT::VertexChannelBindingSet>(strip,
+            RT::VertexChannelBindingSet{.Edges = {.Position = Bug254Bound("v:raised")}, .BindingGeneration = 2u});
+    }
+
+    // A small triangle whose points lane draws its vertices shifted down, on background.
+    const float triX = 0.80f * w, triY = 0.20f * h, triShiftY = 0.20f * h;
+    const EntityHandle shifted = scene.Create();
+    glm::vec3 shiftedApex{};
+    {
+        StampBug254Selectable(scene, shifted);
+        raw.emplace<G::RenderSurface>(shifted);
+        raw.emplace<G::RenderPoints>(
+            shifted, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = kBug254PointSizePx});
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a = mesh.AddVertex(Bug254WorldAtPixel(triX - 40.0f, triY + 30.0f, 0.0f, extent));
+        const auto b = mesh.AddVertex(Bug254WorldAtPixel(triX + 40.0f, triY + 30.0f, 0.0f, extent));
+        const auto c = mesh.AddVertex(Bug254WorldAtPixel(triX, triY - 30.0f, 0.0f, extent));
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c).has_value());
+        gs::PopulateFromMesh(raw, shifted, mesh);
+        auto& vertices = raw.get<gs::Vertices>(shifted).Properties;
+        std::vector<glm::vec3> lowered = vertices.Get<glm::vec3>("v:position").Vector();
+        const float drop =
+            Bug254WorldAtPixel(0.0f, triY + triShiftY, 0.0f, extent).y - Bug254WorldAtPixel(0.0f, triY, 0.0f, extent).y;
+        for (glm::vec3& p : lowered)
+            p.y += drop;
+        shiftedApex = lowered[2];
+        vertices.GetOrAdd<glm::vec3>("v:lowered", glm::vec3{0.0f}).Vector() = lowered;
+        raw.emplace<RT::VertexChannelBindingSet>(shifted,
+            RT::VertexChannelBindingSet{.Points = {.Position = Bug254Bound("v:lowered")}, .BindingGeneration = 2u});
+    }
+
+    // The ReferenceTriangle with its canonical edges and points drawn over the surface,
+    // and a point in front of it and one behind it.
+    const EntityHandle triangle = FindEntityByName(scene, "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(scene, triangle));
+    raw.emplace_or_replace<G::RenderEdges>(triangle);
+    raw.emplace_or_replace<G::RenderPoints>(
+        triangle, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = kBug254PointSizePx});
+    const auto [v1x, v1y] = ProjectReferenceCameraPixel(glm::vec3{0.5f, -0.5f, 0.0f}, extent);
+    const auto [frontX, frontY] = ProjectReferenceCameraPixel(glm::vec3{0.0f, -0.15f, 0.0f}, extent);
+    const auto [backX, backY] = ProjectReferenceCameraPixel(glm::vec3{-0.15f, -0.3f, 0.0f}, extent);
+    const EntityHandle front = AddBug254Points(scene, {Bug254WorldAtPixel(float(frontX), float(frontY), 0.5f, extent)});
+    const EntityHandle behind = AddBug254Points(scene, {Bug254WorldAtPixel(float(backX), float(backY), -0.5f, extent)});
+
+    // Overlapping points and edge bands at depths 0.5 (near) and -0.5 (far), the near
+    // one created first in the first pair and last in the second.
+    const float c1x = 0.30f * w, c2x = 0.40f * w, cy = 0.15f * h;
+    const EntityHandle nearPointFirst = AddBug254Points(scene, {Bug254WorldAtPixel(c1x, cy, 0.5f, extent)});
+    (void)AddBug254Points(scene, {Bug254WorldAtPixel(c1x, cy, -0.5f, extent)});
+    (void)AddBug254Points(scene, {Bug254WorldAtPixel(c2x, cy, -0.5f, extent)});
+    const EntityHandle nearPointLast = AddBug254Points(scene, {Bug254WorldAtPixel(c2x, cy, 0.5f, extent)});
+    const float b1y = 0.30f * h, b2y = 0.45f * h, bx0 = 0.25f * w, bx1 = 0.35f * w;
+    const EntityHandle nearBandFirst = AddBug254EdgeBand(scene, extent, bx0, bx1, b1y, 0.5f);
+    (void)AddBug254EdgeBand(scene, extent, bx0, bx1, b1y, -0.5f);
+    (void)AddBug254EdgeBand(scene, extent, bx0, bx1, b2y, -0.5f);
+    const EntityHandle nearBandLast = AddBug254EdgeBand(scene, extent, bx0, bx1, b2y, 0.5f);
+
+    const float bandMid = float(kBug254BandRows / 2u);
+    const float bandX = 0.10f * w, overlapBandX = 0.30f * w;
+    const auto [apexX, apexY] = ProjectReferenceCameraPixel(shiftedApex, extent);
+    clicks = {
+        {"cloud point, Entity", Target::Entity, pixel(cloudX, cloudY)},
+        {"cloud point, Vertex", Target::Vertex, pixel(cloudX, cloudY)},
+        {"graph node, Entity", Target::Entity, pixel(cloudX, nodeY)},
+        {"graph node, Vertex", Target::Vertex, pixel(cloudX, nodeY)},
+        {"graph edge, Entity", Target::Entity, pixel(bandX, bandY + bandMid)},
+        {"graph edge, Edge", Target::Edge, pixel(bandX, bandY + bandMid)},
+        {"mesh bound edge, Entity", Target::Entity, pixel(bandX, stripBoundY + bandMid)},
+        {"mesh bound edge, Edge", Target::Edge, pixel(bandX, stripBoundY + bandMid)},
+        {"mesh bound point, Vertex", Target::Vertex, pixel(float(apexX), float(apexY))},
+        {"mesh bound point, Entity", Target::Entity, pixel(float(apexX), float(apexY))},
+        {"surface vertex, Vertex", Target::Vertex, pixel(float(v1x) - 5.0f, float(v1y) - 4.0f)},
+        {"surface vertex, Edge", Target::Edge, pixel(float(v1x) - 5.0f, float(v1y) - 4.0f)},
+        {"surface vertex, Face", Target::Face, pixel(float(v1x) - 5.0f, float(v1y) - 4.0f)},
+        {"surface vertex, Entity", Target::Entity, pixel(float(v1x) - 5.0f, float(v1y) - 4.0f)},
+        {"point in front, Entity", Target::Entity, pixel(float(frontX), float(frontY))},
+        {"point behind, Entity", Target::Entity, pixel(float(backX), float(backY))},
+        {"near point first, Entity", Target::Entity, pixel(c1x, cy)},
+        {"near point last, Entity", Target::Entity, pixel(c2x, cy)},
+        {"near band first, Edge", Target::Edge, pixel(overlapBandX, b1y + bandMid)},
+        {"near band last, Edge", Target::Edge, pixel(overlapBandX, b2y + bandMid)},
+        {"background", Target::Entity, pixel(0.95f * w, 0.95f * h)},
+    };
+    results.assign(clicks.size(), Bug254ClickResult{});
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    SCOPED_TRACE(readyProbe.ExitSummary() + " clicks done=" + std::to_string(next));
+    ASSERT_TRUE(run.DeviceOperational);
+    ASSERT_EQ(next, clicks.size()) << "not every click read back";
+    const auto describe = [&](const std::size_t index)
+    {
+        const RT::PrimitiveSelectionResult r = results[index].Refined.value_or(RT::PrimitiveSelectionResult{});
+        return clicks[index].Name + ": hits=" + std::to_string(results[index].Hits) +
+            " kind=" + std::to_string(int(r.Kind)) + " entity=" + std::to_string(r.EntityId) +
+            " vertex=" + std::to_string(r.VertexId) + " edge=" + std::to_string(r.EdgeId) +
+            " face=" + std::to_string(r.FaceId) + " point=" + std::to_string(r.PointId);
+    };
+    const auto expectPick = [&](const std::size_t index,
+                                const EntityHandle entity,
+                                const RT::RefinedPrimitiveKind kind,
+                                const std::optional<float> cursorZ = std::nullopt)
+    {
+        SCOPED_TRACE(describe(index));
+        const Bug254ClickResult& result = results[index];
+        ASSERT_TRUE(result.Completed);
+        EXPECT_EQ(result.Hits, 1u) << "the click did not hit";
+        ASSERT_TRUE(result.Refined.has_value()) << "no refined primitive";
+        EXPECT_TRUE(result.Refined->Resolved());
+        EXPECT_EQ(result.Refined->EntityId, id(entity));
+        EXPECT_EQ(result.Refined->Kind, kind);
+        EXPECT_EQ(result.Selected, (std::vector<std::uint32_t>{id(entity)}));
+        if (cursorZ.has_value())
+        {
+            ASSERT_TRUE(result.Refined->CursorFromDepth);
+            EXPECT_NEAR(result.Refined->WorldCursor.z, *cursorZ, 0.05f)
+                << "the hit depth is not the picked primitive's";
+        }
+    };
+    using Kind = RT::RefinedPrimitiveKind;
+    expectPick(0, cloud, Kind::Point, 0.0f);
+    expectPick(1, cloud, Kind::Point);
+    EXPECT_EQ(results[1].Refined.value_or(RT::PrimitiveSelectionResult{}).PointId, 0u);
+    expectPick(2, graph, Kind::Vertex);
+    expectPick(3, graph, Kind::Vertex);
+    EXPECT_EQ(results[3].Refined.value_or(RT::PrimitiveSelectionResult{}).VertexId, 2u * kBug254BandRows);
+    // The clicked edge is drawn under the clicked pixel: the graph band's middle row
+    // (edge `kBug254BandRows / 2`), and for the strip (whose diagonals pass between two
+    // rows) an edge of its bound positions within one pixel of the click.
+    const std::uint32_t middleEdge = kBug254BandRows / 2u;
+    for (const std::size_t index : {4u, 5u})
+    {
+        expectPick(index, graph, Kind::Edge);
+        EXPECT_EQ(results[index].Refined.value_or(RT::PrimitiveSelectionResult{}).EdgeId, middleEdge)
+            << describe(index);
+    }
+    const auto pixelDistanceToStripEdge =
+        [&](const std::uint32_t edge, const std::pair<std::uint32_t, std::uint32_t> click)
+    {
+        const auto& edges = raw.get<gs::Edges>(strip).Properties;
+        const auto& raised = raw.get<gs::Vertices>(strip).Properties.Get<glm::vec3>("v:raised").Vector();
+        if (edge >= edges.Size())
+            return std::numeric_limits<float>::max();
+        const auto toPixel = [&](const glm::vec3 world)
+        {
+            const float tanHalfFovY = std::tan(glm::radians(45.0f) * 0.5f);
+            const float viewDepth = 3.0f - world.z;
+            const float ndcX = world.x / (tanHalfFovY * (w / h) * viewDepth);
+            const float ndcY = -world.y / (tanHalfFovY * viewDepth);
+            return glm::vec2{(ndcX + 1.0f) * 0.5f * w, (ndcY + 1.0f) * 0.5f * h};
+        };
+        const glm::vec2 a = toPixel(raised[edges.Get<std::uint32_t>(std::string{gs::PropertyNames::kEdgeV0})[edge]]);
+        const glm::vec2 b = toPixel(raised[edges.Get<std::uint32_t>(std::string{gs::PropertyNames::kEdgeV1})[edge]]);
+        const glm::vec2 p{float(click.first) + 0.5f, float(click.second) + 0.5f};
+        const float t = glm::clamp(glm::dot(p - a, b - a) / glm::dot(b - a, b - a), 0.0f, 1.0f);
+        return glm::length(p - (a + t * (b - a)));
+    };
+    for (const std::size_t index : {6u, 7u})
+    {
+        expectPick(index, strip, Kind::Edge);
+        EXPECT_LT(pixelDistanceToStripEdge(
+                      results[index].Refined.value_or(RT::PrimitiveSelectionResult{}).EdgeId, clicks[index].Pixel),
+            1.0f)
+            << describe(index);
+    }
+    expectPick(8, shifted, Kind::Vertex);
+    const RT::PrimitiveSelectionResult shiftedPick = results[8].Refined.value_or(RT::PrimitiveSelectionResult{});
+    EXPECT_EQ(shiftedPick.VertexId, 2u);
+    EXPECT_LT(glm::length(shiftedPick.LocalHit - shiftedApex), 1e-3f) << "not refined against the points lane";
+    expectPick(9, shifted, Kind::Vertex);
+    expectPick(10, triangle, Kind::Vertex);
+    EXPECT_EQ(results[10].Refined.value_or(RT::PrimitiveSelectionResult{}).VertexId, 1u);
+    // Edge and Face picks pass through the vertex's point and keep their hints.
+    {
+        SCOPED_TRACE(describe(11));
+        const RT::PrimitiveSelectionResult edgePick = results[11].Refined.value_or(RT::PrimitiveSelectionResult{});
+        EXPECT_EQ(results[11].Hits, 1u);
+        EXPECT_NE(edgePick.EdgeId, RT::kInvalidPrimitiveIndex) << "an Edge-mode click got no edge";
+        EXPECT_EQ(edgePick.EntityId, id(triangle));
+    }
+    {
+        SCOPED_TRACE(describe(12));
+        const RT::PrimitiveSelectionResult facePick = results[12].Refined.value_or(RT::PrimitiveSelectionResult{});
+        EXPECT_EQ(results[12].Hits, 1u);
+        EXPECT_EQ(facePick.FaceId, 0u) << "a Face-mode click got no face";
+        EXPECT_EQ(facePick.EntityId, id(triangle));
+    }
+    {
+        SCOPED_TRACE(describe(13));
+        EXPECT_EQ(results[13].Selected, (std::vector<std::uint32_t>{id(triangle)}));
+    }
+    expectPick(14, front, Kind::Point, 0.5f);
+    {
+        SCOPED_TRACE(describe(15));
+        EXPECT_EQ(results[15].Selected, (std::vector<std::uint32_t>{id(triangle)})) << "a point behind the surface won";
+        EXPECT_NE(results[15].Refined.value_or(RT::PrimitiveSelectionResult{}).EntityId, id(behind));
+    }
+    expectPick(16, nearPointFirst, Kind::Point, 0.5f);
+    expectPick(17, nearPointLast, Kind::Point, 0.5f);
+    expectPick(18, nearBandFirst, Kind::Edge, 0.5f);
+    expectPick(19, nearBandLast, Kind::Edge, 0.5f);
+    for (const std::size_t index : {18u, 19u})
+        EXPECT_EQ(results[index].Refined.value_or(RT::PrimitiveSelectionResult{}).EdgeId, middleEdge)
+            << describe(index);
+    {
+        SCOPED_TRACE(describe(20));
+        EXPECT_EQ(results[20].Hits, 0u) << "the background click hit something";
+        EXPECT_TRUE(results[20].Selected.empty());
+    }
+
+    engine.Shutdown();
+}

@@ -186,6 +186,16 @@ namespace Extrinsic::Tests
             std::uint32_t Height = 0u;
         };
 
+        struct CopyTextureToBufferRecord
+        {
+            RHI::TextureHandle Source{};
+            RHI::TextureLayout SourceLayout = RHI::TextureLayout::Undefined;
+            RHI::BufferHandle Destination{};
+            std::uint64_t DestinationOffset = 0u;
+            std::uint32_t X = 0u;
+            std::uint32_t Y = 0u;
+        };
+
         struct TextureBarrierRecord
         {
             RHI::TextureHandle Texture{};
@@ -279,6 +289,19 @@ namespace Extrinsic::Tests
                         std::uint64_t size) override;
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,
                                  RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
+        void CopyTextureToBuffer(RHI::TextureHandle src,
+            RHI::TextureLayout srcLayout,
+            std::uint32_t,
+            std::uint32_t,
+            RHI::BufferHandle dst,
+            std::uint64_t dstOffset,
+            std::uint32_t srcOffsetX,
+            std::uint32_t srcOffsetY,
+            std::uint32_t,
+            std::uint32_t) override
+        {
+            CopyTextureToBufferRecords.push_back({src, srcLayout, dst, dstOffset, srcOffsetX, srcOffsetY});
+        }
 
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
         std::vector<SampledTextureBindingRecord> SampledTextureBindings{};
@@ -288,6 +311,7 @@ namespace Extrinsic::Tests
         std::vector<DispatchIndirectRecord> DispatchIndirectRecords{};
         std::vector<ScissorRecord> ScissorRecords{};
         std::vector<CopyBufferRecord> CopyBufferRecords{};
+        std::vector<CopyTextureToBufferRecord> CopyTextureToBufferRecords{};
         std::vector<EventKind> Events{};
         std::vector<std::uint32_t> PushConstantSizes{};
         std::vector<RHI::PipelineHandle> BoundPipelines{};

@@ -2595,6 +2595,7 @@ namespace Extrinsic::Graphics
                     // RUNTIME-089 — carry the runtime selection correlation
                     // token to the picking slot.
                     .Sequence = pick.Sequence,
+                    .Lanes = pick.Lanes,
                 },
                 .Selection = SelectionSnapshot{
                     // RUNTIME-089 Slice B — identity from the runtime selection
@@ -4839,19 +4840,13 @@ namespace Extrinsic::Graphics
         // `features.EnablePicking` branch): `EntityId` (R32_UINT) +
         // `PrimitiveId` (R32_UINT).
         //
-        // Depth state: `BuildDefaultFrameRecipe` now orders `PickingPass`
-        // *after* `DepthPrepass` and declares `Read(SceneDepth, DepthRead)`
-        // on the picking pass (GRAPHICS-074 recipe-side follow-up). The
-        // framegraph compiler therefore emits a render pass with a
-        // `D32_FLOAT` depth attachment in read-only state, so the pipeline
-        // mirrors the depth-equal / depth-write-off shape the forward and
-        // deferred GBuffer pipelines use against the same depth buffer. The
-        // depth-equal test guarantees only the nearest-surface fragment
-        // wins each pixel — without it the recipe would last-fragment-win
-        // and the Slice D readback drain would return wrong IDs for any
-        // pixel covered by more than one draw. The matching recipe gating
-        // (`EnablePicking && EnableDepthPrepass`) ensures this pipeline is
-        // only requested when a populated `SceneDepth` is available.
+        // Depth state (BUG-254): a pending pick renders into the PickingPass's
+        // own cleared `Picking.Depth`, so this pipeline writes the nearest
+        // surface's depth with less-equal; the face pass then tests equal
+        // against it and the edge and point passes test less-equal and write
+        // it, so the nearest drawn primitive wins each pixel. Outline-only
+        // frames use the one-target variant below, equal against the prepass
+        // `SceneDepth` without writes.
         [[nodiscard]] static RHI::PipelineDesc BuildSelectionEntityIdPipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
@@ -4863,9 +4858,11 @@ namespace Extrinsic::Graphics
             desc.Rasterizer.Culling = RHI::CullMode::Back;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            // BUG-254 — a pending pick draws into its own cleared depth, so the
+            // entity pass lays down the nearest surface's depth itself.
             desc.DepthStencil.DepthTestEnable = true;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
+            desc.DepthStencil.DepthWriteEnable = true;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorBlend[1].Enable = false;
@@ -4886,6 +4883,9 @@ namespace Extrinsic::Graphics
             desc.ColorBlend[1].Enable = false;
             desc.ColorTargetCount = 1u;
             desc.ColorTargetFormats[1] = RHI::Format::Undefined;
+            // Outline-only frames test against the prepass depth and never write it.
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
             desc.DebugName = "Renderer.SelectionEntityId.OutlineOnly";
             return desc;
         }
@@ -4893,9 +4893,10 @@ namespace Extrinsic::Graphics
         // GRAPHICS-074 (Slice B) — Face / Edge / Point selection ID
         // pipeline descriptors. Each mirrors the EntityId descriptor's
         // render-pass-compatible shape (two R32_UINT color targets,
-        // D32_FLOAT depth target, depth-equal / depth-test-on /
-        // depth-write-off) so all four pipelines can be bound inside the
-        // same recipe-declared `PickingPass` render pass. They differ
+        // D32_FLOAT depth target) so all four pipelines can be bound inside
+        // the same recipe-declared `PickingPass` render pass. Faces test
+        // depth-equal against the entity pass's depth; edges and points
+        // test less-equal and write it (BUG-254). They differ otherwise
         // only in:
         //   - shader pair (`selection/{face,edge,point}_id.{vert,frag}`),
         //   - primitive topology (TriangleList / LineList / PointList),
@@ -4942,8 +4943,10 @@ namespace Extrinsic::Graphics
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
+            // BUG-254 — edges and points need no surface behind them: the
+            // nearest one wins against the pick pass's own depth.
+            desc.DepthStencil.DepthWriteEnable = true;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorBlend[1].Enable = false;
@@ -4968,8 +4971,10 @@ namespace Extrinsic::Graphics
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
+            // BUG-254 — edges and points need no surface behind them: the
+            // nearest one wins against the pick pass's own depth.
+            desc.DepthStencil.DepthWriteEnable = true;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorBlend[1].Enable = false;
@@ -10782,12 +10787,23 @@ namespace Extrinsic::Graphics
             const RenderCommandPassStatus faceStatus = RecordSelectionPrimitiveIdPass(
                 m_SelectionFaceIdPass, m_SelectionFaceIdPipelineLease, cmd, camera, frame.FrameIndex);
             AccumulateCommandRecordStatus(route.DebugName, route.PassId, faceStatus);
-            const RenderCommandPassStatus edgeStatus = RecordSelectionPrimitiveIdPass(
-                m_SelectionEdgeIdPass, m_SelectionEdgeIdPipelineLease, cmd, camera, frame.FrameIndex);
-            AccumulateCommandRecordStatus(route.DebugName, route.PassId, edgeStatus);
-            const RenderCommandPassStatus pointStatus = RecordSelectionPrimitiveIdPass(
-                m_SelectionPointIdPass, m_SelectionPointIdPipelineLease, cmd, camera, frame.FrameIndex);
-            AccumulateCommandRecordStatus(route.DebugName, route.PassId, pointStatus);
+            // BUG-254 — the selection mode decides which lanes compete: an
+            // Edge- or Face-mode pick never gets a point hint.
+            const PickPrimitiveLanes lanes = renderWorld.PickRequest.Lanes;
+            RenderCommandPassStatus edgeStatus = RenderCommandPassStatus::Recorded;
+            if (lanes.Edges)
+            {
+                edgeStatus = RecordSelectionPrimitiveIdPass(
+                    m_SelectionEdgeIdPass, m_SelectionEdgeIdPipelineLease, cmd, camera, frame.FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, edgeStatus);
+            }
+            RenderCommandPassStatus pointStatus = RenderCommandPassStatus::Recorded;
+            if (lanes.Points)
+            {
+                pointStatus = RecordSelectionPrimitiveIdPass(
+                    m_SelectionPointIdPass, m_SelectionPointIdPipelineLease, cmd, camera, frame.FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, pointStatus);
+            }
             if (faceStatus == RenderCommandPassStatus::Recorded &&
                 edgeStatus == RenderCommandPassStatus::Recorded &&
                 pointStatus == RenderCommandPassStatus::Recorded)
@@ -10805,7 +10821,7 @@ namespace Extrinsic::Graphics
                 m_PickingReadbackBuffer->GetHandle();
             RHI::TextureHandle entityIdHandle{};
             RHI::TextureHandle primitiveIdHandle{};
-            RHI::TextureHandle sceneDepthHandle{};
+            RHI::TextureHandle pickingDepthHandle{};
             for (std::size_t i = 0; i < compiled.TextureNames.size(); ++i)
             {
                 if (i >= compiled.TextureHandles.size())
@@ -10820,9 +10836,9 @@ namespace Extrinsic::Graphics
                 {
                     primitiveIdHandle = compiled.TextureHandles[i];
                 }
-                else if (compiled.TextureNames[i] == std::string_view{"SceneDepth"})
+                else if (compiled.TextureNames[i] == std::string_view{"Picking.Depth"})
                 {
-                    sceneDepthHandle = compiled.TextureHandles[i];
+                    pickingDepthHandle = compiled.TextureHandles[i];
                 }
             }
             if (entityIdHandle.IsValid() && primitiveIdHandle.IsValid())
@@ -10863,27 +10879,27 @@ namespace Extrinsic::Graphics
                 cmd.TextureBarrier(primitiveIdHandle,
                                    RHI::TextureLayout::TransferSrc,
                                    RHI::TextureLayout::ColorAttachment);
-                // BUG-026 — sample the pick pixel's scene depth alongside the
-                // IDs so the runtime can reconstruct the world-space cursor
-                // position. The PickingPass reads SceneDepth as DepthRead, so
-                // the round-trip restores DepthReadOnly for the downstream
-                // surface pass barriers derived from the declared usages.
-                const bool depthCopied = sceneDepthHandle.IsValid();
+                // BUG-026 — sample the pick pixel's depth alongside the IDs so
+                // the runtime can reconstruct the world-space cursor position.
+                // BUG-254 — it comes from the pick pass's own depth, so it is
+                // the depth of the picked primitive; the round-trip restores
+                // the depth-attachment layout the PickingPass wrote it in.
+                const bool depthCopied = pickingDepthHandle.IsValid();
                 if (depthCopied)
                 {
-                    cmd.TextureBarrier(sceneDepthHandle,
-                                       RHI::TextureLayout::DepthReadOnly,
+                    cmd.TextureBarrier(pickingDepthHandle,
+                                       RHI::TextureLayout::DepthAttachment,
                                        RHI::TextureLayout::TransferSrc);
-                    cmd.CopyTextureToBuffer(sceneDepthHandle,
+                    cmd.CopyTextureToBuffer(pickingDepthHandle,
                                             RHI::TextureLayout::TransferSrc,
                                             0u, 0u,
                                             pickingBuffer,
                                             slotOffset + kPickingReadbackDepthOffset,
                                             pickX, pickY,
                                             1u, 1u);
-                    cmd.TextureBarrier(sceneDepthHandle,
+                    cmd.TextureBarrier(pickingDepthHandle,
                                        RHI::TextureLayout::TransferSrc,
-                                       RHI::TextureLayout::DepthReadOnly);
+                                       RHI::TextureLayout::DepthAttachment);
                 }
                 NotePickingReadbackCopyIssued(frame.FrameIndex,
                                               slot,
