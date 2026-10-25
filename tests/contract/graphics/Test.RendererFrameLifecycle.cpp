@@ -2810,7 +2810,8 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     EXPECT_EQ(initialLineDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialLineDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
     EXPECT_TRUE(initialLineDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialLineDesc.DepthStencil.DepthWriteEnable);
+    // BUG-254 slice C: drawn lines write depth, so what lies behind a line is hidden.
+    EXPECT_TRUE(initialLineDesc.DepthStencil.DepthWriteEnable);
     EXPECT_EQ(initialLineDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::LessEqual);
     EXPECT_TRUE(initialLineDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialLineDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);

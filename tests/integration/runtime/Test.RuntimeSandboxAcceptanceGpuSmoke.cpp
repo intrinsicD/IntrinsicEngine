@@ -9797,6 +9797,62 @@ namespace
             EXPECT_TRUE(Results[index].Selected.empty());
         }
     };
+
+    // The clicks plus a readback of the backbuffer, bound once the device runs, so the
+    // last frame's pixels can be compared with what the clicks picked.
+    struct Bug254ClickCapture
+    {
+        Bug254ClickDriver Driver{};
+        Extrinsic::RHI::BufferHandle Readback{};
+        Extrinsic::Core::Extent2D Extent{};
+        Extrinsic::RHI::Format Format{};
+        std::uint32_t BytesPerPixel{0u};
+        std::vector<std::uint8_t> Bytes{};
+        bool Bound{false};
+
+        [[nodiscard]] bool Step(Engine& engine)
+        {
+            if (!Bound && engine.GetDevice().IsOperational())
+            {
+                engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(Readback);
+                Bound = true;
+            }
+            return Driver.Step(engine);
+        }
+
+        // A host-visible buffer for the whole backbuffer; false when none can be made.
+        [[nodiscard]] bool CreateReadback(Engine& engine, const char* debugName)
+        {
+            auto& device = engine.GetDevice();
+            Extent = device.GetBackbufferExtent();
+            Format = device.GetBackbufferFormat();
+            BytesPerPixel = Extrinsic::RHI::BytesPerBlock(Format);
+            if (BytesPerPixel < 4u)
+                return false;
+            Bytes.assign(std::size_t(Extent.Width) * Extent.Height * BytesPerPixel, 0u);
+            Readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+                .SizeBytes = Bytes.size(),
+                .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+                .HostVisible = true,
+                .DebugName = debugName,
+            });
+            return Readback.IsValid();
+        }
+
+        // Unbinds the readback and copies the last frame out of it.
+        void ReadBack(Engine& engine)
+        {
+            engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+            engine.GetDevice().ReadBuffer(Readback, Bytes.data(), Bytes.size(), 0u);
+            engine.GetDevice().DestroyBuffer(Readback);
+        }
+
+        [[nodiscard]] RgbaPixel PixelAt(const float x, const float y) const
+        {
+            return ReadPixel(Bytes, Format, BytesPerPixel, Extent, static_cast<std::uint32_t>(x),
+                static_cast<std::uint32_t>(y));
+        }
+    };
 } // namespace
 
 // The selection modes' clicks on every lane, through the real pick path (pick passes,
@@ -10052,17 +10108,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClicksPickTheNearestDrawnPrimitiveOfTheSe
 TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickFootprintIsTheDrawnLineWidthAndPointShape)
 {
     using Target = RT::SelectionTarget;
-    Bug254ClickDriver driver{};
-    Extrinsic::RHI::BufferHandle readback{};
-    bool readbackBound = false;
+    Bug254ClickCapture capture{};
+    Bug254ClickDriver& driver = capture.Driver;
     const auto ready = [&](Engine& engine)
     {
-        if (!readbackBound && engine.GetDevice().IsOperational())
-        {
-            engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readback);
-            readbackBound = true;
-        }
-        return driver.Step(engine);
+        return capture.Step(engine);
     };
     // Four frames after the last click cover the readback latency.
     auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 4u, 600u, std::chrono::seconds{120}, false);
@@ -10187,21 +10237,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickFootprintIsTheDrawnLineWidthAndPoint
         {"background", Target::Entity, pixel(0.95f * w, 0.95f * h)},
     };
 
-    const Extrinsic::RHI::Format format = device.GetBackbufferFormat();
-    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(format);
-    ASSERT_GE(bytesPerPixel, 4u);
-    const std::uint64_t byteCount = std::uint64_t(extent.Width) * extent.Height * bytesPerPixel;
-    readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
-        .SizeBytes = byteCount,
-        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-        .HostVisible = true,
-        .DebugName = "Sandbox.BUG254.ClickFootprint.Readback",
-    });
-    ASSERT_TRUE(readback.IsValid());
+    ASSERT_TRUE(capture.CreateReadback(engine, "Sandbox.BUG254.ClickFootprint.Readback"));
 
     const auto run = DriveAcceptanceAndCapture(engine);
     SCOPED_TRACE(readyProbe.ExitSummary() + " clicks done=" + std::to_string(driver.Next));
-    engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+    capture.ReadBack(engine);
     ASSERT_TRUE(run.DeviceOperational);
     ASSERT_EQ(driver.Next, driver.Clicks.size()) << "not every click read back";
 
@@ -10223,21 +10263,224 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickFootprintIsTheDrawnLineWidthAndPoint
     driver.ExpectMiss(10);
 
     // The same pixels in the last frame: red where a click hit, background where it missed.
-    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(byteCount), 0u);
-    device.ReadBuffer(readback, bytes.data(), byteCount, 0u);
-    device.DestroyBuffer(readback);
-    const RgbaPixel background =
-        ReadPixel(bytes, format, bytesPerPixel, extent, (extent.Width * 15u) / 16u, extent.Height / 16u);
+    const RgbaPixel background = capture.PixelAt(15.0f * w / 16.0f, h / 16.0f);
     for (std::size_t index = 0u; index < driver.Clicks.size(); ++index)
     {
         const auto [x, y] = driver.Clicks[index].Pixel;
-        const RgbaPixel drawn = ReadPixel(bytes, format, bytesPerPixel, extent, x, y);
+        const RgbaPixel drawn = capture.PixelAt(float(x), float(y));
         SCOPED_TRACE(driver.Describe(index) + " pixel " + PixelText(drawn));
         if (driver.Results[index].Hits > 0u)
             EXPECT_TRUE(IsUi083PointPixel(drawn)) << "a hit where nothing red is drawn";
         else
             EXPECT_LT(RgbDistance(drawn, background), 30) << "a miss where something is drawn";
     }
+
+    engine.Shutdown();
+}
+
+// BUG-254 slice C: drawn lines write depth, so what is drawn on top at a crossing is what the
+// click picks: the nearer of two crossing lines (within one draw, where the far edge is drawn
+// last, and across two entities in both creation orders), a line over a point behind it and a
+// point over a line behind it. A line on its own surface stays drawn; one behind it is hidden.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, DrawnLinesOccludeWhatTheClickPassesOver)
+{
+    using Target = RT::SelectionTarget;
+    Bug254ClickCapture capture{};
+    Bug254ClickDriver& driver = capture.Driver;
+    const auto ready = [&](Engine& engine)
+    {
+        return capture.Step(engine);
+    };
+    // Four frames after the last click cover the readback latency.
+    auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 4u, 600u, std::chrono::seconds{120}, false);
+    ExitWhenReadyApp& readyProbe = *readyApp;
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    Engine& engine = *bootstrap.EnginePtr;
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    auto& device = engine.GetDevice();
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    ASSERT_GT(extent.Width, 0);
+    ASSERT_GT(extent.Height, 0);
+    const float w = static_cast<float>(extent.Width);
+    const float h = static_cast<float>(extent.Height);
+    const auto col = [&](const float fraction)
+    {
+        return std::floor(fraction * w);
+    };
+    const auto row = [&](const float fraction)
+    {
+        return std::floor(fraction * h);
+    };
+    const auto pixel = [](const float x, const float y)
+    {
+        return std::pair{static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)};
+    };
+    const auto id = [](const EntityHandle entity)
+    {
+        return RT::SelectionController::ToStableEntityId(entity);
+    };
+    const glm::vec4 red{1.0f, 0.0f, 0.0f, 1.0f};
+    const glm::vec4 blue{0.0f, 0.0f, 1.0f, 1.0f};
+    const auto uniform = [](const glm::vec4& color)
+    {
+        G::VisualizationConfig config{};
+        config.Source = G::VisualizationConfig::ColorSource::UniformColor;
+        config.Color = color;
+        return config;
+    };
+
+    // Edge lines of width 6 between pixel pairs, each at its own depth.
+    struct Segment
+    {
+        glm::vec2 A{};
+        glm::vec2 B{};
+        float Z{0.0f};
+    };
+    const auto addLines = [&](const std::vector<Segment>& segments, const G::VisualizationConfig& color)
+    {
+        const EntityHandle entity = scene.Create();
+        StampBug254Selectable(scene, entity);
+        raw.emplace<G::RenderEdges>(entity, G::RenderEdges{.Width = 6.0f});
+        raw.emplace<G::VisualizationConfig>(entity, color);
+        Geometry::Graph::Graph graph{};
+        for (const Segment& segment : segments)
+        {
+            const auto a = graph.AddVertex(Bug254WorldAtPixel(segment.A.x, segment.A.y, segment.Z, extent));
+            const auto b = graph.AddVertex(Bug254WorldAtPixel(segment.B.x, segment.B.y, segment.Z, extent));
+            (void)graph.AddEdge(a, b);
+        }
+        gs::PopulateFromGraph(raw, entity, graph);
+        return entity;
+    };
+    const auto horizontal = [](const glm::vec2 at, const float z)
+    {
+        return Segment{at - glm::vec2{60.0f, 0.0f}, at + glm::vec2{60.0f, 0.0f}, z};
+    };
+    const auto vertical = [](const glm::vec2 at, const float z)
+    {
+        return Segment{at - glm::vec2{0.0f, 60.0f}, at + glm::vec2{0.0f, 60.0f}, z};
+    };
+    const auto addPoint = [&](const glm::vec2 at, const float z, const glm::vec4& color)
+    {
+        const EntityHandle entity = AddBug254Points(scene, {Bug254WorldAtPixel(at.x, at.y, z, extent)});
+        raw.emplace_or_replace<G::RenderPoints>(
+            entity, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = 16.0f});
+        raw.emplace<G::VisualizationConfig>(entity, uniform(color));
+        return entity;
+    };
+
+    // One graph: edge 0 red and near, edge 1 blue and far, so the far edge is drawn last.
+    const glm::vec2 single{col(0.12f), row(0.15f)};
+    G::VisualizationConfig perEdge{};
+    perEdge.Source = G::VisualizationConfig::ColorSource::PerEdgeBuffer;
+    perEdge.ColorBufferName = "e:bug254_color";
+    const EntityHandle crossing = addLines({horizontal(single, 0.5f), vertical(single, -0.5f)}, perEdge);
+    raw.get<gs::Edges>(crossing).Properties.GetOrAdd<glm::vec4>("e:bug254_color", glm::vec4{1.0f}).Vector() = {
+        red, blue};
+
+    // The same crossing as two entities, the near one created first, then last.
+    const glm::vec2 nearFirstAt{col(0.12f), row(0.35f)}, nearLastAt{col(0.12f), row(0.55f)};
+    const EntityHandle nearFirst = addLines({horizontal(nearFirstAt, 0.5f)}, uniform(red));
+    (void)addLines({vertical(nearFirstAt, -0.5f)}, uniform(blue));
+    (void)addLines({vertical(nearLastAt, -0.5f)}, uniform(blue));
+    const EntityHandle nearLast = addLines({horizontal(nearLastAt, 0.5f)}, uniform(red));
+
+    // A blue point behind a red line, and a blue point in front of a red line.
+    const glm::vec2 behindAt{col(0.70f), row(0.15f)}, frontAt{col(0.70f), row(0.35f)};
+    const EntityHandle lineOverPoint = addLines({horizontal(behindAt, 0.5f)}, uniform(red));
+    (void)addPoint(behindAt, -0.5f, blue);
+    (void)addLines({horizontal(frontAt, -0.5f)}, uniform(red));
+    const EntityHandle pointOverLine = addPoint(frontAt, 0.5f, blue);
+
+    // A surface at depth 0 with a red line on it and a red line 0.5 behind it.
+    const glm::vec2 surfaceAt{col(0.80f), row(0.70f)};
+    {
+        const EntityHandle quad = scene.Create();
+        StampBug254Selectable(scene, quad);
+        raw.emplace<G::RenderSurface>(quad);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto corner = [&](const float dx, const float dy)
+        {
+            return mesh.AddVertex(Bug254WorldAtPixel(surfaceAt.x + dx, surfaceAt.y + dy, 0.0f, extent));
+        };
+        const auto a = corner(-50.0f, -50.0f);
+        const auto b = corner(-50.0f, 50.0f);
+        const auto c = corner(50.0f, 50.0f);
+        const auto d = corner(50.0f, -50.0f);
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c).has_value());
+        ASSERT_TRUE(mesh.AddTriangle(a, c, d).has_value());
+        gs::PopulateFromMesh(raw, quad, mesh);
+    }
+    (void)addLines({Segment{surfaceAt + glm::vec2{0.0f, -10.0f}, surfaceAt + glm::vec2{40.0f, -10.0f}, 0.0f},
+                       Segment{surfaceAt + glm::vec2{-25.0f, -40.0f}, surfaceAt + glm::vec2{-25.0f, 40.0f}, -0.5f}},
+        uniform(red));
+
+    driver.Clicks = {
+        {"one graph, crossing", Target::Edge, pixel(single.x, single.y)},
+        {"two entities near first, crossing", Target::Entity, pixel(nearFirstAt.x, nearFirstAt.y)},
+        {"two entities near last, crossing", Target::Entity, pixel(nearLastAt.x, nearLastAt.y)},
+        {"line over a point behind it", Target::Entity, pixel(behindAt.x, behindAt.y)},
+        {"point over a line behind it", Target::Entity, pixel(frontAt.x, frontAt.y)},
+        {"background", Target::Entity, pixel(0.95f * w, 0.95f * h)},
+    };
+
+    ASSERT_TRUE(capture.CreateReadback(engine, "Sandbox.BUG254.LineDepth.Readback"));
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    SCOPED_TRACE(readyProbe.ExitSummary() + " clicks done=" + std::to_string(driver.Next));
+    capture.ReadBack(engine);
+    ASSERT_TRUE(run.DeviceOperational);
+    ASSERT_EQ(driver.Next, driver.Clicks.size()) << "not every click read back";
+
+    using Kind = RT::RefinedPrimitiveKind;
+    driver.ExpectPick(0, id(crossing), Kind::Edge, 0.5f);
+    EXPECT_EQ(driver.Refined(0).EdgeId, 0u) << driver.Describe(0);
+    driver.ExpectPick(1, id(nearFirst), Kind::Edge, 0.5f);
+    driver.ExpectPick(2, id(nearLast), Kind::Edge, 0.5f);
+    driver.ExpectPick(3, id(lineOverPoint), Kind::Edge, 0.5f);
+    driver.ExpectPick(4, id(pointOverLine), Kind::Point, 0.5f);
+    driver.ExpectMiss(5);
+
+    // The last frame: the near primitive's colour at each crossing, each primitive's own colour
+    // away from it, the line on the surface drawn and the one behind it hidden.
+    const auto pixelAt = [&](const glm::vec2 at)
+    {
+        return capture.PixelAt(at.x, at.y);
+    };
+    const auto isBlue = [](const RgbaPixel p)
+    {
+        return p.B > 120u && p.B > p.R + 60u && p.B > p.G + 60u;
+    };
+    const auto expectRed = [&](const std::string& what, const glm::vec2 at)
+    {
+        const RgbaPixel p = pixelAt(at);
+        EXPECT_TRUE(IsUi083PointPixel(p)) << what << " is not red: " << PixelText(p);
+    };
+    const auto expectBlue = [&](const std::string& what, const glm::vec2 at)
+    {
+        const RgbaPixel p = pixelAt(at);
+        EXPECT_TRUE(isBlue(p)) << what << " is not blue: " << PixelText(p);
+    };
+    const glm::vec2 right{30.0f, 0.0f}, below{0.0f, 30.0f};
+    expectRed("one graph: crossing (near edge 0)", single);
+    expectRed("one graph: edge 0 alone", single + right);
+    expectBlue("one graph: edge 1 alone", single + below);
+    expectRed("near first: crossing", nearFirstAt);
+    expectBlue("near first: far line alone", nearFirstAt + below);
+    expectRed("near last: crossing", nearLastAt);
+    expectBlue("near last: far line alone", nearLastAt + below);
+    expectRed("line over a point: centre", behindAt);
+    expectBlue("line over a point: point beside the line", behindAt + glm::vec2{0.0f, 6.0f});
+    expectBlue("point over a line: centre", frontAt);
+    expectRed("point over a line: line alone", frontAt + right);
+    expectRed("line on the surface", surfaceAt + glm::vec2{20.0f, -10.0f});
+    const RgbaPixel surface = pixelAt(surfaceAt + glm::vec2{20.0f, 20.0f});
+    const RgbaPixel hidden = pixelAt(surfaceAt + glm::vec2{-25.0f, 20.0f});
+    EXPECT_FALSE(IsUi083PointPixel(hidden)) << "a line behind the surface is drawn: " << PixelText(hidden);
+    EXPECT_LT(RgbDistance(hidden, surface), 30) << PixelText(hidden) << " vs surface " << PixelText(surface);
 
     engine.Shutdown();
 }

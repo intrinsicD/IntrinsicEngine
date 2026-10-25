@@ -4632,8 +4632,9 @@ namespace Extrinsic::Graphics
 
         // GRAPHICS-071 — retained line renderables use the default recipe's
         // `LinePass` after the surface pass. Lines load `SceneDepth` and append
-        // into `SceneColorHDR`; depth writes stay disabled so surface depth is
-        // preserved for later point/selection/postprocess consumers.
+        // into `SceneColorHDR`. BUG-254 slice C: they write depth (less-equal,
+        // so a line on its own surface still draws), so a point or line behind
+        // a nearer line is hidden, as the click passes it over.
         [[nodiscard]] static RHI::PipelineDesc BuildForwardLinePipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
@@ -4646,7 +4647,7 @@ namespace Extrinsic::Graphics
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
-            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthWriteEnable = true;
             desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = true;

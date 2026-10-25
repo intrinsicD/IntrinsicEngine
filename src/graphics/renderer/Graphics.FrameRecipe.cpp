@@ -674,10 +674,11 @@ namespace Extrinsic::Graphics
                            false,
                            std::move(compositionReads),
                            {"SceneColorHDR"});
+        // BUG-254 slice C — lines and points load the scene depth and write it.
         AddPass(out, FrameRecipePassKind::Line, "LinePass", true, false,
-                {"SceneDepth", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count"}, {"SceneColorHDR"});
+                {"SceneDepth", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count"}, {"SceneColorHDR", "SceneDepth"});
         AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false,
-                {"SceneDepth", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"}, {"SceneColorHDR"});
+                {"SceneDepth", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"}, {"SceneColorHDR", "SceneDepth"});
         // GRAPHICS-077 Slice A — transient-debug surface overlay. Placed
         // between the lit-composition family (`SurfacePass` /
         // `CompositionPass` / `LinePass` / `PointPass`) and the
@@ -2162,8 +2163,12 @@ namespace Extrinsic::Graphics
             });
         }
 
+        // BUG-254 slice C — lines and points write the depth they load, so a
+        // primitive behind a nearer line or point is hidden as the pick
+        // passes it over; the write state is the attachment layout they
+        // render with.
         addRecipePass(FrameRecipePassKind::Line, "LinePass", [=](RenderGraphBuilder& builder) {
-            builder.Read(depth, TextureUsage::DepthRead);
+            builder.Write(depth, TextureUsage::DepthWrite);
             builder.Read(lineQuadDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(lineQuadDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
@@ -2178,7 +2183,7 @@ namespace Extrinsic::Graphics
         });
 
         addRecipePass(FrameRecipePassKind::Point, "PointPass", [=](RenderGraphBuilder& builder) {
-            builder.Read(depth, TextureUsage::DepthRead);
+            builder.Write(depth, TextureUsage::DepthWrite);
             builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(pointDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);

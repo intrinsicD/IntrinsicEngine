@@ -2912,6 +2912,70 @@ TEST(FrameRecipeContract, PickingDrawsIntoItsOwnClearedDepthOnlyWhilePicking)
     EXPECT_FALSE(HasTextureUsage(outline.SceneDepthUsage, RHI::TextureUsage::TransferSrc));
 }
 
+// BUG-254 slice C: drawn lines write depth like points, so a primitive behind a nearer line is
+// hidden where the click passes it over. Both passes load the prepass depth (no Undefined
+// transition), write it in the attachment state they render with, and store it.
+TEST(FrameRecipeContract, LineAndPointPassesWriteTheSceneDepthTheyLoad)
+{
+    FrameRecipeFeatures features{};
+    features.EnableDepthPrepass = true;
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(features);
+    RenderGraph graph;
+    const FrameRecipeBuildResult build =
+        BuildDefaultFrameRecipe(graph, features, MakeImports(), FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const std::uint32_t depthIndex = TextureIndexByName(*compiled, "SceneDepth");
+    ASSERT_LT(depthIndex, compiled->TextureNames.size());
+
+    for (const auto& [kind, name] : {std::pair{FrameRecipePassKind::Line, std::string_view{"LinePass"}},
+             std::pair{FrameRecipePassKind::Point, std::string_view{"PointPass"}}})
+    {
+        SCOPED_TRACE(std::string{name});
+        const auto* pass = FindPass(recipe, kind);
+        ASSERT_NE(pass, nullptr);
+        EXPECT_TRUE(Contains(pass->Reads, "SceneDepth"));
+        EXPECT_TRUE(Contains(pass->Writes, "SceneDepth"));
+        EXPECT_TRUE(PassWritesTexture(*compiled, name, "SceneDepth"));
+
+        const std::uint32_t passIndex = PassIndexByName(*compiled, name);
+        ASSERT_LT(passIndex, compiled->PassNames.size());
+        bool sawDepth = false;
+        for (const CompiledRenderPassAttachment& attachment : compiled->RenderPassAttachments)
+        {
+            if (attachment.PassIndex != passIndex || !attachment.IsDepthAttachment)
+                continue;
+            sawDepth = true;
+            EXPECT_EQ(attachment.ResourceIndex, depthIndex);
+            EXPECT_EQ(attachment.Load, RHI::LoadOp::Load);
+            EXPECT_EQ(attachment.Store, RHI::StoreOp::Store);
+        }
+        EXPECT_TRUE(sawDepth);
+    }
+
+    // The surface pass reads the prepass depth; the line pass moves it to the write state.
+    const std::uint32_t lineIndex = PassIndexByName(*compiled, "LinePass");
+    bool sawLineTransition = false;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        if (packet.PassIndex != lineIndex)
+            continue;
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex != depthIndex)
+                continue;
+            sawLineTransition = true;
+            EXPECT_EQ(barrier.Before, TextureBarrierState::DepthRead);
+            EXPECT_EQ(barrier.After, TextureBarrierState::DepthWrite);
+        }
+    }
+    EXPECT_TRUE(sawLineTransition);
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors());
+}
+
 // This producer imports FrameRecipe directly, without Renderer or RenderRecipeConfig.
 TEST(FrameRecipeContract, OverrideProjectionAvailableThroughRecipeOwner)
 {

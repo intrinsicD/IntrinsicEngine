@@ -61,6 +61,7 @@ contracts: [geometry.element-domain-sources]
 3. (After plan review round 1) "Ok, setze den Plan so um. Ja die Modus Regel passt"
 4. (Slice B, 2026-10-25) "Weiter mit BUG-254 Slice B: Klickfläche = sichtbare Linienbreite und
    Punktgröße/-form. Erst Plan mit Review, dann umsetzen."
+5. (Overlap order, after slice B) "Sichtbare Linien sollten tiefe schreiben."
 
 Goal item served: Framework24 W5 "Inspect rendering and properties" (every primitive
 reachable); this is the shortest path because the CPU refinement already maps a hit on any lane
@@ -172,12 +173,63 @@ back to canonical ids, so only the GPU ID passes and the selectable flag stand i
   Overlap order (plan review): forward lines draw `LessEqual` without depth writes and points
   after them with writes, so a farther line drawn later, or a point behind a line, can be drawn
   over a nearer line, while the pick keeps slice A's rule (the nearest primitive wins). The
-  footprint change does not alter this; whether forward lines should write depth is a rendering
-  decision for the operator, raised at the end of the slice.
+  footprint change does not alter this; the operator decided that drawn lines write depth
+  (slice C).
   Surfel coverage equals the disc today (`forward/point.vert` emits the view normal +Z); it is
   shared, not separately tested. Unchanged: equal-depth ties resolve by sub-pass order, hover
   picks use the Entity lanes, and the picking pass declares `Points` while `PointIdPass` reads
   `SelectionPoints` (recorded in slice A).
+
+- **Slice C — drawn lines occlude like the pick (question 5).** Slice B left one mismatch: forward
+  lines test `LessEqual` without depth writes, and points draw after them with writes, so a farther
+  line drawn later, or a point behind a line, is drawn over a nearer line while the click picks the
+  nearer one. The operator decided that drawn lines write depth. Steps:
+  1. `BuildForwardLinePipelineDesc` (`Graphics.Renderer.cpp`): depth writes on, `LessEqual` kept.
+  2. Render graph (`Graphics.FrameRecipe.cpp`): `LinePass` and `PointPass` declare
+     `Write(SceneDepth, DepthWrite)` (load and store as today) instead of `Read(DepthRead)`, and the
+     introspection lists `SceneDepth` among their writes. Today both passes are declared depth
+     readers, so the graph moves `SceneDepth` to the read-only layout before them, while the
+     backend begins every rendering with the depth-attachment layout
+     (`Backends.Vulkan.CommandContext.cpp:305`) and points already write depth. With the write
+     declared, the surface → line transition goes to the attachment layout the passes render
+     with. Points are included because they already write depth. `Write` keeps the texture and
+     its contents (no `UNDEFINED` transition; `Load`/`Store` stay).
+     Not fixed here (plan review): the compiler emits a texture barrier only when the state changes
+     (`Graphics.RenderGraph.Compiler.cpp:2289`), so line → point (both `DepthWrite`) gets no
+     barrier, as `SceneColorHDR` between these passes already gets none, and `DepthWrite` maps to
+     write access only (`Graphics.Renderer.cpp:913`); later `DepthRead` attachment passes keep the
+     read-only-layout mismatch. These are render-graph gaps across all passes, raised with the
+     operator as separate work.
+  3. Effects: depth-tested transient-debug and visualization overlays see line depth; the HZB build
+     and the outline-only picking pass run before `LinePass` and stay surface-only; the selection
+     outline uses the earlier surface IDs without depth testing and does not become line-aware;
+     reconstruction declares a `SceneDepth` read but is not exercised here. A translucent uniform
+     line colour now occludes what lies behind it, as a point already does (`VisualizationAlpha`
+     is always 1). The obsolete "depth writes stay disabled" comment of the line pipeline goes.
+  4. CPU tests, red first: `RendererFrameLifecycle.ForwardLinePointPipelinesSurviveOperationalRebuild`
+     expects line depth writes; a `FrameRecipeContract` test that `LinePass` and `PointPass` write
+     `SceneDepth` in the introspection and the compiled graph, load and store it, and that the
+     barrier into `LinePass` comes from `DepthRead` (not `Undefined`) into `DepthWrite`.
+  5. `gpu;vulkan` smoke `RuntimeSandboxAcceptanceGpuSmoke.DrawnLinesOccludeWhatTheClickPassesOver`
+     (geometry by inverse projection, opaque red and blue, every primitive also sampled away from
+     its crossing):
+     - one graph with two crossing edges, edge 0 red at depth 0.5 and edge 1 blue at -0.5 (per-edge
+       colours), so the far edge is drawn after the near one within one draw: the crossing pixel is
+       red and an Edge-mode click there picks edge 0;
+     - the same crossing as two entities in both creation orders (the cull's atomic append order is
+       not guaranteed, so these support but do not decide);
+     - a blue Flat point at -0.5 under a red line at 0.5: pixel red, Entity-mode click picks the
+       line; control: a blue point at 0.5 over a red line at -0.5: pixel blue, click picks the point;
+     - a red line on a selectable surface at the same depth stays drawn (`LessEqual`), and a red
+       line 0.5 behind the surface is hidden.
+     Predictions: with line depth writes off (the mutation, and the code before the change) the
+     single-graph crossing pixel and the point-behind-line pixel fail (blue); the picks, the
+     near-point control and the surface controls pass either way. The graph declaration has no
+     smoke of its own; the CPU test covers it. The slice A and B click smokes and BUG-026B keep
+     passing.
+  6. Docs: the `LinePass` and `PointPass` rows of `docs/architecture/rendering-three-pass.md`
+     already list `SceneDepth` as written; the code catches up, and the rows say lines and
+     points write depth with `LessEqual`, with the barrier limitation above.
 
 Slice A alone does not complete question 1: native one-pixel edge lines stay hard to hit and
 point footprints are squares of the uniform size until slice B; the selection outline stays
@@ -201,6 +253,11 @@ Slice B:
 - [ ] The pick footprint matches what is drawn: line width, point size (uniform or per point),
       point shape and sphere depth, each with a `gpu;vulkan` click cited as run and its mechanism
       mutated.
+
+Slice C:
+- [ ] Drawn lines and points occlude each other like the pick: at a crossing of primitives at
+      different depths the nearer one is drawn and picked, in both creation orders, with a
+      `gpu;vulkan` smoke cited as run and the line depth writes mutated.
 
 ## Verification
 ```bash
@@ -345,3 +402,53 @@ python3 tools/agents/check_task_policy.py --root . --strict
   slice: retire the `Lines` bucket that nothing draws any more; declare the `SelectionPoints`
   buffers the point pass reads in the picking pass (pre-existing; every bucket's arguments are
   barriered, so no synchronization failure).
+- 2026-10-25: Slice C plan review (Claude author → Codex reviewer, fresh session, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a1753e-0992-7f03-a134-eab99f0ff755`;
+  recursion protection instruction-only), on the plan with sha256 `9965d552…`. Verdict verbatim
+  "revise". Blocking: the declared depth writes do not yield a line → point barrier (the compiler
+  emits barriers only on state changes, and `DepthWrite` maps to write access only) - recorded in
+  the plan as a render-graph gap for the operator, not fixed in this slice; the cross-entity
+  crossing cannot decide the mutation (atomic append order) - a single-graph crossing with per-edge
+  colours added. Optional, followed: pin load/store and the `DepthRead` → `DepthWrite` transition in
+  the CPU test, coplanar and behind-surface line controls, narrower effect claims, the obsolete
+  pipeline comment, and no inference from the silent validation probe.
+- 2026-10-26: Slice C implemented.
+  - `BuildForwardLinePipelineDesc`: depth writes on (`LessEqual` kept); the obsolete "depth writes
+    stay disabled" comment replaced. `LinePass` and `PointPass` declare `Write(SceneDepth,
+    DepthWrite)` with load/store as before, and the introspection lists `SceneDepth` among their
+    writes (the architecture table already did). Docs rows say so, with the same-state barrier
+    limitation.
+  - CPU tests: `RendererFrameLifecycle.ForwardLinePointPipelinesSurviveOperationalRebuild` (line
+    depth writes) and the new `FrameRecipeContract.LineAndPointPassesWriteTheSceneDepthTheyLoad`
+    (both passes read and write `SceneDepth` in the introspection and write it in the compiled graph,
+    their depth attachment loads and stores it, and the barrier into `LinePass` goes `DepthRead` →
+    `DepthWrite`; the recipe validates)
+    failed before the change and pass after; `IntrinsicGraphicsContractCpuTests` 581/581,
+    `IntrinsicGraphicsIntegrationCpuTests` 75/75, `IntrinsicGraphicsContractTests` 71/71.
+  - Vulkan smoke `RuntimeSandboxAcceptanceGpuSmoke.DrawnLinesOccludeWhatTheClickPassesOver` (6 clicks
+    including the background, 14 pixel samples). Against the slice B production code it fails the
+    two predicted, deterministic pixels: the single-graph crossing and the point behind a line drawn
+    blue; it also failed the cross-entity crossing with the near line created last (observed, it
+    depends on the cull's append order); every pick, the near-point control and the surface
+    controls pass. The mutation "line depth writes off" (declarations kept) fails the same pixels. Passed four times on host `hochvogel`, NVIDIA
+    GeForce RTX 4090, driver 580.159.04, X11 `:1`, 1600x900, VSync off; `RuntimeSandboxAcceptanceGpuSmoke`
+    46/46 and the graphics Vulkan smokes 36/36.
+  - Not covered: the render graph still emits no barrier between same-state attachment writes (line
+    → point depth, and `SceneColorHDR` between all overlay passes), `DepthWrite` maps to write
+    access only, and later `DepthRead` attachment passes keep the read-only-layout mismatch with
+    the backend's attachment layout; raised with the operator as separate work.
+  - jscpd: the first draft copied the footprint smoke's readback setup (~70 lines); it moved into
+    `Bug254ClickCapture` next to `Bug254ClickDriver` (both footprint and line-depth smokes use it;
+    all four click smokes passed again). Left: the 40-line test prologue (bootstrap, scene, pixel
+    helpers) the two smokes share, as the other smokes in this file share theirs.
+  - ponytail-review (author, staged diff): the production change is two pipeline/graph flags per
+    pass and comments; no finding beyond the readback copy above (fixed) and the recorded
+    render-graph limitation.
+- 2026-10-26: Slice C code review (Claude author → Codex reviewer, fresh session, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a17550-1153-7850-8536-f79e549feca4`;
+  recursion protection instruction-only), on the staged diff sha256 `7b598d13…`. Verdict verbatim
+  "approve" ("Approval covers bounded slice C with its recorded synchronization limitation.";
+  "The supplied RTX 4090 passes support observed behavior, but do not establish synchronization
+  correctness across Vulkan implementations."). Optional findings, both wording in this note
+  (what the CPU test checks in the compiled graph; click/sample counts and which smoke failures are
+  deterministic): corrected.
