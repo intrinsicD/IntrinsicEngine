@@ -77,11 +77,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
 - unblocked: `UI-077` — Readiness field markers in every config panel (tasks/backlog/ui/UI-077-readiness-field-markers-in-all-panels.md)
 
-## Theme G — Active bugs
-
-- unblocked: `BUG-254` — A click on a point or edge line with no surface behind it misses on Vulkan (tasks/backlog/bugs/BUG-254-gpu-pick-misses-points-and-lines.md)
-- unblocked: `BUG-255` — Default-recipe frames have synchronization hazards on SceneDepth (tasks/backlog/bugs/BUG-255-render-graph-depth-synchronization-hazards.md)
-
 ## Theme H — Agentic workflow hardening
 
 - blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)

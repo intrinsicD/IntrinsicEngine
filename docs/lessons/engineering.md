@@ -90,3 +90,25 @@ Never add loader, ICD or unknown-module suppressions. Qualify on the driver's
 native display: the same build and NVIDIA ICD still failed on Xephyr while the
 native X11 run passed (BUG-229). A nested-display result is a separate WSI-path
 finding, not evidence for or against an engine leak.
+
+## Check GPU synchronization with the validator that sees it
+
+Core validation stayed silent while the tested default-recipe scenes had depth
+hazards: passes that only read depth still stored it, transitions into the
+depth-write state hid the depth from the next load, and the single-submit path
+did not chain the first backbuffer transition to the acquire. Khronos
+synchronization validation (layer 1.3.296,
+`VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT`)
+reported 36 and 42 hazards there. The validation smokes now enable it through
+`OperationalCounterStability::EnableSynchronizationValidation` and expect no
+error. It does not see everything: it reported nothing for barrier-less
+same-state attachment writes between passes or for depth writes into a
+read-only depth attachment, so those rules rest on CPU barrier and recipe
+tests and the Vulkan requirements. The graph boundary and cross-queue
+synchronization were outside that check.
+For draw-order assertions on the GPU, put the primitives in one draw: the
+cull appends draws of different entities in atomic order, which creation
+order does not decide. A mutation that breaks a draw's vertex offset can lose
+the device instead of failing a click. See
+[BUG-255](../../tasks/done/BUG-255-render-graph-depth-synchronization-hazards.md)
+and [BUG-254](../../tasks/done/BUG-254-gpu-pick-misses-points-and-lines.md).

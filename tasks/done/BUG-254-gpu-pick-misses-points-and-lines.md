@@ -237,25 +237,25 @@ surface-only (UI-083 slice 3c highlights selected elements).
 
 ## Acceptance criteria
 Slice A:
-- [ ] A click on a point with no surface beneath (mesh vertex view, graph node, point cloud
+- [x] A click on a point with no surface beneath (mesh vertex view, graph node, point cloud
       point) hits its entity and resolves to that element in Vertex mode and to the entity in
       Entity mode.
-- [ ] A click on an edge line with no surface beneath (mesh edge view, graph edge) hits its
+- [x] A click on an edge line with no surface beneath (mesh edge view, graph edge) hits its
       entity and resolves to that edge in Edge mode.
-- [ ] Of overlapping drawn primitives the nearest is picked, and the reported hit position lies
+- [x] Of overlapping drawn primitives the nearest is picked, and the reported hit position lies
       on it; Edge- and Face-mode clicks keep their edge and face hints.
-- [ ] A point drawn from a bound Position (UI-083) is picked where it is drawn and resolves to
+- [x] A point drawn from a bound Position (UI-083) is picked where it is drawn and resolves to
       its canonical vertex id (extends `RuntimeSandboxAcceptanceGpuSmoke.BoundPointPositionsDrawWhileTheSurfaceStaysCanonical`).
-- [ ] Surface face picks (BUG-026B) keep passing; each case above has a `gpu;vulkan` smoke cited
+- [x] Surface face picks (BUG-026B) keep passing; each case above has a `gpu;vulkan` smoke cited
       as run, with host GPU and driver.
 
 Slice B:
-- [ ] The pick footprint matches what is drawn: line width, point size (uniform or per point),
+- [x] The pick footprint matches what is drawn: line width, point size (uniform or per point),
       point shape and sphere depth, each with a `gpu;vulkan` click cited as run and its mechanism
       mutated.
 
 Slice C:
-- [ ] Drawn lines and points occlude each other like the pick: at a crossing of primitives at
+- [x] Drawn lines and points occlude each other like the pick: at a crossing of primitives at
       different depths the nearer one is drawn and picked, in both creation orders, with a
       `gpu;vulkan` smoke cited as run and the line depth writes mutated.
 
@@ -452,3 +452,40 @@ python3 tools/agents/check_task_policy.py --root . --strict
   correctness across Vulkan implementations."). Optional findings, both wording in this note
   (what the CPU test checks in the compiled graph; click/sample counts and which smoke failures are
   deterministic): corrected.
+
+## Completion — 2026-10-26
+Completed 2026-10-26 on `main`. Commit: slice A `be29e4c60`, slice B `b229e1a65`, slice C `b40b6a381`
+(hosted `ci-linux-clang` and `ci-docs` green on all three, checked 2026-10-26 with `gh run list`); the synchronization gap slice C left is closed by BUG-255
+(`08ce3f169`). Maturity: Operational - every criterion has a `gpu;vulkan` smoke run on host
+`hochvogel` (NVIDIA GeForce RTX 4090, driver 580.159.04, X11 `:1`, 1600x900, VSync off):
+`ClicksPickTheNearestDrawnPrimitiveOfTheSelectionMode`, `ClickFootprintIsTheDrawnLineWidthAndPointShape`,
+`DrawnLinesOccludeWhatTheClickPassesOver`, with the mutations recorded in the log.
+
+Reviewer decisions: final retirement review (Claude coordinator → Codex reviewer, fresh session,
+`codex exec`, requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread
+`01a175db-6f74-7951-b39b-38acd5716b39`; recursion protection instruction-only), on `08ce3f169`
+plus the retirement drafts (diff sha256 prefix `6905b0dc8c246b57`). Verdict verbatim "approve
+retirement". Slice A: "met — “A click on a point with no surface beneath”"; "met — “A click on
+an edge line with no surface beneath”"; "met — “Of overlapping drawn primitives the nearest is
+picked”"; "met — “A point drawn from a bound Position”" ("**Wording mismatch:**
+`BoundPointPositionsDrawWhileTheSurfaceStaysCanonical` was not extended; coverage resides in
+`ClicksPickTheNearestDrawnPrimitiveOfTheSelectionMode`. This does not block the behavioral
+criterion."); "met — “Surface face picks (BUG-026B) keep passing”". Slice B: "met — “The pick
+footprint matches what is drawn”" ("Surfel coverage uses the shared implementation but was not
+separately smoke-tested."). Slice C: "met — “Drawn lines and points occlude each other like the
+pick”". All seven boxes are ticked from these decisions. Its optional findings (bounded summary
+wording, the two limits added below, exact CI attribution, closed index wording) are applied in
+the retirement commit.
+
+Limits:
+- Equal-depth ties between a face, an edge and a point resolve by sub-pass order.
+- Picking still needs the depth prepass in the recipe.
+- Surfel points share the disc coverage code (their view normal is +Z today) but have no smoke of
+  their own.
+- Hover picks keep the Entity lanes; the picking pass declares `Points` while `PointIdPass`
+  reads `SelectionPoints`, and the `Lines` cull bucket has no drawer left (both recorded,
+  no owner yet).
+- Highlighting a selection on every drawn lane is UI-083 slice 3c.
+- One host and driver; other Vulkan implementations were not run.
+
+Evidence: no files under `tasks/evidence/BUG-254/`; nothing to delete.

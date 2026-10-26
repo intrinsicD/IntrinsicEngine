@@ -9,15 +9,15 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- Opened 2026-10-26: [BUG-255 — Default-recipe frames have synchronization hazards on SceneDepth](BUG-255-render-graph-depth-synchronization-hazards.md).
-  Synchronization validation reports depth stores by read-only passes, transitions into `DepthWrite` without read
-  access and an unchained swapchain transition; found from BUG-254 slice C on an RTX 4090.
-
-- Opened 2026-10-25: [BUG-254 — A click on a point or edge line with no surface behind it misses on Vulkan](BUG-254-gpu-pick-misses-points-and-lines.md).
-  The pick ID pipelines test depth-equal against a surface-only depth prepass, and nothing sets
-  `GpuRender_Selectable` for the point pick bucket; found by the UI-083 slice 3a smoke on an RTX 4090.
-
 ## Verified / Closed
+
+- Closed 2026-10-26: [BUG-255 — Default-recipe frames have synchronization hazards on SceneDepth](../../done/BUG-255-render-graph-depth-synchronization-hazards.md).
+  Read-only depth attachments (read-only layout, no store), `DepthWrite` read access, same-state write barriers and the
+  acquire wait; the tested scenes report no hazard under synchronization validation (layer 1.3.296; before 36 and 42).
+
+- Closed 2026-10-26: [BUG-254 — A click on a point or edge line with no surface behind it misses on Vulkan](../../done/BUG-254-gpu-pick-misses-points-and-lines.md).
+  Points, edge lines and surfaces are picked where they are drawn: own pick depth with per-mode lanes, the visible
+  line/point quads in the ID passes, and drawn lines writing depth. gpu;vulkan smokes with mutations on an RTX 4090.
 
 - Closed 2026-10-24: [BUG-252 — GTestDiscoveryTimeout budget test fails on CMake 4.0.3](../../done/BUG-252-gtest-discovery-timeout-budget-cmake403.md).
   CTest 3.29.0-3.31.9, 4.0.0-4.0.4 and 4.1.0-4.1.2 leave a timed-out `execute_process` child running (upstream

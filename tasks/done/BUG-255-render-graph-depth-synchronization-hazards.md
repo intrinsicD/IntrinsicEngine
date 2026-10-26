@@ -127,10 +127,10 @@ is. Slices A and B land together: the zero-hazard check needs both.
   `docs/architecture/rendering-three-pass.md`; the BUG-254 note's "not covered" line points here.
 
 ## Acceptance criteria
-- [ ] Synchronization validation reports no hazard in the graphics validation smokes and in the
+- [x] Synchronization validation reports no hazard in the graphics validation smokes and in the
       line/point/pick sandbox scene, with the runs cited (host GPU, driver) and each fix of slice A
       steps 1-3 and slice B mutated.
-- [ ] Read-only depth passes neither store depth nor render in a layout other than the one the
+- [x] Read-only depth passes neither store depth nor render in a layout other than the one the
       graph transitioned to; same-state writes between passes get a barrier (CPU tests).
 
 ## Verification
@@ -215,3 +215,35 @@ python3 tools/agents/check_task_policy.py --root . --strict
   the sphere fixture's `PointRecordsRecorded` would also count the flat-sprite fallback - not
   changed: no existing counter tells the sphere path apart, and the local probe above showed the
   sphere path runs on this host.
+
+## Completion — 2026-10-26
+Completed 2026-10-26 on `main`. Commit: note `61624ee0d`, fix `08ce3f169`. Maturity: Operational on host
+`hochvogel` (NVIDIA GeForce RTX 4090, driver 580.159.04, Khronos validation layer 1.3.296):
+synchronization validation reports no hazard in the four validation cases. The default CPU gate
+(5898/5898) and every `gpu` test (166/166) ran before the formatting-only edits and the
+`validationActive` guard; after them the touched graphics contract suites (213/213) and the three
+click smokes passed again. Hosted `ci-docs` passed on `08ce3f169`; `ci-linux-clang` was still
+running when this was written.
+
+Reviewer decisions: final retirement review (Claude coordinator → Codex reviewer, fresh session,
+`codex exec`, requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread
+`01a175db-6f74-7951-b39b-38acd5716b39`; recursion protection instruction-only), on `08ce3f169`
+plus the retirement drafts. Verdict verbatim "approve retirement". "met — “Synchronization
+validation reports no hazard”" ("The transient-depth mutation did **not** fail; same-state
+barriers also lack GPU discrimination. This limits the evidence but does not block wording
+requiring mutations to be performed."); "met — “Read-only depth passes neither store depth”".
+It approved the post-review `validationActive` change ("a passing result without validation must
+not count as synchronization evidence"). Both boxes are ticked from these decisions; its optional
+findings are applied in the retirement commit.
+
+Limits:
+- Synchronization validation (layer 1.3.296) gives no signal for the same-state barriers or for
+  depth writes into a read-only depth attachment; those rules rest on CPU barrier and recipe tests
+  and the Vulkan requirements.
+- Without an active validation layer the sandbox line-depth case still runs its clicks and pixels
+  but is no synchronization evidence.
+- The graph boundary (imported initial and final states) and cross-queue synchronization were
+  left as they were.
+- One host, driver and validation-layer version.
+
+Evidence: no files under `tasks/evidence/BUG-255/`; nothing to delete.
