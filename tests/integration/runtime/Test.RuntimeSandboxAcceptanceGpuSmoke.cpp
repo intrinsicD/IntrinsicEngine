@@ -9467,12 +9467,21 @@ namespace
         return pixel.R > 120u && pixel.R > pixel.G + 60u && pixel.R > pixel.B + 60u;
     }
 
+    // The selection highlight's orange (1, 0.55, 0.05) after tone mapping, measured at
+    // (245, 235, 136) on an RTX 4090; the lit surface reads (245, 245, 245), the background
+    // (170, 203, 231) and the points are red.
+    [[nodiscard]] bool IsUi083HighlightPixel(const RgbaPixel pixel) noexcept
+    {
+        return pixel.R > 200u && pixel.G > 180u && pixel.G > pixel.B + 60u;
+    }
+
     [[nodiscard]] std::uint32_t CountUi083PointPixels(const std::vector<std::uint8_t>& bytes,
         const Extrinsic::RHI::Format format,
         const std::uint32_t bytesPerPixel,
         const Extrinsic::Core::Extent2D extent,
         const std::pair<std::uint32_t, std::uint32_t> center,
-        const std::uint32_t radius)
+        const std::uint32_t radius,
+        bool (*const accept)(RgbaPixel) noexcept = IsUi083PointPixel)
     {
         std::uint32_t count = 0u;
         for (std::uint32_t y = center.second > radius ? center.second - radius : 0u;
@@ -9483,7 +9492,7 @@ namespace
                 x <= std::min<std::uint32_t>(extent.Width - 1u, center.first + radius);
                 ++x)
             {
-                if (IsUi083PointPixel(ReadPixel(bytes, format, bytesPerPixel, extent, x, y)))
+                if (accept(ReadPixel(bytes, format, bytesPerPixel, extent, x, y)))
                     ++count;
             }
         }
@@ -9500,6 +9509,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, BoundPointPositionsDrawWhileTheSurfaceSta
     Extrinsic::RHI::BufferHandle readback{};
     bool bound = false;
     bool commandFailed = false;
+    std::uint32_t apex = 0u;
     const auto ready = [&](Engine& engine)
     {
         if (!engine.GetDevice().IsOperational())
@@ -9522,6 +9532,13 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, BoundPointPositionsDrawWhileTheSurfaceSta
                                     .Domain = RT::GeometryElementDomain::MeshVertex,
                                     .PropertyName = "v:ui083_moved",
                                 }) != RT::EditorCommandStatus::Applied;
+            // UI-083 slice 3c: the selected apex vertex is highlighted on the surface and on the
+            // points lane, which show it at different positions.
+            (void)Selection(engine).EditPrimitives(scene,
+                RT::SelectionController::ToStableEntityId(triangle),
+                RT::GeometryElementDomain::MeshVertex,
+                RT::PrimitiveSelectionEdit::Replace,
+                std::span{&apex, 1u});
             engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readback);
             bound = true;
         }
@@ -9543,6 +9560,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, BoundPointPositionsDrawWhileTheSurfaceSta
     std::vector<glm::vec3> moved = vertices.Get<glm::vec3>("v:position").Vector();
     for (glm::vec3& p : moved)
         p += kUi083PointShift;
+    const auto& canonical = vertices.Get<glm::vec3>("v:position").Vector();
+    apex = static_cast<std::uint32_t>(std::ranges::find(canonical, kUi083CanonicalApex) - canonical.begin());
+    ASSERT_LT(apex, canonical.size()) << "the ReferenceTriangle has no vertex at the canonical apex";
     vertices.GetOrAdd<glm::vec3>("v:ui083_moved", glm::vec3{0.0f}).Vector() = moved;
     raw.emplace_or_replace<G::RenderPoints>(
         triangle, G::RenderPoints{.Type = G::RenderPoints::RenderType::Flat, .Size = 18.0f});
@@ -9604,6 +9624,15 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, BoundPointPositionsDrawWhileTheSurfaceSta
     const RgbaPixel shiftedCentroid = pixelAt(kUi083CanonicalCentroid + kUi083PointShift);
     EXPECT_LT(RgbDistance(shiftedCentroid, background), 30)
         << "the surface moved with the points: " << PixelText(shiftedCentroid);
+    // UI-083 slice 3c: the selected apex is highlighted where the surface shows it and where
+    // the points lane shows it.
+    for (const glm::vec3& at : {kUi083CanonicalApex, kUi083CanonicalApex + kUi083PointShift})
+    {
+        const auto center = ProjectReferenceCameraPixel(at, extent);
+        EXPECT_GE(CountUi083PointPixels(bytes, format, bytesPerPixel, extent, center, 4u, IsUi083HighlightPixel), 9u)
+            << "no selection highlight at (" << at.x << ", " << at.y
+            << "): " << PixelText(ReadPixel(bytes, format, bytesPerPixel, extent, center.first, center.second));
+    }
 
     device.DestroyBuffer(readback);
     engine.Shutdown();

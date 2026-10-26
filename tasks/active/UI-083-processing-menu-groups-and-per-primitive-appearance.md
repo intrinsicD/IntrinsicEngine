@@ -273,13 +273,40 @@ Every position reader in the shaders (forward, id, depth passes) reads its own i
   BUG-254 (on Vulkan a click on a point or edge line with no surface behind it misses).
 
 ### Slice 3c — highlight a selection on every drawn lane (~150 lines)
-- Operator decision 2026-10-25 (see Operator decisions). Replace the single highlight lane
-  (`SelectionLaneFor` in `Runtime.SceneInteractionModule.Selection.cpp`) by every drawn lane
-  whose row shows the selection's domain (`DisplayedPositionLanes`), deduplicated by displayed
-  source. Follows BUG-254, so the highlighted primitives can also be clicked.
-- Tests: a vertex selection on a mesh with surface and points at different positions yields
-  markers at both places; the same source on two lanes yields one marker; faces stay
-  surface-only.
+Operator request (2026-10-26, after BUG-254/255): continue with this slice ("Ja bitte").
+Serves question 4-6 (per-primitive Position) together with the operator decision of 2026-10-25
+on selection highlights; BUG-254 made every highlighted primitive clickable.
+- Today `BuildPrimitiveSelectionRenderSnapshot` (`Runtime.SceneInteractionModule.Selection.cpp`)
+  draws a selection on one lane (`SelectionLaneFor`): a mesh that draws points highlights a
+  selected vertex only at its points-lane position, even when the surface shows it elsewhere.
+- Change: the highlight lanes are the drawn lanes (`DisplayedPositionLanes`) whose primitive shows
+  the selection's domain - vertex-like (mesh vertex, graph node, cloud point): surface, edges,
+  points; mesh edge and halfedge: surface, edges; graph edge and halfedge: edges; face: surface.
+  Each distinct displayed position source among them gets one set of markers (same source on two
+  lanes: one marker). When no drawn lane shows the domain (a face selection on a mesh drawn only
+  as points), the current `SelectionLaneFor` lane stays the fallback, so nothing that is
+  highlighted today disappears. The distinct-source loop moves out of
+  `ResolveEntityDisplayedPositions` into a helper both use (`ResolveDisplayedPositionSources`,
+  lanes passed in); `SelectionLaneFor` stays for the pick's missing-hint fallback.
+- Tests, red first (`IntrinsicRuntimeContractTests`, `Test.PrimitiveSelection.cpp`):
+  - the harness quad drawing surface, edges and points with three distinct positions (surface
+    z+3, edges z+2 bound; points canonical): a selected vertex has three markers (today: one);
+    a selected mesh edge has lines on the surface and the edges lane only (today: one); a selected
+    face stays on the surface; after binding edges to the surface's property a selected vertex has
+    two markers (dedup by resolved property name);
+  - a graph drawing edges (z+2 bound) and points (canonical): a node has two markers; a graph
+    edge and a graph halfedge have a line on the edges lane only (halfedge index / 2 kept);
+  - fallbacks kept: an entity with no render hint highlights on its primary lane
+    (`DisplayedPositionLanes`, the existing `HighlightFollowsBoundPositions`); a face selected on
+    a mesh drawn only as points keeps the surface (`SelectionLaneFor`).
+  Vertex and edge cases fail before the change; the face, dedup and fallback checks may already
+  pass and are shown sensitive by targeted mutations.
+- `gpu;vulkan`: `RuntimeSandboxAcceptanceGpuSmoke.BoundPointPositionsDrawWhileTheSurfaceStaysCanonical`
+  also selects the ReferenceTriangle's apex vertex and finds the orange highlight both at the
+  canonical apex (surface) and at the shifted apex (points lane), with an orange predicate that
+  rejects the red points, the grey surface and the background after tone mapping; the existing
+  red assertions stay. Mutation: back to the single `SelectionLaneFor` lane (only the
+  canonical-apex highlight disappears).
 
 ### Slice 3b — Normal on the point lane (~250 lines, new shader read)
 - `assets/shaders/forward/point.vert:103` sets the view normal to +Z for every point, so Surfel
@@ -612,3 +639,40 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   Vertex-mode click on a mesh point drawn from a bound Points position resolves to the canonical
   vertex 2 with its hit at the bound position, and a mesh drawn from bound edge positions is
   picked where its edges are drawn (RTX 4090, driver 580.159.04).
+- 2026-10-26: Slice 3c plan review (Claude author → Codex reviewer, fresh session, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a179f4-0740-7f23-864b-8511985e9004`;
+  recursion protection instruction-only), on the plan at `407218b32`. Verdict verbatim "revise".
+  Blocking, folded in: distinct positions on all three lanes so dropping a lane cannot hide behind
+  dedup; a graph fixture for nodes, edges and halfedges (today `SelectionLaneFor` puts a graph
+  halfedge on the points lane). Optional, followed: document and assert the two fallbacks; dedup
+  by resolved property name with null bindings allowed and `ResolveEntityDisplayedPositions`'
+  early return kept; an orange predicate valid after tone mapping.
+- 2026-10-26: Slice 3c implemented.
+  - `BuildPrimitiveSelectionRenderSnapshot` highlights a selection on every drawn lane
+    (`DisplayedPositionLanes`) that shows its domain (`LaneShowsDomain`, anonymous namespace in
+    `Runtime.SceneInteractionModule.Selection.cpp`), once per distinct displayed source; a domain
+    no drawn lane shows keeps the `SelectionLaneFor` lane. `ResolveDisplayedPositionSources`
+    (`Runtime.VertexChannelBindings`) holds the distinct-source loop that
+    `ResolveEntityDisplayedPositions` used before (its no-bindings early return kept).
+  - Tests: `PrimitiveSelection.HighlightShowsTheSelectionOnEveryDrawnLane` and
+    `.GraphHighlightsNodesOnBothLanesAndEdgesOnTheEdgesLane` fail on the previous code in exactly
+    the vertex, mesh-edge, face-order, dedup, graph-node and graph-halfedge assertions (the old code
+    put a graph halfedge on the points lane); the graph-edge and face-fallback checks passed before,
+    as predicted. Targeted mutations show the dedup, face-fallback and face-routing checks sensitive:
+    dedup removed (same-source check fails), fallback removed (face fallback fails), faces on every
+    lane (face checks fail); the graph-edge check has no mutation of its own.
+    `IntrinsicRuntimeContractTests` 1796/1796, `IntrinsicRuntimeGraphicsCpuTests` 72/72.
+  - Vulkan: `RuntimeSandboxAcceptanceGpuSmoke.BoundPointPositionsDrawWhileTheSurfaceStaysCanonical`
+    selects the ReferenceTriangle's apex vertex and finds the highlight at the canonical apex and at
+    the shifted apex. The first run measured the highlight at (245, 235, 136) after tone mapping
+    (surface (245, 245, 245), background (170, 203, 231)); the provisional orange predicate was
+    replaced by R > 200, G > 180, G > B + 60, recorded with the measurements. Passed three times;
+    mutation "single `SelectionLaneFor` lane" fails only the canonical-apex highlight, as predicted;
+    `RuntimeSandboxAcceptanceGpuSmoke` 46/46 (RTX 4090, driver 580.159.04, X11 `:1`).
+  - jscpd: no new clone; duplicated lines fell by three with the shared helper.
+- 2026-10-26: Slice 3c code review (Claude author → Codex reviewer, fresh session, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a17a0a-5144-7cb3-9ec1-14191995919d`;
+  recursion protection instruction-only), on the staged diff sha256 `157b9758…`. Verdict verbatim
+  "approve" ("Ponytail: no complexity findings."). Optional findings applied: a mesh halfedge
+  (index 3, edge 1) is checked on both sources with its endpoints; the mutation claim above names
+  the checks it covers. `PrimitiveSelection` passed again after the test addition.

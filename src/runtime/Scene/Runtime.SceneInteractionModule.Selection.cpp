@@ -12,6 +12,29 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.VertexChannelBindings;
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        // Whether `lane`'s primitive shows elements of `domain` (UI-083 slice 3c): vertices on
+        // surface, edges and points; mesh edges on surface and edges; graph edges on edges;
+        // faces on the surface.
+        [[nodiscard]] bool LaneShowsDomain(const GeometryRenderLane lane, const GeometryElementDomain domain) noexcept
+        {
+            using D = GeometryElementDomain;
+            switch (domain)
+            {
+            case D::MeshVertex:
+            case D::GraphNode:
+            case D::PointCloudPoint: return true;
+            case D::MeshEdge:
+            case D::MeshHalfedge:    return lane != GeometryRenderLane::Points;
+            case D::GraphEdge:
+            case D::GraphHalfedge:   return lane == GeometryRenderLane::Edges;
+            case D::MeshFace:        return lane == GeometryRenderLane::Surface;
+            default:                 return false;
+            }
+        }
+    }
+
     RuntimeSceneInteractionRenderSnapshot BuildPrimitiveSelectionRenderSnapshot(
         const ECS::Scene::Registry& scene, const SelectionController& selection, WorldHandle world,
         const std::function<bool(std::uint32_t)>& suppress)
@@ -31,75 +54,81 @@ namespace Extrinsic::Runtime
             const auto source = GS::BuildConstView(scene.Raw(), entity);
             if (!source.VertexSource)
                 continue;
-            // Highlights sit on the displayed positions (RUNTIME-315) of the lane the
-            // selected elements are shown on (UI-083).
+            // Highlights sit on the displayed positions (RUNTIME-315) of every drawn lane that
+            // shows the selected domain, once per distinct source (UI-083 slice 3c). A domain no
+            // drawn lane shows keeps the single lane it is shown on.
             const auto* bindings = scene.Raw().try_get<VertexChannelBindingSet>(entity);
-            const DisplayedPositions displayed = ResolveDisplayedPositions(source.VertexSource->Properties,
-                DisplayedPositionDomainFor(GS::BuildSourceAvailability(source).ProvenanceDomain),
-                bindings,
-                SelectionLaneFor(scene.Raw(), entity, selected.Domain));
-            const std::span<const glm::vec3> positions = displayed.Values;
-            if (positions.empty())
-                continue;
+            const GS::Domain provenance = GS::BuildSourceAvailability(source).ProvenanceDomain;
+            const GeometryElementDomain vertexDomain = DisplayedPositionDomainFor(provenance);
+            DisplayedLaneMask lanes = DisplayedPositionLanes(scene.Raw(), entity, provenance);
+            for (std::size_t lane = 0u; lane < lanes.size(); ++lane)
+                lanes[lane] = lanes[lane] && LaneShowsDomain(GeometryRenderLane(lane), selected.Domain);
+            if (lanes == DisplayedLaneMask{})
+                lanes[std::size_t(SelectionLaneFor(scene.Raw(), entity, selected.Domain))] = true;
             const auto* worldMatrix =
                 scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
             const auto transform = worldMatrix ? worldMatrix->Matrix : glm::mat4{1.f};
-            auto point = [&](std::uint32_t index) -> std::optional<glm::vec3> {
-                if (index >= positions.size())
-                    return std::nullopt;
-                const auto p = glm::vec3(transform * glm::vec4(positions[index], 1.f));
-                if (!Geometry::Validation::IsFinite(p))
-                    return std::nullopt;
-                return p;
-            };
-            auto line = [&](std::uint32_t a, std::uint32_t b) {
-                const auto start = point(a), end = point(b);
-                if (start && end)
-                    result.DebugLines.push_back({*start, *end, color, 2.f, false});
-            };
-            for (auto index : selected.Indices)
+            for (const DisplayedPositions& displayed :
+                ResolveDisplayedPositionSources(source.VertexSource->Properties, vertexDomain, bindings, lanes))
             {
-                if (selected.Domain == D::MeshVertex || selected.Domain == D::GraphNode ||
-                    selected.Domain == D::PointCloudPoint)
+                const std::span<const glm::vec3> positions = displayed.Values;
+                if (positions.empty())
+                    continue;
+                auto point = [&](std::uint32_t index) -> std::optional<glm::vec3>
                 {
-                    if (const auto p = point(index))
-                        result.DebugPoints.push_back({*p, color, config.PointRadius, false});
-                }
-                else if (selected.Domain == D::MeshEdge || selected.Domain == D::GraphEdge ||
-                         selected.Domain == D::MeshHalfedge || selected.Domain == D::GraphHalfedge)
+                    if (index >= positions.size())
+                        return std::nullopt;
+                    const auto p = glm::vec3(transform * glm::vec4(positions[index], 1.f));
+                    if (!Geometry::Validation::IsFinite(p))
+                        return std::nullopt;
+                    return p;
+                };
+                auto line = [&](std::uint32_t a, std::uint32_t b)
                 {
-                    if (!source.EdgeSource)
-                        continue;
-                    if (selected.Domain == D::MeshHalfedge || selected.Domain == D::GraphHalfedge)
-                        index /= 2;
-                    const auto a = source.EdgeSource->Properties.Get<std::uint32_t>("e:v0");
-                    const auto b = source.EdgeSource->Properties.Get<std::uint32_t>("e:v1");
-                    if (a && b && index < a.Size() && index < b.Size())
-                        line(a[index], b[index]);
-                }
-                else if (selected.Domain == D::MeshFace && source.HalfedgeSource &&
-                         source.FaceSource)
+                    const auto start = point(a), end = point(b);
+                    if (start && end)
+                        result.DebugLines.push_back({*start, *end, color, 2.f, false});
+                };
+                for (auto index : selected.Indices)
                 {
-                    const auto first =
-                        source.FaceSource->Properties.Get<std::uint32_t>("f:halfedge");
-                    const auto next =
-                        source.HalfedgeSource->Properties.Get<std::uint32_t>("h:next");
-                    const auto to =
-                        source.HalfedgeSource->Properties.Get<std::uint32_t>("h:to_vertex");
-                    if (!first || !next || !to || index >= first.Size())
-                        continue;
-                    auto h = first[index];
-                    for (std::size_t steps = 0; steps < next.Size(); ++steps)
+                    if (selected.Domain == D::MeshVertex || selected.Domain == D::GraphNode ||
+                        selected.Domain == D::PointCloudPoint)
                     {
-                        if (h >= next.Size() || h >= to.Size())
-                            break;
-                        const auto n = next[h];
-                        if (n >= to.Size())
-                            break;
-                        line(to[h], to[n]);
-                        h = n;
-                        if (h == first[index])
-                            break;
+                        if (const auto p = point(index))
+                            result.DebugPoints.push_back({*p, color, config.PointRadius, false});
+                    }
+                    else if (selected.Domain == D::MeshEdge || selected.Domain == D::GraphEdge ||
+                        selected.Domain == D::MeshHalfedge || selected.Domain == D::GraphHalfedge)
+                    {
+                        if (!source.EdgeSource)
+                            continue;
+                        if (selected.Domain == D::MeshHalfedge || selected.Domain == D::GraphHalfedge)
+                            index /= 2;
+                        const auto a = source.EdgeSource->Properties.Get<std::uint32_t>("e:v0");
+                        const auto b = source.EdgeSource->Properties.Get<std::uint32_t>("e:v1");
+                        if (a && b && index < a.Size() && index < b.Size())
+                            line(a[index], b[index]);
+                    }
+                    else if (selected.Domain == D::MeshFace && source.HalfedgeSource && source.FaceSource)
+                    {
+                        const auto first = source.FaceSource->Properties.Get<std::uint32_t>("f:halfedge");
+                        const auto next = source.HalfedgeSource->Properties.Get<std::uint32_t>("h:next");
+                        const auto to = source.HalfedgeSource->Properties.Get<std::uint32_t>("h:to_vertex");
+                        if (!first || !next || !to || index >= first.Size())
+                            continue;
+                        auto h = first[index];
+                        for (std::size_t steps = 0; steps < next.Size(); ++steps)
+                        {
+                            if (h >= next.Size() || h >= to.Size())
+                                break;
+                            const auto n = next[h];
+                            if (n >= to.Size())
+                                break;
+                            line(to[h], to[n]);
+                            h = n;
+                            if (h == first[index])
+                                break;
+                        }
                     }
                 }
             }

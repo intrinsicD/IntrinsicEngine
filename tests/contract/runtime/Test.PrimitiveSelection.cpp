@@ -3,6 +3,7 @@
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <vector>
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -301,6 +302,148 @@ TEST(PrimitiveSelection, HighlightFollowsBoundPositions)
     ASSERT_EQ(snapshot.DebugPoints.size(), 1u);
     EXPECT_EQ(snapshot.DebugPoints[0].Position, glm::vec3(1, 1, 0));
 }
+// UI-083 slice 3c: a selection is highlighted on every drawn lane that shows its domain, once
+// per distinct displayed position source: vertices on surface, edges and points; mesh edges on
+// surface and edges; faces on the surface only.
+namespace
+{
+    // Every `z` the selection's markers or lines sit at, in order.
+    [[nodiscard]] std::vector<float> MarkerDepths(const R::RuntimeSceneInteractionRenderSnapshot& snapshot)
+    {
+        std::vector<float> depths;
+        for (const auto& point : snapshot.DebugPoints)
+            depths.push_back(point.Position.z);
+        return depths;
+    }
+
+    [[nodiscard]] std::vector<float> LineDepths(const R::RuntimeSceneInteractionRenderSnapshot& snapshot)
+    {
+        std::vector<float> depths;
+        for (const auto& line : snapshot.DebugLines)
+        {
+            EXPECT_EQ(line.Start.z, line.End.z);
+            depths.push_back(line.Start.z);
+        }
+        return depths;
+    }
+
+    // `z`-lifted copy of the canonical positions under `name`.
+    void AddLiftedPositions(Geometry::PropertySet& vertices, const char* name, const float lift)
+    {
+        auto lifted = vertices.Get<glm::vec3>("v:position").Vector();
+        for (glm::vec3& p : lifted)
+            p.z += lift;
+        vertices.GetOrAdd<glm::vec3>(name, glm::vec3{0.0f}).Vector() = lifted;
+    }
+
+    [[nodiscard]] R::VertexChannelSourceBinding BoundPosition(const D domain, const char* name)
+    {
+        return {.Enabled = true, .Property = {domain, name, Geometry::PropertyValueKind::Vec3}};
+    }
+}
+
+TEST(PrimitiveSelection, HighlightShowsTheSelectionOnEveryDrawnLane)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    Harness h;
+    auto& raw = h.Scene.Raw();
+    raw.emplace<G::RenderSurface>(h.Entity);
+    raw.emplace<G::RenderEdges>(h.Entity);
+    raw.emplace<G::RenderPoints>(h.Entity);
+    const auto snapshot = [&]
+    {
+        return R::BuildPrimitiveSelectionRenderSnapshot(h.Scene, h.Selection, R::DefaultWorldHandle);
+    };
+
+    // Every lane shows the canonical positions: one marker.
+    ASSERT_TRUE(h.Change(Edit::Replace, {2}).Usable());
+    EXPECT_EQ(MarkerDepths(snapshot()), (std::vector<float>{0.0f}));
+
+    // Three distinct sources: the surface at z+3, the edges at z+2, the points canonical.
+    auto& vertices = raw.get<GS::Vertices>(h.Entity).Properties;
+    AddLiftedPositions(vertices, "v:lift3", 3.0f);
+    AddLiftedPositions(vertices, "v:lift2", 2.0f);
+    auto& bindings = raw.emplace<R::VertexChannelBindingSet>(h.Entity,
+        R::VertexChannelBindingSet{.Surface = {.Position = BoundPosition(D::MeshVertex, "v:lift3")},
+            .Edges = {.Position = BoundPosition(D::MeshVertex, "v:lift2")}});
+    EXPECT_EQ(MarkerDepths(snapshot()), (std::vector<float>{3.0f, 2.0f, 0.0f})) << "vertex: surface, edges, points";
+    EXPECT_EQ(snapshot().DebugPoints.front().Position, glm::vec3(1, 1, 3));
+
+    // A mesh halfedge on the surface and the edges lane, at its edge's (index / 2) endpoints.
+    ASSERT_TRUE(h.Change(Edit::Replace, {3}, D::MeshHalfedge).Usable());
+    {
+        const auto& edges = raw.get<GS::Edges>(h.Entity).Properties;
+        const auto& canonical = vertices.Get<glm::vec3>("v:position").Vector();
+        const glm::vec3 from = canonical[edges.Get<std::uint32_t>("e:v0")[1]];
+        const glm::vec3 to = canonical[edges.Get<std::uint32_t>("e:v1")[1]];
+        const auto halfedgeSnapshot = snapshot();
+        ASSERT_EQ(LineDepths(halfedgeSnapshot), (std::vector<float>{3.0f, 2.0f})) << "halfedge: surface, edges";
+        for (const auto& line : halfedgeSnapshot.DebugLines)
+        {
+            const glm::vec3 lift{0.0f, 0.0f, line.Start.z};
+            EXPECT_EQ(line.Start, from + lift);
+            EXPECT_EQ(line.End, to + lift);
+        }
+    }
+    ASSERT_TRUE(h.Change(Edit::Clear, {}, D::MeshHalfedge).Usable());
+
+    // A mesh edge on the surface and the edges lane, not the points lane.
+    ASSERT_TRUE(h.Change(Edit::Replace, {0}, D::MeshEdge).Usable());
+    EXPECT_EQ(LineDepths(snapshot()), (std::vector<float>{3.0f, 2.0f})) << "edge: surface, edges";
+
+    // A face on the surface only (the edge's two lines come first).
+    ASSERT_TRUE(h.Change(Edit::Replace, {0}, D::MeshFace).Usable());
+    EXPECT_EQ(LineDepths(snapshot()), (std::vector<float>{3.0f, 2.0f, 3.0f, 3.0f, 3.0f})) << "face: surface";
+
+    // Edges rebound to the surface's property: their markers merge with the surface's.
+    bindings.Edges.Position = BoundPosition(D::MeshVertex, "v:lift3");
+    EXPECT_EQ(MarkerDepths(snapshot()), (std::vector<float>{3.0f, 0.0f})) << "same source, one marker";
+
+    // Fallback: a face on a mesh drawn only as points keeps the surface.
+    raw.remove<G::RenderSurface>(h.Entity);
+    raw.remove<G::RenderEdges>(h.Entity);
+    ASSERT_TRUE(h.Change(Edit::Clear, {}, D::MeshEdge).Usable());
+    EXPECT_EQ(LineDepths(snapshot()), (std::vector<float>{3.0f, 3.0f, 3.0f})) << "face fallback: surface";
+}
+
+// UI-083 slice 3c: a graph shows nodes on its edges and points lanes, edges and halfedges on its
+// edges lane only.
+TEST(PrimitiveSelection, GraphHighlightsNodesOnBothLanesAndEdgesOnTheEdgesLane)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    Harness h;
+    Geometry::Graph::Graph graph;
+    const auto a = graph.AddVertex({0, 0, 0}), b = graph.AddVertex({1, 0, 0}), c = graph.AddVertex({1, 1, 0});
+    (void)graph.AddEdge(a, b);
+    (void)graph.AddEdge(b, c);
+    auto& raw = h.Scene.Raw();
+    GS::PopulateFromGraph(raw, h.Entity, graph);
+    raw.emplace<G::RenderEdges>(h.Entity);
+    raw.emplace<G::RenderPoints>(h.Entity);
+    AddLiftedPositions(raw.get<GS::Vertices>(h.Entity).Properties, "v:lift2", 2.0f);
+    raw.emplace<R::VertexChannelBindingSet>(
+        h.Entity, R::VertexChannelBindingSet{.Edges = {.Position = BoundPosition(D::GraphNode, "v:lift2")}});
+    const auto snapshot = [&]
+    {
+        return R::BuildPrimitiveSelectionRenderSnapshot(h.Scene, h.Selection, R::DefaultWorldHandle);
+    };
+
+    ASSERT_TRUE(h.Change(Edit::Replace, {2}, D::GraphNode).Usable());
+    EXPECT_EQ(MarkerDepths(snapshot()), (std::vector<float>{2.0f, 0.0f})) << "node: edges, points";
+
+    ASSERT_TRUE(h.Change(Edit::Replace, {0}, D::GraphEdge).Usable());
+    EXPECT_EQ(LineDepths(snapshot()), (std::vector<float>{2.0f})) << "edge: edges lane only";
+
+    // Halfedge 3 belongs to edge 1 (b, c).
+    ASSERT_TRUE(h.Change(Edit::Clear, {}, D::GraphEdge).Usable());
+    ASSERT_TRUE(h.Change(Edit::Replace, {3}, D::GraphHalfedge).Usable());
+    const auto halfedge = snapshot();
+    EXPECT_EQ(LineDepths(halfedge), (std::vector<float>{2.0f})) << "halfedge: edges lane only";
+    ASSERT_EQ(halfedge.DebugLines.size(), 1u);
+    EXPECT_EQ(halfedge.DebugLines[0].Start, glm::vec3(1, 0, 2));
+    EXPECT_EQ(halfedge.DebugLines[0].End, glm::vec3(1, 1, 2));
+}
+
 // RUNTIME-315: a pick read back after the Position binding changed was rendered
 // from other positions, so its stamp differs and the pick is discarded, even
 // when the newly bound source carries the same property revision.

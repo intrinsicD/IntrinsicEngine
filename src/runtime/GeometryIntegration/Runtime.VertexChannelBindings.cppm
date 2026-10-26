@@ -212,6 +212,13 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] DisplayedLaneMask DisplayedPositionLanes(
         const entt::registry& registry, entt::entity entity, ECS::Components::GeometrySources::Domain provenance);
 
+    // The distinct position sources `lanes` display, in lane order: lanes that
+    // show the same source (by name) share one entry.
+    [[nodiscard]] std::vector<DisplayedPositions> ResolveDisplayedPositionSources(const Geometry::PropertySet& vertices,
+        GeometryElementDomain vertexDomain,
+        const VertexChannelBindingSet* bindings,
+        const DisplayedLaneMask& lanes);
+
     // The entity-level resolution shared by every consumer that only has the
     // registry (culling, camera focus/framing, gizmo pivot): each distinct
     // source of the `DisplayedPositionLanes`, in lane order, and the vertex

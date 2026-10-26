@@ -391,23 +391,35 @@ namespace Extrinsic::Runtime
             return {};
         const GS::Domain provenance = GS::BuildSourceAvailability(view).ProvenanceDomain;
         const GeometryElementDomain vertexDomain = DisplayedPositionDomainFor(provenance);
-        const DisplayedLaneMask lanes = DisplayedPositionLanes(registry, entity, provenance);
-        EntityDisplayedPositions displayed{.Vertices = &view.VertexSource->Properties};
+        return EntityDisplayedPositions{
+            .Sources = ResolveDisplayedPositionSources(view.VertexSource->Properties,
+                vertexDomain,
+                bindings,
+                DisplayedPositionLanes(registry, entity, provenance)),
+            .Vertices = &view.VertexSource->Properties,
+        };
+    }
+
+    std::vector<DisplayedPositions> ResolveDisplayedPositionSources(const Geometry::PropertySet& vertices,
+        const GeometryElementDomain vertexDomain,
+        const VertexChannelBindingSet* bindings,
+        const DisplayedLaneMask& lanes)
+    {
+        std::vector<DisplayedPositions> sources;
         for (const GeometryRenderLane lane :
             {GeometryRenderLane::Surface, GeometryRenderLane::Edges, GeometryRenderLane::Points})
         {
             if (!lanes[std::size_t(lane)])
                 continue;
-            const DisplayedPositions positions =
-                ResolveDisplayedPositions(view.VertexSource->Properties, vertexDomain, bindings, lane);
-            if (std::ranges::none_of(displayed.Sources,
+            const DisplayedPositions positions = ResolveDisplayedPositions(vertices, vertexDomain, bindings, lane);
+            if (std::ranges::none_of(sources,
                     [&](const DisplayedPositions& source)
                     {
                         return source.Name == positions.Name;
                     }))
-                displayed.Sources.push_back(positions);
+                sources.push_back(positions);
         }
-        return displayed;
+        return sources;
     }
 
     std::string DisplayedPositionsSignature(const EntityDisplayedPositions& displayed)
