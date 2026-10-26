@@ -10294,10 +10294,15 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, DrawnLinesOccludeWhatTheClickPassesOver)
     // Four frames after the last click cover the readback latency.
     auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 4u, 600u, std::chrono::seconds{120}, false);
     ExitWhenReadyApp& readyProbe = *readyApp;
+    // BUG-255: these frames (surfaces, lines, points, picking) run under core and
+    // synchronization validation (the sandbox bootstrap keeps the reference config's validation).
+    Counters::EnableSynchronizationValidation();
     auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
     if (bootstrap.Skipped)
         GTEST_SKIP() << bootstrap.SkipReason;
     Engine& engine = *bootstrap.EnginePtr;
+    const auto vk = Extrinsic::Backends::Vulkan::GetVulkanBootstrapDiagnosticsSnapshot();
+    const bool validationActive = vk.ValidationEnabled && vk.DebugUtilsEnabled;
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     auto& device = engine.GetDevice();
@@ -10443,6 +10448,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, DrawnLinesOccludeWhatTheClickPassesOver)
     driver.ExpectPick(3, id(lineOverPoint), Kind::Edge, 0.5f);
     driver.ExpectPick(4, id(pointOverLine), Kind::Point, 0.5f);
     driver.ExpectMiss(5);
+    if (validationActive)
+        EXPECT_EQ(run.After.ValidationError, 0u) << "validation errors (core or synchronization) in these frames";
+    else
+        std::cout << "[  NOTE    ] Vulkan validation layer/debug-utils unavailable; no synchronization check\n";
 
     // The last frame: the near primitive's colour at each crossing, each primitive's own colour
     // away from it, the line on the surface drawn and the one behind it hidden.

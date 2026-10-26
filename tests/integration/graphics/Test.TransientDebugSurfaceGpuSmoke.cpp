@@ -163,7 +163,8 @@ struct TransientDebugBootstrap
 
 [[nodiscard]] TransientDebugBootstrap BootstrapOperationalDefaultRecipe(
 	const std::uint32_t targetFrames = 4u,
-	const char* const windowTitle = "Intrinsic TransientDebug gpu;vulkan smoke")
+	const char* const windowTitle = "Intrinsic TransientDebug gpu;vulkan smoke",
+	const bool enableValidation = false)
 {
 	if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
 	{
@@ -175,12 +176,14 @@ struct TransientDebugBootstrap
             };
         }
 
+	if (enableValidation)
+		Counters::EnableSynchronizationValidation();
 	auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
 	config.Window.Title = windowTitle;
 	config.Window.Width = kReadbackWidth;
 	config.Window.Height = kReadbackHeight;
 	config.Window.Resizable = false;
-	config.Render.EnableValidation = false;
+	config.Render.EnableValidation = enableValidation;
 	config.Render.EnableVSync = false;
 
         auto enginePtr = std::make_unique<Engine>(config);
@@ -252,7 +255,8 @@ struct TransientDebugRunCapture
 	return camera;
 }
 
-[[nodiscard]] TransientDebugRunCapture DriveTransientDebugFrameAndCapture(Engine& engine, bool worldCamera = false)
+[[nodiscard]] TransientDebugRunCapture DriveTransientDebugFrameAndCapture(
+	Engine& engine, bool worldCamera = false, bool depthTestedSphere = false)
 {
 	std::array<Extrinsic::Graphics::DebugTrianglePacket, 1> kTriangles{{
 		Extrinsic::Graphics::DebugTrianglePacket{
@@ -281,7 +285,8 @@ struct TransientDebugRunCapture
 			},
 			.Color = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
 			.Radius = 0.05f,
-			.DepthTested = false,
+			.DepthTested = depthTestedSphere,
+			.Sphere = depthTestedSphere,
 		},
 	}};
 
@@ -399,6 +404,36 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCommandSt
             << " -> " << run.After.OperationalGateFailure;
 
         engine.Shutdown();
+}
+
+// BUG-255: a depth-tested debug sphere writes depth inside TransientDebugSurfacePass, which
+// therefore binds the scene depth writable; under core and synchronization validation the
+// warm-up and the debug frame raise no validation error.
+TEST(TransientDebugSurfaceGpuSmoke, DepthTestedSphereWritesDepthWithoutValidationErrors)
+{
+	auto bootstrap = BootstrapOperationalDefaultRecipe(4u, "Intrinsic TransientDebug validation smoke", true);
+	if (bootstrap.Skipped)
+	{
+		GTEST_SKIP() << bootstrap.SkipReason;
+	}
+	Engine& engine = *bootstrap.EnginePtr;
+	const auto vk = Extrinsic::Backends::Vulkan::GetVulkanBootstrapDiagnosticsSnapshot();
+	if (!vk.ValidationEnabled || !vk.DebugUtilsEnabled)
+	{
+		engine.Shutdown();
+		GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; the validation smoke is opt-in.";
+	}
+
+	// Spheres need a camera; without one they draw as flat sprites, which write no depth.
+	const auto run = DriveTransientDebugFrameAndCapture(engine, true, true);
+	ASSERT_TRUE(run.DeviceOperational);
+	const auto* pass = FindCommandPass(run.Stats, "TransientDebugSurfacePass");
+	ASSERT_NE(pass, nullptr);
+	EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded);
+	EXPECT_EQ(run.Stats.TransientDebugUpload.PointRecordsRecorded, 1u);
+	EXPECT_EQ(run.After.ValidationError, 0u) << "validation errors across warm-up and the debug frame";
+	EXPECT_TRUE(Counters::IsStable(run.Before, run.After));
+	engine.Shutdown();
 }
 
 void ExpectMixedLaneReadback(bool worldCamera);

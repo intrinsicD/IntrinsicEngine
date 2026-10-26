@@ -140,7 +140,7 @@ ctest --test-dir build/ci --output-on-failure --timeout 60 \
   -R '^(RenderGraph[A-Za-z]*|GraphicsOwnershipTransferBarriers|OwnershipTransferBarriers|FrameRecipeContract|RendererFrameLifecycle)\.'
 cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests -j 6
 ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 300 \
-  -R '^(DefaultRecipeSurfaceGpuSmoke\.[A-Za-z]*WithValidation|TransientDebugSurfaceGpuSmoke\.DepthTestedSphere[A-Za-z]*|RuntimeSandboxAcceptanceGpuSmoke\.[A-Za-z]*SyncHazard[A-Za-z]*)$'
+  -R '^(DefaultRecipeSurfaceGpuSmoke\.[A-Za-z]*WithValidation|TransientDebugSurfaceGpuSmoke\.DepthTestedSphereWritesDepthWithoutValidationErrors|RuntimeSandboxAcceptanceGpuSmoke\.DrawnLinesOccludeWhatTheClickPassesOver)$'
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
@@ -157,3 +157,61 @@ python3 tools/agents/check_task_policy.py --root . --strict
   read-only flag comes from the bound depth texture's access and a read-only clear is rejected;
   red/green predictions per case; an explicit depth-tested sphere fixture under validation; named
   GPU cases instead of whole suites.
+- 2026-10-26: Slices A and B implemented.
+  - Compiler (`Graphics.RenderGraph.Compiler.cpp`): `IsWriteState` for texture and buffer barrier
+    states; the plain-barrier branch also fires for an unchanged write state last accessed by
+    another pass of the same queue (ownership-transfer branch unchanged). A bound depth attachment
+    whose pass has no `DepthWrite` access to it compiles `DepthReadOnly`; `DepthRead` with
+    `LoadOp::Clear` is rejected (`RenderGraphValidationCode::RenderPassReadOnlyDepthClear`, appended).
+  - Executor and RHI: `RHI::DepthAttachment::ReadOnly` (from `DepthReadOnly`); `ToMemoryAccess(DepthWrite)`
+    is `DepthStencilRead | DepthStencilWrite`. Vulkan: a read-only depth begins rendering in
+    `DEPTH_STENCIL_READ_ONLY_OPTIMAL` with `VK_ATTACHMENT_STORE_OP_NONE`; the single-submit path waits
+    for the acquire at `ALL_COMMANDS`. Recipe: `TransientDebugSurfacePass` writes `SceneDepth` in the
+    builder and the introspection.
+  - CPU tests, red before the change (5) and green after: `RenderGraphValidation.SameStateWritesInTwoPassesGetABarrier`
+    (four texture usages, loaded colour, two buffer usages), `.DepthReadAttachmentCompilesReadOnly`
+    (read-only reader, writable writers, read-only clear rejected), `FrameRecipeContract.LineAndPointPassesWriteTheSceneDepthTheyLoad`
+    (`PointPass` same-state barrier), `.DepthReadingPassesBindTheSceneDepthReadOnly`,
+    `RendererFrameLifecycle.DepthReadingPassesBeginReadOnlyAndDepthWritesSeeTheirReads` (`MockRHI`
+    now records begun depth attachments); the guard `.RepeatedReadsAndCrossQueueWritesGetNoSameStateBarrier`
+    was green before, as predicted. `IntrinsicGraphicsContractCpuTests` 586/586,
+    `IntrinsicGraphicsIntegrationCpuTests` 75/75, `IntrinsicGraphicsContractTests` 71/71.
+  - `gpu;vulkan` with synchronization validation (`OperationalCounterStability::EnableSynchronizationValidation`,
+    set before bootstrap): `DefaultRecipeSurfaceGpuSmoke.ParallelRecording...WithValidation` (both),
+    the new `TransientDebugSurfaceGpuSmoke.DepthTestedSphereWritesDepthWithoutValidationErrors` and
+    `RuntimeSandboxAcceptanceGpuSmoke.DrawnLinesOccludeWhatTheClickPassesOver` (now asserts no
+    validation error) report no hazard (spike: 36 and 42).
+  - Mutations against the finished fix (host `hochvogel`, RTX 4090, driver 580.159.04, X11 `:1`):
+    read-only depth undone - all four fail with `SYNC-HAZARD-WRITE-AFTER-WRITE` on `SceneDepth`
+    (12 transitions + 4 secondary-command stores per graphics case, 21 sandbox, 5 transient), as
+    predicted; `DepthWrite` read access undone - all four fail with `SYNC-HAZARD-READ-AFTER-WRITE`
+    at the depth load (8, 8, 21, 5), as predicted; acquire wait undone - the graphics case
+    fails with 8 `SYNC-HAZARD-WRITE-AFTER-READ` at `vkQueueSubmit` as predicted, but the async-compute
+    case passes (prediction wrong: it submits through the batched path, which waits at `ALL_COMMANDS`);
+    same-state barriers undone - all pass, as predicted (no GPU signal; the CPU tests carry it);
+    transient pass back to `Read(DepthRead)` - all pass, against the prediction: a local probe showed
+    the depth-tested sphere does draw with depth writes inside a render pass begun read-only, but
+    this validation layer (1.3.296, which lists `VUID-vkCmdDraw-None-06886`) reported nothing; step
+    2 rests on the CPU recipe test and the Vulkan rule. The first version of the sphere fixture drew
+    a flat sprite (`Sphere` unset, no camera), which writes no depth; fixed before this run.
+  - Full runs on the final sources (before formatting-only edits to the compiler and two CPU test
+    files, after which the graphics contract suites passed again, 213/213): default CPU gate
+    (`ctest -LE 'gpu|vulkan|slow|flaky-quarantine'`) 5898/5898, run because two widely imported
+    module interfaces changed (`RHI.CommandContext.cppm`, `Graphics.RenderGraph.Compiler.cppm`);
+    every `gpu` test in `build/ci-vulkan` 166/166 (`ExtrinsicSandbox.VulkanShutdownLsanContract`
+    needs `VK_DRIVER_FILES` naming one ICD and passed with the NVIDIA one); the four
+    synchronization-validation cases passed three times.
+  - jscpd: no new clone in production code; the compiler tests repeat their two-pass setup for
+    textures and buffers (12 and 6 lines).
+  - ponytail-review (author, staged diff): no finding; the texture and buffer same-state conditions
+    are near-copies kept beside their existing per-type branches.
+- 2026-10-26: Code review (Claude author → Codex reviewer, fresh session, `codex exec`, requested
+  `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a175c7-9f7c-7c03-846a-6592eb9494ce`;
+  recursion protection instruction-only), on the staged diff sha256 `3f182512…`. Verdict verbatim
+  "approve" ("No blocking production correctness finding"; the mutations "provide **no GPU
+  discrimination** for same-state barriers or the transient declaration; those rely on CPU coverage
+  and Vulkan requirements"). Optional findings: the sandbox case now asserts zero validation errors
+  only when the validation layer and debug-utils are active (the three click smokes passed again);
+  the sphere fixture's `PointRecordsRecorded` would also count the flat-sprite fallback - not
+  changed: no existing counter tells the sphere path apart, and the local probe above showed the
+  sphere path runs on this host.

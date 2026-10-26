@@ -3152,7 +3152,9 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         return;
     }
 
-    const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    // BUG-255: wait for the acquire at every stage, as the batched path does, so the
+    // backbuffer's first layout transition (source stage NONE) is ordered after it.
+    const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.waitSemaphoreCount = 1u;

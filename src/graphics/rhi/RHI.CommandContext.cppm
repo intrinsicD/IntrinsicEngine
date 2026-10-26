@@ -53,6 +53,8 @@ namespace Extrinsic::RHI
         StoreOp       Store       = StoreOp::DontCare;
         float         ClearDepth  = 1.f;
         std::uint8_t  ClearStencil = 0;
+        // The pass only reads depth: read-only layout, no store write (BUG-255).
+        bool          ReadOnly = false;
     };
 
     export struct RenderPassDesc

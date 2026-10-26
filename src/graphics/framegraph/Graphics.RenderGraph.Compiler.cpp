@@ -45,6 +45,21 @@ namespace Extrinsic::Graphics
             return TextureBarrierState::Undefined;
         }
 
+        // BUG-255: a pass that finds a resource in the write state another pass of its queue
+        // left it in still depends on that pass's writes (and loads, tests or blends them), so
+        // it gets a barrier that keeps the layout.
+        [[nodiscard]] constexpr bool IsWriteState(const TextureBarrierState state) noexcept
+        {
+            return state == TextureBarrierState::ColorAttachmentWrite ||
+                state == TextureBarrierState::ColorAttachmentReadWrite || state == TextureBarrierState::DepthWrite ||
+                state == TextureBarrierState::ShaderWrite || state == TextureBarrierState::TransferDst;
+        }
+
+        [[nodiscard]] constexpr bool IsWriteState(const BufferBarrierState state) noexcept
+        {
+            return state == BufferBarrierState::ShaderWrite || state == BufferBarrierState::TransferDst;
+        }
+
         [[nodiscard]] bool RequiresColorAttachmentReadWrite(
             const RenderPassRecord& pass,
             const std::uint32_t textureIndex) noexcept
@@ -1951,12 +1966,31 @@ namespace Extrinsic::Graphics
 
                 if (pass.RenderPass.Depth.Target.IsValid() && depthTexture != std::numeric_limits<std::uint32_t>::max())
                 {
+                    // BUG-255: a pass that only reads its bound depth renders it read-only, so its
+                    // store is no write and the layout is the one the graph moved it to.
+                    const bool depthReadOnly = std::ranges::none_of(pass.TextureAccesses,
+                        [depthTexture](const TextureAccess& access)
+                        {
+                            return access.Ref.Index == depthTexture && access.Usage == TextureUsage::DepthWrite;
+                        });
+                    if (depthReadOnly && pass.RenderPass.Depth.Load == RHI::LoadOp::Clear)
+                    {
+                        SetCompileFinding(validation,
+                            RenderGraphValidationCode::RenderPassReadOnlyDepthClear,
+                            "RenderGraph render pass clears a depth attachment it only reads: pass=\"" + pass.Name +
+                                "\".",
+                            passIndex,
+                            pass.Name);
+                        publishValidation(std::move(validation));
+                        return std::unexpected(Core::ErrorCode::InvalidArgument);
+                    }
                     renderPassAttachments.push_back(CompiledRenderPassAttachment{
                         .PassIndex = passIndex,
                         .ResourceIndex = depthTexture,
                         .AttachmentIndex = 0u,
                         .IsTextureResource = true,
                         .IsDepthAttachment = true,
+                        .DepthReadOnly = depthReadOnly,
                         .Load = pass.RenderPass.Depth.Load,
                         .Store = pass.RenderPass.Depth.Store,
                         .Format = depthTexture < textures.size() ? textures[depthTexture].Desc.Fmt : RHI::Format::Undefined,
@@ -2286,7 +2320,10 @@ namespace Extrinsic::Graphics
                     ++crossQueueOwnershipTransferCount;
                     textureStateByRef[textureIndex] = next;
                 }
-                else if (prev != next)
+                else if (prev != next ||
+                    (IsWriteState(next) && textureLastAccessorByRef[textureIndex] >= 0 &&
+                        textureLastAccessorByRef[textureIndex] != static_cast<std::int32_t>(passIndex) &&
+                        textureQueueByRef[textureIndex] == pass.Queue))
                 {
                     BarrierPacket& packet = barrierPackets.FindOrCreate(passIndex, BarrierPacketStage::BeforePass);
                     packet.TextureBarriers.push_back(TextureBarrierPacket{
@@ -2341,7 +2378,10 @@ namespace Extrinsic::Graphics
                     ++crossQueueOwnershipTransferCount;
                     bufferStateByRef[bufferIndex] = next;
                 }
-                else if (prev != next)
+                else if (prev != next ||
+                    (IsWriteState(next) && bufferLastAccessorByRef[bufferIndex] >= 0 &&
+                        bufferLastAccessorByRef[bufferIndex] != static_cast<std::int32_t>(passIndex) &&
+                        bufferQueueByRef[bufferIndex] == pass.Queue))
                 {
                     BarrierPacket& packet = barrierPackets.FindOrCreate(passIndex, BarrierPacketStage::BeforePass);
                     packet.BufferBarriers.push_back(BufferBarrierPacket{

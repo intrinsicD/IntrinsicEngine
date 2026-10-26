@@ -47,6 +47,7 @@ namespace Extrinsic::Graphics
         CrossQueueCycle,
         DuplicatePassId,
         DuplicateResourceId,
+        RenderPassReadOnlyDepthClear,
     };
 
     export struct RenderGraphValidationFinding
@@ -92,6 +93,8 @@ namespace Extrinsic::Graphics
         std::uint32_t AttachmentIndex = 0;
         bool IsTextureResource = true;
         bool IsDepthAttachment = false;
+        // The pass only reads its bound depth (BUG-255).
+        bool DepthReadOnly = false;
         RHI::LoadOp Load = RHI::LoadOp::Clear;
         RHI::StoreOp Store = RHI::StoreOp::Store;
         RHI::Format Format = RHI::Format::Undefined;

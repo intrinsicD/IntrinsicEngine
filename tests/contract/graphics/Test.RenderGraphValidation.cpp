@@ -3,9 +3,11 @@
 #include <array>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 import Extrinsic.Graphics.RenderGraph;
@@ -935,4 +937,240 @@ TEST(RenderGraphValidation, ResetReusedCompilerScratchKeepsCompiledOutputStable)
     EXPECT_EQ(CompiledGraphSignature(*firstReusedCompiled), freshSignature);
     EXPECT_EQ(CompiledGraphSignature(*secondReusedCompiled), freshSignature);
     EXPECT_TRUE(reused.GetLastCompileValidationResult().Findings.empty());
+}
+
+// --- BUG-255: same-state write barriers and read-only depth attachments ---
+
+namespace
+{
+    template <typename Barrier, typename Packets>
+    [[nodiscard]] std::vector<Barrier> BarriersBeforePass(const CompiledRenderGraph& compiled,
+        const std::uint32_t passIndex,
+        const std::uint32_t resourceIndex,
+        Packets BarrierPacket::* packets)
+    {
+        std::vector<Barrier> out{};
+        for (const BarrierPacket& packet : compiled.BarrierPackets)
+        {
+            if (packet.PassIndex != passIndex || packet.Stage != BarrierPacketStage::BeforePass)
+                continue;
+            for (const Barrier& barrier : packet.*packets)
+            {
+                if constexpr (std::is_same_v<Barrier, TextureBarrierPacket>)
+                {
+                    if (barrier.TextureIndex == resourceIndex)
+                        out.push_back(barrier);
+                }
+                else
+                {
+                    if (barrier.BufferIndex == resourceIndex)
+                        out.push_back(barrier);
+                }
+            }
+        }
+        return out;
+    }
+
+    [[nodiscard]] std::vector<TextureBarrierPacket> TextureBarriersBeforePass(
+        const CompiledRenderGraph& compiled, const std::uint32_t passIndex, const std::uint32_t textureIndex)
+    {
+        return BarriersBeforePass<TextureBarrierPacket>(
+            compiled, passIndex, textureIndex, &BarrierPacket::TextureBarriers);
+    }
+
+    [[nodiscard]] std::vector<BufferBarrierPacket> BufferBarriersBeforePass(
+        const CompiledRenderGraph& compiled, const std::uint32_t passIndex, const std::uint32_t bufferIndex)
+    {
+        return BarriersBeforePass<BufferBarrierPacket>(
+            compiled, passIndex, bufferIndex, &BarrierPacket::BufferBarriers);
+    }
+}
+
+// A pass that writes a resource in the state another pass left it in still depends on that
+// pass's writes (and loads, tests or blends what it wrote), so it gets a barrier that keeps
+// the layout.
+TEST(RenderGraphValidation, SameStateWritesInTwoPassesGetABarrier)
+{
+    for (const TextureUsage usage : {TextureUsage::ColorAttachmentWrite,
+             TextureUsage::DepthWrite,
+             TextureUsage::ShaderWrite,
+             TextureUsage::TransferDst})
+    {
+        SCOPED_TRACE("texture usage " + std::to_string(static_cast<int>(usage)));
+        RenderGraph graph;
+        const TextureRef target = graph.CreateTexture("Target", RHI::TextureDesc{});
+        (void)graph.AddPass("First",
+            [target, usage](RenderGraphBuilder& builder)
+            {
+                (void)builder.Write(target, usage);
+                builder.SideEffect();
+            });
+        const PassRef second = graph.AddPass("Second",
+            [target, usage](RenderGraphBuilder& builder)
+            {
+                (void)builder.Write(target, usage);
+                builder.SideEffect();
+            });
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        const std::vector<TextureBarrierPacket> barriers =
+            TextureBarriersBeforePass(*compiled, second.Index, target.Index);
+        ASSERT_EQ(barriers.size(), 1u);
+        EXPECT_EQ(barriers.front().Before, barriers.front().After);
+    }
+
+    {
+        SCOPED_TRACE("loaded colour attachment (read-write)");
+        RenderGraph graph;
+        const TextureRef target = graph.CreateTexture("Target", RHI::TextureDesc{});
+        const auto overlay = [target](RenderGraphBuilder& builder)
+        {
+            (void)builder.Read(target, TextureUsage::ColorAttachmentRead);
+            (void)builder.Write(target, TextureUsage::ColorAttachmentWrite);
+            builder.SetRenderPass(RHI::RenderPassDesc{.ColorTargets = kCompilerScratchColorAttachments});
+            builder.SideEffect();
+        };
+        (void)graph.AddPass("First", overlay);
+        const PassRef second = graph.AddPass("Second", overlay);
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        const std::vector<TextureBarrierPacket> barriers =
+            TextureBarriersBeforePass(*compiled, second.Index, target.Index);
+        ASSERT_EQ(barriers.size(), 1u);
+        EXPECT_EQ(barriers.front().Before, TextureBarrierState::ColorAttachmentReadWrite);
+        EXPECT_EQ(barriers.front().After, TextureBarrierState::ColorAttachmentReadWrite);
+    }
+
+    for (const BufferUsage usage : {BufferUsage::ShaderWrite, BufferUsage::TransferDst})
+    {
+        SCOPED_TRACE("buffer usage " + std::to_string(static_cast<int>(usage)));
+        RenderGraph graph;
+        const BufferRef target = graph.CreateBuffer("Target", RHI::BufferDesc{.SizeBytes = 256u});
+        (void)graph.AddPass("First",
+            [target, usage](RenderGraphBuilder& builder)
+            {
+                (void)builder.Write(target, usage);
+                builder.SideEffect();
+            });
+        const PassRef second = graph.AddPass("Second",
+            [target, usage](RenderGraphBuilder& builder)
+            {
+                (void)builder.Write(target, usage);
+                builder.SideEffect();
+            });
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        const std::vector<BufferBarrierPacket> barriers =
+            BufferBarriersBeforePass(*compiled, second.Index, target.Index);
+        ASSERT_EQ(barriers.size(), 1u);
+        EXPECT_EQ(barriers.front().Before, barriers.front().After);
+    }
+}
+
+// Guards against excess barriers: repeated reads need none, and a write on another queue is
+// ordered by the cross-queue timeline dependency, not by a barrier on this queue.
+TEST(RenderGraphValidation, RepeatedReadsAndCrossQueueWritesGetNoSameStateBarrier)
+{
+    {
+        RenderGraph graph;
+        const TextureRef depth = graph.CreateTexture("Depth", RHI::TextureDesc{});
+        (void)graph.AddPass("Write",
+            [depth](RenderGraphBuilder& builder)
+            {
+                (void)builder.Write(depth, TextureUsage::DepthWrite);
+            });
+        (void)graph.AddPass("Read0",
+            [depth](RenderGraphBuilder& builder)
+            {
+                (void)builder.Read(depth, TextureUsage::DepthRead);
+                builder.SideEffect();
+            });
+        const PassRef read1 = graph.AddPass("Read1",
+            [depth](RenderGraphBuilder& builder)
+            {
+                (void)builder.Read(depth, TextureUsage::DepthRead);
+                builder.SideEffect();
+            });
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        EXPECT_TRUE(TextureBarriersBeforePass(*compiled, read1.Index, depth.Index).empty());
+    }
+    {
+        RenderGraph graph;
+        const TextureRef shared = graph.CreateTexture("Shared", RHI::TextureDesc{});
+        (void)graph.AddPass("GraphicsWrite",
+            [shared](RenderGraphBuilder& builder)
+            {
+                builder.SetQueue(RenderQueue::Graphics);
+                (void)builder.Write(shared, TextureUsage::ShaderWrite);
+                builder.SideEffect();
+            });
+        const PassRef computeWrite = graph.AddPass("ComputeWrite",
+            [shared](RenderGraphBuilder& builder)
+            {
+                builder.SetQueue(RenderQueue::AsyncCompute);
+                (void)builder.Write(shared, TextureUsage::ShaderWrite);
+                builder.SideEffect();
+            });
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        EXPECT_EQ(compiled->CrossQueueTimelineEdgeCount, 1u);
+        EXPECT_TRUE(TextureBarriersBeforePass(*compiled, computeWrite.Index, shared.Index).empty());
+    }
+}
+
+// A pass that only reads its bound depth attachment renders it read-only (read-only layout, no
+// store write); one that writes it does not; a read-only clear is a contradiction.
+TEST(RenderGraphValidation, DepthReadAttachmentCompilesReadOnly)
+{
+    const auto depthPass = [](const TextureRef depth, const TextureUsage usage, const RHI::LoadOp load)
+    {
+        return [depth, usage, load](RenderGraphBuilder& builder)
+        {
+            if (usage == TextureUsage::DepthWrite)
+                (void)builder.Write(depth, usage);
+            else
+                (void)builder.Read(depth, usage);
+            builder.SetRenderPass(RHI::RenderPassDesc{
+                .Depth =
+                    RHI::DepthAttachment{
+                        .Target = RHI::TextureHandle{1u, 1u}, .Load = load, .Store = RHI::StoreOp::Store},
+            });
+            builder.SideEffect();
+        };
+    };
+    {
+        RenderGraph graph;
+        const TextureRef depth = graph.CreateTexture("Depth", RHI::TextureDesc{});
+        const PassRef prepass =
+            graph.AddPass("Prepass", depthPass(depth, TextureUsage::DepthWrite, RHI::LoadOp::Clear));
+        const PassRef surface = graph.AddPass("Surface", depthPass(depth, TextureUsage::DepthRead, RHI::LoadOp::Load));
+        const PassRef lines = graph.AddPass("Lines", depthPass(depth, TextureUsage::DepthWrite, RHI::LoadOp::Load));
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        const auto readOnly = [&](const PassRef pass)
+        {
+            for (const CompiledRenderPassAttachment& attachment : compiled->RenderPassAttachments)
+            {
+                if (attachment.PassIndex == pass.Index && attachment.IsDepthAttachment)
+                    return std::optional<bool>{attachment.DepthReadOnly};
+            }
+            return std::optional<bool>{};
+        };
+        EXPECT_EQ(readOnly(prepass), std::optional<bool>{false});
+        EXPECT_EQ(readOnly(surface), std::optional<bool>{true});
+        EXPECT_EQ(readOnly(lines), std::optional<bool>{false});
+    }
+    {
+        RenderGraph graph;
+        const TextureRef depth = graph.CreateTexture("Depth", RHI::TextureDesc{});
+        (void)graph.AddPass("Prepass", depthPass(depth, TextureUsage::DepthWrite, RHI::LoadOp::Clear));
+        (void)graph.AddPass("ClearingReader", depthPass(depth, TextureUsage::DepthRead, RHI::LoadOp::Clear));
+        const auto compiled = graph.Compile();
+        ASSERT_FALSE(compiled.has_value());
+        const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(
+            graph.GetLastCompileValidationResult(), RenderGraphValidationCode::RenderPassReadOnlyDepthClear);
+        ASSERT_EQ(findings.size(), 1u);
+        EXPECT_EQ(findings.front().PassName, "ClearingReader");
+    }
 }

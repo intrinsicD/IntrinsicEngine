@@ -302,11 +302,15 @@ void VulkanCommandContext::BeginRenderPass(const RHI::RenderPassDesc& desc)
         if (img)
         {
             depthInfo.imageView   = img->View;
-            depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            // BUG-255: a read-only depth stays in the read-only layout the graph moved it to
+            // and is not stored (STORE_OP_NONE keeps its contents without a write).
+            depthInfo.imageLayout = desc.Depth.ReadOnly ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                                        : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             depthInfo.loadOp      = desc.Depth.Load  == RHI::LoadOp::Clear ? VK_ATTACHMENT_LOAD_OP_CLEAR
                                   : desc.Depth.Load  == RHI::LoadOp::Load  ? VK_ATTACHMENT_LOAD_OP_LOAD
                                                                             : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            depthInfo.storeOp     = desc.Depth.Store == RHI::StoreOp::Store ? VK_ATTACHMENT_STORE_OP_STORE
+            depthInfo.storeOp     = desc.Depth.ReadOnly                     ? VK_ATTACHMENT_STORE_OP_NONE
+                                  : desc.Depth.Store == RHI::StoreOp::Store ? VK_ATTACHMENT_STORE_OP_STORE
                                                                              : VK_ATTACHMENT_STORE_OP_DONT_CARE;
             depthInfo.clearValue.depthStencil = {desc.Depth.ClearDepth, desc.Depth.ClearStencil};
             hasDepth = true;

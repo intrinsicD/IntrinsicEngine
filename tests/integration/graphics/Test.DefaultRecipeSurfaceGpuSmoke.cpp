@@ -121,6 +121,8 @@ struct DefaultRecipeBootstrap
         };
     }
 
+    if (enableValidation)
+        Counters::EnableSynchronizationValidation();
     auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
     config.Window.Title = windowTitle;
     // Fixed framebuffer keeps backbuffer sizing and format negotiation stable

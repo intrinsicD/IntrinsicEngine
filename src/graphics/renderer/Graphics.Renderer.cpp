@@ -910,7 +910,9 @@ namespace Extrinsic::Graphics
                 return RHI::MemoryAccess::ColorAttachmentRead |
                        RHI::MemoryAccess::ColorAttachmentWrite;
             case TextureBarrierState::DepthRead:            return RHI::MemoryAccess::DepthStencilRead;
-            case TextureBarrierState::DepthWrite:           return RHI::MemoryAccess::DepthStencilWrite;
+            // BUG-255: a depth-writing pass also loads and tests the depth.
+            case TextureBarrierState::DepthWrite:
+                return RHI::MemoryAccess::DepthStencilRead | RHI::MemoryAccess::DepthStencilWrite;
             case TextureBarrierState::ShaderRead:           return RHI::MemoryAccess::ShaderRead;
             case TextureBarrierState::ShaderWrite:          return RHI::MemoryAccess::ShaderWrite;
             case TextureBarrierState::TransferSrc:          return RHI::MemoryAccess::TransferRead;
@@ -7053,6 +7055,7 @@ namespace Extrinsic::Graphics
                         .Load = attachment.Load,
                         .Store = attachment.Store,
                         .ClearDepth = 1.0f,
+                        .ReadOnly = attachment.DepthReadOnly,
                     };
                     out.HasAttachments = true;
                     continue;

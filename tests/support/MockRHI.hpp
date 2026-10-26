@@ -248,7 +248,10 @@ namespace Extrinsic::Tests
 
         void Begin() override;
         void End()   override;
-        void BeginRenderPass(const RHI::RenderPassDesc&) override {}
+        void BeginRenderPass(const RHI::RenderPassDesc& desc) override
+        {
+            RenderPassDepths.push_back(desc.Depth);
+        }
         void EndRenderPass() override {}
         void SetViewport(float, float, float, float, float, float) override {}
         void SetScissor(const std::int32_t x,
@@ -304,6 +307,8 @@ namespace Extrinsic::Tests
         }
 
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
+        // The depth attachment of every render pass begun, in order.
+        std::vector<RHI::DepthAttachment> RenderPassDepths{};
         std::vector<SampledTextureBindingRecord> SampledTextureBindings{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
         std::vector<MemoryBarrierRecord>  MemoryBarrierCalls{};

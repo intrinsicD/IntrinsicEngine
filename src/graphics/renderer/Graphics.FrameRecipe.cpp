@@ -693,7 +693,7 @@ namespace Extrinsic::Graphics
         // reports `SkippedUnavailable` because no pipelines exist yet.
         AddPass(out, FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass",
                 features.EnableTransientDebugSurface, false,
-                {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"});
+                {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR", "SceneDepth"});
         AddPass(out, FrameRecipePassKind::Reconstruction, "ReconstructionPass",
                 reconstructionActive, false,
                 {"SceneColorHDR", "SceneDepth", "MotionVectors", "Reconstruction.HistoryPrevious"},
@@ -2208,8 +2208,8 @@ namespace Extrinsic::Graphics
         // wiring rationale documented on the canonical `Pass.Present`
         // (GRAPHICS-076 Slice A follow-up). The LOAD-store color
         // attachment preserves the lit color from the prior passes; the
-        // depth attachment is depth-read-only (Slice B/C variants test
-        // against the prepass depth without overwriting it). The depth
+        // depth attachment is written (BUG-255: depth-tested spheres write
+        // depth; the other variants only test it). The depth
         // `StoreOp` is `Store` (not `DontCare`) because downstream
         // passes that still read `SceneDepth` — `SelectionOutlinePass`
         // when `EnableSelectionOutline` is set declares
@@ -2224,7 +2224,8 @@ namespace Extrinsic::Graphics
         if (features.EnableTransientDebugSurface)
         {
             addRecipePass(FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass", [=](RenderGraphBuilder& builder) {
-                builder.Read(depth, TextureUsage::DepthRead);
+                // BUG-255: depth-tested debug spheres write depth.
+                builder.Write(depth, TextureUsage::DepthWrite);
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
                     .ColorTargets = kTransientDebugSurfaceRenderPassColorAttachments,

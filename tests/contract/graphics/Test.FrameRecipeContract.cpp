@@ -2972,6 +2972,76 @@ TEST(FrameRecipeContract, LineAndPointPassesWriteTheSceneDepthTheyLoad)
     }
     EXPECT_TRUE(sawLineTransition);
 
+    // BUG-255: the point pass loads and tests the depth the line pass wrote, in the same state.
+    const std::uint32_t pointIndex = PassIndexByName(*compiled, "PointPass");
+    bool sawPointBarrier = false;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        if (packet.PassIndex != pointIndex)
+            continue;
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex != depthIndex)
+                continue;
+            sawPointBarrier = true;
+            EXPECT_EQ(barrier.Before, TextureBarrierState::DepthWrite);
+            EXPECT_EQ(barrier.After, TextureBarrierState::DepthWrite);
+        }
+    }
+    EXPECT_TRUE(sawPointBarrier);
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors());
+}
+
+// BUG-255: a pass that only reads the scene depth binds it read-only (no store write, the
+// read-only layout the graph moved it to); a pass that writes it does not. The transient debug
+// surface pass writes depth: its depth-tested spheres do.
+TEST(FrameRecipeContract, DepthReadingPassesBindTheSceneDepthReadOnly)
+{
+    FrameRecipeFeatures features{};
+    features.EnableDepthPrepass = true;
+    features.EnableSelectionOutline = true;
+    features.EnableTransientDebugSurface = true;
+    features.EnableVisualizationOverlay = true;
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(features);
+    RenderGraph graph;
+    const FrameRecipeBuildResult build =
+        BuildDefaultFrameRecipe(graph, features, MakeImports(), FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const std::uint32_t depthIndex = TextureIndexByName(*compiled, "SceneDepth");
+    ASSERT_LT(depthIndex, compiled->TextureNames.size());
+
+    const auto depthReadOnly = [&](const std::string_view passName) -> std::optional<bool>
+    {
+        const std::uint32_t passIndex = PassIndexByName(*compiled, passName);
+        for (const CompiledRenderPassAttachment& attachment : compiled->RenderPassAttachments)
+        {
+            if (attachment.PassIndex == passIndex && attachment.IsDepthAttachment &&
+                attachment.ResourceIndex == depthIndex)
+                return attachment.DepthReadOnly;
+        }
+        return std::nullopt;
+    };
+    for (const std::string_view reader :
+        {"SurfacePass", "PickingPass", "VisualizationOverlayPass", "SelectionOutlinePass"})
+    {
+        SCOPED_TRACE(std::string{reader});
+        EXPECT_EQ(depthReadOnly(reader), std::optional<bool>{true});
+    }
+    for (const std::string_view writer : {"DepthPrepass", "LinePass", "PointPass", "TransientDebugSurfacePass"})
+    {
+        SCOPED_TRACE(std::string{writer});
+        EXPECT_EQ(depthReadOnly(writer), std::optional<bool>{false});
+    }
+
+    const auto* transient = FindPass(recipe, FrameRecipePassKind::TransientDebugSurface);
+    ASSERT_NE(transient, nullptr);
+    EXPECT_TRUE(Contains(transient->Writes, "SceneDepth"));
+    EXPECT_TRUE(PassWritesTexture(*compiled, "TransientDebugSurfacePass", "SceneDepth"));
+
     const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
     EXPECT_FALSE(validation.HasErrors());
 }

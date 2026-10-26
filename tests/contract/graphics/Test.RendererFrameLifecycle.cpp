@@ -5434,6 +5434,53 @@ TEST(RendererFrameLifecycle, PickingPassRecordsOnlyThePickLanesSubPasses)
     }
 }
 
+// BUG-255: a default frame begins the depth-reading surface pass with a read-only depth
+// attachment and the depth-writing passes without, and a barrier into the depth-write state makes
+// the depth visible to that pass's load and test reads as well as its writes.
+TEST(RendererFrameLifecycle, DepthReadingPassesBeginReadOnlyAndDepthWritesSeeTheirReads)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{297u, 1u};
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    Extrinsic::Graphics::RenderWorld world =
+        renderer->ExtractRenderWorld(Extrinsic::Graphics::RenderFrameInput{.Viewport = {.Width = 320, .Height = 240}});
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    std::uint32_t readOnly = 0u;
+    std::uint32_t writable = 0u;
+    for (const Extrinsic::RHI::DepthAttachment& depth : device.CommandContext.RenderPassDepths)
+    {
+        if (!depth.Target.IsValid())
+            continue;
+        ++(depth.ReadOnly ? readOnly : writable);
+    }
+    EXPECT_GT(readOnly, 0u) << "no pass began with a read-only depth attachment";
+    EXPECT_GT(writable, 0u) << "no pass began with a writable depth attachment";
+
+    const auto has = [](const Extrinsic::RHI::MemoryAccess access, const Extrinsic::RHI::MemoryAccess bit)
+    {
+        return (static_cast<std::uint32_t>(access) & static_cast<std::uint32_t>(bit)) != 0u;
+    };
+    bool sawDepthWriteBarrier = false;
+    for (const auto& barrier : device.CommandContext.TextureBarrierCalls)
+    {
+        if (barrier.After != Extrinsic::RHI::TextureLayout::DepthAttachment)
+            continue;
+        sawDepthWriteBarrier = true;
+        EXPECT_TRUE(has(barrier.AfterAccess, Extrinsic::RHI::MemoryAccess::DepthStencilRead));
+        EXPECT_TRUE(has(barrier.AfterAccess, Extrinsic::RHI::MemoryAccess::DepthStencilWrite));
+    }
+    EXPECT_TRUE(sawDepthWriteBarrier);
+    renderer->Shutdown();
+}
+
 // GRAPHICS-074 Slice D.2 — when no pick is pending, the recipe drops the
 // PickingPass entirely (`EnablePicking = false`), so no readback copy is
 // recorded and `PickingReadbackCopyCount` stays at zero. This test pairs
