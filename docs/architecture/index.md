@@ -90,6 +90,7 @@ Status labels:
 | `gpu-driven-modular-rendering-pipeline-plan.md` | migration | Planning doc for rendering migration; not canonical architecture. |
 | `ground-up-redesign-blueprint-2026.md` | archival | Vision/blueprint context. |
 | `ground-up-redesign-vision.md` | archival | Vision narrative; non-normative. |
+| `moonshot.md` | roadmap | Twelve-month moonshot (pillars M1–M11); a proposal, not a claim. |
 | `htex-halfedge-patch-system.md` | legacy-background | Geometry method background; its test-only `Geometry.HtexPatch` prototype was removed. |
 | `parameterization-mapping-roadmap.md` | roadmap | GEOM-011 planning note for parameterization, atlas, distortion, and surface-map packs. |
 | `post-merge-audit-checklist.md` | migration | Temporary migration review artifact. |
