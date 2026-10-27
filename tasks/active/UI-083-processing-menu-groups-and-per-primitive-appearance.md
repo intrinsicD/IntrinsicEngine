@@ -1127,3 +1127,33 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   source rules, test layout, docs sync and compiler hazards pass. jscpd: no new clone in the
   changed files beyond include blocks and the usual test setup. The acceptance criteria are left
   for the closing review; slice 5 (the combined and live check) is open.
+- 2026-10-27: Slice 5 (combined and live check). Operator request: "Starte slice 5". No code
+  change, so no plan review.
+  - Combined smokes: the final-tree Vulkan gate of slice 4 (168/168, RTX 4090, driver
+    580.159.04) ran every slice's `gpu;vulkan` smoke together on the tree committed as
+    `7a999e199`.
+  - Live check: `build/ci-vulkan/bin/ExtrinsicSandbox --agent-socket` on X11 `:1` (Vulkan,
+    validation on, VSync), driven through the `intrinsic-sandbox` MCP; device operational,
+    0 validation errors, the log shows only the known cold-start warnings.
+    - Imports: `tests/data/sculpt.obj` (mesh, 3669 vertices), a 6x6 grid graph written as TGF
+      (36 nodes, 60 edges), `assets/models/M16.xyz` (385456 points).
+    - Menus: the menu bar shows File, View, PointCloud, Graph, Mesh, Gizmo.
+    - Sections (`attribute_bindings`, the model the Appearance panel draws): mesh Faces
+      (position, normal, texcoord, color), Edges (position, color, line width), Vertices
+      (position, normal, color, point size); graph Edges and Vertices without Faces; point
+      cloud Vertices only. Normal defaults read "mesh v:normal, point cloud p:normal, graph
+      none".
+    - Per-lane positions: binding the mesh's points-lane position to `v:normal` drew the points
+      on the unit sphere while the surface stayed in place; Default restored them.
+    - Vector field: after `mesh_curvature`, a `v:normal` field with length `v:mean_curvature`
+      x 0.02 and color `v:gaussian_curvature` through Jet drew short arrows on flat regions,
+      long ones at creases, none where the mean curvature is negative, and colors across the
+      Jet range; `v:principal_dir1` as color drew clamped RGB (black where every component is
+      negative). Undo and redo were one step each; a scene save and reload kept the layer with
+      both properties (keys `lengthProperty`, `colorProperty`, `colorMap`, `colorAutoRange`,
+      `colorRange` in the file) and drew the same image.
+  - Not checked live: opened submenus, the Appearance window itself, Surfel orientation and
+    per-lane selection highlights. The MCP has no menu, window, point-mode or primitive-pick
+    operation, and `:1` is the operator's desktop, which was not driven by synthetic input.
+    These cases are covered by the slice 1 headless menu tests, the slice 2 panel tests and the
+    slice 3b/3c `gpu;vulkan` smokes.
