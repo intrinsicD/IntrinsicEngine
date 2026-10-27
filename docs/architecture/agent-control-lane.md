@@ -122,7 +122,22 @@ Nothing exists without the launch flag: no module, thread or socket.
 
 Present `tools/call.arguments` must be a JSON object. Undo and redo default to one
 step only when `steps` is omitted; a supplied value must be an integer in 1..64.
-Malformed arguments are rejected before invoking a mutation. The socket rejects
+Malformed arguments are rejected before invoking a mutation. Every call is validated
+against the tool's advertised `inputSchema` before the tool runs (RUNTIME-326): a
+violation answers `invalid_params` naming the first problem with a slash-separated
+path such as `"params/iterations"` (within each object: unknown keys first, then
+missing required ones, then values), and the tool, its history and its jobs are not
+touched. Read-only and minimized-window refusals keep their precedence. The checked
+JSON Schema subset is `type`, `enum`, `const`, `minimum`, `maximum`,
+`exclusiveMinimum`, `exclusiveMaximum`, `minLength` (code points), `minItems`,
+`maxItems`, `items`, `properties`, `required`, `additionalProperties` (boolean),
+`oneOf`, `anyOf`, `allOf`, `if`/`then`; annotations (`description`, `default`,
+`title`, `examples`, `x-*`) are ignored. A tool whose schema uses any other keyword is
+refused at registration, `pattern` included (the job token format is checked by the
+job tools themselves). One deliberate narrowing of JSON Schema: `integer` means an
+integer literal, so `1.0` is refused, as the tools' integer readers refuse it; numbers
+compare exactly across signed, unsigned and floating values. Cross-field rules a schema cannot state (for example
+`jobs_wait` refusing a token together with an entity) stay with the tool. The socket rejects
 each complete line exceeding `MaxMessageBytes` before queueing it and applies the
 same bound to an incomplete line, including lines assembled over multiple receives.
 

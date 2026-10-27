@@ -33,6 +33,7 @@ namespace
     {
         R::AgentOperationRegistry registry;
         EXPECT_TRUE(registry.Register({.Name = "echo", .Title = "Echo", .Description = "Returns its arguments.",
+            .InputSchemaJson = R"({"type":"object","properties":{"x":{"type":"integer"}},"additionalProperties":false})",
             .ReadOnly = true, .Invoke = [](const R::AgentOperationContext&, std::string_view args) {
                 return R::AgentOperationOutcome{.Text = std::string(args)}; }}));
         EXPECT_TRUE(registry.Register({.Name = "mutate", .Title = "Mutate", .ReadOnly = false,
@@ -787,12 +788,14 @@ TEST(AgentOperations, EditorOperationsShareTheDomainEnum)
     EXPECT_GE(seen, 2) << "k-means and consolidation at least";
     EXPECT_EQ(Json::parse(registry.Find("run_point_cloud_consolidation")->InputSchemaJson)["properties"]["positions"]["default"], "v:position");
     const R::AgentOperationContext context{};
+    // RUNTIME-326: the dispatch refuses an unknown domain against the shared enum before the tool runs.
     const auto bad = R::InvokeAgentOperation(registry, "run_kmeans", context, R"({"entity":1,"domain":"Bogus"})", false);
-    EXPECT_TRUE(bad.IsError);
-    EXPECT_NE(bad.Text.find("Unknown domain 'Bogus'"), std::string::npos) << bad.Text;
+    EXPECT_EQ(bad.ErrorCode, "invalid_params");
+    EXPECT_NE(bad.Text.find("\"domain\" must be one of"), std::string::npos) << bad.Text;
     const auto badShow = R::InvokeAgentOperation(registry, "show_property", context,
                                                  R"({"entity":1,"name":"x","domain":"Bogus"})", false);
-    EXPECT_NE(badShow.Text.find("Unknown domain 'Bogus'"), std::string::npos) << badShow.Text;
+    EXPECT_EQ(badShow.ErrorCode, "invalid_params");
+    EXPECT_NE(badShow.Text.find("\"domain\" must be one of"), std::string::npos) << badShow.Text;
 }
 
 // RUNTIME-316 / UI-083: the attribute tools take their attribute enum and row documentation from
@@ -1065,12 +1068,14 @@ TEST(AgentOperations, ConfiguredOperationEntityRulesFollowTheSection)
     const auto missing = call("run_operation", R"({"operation":"geodesics"})");
     EXPECT_TRUE(missing.IsError);
     EXPECT_NE(missing.Text.find("needs {\"entity\""), std::string::npos) << missing.Text;
-    EXPECT_NE(call("preview_mesh_operation", R"({"operation":"scalar_gradient"})").Text.find("needs"), std::string::npos);
-    // Unknown names list the valid ones; the mesh alias does not serve other families.
+    // RUNTIME-326: the mesh alias's schema requires the entity, so the dispatch names it.
+    EXPECT_NE(call("preview_mesh_operation", R"({"operation":"scalar_gradient"})").Text.find("missing argument \"entity\""), std::string::npos);
+    // Unknown names list the valid ones (the schema enum); the mesh alias does not serve other families.
     const auto unknown = call("run_operation", R"({"operation":"nope","entity":1})");
-    EXPECT_NE(unknown.Text.find("Unknown operation 'nope'"), std::string::npos);
-    const auto aliasMiss = call("run_mesh_operation", R"({"operation":"outlier_analysis"})");
-    EXPECT_NE(aliasMiss.Text.find("Unknown operation"), std::string::npos) << aliasMiss.Text;
+    EXPECT_EQ(unknown.ErrorCode, "invalid_params");
+    EXPECT_NE(unknown.Text.find("\"operation\" must be one of [\"property_smoothing\""), std::string::npos) << unknown.Text;
+    const auto aliasMiss = call("run_mesh_operation", R"({"operation":"outlier_analysis","entity":1})");
+    EXPECT_NE(aliasMiss.Text.find("\"operation\" must be one of"), std::string::npos) << aliasMiss.Text;
     EXPECT_EQ(aliasMiss.Text.find("outlier_analysis\"]"), std::string::npos);
 }
 
@@ -1244,4 +1249,244 @@ TEST(AgentOperations, JobToolsClassifyAndValidateTheirArguments)
     EXPECT_EQ(code("jobs_cancel", R"({"token":"1"})"), "invalid_params");
     EXPECT_TRUE(R::InvokeAgentOperation(registry, "jobs_cancel", empty, R"({"token":"1:0"})", true).IsError)
         << "a read-only session cannot cancel";
+}
+
+// RUNTIME-326: the advertised schema is the one declaration of a tool's arguments; the dispatch
+// validates every call against it, and a schema with a keyword the validator cannot check is
+// refused instead of silently skipped.
+TEST(AgentArgumentSchema, ChecksEverySupportedKeyword)
+{
+    const auto valid = [](const char* schema, const char* args) {
+        return !R::ValidateAgentArgumentsJson(schema, args).has_value();
+    };
+    const char* object = R"({"type":"object","properties":{"a":{"type":"integer","minimum":1,"maximum":3},
+        "b":{"type":"number","exclusiveMinimum":0,"exclusiveMaximum":1},"s":{"type":"string","minLength":2},
+        "e":{"type":"string","enum":["x","y"]},"c":{"const":true},"t":{"type":["object","string"]},
+        "v":{"type":"array","items":{"type":"number","minimum":0},"minItems":2,"maxItems":3},"o":{"type":"boolean"}},
+        "required":["a"],"additionalProperties":false})";
+    EXPECT_TRUE(valid(object, R"({"a":1})"));
+    EXPECT_TRUE(valid(object, R"({"a":3,"b":0.5,"s":"3:1","e":"y","c":true,"t":"text","v":[0,1,2],"o":false})"));
+    EXPECT_TRUE(valid(object, R"({"a":2,"t":{"k":1}})"));
+    for (const char* bad : {R"({})", R"({"a":0})", R"({"a":4})", R"({"a":1.5})", R"({"a":"1"})", R"({"a":1,"b":0})",
+             R"({"a":1,"b":1})", R"({"a":1,"s":"1"})", R"({"a":1,"e":"z"})", R"({"a":1,"c":false})",
+             R"({"a":1,"t":3})", R"({"a":1,"v":[1]})", R"({"a":1,"v":[1,2,3,4]})", R"({"a":1,"v":[1,-1]})",
+             R"({"a":1,"o":1})", R"({"a":1,"z":1})", R"([])"})
+        EXPECT_FALSE(valid(object, bad)) << bad;
+    const auto unknown = R::ValidateAgentArgumentsJson(object, R"({"a":1,"lenght":2})");
+    ASSERT_TRUE(unknown.has_value());
+    EXPECT_NE(unknown->find("lenght"), std::string::npos) << *unknown;
+
+    const char* bounded = R"({"type":"object","properties":{"id":{"type":"integer","minimum":1,"maximum":4294967295},
+        "n":{"type":"object","properties":{"k":{"type":"integer"}},"additionalProperties":false},
+        "m":{"anyOf":[{"type":"integer","enum":[0,1]},{"type":"string","enum":["a","b"]}]}},"additionalProperties":false})";
+    EXPECT_TRUE(valid(bounded, R"({"id":4294967295,"n":{"k":1},"m":1})"));
+    EXPECT_TRUE(valid(bounded, R"({"m":"b"})")) << "anyOf: either representation";
+    for (const char* bad : {R"({"id":4294967296})", R"({"id":2.5})", R"({"n":{"k":1,"j":2}})", R"({"n":{"k":1.5}})",
+             R"({"m":2})", R"({"m":"c"})", R"({"m":true})"})
+        EXPECT_FALSE(valid(bounded, bad)) << bad;
+    const auto nested = R::ValidateAgentArgumentsJson(bounded, R"({"n":{"j":2}})");
+    ASSERT_TRUE(nested.has_value());
+    EXPECT_NE(nested->find("n/j"), std::string::npos) << *nested;
+
+    // minLength counts code points; numbers compare exactly across int64, uint64 and double.
+    const char* exact = R"({"type":"object","properties":{"s":{"type":"string","minLength":2},
+        "m":{"type":"integer","maximum":9007199254740992},"x":{"type":"integer","exclusiveMinimum":9007199254740992},
+        "c":{"const":-1},"one":{"const":1},"u":{"enum":[18446744073709551615]}},"additionalProperties":false})";
+    EXPECT_FALSE(valid(exact, R"({"s":"\u00e9"})")) << "one code point, two bytes";
+    EXPECT_TRUE(valid(exact, R"({"s":"\u00e9\ud83d\ude42"})")) << "two code points, six bytes";
+    EXPECT_FALSE(valid(exact, R"({"m":9007199254740993})"));
+    EXPECT_TRUE(valid(exact, R"({"m":9007199254740992})"));
+    EXPECT_TRUE(valid(exact, R"({"x":9007199254740993})"));
+    EXPECT_FALSE(valid(exact, R"({"x":9007199254740992})"));
+    EXPECT_FALSE(valid(exact, R"({"c":18446744073709551615})")) << "no signed/unsigned wrap";
+    EXPECT_TRUE(valid(exact, R"({"c":-1})"));
+    EXPECT_TRUE(valid(exact, R"({"one":1.0})")) << "1 == 1.0";
+    EXPECT_FALSE(valid(exact, R"({"u":-1})"));
+    EXPECT_TRUE(valid(exact, R"({"u":18446744073709551615})"));
+    const char* deep = R"({"type":"object","properties":{"c":{"const":{"x":[-1,1]}}},"additionalProperties":false})";
+    EXPECT_FALSE(valid(deep, R"({"c":{"x":[18446744073709551615,1]}})")) << "exact equality inside objects and arrays";
+    EXPECT_TRUE(valid(deep, R"({"c":{"x":[-1,1.0]}})"));
+
+    const char* choice = R"({"type":"object","properties":{"p":{"type":"string"},"d":{"type":"boolean","const":true}},
+        "oneOf":[{"required":["p"]},{"required":["d"]}],"additionalProperties":false})";
+    EXPECT_TRUE(valid(choice, R"({"p":"x"})"));
+    EXPECT_TRUE(valid(choice, R"({"d":true})"));
+    EXPECT_FALSE(valid(choice, R"({})"));
+    EXPECT_FALSE(valid(choice, R"({"p":"x","d":true})")) << "oneOf: exactly one branch";
+
+    const char* conditional = R"({"type":"object","properties":{"op":{"type":"string"},"params":{"type":"object"}},
+        "allOf":[{"if":{"properties":{"op":{"const":"k"}},"required":["op"]},
+                  "then":{"properties":{"params":{"type":"object","properties":{"n":{"type":"integer","minimum":2}},"additionalProperties":false}}}}],
+        "additionalProperties":false})";
+    EXPECT_TRUE(valid(conditional, R"({"op":"k","params":{"n":2}})"));
+    EXPECT_TRUE(valid(conditional, R"({"op":"other","params":{"n":0,"x":1}})")) << "then applies only when if holds";
+    EXPECT_FALSE(valid(conditional, R"({"op":"k","params":{"n":1}})"));
+    EXPECT_FALSE(valid(conditional, R"({"op":"k","params":{"m":3}})"));
+
+    // Annotations are ignored; every other keyword makes the schema unsupported.
+    EXPECT_TRUE(R::IsSupportedAgentSchemaJson(
+        R"({"type":"object","title":"t","properties":{"a":{"type":"integer","default":1,"description":"d","x-enum-names":["A"]}},"additionalProperties":false})"));
+    for (const char* unsupported : {R"({"type":"object","properties":{"a":{"type":"string","format":"uri"}}})",
+             R"({"type":"object","properties":{"a":{"$ref":"#/x"}}})",
+             R"({"type":"object","not":{"required":["a"]}})", R"({"type":"object","properties":{"a":{"type":"string","pattern":"^a$"}}})", R"({"type":"object","properties":{"a":{"multipleOf":2}}})",
+             R"({"type":"object","additionalProperties":{"type":"string"}})", R"(not json)",
+             R"({"type":"object","required":[1]})", R"({"type":"object","properties":{"a":{"minimum":"1"}}})",
+             R"({"type":"object","properties":{"a":{"minItems":-1}}})", R"({"type":"object","properties":{"a":{"type":"tuple"}}})",
+             R"({"type":"object","properties":{"a":{"items":{"format":"x"}}}})", R"({"type":"object","if":{},"then":{"not":{}}})",
+             R"({"type":"object","oneOf":[{"required":["a"]},{"uniqueItems":true}]})", R"({"type":"object","properties":{"a":7}})"})
+        EXPECT_FALSE(R::IsSupportedAgentSchemaJson(unsupported)) << unsupported;
+}
+
+namespace
+{
+    R::AgentOperationRegistry FullAgentRegistry()
+    {
+        R::AgentOperationRegistry registry;
+        R::RegisterEditorAgentOperations(registry);
+        R::RegisterViewCaptureAgentOperations(registry);
+        return registry;
+    }
+}
+
+TEST(AgentArgumentSchema, EveryRegisteredSchemaIsSupportedAndClosed)
+{
+    const auto registry = FullAgentRegistry();
+    // Listed from the registration sources (2026-10-27), so a schema refused at registration shows as a missing tool.
+    for (const char* name : {"attribute_bindings", "bind_attribute", "config_apply", "config_get", "config_preview", "config_schema",
+             "config_sections", "device_status", "diagnostics_read", "entity_properties", "history", "import_file", "jobs_cancel",
+             "jobs_list", "jobs_wait", "load_scene", "log", "preview_keypoint_analysis", "preview_kmeans", "preview_mesh_operation",
+             "preview_operation", "preview_point_cloud_consolidation", "preview_point_sampling", "preview_registration", "property_compare",
+             "property_list", "property_stats", "property_values", "redo", "run_keypoint_analysis", "run_kmeans", "run_mesh_operation",
+             "run_operation", "run_point_cloud_consolidation", "run_point_sampling", "run_registration", "save_scene", "scene_entities",
+             "select_entity", "set_camera", "set_visibility", "show_property", "undo", "vector_field", "vector_fields", "view_capture",
+             "view_screenshot"})
+        EXPECT_NE(registry.Find(name), nullptr) << name;
+    EXPECT_EQ(registry.Entries().size(), 47u);
+    for (const auto& spec : registry.Entries())
+    {
+        SCOPED_TRACE(spec.Name);
+        EXPECT_TRUE(R::IsSupportedAgentSchemaJson(spec.InputSchemaJson));
+        EXPECT_EQ(Json::parse(spec.InputSchemaJson).value("additionalProperties", true), false);
+    }
+    R::AgentOperationRegistry refusing;
+    EXPECT_FALSE(refusing.Register({.Name = "loose", .InputSchemaJson = R"({"type":"object","properties":{"a":{"format":"uri"}}})",
+        .Invoke = [](const R::AgentOperationContext&, std::string_view) { return R::AgentOperationOutcome{}; }}))
+        << "a constraint the dispatch cannot check is refused at registration";
+    EXPECT_FALSE(refusing.Register({.Name = "broken", .InputSchemaJson = "{not json",
+        .Invoke = [](const R::AgentOperationContext&, std::string_view) { return R::AgentOperationOutcome{}; }}));
+    EXPECT_TRUE(refusing.Entries().empty());
+    EXPECT_EQ(refusing.Find("loose"), nullptr);
+}
+
+// The dispatch refuses before the tool runs: the handler is not called, no continuation is created and
+// a seeded undo history is unchanged. Read-only and minimized refusals keep their precedence.
+TEST(AgentArgumentSchema, ViolationsNeverReachTheHandler)
+{
+    int calls = 0;
+    R::AgentOperationRegistry registry;
+    ASSERT_TRUE(registry.Register({.Name = "count", .Title = "Count",
+        .InputSchemaJson = R"({"type":"object","properties":{"n":{"type":"integer","minimum":1}},"required":["n"],"additionalProperties":false})",
+        .ReadOnly = false, .NeedsPresentedFrame = true,
+        .Invoke = [&calls](const R::AgentOperationContext&, std::string_view) {
+            ++calls;
+            return R::AgentOperationOutcome{.Text = "{}", .Continuation = [](const R::AgentOperationContext&, R::AgentOperationOutcome&) { return true; }}; }}));
+    R::EditorCommandHistory history;
+    ASSERT_EQ(history.Execute({.Label = "Seed", .Redo = [] { return R::EditorCommandHistoryStatus::Applied; },
+                               .Undo = [] { return R::EditorCommandHistoryStatus::Applied; }}).Status, R::EditorCommandHistoryStatus::Applied);
+    const R::AgentOperationContext context{.History = &history};
+    for (const char* arguments : {R"({"n":1,"x":2})", R"({"n":0})", R"({"n":1.5})", R"({})", R"([])", R"(not json)"})
+    {
+        const auto outcome = R::InvokeAgentOperation(registry, "count", context, arguments, false);
+        EXPECT_EQ(outcome.ErrorCode, "invalid_params") << arguments;
+        EXPECT_FALSE(outcome.Continuation) << arguments;
+    }
+    const auto both = R::InvokeAgentOperation(registry, "count", context, R"({"n":1,"x":2})", false);
+    EXPECT_NE(both.Text.find("unknown argument \"x\""), std::string::npos) << both.Text;
+    EXPECT_EQ(calls, 0);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(R::InvokeAgentOperation(registry, "count", context, R"({"x":2})", true).ErrorCode, "") << "read-only refusal first";
+    const R::AgentOperationContext minimized{.History = &history, .ViewportPresentable = false};
+    EXPECT_EQ(R::InvokeAgentOperation(registry, "count", minimized, R"({"x":2})", false).ErrorCode, "viewport_not_presentable");
+    EXPECT_FALSE(R::InvokeAgentOperation(registry, "count", context, R"({"n":2})", false).IsError);
+    EXPECT_EQ(calls, 1);
+}
+
+// Valid calls keep reaching their tools: enum names and integer codes, object and string payloads.
+TEST(AgentArgumentSchema, DocumentedArgumentFormsStillReachTheTool)
+{
+    const auto registry = FullAgentRegistry();
+    const R::AgentOperationContext empty{};
+    const auto reaches = [&](const char* tool, const char* arguments) {
+        const auto outcome = R::InvokeAgentOperation(registry, tool, empty, arguments, false);
+        return outcome.ErrorCode != "invalid_params" || outcome.Text.find("Invalid arguments") == std::string::npos;
+    };
+    const Json schema = Json::parse(registry.Find("run_operation")->InputSchemaJson);
+    bool anyOf = false;
+    for (const auto& rule : schema["allOf"])
+        if (rule["if"]["properties"]["operation"]["const"] == "mesh_simplify")
+            anyOf = rule["then"]["properties"]["params"]["properties"]["metric"].contains("anyOf");
+    EXPECT_TRUE(anyOf) << "mesh_simplify.metric takes a name or an integer code";
+    EXPECT_TRUE(reaches("preview_operation", R"({"operation":"mesh_simplify","entity":1,"params":{"metric":"fa_qem"}})"));
+    EXPECT_TRUE(reaches("preview_operation", R"({"operation":"mesh_simplify","entity":1,"params":{"metric":1}})"));
+    EXPECT_FALSE(reaches("preview_operation", R"({"operation":"mesh_simplify","entity":1,"params":{"metric":"bogus"}})"));
+    EXPECT_FALSE(reaches("preview_operation", R"({"operation":"mesh_simplify","entity":1,"params":{"metric":"fa_qem","typo":1}})"));
+    EXPECT_TRUE(reaches("config_preview", R"({"section":"sandbox.property_smoothing","payload":{}})"));
+    EXPECT_TRUE(reaches("config_preview", R"({"section":"sandbox.property_smoothing","payload":"{}"})"));
+    EXPECT_FALSE(reaches("config_preview", R"({"section":"sandbox.property_smoothing","payload":3})"));
+    EXPECT_TRUE(reaches("vector_field", R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","line_width":2,"stride":3})"));
+    EXPECT_FALSE(reaches("vector_field", R"({"entity":4294967296,"action":"remove","domain":"MeshVertex","property":"v"})"));
+    EXPECT_FALSE(reaches("set_camera", R"({"pose":{"position":[0,0,3],"target":[0,0,0],"roll":1}})"));
+}
+
+TEST(AgentArgumentSchema, UnknownArgumentIsRefusedForEveryToolBeforeItRuns)
+{
+    // Unknown keys are reported before missing required ones, so the bare object names the key for every tool.
+    const auto registry = FullAgentRegistry();
+    R::EditorCommandHistory history;
+    ASSERT_EQ(history.Execute({.Label = "Seed", .Redo = [] { return R::EditorCommandHistoryStatus::Applied; },
+                               .Undo = [] { return R::EditorCommandHistoryStatus::Applied; }}).Status, R::EditorCommandHistoryStatus::Applied);
+    const R::AgentOperationContext context{.History = &history};
+    for (const auto& spec : registry.Entries())
+    {
+        SCOPED_TRACE(spec.Name);
+        const auto outcome = R::InvokeAgentOperation(registry, spec.Name, context, R"({"__unknown__":1})", false);
+        EXPECT_TRUE(outcome.IsError);
+        EXPECT_EQ(outcome.ErrorCode, "invalid_params") << outcome.Text;
+        EXPECT_NE(outcome.Text.find("__unknown__"), std::string::npos) << outcome.Text;
+        EXPECT_FALSE(outcome.Continuation);
+    }
+    // Otherwise valid calls with one misspelt key.
+    for (const auto& [tool, arguments] : {std::pair{"vector_field", R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","visible":false,"lenght":2})"},
+             std::pair{"bind_attribute", R"({"entity":1,"lane":"points","attribute":"color","default":true,"propery":"x"})"},
+             std::pair{"run_operation", R"({"operation":"mesh_simplify","entity":1,"parms":{}})"}})
+        EXPECT_EQ(R::InvokeAgentOperation(registry, tool, context, arguments, false).ErrorCode, "invalid_params") << tool;
+    EXPECT_EQ(history.UndoCount(), 1u);
+}
+
+// A huge job token returns normally through the dispatch (no regex on the socket path); jobs_cancel reaches
+// its checked token parser, jobs_wait stops earlier here because the empty context has no job service.
+TEST(AgentArgumentSchema, HugeJobTokenReturnsNormally)
+{
+    const auto registry = FullAgentRegistry();
+    const R::AgentOperationContext empty{};
+    const std::string token = std::string(1'000'000, '7') + ":1";
+    EXPECT_TRUE(R::InvokeAgentOperation(registry, "jobs_wait", empty, Json{{"token", token}}.dump(), false).IsError);
+    EXPECT_EQ(R::InvokeAgentOperation(registry, "jobs_cancel", empty, Json{{"token", token}}.dump(), false).ErrorCode, "invalid_params");
+}
+
+TEST(AgentArgumentSchema, VectorFieldRangesAreRefusedBeforeTheCommand)
+{
+    const auto registry = FullAgentRegistry();
+    R::EditorCommandHistory history;
+    const R::AgentOperationContext context{.History = &history};
+    for (const char* arguments : {
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","line_width":100})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","stride":0})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","color":[2,0,0,1]})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","length":0})"})
+    {
+        const auto outcome = R::InvokeAgentOperation(registry, "vector_field", context, arguments, false);
+        EXPECT_EQ(outcome.ErrorCode, "invalid_params") << arguments << ": " << outcome.Text;
+    }
+    EXPECT_FALSE(history.CanUndo());
 }

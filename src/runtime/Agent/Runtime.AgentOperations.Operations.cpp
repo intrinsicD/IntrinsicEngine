@@ -1018,7 +1018,7 @@ namespace Extrinsic::Runtime
         const std::string configured = Schema(
             R"({"operation":{"type":"string","enum":)" + OperationEnum(nullptr) +
                 R"(,"description":"Operation; its settings come from its config section (config_apply first)."},)" +
-                R"("entity":{"type":"integer","minimum":1,"description":"Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity."},)" +
+                R"("entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity."},)" +
                 R"("params":{"type":"object","description":"Explicit settings of the operations listed with 'params' (the schema per operation is in allOf, keys, defaults and ranges are in the description); omitted keys keep their defaults; enums take their name or integer code. Refused for operations that read a config section."}})",
             R"(["operation"])");
         const std::string configuredSchema = configured.substr(0, configured.size() - 1) + R"(,"allOf":[)" + paramsRules + "]}";

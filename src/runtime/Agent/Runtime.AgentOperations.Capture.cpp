@@ -163,8 +163,8 @@ namespace Extrinsic::Runtime
         constexpr std::string_view kRegionSchema =
             R"("region":{"type":"string","enum":["viewport","window"],"description":"viewport: the 3D scene rectangle (default); window: the whole Sandbox window with its panels"},)"
             R"("preset":{"type":"string","enum":["current","front","back","left","right","top","bottom","isometric"],"description":"Camera for the shot (default current); presets frame fit_entity or the whole scene, and the view is restored afterwards"},)"
-            R"("fit_entity":{"type":"integer","minimum":1,"description":"Stable entity id a preset frames"},)"
-            R"("legend_entity":{"type":"integer","minimum":1,"description":"Append a colormap strip for this entity's scalar coloring and return its range"})";
+            R"("fit_entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Stable entity id a preset frames"},)"
+            R"("legend_entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Append a colormap strip for this entity's scalar coloring and return its range"})";
     }
 
     void RegisterViewCaptureAgentOperations(AgentOperationRegistry& registry)

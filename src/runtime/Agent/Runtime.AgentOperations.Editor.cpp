@@ -870,27 +870,6 @@ namespace Extrinsic::Runtime
                 });
             if (!bad.empty())
                 return InvalidParams("Invalid \"" + bad + "\"; see the schema.");
-            // The schema allows no other key: a misspelt field must not pass as "no change".
-            constexpr std::array<std::string_view, 17> kKeys{"entity",
-                "action",
-                "domain",
-                "property",
-                "visible",
-                "depth_tested",
-                "length_mode",
-                "length",
-                "line_width",
-                "color",
-                "stride",
-                "max_glyphs",
-                "length_property",
-                "color_property",
-                "colormap",
-                "color_auto_range",
-                "color_range"};
-            for (const auto& item : args->items())
-                if (std::ranges::find(kKeys, item.key()) == kKeys.end())
-                    return InvalidParams("Unknown argument \"" + item.key() + "\"; see the schema.");
             if (!edits.empty() && operation != EditorVectorFieldOperation::Update)
                 return InvalidParams("Only update takes layer fields; add uses the panel's defaults.");
 
@@ -1581,7 +1560,7 @@ namespace Extrinsic::Runtime
                         R"("length":{"type":"number","exclusiveMinimum":0,"description":"Arrow length (normalized) or scale (raw); multiplies a length property."},)"
                         R"("line_width":{"type":"number","minimum":0.5,"maximum":32},)"
                         R"("color":{"type":"array","items":{"type":"number","minimum":0,"maximum":1},"minItems":4,"maxItems":4,"description":"Uniform RGBA, drawn while color_property is Default."},)"
-                        R"("stride":{"type":"integer","minimum":1},"max_glyphs":{"type":"integer","minimum":0},)"
+                        R"("stride":{"type":"integer","minimum":1,"maximum":4294967295},"max_glyphs":{"type":"integer","minimum":0,"maximum":4294967295},)"
                         R"("length_property":{"type":"string","description":"Scalar property multiplying each arrow's length; empty is Default."},)"
                         R"("color_property":{"type":"string","description":"Scalar or vec3/vec4 property coloring each arrow; empty is Default."},)"
                         R"("colormap":{"type":"string","enum":[)" +
@@ -1613,10 +1592,10 @@ namespace Extrinsic::Runtime
                    R"("pose":{"type":"object","properties":{"position":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
                    R"("target":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
                    R"("up":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3,"description":"Default [0,1,0]."}},)"
-                   R"("required":["position","target"]},)"
+                   R"("required":["position","target"],"additionalProperties":false},)"
                    R"("preset":{"type":"string","enum":["front","back","left","right","top","bottom","isometric"]},)"
                    R"("focus":{"type":"boolean","description":"true: frame the entities or the selection."},)"
-                   R"("entities":{"type":"array","items":{"type":"integer","minimum":0},"description":"Stable ids for preset or focus."}})"),
+                   R"("entities":{"type":"array","items":{"type":"integer","minimum":0,"maximum":4294967295},"description":"Stable ids for preset or focus."}})"),
             false, SetCamera);
         add("history", "Undo history", "Undo/redo availability, top labels, counts and dirty state.", none, true, History);
         const std::string steps = Schema(R"({"steps":{"type":"integer","minimum":1,"maximum":64,"default":1}})");
@@ -1644,7 +1623,7 @@ namespace Extrinsic::Runtime
             "Background jobs with token, state, progress and elapsed time; editor jobs also name the entity and output they "
             "write, the requested and resolved backend (cpu, gpu_compute, gpu_graphics, auto; null while unknown), the run's "
             "diagnostic and whether jobs_cancel accepts them (cancellable).", none, true, JobsList);
-        const std::string tokenProperty = R"("token":{"type":"string","pattern":"^[0-9]+:[0-9]+$","description":"Job token from jobs_list, e.g. 3:1."})";
+        const std::string tokenProperty = R"("token":{"type":"string","description":"Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1."})";
         add("jobs_wait", "Wait for a job",
             "Wait until a job ended (finished: true) or timeout_ms passed (timed_out: true), while frames keep running. Name the "
             "job by token, or by entity and output (the newest editor run writing that output when called). A job that ended "

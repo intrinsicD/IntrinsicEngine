@@ -98,7 +98,7 @@ export namespace Extrinsic::Runtime
     class AgentOperationRegistry
     {
     public:
-        // Fails for empty or duplicate names and missing invokers.
+        // Fails for empty or duplicate names, missing invokers and unsupported input schemas.
         [[nodiscard]] bool Register(AgentOperationSpec spec);
         [[nodiscard]] const AgentOperationSpec* Find(std::string_view name) const noexcept;
         [[nodiscard]] std::span<const AgentOperationSpec> Entries() const noexcept { return m_Entries; }
@@ -107,11 +107,18 @@ export namespace Extrinsic::Runtime
         std::vector<AgentOperationSpec> m_Entries{};
     };
 
-    // Runs one operation: unknown names and mutating operations in a read-only session are
-    // errors; history entries recorded during the call are labeled "Agent: <label>".
+    // Runs one operation: unknown names, mutating operations in a read-only session and arguments
+    // that violate the input schema (invalid_params) are errors before it runs; history entries recorded during the call are labeled "Agent: <label>".
     [[nodiscard]] AgentOperationOutcome InvokeAgentOperation(
         const AgentOperationRegistry& registry, std::string_view name,
         const AgentOperationContext& context, std::string_view argumentsJson, bool readOnlySession);
+
+    // RUNTIME-326: the JSON Schema subset of tool input schemas. A schema is supported when it
+    // parses and uses only the checked keywords (and annotations); validation returns the first
+    // violation ("unknown argument \"x\"", "\"a\" must be at least 1", ...) or nothing.
+    [[nodiscard]] bool IsSupportedAgentSchemaJson(std::string_view schemaJson);
+    [[nodiscard]] std::optional<std::string> ValidateAgentArgumentsJson(
+        std::string_view schemaJson, std::string_view argumentsJson);
 
     // Resolves a user-supplied path against the allowed roots (relative paths resolve
     // against the first root); nullopt when it escapes every root or no root is set.

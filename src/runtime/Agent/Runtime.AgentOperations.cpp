@@ -67,7 +67,8 @@ namespace Extrinsic::Runtime
 
     bool AgentOperationRegistry::Register(AgentOperationSpec spec)
     {
-        if (spec.Name.empty() || !spec.Invoke || Find(spec.Name) != nullptr) return false;
+        if (spec.Name.empty() || !spec.Invoke || Find(spec.Name) != nullptr || !IsSupportedAgentSchemaJson(spec.InputSchemaJson))
+            return false;
         m_Entries.push_back(std::move(spec));
         return true;
     }
@@ -102,8 +103,11 @@ namespace Extrinsic::Runtime
                 return {.IsError = true,
                         .Text = "'" + spec->Name + "' needs a presented frame, but the Sandbox window is minimized; restore it and retry.",
                         .ErrorCode = "viewport_not_presentable"};
+            const std::string_view arguments = argumentsJson.empty() ? std::string_view{"{}"} : argumentsJson;
+            if (auto violation = ValidateAgentArgumentsJson(spec->InputSchemaJson, arguments))
+                return {.IsError = true, .Text = "Invalid arguments: " + *violation + "; see the schema.", .ErrorCode = "invalid_params"};
             const ScopedEditorCommandLabelPrefix prefix{context.History, "Agent: "};
-            return spec->Invoke(context, argumentsJson.empty() ? std::string_view{"{}"} : argumentsJson);
+            return spec->Invoke(context, arguments);
         };
         auto outcome = invoke();
         if (!record) return outcome;

@@ -1295,7 +1295,8 @@ TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
         invalid({{"operation", "mesh_simplify"}, {"entity", grid}, {"params", {{"metric", "bogus"}}}}, "enum value outside the list");
         // Ranges are the command owners': the agent cannot ask for more than the panel's controls allow.
         const auto range = invalid({{"operation", "mesh_subdivide"}, {"entity", grid}, {"params", {{"iterations", 30}}}}, "subdivide iterations");
-        rig.Check(range.find("1 to 10") != std::string::npos, "the range is reported: " + range);
+        // RUNTIME-326: the dispatch reports the violated bound of the declared range.
+        rig.Check(range.find("\"params/iterations\" must be at most 10") != std::string::npos, "the range is reported: " + range);
         invalid({{"operation", "mesh_remesh"}, {"entity", grid}, {"params", {{"iterations", 65}}}}, "remesh iterations");
         invalid({{"operation", "mesh_denoise"}, {"entity", grid}, {"params", {{"vertex_iterations", 5000}}}}, "denoise iterations");
         invalid({{"operation", "mesh_denoise"}, {"entity", grid}, {"params", {{"sigma_spatial", -1.0}}}}, "negative sigma");

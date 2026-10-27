@@ -257,6 +257,7 @@ target_sources(${target_name}
         Config/Runtime.EngineConfigControl.cpp
         Config/Runtime.ConfigFieldSpec.cpp
         Agent/Runtime.AgentOperations.cpp
+        Agent/Runtime.AgentOperations.ArgumentSchema.cpp
         Agent/Runtime.AgentOperations.Editor.cpp
         Agent/Runtime.AgentOperations.PropertyInspection.cpp
         Agent/Runtime.AgentOperations.Operations.cpp
