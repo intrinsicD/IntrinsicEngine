@@ -41,20 +41,25 @@ namespace Extrinsic::Graphics
             const bool rowsValid = packet.RowBufferSourceKey.empty()
                 ? packet.RowCount == packet.ElementCount && packet.RowBufferBDA == 0u
                 : packet.RowBufferBDA != 0u;
-            return !packet.Name.empty() && packet.ElementCount > 0u &&
-                   packet.RowCount > 0u && packet.RowCount <= packet.ElementCount &&
-                   packet.PositionBufferBDA != 0u && packet.VectorBufferBDA != 0u &&
-                   rowsValid;
+            return !packet.Name.empty() && packet.ElementCount > 0u && packet.RowCount > 0u &&
+                packet.RowCount <= packet.ElementCount && packet.PositionBufferBDA != 0u &&
+                packet.VectorBufferBDA != 0u && rowsValid &&
+                   // UI-083: a named length or color buffer must have resolved.
+                (packet.LengthBufferSourceKey.empty() || packet.LengthBufferBDA != 0u) &&
+                (packet.ColorMode == VectorFieldColorMode::Uniform || packet.ColorBufferBDA != 0u);
         }
+
+        [[nodiscard]] bool SupportedColormap(Colormap::Type type) noexcept;
 
         [[nodiscard]] bool VectorFieldStyleValid(const VectorFieldOverlayPacket& packet) noexcept
         {
-            return IsFinite(packet.Scale) && packet.Scale > 0.f &&
-                   IsFinite(packet.Color) && packet.RowStride > 0u &&
-                   IsFinite(packet.LineWidthPx) &&
-                   packet.LineWidthPx >= kVectorFieldMinLineWidthPx &&
-                   packet.LineWidthPx <= kVectorFieldMaxLineWidthPx &&
-                   IsFinite(packet.ObjectToWorld);
+            return IsFinite(packet.Scale) && packet.Scale > 0.f && IsFinite(packet.Color) && packet.RowStride > 0u &&
+                IsFinite(packet.LineWidthPx) && packet.LineWidthPx >= kVectorFieldMinLineWidthPx &&
+                packet.LineWidthPx <= kVectorFieldMaxLineWidthPx && IsFinite(packet.ObjectToWorld) &&
+                (packet.ColorMode != VectorFieldColorMode::Colormap ||
+                    (SupportedColormap(packet.ColorMap) && IsFinite(packet.ColorRangeMin) &&
+                        IsFinite(packet.ColorRangeMax) && packet.ColorRangeMin < packet.ColorRangeMax)) &&
+                packet.ColorMode <= VectorFieldColorMode::Rgba;
         }
 
         [[nodiscard]] bool ValidRange(const float minValue, const float maxValue) noexcept

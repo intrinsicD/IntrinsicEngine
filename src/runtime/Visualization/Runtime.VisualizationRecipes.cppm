@@ -283,7 +283,34 @@ export namespace Extrinsic::Runtime
         glm::vec4 Color{1.0f};
         bool DepthTested{true};
         bool CopyPayloads{true};
+        // UI-083: optional per-element length multipliers (+inf marks an invalid value) and
+        // colors (colormap scalars, +inf invalid; or RGBA, negative invalid). A nonzero address
+        // replaces the span with a resident buffer (a GPU preview front). Never copied: the
+        // spans are lent like borrowed vectors.
+        std::string LengthKey{};
+        std::span<const float> Lengths{};
+        std::uint64_t LengthBDA{0u};
+        std::uint64_t LengthStamp{0u};
+        Graphics::VectorFieldColorMode ColorMode{Graphics::VectorFieldColorMode::Uniform};
+        std::string ColorKey{};
+        std::span<const float> ColorScalars{};
+        std::span<const glm::vec4> ColorRgba{};
+        std::uint64_t ColorBDA{0u};
+        std::uint64_t ColorStamp{0u};
+        Graphics::Colormap::Type ColorMap{Graphics::Colormap::Type::Viridis};
+        float ColorRangeMin{0.0f};
+        float ColorRangeMax{1.0f};
     };
+
+    // The overlay's auto range (2-98 % quantiles from 64 values on, a constant range widened by
+    // ±0.5) over the finite values; infinite ones are skipped. False without a finite value.
+    [[nodiscard]] bool ComputeVisualizationAutoRange(std::span<const float> values, float& minValue, float& maxValue);
+
+    // The overlay's checked conversion of a scalar property (float, double, int32, uint32, uint64
+    // or bool) to one float per element; a value that is NaN, infinite, outside float range or an
+    // integer float cannot hold exactly becomes +inf. False when `name` is no scalar property.
+    [[nodiscard]] bool ConvertVisualizationScalars(
+        const Geometry::PropertySet& properties, std::string_view name, std::vector<float>& out);
 
     // Smallest stride >= `stride` that draws at most `maxGlyphs` of
     // `rowCount` rows (`maxGlyphs == 0` keeps `stride`).

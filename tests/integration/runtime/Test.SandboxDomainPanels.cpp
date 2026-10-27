@@ -867,6 +867,158 @@ TEST(SandboxDomainPanels, VectorFieldSectionAddsEditsAndRemovesFieldsWithoutVisi
     engine.Shutdown();
 }
 
+// UI-083 (question 7 for arrows): binding a color property disables the uniform arrow color and
+// keeps it; with a length property bound the length multiplier stays editable; Default restores
+// the remembered color; undo and redo restore whole layers.
+TEST(SandboxDomainPanels, VectorFieldColorPropertyKeepsTheRememberedUniformColor)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(raw, entity, mesh);
+    raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    (void)raw.get<GS::Faces>(entity).Properties.GetOrAdd<float>("f:heat", 2.0f);
+    const glm::vec4 remembered{0.2f, 0.4f, 0.6f, 1.0f};
+    raw.emplace<Runtime::GeometryPresentationRecipe>(entity,
+        Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
+            .VectorFields = {Runtime::GeometryVectorFieldLayerRecipe{
+                .Vector = {.Domain = Runtime::GeometryElementDomain::MeshFace,
+                    .Name = "f:flow",
+                    .ValueKind = Geometry::PropertyValueKind::Vec3},
+                .Length = 0.5f,
+                .Color = remembered,
+            }},
+        });
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+    auto* history = engine.Services().Find<Runtime::EditorCommandHistory>();
+    ASSERT_NE(history, nullptr);
+
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("scene.appearance", true));
+
+    const auto layer = [&]() -> Runtime::GeometryVectorFieldLayerRecipe
+    {
+        const auto* recipe = raw.try_get<Runtime::GeometryPresentationRecipe>(entity);
+        const auto* found = recipe != nullptr
+            ? Runtime::FindGeometryVectorFieldLayer(*recipe, Runtime::GeometryElementDomain::MeshFace, "f:flow")
+            : nullptr;
+        return found != nullptr ? *found : Runtime::GeometryVectorFieldLayerRecipe{};
+    };
+    const auto selectInPopup = [](const char* label)
+    {
+        const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+        if (popups.empty() || popups.back().Window == nullptr)
+            return false;
+        ImGui::ActivateItemByID(popups.back().Window->GetID(label));
+        return true;
+    };
+    Runtime::GeometryVectorFieldLayerRecipe bound{};
+
+    int frame = 0;
+    int step = 0;
+    driver->OnFrame = [&](Runtime::Engine& kernel)
+    {
+        ++frame;
+        auto* window = ImGui::FindWindowByName("Appearance");
+        if (frame < 3)
+            return;
+        if (window == nullptr || frame > 200)
+        {
+            ADD_FAILURE() << "Appearance automation stalled at step " << step;
+            kernel.RequestExit();
+            return;
+        }
+        ImGui::SetWindowSize(window, ImVec2{600.0f, 1100.0f});
+        if (frame % 3 != 0)
+            return;
+        const ImGuiID section = ImHashStr("vector-fields", 0, window->ID);
+        const ImGuiID row = ImHashStr("Facesf:flow", 0, section);
+        const ImGuiID colorRed = ImHashStr("##X", 0, ImHashStr("Color", 0, row));
+        const ImGuiID length = ImHashStr("###length", 0, row);
+        switch (step)
+        {
+        case 0:
+            ImGui::FocusWindow(window);
+            window->DC.StateStorage->SetInt(ImHashStr("Vector fields", 0, window->ID), 1);
+            for (const char* lane : {"Vertices", "Edges", "Faces"})
+                window->DC.StateStorage->SetInt(ImHashStr(lane, 0, window->ID), 0);
+            break;
+        case 1: ImGui::ActivateItemByID(ImHashStr("Color property", 0, row)); break;
+        case 2: EXPECT_TRUE(selectInPopup("f:heat")) << "Color property dropdown did not open"; break;
+        case 3:
+            EXPECT_EQ(layer().ColorProperty, "f:heat");
+            EXPECT_EQ(layer().Color, remembered) << "binding keeps the uniform color";
+            // A typed red channel would change the color if a bound layer wrote its uniform color.
+            ImGui::ActivateItemByID(colorRed);
+            ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+            break;
+        case 4: ImGui::GetIO().AddInputCharactersUTF8("9"); break;
+        case 5: ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true); break;
+        case 6:
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+            EXPECT_EQ(layer().Color, remembered) << "a bound layer's uniform color is not written";
+            ImGui::ClearActiveID();
+            ImGui::ActivateItemByID(ImHashStr("Length property", 0, row));
+            break;
+        case 7: EXPECT_TRUE(selectInPopup("f:heat")) << "Length property dropdown did not open"; break;
+        case 8:
+            EXPECT_EQ(layer().LengthProperty, "f:heat");
+            ImGui::ActivateItemByID(length);
+            ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+            break;
+        case 9:  ImGui::GetIO().AddInputCharactersUTF8("2"); break;
+        case 10: ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true); break;
+        case 11:
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+            EXPECT_FLOAT_EQ(layer().Length, 2.0f) << "the multiplier stays editable with a length property bound";
+            bound = layer();
+            ImGui::ClearActiveID();
+            ImGui::ActivateItemByID(ImHashStr("Color property", 0, row));
+            break;
+        case 12: EXPECT_TRUE(selectInPopup("Default")) << "Color property dropdown did not reopen"; break;
+        case 13:
+        {
+            const auto restored = layer();
+            EXPECT_TRUE(restored.ColorProperty.empty());
+            EXPECT_EQ(restored.Color, remembered) << "Default restores the remembered color";
+            ASSERT_EQ(history->Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+            EXPECT_EQ(layer(), bound) << "undo restores the whole bound layer";
+            ASSERT_EQ(history->Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+            EXPECT_EQ(layer(), restored) << "redo restores the whole default layer";
+            kernel.RequestExit();
+            break;
+        }
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 14);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
 // UI-051: the Properties and Selection windows of the PointCloud and Graph
 // kinds gate on the element-domain data they read, not on entity provenance.
 namespace

@@ -30,6 +30,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <bit>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -8686,6 +8687,217 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldShaderHandlesDepthLengthModesV
     // plane to z = 7. Its visible part must still be drawn.
     const glm::vec3 nearSample = kVectorProbes[7].Anchor + glm::vec3{0.0f, 0.0f, 0.3f};
     EXPECT_TRUE(IsCyan(frame.At(nearSample))) << text(frame.At(nearSample));
+}
+
+// --- UI-083 slice 4: per-arrow length and color properties ---
+namespace
+{
+// One point per row; `Layer` names the layer whose vector is nonzero there (0: none, the
+// deleted point 0 included). Every arrow points along +x.
+    struct StyledProbe
+    {
+        glm::vec3 Anchor;
+        int Layer;
+        float Length;
+        float Heat;
+        glm::vec4 Rgba;
+        float Huge;
+        float Tiny;
+        float Sub{0.0f};
+    };
+
+    constexpr float kStyledNaN = std::numeric_limits<float>::quiet_NaN();
+    const float kTinyLow = std::bit_cast<float>(0x00800003u);
+    const float kTinyHigh = std::bit_cast<float>(0x00800004u);
+// Denormal floats, which a GPU may flush to zero as arithmetic operands.
+    const float kSubLow = std::bit_cast<float>(0x00000001u);
+    const float kSubMiddle = std::bit_cast<float>(0x00000003u);
+    const float kSubHigh = std::bit_cast<float>(0x00000004u);
+    const glm::vec4 kNoRgba{0.0f, 0.0f, 0.0f, 1.0f};
+
+// Probes sit at z = 0, left and right of the reference triangle.
+    const std::array<StyledProbe, 19> kStyledProbes{{
+        {{-2.0f, -0.9f, 0.0f}, 1, 3.0f, 20.0f, kNoRgba, 0.0f, kTinyLow},       // 0: deleted
+        {{-2.0f, 1.0f, 0.0f}, 1, 1.0f, 10.0f, kNoRgba, 0.0f, kTinyLow},        // 1: short, blue
+        {{-2.0f, 0.8f, 0.0f}, 1, 3.0f, 20.0f, kNoRgba, 0.0f, kTinyLow},        // 2: long, dark red
+        {{-2.0f, 0.6f, 0.0f}, 1, kStyledNaN, 10.0f, kNoRgba, 0.0f, kTinyLow},  // 3: no arrow
+        {{-1.9f, 0.4f, 0.0f}, 1, -1.0f, 10.0f, kNoRgba, 0.0f, kTinyLow},       // 4: no arrow
+        {{-2.0f, 0.2f, 0.0f}, 1, 0.0f, 10.0f, kNoRgba, 0.0f, kTinyLow},        // 5: no arrow
+        {{-2.0f, 0.0f, 0.0f}, 1, 1.0f, kStyledNaN, kNoRgba, 0.0f, kTinyLow},   // 6: uniform magenta
+        {{-2.0f, -0.2f, 0.0f}, 2, 1.0f, 0.0f, {0.0f, 1.0f, 1.0f, 0.5f}, 0.0f, kTinyLow},     // 7: half cyan
+        {{-2.0f, -0.4f, 0.0f}, 2, 1.0f, 0.0f, {kStyledNaN, 0.0f, 0.0f, 1.0f}, 0.0f, kTinyLow}, // 8: magenta
+        {{-2.0f, -0.6f, 0.0f}, 3, 2.0f, 0.0f, kNoRgba, 0.0f, kTinyLow},        // 9: raw, 0.2 long
+        {{0.9f, 1.0f, 0.0f}, 4, 1.0f, 0.0f, kNoRgba, -3.0e38f, kTinyLow},      // 10: blue
+        {{0.9f, 0.8f, 0.0f}, 4, 1.0f, 0.0f, kNoRgba, 0.0f, kTinyLow},          // 11: middle
+        {{0.9f, 0.6f, 0.0f}, 4, 1.0f, 0.0f, kNoRgba, 3.0e38f, kTinyLow},       // 12: dark red
+        {{0.9f, 0.4f, 0.0f}, 5, 1.0f, 0.0f, kNoRgba, 0.0f, kTinyLow},          // 13: blue
+        {{0.9f, 0.2f, 0.0f}, 5, 1.0f, 0.0f, kNoRgba, 0.0f, kTinyHigh},         // 14: dark red
+        {{1.5f, -0.9f, 0.0f}, 0, 1.0f, 0.0f, kNoRgba, 0.0f, kTinyLow},         // 15: background
+        {{0.9f, 0.0f, 0.0f}, 6, 1.0f, 0.0f, kNoRgba, 0.0f, kTinyLow, kSubLow},     // 16: blue
+        {{0.9f, -0.2f, 0.0f}, 6, 1.0f, 0.0f, kNoRgba, 0.0f, kTinyLow, kSubMiddle}, // 17: 2/3
+        {{0.9f, -0.4f, 0.0f}, 6, 1.0f, 0.0f, kNoRgba, 0.0f, kTinyLow, kSubHigh},   // 18: dark red
+    }};
+
+    void AddStyledVectorProbeEntity(Engine& engine)
+    {
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        auto& raw = scene.Raw();
+        const EntityHandle probe = scene.Create();
+        raw.emplace<ECSC::Transform::WorldMatrix>(probe).Matrix = glm::mat4{1.0f};
+        Geometry::PointCloud::Cloud cloud;
+        for (const StyledProbe& point : kStyledProbes)
+            (void)cloud.AddPoint(point.Anchor);
+        gs::PopulateFromCloud(raw, probe, cloud);
+        auto& vertices = raw.get<gs::Vertices>(probe).Properties;
+        const std::array<const char*, 6> vectors{"v:dirA", "v:dirB", "v:dirC", "v:dirD", "v:dirE", "v:dirF"};
+        for (std::size_t layer = 0u; layer < vectors.size(); ++layer)
+        {
+            auto values = vertices.GetOrAdd<glm::vec3>(vectors[layer], glm::vec3{0.0f});
+            for (std::size_t i = 0u; i < kStyledProbes.size(); ++i)
+            {
+                if (kStyledProbes[i].Layer == static_cast<int>(layer + 1u))
+                    values.Vector()[i] = layer == 2u ? glm::vec3{0.5f, 0.0f, 0.0f} : glm::vec3{1.0f, 0.0f, 0.0f};
+            }
+        }
+        auto len = vertices.GetOrAdd<float>("v:len", 0.0f);
+        auto heat = vertices.GetOrAdd<float>("v:heat", 0.0f);
+        auto rgba = vertices.GetOrAdd<glm::vec4>("v:rgba", kNoRgba);
+        auto huge = vertices.GetOrAdd<float>("v:huge", 0.0f);
+        auto tiny = vertices.GetOrAdd<float>("v:tiny", 0.0f);
+        auto sub = vertices.GetOrAdd<float>("v:sub", 0.0f);
+        for (std::size_t i = 0u; i < kStyledProbes.size(); ++i)
+        {
+            len.Vector()[i] = kStyledProbes[i].Length;
+            heat.Vector()[i] = kStyledProbes[i].Heat;
+            rgba.Vector()[i] = kStyledProbes[i].Rgba;
+            huge.Vector()[i] = kStyledProbes[i].Huge;
+            tiny.Vector()[i] = kStyledProbes[i].Tiny;
+            sub.Vector()[i] = kStyledProbes[i].Sub;
+        }
+        vertices.GetOrAdd<bool>("v:deleted", false).Vector()[0] = true;
+
+        using D = RT::GeometryElementDomain;
+        const auto add = [&](const char* vector, const auto& style)
+        {
+            auto layer = VectorFieldSmokeLayer(D::PointCloudPoint, vector, {1, 0, 1, 1}, true);
+            layer.Length = 0.1f;
+            layer.LineWidthPx = 6.0f;
+            style(layer);
+            EXPECT_EQ(ApplyVectorFieldCommandTo(engine, probe, RT::EditorVectorFieldOperation::Add, layer),
+                RT::EditorCommandStatus::Applied)
+                << vector;
+        };
+        add("v:dirA",
+            [](RT::GeometryVectorFieldLayerRecipe& l)
+            {
+                l.LengthProperty = "v:len";
+                l.ColorProperty = "v:heat";
+                l.ColorMap = Extrinsic::Graphics::Colormap::Type::Jet;
+                l.ColorAutoRange = false;
+                l.ColorRangeMin = 10.0f;
+                l.ColorRangeMax = 20.0f;
+            });
+        add("v:dirB",
+            [](RT::GeometryVectorFieldLayerRecipe& l)
+            {
+                l.ColorProperty = "v:rgba";
+            });
+        add("v:dirC",
+            [](RT::GeometryVectorFieldLayerRecipe& l)
+            {
+                l.LengthMode = RT::GeometryVectorFieldLengthMode::Raw;
+                l.Length = 0.2f;
+                l.LengthProperty = "v:len";
+            });
+        add("v:dirD",
+            [](RT::GeometryVectorFieldLayerRecipe& l)
+            {
+                l.ColorProperty = "v:huge";
+                l.ColorMap = Extrinsic::Graphics::Colormap::Type::Jet;
+            });
+        add("v:dirE",
+            [](RT::GeometryVectorFieldLayerRecipe& l)
+            {
+                l.ColorProperty = "v:tiny";
+                l.ColorMap = Extrinsic::Graphics::Colormap::Type::Jet;
+                l.ColorAutoRange = false;
+                l.ColorRangeMin = kTinyLow;
+                l.ColorRangeMax = kTinyHigh;
+            });
+        add("v:dirF",
+            [](RT::GeometryVectorFieldLayerRecipe& l)
+            {
+                l.ColorProperty = "v:sub";
+                l.ColorMap = Extrinsic::Graphics::Colormap::Type::Jet;
+                l.ColorAutoRange = false;
+                l.ColorRangeMin = kSubLow;
+                l.ColorRangeMax = kSubHigh;
+            });
+    }
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldArrowsTakeLengthAndColorFromProperties)
+{
+    const auto frame = RunVectorFieldSmoke(VectorFieldSmokeEdit::None, AddStyledVectorProbeEntity);
+    if (frame.Skipped)
+        GTEST_SKIP() << frame.SkipReason;
+    EXPECT_EQ(frame.Stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 6u);
+    const auto along = [](const std::size_t probe, const float distance)
+    {
+        return kStyledProbes[probe].Anchor + glm::vec3{distance, 0.0f, 0.0f};
+    };
+    const auto at = [&](const std::size_t probe, const float distance)
+    {
+        return frame.At(along(probe, distance));
+    };
+    const auto text = [](const RgbaPixel p)
+    {
+        return VectorFieldPixelText(p);
+    };
+    const RgbaPixel background = frame.At(kStyledProbes[15].Anchor);
+    const auto empty = [&](const RgbaPixel p)
+    {
+        return RgbDistance(p, background) < 24;
+    };
+
+    // Lengths: Length 0.1 times the property; NaN, -1 and 0 draw nothing anywhere near the anchor.
+    EXPECT_TRUE(IsBlue(at(1, 0.05f))) << text(at(1, 0.05f));
+    EXPECT_TRUE(empty(at(1, 0.2f))) << "a length-1 arrow is 0.1 long " << text(at(1, 0.2f));
+    EXPECT_TRUE(IsRed(at(2, 0.2f))) << "a length-3 arrow is 0.3 long " << text(at(2, 0.2f));
+    for (const std::size_t probe : {std::size_t{3}, std::size_t{4}, std::size_t{5}})
+    {
+        for (const float distance : {-0.05f, 0.0f, 0.05f})
+            EXPECT_TRUE(empty(at(probe, distance))) << probe << " at " << distance << " " << text(at(probe, distance));
+    }
+    // Raw: 0.2 * 2 * |(0.5, 0, 0)| = 0.2 long; without the multiplier it would end at 0.1.
+    EXPECT_TRUE(IsMagenta(at(9, 0.15f))) << text(at(9, 0.15f));
+
+    // Colors: Jet's ends over 10..20, the uniform color for an invalid scalar or RGBA value, and a
+    // half-transparent cyan blended with the background.
+    EXPECT_TRUE(IsRed(at(2, 0.05f))) << text(at(2, 0.05f));
+    EXPECT_TRUE(IsMagenta(at(6, 0.05f))) << text(at(6, 0.05f));
+    EXPECT_TRUE(IsMagenta(at(8, 0.05f))) << text(at(8, 0.05f));
+    const RgbaPixel half = at(7, 0.05f);
+    EXPECT_GE(half.R, 30) << "not opaque cyan " << text(half);
+    EXPECT_LE(half.R + 30, background.R) << "not the background " << text(half);
+    EXPECT_GT(half.G, half.R + 30) << text(half);
+    EXPECT_GT(half.B, half.R + 30) << text(half);
+
+    // A ±3e38 auto range: both ends and a middle that is neither end.
+    EXPECT_TRUE(IsBlue(at(10, 0.05f))) << text(at(10, 0.05f));
+    EXPECT_TRUE(IsRed(at(12, 0.05f))) << text(at(12, 0.05f));
+    const RgbaPixel middle = at(11, 0.05f);
+    EXPECT_GT(middle.R, 120) << "not the blue end " << text(middle);
+    EXPECT_GT(middle.G, 120) << "not the red end " << text(middle);
+    // A range between adjacent floats keeps its endpoints apart.
+    EXPECT_TRUE(IsBlue(at(13, 0.05f))) << text(at(13, 0.05f));
+    EXPECT_TRUE(IsRed(at(14, 0.05f))) << text(at(14, 0.05f));
+    // A denormal range: both ends and 2/3 of the way (Jet's orange-yellow) stay apart.
+    EXPECT_TRUE(IsBlue(at(16, 0.05f))) << text(at(16, 0.05f));
+    EXPECT_TRUE(IsRed(at(18, 0.05f))) << text(at(18, 0.05f));
+    const RgbaPixel inner = at(17, 0.05f);
+    EXPECT_GT(inner.R, 120) << "not the blue end " << text(inner);
+    EXPECT_GT(inner.G, 120) << "not the red end " << text(inner);
 }
 
 // Clip space is Y-up and every fullscreen blit preserves orientation, so the

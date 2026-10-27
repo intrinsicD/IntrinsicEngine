@@ -113,6 +113,18 @@ export namespace Extrinsic::Graphics
     // Instance `i` draws live row `i * RowStride`. The glyph tip is
     // `anchor + Scale * (NormalizeLength ? normalize(v) : v)` in object space,
     // then both endpoints are transformed by `ObjectToWorld`.
+    //
+    // UI-083: an optional per-element float length buffer multiplies `Scale`; a
+    // value that is not > 0 or infinite draws no glyph. An optional color buffer
+    // holds colormap scalars (an infinite or NaN value, or an unready colormap,
+    // keeps `Color`) or RGBA colors (a negative component keeps `Color`).
+    enum class VectorFieldColorMode : std::uint8_t
+    {
+        Uniform = 0,
+        Colormap,
+        Rgba,
+    };
+
     struct VectorFieldOverlayPacket
     {
         std::string Name{};
@@ -133,6 +145,19 @@ export namespace Extrinsic::Graphics
         glm::vec4 Color{1.f};
         // Selects the depth-tested or always-on-top pipeline variant.
         bool DepthTested{true};
+        // Per-element length multipliers (ScalarFloat, ElementCount values); empty key and
+        // zero address: uniform length.
+        std::string LengthBufferSourceKey{};
+        std::uint64_t LengthBufferBDA{0u};
+        VectorFieldColorMode ColorMode{VectorFieldColorMode::Uniform};
+        // ScalarFloat for Colormap, RgbaFloat4 for Rgba; ElementCount values.
+        std::string ColorBufferSourceKey{};
+        std::uint64_t ColorBufferBDA{0u};
+        Colormap::Type ColorMap{Colormap::Type::Viridis};
+        float ColorRangeMin{0.f};
+        float ColorRangeMax{1.f};
+        // Filled by the renderer from the colormap system; 0 (invalid) until it is ready.
+        std::uint32_t ColormapBindlessIndex{0u};
     };
 
     inline constexpr float kVectorFieldMinLineWidthPx = 0.5f;

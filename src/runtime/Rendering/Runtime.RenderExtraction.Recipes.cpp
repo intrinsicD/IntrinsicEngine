@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <cstddef>
 #include <cmath>
 #include <algorithm>
@@ -183,14 +184,9 @@ namespace Extrinsic::Runtime
                 if (scalar->AutoRange && front->ScalarRange)
                 {
                     scalar->AutoRange = false;
-                    scalar->RangeMin = (*front->ScalarRange)[0];
-                    scalar->RangeMax = (*front->ScalarRange)[1];
-                    if (scalar->RangeMin == scalar->RangeMax)
-                    {
-                        const float extent = std::max(0.5f, std::abs(scalar->RangeMin) * 1e-5f);
-                        (void)Graphics::ExpandConstantScalarRange(
-                            scalar->RangeMin, extent, scalar->RangeMin, scalar->RangeMax);
-                    }
+                    const std::array<float, 2> range = WidenGpuFrontScalarRange(*front->ScalarRange);
+                    scalar->RangeMin = range[0];
+                    scalar->RangeMax = range[1];
                 }
                 ++stats.VisualizationRecipeScalarGpuFrontsObserved;
             }
@@ -294,6 +290,16 @@ namespace Extrinsic::Runtime
         }
 
         m_VisualizationState.Batch.Append(std::move(encoded.Batch));
+    }
+
+    std::array<float, 2> WidenGpuFrontScalarRange(std::array<float, 2> range) noexcept
+    {
+        if (range[0] == range[1])
+        {
+            const float extent = std::max(0.5f, std::abs(range[0]) * 1e-5f);
+            (void)Graphics::ExpandConstantScalarRange(range[0], extent, range[0], range[1]);
+        }
+        return range;
     }
 
     void RenderExtractionCache::SetGpuPropertyObserver(GpuPropertyObserver observer)

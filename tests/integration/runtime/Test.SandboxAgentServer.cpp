@@ -1891,6 +1891,105 @@ TEST(SandboxAgentServer, BindAttributeRebindsRefusesAndRestoresTheDefault)
     EXPECT_TRUE(canonicalUnchanged) << "canonical positions are never written";
 }
 
+// UI-083: vector_field runs the panel's command: add takes the panel's defaults, update binds the
+// per-arrow length and color properties, an unresolvable property is refused, and every call is
+// one undo step; vector_fields lists what the panel offers.
+TEST(SandboxAgentServer, VectorFieldAddsStylesRefusesAndUndoes)
+{
+    AgentRig rig("vectorfield");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto mesh = rig.AddGrid();
+    {
+        auto& vertices = rig.Scene().Raw().get<GS::Vertices>(R::SelectionController::ToEntityHandle(mesh)).Properties;
+        (void)vertices.GetOrAdd<glm::vec3>("flow", glm::vec3{1.0f, 0.0f, 0.0f});
+        auto heat = vertices.GetOrAdd<float>("heat", 0.0f);
+        for (std::size_t i = 0; i < vertices.Size(); ++i)
+            heat[i] = float(i);
+    }
+    rig.Run(
+        [&](Client& c)
+        {
+            bool isError = true;
+            const auto undoCount = [&]
+            {
+                return c.Tool("history")["undo_count"].get<int>();
+            };
+            const Json field{{"entity", mesh}, {"domain", "MeshVertex"}, {"property", "flow"}};
+            const auto call = [&](const char* action, Json extra = Json::object())
+            {
+                Json arguments = field;
+                arguments["action"] = action;
+                arguments.update(extra);
+                return c.Request("tools/call", {{"name", "vector_field"}, {"arguments", arguments}});
+            };
+        // An unknown operation answers without "result"; read fields only where they exist.
+            const auto layer = [](const Json& reply)
+            {
+                return reply.contains("layers") && !reply["layers"].empty() ? reply["layers"][0] : Json::object();
+            };
+            const auto layerCount = [](const Json& reply)
+            {
+                return reply.contains("layers") ? reply["layers"].size() : std::size_t{99};
+            };
+            const int before = undoCount();
+            const auto added = c.Tool("vector_field",
+                Json{{"entity", mesh}, {"domain", "MeshVertex"}, {"property", "flow"}, {"action", "add"}},
+                &isError);
+            rig.Check(!isError && added["status"] == "Applied" && layerCount(added) == 1u &&
+                    layer(added).value("length", 1.0) != 1.0 && layer(added).value("length_property", "?") == "",
+                "add takes the panel's bounding-box length and no style property: " + added.dump());
+            rig.Check(undoCount() == before + 1, "add is one undo step");
+
+            const auto updated = c.Tool("vector_field",
+                Json{{"entity", mesh},
+                    {"domain", "MeshVertex"},
+                    {"property", "flow"},
+                    {"action", "update"},
+                    {"length_property", "heat"},
+                    {"color_property", "heat"},
+                    {"colormap", "Jet"},
+                    {"color_auto_range", false},
+                    {"color_range", {0.0, 8.0}}},
+                &isError);
+            rig.Check(!isError && updated["status"] == "Applied" &&
+                    layer(updated).value("length_property", "") == "heat" &&
+                    layer(updated).value("color_property", "") == "heat" &&
+                    layer(updated).value("colormap", "") == "Jet" &&
+                    layer(updated).value("color_auto_range", true) == false &&
+                    layer(updated).value("color_range", Json()) == Json({0.0, 8.0}),
+                "update binds length and color: " + updated.dump());
+            rig.Check(undoCount() == before + 2, "update is one undo step");
+
+            const auto refused = call("update", {{"color_property", "missing"}});
+            const Json::json_pointer errorCode{"/result/structuredContent/error/code"};
+            rig.Check(refused.contains(errorCode) && refused[errorCode] == "invalid_visualization_property",
+                "a property that does not resolve is refused: " + refused.dump());
+            rig.Check(undoCount() == before + 2, "the refusal changes nothing");
+
+            const auto listing = c.Tool("vector_fields", {{"entity", mesh}}, &isError);
+            bool offersHeat = false;
+            for (const auto& domain : listing.value("domains", Json::array()))
+                for (const auto& option : domain.value("style_properties", Json::array()))
+                    offersHeat = offersHeat ||
+                        (domain["domain"] == "MeshVertex" && option["name"] == "heat" && option["scalar"] == true);
+            rig.Check(!isError && offersHeat && layerCount(listing) == 1u &&
+                    layer(listing).value("length_property", "") == "heat" && layer(listing).value("status", "?") == "",
+                "the listing offers heat and shows the bound layer: " + listing.dump());
+
+            const auto removed = c.Tool("vector_field",
+                Json{{"entity", mesh}, {"domain", "MeshVertex"}, {"property", "flow"}, {"action", "remove"}},
+                &isError);
+            rig.Check(
+                !isError && removed["status"] == "Applied" && layerCount(removed) == 0u, "remove: " + removed.dump());
+            rig.Check(undoCount() == before + 3, "remove is one undo step");
+            const auto undone = c.Tool("undo", Json::object(), &isError);
+            rig.Check(!isError && undone.contains("undone") && undone["undone"].size() == 1u, "undo: " + undone.dump());
+            const auto restored = c.Tool("vector_fields", {{"entity", mesh}}, &isError);
+            rig.Check(layerCount(restored) == 1u && layer(restored).value("color_property", "") == "heat",
+                "undo brings the styled layer back: " + restored.dump());
+        });
+}
+
 // RUNTIME-316: show_property is the Color binding (one mechanism, the lane overlay): it and
 // bind_attribute color see and replace each other's choice, and refusals carry typed codes.
 TEST(SandboxAgentServer, ShowPropertyIsTheColorBinding)

@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -28,6 +29,8 @@
 
 #include <gtest/gtest.h>
 
+import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.Pass.VisualizationOverlay;
 import Extrinsic.Graphics.Renderer;
@@ -594,6 +597,150 @@ TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryPacketStateAndStri
     EXPECT_FLOAT_EQ(record.Scale, 0.25f);
     EXPECT_FLOAT_EQ(record.LineWidthPx, 3.0f);
     EXPECT_EQ(record.Flags & Graphics::kVisualizationVectorFieldNormalizeFlag, 0u);
+}
+
+// UI-083: the 144-byte record carries the per-element length and color buffers, the color kind
+// and the colormap range; a named style buffer that did not resolve skips the packet.
+TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryLengthAndColorBuffers)
+{
+    static_assert(sizeof(Graphics::VisualizationVectorFieldDrawRecord) == 144u);
+    Graphics::VectorFieldOverlayPacket colormap{
+        .Name = "Test.VectorField.Colormap",
+        .ElementCount = 4u,
+        .RowCount = 4u,
+        .PositionBufferBDA = kAnchorBDA,
+        .VectorBufferBDA = kVectorBDA,
+        .LengthBufferSourceKey = "lengths",
+        .LengthBufferBDA = 0x40000u,
+        .ColorMode = Graphics::VectorFieldColorMode::Colormap,
+        .ColorBufferSourceKey = "heat",
+        .ColorBufferBDA = 0x50000u,
+        .ColorMap = Graphics::Colormap::Type::Jet,
+        .ColorRangeMin = 10.0f,
+        .ColorRangeMax = 20.0f,
+        .ColormapBindlessIndex = 7u,
+    };
+    Graphics::VectorFieldOverlayPacket rgba = colormap;
+    rgba.Name = "Test.VectorField.Rgba";
+    rgba.ColorMode = Graphics::VectorFieldColorMode::Rgba;
+    rgba.LengthBufferSourceKey.clear();
+    rgba.LengthBufferBDA = 0u;
+    Graphics::VectorFieldOverlayPacket unresolvedLength = colormap;
+    unresolvedLength.LengthBufferBDA = 0u;
+    Graphics::VectorFieldOverlayPacket unresolvedColor = colormap;
+    unresolvedColor.ColorBufferBDA = 0u;
+    EXPECT_TRUE(Graphics::IsRenderableVectorFieldPacket(colormap));
+    EXPECT_TRUE(Graphics::IsRenderableVectorFieldPacket(rgba));
+    EXPECT_FALSE(Graphics::IsRenderableVectorFieldPacket(unresolvedLength));
+    EXPECT_FALSE(Graphics::IsRenderableVectorFieldPacket(unresolvedColor));
+
+    MockDevice device;
+    device.FramesInFlight = 2u;
+    RHI::BufferManager bufferManager{device};
+    Graphics::VisualizationOverlayUploadHelper helper{device, bufferManager};
+    helper.BeginFrame(0u, device.FramesInFlight);
+    const std::array<Graphics::VectorFieldOverlayPacket, 4> packets{unresolvedLength, colormap, unresolvedColor, rgba};
+    const Graphics::VisualizationVectorFieldUploadResult upload = helper.UploadVectorFields(packets);
+    ASSERT_TRUE(upload.Uploaded);
+    ASSERT_EQ(upload.RecordCount, 2u);
+    ASSERT_FALSE(device.BufferWrites.empty());
+    const auto& write = device.BufferWrites.back();
+    ASSERT_EQ(write.Data.size(), 2u * sizeof(Graphics::VisualizationVectorFieldDrawRecord));
+    std::array<Graphics::VisualizationVectorFieldDrawRecord, 2> records{};
+    std::memcpy(records.data(), write.Data.data(), write.Data.size());
+
+    EXPECT_EQ(records[0].LengthBufferBDA, 0x40000u);
+    EXPECT_EQ(records[0].ColorBufferBDA, 0x50000u);
+    EXPECT_EQ(records[0].ColormapID, 7u);
+    EXPECT_FLOAT_EQ(records[0].ColorRangeMin, 10.0f);
+    EXPECT_FLOAT_EQ(records[0].ColorRangeMax, 20.0f);
+    EXPECT_EQ(records[0].Flags & Graphics::kVisualizationVectorFieldColormapFlag,
+        Graphics::kVisualizationVectorFieldColormapFlag);
+    EXPECT_EQ(records[0].Flags & Graphics::kVisualizationVectorFieldRgbaFlag, 0u);
+    EXPECT_EQ(records[1].LengthBufferBDA, 0u);
+    EXPECT_EQ(records[1].ColorBufferBDA, 0x50000u);
+    EXPECT_EQ(records[1].Flags & Graphics::kVisualizationVectorFieldColormapFlag, 0u);
+    EXPECT_EQ(
+        records[1].Flags & Graphics::kVisualizationVectorFieldRgbaFlag, Graphics::kVisualizationVectorFieldRgbaFlag);
+}
+
+// UI-083: the renderer resolves the style buffers by key, type and count, and takes the record's
+// colormap index from the colormap system every frame.
+TEST(VisualizationOverlayPassContract, RendererResolvesVectorFieldStyleBuffersAndColormap)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{789u, 1u};
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const std::vector<glm::vec3> anchors(3u, glm::vec3{0.0f});
+    const std::vector<glm::vec3> vectors(3u, glm::vec3{1.0f, 0.0f, 0.0f});
+    const std::vector<float> lengths{1.0f, 2.0f, 3.0f};
+    const std::vector<float> shortLengths{1.0f, 2.0f};
+    const auto descriptor = [](std::string key,
+                                Graphics::VisualizationValueType type,
+                                std::uint32_t count,
+                                std::uint32_t stride,
+                                std::span<const std::byte> bytes)
+    {
+        return Graphics::VisualizationPropertyBufferUploadDescriptor{.SourceKey = std::move(key),
+            .Domain = Graphics::VisualizationAttributeDomain::Vertex,
+            .ValueType = type,
+            .ElementCount = count,
+            .StrideBytes = stride,
+            .DirtyStamp = 1u,
+            .Bytes = bytes};
+    };
+    const std::vector<Graphics::VisualizationPropertyBufferUploadDescriptor> buffers{
+        descriptor(
+            "anchors", Graphics::VisualizationValueType::VectorFloat3, 3u, 12u, std::as_bytes(std::span{anchors})),
+        descriptor(
+            "vectors", Graphics::VisualizationValueType::VectorFloat3, 3u, 12u, std::as_bytes(std::span{vectors})),
+        descriptor("lengths", Graphics::VisualizationValueType::ScalarFloat, 3u, 4u, std::as_bytes(std::span{lengths})),
+        descriptor(
+            "short", Graphics::VisualizationValueType::ScalarFloat, 2u, 4u, std::as_bytes(std::span{shortLengths})),
+    };
+    const Graphics::VectorFieldOverlayPacket base{
+        .Name = "Test.VectorField.Styled",
+        .PositionBufferSourceKey = "anchors",
+        .VectorBufferSourceKey = "vectors",
+        .ElementCount = 3u,
+        .RowCount = 3u,
+        .LengthBufferSourceKey = "lengths",
+        .ColorMode = Graphics::VectorFieldColorMode::Colormap,
+        .ColorBufferSourceKey = "lengths",
+        .ColorMap = Graphics::Colormap::Type::Jet,
+    };
+    Graphics::VectorFieldOverlayPacket wrongCount = base;
+    wrongCount.Name = "Test.VectorField.WrongCount";
+    wrongCount.LengthBufferSourceKey = "short";
+    const std::array<Graphics::VectorFieldOverlayPacket, 2> packets{base, wrongCount};
+
+    for (int frameIndex = 0; frameIndex < 3; ++frameIndex)
+    {
+        RHI::FrameHandle frame{};
+        ASSERT_TRUE(renderer->BeginFrame(frame));
+        renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+            .VisualizationPropertyBuffers =
+                std::span<const Graphics::VisualizationPropertyBufferUploadDescriptor>{buffers.data(), buffers.size()},
+            .VisualizationVectorFields =
+                std::span<const Graphics::VectorFieldOverlayPacket>{packets.data(), packets.size()},
+        });
+        Graphics::RenderWorld world = renderer->ExtractRenderWorld({.Viewport = {.Width = 64, .Height = 64}});
+        ASSERT_EQ(world.Visualization.VectorFields.size(), 2u);
+        const auto& styled = world.Visualization.VectorFields[0];
+        EXPECT_NE(styled.LengthBufferBDA, 0u);
+        EXPECT_EQ(styled.ColorBufferBDA, styled.LengthBufferBDA);
+        EXPECT_EQ(styled.ColormapBindlessIndex,
+            renderer->GetColormapSystem().GetBindlessIndex(Graphics::Colormap::Type::Jet));
+        EXPECT_TRUE(Graphics::IsRenderableVectorFieldPacket(styled));
+        EXPECT_EQ(world.Visualization.VectorFields[1].LengthBufferBDA, 0u) << "a count mismatch does not resolve";
+        EXPECT_FALSE(Graphics::IsRenderableVectorFieldPacket(world.Visualization.VectorFields[1]));
+        renderer->PrepareFrame(world);
+        renderer->ExecuteFrame(frame, world);
+    }
+    EXPECT_TRUE(renderer->GetColormapSystem().IsReady());
+    renderer->Shutdown();
 }
 
 TEST(VisualizationOverlayPassContract, VectorFieldRecordOverflowSkipsUnavailable)

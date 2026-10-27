@@ -190,6 +190,16 @@ export namespace Extrinsic::Runtime
         std::uint32_t Stride{1u};
         std::uint32_t MaxGlyphs{0u};
         bool Enabled{true};
+        // UI-083: optional per-arrow inputs on the vector's own domain (empty: none). The length
+        // property (any scalar kind) multiplies `Length`; the color property is a scalar drawn
+        // through `ColorMap` or a vec3/vec4 drawn as RGB(A). Invalid values: no arrow for the
+        // length, the uniform `Color` for the color.
+        std::string LengthProperty{};
+        std::string ColorProperty{};
+        Graphics::Colormap::Type ColorMap{Graphics::Colormap::Type::Viridis};
+        bool ColorAutoRange{true};
+        float ColorRangeMin{0.0f};
+        float ColorRangeMax{1.0f};
 
         [[nodiscard]] friend bool operator==(
             const GeometryVectorFieldLayerRecipe&,

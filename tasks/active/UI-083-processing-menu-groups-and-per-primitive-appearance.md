@@ -395,73 +395,188 @@ the Vertices Normal row exists since slice 2 but changes nothing on screen.
     view revision without `Normal`; graph/cloud revision tracking only a bound source; fallback +Z
     restored.
 
-### Slice 4 — per-arrow length and color for vector fields (~750 lines)
-Current state:
-- Each arrow is one GPU instance (9 vertices) expanded in
-  `assets/shaders/visualization_vector_field.vert`.
-- Length, LengthMode and Color are uniform fields of the 128-byte
-  `VisualizationVectorFieldDrawRecord` (`Graphics.VisualizationOverlayUploadHelper.cppm:25-40`).
-- The 12 reserved bytes at offsets 116-127 hold one address at most (at 120). Two addresses
-  plus a range do not fit, so the record grows.
-- No agent operation reaches vector fields.
-
-Plan:
-- Spike first: prove a typed per-element buffer resolves by count through the existing packet
-  path (`Graphics.Renderer.cpp:2246-2283`) and that a not-yet-ready colormap index is observable.
-- Recipe (`Runtime.GeometryPresentation.cppm:177`):
-  - Optional `LengthProperty` and `ColorProperty` (`GeometryPropertyRef`, both on
-    `Vector.Domain`), plus `ColorMap`, `ColorAutoRange` and `ColorRangeMin/Max`.
-  - `ValidateGeometryVectorFieldLayers` accepts every scalar kind the Color rows accept (float,
-    double, signed/unsigned integer, bool) through the overlay's checked conversion
-    (`Runtime.VisualizationRecipes.cpp:591`), and Vec3/Vec4 for color.
-  - It also checks that the colormap is in range and that a manual range is finite with
-    min < max. The editor command resolves the named refs.
-- Extraction (`Runtime.RenderExtraction.VectorFields.cpp`):
-  - Resolve each ref by kind and count. A ref that no longer resolves falls back to the
-    uniform value with a counter and a layer status (the `Vector` pattern).
-  - A float payload cache keyed like the vector cache converts with the checked conversion.
-    It marks NaN, ±inf and overflowing values invalid as +inf (scalar uploads reject NaN,
-    `Graphics.VisualizationPackets.cpp:290-293`).
-  - The auto range comes from the overlay's `ComputeRange`
-    (`Runtime.VisualizationRecipes.cpp:237-310`, exported, not copied), run over valid samples
-    only. A constant range is widened as the overlay does. All samples invalid gives the uniform
-    length/color for the layer and a status line.
-  - A Vec3/Vec4 color with any non-finite component draws the uniform color for that arrow;
-    components are clamped to 0..1.
+### Slice 4 — per-arrow length and color for vector fields (~800 lines, two review blocks)
+Operator request (2026-10-27): continue with this slice, plan and review first ("Ja bitte, slice 4").
+Serves question 8 ("Vector field rendering should also let me choose : length (uniform edit,
+varying property), color (uniform color edit, varying property)") and, for the arrow color,
+question 7 (the uniform color is active only on Default and remembers its value).
+- Today (investigated at `215432c01`):
+  - One GPU instance (9 vertices) per arrow, expanded in
+    `assets/shaders/visualization_vector_field.vert`. Length (`Scale`, normalize flag) and color
+    (`PackedColor`) are uniform fields of the 128-byte `VisualizationVectorFieldDrawRecord`
+    (`Graphics.VisualizationOverlayUploadHelper.cppm:25`); bytes 116-127 are reserved.
+  - Extraction (`Runtime.RenderExtraction.VectorFields.cpp`) keeps per-entity anchor, vec3 payload
+    and glyph-order caches keyed by property revisions and lends their spans to
+    `AppendVectorFieldPacket`. The renderer resolves each packet's buffer keys to addresses by
+    domain, value type and element count (`Graphics.Renderer.cpp:2248`); the upload helper drops a
+    packet whose addresses did not resolve.
+  - Every pipeline uses the global layout with the bindless textures at set 0
+    (`Backends.Vulkan.CommandContext.cpp:386`), so the arrow shader can sample a colormap as
+    `forward/point.vert` does. `ColormapSystem::GetBindlessIndex` returns the invalid index until
+    the lookup textures are ready.
+  - The overlay's checked scalar conversion (`ToFiniteFloat`) and auto range (`ComputeRange`:
+    2-98 % quantiles from 64 values on, a constant range widened by ±0.5) are file-local in
+    `Runtime.VisualizationRecipes.cpp:155,238`.
+  - Scene layers are read with every key required (`TryReadGeometryVectorFieldLayer`,
+    `Runtime.SceneSerialization.cpp:1483`). No agent operation reaches vector fields.
+- Recipe (`GeometryVectorFieldLayerRecipe`):
+  - `std::string LengthProperty`, `std::string ColorProperty` (empty: none). Both name a property
+    on the vector's own domain, so a plain name replaces the earlier plan's `GeometryPropertyRef`
+    and there is no domain to validate. The kind is read from the property when drawn, so a float
+    recomputed as double keeps working.
+  - `Graphics::Colormap::Type ColorMap{Viridis}`, `bool ColorAutoRange{true}`,
+    `float ColorRangeMin{0}`, `float ColorRangeMax{1}`, used while the color property is scalar.
+  - `ValidateGeometryVectorFieldLayer` adds: colormap below `Count`; range finite with min < max
+    (always, so a remembered manual range stays valid).
+  - Scene keys `lengthProperty`, `colorProperty`, `colorMap`, `colorAutoRange`, `colorRange` are
+    always written and optional on read (absent: the defaults), so saved scenes keep loading.
+- Value rules (shared by extraction, the editor model and the command):
+  - Length: a scalar kind the Color rows accept (float, double, int32, uint32, uint64, bool) on the
+    vector's domain with one value per element. Arrow = `Length × value` in both length modes (Raw:
+    `Length × value × v`). A value that is NaN, ±inf, outside float range or an integer float
+    cannot hold exactly (the overlay's `ToFiniteFloat`), and every value ≤ 0, draws no arrow; a
+    bool works as a show/hide mask.
+  - Color: the same scalar kinds through the colormap, or vec3/vec4 as RGB(A) with components
+    clamped to 0..1 (vec3 and colormap colors are opaque). An invalid scalar, or an RGB(A) value
+    with a non-finite component, draws that arrow in the uniform color. Auto range: the overlay's
+    `ComputeRange` over the valid values only (exported as one float function, not copied); with
+    no valid value the range stays 0..1 and is unused.
+  - A named property that is missing, of another kind or of another count draws the whole layer
+    with the uniform length/color, counts `VectorFieldStyleFallbackCount`, and the layer row's
+    status names it. This replaces the earlier plan's "all samples invalid" fallback: the per-arrow
+    rules already cover that case (no arrows, or every arrow uniform).
+- Extraction:
+  - A style cache per (domain, property) beside the vec3 payload cache, released the same way:
+    rebuilt when revision or count changes, reused within a frame. Scalars become one float per
+    element (invalid: +inf, which the scalar upload accepts) plus the auto range of the valid
+    values; vec3/vec4 become one vec4 per element (invalid: (-1, -1, -1, -1)). No cache entry is
+    held across the insertion of another (the lent spans point into each entry's own buffers), and
+    the payloads stay lent until the batch is submitted (release runs after submission, as
+    today); superseded `std::deque`: see the log, 2026-10-27.
+  - GPU previews (`geometry.property-coherence`, `docs/architecture/property-coherence.md`
+    §Observation): a scalar style property is first offered to the extraction's GPU property
+    observer, as the scalar recipe does (`Runtime.RenderExtraction.Recipes.cpp:175`). A front
+    with one value per element is bound by address (no CPU upload), and its auto range is the
+    front's `ScalarRange`, widened when constant as for the scalar recipe; without one the CPU
+    auto range is kept, or 0..1 when the CPU has no such property. The observer is asked with the
+    CPU property's scalar kind (a double maps to its float presentation ring), or Float for a name
+    the CPU does not have yet. When the front ends (Accept, Discard), the CPU cache is used again,
+    or the layer falls back if the CPU has no such property. Vec3/vec4 colors are not observed (the residency
+    publishes scalar fronts only).
+  - `VectorFieldPacketInputs` and `VectorFieldOverlayPacket` gain a length buffer and a color
+    buffer (key, span or address, stamp), the color mode (uniform / colormap / RGBA), the colormap
+    and the range. Buffers are lent per element like the vectors, under keys of their own
+    (`vector.scalar` / `vector.rgba` + property), so one property used for length and color uploads
+    once.
 - GPU:
-  - The record grows to 144 bytes: `ColormapID@116`, `LengthBDA@120`, `ColorBDA@128`,
-    `RangeMin@136`, `RangeMax@140`, plus two flag bits for the color kind.
-  - The C++ struct, its `static_assert`, the shader struct and
-    `Test.VisualizationOverlayPass.cpp:583` change together.
-  - The shader scales by `Scale * s` and draws no arrow for `s <= 0` or an invalid `s`. It reads
-    the property through the glyph row index, so the UI-081 order indirection applies.
-  - A scalar color samples the bindless colormap texture, as `point.vert` does. An invalid
-    sample or a not-yet-ready colormap draws the uniform color.
-- UI (`Sandbox.DomainPanels.cpp:609-696`):
-  - A Length row: the uniform field is labelled Scale and stays enabled while a property is
-    bound, because it multiplies.
-  - A Color row: the uniform color is disabled while bound; a scalar shows colormap, auto range
-    and min/max.
-  - The vector-field model gets its own candidate lists, so
-    `VectorFieldModelOffersExactlyTheVectorsTheCommandAccepts` stays valid.
-- Agent parity: one agent operation for vector-field layers (add/update/remove with the full
-  layer recipe) through the existing `ApplyEditorGeometryVectorFieldCommand`, in
-  `Runtime.AgentOperations.Editor.cpp`, with its schema. There is no new command layer.
-- Persistence: optional scene keys (absent = no property). Undo snapshots the whole recipe and
-  the recipe's `operator==` is defaulted, so both cover the new fields.
-- Tests, red first:
-  - Recipe validation and model candidates for every scalar kind
-    (`Test.VisualizationRecipes.cpp`, `Test.SandboxEditorVisualization.cpp`).
-  - Extraction (`Test.RuntimeVectorFieldExtraction.cpp`): resolve, overflow, mixed
-    invalid/valid samples, constant range, all invalid, a removed property falling back, and
-    rows read through the glyph order.
-  - Record layout (`Test.VisualizationOverlayPass.cpp`).
-  - Round trip (`Test.RuntimeSceneSerialization.cpp`).
-  - Panel rows (`Test.SandboxDomainPanels.cpp`).
-  - The agent operation matches the UI result (`Test.AgentOperations.cpp`,
+  - The record grows to 144 bytes: `ColormapID@116`, `LengthBufferBDA@120`, `ColorBufferBDA@128`,
+    `ColorRangeMin@136`, `ColorRangeMax@140`; flag bits 1 (colormap color) and 2 (RGBA color). The
+    C++ struct with `offsetof` asserts, the shader struct and `Test.VisualizationOverlayPass.cpp`
+    change together.
+  - The renderer resolves the two new keys like the vector key (ScalarFloat / RgbaFloat4, count =
+    ElementCount); a named key that does not resolve makes the packet unrenderable, as for anchors
+    and vectors. It fills `ColormapID` from `ColormapSystem::GetBindlessIndex`.
+  - Shader, reading by the glyph's source row (`row`, so live rows and the UI-081 order apply):
+    `s` not > 0 or infinite draws nothing; otherwise the scale is `Scale × s` (an overflow to
+    infinity is caught by the existing finite-tip check). Colormap: `s ≤ min` gives t = 0 and
+    `s ≥ max` t = 1 exactly; between them `t = (s - min) / (max - min)` on operands scaled by
+    2^-100 when an end exceeds 1e30 (or 2^100 below 1e-30), computed `precise`, and t = 0 if the
+    width still is not positive (superseded halving: see the log, 2026-10-27); sampled at LOD 0; an infinite or NaN `s` or an invalid colormap index
+    keeps the uniform color. RGBA: a negative component keeps the uniform color.
+- UI (`DrawVectorFieldLayer`, `Sandbox.DomainPanels.cpp:610`):
+  - "Length property" combo: Default (no property) + the domain's scalar candidates. The uniform field reads
+    "Scale" while one is bound and stays enabled (it multiplies).
+  - "Color property" combo: Default + scalar and vec3/vec4 candidates. The uniform color is disabled
+    while one is bound and keeps its value (question 7); a scalar shows Colormap, Auto range and,
+    when that is off, Min/Max.
+  - `EditorVectorFieldDomainOption` gains one `StyleProperties` list (name, kind, compatible,
+    reason); the layer row's status adds the length/color fallbacks and is shown whenever it is
+    non-empty (today the panel shows it only while the vector is unavailable,
+    `Sandbox.DomainPanels.cpp:629`).
+- Command (`ApplyEditorGeometryVectorFieldCommand`): on Add, and on Update when a style property
+  name changes, a non-empty name must satisfy the value rules, or be a pending GPU scalar
+  (`EditorVisualizationEditingContext::PendingResidentScalar`, as the display request accepts
+  one, `Runtime.VisualizationEditingOperations.Actions.cpp:1710`). An unchanged name that no
+  longer resolves stays (its layer falls back), so other edits of that layer keep working.
+  `BuildEditorVectorFieldModel` takes the same pending check, so a name that only a GPU preview
+  carries shows "GPU preview" instead of a fallback. The panel lists CPU properties only; a
+  GPU-only result is bound by the agent or after Accept.
+- Agent (`Runtime.AgentOperations.Editor.cpp`), split like `attribute_bindings` /
+  `bind_attribute` so the listing stays read-only: `vector_fields` returns the vector-field model
+  (domains, vec3 and style candidates, layers with status); `vector_field` takes `action` add,
+  update or remove. Add uses the command's defaults, as the panel does, and takes no fields;
+  update merges the given fields (every recipe field, snake_case) onto the current layer. Each
+  action is one command, so one undo step.
+- Review blocks: A = recipe, validation, scene keys, extraction, packet, record, shader, renderer
+  resolution, their CPU tests and the smoke; B = model, command check, panel rows, agent operation
+  and their tests. One code review per block.
+- Tests, red first (predictions in the log before the first run):
+  - `Test.RuntimeSceneSerialization.cpp`: nondefault values of the new keys round-trip; a present
+    but malformed key (wrong type, unknown colormap, min ≥ max) rejects the document. A layer
+    without the new keys loads with the defaults; that already passes today, so its sensitivity
+    is shown by a mutation that makes a new key required.
+  - `Test.SandboxEditorVisualization.cpp`: validation rejects a bad colormap and bad ranges.
+  - `Test.RuntimeVectorFieldExtraction.cpp`:
+    - Values: a float length {1, 2, NaN, -1, 0} uploads {1, 2, inf, -1, 0}; a double 1e39 and an
+      inexact uint32 2^24 + 1 become +inf; int32, uint64 and bool convert; an int32 color
+      {0, 10, 5} gets the auto range 0..10, a constant {3, 3} widens to 2.5..3.5, an invalid
+      value is left out of the range; vec3 colors clamp with alpha 1, a NaN component becomes
+      (-1, …); vec4 keeps its alpha; the length buffer stays element-indexed under a glyph order.
+    - Fallback: a removed property falls back (counter, no length key) and adding it back
+      restores; replacing it by a property of another kind falls back.
+    - Caches: editing the property rebuilds only its style cache; steady frames scan nothing; two
+      distinct properties carrying the same revision token keep their own values; one scalar used
+      for length and color uploads once; one vec3 used as vector and as color keeps both
+      representations; five layers with distinct style properties (cache growth) all keep their
+      values.
+    - GPU preview: with an injected observer returning a front for the length property, the
+      packet binds the front's address and no CPU length bytes are uploaded; the front's range is
+      used for an auto color range; a new front address, stamp and range with every CPU revision
+      unchanged is followed by the next packet; once the observer stops returning it, the CPU
+      upload returns. A name only the front carries draws from the front and falls back (counter)
+      when the front ends.
+  - `Test.VisualizationOverlayPass.cpp`: size 144 and the new offsets; the record carries the new
+    fields and flags; an unresolved length or color key skips the packet; the record's
+    `ColormapID` is the colormap system's index for the packet's map (invalid while the system is
+    not ready, if the mock device lets that state be observed).
+  - Block B: the command binds a GPU-only name that `PendingResidentScalar` reports and the model
+    shows it as a GPU preview, then as a fallback once the check fails; the model's style
+    candidates per kind equal what the command accepts (vec2 and
+    wrong-count properties excluded; a sibling of
+    `VectorFieldModelOffersExactlyTheVectorsTheCommandAccepts`); the unchanged-name rule; the panel
+    sequence for question 7 (`Test.SandboxDomainPanels.cpp`): set a uniform color, bind a color
+    property, the uniform color is disabled, the length multiplier still edits, Default restores
+    the remembered color; undo and redo restore whole recipes; the agent operation yields the
+    panel's recipe and undoes in one step (`Test.AgentOperations.cpp`,
     `Test.SandboxAgentServer.cpp`).
-- `gpu;vulkan` smoke: two arrows with different property lengths and a scalar color at both
-  colormap ends, read back (extends `RuntimeSandboxAcceptanceGpuSmoke.VectorField*`).
+- `gpu;vulkan` (`RuntimeSandboxAcceptanceGpuSmoke`, a new test beside the vector-field probes): a
+  point cloud at z = 0 away from the reference triangle, identity transform, element 0 deleted (so
+  an instance is not its row), width 4 px, uniform color magenta. Five layers (five records, so
+  the 144-byte stride is read past record 0); each layer's vector is zero outside its own rows, so
+  no layer draws over another's probes:
+  - L1, Normalized, Length 0.1 along +x, length `p:len`, color `p:heat` through Jet with the
+    manual range 10..20: element 0 (deleted) len 3, heat 20; e1 len 1, heat 10 (short, blue); e2
+    len 3, heat 20 (covers anchor + 0.2 x, dark red); e3 len NaN, e4 len -1, e5 len 0 (nothing at
+    the anchor, along +x or, for -1, along -x); e6 len 1, heat NaN (magenta).
+  - L2, color `p:rgba` (vec4): e8 (0, 1, 1, 0.5) is blended between cyan and the background; e9
+    (NaN, 0, 0, 1) draws magenta.
+  - L3, Raw, Length 0.2, vector (0.5, 0, 0) on e11 only, length `p:len` = 2 there (shared with
+    L1, one upload): the arrow covers anchor + 0.15 x (0.1 long without the multiplier).
+  - L4, color `p:huge` with auto range on e12-e14: values -3e38, 0, +3e38 (0 everywhere else)
+    draw Jet's blue, middle green and dark red.
+  - L5, color `p:tiny` with the manual range [a, b], a and b adjacent normal floats (bit patterns
+    0x00800003 and 0x00800004), on e15-e16: a draws blue, b dark red.
+- Mutations (each must fail a named check): the shader ignores the length buffer; reads length by
+  instance instead of row; reads color by instance instead of row; draws an invalid, zero or
+  negative length; applies the multiplier in Normalized mode only; ignores the color buffer;
+  skips the range normalization; normalizes without the overflow halving (L4's middle value);
+  halves always and drops the endpoint mapping (the first delta's shader, L5). Each of the last two
+  protections alone is masked by the other on L5 (the width of adjacent floats there is a denormal
+  whose flushing is hardware-defined), so it is recorded as not separately observable; skips the invalid-scalar check;
+  drops the RGBA sentinel check; forces RGBA opaque; the renderer leaves `ColormapID` invalid; the
+  auto range includes invalid values; the style cache ignores the revision; the style caches live
+  in a `std::vector` (only under a sanitizer or by an asserted pointer check, else recorded as not
+  observable); the GPU front is not observed; a new scene key is required.
 
 ### Slice 5 — combined and live check
 - Run every slice's `gpu;vulkan` smoke together on the final tree. Then do a live Sandbox check
@@ -860,3 +975,155 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
 - 2026-10-27: Final check of slice 3b (same Codex thread), on the staged diff sha256 `d23927ab…`
   (the approved diff plus the two followed nonblocking findings). Verdict verbatim "approve"
   ("Approval stands for staged diff …", "No new findings.").
+- 2026-10-27: Slice 4 plan review (Claude author → Codex reviewer, `codex exec`, codex-cli
+  0.163.0, requested `gpt-6-astra` at `xhigh`, read-only sandbox; thread
+  `01a17bfe-32c2-7de0-842a-da03917913ce`; recursion protection instruction-only). Object: this
+  note at sha256 `d48ab667…`, base `215432c01`. Verdict "revise", four blocking findings: the
+  colormap normalization overflows for a finite range such as ±3e38 (B1); cache entries can be
+  invalidated while a second one is added, and shared-property cases are untested (B2); several
+  planned mutations survive the smoke (identity range, no invalid RGBA, Normalized only, alpha
+  1) (B3); GPU scalar previews are not observed, against `geometry.property-coherence` (B4).
+  Optional: keep the steps, label the unbound choice Default, test the question-7 panel sequence
+  with undo and redo, show fallback status while the vector resolves, separate compatibility
+  checks from red-first ones. All were folded into the plan above.
+- 2026-10-27: Slice 4 plan delta round 2 (same Codex thread), on sha256 `f1ba0381…`. Verdict
+  "revise": B2 and B3 resolved; B1's unconditional halving collapses a valid tiny range (adjacent
+  floats 0x00800003/0x00800004); B4 lacks the command boundary (a GPU-only scalar cannot be bound,
+  and the status cannot tell a front from a fallback) and the observer test must change the front
+  with CPU revisions unchanged. Nonblocking: keep the smoke layers spatially independent. Folded
+  in: halving only on overflow with explicit endpoint mapping and a tiny-range layer; the command
+  and model take `PendingResidentScalar`; the observer test changes address, stamp and range.
+- 2026-10-27: Slice 4 plan delta round 3 (same Codex thread), on sha256 `f21f9a5e…`. Verdict
+  verbatim "approve" ("B1 and B4 are resolved at plan level. No remaining or new blocking
+  findings."). Implementation and Vulkan behavior unverified.
+- 2026-10-27: Slice 4 block A, red-first predictions (written before the first run; the new
+  recipe, packet and record fields exist, no behavior yet):
+  - `RuntimeSceneSerialization.VectorFieldStyleKeysRoundTripAndStayOptional`: the round trip
+    fails (keys not written, defaults restored); the older-scene load passes (already true today);
+    all six malformed-key loads succeed instead of failing.
+  - `SandboxEditorUi.VectorFieldCommandRejectsBadColormapsAndRanges`: all five rejections are
+    Applied instead, and the layer differs from the base afterwards.
+  - `RuntimeVectorFieldExtraction`: the four new tests fail wherever a length/color buffer, mode,
+    range, fallback count or second style-cache reuse is expected; checks that hold with no style
+    path (uniform mode, zero addresses, equal tokens, vector buffer) pass.
+  - `VisualizationOverlayPassContract.VectorFieldRecordsCarryLengthAndColorBuffers`: both
+    unresolved packets count as renderable and four records are written (stops there).
+    `RendererResolvesVectorFieldStyleBuffersAndColormap`: no length address, the wrong-count
+    packet is renderable; the colormap index check fails only if the mock reports the colormap
+    ready.
+  - Red results, as predicted: serialization (round trip, six malformed keys), command (five
+    rejections, layer changed), the four extraction tests (no style buffers, modes, ranges,
+    fallbacks or second reuse; equal tokens and vector buffers held) and both overlay tests
+    (unresolved packets renderable, four records; no length address, wrong-count packet
+    renderable). The mock reports the colormap ready (Jet index 4), so the index check failed too.
+  - With block A implemented the eight tests pass, and the task's CPU suites pass 737/737.
+  - GPU predictions for the new smoke on a shader that only carries the 144-byte record (no
+    length or color reads): e1 not blue; e2 not red and not 0.3 long; e3-e5 drawn at the anchor
+    and +0.05 (not at -0.05); the Raw arrow ends at 0.1; the half-cyan sample fails its upper R
+    bound and both cyan checks; L4 and L5 show magenta (ends fail, the middle fails only its G
+    check); five records. With the full shader every check passes.
+  - GPU red on the record-only shader (RTX 4090, driver 580.159.04, X11 `:1`): as predicted
+    except one sample: e1 magenta (245, 0, 245); e2 ends at 0.1 (background at 0.2); e3-e5 drawn
+    at +0.05; the Raw arrow ends at 0.1; the half-cyan sample magenta; L4 and L5 magenta. Wrong
+    prediction: the anchor samples of e3-e5 stayed background, because a uniform shaft starts
+    exactly at the anchor (only a cap, as for a zero length, covers it).
+  - GPU with the full shader: every check passed except L4's middle value, which drew Jet's low
+    end (0, 0, 236). The CPU range was right (-3e38..3e38, probed). Halving on an infinite width
+    and halving on large ends both failed the same way; forcing t = 0.5 for that range drew the
+    middle green, and a branch probe showed the range finite and the scaling condition true. The
+    NVIDIA compiler cancels a common factor out of `(v·k - lo·k) / (hi·k - lo·k)` and divides
+    the overflowing original. Fix: operands scaled by 2^-100 (or 2^100 for tiny ranges) and the
+    offset and width computed `precise`. With it the new smoke and all ten vector-field and
+    overlay `gpu;vulkan` tests pass.
+  - The explicit endpoint mapping was removed: with the power-of-two scaling the quotient maps
+    both ends exactly, and the smoke stays green without it.
+  - Block A mutations, each against the new tests. Shader (the new smoke, 14 of 14 detected): no
+    length read; length or color read by instance instead of row; invalid, zero or negative
+    lengths drawn; the multiplier only in Normalized mode; no color read; no range normalization;
+    no power-of-two scaling; not `precise`; no invalid-scalar check; no RGBA sentinel check; RGBA
+    forced opaque. CPU: the auto range over invalid values, no RGBA sentinel, the style cache
+    ignoring the revision, the GPU front not observed (extraction tests) and the colormap index
+    left invalid (renderer test) are detected; style caches in a `std::vector` survive, as
+    planned (the lent spans point into the inner buffers, which a move keeps). "A new scene key
+    is required" is rerun after block B (the block-B tests did not compile yet).
+- 2026-10-27: Slice 4 block B, red-first predictions (the option list and the model's pending
+  parameter exist, no behavior; the agent operations do not exist):
+  - `SandboxEditorUi.VectorFieldStyleCandidatesAreExactlyWhatTheCommandAccepts`: no style
+    options are offered, so every scalar, vec3 and vec4 name fails its "accepted iff offered"
+    check (the command accepts any name today) and both counts are 0.
+  - `SandboxEditorUi.VectorFieldStyleNamesResolveOnceAndReportTheirFallback`: the missing names
+    are Applied instead of refused (so the Add does not fail first and the second Add answers
+    NoChange); the row statuses are empty.
+  - `SandboxDomainPanels.VectorFieldColorPropertyKeepsTheRememberedUniformColor`: the Color
+    property combo does not exist, so the dropdown does not open and later steps fail.
+  - `AgentOperations.VectorFieldOperationsValidateTheirArgumentsBeforeTouchingTheScene` and
+    `SandboxAgentServer.VectorFieldAddsStylesRefusesAndUndoes`: the operations are unknown.
+  - Red results, as predicted: the parity test fails every "accepted iff offered" check (no
+    options offered, everything accepted); the name test fails at the first Add (Applied instead
+    of refused) and stops at the second (NoChange); the panel's Color property dropdown does not
+    open (the test first lacked the history service, `SceneDocumentModule`, and was rerun); the
+    agent contract test finds no operation; the agent server test gets "Unknown tool" (its reads
+    were first made safe for replies without "result", which had aborted the test binary).
+- 2026-10-27: Slice 4 block A code review (Claude author → Codex reviewer, fresh `codex exec`
+  thread `01a17c26-e240-7da3-aed2-d5e03491187f`, codex-cli 0.163.0, requested `gpt-6-astra` at
+  `xhigh`, read-only sandbox; recursion protection instruction-only), on the block-A patch sha256
+  `7fdede75…` against `215432c01`. Verdict "revise required". Blocking: a GPU may flush denormal
+  operands before the 2^100 scaling, so a denormal range (bit patterns 0x1..0x4) collapses to the
+  low end (portability; not reproduced on the RTX 4090). Nonblocking: the auto range copied the
+  valid values a second time (`ComputeRange` already skips infinities); the deque is unnecessary
+  (no entry pointer is held across an insertion). Fixes: denormals are scaled through their bits
+  (`ScaleUp100`), the smoke gains layer L6 with denormal ends and an interior value; the auto
+  range runs `ComputeRange` with infinities skipped; the style caches are a `std::vector` again.
+  - Predictions for L6 (range 0x1..0x4, values 0x1, 0x3, 0x4): with `ScaleUp100` every check
+    passes. With the reviewed shader's plain `x * 2^100` (mutation M15) the outcome depends on
+    whether this GPU flushes denormal operands: preserved, L6 passes and the fix is shown only
+    by the code and the review's reading of the Vulkan spec; flushed, L6 draws the low end for
+    0x3 and 0x4.
+  - Results: with `ScaleUp100` the new smoke passes. M15 (plain `x * 2^100`) is detected: L6
+    draws Jet's low end (0, 0, 236) for 0x3 and 0x4, so this GPU flushes denormal operands and
+    the review's finding reproduces here. No large-range scaling (L4's middle) and no tiny-range
+    scaling (L5's high end) are detected. Without `precise` the smoke now passes: with the scaling
+    in its own branches the compiler no longer cancels it (the earlier one-expression form failed);
+    `precise` stays as a guard against that measured rewrite and is recorded as not separately
+    observable.
+- 2026-10-27: Slice 4 block B implemented: `EditorVectorFieldStyleOption` candidates from one rule
+  (`VectorFieldStyleOption`: scalar for length; scalar, vec3 or vec4 for color; no topology rows),
+  row statuses for fallbacks and GPU previews, the command's new-name check (CPU property or
+  `PendingResidentScalar`), the panel's Length/Color property combos with the disabled,
+  not-written uniform color and the colormap/range controls, and the agent operations
+  `vector_fields` / `vector_field`. The five block-B tests pass. Mutations: no style options,
+  no name check, unchanged names rechecked, the command or the model ignoring GPU previews, the
+  panel writing a bound color, and agent add taking fields are detected; the agent's
+  `UseLayerStyle` on update survived because the command reads that flag only on add, so it was
+  removed. "A new scene key is required" (block A) is detected by the serialization test.
+  ImGui 1.92.5 activates a disabled item through `ActivateItemByID`, so the panel test types into
+  the disabled color and asserts that nothing is written (the house rule for bound uniforms); a
+  disabled length field would not be caught by its activation check.
+- 2026-10-27: Slice 4 block-B review (same Codex thread as block A, `01a17c26-…`), on the staged
+  slice sha256 `6d2aae50…`. Verdict "revise required". Blocking: a style property with the wrong
+  element count is offered and accepted, then falls back silently (B1); unknown agent arguments
+  are ignored, so `"lenght":2` answers NoChange and a typo beside a valid field applies the rest
+  (B2). Nonblocking: the length label needs no `std::string`; the panel test never edits the
+  length with a length property bound. The block-A findings were judged addressed.
+  - Red-first predictions for the new checks (tests written before the fixes): the parity test
+    offers `v:short` (float, two of three values), so its length count is 7, not 6, and its
+    color count 10, not 9; the name test finds no status for the shrunken bound `v:g`; both
+    agent arguments with `lenght` are accepted (the detached call then says "not attached"
+    instead of `invalid_params`). The extended panel test (a bound length property, then the
+    multiplier set to 2) is expected to pass already; it is shown sensitive by a mutation.
+  - Red results, as predicted: lengths 7 / colors 10 offered, no status for the shrunken `v:g`,
+    both `lenght` arguments accepted; the extended panel test passed. Fixes: the shared
+    candidate rule reads the property's descriptor and requires one value per element; the agent
+    operation refuses any key outside its schema before touching the workspace; the length label
+    is a literal again. With them the block-B tests and the agent suite pass (42 tests). The
+    panel test's new length step is detected by a mutation that drops the edit while a length
+    property is bound.
+- 2026-10-27: Slice 4 delta review (same Codex thread), on the delta sha256 `7ae4db0e…` to the
+  staged slice sha256 `216baae6…`. Verdict verbatim "approve" ("B1 and B2 are resolved. No
+  remaining or new blocking findings."); the reviewer checked that the reviewed patch plus the
+  delta reproduce all 29 staged files.
+- 2026-10-27: Slice 4 gates on the final tree: CPU 5917/5917; Vulkan `gpu;vulkan` 168/168 (RTX
+  4090, driver 580.159.04, X11 `:1`, backbuffer 1600x900). Layering, task policy, session brief,
+  source rules, test layout, docs sync and compiler hazards pass. jscpd: no new clone in the
+  changed files beyond include blocks and the usual test setup. The acceptance criteria are left
+  for the closing review; slice 5 (the combined and live check) is open.

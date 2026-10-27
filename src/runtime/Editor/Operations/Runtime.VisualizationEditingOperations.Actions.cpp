@@ -7,6 +7,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -2278,9 +2279,51 @@ ApplyEditorRenderHintCommand(
         }
     }
 
-    EditorVectorFieldModel BuildEditorVectorFieldModel(
-        const GeometryEntityAvailability& availability,
-        const GeometryPresentationRecipe* recipe)
+    namespace
+    {
+        // UI-083: a property on `domain` with one value per element that can drive a per-arrow
+        // length (a scalar kind) or color (also vec3/vec4); connectivity and deletion rows are not
+        // element values. The one rule behind the model's candidates and the command's check.
+        [[nodiscard]] std::optional<EditorVectorFieldStyleOption> VectorFieldStyleOption(
+            const Geometry::PropertySet& properties, const GeometryElementDomain domain, const std::string& name)
+        {
+            using K = Geometry::PropertyValueKind;
+            if (IsTopologyProperty(domain, name))
+                return std::nullopt;
+            const auto descriptors = properties.Descriptors();
+            const auto descriptor = std::ranges::find(descriptors, name, &Geometry::PropertyDescriptor::Name);
+            if (descriptor == descriptors.end() || descriptor->ElementCount != properties.Size())
+                return std::nullopt;
+            const K kind = descriptor->ValueKind;
+            const bool scalar = kind == K::Bool || kind == K::Int32 || kind == K::UInt32 || kind == K::UInt64 ||
+                kind == K::Float || kind == K::Double;
+            if (!scalar && kind != K::Vec3 && kind != K::Vec4)
+                return std::nullopt;
+            return EditorVectorFieldStyleOption{.Name = name, .Kind = kind, .Scalar = scalar};
+        }
+
+        // A style property a GPU preview carries without a CPU property is a pending float output.
+        [[nodiscard]] GeometryPropertyRef PendingStyleRef(const GeometryElementDomain domain, const std::string& name)
+        {
+            return GeometryPropertyRef{.Domain = domain, .Name = name, .ValueKind = Geometry::PropertyValueKind::Float};
+        }
+
+        // Whether `name` can be the length (`color == false`) or color of a layer on `domain`.
+        [[nodiscard]] bool VectorFieldStyleResolves(const GeometryEntityAvailability& availability,
+            const GeometryElementDomain domain,
+            const std::string& name,
+            const bool color)
+        {
+            const Geometry::PropertySet* properties = ResolveGeometryPropertySet(availability, domain);
+            const auto option =
+                properties != nullptr ? VectorFieldStyleOption(*properties, domain, name) : std::nullopt;
+            return option.has_value() && (color || option->Scalar);
+        }
+    }
+
+    EditorVectorFieldModel BuildEditorVectorFieldModel(const GeometryEntityAvailability& availability,
+        const GeometryPresentationRecipe* recipe,
+        const std::function<bool(const GeometryPropertyRef&)>& pendingResidentScalar)
     {
         EditorVectorFieldModel model{};
         constexpr std::array<GeometryElementDomain, 6> kDomains{
@@ -2308,6 +2351,8 @@ ApplyEditorRenderHintCommand(
             };
             for (const std::string& name : properties->Properties())
             {
+                if (auto style = VectorFieldStyleOption(*properties, domain, name))
+                    option.StyleProperties.push_back(std::move(*style));
                 // Any vec3 is a valid field (positions included); only
                 // connectivity/deletion rows are not element values.
                 if (DetectGeometryPropertyValueKind(*properties, name) !=
@@ -2330,6 +2375,7 @@ ApplyEditorRenderHintCommand(
                 });
             }
             std::ranges::sort(option.Properties, {}, &EditorVectorFieldPropertyOption::Name);
+            std::ranges::sort(option.StyleProperties, {}, &EditorVectorFieldStyleOption::Name);
             model.Domains.push_back(std::move(option));
         }
         model.Available = !model.Domains.empty();
@@ -2342,13 +2388,27 @@ ApplyEditorRenderHintCommand(
                     availability, layer.Vector.Domain, layer.Vector.Name,
                     Geometry::PropertyValueKind::Vec3,
                     ResolveGeometryElementCount(availability, layer.Vector.Domain));
+                std::string status =
+                    resolution.Resolved() ? std::string{} : "Not drawn: " + std::string{ToString(resolution.Status)};
+                // UI-083: a style property that does not resolve draws the uniform value.
+                const auto styleStatus = [&](const std::string& name, const bool color)
+                {
+                    const char* what = color ? "color" : "length";
+                    if (name.empty() || VectorFieldStyleResolves(availability, layer.Vector.Domain, name, color))
+                        return;
+                    const bool pending =
+                        pendingResidentScalar && pendingResidentScalar(PendingStyleRef(layer.Vector.Domain, name));
+                    status += (status.empty() ? "" : "; ") + std::string{"Per-arrow "} + what + " '" + name +
+                        (pending ? "' from the GPU preview"
+                                 : "' not found or not usable: uniform " + std::string{what});
+                };
+                styleStatus(layer.LengthProperty, false);
+                styleStatus(layer.ColorProperty, true);
                 model.Layers.push_back(EditorVectorFieldLayerRow{
                     .Layer = layer,
                     .DomainLabel = DebugNameForEditorVectorFieldDomain(layer.Vector.Domain),
                     .SourceAvailable = resolution.Resolved(),
-                    .Status = resolution.Resolved()
-                        ? std::string{}
-                        : "Not drawn: " + std::string{ToString(resolution.Status)},
+                    .Status = std::move(status),
                 });
             }
         }
@@ -2438,6 +2498,32 @@ ApplyEditorRenderHintCommand(
                                      layer.Vector.Name == identity.Name;
                           });
             break;
+        }
+
+        // UI-083: a newly named length or color property must resolve now, or be a pending GPU
+        // scalar; a name that stays does not, so a layer whose property went away stays editable.
+        if (command.Operation != EditorVectorFieldOperation::Remove)
+        {
+            const GeometryVectorFieldLayerRecipe* edited =
+                FindGeometryVectorFieldLayer(after.Recipe, identity.Domain, identity.Name);
+            const GeometryVectorFieldLayerRecipe* previous =
+                FindGeometryVectorFieldLayer(before.Recipe, identity.Domain, identity.Name);
+            const auto newNameResolves = [&](const std::string& name, const std::string& old, const bool color)
+            {
+                if (name.empty() || (previous != nullptr && name == old) ||
+                    VectorFieldStyleResolves(availability, identity.Domain, name, color))
+                    return true;
+                return context.PendingResidentScalar &&
+                    context.PendingResidentScalar(entity, PendingStyleRef(identity.Domain, name));
+            };
+            if (edited != nullptr &&
+                (!newNameResolves(
+                     edited->LengthProperty, previous != nullptr ? previous->LengthProperty : std::string{}, false) ||
+                    !newNameResolves(
+                        edited->ColorProperty, previous != nullptr ? previous->ColorProperty : std::string{}, true)))
+            {
+                return EditorCommandStatus::InvalidVisualizationProperty;
+            }
         }
 
         std::string reason{};

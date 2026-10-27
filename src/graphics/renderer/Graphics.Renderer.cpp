@@ -2269,6 +2269,32 @@ namespace Extrinsic::Graphics
                             packet.VectorBufferBDA = address->BufferBDA;
                         }
                     }
+                    // UI-083: per-element lengths and colors resolve like the vectors.
+                    const auto resolveStyle =
+                        [&](const std::string& key, std::uint64_t& bda, const VisualizationValueType type)
+                    {
+                        if (bda != 0u || key.empty())
+                            return;
+                        const VisualizationPropertyBufferAddress* address = findAddress(key,
+                            {},
+                            packet.Domain,
+                            [type](const VisualizationValueType candidate)
+                            {
+                                return candidate == type;
+                            });
+                        if (address != nullptr && address->ElementCount == packet.ElementCount)
+                            bda = address->BufferBDA;
+                    };
+                    resolveStyle(
+                        packet.LengthBufferSourceKey, packet.LengthBufferBDA, VisualizationValueType::ScalarFloat);
+                    resolveStyle(packet.ColorBufferSourceKey,
+                        packet.ColorBufferBDA,
+                        packet.ColorMode == VectorFieldColorMode::Rgba ? VisualizationValueType::RgbaFloat4
+                                                                       : VisualizationValueType::ScalarFloat);
+                    if (packet.ColorMode == VectorFieldColorMode::Colormap &&
+                        m_Subsystems.ColormapSystemRegistry.has_value())
+                        packet.ColormapBindlessIndex =
+                            m_Subsystems.ColormapSystemRegistry->GetBindlessIndex(packet.ColorMap);
                     if (packet.RowBufferBDA == 0u && !packet.RowBufferSourceKey.empty())
                     {
                         const VisualizationPropertyBufferAddress* address =

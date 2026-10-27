@@ -46,6 +46,7 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Geometry.Properties.Types;
@@ -592,6 +593,332 @@ namespace Extrinsic::Runtime
                                                                        : Json(std::string(ToString(sourceDomain)))},
                     {"property", property ? Json(*property) : Json(nullptr)},
                     {"default", restoreDefault}});
+        }
+
+        // ---- vector fields (UI-083) ----------------------------------------------------------
+        // The Appearance panel's vector-field model and command; the colormap names are the panel's.
+        constexpr std::array<const char*, 6> kVectorFieldColormaps{
+            "Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"};
+
+        struct VectorFieldLookup
+        {
+            bool Prepared{false};
+            bool HasEntity{false};
+            EditorVectorFieldModel Model{};
+        };
+
+        VectorFieldLookup LookupVectorFields(const AgentOperationContext& context, const std::uint32_t entity)
+        {
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared)
+                return {};
+            // Every window kind carries the entity's vector-field model.
+            auto window =
+                BuildEditorDomainWindowModel(prepared->SnapshotQueries, EditorDomainWindowKind::Mesh, nullptr, entity);
+            return {.Prepared = true, .HasEntity = window.HasSelectedEntity, .Model = std::move(window.VectorFields)};
+        }
+
+        Json VectorFieldLayerJson(const EditorVectorFieldLayerRow& row)
+        {
+            const GeometryVectorFieldLayerRecipe& layer = row.Layer;
+            const auto colormap = static_cast<std::size_t>(layer.ColorMap);
+            return {{"domain", std::string(ToString(layer.Vector.Domain))},
+                {"property", layer.Vector.Name},
+                {"visible", layer.Enabled},
+                {"depth_tested", layer.DepthTested},
+                {"length_mode", layer.LengthMode == GeometryVectorFieldLengthMode::Raw ? "raw" : "normalized"},
+                {"length", layer.Length},
+                {"line_width", layer.LineWidthPx},
+                {"color", {layer.Color.x, layer.Color.y, layer.Color.z, layer.Color.w}},
+                {"stride", layer.Stride},
+                {"max_glyphs", layer.MaxGlyphs},
+                {"length_property", layer.LengthProperty},
+                {"color_property", layer.ColorProperty},
+                {"colormap", colormap < kVectorFieldColormaps.size() ? kVectorFieldColormaps[colormap] : "Viridis"},
+                {"color_auto_range", layer.ColorAutoRange},
+                {"color_range", {layer.ColorRangeMin, layer.ColorRangeMax}},
+                {"available", row.SourceAvailable},
+                {"status", row.Status}};
+        }
+
+        Json VectorFieldLayersJson(const EditorVectorFieldModel& model)
+        {
+            Json layers = Json::array();
+            for (const EditorVectorFieldLayerRow& row : model.Layers)
+                layers.push_back(VectorFieldLayerJson(row));
+            return layers;
+        }
+
+        AgentOperationOutcome VectorFields(const AgentOperationContext& context, std::string_view arguments)
+        {
+            const auto args = ParseObject(arguments);
+            const auto entity = args ? UInt(*args, "entity") : std::nullopt;
+            if (!entity)
+                return InvalidParams("Pass {\"entity\": <stable id>}.");
+            const VectorFieldLookup lookup = LookupVectorFields(context, *entity);
+            if (!lookup.Prepared)
+                return Fail(kNoWorkspace);
+            if (!lookup.HasEntity)
+                return UnknownEntity(*entity);
+            Json domains = Json::array();
+            for (const EditorVectorFieldDomainOption& domain : lookup.Model.Domains)
+            {
+                Json vectors = Json::array();
+                for (const EditorVectorFieldPropertyOption& option : domain.Properties)
+                    if (option.Compatible)
+                        vectors.push_back(option.Name);
+                Json styles = Json::array();
+                for (const EditorVectorFieldStyleOption& option : domain.StyleProperties)
+                    styles.push_back(
+                        {{"name", option.Name}, {"kind", KindName(option.Kind)}, {"scalar", option.Scalar}});
+                domains.push_back({{"domain", std::string(ToString(domain.Domain))},
+                    {"label", domain.Label},
+                    {"count", domain.ElementCount},
+                    {"vector_properties", vectors},
+                    {"style_properties", styles}});
+            }
+            return Ok({{"entity", *entity}, {"domains", domains}, {"layers", VectorFieldLayersJson(lookup.Model)}});
+        }
+
+        AgentOperationOutcome VectorField(const AgentOperationContext& context, std::string_view arguments)
+        {
+            constexpr const char* kUsage =
+                "Pass {\"entity\": <stable id>, \"action\": add|update|remove, \"domain\": <element domain>, "
+                "\"property\": <vec3 property>}; update also takes the fields to change (see the schema).";
+            const auto args = ParseObject(arguments);
+            if (!args)
+                return InvalidParams(kUsage);
+            const auto entity = UInt(*args, "entity");
+            const auto action = String(*args, "action");
+            const auto domainName = String(*args, "domain");
+            const auto domain = ParseDomain(domainName);
+            const auto property = String(*args, "property");
+            if (!entity || !action || !domainName || !property || property->empty())
+                return InvalidParams(kUsage);
+            if (!domain)
+                return InvalidParams(UnknownDomainMessage(*domainName));
+            EditorVectorFieldOperation operation{};
+            if (*action == "add")
+                operation = EditorVectorFieldOperation::Add;
+            else if (*action == "update")
+                operation = EditorVectorFieldOperation::Update;
+            else if (*action == "remove")
+                operation = EditorVectorFieldOperation::Remove;
+            else
+                return InvalidParams("Unknown action '" + *action + "'; use add, update or remove.");
+
+            // Update edits the current layer field by field; add and remove take none (add uses the
+            // panel's defaults, so each action is the panel's one step).
+            std::vector<std::function<void(GeometryVectorFieldLayerRecipe&)>> edits;
+            std::string bad;
+            const auto field = [&](const char* key, const auto& parse)
+            {
+                if (args->contains(key) && bad.empty() && !parse((*args)[key]))
+                    bad = key;
+            };
+            const auto number = [](const Json& v)
+            {
+                return v.is_number();
+            };
+            field("visible",
+                [&](const Json& v)
+                {
+                    if (!v.is_boolean())
+                        return false;
+                    edits.push_back(
+                        [on = v.get<bool>()](auto& l)
+                        {
+                            l.Enabled = on;
+                        });
+                    return true;
+                });
+            field("depth_tested",
+                [&](const Json& v)
+                {
+                    if (!v.is_boolean())
+                        return false;
+                    edits.push_back(
+                        [on = v.get<bool>()](auto& l)
+                        {
+                            l.DepthTested = on;
+                        });
+                    return true;
+                });
+            field("length_mode",
+                [&](const Json& v)
+                {
+                    if (!v.is_string() || (v != "normalized" && v != "raw"))
+                        return false;
+                    const auto mode =
+                        v == "raw" ? GeometryVectorFieldLengthMode::Raw : GeometryVectorFieldLengthMode::Normalized;
+                    edits.push_back(
+                        [mode](auto& l)
+                        {
+                            l.LengthMode = mode;
+                        });
+                    return true;
+                });
+            field("length",
+                [&](const Json& v)
+                {
+                    if (!number(v))
+                        return false;
+                    edits.push_back(
+                        [x = v.get<float>()](auto& l)
+                        {
+                            l.Length = x;
+                        });
+                    return true;
+                });
+            field("line_width",
+                [&](const Json& v)
+                {
+                    if (!number(v))
+                        return false;
+                    edits.push_back(
+                        [x = v.get<float>()](auto& l)
+                        {
+                            l.LineWidthPx = x;
+                        });
+                    return true;
+                });
+            field("color",
+                [&](const Json& v)
+                {
+                    if (!v.is_array() || v.size() != 4u || !std::ranges::all_of(v, number))
+                        return false;
+                    edits.push_back(
+                        [c = glm::vec4{v[0].get<float>(), v[1].get<float>(), v[2].get<float>(), v[3].get<float>()}](
+                            auto& l)
+                        {
+                            l.Color = c;
+                        });
+                    return true;
+                });
+            for (const char* key : {"stride", "max_glyphs"})
+            {
+                field(key,
+                    [&](const Json&)
+                    {
+                        const auto value = UInt(*args, key);
+                        if (!value)
+                            return false;
+                        const bool stride = std::string_view{key} == "stride";
+                        edits.push_back(
+                            [x = *value, stride](auto& l)
+                            {
+                                (stride ? l.Stride : l.MaxGlyphs) = x;
+                            });
+                        return true;
+                    });
+            }
+            for (const char* key : {"length_property", "color_property"})
+            {
+                field(key,
+                    [&](const Json& v)
+                    {
+                        if (!v.is_string())
+                            return false;
+                        const bool length = std::string_view{key} == "length_property";
+                        edits.push_back(
+                            [name = v.get<std::string>(), length](auto& l)
+                            {
+                                (length ? l.LengthProperty : l.ColorProperty) = name;
+                            });
+                        return true;
+                    });
+            }
+            field("colormap",
+                [&](const Json& v)
+                {
+                    const auto it = v.is_string() ? std::ranges::find(kVectorFieldColormaps, v.get<std::string>())
+                                                  : kVectorFieldColormaps.end();
+                    if (it == kVectorFieldColormaps.end())
+                        return false;
+                    const auto index = std::distance(kVectorFieldColormaps.begin(), it);
+                    edits.push_back(
+                        [index](auto& l)
+                        {
+                            l.ColorMap = static_cast<decltype(l.ColorMap)>(index);
+                        });
+                    return true;
+                });
+            field("color_auto_range",
+                [&](const Json& v)
+                {
+                    if (!v.is_boolean())
+                        return false;
+                    edits.push_back(
+                        [on = v.get<bool>()](auto& l)
+                        {
+                            l.ColorAutoRange = on;
+                        });
+                    return true;
+                });
+            field("color_range",
+                [&](const Json& v)
+                {
+                    if (!v.is_array() || v.size() != 2u || !std::ranges::all_of(v, number))
+                        return false;
+                    edits.push_back(
+                        [lo = v[0].get<float>(), hi = v[1].get<float>()](auto& l)
+                        {
+                            l.ColorRangeMin = lo;
+                            l.ColorRangeMax = hi;
+                        });
+                    return true;
+                });
+            if (!bad.empty())
+                return InvalidParams("Invalid \"" + bad + "\"; see the schema.");
+            // The schema allows no other key: a misspelt field must not pass as "no change".
+            constexpr std::array<std::string_view, 17> kKeys{"entity",
+                "action",
+                "domain",
+                "property",
+                "visible",
+                "depth_tested",
+                "length_mode",
+                "length",
+                "line_width",
+                "color",
+                "stride",
+                "max_glyphs",
+                "length_property",
+                "color_property",
+                "colormap",
+                "color_auto_range",
+                "color_range"};
+            for (const auto& item : args->items())
+                if (std::ranges::find(kKeys, item.key()) == kKeys.end())
+                    return InvalidParams("Unknown argument \"" + item.key() + "\"; see the schema.");
+            if (!edits.empty() && operation != EditorVectorFieldOperation::Update)
+                return InvalidParams("Only update takes layer fields; add uses the panel's defaults.");
+
+            const VectorFieldLookup lookup = LookupVectorFields(context, *entity);
+            if (!lookup.Prepared)
+                return Fail(kNoWorkspace);
+            if (!lookup.HasEntity)
+                return UnknownEntity(*entity);
+            GeometryVectorFieldLayerRecipe layer{
+                .Vector = {.Domain = *domain, .Name = *property, .ValueKind = Geometry::PropertyValueKind::Vec3}};
+            for (const EditorVectorFieldLayerRow& row : lookup.Model.Layers)
+                if (row.Layer.Vector.Domain == *domain && row.Layer.Vector.Name == *property)
+                    layer = row.Layer;
+            for (const auto& edit : edits)
+                edit(layer);
+
+            const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
+            const EditorCommandStatus status = ApplyEditorGeometryVectorFieldCommand(visualization.Commands,
+                EditorGeometryVectorFieldCommand{
+                    .StableEntityId = *entity, .Operation = operation, .Layer = std::move(layer)});
+            if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
+                return {.IsError = true,
+                    .Text = "The vector field command answered " +
+                        std::string(DebugNameForEditorCommandStatus(status)) +
+                        " (a missing field, a property that does not resolve, or a value out of range).",
+                    .ErrorCode = ErrorCodeFor(status)};
+            return Ok({{"status", DebugNameForEditorCommandStatus(status)},
+                {"layers", VectorFieldLayersJson(LookupVectorFields(context, *entity).Model)}});
         }
 
         AgentOperationOutcome ShowProperty(const AgentOperationContext& context, std::string_view arguments)
@@ -1222,6 +1549,50 @@ namespace Extrinsic::Runtime
             }(),
             false,
             BindAttribute);
+        add("vector_fields",
+            "Vector fields",
+            "List an entity's Appearance vector fields like the panel's Vector fields section: per element domain the vec3 "
+            "properties a field can draw and the style properties a field can take (scalar ones for length and color, "
+            "vec3/vec4 for color), and every layer with its fields and status (a missing or GPU-preview style property).",
+            Schema("{" + kEntityProperty + "}", R"(["entity"])"),
+            true,
+            VectorFields);
+        add(
+            "vector_field",
+            "Edit vector field",
+            "Add, update or remove one Appearance vector field (identified by domain and vec3 property) through the panel's "
+            "command; one undoable step each. add uses the panel's defaults (bounding-box length, palette color); update "
+            "changes only the fields passed. Per-arrow inputs: length_property (a scalar; arrow length = length x value, a "
+            "value that is not > 0 draws no arrow) and color_property (a scalar through colormap and color_range, or "
+            "vec3/vec4 as RGB(A); an invalid value draws the uniform color); \"\" restores Default. Refusals end with the "
+            "snake-case command status as error code (invalid_visualization_property, stale_entity); bad arguments "
+            "invalid_params. The reply lists the entity's layers.",
+            []
+            {
+                std::string colormaps;
+                for (const char* name : kVectorFieldColormaps)
+                    colormaps += std::string(colormaps.empty() ? "" : ",") + "\"" + name + "\"";
+                return Schema("{" + kEntityProperty +
+                        R"(,"action":{"type":"string","enum":["add","update","remove"]},)" +
+                        DomainProperty("Element domain of the vec3 property.") +
+                        R"(,"property":{"type":"string","minLength":1,"description":"The vec3 property the arrows draw."},)"
+                        R"("visible":{"type":"boolean"},"depth_tested":{"type":"boolean"},)"
+                        R"("length_mode":{"type":"string","enum":["normalized","raw"]},)"
+                        R"("length":{"type":"number","exclusiveMinimum":0,"description":"Arrow length (normalized) or scale (raw); multiplies a length property."},)"
+                        R"("line_width":{"type":"number","minimum":0.5,"maximum":32},)"
+                        R"("color":{"type":"array","items":{"type":"number","minimum":0,"maximum":1},"minItems":4,"maxItems":4,"description":"Uniform RGBA, drawn while color_property is Default."},)"
+                        R"("stride":{"type":"integer","minimum":1},"max_glyphs":{"type":"integer","minimum":0},)"
+                        R"("length_property":{"type":"string","description":"Scalar property multiplying each arrow's length; empty is Default."},)"
+                        R"("color_property":{"type":"string","description":"Scalar or vec3/vec4 property coloring each arrow; empty is Default."},)"
+                        R"("colormap":{"type":"string","enum":[)" +
+                        colormaps +
+                        R"(]},)"
+                        R"("color_auto_range":{"type":"boolean"},)"
+                        R"("color_range":{"type":"array","items":{"type":"number"},"minItems":2,"maxItems":2,"description":"Manual colormap range, min < max."}})",
+                    R"(["entity","action","domain","property"])");
+            }(),
+            false,
+            VectorField);
         add("set_visibility",
             "Set visibility",
             "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points / Bounding box checkboxes; by default the "

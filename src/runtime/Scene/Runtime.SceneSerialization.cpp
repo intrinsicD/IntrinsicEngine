@@ -1475,11 +1475,56 @@ namespace Extrinsic::Runtime
                 {"stride", layer.Stride},
                 {"maxGlyphs", layer.MaxGlyphs},
                 {"enabled", layer.Enabled},
+                {"lengthProperty", layer.LengthProperty},
+                {"colorProperty", layer.ColorProperty},
+                {"colorMap", ColormapToString(layer.ColorMap)},
+                {"colorAutoRange", layer.ColorAutoRange},
+                {"colorRange", json::array({layer.ColorRangeMin, layer.ColorRangeMax})},
             };
         }
 
-        // Every field is required: vector-field layers have one current
-        // format, and a partial layer is rejected rather than defaulted.
+        // UI-083 keys are optional (scenes written before them load with the defaults); a key
+        // that is present must be well-formed.
+        [[nodiscard]] bool TryReadGeometryVectorFieldStyle(const json& value, GeometryVectorFieldLayerRecipe& out)
+        {
+            const auto readString = [&value](const char* key, std::string& target)
+            {
+                if (!value.contains(key))
+                    return true;
+                if (!value[key].is_string())
+                    return false;
+                target = value[key].get<std::string>();
+                return true;
+            };
+            if (!readString("lengthProperty", out.LengthProperty) || !readString("colorProperty", out.ColorProperty))
+            {
+                return false;
+            }
+            if (value.contains("colorMap") &&
+                (!value["colorMap"].is_string() ||
+                    !TryColormapFromString(value["colorMap"].get<std::string>(), out.ColorMap)))
+            {
+                return false;
+            }
+            if (value.contains("colorAutoRange"))
+            {
+                if (!value["colorAutoRange"].is_boolean())
+                    return false;
+                out.ColorAutoRange = value["colorAutoRange"].get<bool>();
+            }
+            if (value.contains("colorRange"))
+            {
+                const json& range = value["colorRange"];
+                if (!range.is_array() || range.size() != 2u || !range[0].is_number() || !range[1].is_number())
+                    return false;
+                out.ColorRangeMin = range[0].get<float>();
+                out.ColorRangeMax = range[1].get<float>();
+            }
+            return true;
+        }
+
+        // The keys before UI-083 are required: a partial layer is rejected
+        // rather than defaulted.
         [[nodiscard]] bool TryReadGeometryVectorFieldLayer(
             const json& value,
             GeometryVectorFieldLayerRecipe& out)
@@ -1517,7 +1562,7 @@ namespace Extrinsic::Runtime
             out.Stride = static_cast<std::uint32_t>(stride);
             out.MaxGlyphs = static_cast<std::uint32_t>(maxGlyphs);
             out.Enabled = value["enabled"].get<bool>();
-            return true;
+            return TryReadGeometryVectorFieldStyle(value, out);
         }
 
         [[nodiscard]] json GeometryPresentationRecipeToJson(

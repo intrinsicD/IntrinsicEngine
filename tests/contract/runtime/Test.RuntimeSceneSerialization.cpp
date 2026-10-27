@@ -1095,6 +1095,103 @@ TEST(RuntimeSceneSerialization, VectorFieldLayersRoundTripAcrossDomains)
     EXPECT_EQ(restored->Presentations.size(), 1u);
 }
 
+// UI-083: per-arrow length and color keys round-trip, are optional for older scenes and are
+// rejected when present but malformed.
+TEST(RuntimeSceneSerialization, VectorFieldStyleKeysRoundTripAndStayOptional)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle sourceEntity = AddGeometryPresentationEntity(source);
+    const Runtime::GeometryVectorFieldLayerRecipe styled{
+        .Vector = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+            .Name = "v:normal",
+            .ValueKind = Geometry::PropertyValueKind::Vec3},
+        .LengthProperty = "v:len",
+        .ColorProperty = "v:heat",
+        .ColorMap = Extrinsic::Graphics::Colormap::Type::Jet,
+        .ColorAutoRange = false,
+        .ColorRangeMin = 10.0f,
+        .ColorRangeMax = 20.0f,
+    };
+    source.Raw().get<Runtime::GeometryPresentationRecipe>(sourceEntity).VectorFields = {styled};
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "styled.json", backend).has_value());
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("styled.json"));
+
+    const auto load = [](const nlohmann::json& document) -> std::optional<Runtime::GeometryVectorFieldLayerRecipe>
+    {
+        ECS::Scene::Registry loaded;
+        if (!Runtime::DeserializeSceneDocument(loaded, document.dump()).has_value())
+            return std::nullopt;
+        const auto* recipe =
+            loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(FindEntityByName(loaded, "Mesh Entity"));
+        if (recipe == nullptr || recipe->VectorFields.size() != 1u)
+            return std::nullopt;
+        return recipe->VectorFields.front();
+    };
+    const auto edited = [&](const auto& edit)
+    {
+        nlohmann::json copy = parsed;
+        for (auto& entityJson : copy["entities"])
+        {
+            if (entityJson.contains("geometryPresentation"))
+                edit(entityJson["geometryPresentation"]["vectorFields"][0]);
+        }
+        return copy;
+    };
+
+    const auto restored = load(parsed);
+    ASSERT_TRUE(restored.has_value());
+    EXPECT_EQ(*restored, styled);
+
+    // A scene written before the keys existed loads with the defaults.
+    const auto older = load(edited(
+        [](nlohmann::json& layer)
+        {
+            for (const char* key : {"lengthProperty", "colorProperty", "colorMap", "colorAutoRange", "colorRange"})
+                layer.erase(key);
+        }));
+    ASSERT_TRUE(older.has_value());
+    Runtime::GeometryVectorFieldLayerRecipe defaults = styled;
+    defaults.LengthProperty.clear();
+    defaults.ColorProperty.clear();
+    defaults.ColorMap = Extrinsic::Graphics::Colormap::Type::Viridis;
+    defaults.ColorAutoRange = true;
+    defaults.ColorRangeMin = 0.0f;
+    defaults.ColorRangeMax = 1.0f;
+    EXPECT_EQ(*older, defaults);
+
+    EXPECT_FALSE(load(edited(
+        [](nlohmann::json& layer)
+        {
+            layer["lengthProperty"] = 5;
+        })));
+    EXPECT_FALSE(load(edited(
+        [](nlohmann::json& layer)
+        {
+            layer["colorProperty"] = nullptr;
+        })));
+    EXPECT_FALSE(load(edited(
+        [](nlohmann::json& layer)
+        {
+            layer["colorMap"] = "Rainbow";
+        })));
+    EXPECT_FALSE(load(edited(
+        [](nlohmann::json& layer)
+        {
+            layer["colorAutoRange"] = "yes";
+        })));
+    EXPECT_FALSE(load(edited(
+        [](nlohmann::json& layer)
+        {
+            layer["colorRange"] = nlohmann::json::array({2.0, 1.0});
+        })));
+    EXPECT_FALSE(load(edited(
+        [](nlohmann::json& layer)
+        {
+            layer["colorRange"] = nlohmann::json::array({1.0});
+        })));
+}
+
 TEST(RuntimeSceneSerialization, InvalidVectorFieldLayerRejectsDocument)
 {
     ECS::Scene::Registry source;

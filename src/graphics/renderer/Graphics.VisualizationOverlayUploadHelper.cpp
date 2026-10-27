@@ -138,7 +138,14 @@ namespace Extrinsic::Graphics
                 .PackedColor = PackVertexColorUnorm4x8(packet.Color),
                 .Scale = packet.Scale,
                 .LineWidthPx = packet.LineWidthPx,
-                .Flags = packet.NormalizeLength ? kVisualizationVectorFieldNormalizeFlag : 0u,
+                .Flags = (packet.NormalizeLength ? kVisualizationVectorFieldNormalizeFlag : 0u) |
+                    (packet.ColorMode == VectorFieldColorMode::Colormap ? kVisualizationVectorFieldColormapFlag : 0u) |
+                    (packet.ColorMode == VectorFieldColorMode::Rgba ? kVisualizationVectorFieldRgbaFlag : 0u),
+                .ColormapID = packet.ColorMode == VectorFieldColorMode::Colormap ? packet.ColormapBindlessIndex : 0u,
+                .LengthBufferBDA = packet.LengthBufferBDA,
+                .ColorBufferBDA = packet.ColorMode != VectorFieldColorMode::Uniform ? packet.ColorBufferBDA : 0u,
+                .ColorRangeMin = packet.ColorRangeMin,
+                .ColorRangeMax = packet.ColorRangeMax,
             });
         }
         if (records.empty())

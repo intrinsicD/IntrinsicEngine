@@ -2442,6 +2442,73 @@ TEST(SandboxEditorUi, VectorFieldCommandsValidateAndUseCommandHistory)
     EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshFace, "f:flow"), nullptr);
 }
 
+// UI-083: the colormap must exist and the color range must be finite with min < max, also
+// while the auto range is on (the remembered manual range stays valid).
+TEST(SandboxEditorUi, VectorFieldCommandRejectsBadColormapsAndRanges)
+{
+    using D = Runtime::GeometryElementDomain;
+    using Op = Runtime::EditorVectorFieldOperation;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldColorRange");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const auto apply = [&](const Op op, Runtime::GeometryVectorFieldLayerRecipe layer)
+    {
+        return Runtime::ApplyEditorGeometryVectorFieldCommand(context,
+            Runtime::EditorGeometryVectorFieldCommand{
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+                .Operation = op,
+                .Layer = std::move(layer),
+                .UseLayerStyle = true,
+            });
+    };
+    ASSERT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshVertex, "v:normal")}), Runtime::EditorCommandStatus::Applied);
+    const Runtime::GeometryVectorFieldLayerRecipe base = *FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal");
+    const auto rejected = [&](const auto& edit)
+    {
+        Runtime::GeometryVectorFieldLayerRecipe layer = base;
+        edit(layer);
+        return apply(Op::Update, layer) == Runtime::EditorCommandStatus::InvalidVisualizationProperty;
+    };
+    EXPECT_TRUE(rejected(
+        [](auto& l)
+        {
+            l.ColorMap = Graphics::Colormap::Type::Count;
+        }));
+    EXPECT_TRUE(rejected(
+        [](auto& l)
+        {
+            l.ColorRangeMin = 1.0f;
+        }));
+    EXPECT_TRUE(rejected(
+        [](auto& l)
+        {
+            l.ColorRangeMin = 2.0f;
+        }));
+    EXPECT_TRUE(rejected(
+        [](auto& l)
+        {
+            l.ColorRangeMax = std::numeric_limits<float>::infinity();
+        }));
+    EXPECT_TRUE(rejected(
+        [](auto& l)
+        {
+            l.ColorRangeMin = std::numeric_limits<float>::quiet_NaN();
+        }));
+    EXPECT_EQ(*FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal"), base);
+
+    Runtime::GeometryVectorFieldLayerRecipe valid = base;
+    valid.ColorMap = Graphics::Colormap::Type::Jet;
+    valid.ColorAutoRange = false;
+    valid.ColorRangeMin = 10.0f;
+    valid.ColorRangeMax = 20.0f;
+    ASSERT_EQ(apply(Op::Update, valid), Runtime::EditorCommandStatus::Applied);
+    EXPECT_EQ(*FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal"), valid);
+}
+
 TEST(SandboxEditorUi, VectorFieldModelListsDomainsCandidatesAndLayerStatus)
 {
     using D = Runtime::GeometryElementDomain;
@@ -2524,6 +2591,149 @@ TEST(SandboxEditorUi, VectorFieldModelOffersExactlyTheVectorsTheCommandAccepts)
     EXPECT_EQ(offered, 2u) << "v:position and f:flow";
     EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshVertex, "v:position"), nullptr);
     EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshFace, "f:flow"), nullptr);
+}
+
+// UI-083: the vector-field model offers exactly the length (scalar) and color (scalar, vec3,
+// vec4) properties the command accepts, for every property the domain carries.
+TEST(SandboxEditorUi, VectorFieldStyleCandidatesAreExactlyWhatTheCommandAccepts)
+{
+    using D = Runtime::GeometryElementDomain;
+    using Op = Runtime::EditorVectorFieldOperation;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldStyleParity");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    (void)vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    (void)vertices.GetOrAdd<bool>("v:b", true);
+    (void)vertices.GetOrAdd<std::int32_t>("v:i", 1);
+    (void)vertices.GetOrAdd<std::uint32_t>("v:u", 1u);
+    (void)vertices.GetOrAdd<std::uint64_t>("v:q", 1u);
+    (void)vertices.GetOrAdd<float>("v:f", 1.0f);
+    (void)vertices.GetOrAdd<double>("v:d", 1.0);
+    (void)vertices.GetOrAdd<glm::vec2>("v:uv", glm::vec2{1.0f});
+    (void)vertices.GetOrAdd<glm::vec4>("v:rgba", glm::vec4{1.0f});
+    // One value short of the three vertices: neither offered nor accepted.
+    vertices.GetOrAdd<float>("v:short", 1.0f).Vector().resize(2u);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto apply = [&](const Op op, const Runtime::GeometryVectorFieldLayerRecipe& layer)
+    {
+        return Runtime::ApplyEditorGeometryVectorFieldCommand(context,
+            Runtime::EditorGeometryVectorFieldCommand{
+                .StableEntityId = stableId, .Operation = op, .Layer = layer, .UseLayerStyle = true});
+    };
+    ASSERT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshVertex, "v:normal")}), Runtime::EditorCommandStatus::Applied);
+    const Runtime::GeometryVectorFieldLayerRecipe base = *FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal");
+
+    const Runtime::EditorVectorFieldModel model =
+        Runtime::BuildEditorVectorFieldModel(Runtime::BuildGeometryAvailability(registry.Raw(), mesh), nullptr);
+    const auto domain =
+        std::ranges::find(model.Domains, D::MeshVertex, &Runtime::EditorVectorFieldDomainOption::Domain);
+    ASSERT_NE(domain, model.Domains.end());
+    std::size_t lengthOffered = 0u;
+    std::size_t colorOffered = 0u;
+    for (const std::string& name : vertices.Properties())
+    {
+        const auto option =
+            std::ranges::find(domain->StyleProperties, name, &Runtime::EditorVectorFieldStyleOption::Name);
+        const bool offered = option != domain->StyleProperties.end();
+        const bool scalar = offered && option->Scalar;
+        lengthOffered += scalar ? 1u : 0u;
+        colorOffered += offered ? 1u : 0u;
+
+        Runtime::GeometryVectorFieldLayerRecipe layer = base;
+        layer.LengthProperty = name;
+        EXPECT_EQ(apply(Op::Update, layer) == Runtime::EditorCommandStatus::Applied, scalar) << "length " << name;
+        layer = base;
+        layer.ColorProperty = name;
+        EXPECT_EQ(apply(Op::Update, layer) == Runtime::EditorCommandStatus::Applied, offered) << "color " << name;
+        (void)apply(Op::Update, base);
+    }
+    EXPECT_EQ(lengthOffered, 6u) << "bool, int32, uint32, uint64, float and double";
+    EXPECT_EQ(colorOffered, 6u + 3u) << "the scalars plus v:position, v:normal and v:rgba";
+}
+
+// UI-083: a newly named style property must resolve (or be a pending GPU scalar); a name that
+// stops resolving stays, so other edits of its layer keep working, and the row says why it falls
+// back.
+TEST(SandboxEditorUi, VectorFieldStyleNamesResolveOnceAndReportTheirFallback)
+{
+    using D = Runtime::GeometryElementDomain;
+    using Op = Runtime::EditorVectorFieldOperation;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldStyleNames");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    (void)vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    (void)vertices.GetOrAdd<float>("v:f", 1.0f);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const Intrinsic::Tests::EditorFeatureTestContext features = MakeContext(registry, selection);
+    Runtime::EditorVisualizationEditingContext context = features;
+    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto apply = [&](const Op op, const Runtime::GeometryVectorFieldLayerRecipe& layer)
+    {
+        return Runtime::ApplyEditorGeometryVectorFieldCommand(context,
+            Runtime::EditorGeometryVectorFieldCommand{
+                .StableEntityId = stableId, .Operation = op, .Layer = layer, .UseLayerStyle = true});
+    };
+    Runtime::GeometryVectorFieldLayerRecipe layer{.Vector = VectorRef(D::MeshVertex, "v:normal")};
+    layer.LengthProperty = "v:missing";
+    EXPECT_EQ(apply(Op::Add, layer), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    layer.LengthProperty = "v:f";
+    ASSERT_EQ(apply(Op::Add, layer), Runtime::EditorCommandStatus::Applied);
+    layer.ColorProperty = "v:missing";
+    EXPECT_EQ(apply(Op::Update, layer), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    layer.ColorProperty.clear();
+
+    const auto rowStatus = [&](const std::function<bool(const Runtime::GeometryPropertyRef&)>& pending)
+    {
+        const auto model =
+            Runtime::BuildEditorVectorFieldModel(Runtime::BuildGeometryAvailability(registry.Raw(), mesh),
+                registry.Raw().try_get<Runtime::GeometryPresentationRecipe>(mesh),
+                pending);
+        return model.Layers.size() == 1u ? model.Layers.front().Status : std::string{"<no layer>"};
+    };
+    EXPECT_EQ(rowStatus({}), "");
+
+    {
+        auto f = vertices.Get<float>("v:f");
+        vertices.Remove(f);
+    }
+    layer.Length = 2.0f;
+    EXPECT_EQ(apply(Op::Update, layer), Runtime::EditorCommandStatus::Applied) << "an unchanged name stays";
+    EXPECT_NE(rowStatus({}).find("v:f"), std::string::npos) << rowStatus({});
+
+    // A bound color property that loses an element falls back and says so.
+    vertices.GetOrAdd<float>("v:g", 1.0f);
+    layer.ColorProperty = "v:g";
+    ASSERT_EQ(apply(Op::Update, layer), Runtime::EditorCommandStatus::Applied);
+    vertices.Get<float>("v:g").Vector().resize(2u);
+    EXPECT_NE(rowStatus({}).find("v:g"), std::string::npos) << rowStatus({});
+    layer.ColorProperty.clear();
+
+    // A scalar that only a GPU preview carries is accepted and reported as such.
+    context.PendingResidentScalar = [](ECS::EntityHandle, const Runtime::GeometryPropertyRef& ref)
+    {
+        return ref.Name == "v:gpu";
+    };
+    layer.LengthProperty = "v:gpu";
+    EXPECT_EQ(apply(Op::Update, layer), Runtime::EditorCommandStatus::Applied);
+    const std::string pending = rowStatus(
+        [](const Runtime::GeometryPropertyRef& ref)
+        {
+            return ref.Name == "v:gpu";
+        });
+    EXPECT_NE(pending.find("GPU preview"), std::string::npos) << pending;
+    const std::string ended = rowStatus(
+        [](const Runtime::GeometryPropertyRef&)
+        {
+            return false;
+        });
+    EXPECT_NE(ended.find("v:gpu"), std::string::npos) << ended;
+    EXPECT_EQ(ended.find("GPU preview"), std::string::npos) << ended;
 }
 
 TEST(SandboxEditorUi, VectorFieldAddCreatesPresentationTransactionallyAndUndoRestoresAbsence)

@@ -283,6 +283,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t VectorFieldPayloadCacheReuses{0};
         std::uint32_t VectorFieldCacheReleases{0};
         std::uint32_t VectorFieldNonFiniteVectorCount{0};
+        // UI-083: a named length or color property that does not resolve (missing, another kind
+        // or count); the layer draws the uniform length or color. Style caches count as payload
+        // caches above.
+        std::uint32_t VectorFieldStyleFallbackCount{0};
         std::uint64_t VectorFieldCacheScannedElementCount{0};
         // Live-row bounds checks performed while appending packets; cache
         // rows are validated when built, so steady frames report zero.

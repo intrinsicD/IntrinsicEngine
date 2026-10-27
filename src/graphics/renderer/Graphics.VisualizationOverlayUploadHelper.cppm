@@ -2,6 +2,7 @@
 // per-frame-slot GPU buffers.
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -35,11 +36,23 @@ export namespace Extrinsic::Graphics
         float Scale{1.0f};
         float LineWidthPx{1.0f};
         std::uint32_t Flags{0u};
-        std::uint32_t Reserved[3]{};
+        std::uint32_t ColormapID{0u};
+        // Per-element float multipliers / colormap scalars or vec4 colors; 0 = none.
+        std::uint64_t LengthBufferBDA{0u};
+        std::uint64_t ColorBufferBDA{0u};
+        float ColorRangeMin{0.0f};
+        float ColorRangeMax{1.0f};
     };
-    static_assert(sizeof(VisualizationVectorFieldDrawRecord) == 128u);
+    static_assert(sizeof(VisualizationVectorFieldDrawRecord) == 144u);
+    static_assert(offsetof(VisualizationVectorFieldDrawRecord, ColormapID) == 116u);
+    static_assert(offsetof(VisualizationVectorFieldDrawRecord, LengthBufferBDA) == 120u);
+    static_assert(offsetof(VisualizationVectorFieldDrawRecord, ColorBufferBDA) == 128u);
+    static_assert(offsetof(VisualizationVectorFieldDrawRecord, ColorRangeMax) == 140u);
 
     inline constexpr std::uint32_t kVisualizationVectorFieldNormalizeFlag = 1u;
+    // The color buffer holds colormap scalars / RGBA colors.
+    inline constexpr std::uint32_t kVisualizationVectorFieldColormapFlag = 2u;
+    inline constexpr std::uint32_t kVisualizationVectorFieldRgbaFlag = 4u;
     // Arrow glyph: a six-vertex shaft quad followed by a three-vertex head.
     inline constexpr std::uint32_t kVisualizationVectorFieldGlyphVertexCount = 9u;
 

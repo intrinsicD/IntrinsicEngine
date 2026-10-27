@@ -130,6 +130,9 @@ namespace Extrinsic::Runtime
         const Graphics::Components::VisualizationConfig* visualization) noexcept;
     [[nodiscard]] bool IsRenderExtractionColorBufferVisualizationSource(
         const Graphics::Components::VisualizationConfig* visualization) noexcept;
+    // A GPU preview front's published scalar range, widened when constant (a front may hold one
+    // value everywhere); the caller still rejects a non-finite range.
+    [[nodiscard]] std::array<float, 2> WidenGpuFrontScalarRange(std::array<float, 2> range) noexcept;
     struct RenderExtractionCache::State
     {
         State();
@@ -437,11 +440,38 @@ namespace Extrinsic::Runtime
             std::uint64_t LastUsedFrame{0u};
         };
 
+        // UI-083: one per-element length/color property, converted once per revision. Scalars
+        // hold +inf where a value is invalid, colors (-1, -1, -1, -1); `Kind` None remembers a
+        // property that is missing or neither scalar nor vec3/vec4.
+        struct VectorFieldStyleCache
+        {
+            enum class ValueKind : std::uint8_t
+            {
+                None,
+                Scalar,
+                Rgba
+            };
+
+            GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+            std::string Property{};
+            Geometry::PropertyRevision Revision{0u};
+            std::size_t Count{0u};
+            ValueKind Kind{ValueKind::None};
+            std::vector<float> Scalars{};
+            std::vector<glm::vec4> Rgba{};
+            // The overlay's auto range over the valid scalars (0..1 without any).
+            float AutoRangeMin{0.0f};
+            float AutoRangeMax{1.0f};
+            std::uint64_t Stamp{0u};
+            std::uint64_t LastUsedFrame{0u};
+        };
+
         struct VectorFieldEntityCache
         {
             std::vector<VectorFieldAnchorCache> Anchors{};
             std::vector<VectorFieldPayloadCache> Payloads{};
             std::vector<VectorFieldOrderCache> Orders{};
+            std::vector<VectorFieldStyleCache> Styles{};
             std::uint64_t LastUsedFrame{0u};
         };
 

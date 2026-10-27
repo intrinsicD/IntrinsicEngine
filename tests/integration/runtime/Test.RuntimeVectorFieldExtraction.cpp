@@ -1,6 +1,7 @@
 // Vector-field extraction from Appearance layers: domain anchors, deleted
 // rows, cache reuse and invalidation, lane independence and release.
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -21,6 +22,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderWorld;
@@ -567,4 +569,310 @@ TEST(RuntimeVectorFieldExtraction, AValidGlyphOrderDrawsARankSortedPrefix)
     ASSERT_NE(packet, nullptr);
     EXPECT_EQ(packet->RowCount, 2u);
     EXPECT_EQ(fixture.Read<std::uint32_t>(packet->RowBufferBDA), (std::vector<std::uint32_t>{3u, 4u, 0u, 2u}));
+}
+
+namespace
+{
+    struct StyleUpload
+    {
+        bool Found{false};
+        std::uint32_t Fallbacks{0u};
+        Graphics::VectorFieldColorMode Mode{Graphics::VectorFieldColorMode::Uniform};
+        float RangeMin{0.0f};
+        float RangeMax{0.0f};
+        std::uint64_t LengthBDA{0u};
+        std::uint64_t ColorBDA{0u};
+        std::vector<float> Lengths{};
+        std::vector<float> Scalars{};
+        std::vector<glm::vec4> Rgba{};
+    };
+
+    // Extracts one frame with `layers` and reads back the style buffers of the layer drawing `vector`.
+    [[nodiscard]] StyleUpload ExtractStyle(Fixture& fixture,
+        const ECS::EntityHandle entity,
+        std::vector<Runtime::GeometryVectorFieldLayerRecipe> layers,
+        const std::string_view vector = ":v:dir")
+    {
+        Recipe(fixture.Scene, entity).VectorFields = std::move(layers);
+        const auto frame = fixture.Extract();
+        StyleUpload out{.Fallbacks = frame.Stats.VectorFieldStyleFallbackCount};
+        const auto* packet = FindPacket(frame.World, vector);
+        if (packet == nullptr)
+            return out;
+        out.Found = true;
+        out.Mode = packet->ColorMode;
+        out.RangeMin = packet->ColorRangeMin;
+        out.RangeMax = packet->ColorRangeMax;
+        out.LengthBDA = packet->LengthBufferBDA;
+        out.ColorBDA = packet->ColorBufferBDA;
+        if (packet->LengthBufferBDA >= 0x1'0000'0000ull)
+            out.Lengths = fixture.Read<float>(packet->LengthBufferBDA);
+        if (packet->ColorBufferBDA >= 0x1'0000'0000ull)
+        {
+            if (packet->ColorMode == Graphics::VectorFieldColorMode::Rgba)
+                out.Rgba = fixture.Read<glm::vec4>(packet->ColorBufferBDA);
+            else
+                out.Scalars = fixture.Read<float>(packet->ColorBufferBDA);
+        }
+        return out;
+    }
+
+    [[nodiscard]] Runtime::GeometryVectorFieldLayerRecipe Styled(const std::string& length, const std::string& color)
+    {
+        auto layer = Layer(D::MeshVertex, "v:dir");
+        layer.LengthProperty = length;
+        layer.ColorProperty = color;
+        return layer;
+    }
+}
+
+// UI-083: per-arrow lengths and colors upload one checked value per element. A length that is not
+// a valid float becomes +inf (the shader draws no arrow); an invalid color becomes +inf or a
+// negative RGBA (the shader keeps the uniform color).
+TEST(RuntimeVectorFieldExtraction, StylePropertiesUploadCheckedPerElementValues)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    auto& vertices = fixture.Scene.Raw().get<GS::Vertices>(entity).Properties;
+    constexpr float inf = std::numeric_limits<float>::infinity();
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    vertices.GetOrAdd<float>("v:len", 0.0f).Vector() = {1.0f, 2.0f, nan, -1.0f, 0.0f};
+    vertices.GetOrAdd<double>("v:lend", 0.0).Vector() = {1.0e39, 3.0, 0.0, 0.0, 0.0};
+    vertices.GetOrAdd<std::uint32_t>("v:lenu", 0u).Vector() = {16777217u, 7u, 0u, 0u, 0u};
+    vertices.GetOrAdd<std::int32_t>("v:leni", 0).Vector() = {-2, 5, 0, 0, 0};
+    vertices.GetOrAdd<std::uint64_t>("v:lenq", 0u).Vector() = {4u, 0u, 0u, 0u, 0u};
+    vertices.GetOrAdd<bool>("v:show", false).Vector() = {true, false, true, false, false};
+
+    const auto lengths = [&](const std::string& name)
+    {
+        const StyleUpload upload = ExtractStyle(fixture, entity, {Styled(name, "")});
+        EXPECT_TRUE(upload.Found) << name;
+        EXPECT_EQ(upload.Fallbacks, 0u) << name;
+        EXPECT_EQ(upload.Mode, Graphics::VectorFieldColorMode::Uniform) << name;
+        return upload.Lengths;
+    };
+    EXPECT_EQ(lengths("v:len"), (std::vector<float>{1.0f, 2.0f, inf, -1.0f, 0.0f}));
+    EXPECT_EQ(lengths("v:lend"), (std::vector<float>{inf, 3.0f, 0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(lengths("v:lenu"), (std::vector<float>{inf, 7.0f, 0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(lengths("v:leni"), (std::vector<float>{-2.0f, 5.0f, 0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(lengths("v:lenq"), (std::vector<float>{4.0f, 0.0f, 0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(lengths("v:show"), (std::vector<float>{1.0f, 0.0f, 1.0f, 0.0f, 0.0f}));
+
+    vertices.GetOrAdd<std::int32_t>("v:heat", 0).Vector() = {0, 10, 5, 5, 5};
+    (void)vertices.GetOrAdd<float>("v:flat", 3.0f);
+    vertices.GetOrAdd<float>("v:mixed", 0.0f).Vector() = {nan, 1.0f, 2.0f, inf, 4.0f};
+    auto rgb = vertices.GetOrAdd<glm::vec3>("v:rgb", glm::vec3{0.5f});
+    rgb.Vector()[0] = {2.0f, -1.0f, 0.5f};
+    rgb.Vector()[1] = {nan, 0.0f, 0.0f};
+    (void)vertices.GetOrAdd<glm::vec4>("v:rgba", glm::vec4{0.0f, 1.0f, 1.0f, 0.5f});
+
+    auto heat = Styled("", "v:heat");
+    heat.ColorMap = Graphics::Colormap::Type::Jet;
+    StyleUpload upload = ExtractStyle(fixture, entity, {heat});
+    EXPECT_EQ(upload.Mode, Graphics::VectorFieldColorMode::Colormap);
+    EXPECT_EQ(upload.LengthBDA, 0u);
+    EXPECT_EQ(upload.Scalars, (std::vector<float>{0.0f, 10.0f, 5.0f, 5.0f, 5.0f}));
+    EXPECT_FLOAT_EQ(upload.RangeMin, 0.0f);
+    EXPECT_FLOAT_EQ(upload.RangeMax, 10.0f);
+    heat.ColorAutoRange = false;
+    heat.ColorRangeMin = 10.0f;
+    heat.ColorRangeMax = 20.0f;
+    upload = ExtractStyle(fixture, entity, {heat});
+    EXPECT_FLOAT_EQ(upload.RangeMin, 10.0f);
+    EXPECT_FLOAT_EQ(upload.RangeMax, 20.0f);
+
+    upload = ExtractStyle(fixture, entity, {Styled("", "v:flat")});
+    EXPECT_FLOAT_EQ(upload.RangeMin, 2.5f);
+    EXPECT_FLOAT_EQ(upload.RangeMax, 3.5f);
+    upload = ExtractStyle(fixture, entity, {Styled("", "v:mixed")});
+    EXPECT_EQ(upload.Scalars, (std::vector<float>{inf, 1.0f, 2.0f, inf, 4.0f}));
+    EXPECT_FLOAT_EQ(upload.RangeMin, 1.0f) << "invalid values stay out of the auto range";
+    EXPECT_FLOAT_EQ(upload.RangeMax, 4.0f);
+
+    upload = ExtractStyle(fixture, entity, {Styled("", "v:rgb")});
+    EXPECT_EQ(upload.Mode, Graphics::VectorFieldColorMode::Rgba);
+    ASSERT_EQ(upload.Rgba.size(), 5u);
+    EXPECT_EQ(upload.Rgba[0], (glm::vec4{1.0f, 0.0f, 0.5f, 1.0f}));
+    EXPECT_EQ(upload.Rgba[1], glm::vec4{-1.0f});
+    EXPECT_EQ(upload.Rgba[2], (glm::vec4{0.5f, 0.5f, 0.5f, 1.0f}));
+    upload = ExtractStyle(fixture, entity, {Styled("", "v:rgba")});
+    ASSERT_EQ(upload.Rgba.size(), 5u);
+    EXPECT_EQ(upload.Rgba[0], (glm::vec4{0.0f, 1.0f, 1.0f, 0.5f}));
+
+    // Under a glyph order the rows are reordered; the length buffer stays indexed by element.
+    vertices.GetOrAdd<float>("v:glyph_rank").Vector() = {3.0f, 0.0f, 4.0f, 1.0f, 2.0f};
+    auto ordered = Styled("v:len", "");
+    ordered.MaxGlyphs = 2u;
+    upload = ExtractStyle(fixture, entity, {ordered});
+    EXPECT_EQ(upload.Lengths, (std::vector<float>{1.0f, 2.0f, inf, -1.0f, 0.0f}));
+}
+
+// UI-083: a style property that no longer resolves draws the uniform value and is counted; a
+// steady frame rebuilds nothing and an edit rebuilds only that property's cache.
+TEST(RuntimeVectorFieldExtraction, StylePropertiesFallBackAndRebuildOnlyTheirOwnCache)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    auto& vertices = fixture.Scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<float>("v:len", 0.0f).Vector() = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    const auto layer = Styled("v:len", "v:len");
+
+    StyleUpload upload = ExtractStyle(fixture, entity, {layer});
+    EXPECT_EQ(upload.Lengths, (std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f}));
+    EXPECT_NE(upload.LengthBDA, 0u);
+    EXPECT_EQ(upload.ColorBDA, upload.LengthBDA) << "one scalar for length and color uploads once";
+
+    for (int frame = 0; frame < 2; ++frame)
+    {
+        const auto steady = fixture.Extract();
+        EXPECT_EQ(steady.Stats.VectorFieldPayloadCacheBuilds, 0u);
+        EXPECT_EQ(steady.Stats.VectorFieldPayloadCacheReuses, 2u) << "the vectors and one style cache";
+        EXPECT_EQ(steady.Stats.VectorFieldCacheScannedElementCount, 0u);
+        EXPECT_EQ(steady.World.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 0u);
+    }
+
+    vertices.Get<float>("v:len").Vector()[0] = 9.0f;
+    const auto edit = fixture.Extract();
+    EXPECT_EQ(edit.Stats.VectorFieldPayloadCacheBuilds, 1u);
+    EXPECT_EQ(edit.Stats.VectorFieldAnchorCacheBuilds, 0u);
+    const auto* packet = FindPacket(edit.World, ":v:dir");
+    ASSERT_NE(packet, nullptr);
+    ASSERT_NE(packet->LengthBufferBDA, 0u);
+    EXPECT_EQ(fixture.Read<float>(packet->LengthBufferBDA), (std::vector<float>{9.0f, 2.0f, 3.0f, 4.0f, 5.0f}));
+
+    {
+        auto len = vertices.Get<float>("v:len");
+        vertices.Remove(len);
+    }
+    upload = ExtractStyle(fixture, entity, {layer});
+    EXPECT_EQ(upload.Fallbacks, 2u);
+    EXPECT_EQ(upload.LengthBDA, 0u);
+    EXPECT_EQ(upload.Mode, Graphics::VectorFieldColorMode::Uniform);
+    EXPECT_EQ(upload.ColorBDA, 0u);
+
+    vertices.GetOrAdd<float>("v:len", 0.0f).Vector() = {5.0f, 4.0f, 3.0f, 2.0f, 1.0f};
+    upload = ExtractStyle(fixture, entity, {layer});
+    EXPECT_EQ(upload.Fallbacks, 0u);
+    EXPECT_EQ(upload.Lengths, (std::vector<float>{5.0f, 4.0f, 3.0f, 2.0f, 1.0f}));
+
+    // Replaced by a vec3: no longer a length, now an RGB color.
+    {
+        auto len = vertices.Get<float>("v:len");
+        vertices.Remove(len);
+    }
+    (void)vertices.GetOrAdd<glm::vec3>("v:len", glm::vec3{0.25f});
+    upload = ExtractStyle(fixture, entity, {layer});
+    EXPECT_EQ(upload.Fallbacks, 1u);
+    EXPECT_EQ(upload.LengthBDA, 0u);
+    EXPECT_EQ(upload.Mode, Graphics::VectorFieldColorMode::Rgba);
+    ASSERT_EQ(upload.Rgba.size(), 5u);
+    EXPECT_EQ(upload.Rgba[4], (glm::vec4{0.25f, 0.25f, 0.25f, 1.0f}));
+}
+
+// UI-083: style caches are keyed by property, not by revision token, survive cache growth and keep
+// a vec3 used as vector and as color in both representations.
+TEST(RuntimeVectorFieldExtraction, StyleCachesKeepSameTokenAndSharedPropertiesApart)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    auto& vertices = fixture.Scene.Raw().get<GS::Vertices>(entity).Properties;
+    (void)vertices.GetOrAdd<float>("v:t1", 1.0f);
+    (void)vertices.GetOrAdd<float>("v:t2", 2.0f);
+    ASSERT_EQ(vertices.FindPropertyRevision("v:t1"), vertices.FindPropertyRevision("v:t2"));
+    EXPECT_EQ(ExtractStyle(fixture, entity, {Styled("v:t1", "")}).Lengths, std::vector<float>(5u, 1.0f));
+    EXPECT_EQ(ExtractStyle(fixture, entity, {Styled("v:t2", "")}).Lengths, std::vector<float>(5u, 2.0f));
+
+    const StyleUpload self = ExtractStyle(fixture, entity, {Styled("", "v:dir")});
+    EXPECT_EQ(self.Rgba, std::vector<glm::vec4>(5u, glm::vec4{0.0f, 0.0f, 1.0f, 1.0f}));
+    {
+        const auto frame = fixture.Extract();
+        const auto* packet = FindPacket(frame.World, ":v:dir");
+        ASSERT_NE(packet, nullptr);
+        EXPECT_EQ(fixture.Read<glm::vec3>(packet->VectorBufferBDA), std::vector<glm::vec3>(5u, glm::vec3{0, 0, 1}));
+    }
+
+    // Five layers with five style properties grow the cache while earlier entries are lent.
+    std::vector<Runtime::GeometryVectorFieldLayerRecipe> layers{};
+    for (int i = 0; i < 5; ++i)
+    {
+        const std::string suffix = std::to_string(i);
+        (void)vertices.GetOrAdd<glm::vec3>("v:d" + suffix, glm::vec3{1.0f, 0.0f, 0.0f});
+        (void)vertices.GetOrAdd<float>("v:l" + suffix, static_cast<float>(i + 1));
+        auto layer = Layer(D::MeshVertex, "v:d" + suffix);
+        layer.LengthProperty = "v:l" + suffix;
+        layer.ColorProperty = "v:l" + suffix;
+        layers.push_back(layer);
+    }
+    Recipe(fixture.Scene, entity).VectorFields = layers;
+    const auto frame = fixture.Extract();
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto* packet = FindPacket(frame.World, ":v:d" + std::to_string(i));
+        ASSERT_NE(packet, nullptr) << i;
+        EXPECT_EQ(fixture.Read<float>(packet->LengthBufferBDA), std::vector<float>(5u, static_cast<float>(i + 1))) << i;
+        EXPECT_EQ(packet->ColorBufferBDA, packet->LengthBufferBDA) << i;
+    }
+}
+
+// UI-083, geometry.property-coherence: a scalar style property with a GPU preview front is drawn
+// from the front; the CPU values return once the front ends.
+TEST(RuntimeVectorFieldExtraction, GpuPreviewFrontsDriveScalarStyleBuffers)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    auto& vertices = fixture.Scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<float>("v:len", 0.0f).Vector() = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    struct Front
+    {
+        std::uint64_t Address{0u};
+        std::uint64_t Stamp{0u};
+        std::array<float, 2> Range{};
+        std::string Name{"v:len"};
+    };
+    std::optional<Front> front = Front{.Address = 0xABCD0000ull, .Stamp = 1u, .Range = {-8.0f, 12.0f}};
+    fixture.Extraction.SetGpuPropertyObserver(
+        [&front, entity](auto, const auto observed, const Runtime::GeometryPropertyRef& property)
+            -> std::optional<Runtime::RenderExtractionCache::GpuPropertyFront>
+        {
+            if (!front || observed != entity || property.Name != front->Name)
+                return std::nullopt;
+            return Runtime::RenderExtractionCache::GpuPropertyFront{.Buffer = {9, 1},
+                .Address = front->Address,
+                .Bytes = 20,
+                .Count = 5u,
+                .Stamp = front->Stamp,
+                .ScalarRange = front->Range};
+        });
+    const auto layer = Styled("v:len", "v:len");
+
+    StyleUpload upload = ExtractStyle(fixture, entity, {layer});
+    EXPECT_EQ(upload.LengthBDA, 0xABCD0000ull);
+    EXPECT_EQ(upload.ColorBDA, 0xABCD0000ull);
+    EXPECT_FLOAT_EQ(upload.RangeMin, -8.0f);
+    EXPECT_FLOAT_EQ(upload.RangeMax, 12.0f);
+
+    // A new front with every CPU revision unchanged is followed.
+    const auto revision = vertices.FindPropertyRevision("v:len");
+    front = Front{.Address = 0xABCE0000ull, .Stamp = 2u, .Range = {-1.0f, 1.0f}};
+    upload = ExtractStyle(fixture, entity, {layer});
+    EXPECT_EQ(vertices.FindPropertyRevision("v:len"), revision);
+    EXPECT_EQ(upload.LengthBDA, 0xABCE0000ull);
+    EXPECT_FLOAT_EQ(upload.RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(upload.RangeMax, 1.0f);
+
+    front.reset();
+    upload = ExtractStyle(fixture, entity, {layer});
+    EXPECT_EQ(upload.Lengths, (std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f}));
+    EXPECT_FLOAT_EQ(upload.RangeMin, 1.0f);
+    EXPECT_FLOAT_EQ(upload.RangeMax, 5.0f);
+
+    // A name only the front carries draws from it and falls back when the front ends.
+    front = Front{.Address = 0xABCF0000ull, .Stamp = 3u, .Range = {0.0f, 2.0f}, .Name = "v:gpu_only"};
+    upload = ExtractStyle(fixture, entity, {Styled("v:gpu_only", "")});
+    EXPECT_EQ(upload.Fallbacks, 0u);
+    EXPECT_EQ(upload.LengthBDA, 0xABCF0000ull);
+    front.reset();
+    upload = ExtractStyle(fixture, entity, {Styled("v:gpu_only", "")});
+    EXPECT_EQ(upload.Fallbacks, 1u);
+    EXPECT_EQ(upload.LengthBDA, 0u);
 }

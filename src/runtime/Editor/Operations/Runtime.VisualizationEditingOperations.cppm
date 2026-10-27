@@ -613,6 +613,15 @@ export namespace Extrinsic::Runtime
         std::string DisabledReason{};
     };
 
+    // UI-083: a property that can drive a layer's per-arrow length (`Scalar`) or color (a scalar,
+    // vec3 or vec4) on the vector's domain.
+    struct EditorVectorFieldStyleOption
+    {
+        std::string Name{};
+        Geometry::PropertyValueKind Kind{Geometry::PropertyValueKind::Unknown};
+        bool Scalar{false};
+    };
+
     struct EditorVectorFieldDomainOption
     {
         GeometryElementDomain Domain{GeometryElementDomain::Unknown};
@@ -623,6 +632,7 @@ export namespace Extrinsic::Runtime
         // valid (live ranks exactly 0..L-1); present with 0 rows means stale after an element change.
         bool OrderPresent{false};
         std::uint32_t OrderRows{0u};
+        std::vector<EditorVectorFieldStyleOption> StyleProperties{};
     };
 
     struct EditorVectorFieldLayerRow
@@ -646,9 +656,11 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] const char* DebugNameForEditorVectorFieldDomain(
         GeometryElementDomain domain) noexcept;
 
-    [[nodiscard]] EditorVectorFieldModel BuildEditorVectorFieldModel(
-        const GeometryEntityAvailability& availability,
-        const GeometryPresentationRecipe* recipe);
+    // `pendingResidentScalar` (optional) tells a style property that only a GPU preview carries
+    // from one that falls back.
+    [[nodiscard]] EditorVectorFieldModel BuildEditorVectorFieldModel(const GeometryEntityAvailability& availability,
+        const GeometryPresentationRecipe* recipe,
+        const std::function<bool(const GeometryPropertyRef&)>& pendingResidentScalar = {});
 
     // Validates a candidate source for one attribute row: the runtime table's
     // domain/kind/count/finite rules, and for Color the visualization recipe

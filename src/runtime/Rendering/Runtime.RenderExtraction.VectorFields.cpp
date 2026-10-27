@@ -4,6 +4,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
@@ -26,6 +27,7 @@ module Extrinsic.Runtime.RenderExtraction;
 import Geometry.Validation;
 import :Internal;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -129,6 +131,12 @@ namespace Extrinsic::Runtime
             bool DepthTested{true};
             std::uint32_t Stride{1u};
             std::uint32_t MaxGlyphs{0u};
+            std::string LengthProperty{};
+            std::string ColorProperty{};
+            Graphics::Colormap::Type ColorMap{Graphics::Colormap::Type::Viridis};
+            bool ColorAutoRange{true};
+            float ColorRangeMin{0.0f};
+            float ColorRangeMax{1.0f};
         };
 
         // Rows whose `deleted` flag is set are dead; a missing flag means all live.
@@ -459,6 +467,95 @@ namespace Extrinsic::Runtime
             cache->Stamp = NextVectorFieldCacheStamp();
             return cache;
         }
+
+        // UI-083: the converted values of one length/color property; nullptr when it is missing,
+        // has another count or is neither scalar nor vec3/vec4. A cache used earlier this frame is
+        // reused as is: its payload is already lent to the batch. The returned entry is valid until
+        // the next call (a new entry may move it; lent spans point into its own buffers and stay).
+        template <typename EntityCache>
+        [[nodiscard]] const typename decltype(EntityCache::Styles)::value_type* EnsureStyleCache(
+            EntityCache& entityCache,
+            const Geometry::PropertySet& properties,
+            const GeometryElementDomain domain,
+            const std::string& property,
+            const std::uint64_t frame,
+            RuntimeRenderExtractionStats& stats)
+        {
+            using StyleCache = typename decltype(entityCache.Styles)::value_type;
+            using Kind = typename StyleCache::ValueKind;
+            const Geometry::PropertyRevision revision = RevisionOf(&properties, property);
+            const std::size_t count = properties.Size();
+            StyleCache* cache = nullptr;
+            for (StyleCache& candidate : entityCache.Styles)
+            {
+                if (candidate.Domain == domain && candidate.Property == property)
+                    cache = &candidate;
+            }
+            if (cache != nullptr && cache->Count == count &&
+                (cache->LastUsedFrame == frame || (revision != 0u && cache->Revision == revision)))
+            {
+                if (cache->LastUsedFrame != frame)
+                    ++stats.VectorFieldPayloadCacheReuses;
+                cache->LastUsedFrame = frame;
+                return cache->Kind != Kind::None ? cache : nullptr;
+            }
+            if (cache == nullptr)
+            {
+                entityCache.Styles.push_back(StyleCache{.Domain = domain, .Property = property});
+                cache = &entityCache.Styles.back();
+            }
+            cache->LastUsedFrame = frame;
+            cache->Revision = revision;
+            cache->Count = count;
+            cache->Kind = Kind::None;
+            cache->Scalars.clear();
+            cache->Rgba.clear();
+            cache->AutoRangeMin = 0.0f;
+            cache->AutoRangeMax = 1.0f;
+            ++stats.VectorFieldPayloadCacheBuilds;
+            stats.VectorFieldCacheScannedElementCount += count;
+
+            if (ConvertVisualizationScalars(properties, property, cache->Scalars))
+            {
+                if (cache->Scalars.size() != count)
+                    return nullptr;
+                // Invalid values are +inf and stay out of the range.
+                (void)ComputeVisualizationAutoRange(cache->Scalars, cache->AutoRangeMin, cache->AutoRangeMax);
+                cache->Kind = Kind::Scalar;
+            }
+            else
+            {
+                const auto toRgba = [&](const auto& values, const auto& widen)
+                {
+                    if (values.size() != count)
+                        return;
+                    cache->Rgba.reserve(count);
+                    for (const auto& value : values)
+                    {
+                        const glm::vec4 rgba = widen(value);
+                        const bool finite = IsFinite(glm::vec3{rgba}) && std::isfinite(rgba.w);
+                        cache->Rgba.push_back(finite ? glm::clamp(rgba, 0.0f, 1.0f) : glm::vec4{-1.0f});
+                    }
+                    cache->Kind = Kind::Rgba;
+                };
+                if (const auto rgb = properties.Get<glm::vec3>(property))
+                    toRgba(rgb.Span(),
+                        [](const glm::vec3& v)
+                        {
+                            return glm::vec4{v, 1.0f};
+                        });
+                else if (const auto rgba = properties.Get<glm::vec4>(property))
+                    toRgba(rgba.Span(),
+                        [](const glm::vec4& v)
+                        {
+                            return v;
+                        });
+                if (cache->Kind == Kind::None)
+                    return nullptr;
+            }
+            cache->Stamp = NextVectorFieldCacheStamp();
+            return cache;
+        }
     }
 
     namespace
@@ -523,6 +620,117 @@ namespace Extrinsic::Runtime
         }
     }
 
+    namespace
+    {
+        [[nodiscard]] bool IsScalarKind(const Geometry::PropertyValueKind kind) noexcept
+        {
+            using K = Geometry::PropertyValueKind;
+            return kind == K::Bool || kind == K::Int32 || kind == K::UInt32 || kind == K::UInt64 || kind == K::Float ||
+                kind == K::Double;
+        }
+
+        // UI-083: binds a layer's length and color properties, a GPU preview front by address
+        // (geometry.property-coherence), else the CPU style cache. A property that resolves
+        // neither way leaves the uniform length or color and is counted.
+        template <typename EntityCache, typename ObserveFront>
+        void BindVectorFieldStyle(const ObserveFront& observeFront,
+            const std::uint32_t stableId,
+            const VectorFieldRequest& request,
+            const Geometry::PropertySet& properties,
+            EntityCache& entityCache,
+            const std::uint64_t frame,
+            RuntimeRenderExtractionStats& stats,
+            VectorFieldPacketInputs& inputs)
+        {
+            using Kind = typename decltype(entityCache.Styles)::value_type::ValueKind;
+            const auto styleCache = [&](const std::string& name)
+            {
+                return EnsureStyleCache(entityCache, properties, request.Domain, name, frame, stats);
+            };
+            const auto scalarKey = [&](const std::string& name)
+            {
+                return BuildKey(stableId, "vector.scalar", request.Domain, name);
+            };
+
+            if (!request.LengthProperty.empty())
+            {
+                if (const auto front = observeFront(request.LengthProperty))
+                {
+                    inputs.LengthBDA = front->Address;
+                    inputs.LengthStamp = front->Stamp;
+                }
+                else if (const auto* cache = styleCache(request.LengthProperty); cache && cache->Kind == Kind::Scalar)
+                {
+                    inputs.LengthKey = scalarKey(request.LengthProperty);
+                    inputs.Lengths = cache->Scalars;
+                    inputs.LengthStamp = cache->Stamp;
+                }
+                else
+                {
+                    ++stats.VectorFieldStyleFallbackCount;
+                }
+            }
+
+            if (request.ColorProperty.empty())
+                return;
+            inputs.ColorMap = request.ColorMap;
+            inputs.ColorRangeMin = request.ColorRangeMin;
+            inputs.ColorRangeMax = request.ColorRangeMax;
+            std::optional<std::array<float, 2>> autoRange{};
+            if (const auto front = observeFront(request.ColorProperty))
+            {
+                inputs.ColorMode = Graphics::VectorFieldColorMode::Colormap;
+                inputs.ColorBDA = front->Address;
+                inputs.ColorStamp = front->Stamp;
+                if (front->ScalarRange)
+                {
+                    autoRange = WidenGpuFrontScalarRange(*front->ScalarRange);
+                }
+                else if (request.ColorAutoRange)
+                {
+                    // An existing property keeps its CPU auto range; a GPU-only one draws 0..1.
+                    if (const auto* cache = styleCache(request.ColorProperty); cache && cache->Kind == Kind::Scalar)
+                        autoRange = std::array{cache->AutoRangeMin, cache->AutoRangeMax};
+                    else
+                        autoRange = std::array{0.0f, 1.0f};
+                }
+            }
+            else if (const auto* cache = styleCache(request.ColorProperty); cache != nullptr)
+            {
+                inputs.ColorStamp = cache->Stamp;
+                if (cache->Kind == Kind::Scalar)
+                {
+                    inputs.ColorMode = Graphics::VectorFieldColorMode::Colormap;
+                    inputs.ColorKey = scalarKey(request.ColorProperty);
+                    inputs.ColorScalars = cache->Scalars;
+                    autoRange = std::array{cache->AutoRangeMin, cache->AutoRangeMax};
+                }
+                else
+                {
+                    inputs.ColorMode = Graphics::VectorFieldColorMode::Rgba;
+                    inputs.ColorKey = BuildKey(stableId, "vector.rgba", request.Domain, request.ColorProperty);
+                    inputs.ColorRgba = cache->Rgba;
+                }
+            }
+            else
+            {
+                ++stats.VectorFieldStyleFallbackCount;
+                return;
+            }
+            if (request.ColorAutoRange && autoRange && std::isfinite((*autoRange)[0]) &&
+                std::isfinite((*autoRange)[1]) && (*autoRange)[0] < (*autoRange)[1])
+            {
+                inputs.ColorRangeMin = (*autoRange)[0];
+                inputs.ColorRangeMax = (*autoRange)[1];
+            }
+            else if (request.ColorAutoRange)
+            {
+                inputs.ColorRangeMin = 0.0f;
+                inputs.ColorRangeMax = 1.0f;
+            }
+        }
+    }
+
     void RenderExtractionCache::State::AppendVectorFieldLayers(
         entt::registry& registry,
         const entt::entity entity,
@@ -548,6 +756,12 @@ namespace Extrinsic::Runtime
                     .DepthTested = layer.DepthTested,
                     .Stride = layer.Stride,
                     .MaxGlyphs = layer.MaxGlyphs,
+                    .LengthProperty = layer.LengthProperty,
+                    .ColorProperty = layer.ColorProperty,
+                    .ColorMap = layer.ColorMap,
+                    .ColorAutoRange = layer.ColorAutoRange,
+                    .ColorRangeMin = layer.ColorRangeMin,
+                    .ColorRangeMax = layer.ColorRangeMax,
                 });
             }
         }
@@ -611,40 +825,59 @@ namespace Extrinsic::Runtime
             if (ordered)
                 ++stats.VectorFieldOrderedLayerCount;
 
-            VisualizationEncodingDiagnostics appendDiagnostics{};
-            const VisualizationRecipeStatus status = AppendVectorFieldPacket(m_VisualizationState.Batch,
-                VectorFieldPacketInputs{
-                    .Name = BuildKey(stableId, "vector", request.Domain, request.Name),
-                    .Domain = ToAttributeDomain(request.Domain),
-                    .ElementCount = static_cast<std::uint32_t>(properties->Size()),
-                    .AnchorKey = BuildKey(stableId, "vector.anchor", request.Domain, {}),
-                    .Anchors = anchorValues,
-                    .AnchorStamp = anchors->Stamp,
-                    .VectorKey = BuildKey(stableId, "vector.value", request.Domain, request.Property),
-                    .Vectors = vectorValues,
-                    .VectorStamp = payload->Stamp,
-                    .RowKey = ordered      ? BuildKey(stableId, "vector.order", request.Domain, {})
-                        : anchors->AllLive ? std::string{}
-                                           : BuildKey(stableId, "vector.rows", request.Domain, {}),
-                    .Rows = ordered        ? std::span<const std::uint32_t>{order->Rows}
-                        : anchors->AllLive ? std::span<const std::uint32_t>{}
-                                           : std::span<const std::uint32_t>{anchors->LiveRows},
-                    .RowStamp = ordered ? order->Stamp : anchors->Stamp,
+            VectorFieldPacketInputs inputs{
+                .Name = BuildKey(stableId, "vector", request.Domain, request.Name),
+                .Domain = ToAttributeDomain(request.Domain),
+                .ElementCount = static_cast<std::uint32_t>(properties->Size()),
+                .AnchorKey = BuildKey(stableId, "vector.anchor", request.Domain, {}),
+                .Anchors = anchorValues,
+                .AnchorStamp = anchors->Stamp,
+                .VectorKey = BuildKey(stableId, "vector.value", request.Domain, request.Property),
+                .Vectors = vectorValues,
+                .VectorStamp = payload->Stamp,
+                .RowKey = ordered      ? BuildKey(stableId, "vector.order", request.Domain, {})
+                    : anchors->AllLive ? std::string{}
+                                       : BuildKey(stableId, "vector.rows", request.Domain, {}),
+                .Rows = ordered        ? std::span<const std::uint32_t>{order->Rows}
+                    : anchors->AllLive ? std::span<const std::uint32_t>{}
+                                       : std::span<const std::uint32_t>{anchors->LiveRows},
+                .RowStamp = ordered ? order->Stamp : anchors->Stamp,
                     // Cache rows are produced from the element range at build.
-                    .RowsPrevalidated = true,
-                    .Stride = ordered ? 1u : request.Stride,
-                    .MaxGlyphs = ordered ? 0u : request.MaxGlyphs,
-                    .DrawRowCount =
-                        ordered ? OrderedDrawRowCount(order->Rows.size(), request.Stride, request.MaxGlyphs) : 0u,
-                    .ObjectToWorld = worldMatrix,
-                    .Scale = request.Scale,
-                    .NormalizeLength = request.Normalize,
-                    .LineWidthPx = request.LineWidthPx,
-                    .Color = request.Color,
-                    .DepthTested = request.DepthTested,
-                    .CopyPayloads = false,
-                },
-                &appendDiagnostics);
+                .RowsPrevalidated = true,
+                .Stride = ordered ? 1u : request.Stride,
+                .MaxGlyphs = ordered ? 0u : request.MaxGlyphs,
+                .DrawRowCount =
+                    ordered ? OrderedDrawRowCount(order->Rows.size(), request.Stride, request.MaxGlyphs) : 0u,
+                .ObjectToWorld = worldMatrix,
+                .Scale = request.Scale,
+                .NormalizeLength = request.Normalize,
+                .LineWidthPx = request.LineWidthPx,
+                .Color = request.Color,
+                .DepthTested = request.DepthTested,
+                .CopyPayloads = false,
+            };
+            const auto observeFront =
+                [&](const std::string& name) -> std::optional<RenderExtractionCache::GpuPropertyFront>
+            {
+                if (!m_GpuPropertyObserver)
+                    return std::nullopt;
+                // A name the CPU does not have yet is a pending float output; vec3/vec4 colors
+                // have no scalar fronts.
+                Geometry::PropertyValueKind kind = DetectGeometryPropertyValueKind(*properties, name);
+                if (kind == Geometry::PropertyValueKind::Unknown)
+                    kind = Geometry::PropertyValueKind::Float;
+                else if (!IsScalarKind(kind))
+                    return std::nullopt;
+                auto front = m_GpuPropertyObserver(m_World, entity, GeometryPropertyRef{request.Domain, name, kind});
+                if (!front || front->Address == 0u || front->Count != properties->Size())
+                    return std::nullopt;
+                return front;
+            };
+            BindVectorFieldStyle(observeFront, stableId, request, *properties, entityCache, frame, stats, inputs);
+
+            VisualizationEncodingDiagnostics appendDiagnostics{};
+            const VisualizationRecipeStatus status =
+                AppendVectorFieldPacket(m_VisualizationState.Batch, inputs, &appendDiagnostics);
             stats.VectorFieldRowIndexCheckCount += appendDiagnostics.VectorRowIndexCheckCount;
             if (status == VisualizationRecipeStatus::Encoded)
                 ++stats.VectorFieldPacketCount;
@@ -662,8 +895,8 @@ namespace Extrinsic::Runtime
             VectorFieldEntityCache& cache = it->second;
             if (cache.LastUsedFrame != frame)
             {
-                stats.VectorFieldCacheReleases +=
-                    static_cast<std::uint32_t>(cache.Anchors.size() + cache.Payloads.size() + cache.Orders.size());
+                stats.VectorFieldCacheReleases += static_cast<std::uint32_t>(
+                    cache.Anchors.size() + cache.Payloads.size() + cache.Orders.size() + cache.Styles.size());
                 it = m_VectorFieldCaches.erase(it);
                 continue;
             }
@@ -681,6 +914,13 @@ namespace Extrinsic::Runtime
                 [&](const VectorFieldOrderCache& order)
                 {
                     const bool unused = order.LastUsedFrame != frame;
+                    stats.VectorFieldCacheReleases += unused ? 1u : 0u;
+                    return unused;
+                });
+            std::erase_if(cache.Styles,
+                [&](const VectorFieldStyleCache& style)
+                {
+                    const bool unused = style.LastUsedFrame != frame;
                     stats.VectorFieldCacheReleases += unused ? 1u : 0u;
                     return unused;
                 });

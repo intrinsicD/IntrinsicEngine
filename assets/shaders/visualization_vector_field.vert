@@ -22,12 +22,18 @@
 //     width on screen, draws a width-sized cap instead of vanishing;
 //   * glyphs are pulled toward the camera by a distance-relative view-space
 //     bias so tangent fields stay visible on the surface they annotate
-//     (standard [0, 1] depth with LessEqual).
+//     (standard [0, 1] depth with LessEqual);
+//   * UI-083: an optional per-element length `s` (read at the glyph's source
+//     row) scales the arrow by `Scale * s`; `s` not > 0 or infinite draws
+//     nothing. An optional per-element color is a colormap scalar (an infinite
+//     or NaN value, or an invalid colormap index, keeps PackedColor) or an RGBA
+//     color (a negative component keeps PackedColor).
 
 #version 460
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/gpu_scene.glsl"
 
@@ -44,9 +50,11 @@ struct VectorFieldDrawRecord
     float Scale;
     float LineWidthPx;
     uint Flags;
-    uint Reserved0;
-    uint Reserved1;
-    uint Reserved2;
+    uint ColormapID;
+    uint64_t LengthBufferBDA;
+    uint64_t ColorBufferBDA;
+    float ColorRangeMin;
+    float ColorRangeMax;
 };
 
 layout(buffer_reference, scalar) readonly buffer VectorFieldDrawRecordRef
@@ -62,9 +70,13 @@ layout(push_constant, scalar) uniform PushConsts
     uint Reserved;
 } pc;
 
+layout(set = 0, binding = 0) uniform sampler2D globalTextures[];
+
 layout(location = 0) out vec4 fragColor;
 
 const uint kNormalizeFlag = 1u;
+const uint kColormapFlag = 2u;
+const uint kRgbaFlag = 4u;
 const float kMinClipW = 1.0e-7;
 const float kDepthBiasFraction = 1.0e-3;
 const float kHeadLengthFraction = 0.35;
@@ -105,6 +117,62 @@ vec4 ToBiasedClip(GpuSceneTable scene, vec3 world)
     return scene.CameraProj * view;
 }
 
+// x * 2^100, exact also for a denormal x, which a GPU may flush to zero as an arithmetic operand:
+// its bits are m * 2^-149, so the product is m * 2^-49.
+float ScaleUp100(float x)
+{
+    const uint bits = floatBitsToUint(x);
+    if ((bits & 0x7F800000u) != 0u)
+        return x * exp2(100.0);
+    const float scaled = float(bits & 0x007FFFFFu) * exp2(-49.0);
+    return (bits & 0x80000000u) != 0u ? -scaled : scaled;
+}
+
+// t in [0, 1] of `value` in [lo, hi] (lo < hi). The operands are scaled by a power of two so the
+// width and the reciprocal the GPU divides with stay normal floats: a width above ~8.5e37 has a
+// denormal reciprocal, flushed to zero, and a tiny width is itself denormal.
+float NormalizedColorScalar(float value, float lo, float hi)
+{
+    const float magnitude = max(abs(lo), abs(hi));
+    if (magnitude > 1.0e30)
+    {
+        value *= exp2(-100.0);
+        lo *= exp2(-100.0);
+        hi *= exp2(-100.0);
+    }
+    else if (magnitude < 1.0e-30)
+    {
+        value = ScaleUp100(value);
+        lo = ScaleUp100(lo);
+        hi = ScaleUp100(hi);
+    }
+    // `precise`: the compiler may otherwise cancel the scale out of the quotient again.
+    precise const float offset = value - lo;
+    precise const float width = hi - lo;
+    return width > 0.0 ? clamp(offset / width, 0.0, 1.0) : 0.0;
+}
+
+vec4 ArrowColor(VectorFieldDrawRecord record, uint row)
+{
+    const vec4 uniformColor = unpackUnorm4x8(record.PackedColor);
+    if (record.ColorBufferBDA == uint64_t(0))
+        return uniformColor;
+    if ((record.Flags & kColormapFlag) != 0u)
+    {
+        const float s = GpuFloatBufferRef(record.ColorBufferBDA).Data[row];
+        if (isinf(s) || isnan(s) || !GpuVisualizationHasValidBindless(record.ColormapID))
+            return uniformColor;
+        const float t = NormalizedColorScalar(s, record.ColorRangeMin, record.ColorRangeMax);
+        return vec4(textureLod(globalTextures[nonuniformEXT(record.ColormapID)], vec2(t, 0.5), 0.0).rgb, 1.0);
+    }
+    if ((record.Flags & kRgbaFlag) != 0u)
+    {
+        const vec4 c = GpuVec4BufferRef(record.ColorBufferBDA).Data[row];
+        return any(lessThan(c, vec4(0.0))) ? uniformColor : c;
+    }
+    return uniformColor;
+}
+
 void main()
 {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
@@ -126,6 +194,18 @@ void main()
         return;
     }
 
+    float scale = record.Scale;
+    if (record.LengthBufferBDA != uint64_t(0))
+    {
+        const float s = GpuFloatBufferRef(record.LengthBufferBDA).Data[row];
+        if (!(s > 0.0) || isinf(s))
+        {
+            EmitDegenerate();
+            return;
+        }
+        scale *= s;
+    }
+
     const vec3 anchor = GpuReadPackedVec3(record.PositionBufferBDA, row);
     vec3 vector = GpuReadPackedVec3(record.VectorBufferBDA, row);
     if (!AllFinite(anchor) || !AllFinite(vector))
@@ -145,11 +225,11 @@ void main()
         // Rescale first: length() of a huge finite vector overflows and of a
         // tiny one underflows, while the rescaled length lies in [1, sqrt(3)].
         const vec3 unit = vector / largest;
-        vector = unit * (record.Scale / length(unit));
+        vector = unit * (scale / length(unit));
     }
     else
     {
-        vector *= record.Scale;
+        vector *= scale;
     }
 
     const vec3 tip = anchor + vector;
@@ -253,5 +333,5 @@ void main()
 
     const vec2 offsetNdc = offsetPx * 2.0 / viewport;
     gl_Position = center + vec4(offsetNdc * center.w, 0.0, 0.0);
-    fragColor = unpackUnorm4x8(record.PackedColor);
+    fragColor = ArrowColor(record, row);
 }

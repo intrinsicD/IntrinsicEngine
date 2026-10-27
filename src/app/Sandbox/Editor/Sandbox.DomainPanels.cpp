@@ -626,7 +626,7 @@ namespace Extrinsic::Sandbox::Editor
             }
             if (!open)
                 return;
-            if (!row.SourceAvailable)
+            if (!row.Status.empty())
                 ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", row.Status.c_str());
 
             GeometryVectorFieldLayerRecipe layer = row.Layer;
@@ -640,8 +640,39 @@ namespace Extrinsic::Sandbox::Editor
                 layer.LengthMode = static_cast<GeometryVectorFieldLengthMode>(lengthMode);
                 changed = true;
             }
+            // UI-083: per-arrow inputs from properties on the field's domain; Default is none.
+            static const std::vector<EditorVectorFieldStyleOption> kNoOptions{};
+            const std::vector<EditorVectorFieldStyleOption>& styleOptions =
+                domain != nullptr ? domain->StyleProperties : kNoOptions;
+            const auto styleCombo = [&](const char* label, std::string& property, const bool scalarOnly)
+            {
+                if (!ImGui::BeginCombo(label, property.empty() ? "Default" : property.c_str()))
+                    return false;
+                bool picked = false;
+                if (ImGui::Selectable("Default", property.empty()))
+                {
+                    property.clear();
+                    picked = true;
+                }
+                for (const EditorVectorFieldStyleOption& option : styleOptions)
+                {
+                    if (scalarOnly && !option.Scalar)
+                        continue;
+                    if (ImGui::Selectable(option.Name.c_str(), option.Name == property))
+                    {
+                        property = option.Name;
+                        picked = true;
+                    }
+                }
+                ImGui::EndCombo();
+                return picked;
+            };
+            changed |= styleCombo("Length property", layer.LengthProperty, true);
+            // The uniform length multiplies a bound property, so it stays editable.
             const char* lengthLabel =
-                layer.LengthMode == GeometryVectorFieldLengthMode::Normalized ? "Length" : "Scale";
+                layer.LengthMode == GeometryVectorFieldLengthMode::Normalized && layer.LengthProperty.empty()
+                ? "Length###length"
+                : "Scale###length";
             changed |= ImGui::DragFloat(lengthLabel,
                 &layer.Length,
                 std::max(layer.Length * 0.01f, 1.0e-6f),
@@ -655,7 +686,43 @@ namespace Extrinsic::Sandbox::Editor
                 kMaxGeometryVectorFieldLineWidthPx,
                 "%.1f",
                 ImGuiSliderFlags_AlwaysClamp);
-            changed |= ImGui::ColorEdit4("Color", &layer.Color.x);
+            changed |= styleCombo("Color property", layer.ColorProperty, false);
+            // Question 7: the uniform color is active only on Default and keeps its value meanwhile;
+            // a bound layer's color is not written.
+            const bool colorBound = !layer.ColorProperty.empty();
+            glm::vec4 uniformColor = layer.Color;
+            ImGui::BeginDisabled(colorBound);
+            const bool colorEdited = ImGui::ColorEdit4("Color", &uniformColor.x);
+            ImGui::EndDisabled();
+            if (colorEdited && !colorBound)
+            {
+                layer.Color = uniformColor;
+                changed = true;
+            }
+            // A scalar (or a name without an option: a GPU-only scalar) goes through the colormap.
+            const auto bound =
+                std::ranges::find(styleOptions, layer.ColorProperty, &EditorVectorFieldStyleOption::Name);
+            if (!layer.ColorProperty.empty() && (bound == styleOptions.end() || bound->Scalar))
+            {
+                int colormap =
+                    std::clamp(static_cast<int>(layer.ColorMap), 0, static_cast<int>(kColormapNames.size()) - 1);
+                if (ImGui::Combo("Colormap", &colormap, kColormapNames.data(), static_cast<int>(kColormapNames.size())))
+                {
+                    layer.ColorMap = static_cast<decltype(layer.ColorMap)>(colormap);
+                    changed = true;
+                }
+                changed |= ImGui::Checkbox("Auto range", &layer.ColorAutoRange);
+                if (!layer.ColorAutoRange)
+                {
+                    float range[2]{layer.ColorRangeMin, layer.ColorRangeMax};
+                    if (ImGui::DragFloat2("Range min/max", range, 0.01f, 0.0f, 0.0f, "%.4g"))
+                    {
+                        layer.ColorRangeMin = range[0];
+                        layer.ColorRangeMax = range[1];
+                        changed = true;
+                    }
+                }
+            }
 
             // With a valid arrow order the slider draws its first N live elements (MaxGlyphs, 0 = all;
             // an older layer's stride shows as the count it draws); without one the layer keeps every

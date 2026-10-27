@@ -2899,9 +2899,14 @@ BuildEditorDomainWindowModelFromBindings(
             VisualizationTargetAvailableForView(
                 availability,
                 model.VisualizationTarget);
-        model.VectorFields = BuildEditorVectorFieldModel(
-            availability,
-            raw.try_get<GeometryPresentationRecipe>(*selected));
+        // UI-083: a style property only a GPU preview carries is reported as such.
+        const auto pending = MakeEditorVisualizationEditingContext(context).PendingResidentScalar;
+        model.VectorFields = BuildEditorVectorFieldModel(availability,
+            raw.try_get<GeometryPresentationRecipe>(*selected),
+            [&pending, entity = *selected](const GeometryPropertyRef& ref)
+            {
+                return pending && pending(entity, ref);
+            });
         const EditorGeometryDomainModel geometry =
             BuildGeometryDomainModel(raw, *selected);
         EditorSelectedAnalysisModel selectedAnalysis =

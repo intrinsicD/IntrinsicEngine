@@ -480,6 +480,18 @@ namespace Extrinsic::Runtime
             reason = "unknown vector length mode";
             return false;
         }
+        if (static_cast<std::uint8_t>(layer.ColorMap) >= Graphics::Colormap::kColormapCount)
+        {
+            reason = "unknown vector colormap";
+            return false;
+        }
+        // Checked with the auto range on too, so the remembered manual range stays usable.
+        if (!std::isfinite(layer.ColorRangeMin) || !std::isfinite(layer.ColorRangeMax) ||
+            !(layer.ColorRangeMin < layer.ColorRangeMax))
+        {
+            reason = "vector color range must be finite with min < max";
+            return false;
+        }
         reason.clear();
         return true;
     }

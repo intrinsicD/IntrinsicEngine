@@ -116,7 +116,8 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
         const bool reader = spec.Name.starts_with("scene_") || spec.Name.starts_with("entity_") || spec.Name == "history" ||
                             spec.Name.starts_with("config_sections") || spec.Name == "config_schema" || spec.Name == "config_get" || spec.Name == "config_preview" ||
                             spec.Name == "jobs_list" || spec.Name == "jobs_wait" || spec.Name == "log" || spec.Name.starts_with("preview_") ||
-                            spec.Name == "attribute_bindings" || spec.Name.starts_with("property_") ||
+                            spec.Name == "attribute_bindings" || spec.Name == "vector_fields" ||
+                            spec.Name.starts_with("property_") ||
                             spec.Name == "diagnostics_read" || spec.Name == "device_status";
         EXPECT_EQ(spec.ReadOnly, reader) << "read-only flag follows the naming convention";
     }
@@ -896,6 +897,57 @@ TEST(AgentOperations, BindAttributeValidatesItsArgumentsBeforeTouchingTheScene)
     EXPECT_TRUE(detached.IsError);
     EXPECT_NE(detached.Text.find("not attached"), std::string::npos) << detached.Text;
     EXPECT_TRUE(R::InvokeAgentOperation(registry, "bind_attribute", empty, "{}", true).IsError) << "refused in a read-only session";
+}
+
+// UI-083: vector_fields lists and vector_field edits Appearance vector fields through the
+// panel's command; malformed arguments are invalid_params before the scene is touched.
+TEST(AgentOperations, VectorFieldOperationsValidateTheirArgumentsBeforeTouchingTheScene)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    const auto* list = registry.Find("vector_fields");
+    const auto* edit = registry.Find("vector_field");
+    ASSERT_NE(list, nullptr);
+    ASSERT_NE(edit, nullptr);
+    EXPECT_TRUE(list->ReadOnly);
+    EXPECT_FALSE(edit->ReadOnly);
+    EXPECT_FALSE(edit->Destructive) << "undoable: recorded as an Agent: history entry";
+    const auto schema = Json::parse(edit->InputSchemaJson);
+    EXPECT_EQ(schema["required"], Json::array({"entity", "action", "domain", "property"}));
+    EXPECT_EQ(schema["properties"]["action"]["enum"], Json::array({"add", "update", "remove"}));
+    EXPECT_EQ(schema["properties"]["colormap"]["enum"],
+        Json::array({"Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"}));
+
+    const R::AgentOperationContext empty{};
+    for (const char* arguments : {R"({})",
+             R"({"entity":1,"action":"add","domain":"MeshVertex"})",
+             R"({"entity":1,"action":"grow","domain":"MeshVertex","property":"v"})",
+             R"({"entity":1,"action":"add","domain":"Bogus","property":"v"})",
+             R"({"entity":1,"action":"add","domain":"MeshVertex","property":""})",
+             R"({"entity":1,"action":"add","domain":"MeshVertex","property":"v","length":2})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","colormap":"Rainbow"})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","color":[1,0,0]})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","color_range":[0]})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","length_mode":"sideways"})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","length_property":3})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","stride":-1})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","lenght":2})",
+             R"({"entity":1,"action":"update","domain":"MeshVertex","property":"v","visible":false,"lenght":2})"})
+    {
+        const auto refused = R::InvokeAgentOperation(registry, "vector_field", empty, arguments, false);
+        EXPECT_TRUE(refused.IsError) << arguments;
+        EXPECT_EQ(refused.ErrorCode, "invalid_params") << arguments;
+    }
+    const auto detached = R::InvokeAgentOperation(registry,
+        "vector_field",
+        empty,
+        R"({"entity":1,"action":"remove","domain":"MeshVertex","property":"v"})",
+        false);
+    EXPECT_TRUE(detached.IsError);
+    EXPECT_NE(detached.Text.find("not attached"), std::string::npos) << detached.Text;
+    EXPECT_TRUE(R::InvokeAgentOperation(registry, "vector_field", empty, "{}", true).IsError)
+        << "refused in a read-only session";
+    EXPECT_EQ(R::InvokeAgentOperation(registry, "vector_fields", empty, R"({})", true).ErrorCode, "invalid_params");
 }
 
 // A job queued during an agent call publishes on a later frame, after the call's label scope

@@ -1403,6 +1403,45 @@ namespace Extrinsic::Runtime
             std::max<std::uint64_t>(base, needed));
     }
 
+    bool ComputeVisualizationAutoRange(const std::span<const float> values, float& minValue, float& maxValue)
+    {
+        VisualizationEncodingDiagnostics unused{};
+        return ComputeRange(values, minValue, maxValue, unused, /*allowInfinite=*/true);
+    }
+
+    bool ConvertVisualizationScalars(
+        const Geometry::PropertySet& properties, const std::string_view name, std::vector<float>& out)
+    {
+        const auto convert = [&out](const auto& values)
+        {
+            out.assign(values.size(), std::numeric_limits<float>::infinity());
+            for (std::size_t i = 0u; i < values.size(); ++i)
+            {
+                float converted = 0.0f;
+                if (ToFiniteFloat(values[i], converted))
+                    out[i] = converted;
+            }
+            return true;
+        };
+        if (const auto p = properties.Get<float>(name))
+            return convert(p.Vector());
+        if (const auto p = properties.Get<double>(name))
+            return convert(p.Vector());
+        if (const auto p = properties.Get<std::int32_t>(name))
+            return convert(p.Vector());
+        if (const auto p = properties.Get<std::uint32_t>(name))
+            return convert(p.Vector());
+        if (const auto p = properties.Get<std::uint64_t>(name))
+            return convert(p.Vector());
+        if (const auto p = properties.Get<bool>(name))
+        {
+            const std::vector<bool>& flags = p.Vector();
+            out.assign(flags.begin(), flags.end());
+            return true;
+        }
+        return false;
+    }
+
     VisualizationRecipeStatus AppendVectorFieldPacket(
         VisualizationEncodingBatch& batch,
         const VectorFieldPacketInputs& inputs,
@@ -1436,6 +1475,23 @@ namespace Extrinsic::Runtime
             !IsFinite(inputs.Color) || !IsFinite(inputs.LineWidthPx) ||
             inputs.LineWidthPx < Graphics::kVectorFieldMinLineWidthPx ||
             inputs.LineWidthPx > Graphics::kVectorFieldMaxLineWidthPx)
+        {
+            return VisualizationRecipeStatus::InvalidRange;
+        }
+        using ColorMode = Graphics::VectorFieldColorMode;
+        const bool lengthLent = inputs.LengthBDA == 0u && !inputs.LengthKey.empty();
+        const bool colorLent = inputs.ColorMode != ColorMode::Uniform && inputs.ColorBDA == 0u;
+        if (colorLent && inputs.ColorKey.empty())
+            return VisualizationRecipeStatus::InvalidBuffer;
+        if ((lengthLent && inputs.Lengths.size() != count) ||
+            (colorLent && inputs.ColorMode == ColorMode::Colormap && inputs.ColorScalars.size() != count) ||
+            (colorLent && inputs.ColorMode == ColorMode::Rgba && inputs.ColorRgba.size() != count))
+        {
+            return VisualizationRecipeStatus::ElementCountMismatch;
+        }
+        if (inputs.ColorMode == ColorMode::Colormap &&
+            (!IsFinite(inputs.ColorRangeMin) || !IsFinite(inputs.ColorRangeMax) ||
+                !(inputs.ColorRangeMin < inputs.ColorRangeMax)))
         {
             return VisualizationRecipeStatus::InvalidRange;
         }
@@ -1522,6 +1578,37 @@ namespace Extrinsic::Runtime
             appendVec3(inputs.AnchorKey, inputs.Anchors, inputs.AnchorStamp, false);
         if (inputs.VectorBDA == 0u)
             appendVec3(inputs.VectorKey, inputs.Vectors, inputs.VectorStamp, true);
+        // Style buffers are always lent; a key already in the batch (one property used for
+        // length and color) is shared.
+        const auto appendLent = [&](const std::string& key,
+                                    const Graphics::VisualizationValueType valueType,
+                                    const std::uint32_t strideBytes,
+                                    const std::uint64_t stamp,
+                                    const std::span<const std::byte> bytes)
+        {
+            if (alreadyAppended(key))
+                return;
+            appendBorrowed(key, valueType, count, strideBytes, stamp, bytes);
+            batch.PropertyBuffers.back().Domain = inputs.Domain;
+        };
+        if (lengthLent)
+            appendLent(inputs.LengthKey,
+                Graphics::VisualizationValueType::ScalarFloat,
+                sizeof(float),
+                inputs.LengthStamp,
+                std::as_bytes(inputs.Lengths));
+        if (colorLent && inputs.ColorMode == ColorMode::Colormap)
+            appendLent(inputs.ColorKey,
+                Graphics::VisualizationValueType::ScalarFloat,
+                sizeof(float),
+                inputs.ColorStamp,
+                std::as_bytes(inputs.ColorScalars));
+        if (colorLent && inputs.ColorMode == ColorMode::Rgba)
+            appendLent(inputs.ColorKey,
+                Graphics::VisualizationValueType::RgbaFloat4,
+                sizeof(glm::vec4),
+                inputs.ColorStamp,
+                std::as_bytes(inputs.ColorRgba));
         if (hasRows && !alreadyAppended(inputs.RowKey))
         {
             if (inputs.CopyPayloads)
@@ -1558,6 +1645,14 @@ namespace Extrinsic::Runtime
             .LineWidthPx = inputs.LineWidthPx,
             .Color = inputs.Color,
             .DepthTested = inputs.DepthTested,
+            .LengthBufferSourceKey = lengthLent ? inputs.LengthKey : std::string{},
+            .LengthBufferBDA = inputs.LengthBDA,
+            .ColorMode = inputs.ColorMode,
+            .ColorBufferSourceKey = colorLent ? inputs.ColorKey : std::string{},
+            .ColorBufferBDA = inputs.ColorMode != ColorMode::Uniform ? inputs.ColorBDA : 0u,
+            .ColorMap = inputs.ColorMap,
+            .ColorRangeMin = inputs.ColorRangeMin,
+            .ColorRangeMax = inputs.ColorRangeMax,
         });
         return VisualizationRecipeStatus::Encoded;
     }
