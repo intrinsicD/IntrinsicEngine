@@ -594,19 +594,20 @@ question 7 (the uniform color is active only on Default and remembers its value)
 - [x] Every processing method sits in one of the nine groups under Mesh, Graph and PointCloud
       `> Processing` and under `View > Processing`; Geodesics is
       `Mesh > Processing > Geodesics > Virtual Source Propagation`.
-- [ ] Vertices lists Position, Normal, Color, Point size; Edges lists Position, Color, Line width;
+- [x] Vertices lists Position, Normal, Color, Point size; Edges lists Position, Color, Line width;
       Faces lists Position, Normal, Texcoord, Color; each row binds its own primitive from the
       source domains of the slice 2 table.
 - [x] A uniform color/size/width edit is enabled only while its row is on Default and keeps its
       last value across a bind and Default. Color Default follows the slice 2 precedence:
-      picked uniform, then imported color, then grey-white.
-- [ ] Binding a Position or Normal on one primitive leaves the other primitives unchanged;
+      picked uniform, then imported color, then grey-white on the surface (edges and points keep
+      their dark default, operator decision 2026-10-23).
+- [x] Binding a Position or Normal on one primitive leaves the other primitives unchanged;
       position fronts, picking, highlights and bounds follow the slice 3a rules.
-- [ ] A vector-field layer takes an optional length property (length = uniform × value) and an
+- [x] A vector-field layer takes an optional length property (length = uniform × value) and an
       optional color property (scalar via colormap, vec3/vec4 as RGB), with the slice 4
       invalid-value rules.
-- [ ] UI, agent tools and scene save/load reach the same commands; undo/redo is one step each.
-- [ ] Operational on Vulkan: each slice's `gpu;vulkan` smoke passes and the live Sandbox check is
+- [x] UI, agent tools and scene save/load reach the same commands; undo/redo is one step each.
+- [x] Operational on Vulkan: each slice's `gpu;vulkan` smoke passes and the live Sandbox check is
       recorded (or the remaining cases are handed to GRAPHICS-158 with a named owner).
 
 ## Verification
@@ -635,13 +636,13 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   (B6), and missing verification suites (B7). O1-O4 covered smoke placement and spikes,
   explicit per-lane slots, Color combinations and the record reserve. All were folded into
   this revision.
-- 2026-10-23: Delta round 2 (same thread, revision sha256 `e272084a…`). Verdict "revise":
+- 2026-10-23: Delta round 2 (same thread, revision sha256 `e272084a807fdce23e2640128a4aea2d8d4ef103d19e6551c7ed4b2fcbd9cdaa`). Verdict "revise":
   B1, B2, B4-B7 and O1-O4 resolved. B3 was still blocking: the selection mode does not say which
   lane a GPU hint came from, so a Surface hit could be compared against displaced points. Fix:
   refinement uses the producing lane from the encoded id's domain, the fallback uses the
   request's target lane, and highlights use the stored selection's domain, with a
   separated-lane fixture. Optional: arrow length removed from the disabled-while-bound default.
-- 2026-10-23: Delta round 3 (same thread, revision sha256 `dc6e46e6…`). Verdict verbatim:
+- 2026-10-23: Delta round 3 (same thread, revision sha256 `dc6e46e667820a7e521dedd130685480b875ac488dde1a03d01242e13485f973`). Verdict verbatim:
   "approve. Still blocking: none. B3 is resolved at plan level: GPU-hit refinement uses the
   producing lane, fallback uses the issuing request's target, and highlights use the stored
   selection's domain." Implementation and runtime behavior are unverified.
@@ -673,13 +674,13 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a1688d-73de-77e2-b443-1417368820cb`;
   recursion protection instruction-only).
   - Ponytail (author): no findings.
-  - Round 1 on diff sha256 `29b13f18…`: "revise required". C1: two docs still named old paths.
+  - Round 1 on diff sha256 `29b13f182d8b7012903ab72164a436b4d3ba31d4bd5c566c9842467668a0c707`: "revise required". C1: two docs still named old paths.
     C2: the METHOD-040 instructions pointed to Curvature instead of Curvature Segmentation. C3
     (optional): the sort ran at every menu depth. All fixed; C3 got a red-first test.
-  - Round 2 on `cd2b7acb…`: C1-C3 resolved. New C4: the Progressive Poisson menu test still
+  - Round 2 on `cd2b7acbbb5a10e7d2dec356d99f89c9390aff9eb1e3791368a96f65aad5b3c2`: C1-C3 resolved. New C4: the Progressive Poisson menu test still
     expected the old paths; the author's suite filter had missed that suite. Fixed, and
     verification widened to the whole executable.
-  - Round 3 on `83f54e7c…`: verdict verbatim "approve. Still blocking: none".
+  - Round 3 on `83f54e7c34669f65f7176e2374c8416f30e82d63a20307e495243c85c9d6f633`: verdict verbatim "approve. Still blocking: none".
 - 2026-10-23: Operator decision (slice 2): Default is grey-white for the surface only. Edges and
   points keep their dark default (`0.02`), so a wireframe or point overlay stays visible on a
   grey-white surface. Imported colors still win on every primitive.
@@ -713,7 +714,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   - Verification: all CPU tests of `IntrinsicRuntimeContractTests`,
     `IntrinsicRuntimeGraphicsCpuTests`, `IntrinsicGraphicsContractCpuTests`,
     `IntrinsicGraphicsContractTests` and `IntrinsicSandboxEditorIntegrationTests` pass
-    (2734/2734).
+    (2734 tests: 2732 passed, 2 skipped: `ImGuiAdapterEngineWiring.RunNormalizesNativeClose*`, which
+    need a native window).
   - Mutation check: ten targeted tests each fail with their mechanism removed. The mechanisms
     are the imported edge/point color, grey-white base, lane starting color, remembered size
     on Default, `value` in the codec, lane target of Color, a lane row, the bound-field write
@@ -725,7 +727,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   recursion protection instruction-only).
   - Ponytail (author): one finding, the per-frame base-color patch would overwrite authored
     factors once GRAPHICS-105 projects them. Fixed: only the two defaults are switched.
-  - Round 1: "revise required".
+  - Round 1 on diff sha256 `91b88a51ebc649826a7e4a2c5ebd83ba7643d13ab9dbb123efe261e096f63136`:
+    "revise required".
     - P1: the diff carried ARA edits from another session in this checkout; they were
       unstaged.
     - C1: albedo textures from presentation slots or a baked Appearance texture got the grey
@@ -734,8 +737,10 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
     - C2: same-named properties on two domains shared one property-buffer key. Fixed:
       `DomainKeyLane` adds the domain to the key.
     - C1 and C2 each got a regression test that fails with its fix removed.
-  - Round 2: verdict verbatim "approve. Still blocking: none. New findings: none".
-  - Full CPU suite 5876/5876 after the fixes.
+  - Round 2 on diff sha256 `b8699686f4b72d1941d532bc278d93ae5f52bd9b6a81cdf3e88f36d33ef7d0ae`: verdict verbatim
+    "approve. Still blocking: none. New findings: none".
+  - Full CPU suite after the fixes: 5876 tests, 5874 passed, 2 skipped
+    (`ImGuiAdapterEngineWiring.RunNormalizesNativeClose*`, native window), none failed.
 - 2026-10-25: Slice 3a implemented (independent Position per primitive) on base `d3bec9527`.
   - `VertexChannelBindingSet` holds `Surface`/`Edges`/`Points` slots (`VertexChannelLaneBindings`).
     `ResolveDisplayedPositions`, `FindVertexChannelSourceBinding` and the plan builders take the
@@ -1157,3 +1162,28 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
     operation, and `:1` is the operator's desktop, which was not driven by synthetic input.
     These cases are covered by the slice 1 headless menu tests, the slice 2 panel tests and the
     slice 3b/3c `gpu;vulkan` smokes.
+- 2026-10-27: Closing review (Claude coordinator → Codex reviewer, fresh session, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread
+  `01a17ee3-e07b-7191-b564-82b59e840ca2`; recursion protection instruction-only), on this note
+  (sha256 `9d1e…` before the record fixes) and commits `a9df44fe3`..`83e42148a`. Round 1 verdict
+  "revise required": all seven criteria met; blocking only on the durable record (missing
+  slice-2 review digests, test totals hiding two skipped tests); nonblocking: criterion 3 wording,
+  GRAPHICS-158 context. Delta (diff sha256 `295a6cb5…`, note sha256 `532f8050…`) verdict
+  verbatim "approve retirement" ("B1, B2, N1 and N2 are resolved. No remaining or new findings.").
+
+## Completion — 2026-10-27
+Completed 2026-10-27 on `main`. Commit: slice 1 `a9df44fe3`, slice 2 `599f02ff1`, slice 3a
+`b8bdf73c5` + `df19634f1`, slice 3c `9a845417f`, slice 3b `215432c01`, slice 4 `7a999e199`,
+slice 5 `83e42148a` (hosted `ci-linux-clang` and `ci-docs` green on `7a999e199` and `83e42148a`,
+checked 2026-10-27 with `gh run list`). Maturity: Operational - final-tree `gpu;vulkan` gate
+168/168 on host `hochvogel` (NVIDIA GeForce RTX 4090, driver 580.159.04, X11 `:1`, 1600x900) plus
+the slice-5 live check. Reviewer decisions (closing review above), per criterion: 1 met
+(`ProcessingMenusListTheirGroupsInMenuOrder`, `MenuChildrenSortOnlyProcessingGroups`); 2 met
+(`AppearanceSectionsListThePrimitiveAttributes`, `EveryTableRowBindsAndRestoresItsDefault`); 3 met
+under the recorded operator decisions; 4 met (lane resolution, preview, refinement and selection
+tests, bound-position and Surfel smokes); 5 met (`StylePropertiesUploadCheckedPerElementValues`,
+`GpuPreviewFrontsDriveScalarStyleBuffers`, `VectorFieldArrowsTakeLengthAndColorFromProperties`);
+6 met (`VectorFieldAddsStylesRefusesAndUndoes`, `VectorFieldStyleKeysRoundTripAndStayOptional`);
+7 met on the recorded evidence; the slice-5 "not checked live" cases are covered by automated
+tests, not by manual desktop interaction. No follow-up task. Raw evidence
+`tasks/evidence/UI-083/` (86 files, git-ignored) deleted after the approval.
