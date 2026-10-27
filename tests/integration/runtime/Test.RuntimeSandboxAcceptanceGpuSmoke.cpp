@@ -9881,6 +9881,22 @@ namespace
             return ReadPixel(Bytes, Format, BytesPerPixel, Extent, static_cast<std::uint32_t>(x),
                 static_cast<std::uint32_t>(y));
         }
+
+        // The clicked pixels in the last frame: red where a click hit, background where it missed.
+        void ExpectClickPixelsShowTheHits() const
+        {
+            const RgbaPixel background = PixelAt(15.0f * Extent.Width / 16.0f, Extent.Height / 16.0f);
+            for (std::size_t index = 0u; index < Driver.Clicks.size(); ++index)
+            {
+                const auto [x, y] = Driver.Clicks[index].Pixel;
+                const RgbaPixel drawn = PixelAt(float(x), float(y));
+                SCOPED_TRACE(Driver.Describe(index) + " pixel " + PixelText(drawn));
+                if (Driver.Results[index].Hits > 0u)
+                    EXPECT_TRUE(IsUi083PointPixel(drawn)) << "a hit where nothing red is drawn";
+                else
+                    EXPECT_LT(RgbDistance(drawn, background), 30) << "a miss where something is drawn";
+            }
+        }
     };
 } // namespace
 
@@ -10291,18 +10307,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickFootprintIsTheDrawnLineWidthAndPoint
     driver.ExpectPick(9, id(sphere), Kind::Point, 0.6f * sphereRadius, 0.25f * sphereRadius);
     driver.ExpectMiss(10);
 
-    // The same pixels in the last frame: red where a click hit, background where it missed.
-    const RgbaPixel background = capture.PixelAt(15.0f * w / 16.0f, h / 16.0f);
-    for (std::size_t index = 0u; index < driver.Clicks.size(); ++index)
-    {
-        const auto [x, y] = driver.Clicks[index].Pixel;
-        const RgbaPixel drawn = capture.PixelAt(float(x), float(y));
-        SCOPED_TRACE(driver.Describe(index) + " pixel " + PixelText(drawn));
-        if (driver.Results[index].Hits > 0u)
-            EXPECT_TRUE(IsUi083PointPixel(drawn)) << "a hit where nothing red is drawn";
-        else
-            EXPECT_LT(RgbDistance(drawn, background), 30) << "a miss where something is drawn";
-    }
+    capture.ExpectClickPixelsShowTheHits();
 
     engine.Shutdown();
 }
@@ -10519,6 +10524,219 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, DrawnLinesOccludeWhatTheClickPassesOver)
     const RgbaPixel hidden = pixelAt(surfaceAt + glm::vec2{-25.0f, 20.0f});
     EXPECT_FALSE(IsUi083PointPixel(hidden)) << "a line behind the surface is drawn: " << PixelText(hidden);
     EXPECT_LT(RgbDistance(hidden, surface), 30) << PixelText(hidden) << " vs surface " << PixelText(surface);
+
+    engine.Shutdown();
+}
+
+// UI-083 slice 3b: a Surfel point is drawn and clicked as the disc its normal describes. The
+// points lane reads the cloud's `p:normal`, maps it by the inverse transpose of a model matrix
+// that scales y by 3 and by a camera turned 60 degrees about y, and a zero normal faces the
+// camera; a Flat point ignores the normal. Every click lies 2 px or more inside or outside a
+// drawn boundary, and the pixel under it shows whether something is drawn there. A cloud scaled
+// by 1e12 keeps its orientation (the squared length of its normal would overflow a float), and a
+// cloud flattened onto z = 0 (a singular model matrix) shows that plane's normal.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, SurfelsAreDrawnAndClickedAsTheDiscTheirNormalDescribes)
+{
+    using Target = RT::SelectionTarget;
+    const glm::mat4 scaleY = glm::scale(glm::mat4{1.0f}, glm::vec3{1.0f, 3.0f, 1.0f});
+    // The view normal the tilted Surfel should show: its disc is 32 px long and 2 * 3.3 px wide.
+    const glm::vec3 tiltedView = glm::normalize(glm::vec3{0.9f, 0.3f, 0.2f});
+    const glm::vec2 shortAxis = glm::normalize(glm::vec2{tiltedView});
+    const glm::vec2 longAxis{-shortAxis.y, shortAxis.x};
+    Bug254ClickCapture capture{};
+    Bug254ClickDriver& driver = capture.Driver;
+    driver.Settle = 6u;  // after the entities are created
+    Extrinsic::Core::Extent2D extent{};
+    glm::vec2 tiltedAt{}, facingAt{}, zeroAt{}, flatAt{}, hugeAt{}, flattenedAt{};
+    glm::vec3 flattenedView{};
+    EntityHandle surfels{Extrinsic::ECS::InvalidEntityHandle};
+    EntityHandle flat{Extrinsic::ECS::InvalidEntityHandle};
+    glm::mat4 posedView{1.0f};
+    bool populated = false;
+    bool poseRefused = false;
+    // A dark red, so tone mapping does not flatten the Surfel shading: measured (170, 0, 0)
+    // facing the camera and (156, 0, 0) at |n.z| 0.21 on an RTX 4090.
+    G::VisualizationConfig red{};
+    red.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    red.Color = glm::vec4{0.1f, 0.0f, 0.0f, 1.0f};
+
+    // Poses the camera through the editor command, then places the points at the chosen
+    // pixels through the posed camera, with the object normals that show the wanted view
+    // normals (n_object = Mᵀ Rᵀ n_view for the inverse-transpose normal matrix).
+    const auto populate = [&](Engine& engine)
+    {
+        auto* cameras = engine.Services().Find<RT::CameraControllerRegistry>();
+        if (!engine.GetDevice().IsOperational() || cameras == nullptr ||
+            cameras->ResolveOrNull(RT::CameraControllerSlot::Main) == nullptr)
+            return false;
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        const Intrinsic::Tests::EditorFeatureTestContext context{
+            .Scene = &scene, .Selection = &Selection(engine), .CameraControllers = cameras, .CameraViewport = extent};
+        const float angle = glm::radians(60.0f);
+        poseRefused =
+            RT::ApplyEditorCameraPoseCommand(static_cast<RT::EditorSceneEditingContext>(context),
+                RT::EditorCameraPoseCommand{.Position = 3.0f * glm::vec3{std::sin(angle), 0.0f, std::cos(angle)}})
+                .Status != RT::EditorCommandStatus::Applied;
+        const auto camera = cameras->ResolveOrNull(RT::CameraControllerSlot::Main)->GetView(extent);
+        posedView = camera.View;
+        const glm::mat3 viewToWorld = glm::transpose(glm::mat3{camera.View});
+        const auto worldAtPixel = [&](const glm::vec2 pixel)
+        {
+            // Clip space is Y-up; pixel rows grow downwards. View depth 3 is the origin's.
+            const glm::vec2 ndc{(pixel.x + 0.5f) / float(extent.Width) * 2.0f - 1.0f,
+                1.0f - (pixel.y + 0.5f) / float(extent.Height) * 2.0f};
+            const glm::vec4 onRay = glm::inverse(camera.Projection) * glm::vec4{ndc, 0.5f, 1.0f};
+            const glm::vec3 viewPoint = glm::vec3{onRay} / onRay.w;
+            return glm::vec3{glm::inverse(camera.View) * glm::vec4{viewPoint * (3.0f / -viewPoint.z), 1.0f}};
+        };
+        const auto addCloud = [&](const std::vector<glm::vec3>& local,
+                                  const std::vector<glm::vec3>& normals,
+                                  const glm::mat4& model,
+                                  const G::RenderPoints::RenderType type)
+        {
+            const EntityHandle entity = AddBug254Points(scene, local);
+            auto& raw = scene.Raw();
+            raw.get<ECSC::Transform::WorldMatrix>(entity).Matrix = model;
+            raw.emplace_or_replace<G::RenderPoints>(entity, G::RenderPoints{.Type = type, .Size = 32.0f});
+            raw.emplace<G::VisualizationConfig>(entity, red);
+            raw.get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("p:normal", glm::vec3{0.0f}).Vector() =
+                normals;
+            return entity;
+        };
+        const auto addPlaced = [&](const std::vector<glm::vec2>& pixels,
+                                   const std::vector<glm::vec3>& viewNormals,
+                                   const glm::mat4& model,
+                                   const G::RenderPoints::RenderType type)
+        {
+            std::vector<glm::vec3> local{}, normals{};
+            for (std::size_t i = 0u; i < pixels.size(); ++i)
+            {
+                local.push_back(glm::vec3{glm::inverse(model) * glm::vec4{worldAtPixel(pixels[i]), 1.0f}});
+                normals.push_back(glm::transpose(glm::mat3{model}) * (viewToWorld * viewNormals[i]));
+            }
+            return addCloud(local, normals, model, type);
+        };
+        surfels = addPlaced({tiltedAt, facingAt, zeroAt},
+            {tiltedView, glm::vec3{0.0f, 0.0f, 1.0f}, glm::vec3{0.0f}},
+            scaleY,
+            G::RenderPoints::RenderType::Surfel);
+        flat = addPlaced({flatAt}, {tiltedView}, glm::mat4{1.0f}, G::RenderPoints::RenderType::Flat);
+        (void)addPlaced({hugeAt},
+            {tiltedView},
+            glm::scale(glm::mat4{1.0f}, glm::vec3{1.0e12f}),
+            G::RenderPoints::RenderType::Surfel);
+        // Flattened onto z = 0, where the pixel's ray meets that plane; any object normal with a z
+        // component becomes the plane's normal.
+        const glm::vec3 eye{glm::inverse(camera.View)[3]};
+        const glm::vec3 ray = worldAtPixel(flattenedAt) - eye;
+        (void)addCloud({eye - ray * (eye.z / ray.z)},
+            {glm::vec3{0.6f, 0.0f, 0.8f}},
+            glm::scale(glm::mat4{1.0f}, glm::vec3{1.0f, 1.0f, 0.0f}),
+            G::RenderPoints::RenderType::Surfel);
+        flattenedView = glm::normalize(glm::mat3{camera.View} * glm::vec3{0.0f, 0.0f, 1.0f});
+        return true;
+    };
+    const auto ready = [&](Engine& engine)
+    {
+        if (!populated)
+        {
+            populated = populate(engine);
+            return false;
+        }
+        return capture.Step(engine);
+    };
+    // Four frames after the last click cover the readback latency.
+    auto readyApp = std::make_unique<ExitWhenReadyApp>(ready, 4u, 600u, std::chrono::seconds{120}, false);
+    ExitWhenReadyApp& readyProbe = *readyApp;
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    Engine& engine = *bootstrap.EnginePtr;
+    extent = engine.GetDevice().GetBackbufferExtent();
+    ASSERT_GT(extent.Width, 0);
+    ASSERT_GT(extent.Height, 0);
+    const float w = static_cast<float>(extent.Width);
+    const float h = static_cast<float>(extent.Height);
+    // Away from the ReferenceTriangle in the middle of the frame.
+    tiltedAt = glm::floor(glm::vec2{0.15f * w, 0.20f * h});
+    facingAt = glm::floor(glm::vec2{0.15f * w, 0.45f * h});
+    zeroAt = glm::floor(glm::vec2{0.85f * w, 0.20f * h});
+    flatAt = glm::floor(glm::vec2{0.85f * w, 0.45f * h});
+    hugeAt = glm::floor(glm::vec2{0.15f * w, 0.70f * h});
+    flattenedAt = glm::floor(glm::vec2{0.85f * w, 0.70f * h});
+    // A view-space offset from a point's centre, as a pixel (screen y grows downwards).
+    const auto at = [](const glm::vec2 centre, const glm::vec2 viewOffset)
+    {
+        const glm::vec2 p = glm::floor(centre + glm::vec2{0.5f} + glm::vec2{viewOffset.x, -viewOffset.y});
+        return std::pair{static_cast<std::uint32_t>(p.x), static_cast<std::uint32_t>(p.y)};
+    };
+    driver.Clicks = {
+        {"tilted Surfel, 10 px along its long axis", Target::Vertex, at(tiltedAt, 10.0f * longAxis)},
+        {"tilted Surfel, 8 px along its short axis", Target::Entity, at(tiltedAt, 8.0f * shortAxis)},
+        {"zero-normal Surfel, 10 px along the tilted short axis", Target::Vertex, at(zeroAt, 10.0f * shortAxis)},
+        {"zero-normal Surfel, square corner outside the disc", Target::Entity, at(zeroAt, glm::vec2{13.0f, -13.0f})},
+        {"Flat point, 10 px along the tilted short axis", Target::Vertex, at(flatAt, 10.0f * shortAxis)},
+        {"background",
+            Target::Entity,
+            std::pair{static_cast<std::uint32_t>(0.95f * w), static_cast<std::uint32_t>(0.95f * h)}},
+    };
+
+    ASSERT_TRUE(capture.CreateReadback(engine, "Sandbox.UI083.Surfels.Readback"));
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    SCOPED_TRACE(readyProbe.ExitSummary() + " clicks done=" + std::to_string(driver.Next));
+    capture.ReadBack(engine);
+    ASSERT_TRUE(run.DeviceOperational);
+    ASSERT_TRUE(populated) << "the camera registry never resolved";
+    EXPECT_FALSE(poseRefused) << "the camera pose command was refused";
+    ASSERT_EQ(driver.Next, driver.Clicks.size()) << "not every click read back";
+    {
+        auto* cameras = engine.Services().Find<RT::CameraControllerRegistry>();
+        ASSERT_NE(cameras, nullptr);
+        const glm::mat4 finalView = cameras->ResolveOrNull(RT::CameraControllerSlot::Main)->GetView(extent).View;
+        for (int c = 0; c < 4; ++c)
+            for (int r = 0; r < 4; ++r)
+                EXPECT_NEAR(finalView[c][r], posedView[c][r], 1e-4f) << "the camera moved after the pose";
+    }
+
+    const auto id = [](const EntityHandle entity)
+    {
+        return RT::SelectionController::ToStableEntityId(entity);
+    };
+    using Kind = RT::RefinedPrimitiveKind;
+    driver.ExpectPick(0, id(surfels), Kind::Point);
+    EXPECT_EQ(driver.Refined(0).PointId, 0u) << driver.Describe(0);
+    driver.ExpectMiss(1);
+    driver.ExpectPick(2, id(surfels), Kind::Point);
+    EXPECT_EQ(driver.Refined(2).PointId, 2u) << driver.Describe(2);
+    driver.ExpectMiss(3);
+    driver.ExpectPick(4, id(flat), Kind::Point);
+    driver.ExpectMiss(5);
+
+    capture.ExpectClickPixelsShowTheHits();
+    // Shading is 0.7 + 0.3 |n.z|: a zero normal shades like a Surfel facing the camera, the
+    // tilted one (|n.z| 0.21) darker.
+    const RgbaPixel tilted = capture.PixelAt(tiltedAt.x, tiltedAt.y);
+    const RgbaPixel facing = capture.PixelAt(facingAt.x, facingAt.y);
+    const RgbaPixel zero = capture.PixelAt(zeroAt.x, zeroAt.y);
+    EXPECT_LT(RgbDistance(zero, facing), 6) << PixelText(zero) << " vs facing " << PixelText(facing);
+    EXPECT_GT(int(facing.R) - int(tilted.R), 8) << PixelText(tilted) << " vs facing " << PixelText(facing);
+    // The scaled and the flattened clouds: drawn 12 px along the disc's long axis, background
+    // 4 px past its short half-axis.
+    const RgbaPixel background = capture.PixelAt(15.0f * w / 16.0f, h / 16.0f);
+    const auto expectDisc = [&](const char* what, const glm::vec2 centre, const glm::vec3 viewNormal)
+    {
+        const glm::vec2 shortDir = glm::normalize(glm::vec2{viewNormal});
+        const float shortHalf = std::max(std::abs(viewNormal.z), 0.15f) * 16.0f;
+        const auto [lx, ly] = at(centre, 12.0f * glm::vec2{-shortDir.y, shortDir.x});
+        const auto [sx, sy] = at(centre, (shortHalf + 4.0f) * shortDir);
+        const RgbaPixel along = capture.PixelAt(float(lx), float(ly));
+        const RgbaPixel across = capture.PixelAt(float(sx), float(sy));
+        EXPECT_TRUE(IsUi083PointPixel(along)) << what << ": nothing drawn along the long axis " << PixelText(along);
+        EXPECT_LT(RgbDistance(across, background), 30) << what << ": drawn past the short axis " << PixelText(across);
+    };
+    expectDisc("scaled by 1e12", hugeAt, tiltedView);
+    expectDisc("flattened onto z = 0", flattenedAt, flattenedView);
 
     engine.Shutdown();
 }

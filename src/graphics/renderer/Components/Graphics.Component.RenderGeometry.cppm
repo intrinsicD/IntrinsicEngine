@@ -112,7 +112,7 @@ export namespace Extrinsic::Graphics::Components
         {
             Flat,    ///< Screen-aligned flat disc.
             Sphere,  ///< Impostor sphere — correct depth, occludes surfaces.
-            Surfel   ///< Surface-aligned disc; requires vertex normals.
+            Surfel   ///< Disc aligned with the point's normal; faces the camera without one.
         } Type = RenderType::Sphere;
 
         /// Uniform screen-space diameter in pixels. Kept while SizeProperty is

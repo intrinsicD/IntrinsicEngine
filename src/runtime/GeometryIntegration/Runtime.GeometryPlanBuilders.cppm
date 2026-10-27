@@ -36,28 +36,11 @@ export namespace Extrinsic::Runtime
         Graphics::GpuWorld::GeometryChannelUpdateMask UpdateChannels{};
     };
 
-    [[nodiscard]] inline std::optional<AttributeSourceType>
-        ToAttributeSourceType(
-            const Geometry::PropertyValueKind valueKind) noexcept
-    {
-        switch (valueKind)
-        {
-        case Geometry::PropertyValueKind::Float:
-            return AttributeSourceType::Float32;
-        case Geometry::PropertyValueKind::Vec2:
-            return AttributeSourceType::Vec2;
-        case Geometry::PropertyValueKind::Vec3:
-            return AttributeSourceType::Vec3;
-        case Geometry::PropertyValueKind::Vec4:
-            return AttributeSourceType::Vec4;
-        default:
-            return std::nullopt;
-        }
-    }
-
-    // Bound structural streams for graph and point-cloud vertices. An
-    // unresolved binding leaves the channel absent. Topology owners clear full
-    // buffers before channel preparation.
+    // The points lane's normal stream (`ResolvePointNormalSource`) for graph,
+    // point-cloud and mesh-vertex-view vertices, absent when there is no source.
+    // A zero or non-finite normal uploads as zero, which the point shaders draw
+    // facing the camera. Topology owners clear full buffers before channel
+    // preparation.
     void PrepareBoundVertexChannels(
         const Geometry::PropertySet& properties, GeometryElementDomain domain,
         const VertexChannelBindingSet* channelBindings, std::size_t vertexCount,

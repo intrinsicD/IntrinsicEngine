@@ -1,7 +1,9 @@
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -26,6 +28,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.PointCloud;
 import Geometry.Properties;
 
@@ -1089,6 +1092,75 @@ TEST(PointCloudGeometryExtraction, SwitchingToANamedSizeSourceKeepsResidency)
         extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->HasPointCloudResidency);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// UI-083 slice 3b: the points lane uploads its normal source (a bound `Points.Normal`, else
+// `p:normal`) normalized, a zero or non-finite normal as zero (drawn facing the camera), and
+// follows edits, removal and a bound source that disappears and returns, without dirty tags.
+TEST(PointCloudGeometryExtraction, PointNormalsFollowTheirSourceWithoutDirtyTags)
+{
+    namespace RT = Extrinsic::Runtime;
+    using Normals = std::pair<std::uint64_t, std::uint64_t>;  // byte count, fingerprint
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakePointCloudRenderable(scene);
+    auto& properties = raw.get<gs::Vertices>(entity).Properties;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    properties.GetOrAdd<glm::vec3>("p:normal", glm::vec3{0.0f}).Vector() = {{0, 0, 2}, {0, 0, 0}, {nan, 0, 1}};
+
+    const std::uint64_t positions =
+        Extrinsic::Tests::GeometryFloat32Fingerprint({0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f});
+    const auto expected = [](const std::initializer_list<float> values)
+    {
+        return Normals{sizeof(float) * values.size(), Extrinsic::Tests::GeometryFloat32Fingerprint(values)};
+    };
+    RT::RenderExtractionCache extraction;
+    const auto uploaded = [&]
+    {
+        (void)extraction.ExtractAndSubmit(
+            scene, engine.GetRenderer(), &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+        const auto view = extraction.FindRenderableSidecarForTest(RT::StableEntityLookup::ToRenderId(entity));
+        Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+        EXPECT_TRUE(view.has_value() &&
+            engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(view->PointCloudGeometry, residency));
+        EXPECT_EQ(residency.PositionFingerprint, positions);
+        return Normals{residency.NormalByteCount, residency.NormalFingerprint};
+    };
+
+    EXPECT_EQ(uploaded(), expected({0, 0, 1, 0, 0, 0, 0, 0, 0}));
+    properties.Get<glm::vec3>("p:normal")[1] = glm::vec3{0.0f, 3.0f, 0.0f};
+    EXPECT_EQ(uploaded(), expected({0, 0, 1, 0, 1, 0, 0, 0, 0}));
+    {
+        auto normal = properties.Get<glm::vec3>("p:normal");
+        properties.Remove(normal);
+    }
+    EXPECT_EQ(uploaded(), Normals{});
+    (void)properties.GetOrAdd<glm::vec3>("p:normal", glm::vec3{1.0f, 0.0f, 0.0f});
+    // Written in one revision epoch, `p:normal` and `p:alt` share a token: falling back from one
+    // to the other below must be told by the source's name.
+    (void)properties.GetOrAdd<glm::vec3>("p:alt", glm::vec3{0.0f, 1.0f, 0.0f});
+    ASSERT_EQ(properties.FindPropertyRevision("p:normal"), properties.FindPropertyRevision("p:alt"));
+    EXPECT_EQ(uploaded(), expected({1, 0, 0, 1, 0, 0, 1, 0, 0}));
+
+    raw.emplace<RT::VertexChannelBindingSet>(entity,
+        RT::VertexChannelBindingSet{.Points = {.Normal = {.Enabled = true,
+                                                   .Property = {RT::GeometryElementDomain::PointCloudPoint,
+                                                       "p:alt",
+                                                       Geometry::PropertyValueKind::Vec3}}},
+            .BindingGeneration = 2u});
+    EXPECT_EQ(uploaded(), expected({0, 1, 0, 0, 1, 0, 0, 1, 0}));
+    {
+        auto alt = properties.Get<glm::vec3>("p:alt");
+        properties.Remove(alt);
+    }
+    EXPECT_EQ(uploaded(), expected({1, 0, 0, 1, 0, 0, 1, 0, 0}));  // the canonical source
+    (void)properties.GetOrAdd<glm::vec3>("p:alt", glm::vec3{0.0f, 0.0f, -1.0f});
+    EXPECT_EQ(uploaded(), expected({0, 0, -1, 0, 0, -1, 0, 0, -1}));
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

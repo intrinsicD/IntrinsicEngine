@@ -81,15 +81,6 @@ namespace Extrinsic::Runtime
             return properties.FindPropertyRevision(name).value_or(0u);
         }
 
-        [[nodiscard]] bool BindingMatches(
-            const VertexChannelSourceBinding& binding,
-            const GeometryElementDomain expectedDomain) noexcept
-        {
-            return IsVertexChannelBindingEnabled(binding) &&
-                   binding.Property.Domain == expectedDomain &&
-                   binding.Property.ValueKind == Geometry::PropertyValueKind::Vec3;
-        }
-
         [[nodiscard]] RenderExtractionGeometrySourceRevisions CaptureVertexChannelRevisions(const ConstSourceView& view,
             const VertexChannelBindingSet* bindings,
             const GeometryElementDomain expectedDomain,
@@ -124,9 +115,11 @@ namespace Extrinsic::Runtime
                 snapshot.Texcoord = revisionOf(shading.CornerTexcoord, shading.VertexTexcoord);
                 snapshot.Normal = revisionOf(shading.CornerNormal, shading.VertexNormal);
             }
-            else if (bindings != nullptr && BindingMatches(bindings->Points.Normal, expectedDomain))
+            else
             {
-                snapshot.Normal = PropertyRevisionOf(properties, bindings->Points.Normal.Property.Name);
+                const std::string_view normal = ResolvePointNormalSource(properties, expectedDomain, bindings);
+                snapshot.Normal = PropertyRevisionOf(properties, normal);
+                snapshot.NormalSource = std::hash<std::string_view>{}(normal);
             }
             if (meshDefaults)
             {
@@ -216,14 +209,18 @@ namespace Extrinsic::Runtime
             const VertexChannelBindingSet* bindings,
             const bool edgeView) noexcept
         {
-            // Primitive views draw the entity's displayed positions only; the
-            // binding generation also tracks a rebind of the Position source.
+            // Primitive views draw the entity's displayed positions; the vertex
+            // view also draws the points lane's normals (UI-083).
             RenderExtractionGeometrySourceRevisions snapshot = CaptureVertexChannelRevisions(view,
                 bindings,
                 GeometryElementDomain::MeshVertex,
                 edgeView ? GeometryRenderLane::Edges : GeometryRenderLane::Points,
                 false);
-            snapshot.Normal = 0u;
+            if (edgeView)
+            {
+                snapshot.Normal = 0u;
+                snapshot.NormalSource = 0u;
+            }
             if (edgeView && view.EdgeSource != nullptr)
             {
                 const Geometry::PropertySet& properties =
@@ -285,7 +282,7 @@ namespace Extrinsic::Runtime
                 plan.Channels.Position = true;
             if (current.Texcoord != previous.Texcoord)
                 plan.Channels.Texcoord = true;
-            if (current.Normal != previous.Normal)
+            if (current.Normal != previous.Normal || current.NormalSource != previous.NormalSource)
                 plan.Channels.Normal = true;
             if (current.Color != previous.Color)
                 plan.Channels.Color = true;
@@ -351,9 +348,9 @@ namespace Extrinsic::Runtime
             const RenderExtractionGeometrySourceRevisions& previous,
             const bool edgeView) noexcept
         {
-            if (current.VertexCount != previous.VertexCount ||
-                current.PositionCount != previous.PositionCount ||
-                current.Position != previous.Position)
+            if (current.VertexCount != previous.VertexCount || current.PositionCount != previous.PositionCount ||
+                current.Position != previous.Position || current.Normal != previous.Normal ||
+                current.NormalSource != previous.NormalSource)
             {
                 return true;
             }

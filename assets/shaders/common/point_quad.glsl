@@ -72,6 +72,22 @@ GpuPointQuadCorner GpuPointQuadCornerAt(GpuSceneTable scene,
         ? max((ndcRadiusY * depth) / projectionScaleY, 1.0e-5)
         : 1.0e-3;
     corner.ViewNormal = vec3(0.0, 0.0, 1.0);
+    // UI-083: only a Surfel is oriented by its normal.
+    if (cfg.Point.PointMode == GpuPointMode_Surfel && geo.NormalBufferBDA != uint64_t(0)) {
+        const vec3 n = GpuReadPackedVec3(geo.NormalBufferBDA, sourceVertexIndex);
+        // The cofactor matrix is the inverse transpose times the determinant: it keeps the normal
+        // perpendicular under non-uniform scale and stays defined for a singular model matrix.
+        // Its sign does not matter, a Surfel is two-sided.
+        const mat3 m = mat3(dyn.Model);
+        const vec3 viewNormal = mat3(scene.CameraView) *
+            (cross(m[1], m[2]) * n.x + cross(m[2], m[0]) * n.y + cross(m[0], m[1]) * n.z);
+        // Rescaling by the largest component keeps tiny and huge model scales finite; a zero
+        // normal has no direction and faces the camera.
+        const float largest = max(max(abs(viewNormal.x), abs(viewNormal.y)), abs(viewNormal.z));
+        if (largest > 0.0 && !isinf(largest) && !any(isnan(viewNormal))) {
+            corner.ViewNormal = normalize(viewNormal / largest);
+        }
+    }
     return corner;
 }
 

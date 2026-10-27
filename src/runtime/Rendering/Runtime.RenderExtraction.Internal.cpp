@@ -84,6 +84,9 @@ namespace Extrinsic::Runtime
         std::size_t TopologyElementCount1{0u};
         std::size_t TopologyElementCount2{0u};
         std::uint64_t BindingGeneration{0u};
+        // The hashed name of the points lane's normal source: properties edited in one
+        // revision epoch share a token, so the token alone cannot tell a source switch.
+        std::uint64_t NormalSource{0u};
 
         [[nodiscard]] friend bool operator==(
             const RenderExtractionGeometrySourceRevisions&, const RenderExtractionGeometrySourceRevisions&) = default;

@@ -1798,9 +1798,9 @@ namespace Extrinsic::Runtime
                         VisualizationLane::Points);
                 const bool wantsPoints = pointLane.Requested;
                 // Snapshot the mesh dirty state before BindMeshGeometry
-                // may drain the tags. Primitive edge/point views only pack
-                // position/topology-derived streams, so normal/color-only
-                // channel dirtiness does not reupload those sidecars.
+                // may drain the tags. Normal/color-only channel dirtiness does
+                // not reupload the primitive edge/point views: the vertex view's
+                // normals follow its own source revision snapshot (UI-083).
                 meshDirtyThisFrame =
                     BuildMeshGeometryDirtyPlan(registry, entity).MeshPrimitiveViewDirty;
                 if (wantsSurface)

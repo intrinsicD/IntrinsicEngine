@@ -33,35 +33,21 @@ namespace Extrinsic::Runtime
         VertexChannelStreams& channels)
     {
         // Normals are drawn by the points lane only (lines are unlit).
-        const VertexChannelSourceBinding* normal =
-            channelBindings != nullptr ? &channelBindings->Points.Normal : nullptr;
-        if (normal != nullptr && IsVertexChannelBindingEnabled(*normal))
+        const std::string_view source = ResolvePointNormalSource(properties, domain, channelBindings);
+        if (source.empty())
+            return;
+        std::vector<glm::vec3> normals(vertexCount);
+        const VertexAttributeBinding normalBinding{
+            .Channel = VertexChannel::Normal,
+            .SourceType = AttributeSourceType::Vec3,
+            .SourceProperty = source,
+            .AllowFallback = false,
+            .Normalize = true,
+            .Fallback = glm::vec4{0.0f},
+        };
+        if (ResolveVec3Channel(properties, normalBinding, static_cast<std::uint32_t>(vertexCount), normals).Ok())
         {
-            const std::optional<AttributeSourceType> sourceType =
-                normal->Property.Domain == domain ? ToAttributeSourceType(normal->Property.ValueKind) : std::nullopt;
-            std::vector<glm::vec3> normals(vertexCount);
-            const VertexAttributeBinding normalBinding{
-                .Channel = VertexChannel::Normal,
-                .SourceType = sourceType.value_or(AttributeSourceType::Vec3),
-                .SourceProperty = sourceType == AttributeSourceType::Vec3 ? std::string_view{normal->Property.Name}
-                                                                          : std::string_view{},
-                .AllowFallback = false,
-                .Normalize = true,
-                .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
-            };
-            const AttributeBindResult normalResult =
-                ResolveVec3Channel(
-                    properties,
-                    normalBinding,
-                    static_cast<std::uint32_t>(vertexCount),
-                    normals);
-            if (normalResult.Ok())
-            {
-                SetChannelVec3(
-                    channels,
-                    VertexChannel::Normal,
-                    std::span<const glm::vec3>{normals.data(), normals.size()});
-            }
+            SetChannelVec3(channels, VertexChannel::Normal, std::span<const glm::vec3>{normals.data(), normals.size()});
         }
     }
 

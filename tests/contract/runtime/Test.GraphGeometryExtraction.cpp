@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -1279,6 +1280,79 @@ TEST(GraphGeometryExtraction, SelectableGraphFlagsTheLineAndPointLaneInstancesSe
             EXPECT_EQ((*flags & Extrinsic::RHI::GpuRender_Selectable) != 0u, expected);
         }
     }
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// UI-083 slice 3b: a bound node normal reaches the points lane normalized, a degenerate one as
+// zero, and an edit re-uploads it without dirty tags, both in the upload lines and points share
+// and in the points-only upload a points lane drawn from other positions gets.
+TEST(GraphGeometryExtraction, BoundNodeNormalsFollowEditsOnSharedAndSplitPointGeometry)
+{
+    namespace RT = Extrinsic::Runtime;
+    using Normals = std::pair<std::uint64_t, std::uint64_t>; // byte count, fingerprint
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
+    auto& nodes = raw.get<gs::Vertices>(entity).Properties;
+    nodes.GetOrAdd<glm::vec3>("v:dir", glm::vec3{0.0f}).Vector() = {{0, 2, 0}, {0, 0, 0}, {1, 0, 0}};
+    nodes.GetOrAdd<glm::vec3>("v:moved", glm::vec3{0.0f}).Vector() = {{0, 0, 4}, {1, 0, 4}, {0, 1, 4}};
+    const auto source = [](const char* name)
+    {
+        return RT::VertexChannelSourceBinding{.Enabled = true,
+            .Property = {RT::GeometryElementDomain::GraphNode, name, Geometry::PropertyValueKind::Vec3}};
+    };
+    const auto expected = [](const std::initializer_list<float> values)
+    {
+        return Normals{sizeof(float) * values.size(), Extrinsic::Tests::GeometryFloat32Fingerprint(values)};
+    };
+    RT::RenderExtractionCache extraction;
+    const auto extract = [&]
+    {
+        (void)extraction.ExtractAndSubmit(
+            scene, engine.GetRenderer(), &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+        const auto view = extraction.FindRenderableSidecarForTest(RT::StableEntityLookup::ToRenderId(entity));
+        EXPECT_TRUE(view.has_value());
+        return view.value_or(RT::RenderExtractionCache::RenderableSidecarView{});
+    };
+    const auto normalsOf = [&](const Extrinsic::Graphics::GpuGeometryHandle geometry)
+    {
+        Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+        EXPECT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(geometry, residency));
+        return Normals{residency.NormalByteCount, residency.NormalFingerprint};
+    };
+
+    raw.emplace<RT::VertexChannelBindingSet>(
+        entity, RT::VertexChannelBindingSet{.Points = {.Normal = source("v:dir")}, .BindingGeneration = 2u});
+    auto view = extract();
+    EXPECT_FALSE(view.GraphPointGeometry.IsValid());
+    EXPECT_EQ(normalsOf(view.GraphGeometry), expected({0, 1, 0, 0, 0, 0, 1, 0, 0}));
+    nodes.Get<glm::vec3>("v:dir")[2] = glm::vec3{0.0f, 0.0f, 5.0f};
+    view = extract();
+    EXPECT_EQ(normalsOf(view.GraphGeometry), expected({0, 1, 0, 0, 0, 0, 0, 0, 1}));
+
+    // The points lane drawn from other positions gets its own upload, which follows edits too.
+    raw.replace<RT::VertexChannelBindingSet>(entity,
+        RT::VertexChannelBindingSet{
+            .Points = {.Position = source("v:moved"), .Normal = source("v:dir")}, .BindingGeneration = 3u});
+    Extrinsic::ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity); // as the bind command does
+    view = extract();
+    ASSERT_TRUE(view.GraphPointGeometry.IsValid());
+    EXPECT_EQ(normalsOf(view.GraphPointGeometry), expected({0, 1, 0, 0, 0, 0, 0, 0, 1}));
+    nodes.Get<glm::vec3>("v:dir")[0] = glm::vec3{3.0f, 0.0f, 0.0f};
+    view = extract();
+    ASSERT_TRUE(view.GraphPointGeometry.IsValid());
+    EXPECT_EQ(normalsOf(view.GraphPointGeometry), expected({1, 0, 0, 0, 0, 0, 0, 0, 1}));
+
+    // Unbound, a graph has no canonical normal: the stream goes away.
+    raw.replace<RT::VertexChannelBindingSet>(
+        entity, RT::VertexChannelBindingSet{.Points = {.Position = source("v:moved")}, .BindingGeneration = 4u});
+    view = extract();
+    ASSERT_TRUE(view.GraphPointGeometry.IsValid());
+    EXPECT_EQ(normalsOf(view.GraphPointGeometry), Normals{});
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

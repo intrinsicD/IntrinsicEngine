@@ -186,6 +186,16 @@ export namespace Extrinsic::Runtime
         const VertexChannelBindingSet* bindings,
         GeometryRenderLane lane) noexcept;
 
+    // The normal source the points lane draws (UI-083): its bound Normal when it
+    // resolves on `vertexDomain` (vec3, one value per element), otherwise the
+    // canonical normal of the rule table (`v:normal`, `p:normal`, none for graph
+    // nodes); empty when neither exists. Non-finite values do not disqualify a
+    // source: each element is repaired on upload. Shared by the upload and its
+    // revision tracking.
+    [[nodiscard]] std::string_view ResolvePointNormalSource(const Geometry::PropertySet& vertices,
+        GeometryElementDomain vertexDomain,
+        const VertexChannelBindingSet* bindings) noexcept;
+
     // The vertex domain whose positions an entity of `provenance` displays.
     [[nodiscard]] GeometryElementDomain DisplayedPositionDomainFor(
         ECS::Components::GeometrySources::Domain provenance) noexcept;

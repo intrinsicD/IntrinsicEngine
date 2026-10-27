@@ -1,7 +1,9 @@
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -21,6 +23,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -28,6 +31,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 namespace gs = Extrinsic::ECS::Components::GeometrySources;
@@ -1059,6 +1063,70 @@ TEST(MeshPrimitiveViewExtraction, NonMeshEntityWithRenderComponentsCreatesNoMesh
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshEdgeView);
     EXPECT_FALSE(view->HasMeshVertexView);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// UI-083 slice 3b: a mesh's vertex view uploads the points lane's normal source (`v:normal`
+// unless `Points.Normal` is bound) and rebuilds when it is edited or rebound; the edge view
+// stays without normals.
+TEST(MeshPrimitiveViewExtraction, VertexViewUploadsThePointNormalSourceAndFollowsIt)
+{
+    namespace RT = Extrinsic::Runtime;
+    using Normals = std::pair<std::uint64_t, std::uint64_t>;  // byte count, fingerprint
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+    EnableVertexView(scene, entity, Extrinsic::Graphics::Components::RenderPoints::RenderType::Surfel);
+    EnableEdgeView(scene, entity);
+    auto& vertices = raw.get<gs::Vertices>(entity).Properties;
+    vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f}).Vector() = {{0, 0, 1}, {0, 0, 1}, {0, 0, 1}};
+    vertices.GetOrAdd<glm::vec3>("v:tilted", glm::vec3{0.0f}).Vector() = {{1, 0, 0}, {0, 4, 0}, {0, 0, 0}};
+    const auto expected = [](const std::initializer_list<float> values)
+    {
+        return Normals{sizeof(float) * values.size(), Extrinsic::Tests::GeometryFloat32Fingerprint(values)};
+    };
+    RT::RenderExtractionCache extraction;
+    const auto extract = [&]
+    {
+        (void)extraction.ExtractAndSubmit(
+            scene, engine.GetRenderer(), &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+        const auto view = extraction.FindRenderableSidecarForTest(RT::StableEntityLookup::ToRenderId(entity));
+        EXPECT_TRUE(view.has_value() && view->HasMeshVertexView && view->HasMeshEdgeView);
+        return view.value_or(RT::RenderExtractionCache::RenderableSidecarView{});
+    };
+    const auto normalsOf = [&](const Extrinsic::Graphics::GpuGeometryHandle geometry)
+    {
+        Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+        EXPECT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(geometry, residency));
+        return Normals{residency.NormalByteCount, residency.NormalFingerprint};
+    };
+
+    // Written in one revision epoch, `v:normal` and `v:tilted` share a token: switching between
+    // them below must be told by the source's name.
+    ASSERT_EQ(vertices.FindPropertyRevision("v:normal"), vertices.FindPropertyRevision("v:tilted"));
+    auto view = extract();
+    EXPECT_EQ(normalsOf(view.MeshVertexViewGeometry), expected({0, 0, 1, 0, 0, 1, 0, 0, 1}));
+    EXPECT_EQ(normalsOf(view.MeshEdgeViewGeometry), Normals{});
+
+    raw.emplace<RT::VertexChannelBindingSet>(entity,
+        RT::VertexChannelBindingSet{.Points = {.Normal = {.Enabled = true,
+                                                   .Property = {RT::GeometryElementDomain::MeshVertex,
+                                                       "v:tilted",
+                                                       Geometry::PropertyValueKind::Vec3}}},
+            .BindingGeneration = 2u});
+    view = extract();
+    EXPECT_EQ(normalsOf(view.MeshVertexViewGeometry), expected({1, 0, 0, 0, 1, 0, 0, 0, 0}));
+    raw.replace<RT::VertexChannelBindingSet>(entity, RT::VertexChannelBindingSet{.BindingGeneration = 3u});
+    view = extract();
+    EXPECT_EQ(normalsOf(view.MeshVertexViewGeometry), expected({0, 0, 1, 0, 0, 1, 0, 0, 1}));
+    vertices.Get<glm::vec3>("v:normal")[0] = glm::vec3{0.0f, -2.0f, 0.0f};
+    view = extract();
+    EXPECT_EQ(normalsOf(view.MeshVertexViewGeometry), expected({0, -1, 0, 0, 0, 1, 0, 0, 1}));
+    EXPECT_EQ(normalsOf(view.MeshEdgeViewGeometry), Normals{});
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

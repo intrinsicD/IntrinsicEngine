@@ -308,20 +308,92 @@ on selection highlights; BUG-254 made every highlighted primitive clickable.
   red assertions stay. Mutation: back to the single `SelectionLaneFor` lane (only the
   canonical-apex highlight disappears).
 
-### Slice 3b — Normal on the point lane (~250 lines, new shader read)
-- `assets/shaders/forward/point.vert:103` sets the view normal to +Z for every point, so Surfel
-  discs face the camera even for point clouds that upload normals; `point.frag:25` already
-  handles surfel ellipticity and facing. Read `geo.NormalBufferBDA` when the geometry has one
-  and transform it to view space by the inverse transpose; a zero or non-finite normal keeps +Z.
-  Mesh vertex views and graph point lanes upload `NormalBytes` from the `Points.Normal` slot
-  (else `v:normal`) through `PrepareBoundVertexChannels`.
-- Visible effect: Surfel orientation and shading. Flat and Sphere ignore the normal, and the row
-  tooltip says so. The Edges lane gets no Normal row: lines are unlit and read no normal.
-- Tests:
-  - Extraction uploads points-lane normals for a mesh vertex view and a graph point lane.
-  - A non-uniformly scaled entity keeps surfels perpendicular to the transformed normal.
-  - A zero normal falls back to +Z.
-  - A `gpu;vulkan` readback shows an edge-on surfel for a normal perpendicular to the view.
+### Slice 3b — Normal on the point lane (~300 lines, new shader read)
+Operator request (2026-10-26): continue with this slice, plan and review first ("Ja bitte").
+Serves question 4 ("Vertices should let me control ... Position, Normal, Color ..., PointSize"):
+the Vertices Normal row exists since slice 2 but changes nothing on screen.
+- Today (investigated at `9a845417f`):
+  - `GpuPointQuadCornerAt` (`assets/shaders/common/point_quad.glsl:74`, shared by the drawn point
+    and the point pick since BUG-254) sets every view normal to +Z, so Surfel discs always face
+    the camera. `GpuPointDiscMetric` already draws a Surfel as the disc's projected ellipse
+    (minor axis |n.z|, clamped to 0.15) and `forward/point.frag` shades it by |n.z|.
+  - Point normals did reach the shader once (oct-encoded in the UV slot, BUG-028 `899c8b890`);
+    `dc2806d68` ("Restore surface normal shading") removed that encoding and left +Z.
+  - Uploads: graph and point-cloud geometry carry a normal stream only when `Points.Normal` is
+    bound (`PrepareBoundVertexChannels`, `Runtime.GeometryPlanBuilders.Graph.cpp:28`); a degenerate
+    or non-finite element is written as object-space +Z. The mesh vertex view
+    (`BuildMeshVertexViewPlan`) uploads no normals, and its revision snapshot zeroes `Normal`, so
+    a normal rebind or a `v:normal` edit would not re-upload it.
+  - Clip space is Y-up (negative viewport height), so the quad's disc UV and view-space x/y agree.
+- Change:
+  - `ResolvePointNormalSource(vertices, vertexDomain, bindings)` in `Runtime.VertexChannelBindings`
+    next to `ResolveDisplayedPositions`: the bound `Points.Normal` source when it lives on
+    `vertexDomain`, is vec3 and has one value per element; otherwise the canonical normal of the
+    rule table (`v:normal` on mesh vertices, `p:normal` on cloud points, none on graph nodes) when
+    it exists with the right count; otherwise none. Non-finite values do not disqualify a source
+    (normals are repaired per element, as the table states).
+  - `PrepareBoundVertexChannels` uploads that source, normalized; a zero-length or non-finite
+    element is written as (0, 0, 0) instead of object-space +Z. The mesh vertex view calls it on
+    `MeshVertex` and passes `NormalBytes`.
+  - Revisions: the graph/point-cloud snapshot tracks the resolved source (today only a bound
+    one); the vertex view keeps its `Normal` revision and `MeshPrimitiveViewRevisionChanged`
+    compares it, so a rebind or a normal edit rebuilds the view. The edge view stays normal-free.
+  - Shader: `GpuPointQuadCornerAt` reads `geo.NormalBufferBDA` at the point when the address is
+    set, maps it by `transpose(inverse(mat3(dyn.Model)))` (the house normal matrix of
+    `default_debug_surface.vert`) and the camera view, and keeps +Z unless the result has a finite,
+    positive length (a zero normal; NaN or infinity from a singular model matrix). Superseded after
+    the code review (log, 2026-10-27): Surfels only, the cofactor matrix instead of `inverse()`, a
+    largest-component rescale instead of the length cutoff; a flattened cloud shows the plane's
+    normal. The pick shares
+    the helper, so a Surfel's click area follows its orientation (BUG-254 rule: click area = drawn
+    shape).
+  - Table text: `PointCloudPoint` Normal's canonical property becomes `p:normal`; the Points
+    Normal row's default names it per domain: "mesh v:normal, point cloud p:normal, graph none;
+    without one the disc faces the camera; only Surfel points read it". The agent's attribute
+    listing reports the same text.
+- Decisions for the operator (veto in review): Default draws the canonical normal, so existing
+  meshes and point clouds with normals shown as Surfel become oriented (as before `dc2806d68`);
+  back-facing normals draw like front-facing ones (|n.z|, unchanged); the 0.15 minimum thickness
+  stays, so an edge-on Surfel is a thin line, not invisible.
+- Tests, red first (predictions in the log before the first run):
+  - `VertexChannelBindings` (`IntrinsicRuntimeContractTests`): the rule table names `p:normal`;
+    `ResolvePointNormalSource` picks bound, falls back to canonical for a missing or wrong-domain
+    binding, returns none for an unbound graph.
+  - Extraction sequences, outcomes asserted as uploaded normal bytes with positions unchanged
+    (no dirty tags; which upload mechanism runs, partial or full, is not asserted):
+    - `PointCloudGeometryExtraction`: an unbound cloud with `p:normal` {(0,0,2), (0,0,0), NaN}
+      uploads {(0,0,1), (0,0,0), (0,0,0)} (today no stream); editing `p:normal` re-uploads;
+      removing it drops the stream and adding it back restores it; binding `Points.Normal` to
+      `p:alt` uploads that; removing `p:alt` falls back to `p:normal`, adding it back binds again.
+    - `GraphGeometryExtraction`: a bound node normal with a degenerate element uploads (0,0,0)
+      there (today +Z); editing the bound property re-uploads, both for one geometry shared by
+      lines and points and for a split points geometry (points Position bound elsewhere);
+      unbinding drops the stream (may already pass; kept as a baseline, not red-first evidence).
+    - `MeshPrimitiveViewExtraction`: the vertex view uploads `v:normal` by default (today none);
+      editing `v:normal` re-uploads; binding `Points.Normal` uploads the bound values, unbinding
+      returns to `v:normal`; the edge view keeps no normals.
+  - `gpu;vulkan` (`RuntimeSandboxAcceptanceGpuSmoke`, new test on the BUG-254 click harness):
+    - The camera is posed by `ApplyEditorCameraPoseCommand` at (3 sin 60°, 0, 3 cos 60°) looking at
+      the origin, so the view rotation is not the identity. Points are placed by unprojecting
+      chosen pixels through the controller's `GetView(extent)`.
+    - A Surfel cloud of 32 px points whose world matrix scales y by 3. Each point's `p:normal` is
+      the object-space normal (Sᵀ R_viewᵀ n_v) that should appear as view normal n_v: a tilted
+      n_v = normalize(0.9, 0.3, 0.2) (short half-axis 3.3 px along (0.95, 0.32)), a camera-facing
+      n_v = (0, 0, 1), and a zero normal. A Flat cloud with the tilted normal.
+    - Vertex-mode clicks and the pixels under them: the tilted Surfel is hit 10 px along its long
+      axis and missed 8 px along its short axis; the zero-normal Surfel and the Flat point are hit
+      8-10 px along that short axis; the zero-normal Surfel is missed at the square's corner
+      (13, 13) px; a last background click clears the selection. The zero-normal Surfel's centre
+      has the camera-facing Surfel's colour; the tilted one is darker (shading 0.7 + 0.3 |n.z|).
+    - Analytic check of the clicks (metric ≤ 1 means covered): correct: long 0.39, short 5.88;
+      no camera transform (view normal (0.64, 0.31, -0.70)): short 0.51, hit; `mat3(Model)`
+      (view normal (0.32, 0.95, 0.07)): long 11.4, miss; today's +Z: short 0.25, hit. A missing
+      length guard either yields NaN (the square's corner is covered) or a zero normal (the
+      centre shades as edge-on, darker than the facing Surfel).
+  - Mutations: no shader read; no camera transform; `mat3(Model)` instead of the inverse
+    transpose; no length check; normals applied in Flat mode; vertex view without normals; vertex
+    view revision without `Normal`; graph/cloud revision tracking only a bound source; fallback +Z
+    restored.
 
 ### Slice 4 — per-arrow length and color for vector fields (~750 lines)
 Current state:
@@ -676,3 +748,115 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 
   "approve" ("Ponytail: no complexity findings."). Optional findings applied: a mesh halfedge
   (index 3, edge 1) is checked on both sources with its endpoints; the mutation claim above names
   the checks it covers. `PrimitiveSelection` passed again after the test addition.
+- 2026-10-27: Slice 3b plan review (Claude author → Codex reviewer, fresh session, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a17a72-01f7-7402-b8ac-721fbc2ca385`;
+  recursion protection instruction-only), on the plan diff sha256 `5dd9e6e7…` at `9a845417f`.
+  Verdict verbatim "revise". Blocking, folded in: the reference camera's view rotation is the
+  identity, so the smoke poses a rotated camera and checks the click geometry against the "no
+  camera transform" normal as well; a camera-facing Surfel gives the zero-normal Surfel a colour
+  reference, so a missing length guard fails either way; extraction sequences cover edits of a
+  bound or canonical normal without dirty tags (graph shared and split geometry), removal and
+  re-adding, and a bound source that disappears and returns. Optional, followed: per-domain
+  Default text; a finite-length check. Not followed: asserting partial versus full uploads; the
+  sequences assert the uploaded bytes after each step, which both mechanisms must produce.
+- 2026-10-27: Slice 3b red-first predictions, written before the first run against `9a845417f`'s
+  implementation (the direct `ResolvePointNormalSource` test is left out of that run: the function
+  is new and would not compile):
+  - `VertexChannelBindings.TableListsEveryAttributeDomainRowWithItsTypeRule` fails on the
+    `PointCloudPoint` Normal row only (canonical "" instead of `p:normal`).
+  - `PointCloudGeometryExtraction.PointNormalsFollowTheirSourceWithoutDirtyTags`: fails on the
+    initial upload, the edit, the re-added `p:normal` and the fallback after `p:alt` is removed (no
+    stream without a binding); passes on the removal, the bound `p:alt` and the re-added `p:alt`.
+  - `GraphGeometryExtraction.BoundNodeNormalsFollowEditsOnSharedAndSplitPointGeometry`: the four
+    normal checks while bound fail (the degenerate node uploads +Z); the unbound check passes.
+  - `MeshPrimitiveViewExtraction.VertexViewUploadsThePointNormalSourceAndFollowsIt`: every vertex
+    view check fails (no normal stream); both edge view checks pass.
+  - Result of that run: exactly as predicted (table: the `PointCloudPoint` row only; cloud: initial,
+    edit, re-added and fallback checks; graph: the four bound checks; mesh: the four vertex view
+    checks). With the change all five tests pass, including the direct resolver test.
+  - Predictions for `RuntimeSandboxAcceptanceGpuSmoke.SurfelsAreDrawnAndClickedAsTheDiscTheirNormalDescribes`
+    with the change: every click and pixel check passes; the zero-normal Surfel's centre is within 6
+    of the facing Surfel's colour and the tilted centre's red is at least 8 lower (provisional
+    thresholds, to be measured). Mutations: no shader read (today's behaviour) and no camera
+    transform fail the short-axis click; `mat3(Model)` fails the long-axis click; no length guard
+    fails the corner click or the zero/facing colour check; normals read in Flat mode fail the Flat
+    click.
+- 2026-10-27: Slice 3b implemented.
+  - `ResolvePointNormalSource` (`Runtime.VertexChannelBindings`) picks the points lane's normal:
+    a bound `Points.Normal` on the vertex domain (vec3, one value per element), else the table's
+    canonical one (`v:normal`, now `p:normal` for cloud points, none for graph nodes).
+    `PrepareBoundVertexChannels` uploads it normalized with zero for a degenerate or non-finite
+    element (was object-space +Z); the mesh vertex view now calls it and passes `NormalBytes`.
+    The graph/cloud revision snapshot tracks the resolved source; the vertex view keeps and
+    compares its `Normal` revision. `ToAttributeSourceType` and `BindingMatches` lost their last
+    callers and are removed.
+  - `GpuPointQuadCornerAt` (`point_quad.glsl`) reads the normal, maps it by the inverse-transpose
+    model matrix and the camera view, and keeps +Z unless the length is finite and positive; the
+    draw and the pick share it. The Points Normal row's default text names the source per domain.
+  - Smoke measurement: the first run passed every click and pixel check but measured the tilted
+    Surfel at (241, 0, 0) against (245, 0, 0) facing the camera: tone mapping flattens full red,
+    so the provisional "8 lower" check failed. Recalibrated with a uniform red of 0.1: facing
+    (170, 0, 0), zero normal (170, 0, 0), tilted (156, 0, 0), Flat (170, 0, 0); the thresholds
+    (zero within 6 of facing, tilted at least 8 lower) are kept and the colour is recorded in the
+    test.
+  - GPU mutations, each fails the smoke where predicted: no shader read (short-axis click hits,
+    tilted not darker); no camera transform (short-axis click hits, colours off); `mat3(Model)`
+    (long-axis click misses); no length guard (the zero-normal Surfel turns black and its square
+    corner is hit: NaN); Flat reading the normal (Flat click misses).
+  - CPU mutations, each fails the extraction tests: vertex view without normals (mesh, all four
+    vertex view checks); vertex view without its normal revision (mesh edit and rebinds); revisions
+    tracking only a bound normal (cloud edit, removal and re-add; mesh edit); degenerate normals
+    as +Z (graph four checks, cloud initial and edit, mesh bound check).
+  - `jscpd`: the smoke's click-pixel check duplicated `ClickFootprintIsTheDrawnLineWidthAndPointShape`;
+    it moved into `Bug254ClickCapture::ExpectClickPixelsShowTheHits`, used by both. The three
+    extraction tests keep small local `expected`/`normalsOf` lambdas (test-local harness style).
+  - CPU gate (`build/ci`, `-LE 'gpu|vulkan|slow|flaky-quarantine'`): 5904/5904. Layering, task
+    policy, session brief, doc links, docs sync, source rules, test layout and compiler hazards
+    pass.
+  - Vulkan (host `hochvogel`, NVIDIA GeForce RTX 4090, driver 580.159.04, X11 `:1`, backbuffer
+    1600x900, VSync off): every `gpu;vulkan` test of `build/ci-vulkan`, 167/167, including the new
+    smoke and `ClickFootprintIsTheDrawnLineWidthAndPointShape` with the shared pixel check.
+- 2026-10-27: Slice 3b code review (Claude author → Codex reviewer, fresh session, `codex exec`,
+  requested `gpt-6-astra` at `xhigh`, read-only sandbox, thread `01a17a9d-b7e0-75f0-b369-94e6ff1de1ef`;
+  recursion protection instruction-only), on the staged diff sha256 `5653eb28…`. Verdict verbatim
+  "revise required". Blocking: (1) property revision tokens coalesce per epoch
+  (`PropertyRevisionState::MarkModified`), so two sources written together share a token and a
+  rebind or a fallback between them went unnoticed (mesh vertex view rebind; cloud fallback after
+  the bound source is removed); (2) `inverse()` is undefined for a singular model matrix; (3) the
+  absolute 1e-6 length cutoff turned valid normals camera-facing under a large uniform scale.
+  Ponytail: read the normal only in Surfel mode. Optional: two stale comments.
+  - Fixes: the revision snapshot records the hashed name of the resolved normal source
+    (`NormalSource`), compared wherever `Normal` is; the shader uses the cofactor matrix (the
+    inverse transpose times the determinant, defined for singular matrices; the sign does not
+    matter for a two-sided Surfel), rescales by the largest component before normalizing, and
+    reads the normal only for Surfels; both comments updated.
+  - New cases: the mesh test binds `v:tilted` while it shares `v:normal`'s token, the cloud test
+    falls back from `p:alt` to `p:normal` sharing a token (both premises asserted); the smoke adds
+    a Surfel cloud scaled by 2e6 and one flattened onto z = 0 (drawn along the long axis,
+    background 4 px past the short half-axis of the expected disc).
+  - Predictions before running: without `NormalSource` the mesh test fails at the equal-token bind
+    and the cloud test at the equal-token fallback, the other steps pass; with the previous shader
+    (inverse transpose, 1e-6 cutoff) both new smoke discs fail their short-axis sample; with the
+    fixes every test passes.
+  - Results, as predicted: without `NormalSource` the mesh test fails at the equal-token bind
+    and the cloud test at the equal-token fallback only; with the previous shader the smoke's
+    scaled and flattened discs are drawn past their short axis, (170, 0, 0) and (170, 1, 2); with
+    the fixes all `VertexChannelBindings` and new extraction tests pass (22) and the smoke passes
+    twice. Shader mutations on the final shader, each failing the smoke: no normal read
+    (short-axis click hits, tilted not darker, both new discs too wide); no camera transform
+    (short-axis click, colours, both new discs); model matrix instead of the cofactor matrix
+    (long-axis click misses, a new disc too wide); no zero guard (the zero-normal Surfel turns
+    black and its corner is hit). The Surfel-only gate in `GpuPointQuadCornerAt` and the Flat
+    branch of `GpuPointDiscMetric` each keep Flat points round, so removing one of them alone is
+    not observable; the Flat click covers the pair.
+  - Gates on the fixed tree: CPU 5904/5904; Vulkan `gpu;vulkan` 167/167 (RTX 4090, driver
+    580.159.04, X11 `:1`).
+- 2026-10-27: Slice 3b delta review (same Codex thread `01a17a9d-b7e0-75f0-b369-94e6ff1de1ef`,
+  read-only, recursion protection instruction-only), on the staged diff sha256 `eb47053d…`.
+  Verdict verbatim "approve" ("Remaining blocking findings: None."). Nonblocking, followed: the
+  scaled cloud uses 1e12 instead of 2e6, so the squared length of its cofactor normal overflows a
+  float and the largest-component rescale is tested (without it the disc is drawn black, NaN;
+  with it the smoke passes); the original shader plan paragraph is marked superseded.
+- 2026-10-27: Final check of slice 3b (same Codex thread), on the staged diff sha256 `d23927ab…`
+  (the approved diff plus the two followed nonblocking findings). Verdict verbatim "approve"
+  ("Approval stands for staged diff …", "No new findings.").

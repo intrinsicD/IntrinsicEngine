@@ -68,7 +68,8 @@ namespace Extrinsic::Runtime
         }
 
         // Shading normals and texcoords repair non-finite elements per element
-        // (+Z / zero), so only positions and pixel sizes require finite sources.
+        // (surface normals +Z, point normals zero, texcoords zero), so only
+        // positions and pixel sizes require finite sources.
         constexpr std::array kRules{
             Vec3Row(A::Position, D::MeshVertex, true, kPosition, kPosition),
             Vec3Row(A::Position, D::GraphNode, true, kPosition, kPosition),
@@ -77,8 +78,8 @@ namespace Extrinsic::Runtime
                     "h:normal corners, else v:normal, else +Z"),
             Vec3Row(A::Normal, D::MeshHalfedge, false, "h:normal",
                     "h:normal corners, else v:normal, else +Z"),
-            Vec3Row(A::Normal, D::GraphNode, false, "", "no normal stream"),
-            Vec3Row(A::Normal, D::PointCloudPoint, false, "", "no normal stream"),
+            Vec3Row(A::Normal, D::GraphNode, false, "", "none: points face the camera"),
+            Vec3Row(A::Normal, D::PointCloudPoint, false, "p:normal", "p:normal, else points face the camera"),
             Vec2Row(D::MeshVertex, "v:texcoord", "h:texcoord corners, else v:texcoord, else zero"),
             Vec2Row(D::MeshHalfedge, "h:texcoord", "h:texcoord corners, else v:texcoord, else zero"),
             ColorRow(D::MeshVertex, "material (v:color vertex colors when present)"),
@@ -114,7 +115,11 @@ namespace Extrinsic::Runtime
             RenderLaneAttributeRow{L::Edges, A::Color, kEdgeColor, "v:color when present, else dark lane color"},
             RenderLaneAttributeRow{L::Edges, A::LineWidth, kEdgeElements, "uniform line width (px)"},
             RenderLaneAttributeRow{L::Points, A::Position, kPointVertices, kPosition},
-            RenderLaneAttributeRow{L::Points, A::Normal, kPointVertices, "v:normal, not yet read by points"},
+            RenderLaneAttributeRow{L::Points,
+                A::Normal,
+                kPointVertices,
+                "mesh v:normal, point cloud p:normal, graph none; without one the disc faces the camera; "
+                "only Surfel points read it"},
             RenderLaneAttributeRow{
                 L::Points, A::Color, kPointVertices, "v:color or p:color when present, else dark lane color"},
             RenderLaneAttributeRow{L::Points, A::PointSize, kPointVertices, "uniform point size (px)"},
@@ -308,6 +313,25 @@ namespace Extrinsic::Runtime
             .Name = kPosition,
             .Values = canonical.IsValid() ? canonical.Span() : std::span<const glm::vec3>{},
         };
+    }
+
+    std::string_view ResolvePointNormalSource(const Geometry::PropertySet& vertices,
+        const GeometryElementDomain vertexDomain,
+        const VertexChannelBindingSet* bindings) noexcept
+    {
+        const Geometry::ConstPropertySet properties{vertices};
+        const auto usable = [&](const std::string_view name)
+        {
+            const auto values = properties.Get<glm::vec3>(name);
+            return values.IsValid() && values.Size() == vertices.Size();
+        };
+        if (bindings != nullptr && IsVertexChannelBindingEnabled(bindings->Points.Normal) &&
+            bindings->Points.Normal.Property.Domain == vertexDomain && usable(bindings->Points.Normal.Property.Name))
+        {
+            return bindings->Points.Normal.Property.Name;
+        }
+        const RenderAttributeRule* rule = FindRenderAttributeRule(A::Normal, vertexDomain);
+        return rule != nullptr && usable(rule->CanonicalProperty) ? rule->CanonicalProperty : std::string_view{};
     }
 
     GeometryElementDomain DisplayedPositionDomainFor(

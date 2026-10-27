@@ -460,11 +460,17 @@ namespace Extrinsic::Runtime
             return Failure(status, outBuffer);
         }
         PopulateChannelStreams(*positions, outBuffer);
+        PrepareBoundVertexChannels(view.VertexSource->Properties,
+            GeometryElementDomain::MeshVertex,
+            channelBindings,
+            positions->size(),
+            outBuffer.Channels);
 
         Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
         desc.PackedVertexBytes = std::span<const std::byte>{outBuffer.VertexBytes};
         desc.PositionBytes = ChannelBytes(outBuffer, VertexChannel::Position);
         desc.TexcoordBytes = ChannelBytes(outBuffer, VertexChannel::Texcoord);
+        desc.NormalBytes = ChannelBytes(outBuffer, VertexChannel::Normal);
         desc.SurfaceIndices = {};
         desc.LineIndices = {};
         desc.VertexCount = static_cast<std::uint32_t>(positions->size());

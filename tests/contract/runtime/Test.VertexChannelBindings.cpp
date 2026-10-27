@@ -140,7 +140,7 @@ TEST(VertexChannelBindings, TableListsEveryAttributeDomainRowWithItsTypeRule)
         {A::Normal, D::MeshVertex, "vec3", false, "v:normal"},
         {A::Normal, D::MeshHalfedge, "vec3", false, "h:normal"},
         {A::Normal, D::GraphNode, "vec3", false, ""},
-        {A::Normal, D::PointCloudPoint, "vec3", false, ""},
+        {A::Normal, D::PointCloudPoint, "vec3", false, "p:normal"},
         {A::Texcoord, D::MeshVertex, "vec2", false, "v:texcoord"},
         {A::Texcoord, D::MeshHalfedge, "vec2", false, "h:texcoord"},
         {A::Color, D::MeshVertex, "scalar or vector", false, ""},
@@ -518,6 +518,50 @@ TEST(VertexChannelBindings, DisplayedPositionsFallBackToCanonicalWhenTheBoundSou
     bindings.Surface.Position.Property = {D::GraphNode, "v:offset", Kind::Vec3};  // other domain
     EXPECT_FALSE(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, &bindings, L::Surface).Bound);
     EXPECT_EQ(Runtime::ResolveDisplayedPositions(properties, D::MeshVertex, nullptr, L::Surface).Name, "v:position");
+}
+
+// UI-083 slice 3b: the points lane draws its bound normal, else the canonical one (mesh
+// v:normal, cloud p:normal, none on graph nodes). Non-finite values do not disqualify a
+// source: each element is repaired on upload.
+TEST(VertexChannelBindings, PointNormalsFollowTheBoundSourceElseTheCanonicalOne)
+{
+    ECS::Scene::Registry registry;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    SetProperty<glm::vec3>(properties, "v:normal", std::vector<glm::vec3>(3u, glm::vec3{0, 0, 1}));
+    SetProperty<glm::vec3>(properties, "v:alt", std::vector<glm::vec3>(3u, glm::vec3{1, 0, 0}));
+    properties.Get<glm::vec3>("v:alt").Vector()[1].x = std::numeric_limits<float>::quiet_NaN();
+    Runtime::VertexChannelBindingSet bindings{
+        .Points = {.Normal = {.Enabled = true, .Property = {D::MeshVertex, "v:alt", Kind::Vec3}}}};
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(properties, D::MeshVertex, &bindings), "v:alt");
+    // Only the points lane's slot counts.
+    Runtime::VertexChannelBindingSet surfaceOnly{.Surface = bindings.Points};
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(properties, D::MeshVertex, &surfaceOnly), "v:normal");
+    bindings.Points.Normal.Property.Name = "v:gone";
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(properties, D::MeshVertex, &bindings), "v:normal");
+    bindings.Points.Normal.Property = {D::GraphNode, "v:alt", Kind::Vec3};  // other domain
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(properties, D::MeshVertex, &bindings), "v:normal");
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(properties, D::MeshVertex, nullptr), "v:normal");
+    auto normal = properties.Get<glm::vec3>("v:normal");
+    properties.Remove(normal);
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(properties, D::MeshVertex, nullptr), "");
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    auto& nodes = registry.Raw().get<GS::Vertices>(graph).Properties;
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(nodes, D::GraphNode, nullptr), "");
+    SetProperty<glm::vec3>(nodes, "v:dir", std::vector<glm::vec3>(nodes.Size(), glm::vec3{0, 1, 0}));
+    const Runtime::VertexChannelBindingSet graphBindings{
+        .Points = {.Normal = {.Enabled = true, .Property = {D::GraphNode, "v:dir", Kind::Vec3}}}};
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(nodes, D::GraphNode, &graphBindings), "v:dir");
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 2u);
+    auto& points = registry.Raw().get<GS::Vertices>(cloud).Properties;
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(points, D::PointCloudPoint, nullptr), "");
+    SetProperty<glm::vec3>(points, "p:normal", std::vector<glm::vec3>(2u, glm::vec3{0, 0, 1}));
+    EXPECT_EQ(Runtime::ResolvePointNormalSource(points, D::PointCloudPoint, nullptr), "p:normal");
 }
 
 TEST(VertexChannelBindings, CameraFocusAndDefaultVectorFieldLengthFollowTheDisplayedPositions)
