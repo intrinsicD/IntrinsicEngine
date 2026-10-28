@@ -22,6 +22,9 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "RuntimeTestModule.hpp"
+import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Colormap;
+import Extrinsic.Runtime.LaneVisualizationStyle;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -56,6 +59,7 @@ namespace P = Extrinsic::Platform;
 namespace Config = Extrinsic::Core::Config;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace TF = Extrinsic::ECS::Components::Transform;
+namespace G = Extrinsic::Graphics::Components;
 namespace Editor = Extrinsic::Sandbox::Editor;
 using Json = nlohmann::json;
 namespace
@@ -1988,6 +1992,152 @@ TEST(SandboxAgentServer, VectorFieldAddsStylesRefusesAndUndoes)
             const auto restored = c.Tool("vector_fields", {{"entity", mesh}}, &isError);
             rig.Check(layerCount(restored) == 1u && layer(restored).value("color_property", "") == "heat",
                 "undo brings the styled layer back: " + restored.dump());
+        });
+}
+
+// RUNTIME-336: lane_style sets a lane's declared style fields through the panel's lane config
+// command: one undo step and undo restores; a refused value changes nothing, even with a valid
+// field beside it; a call without style fields is a read that writes nothing; a lane inherits the
+// entity's config until a changed style gives it its own complete config; only lanes the entity can
+// draw are editable.
+TEST(SandboxAgentServer, LaneStyleSetsDeclaredFieldsRefusesAndUndoes)
+{
+    AgentRig rig("lanestyle");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto mesh = rig.AddGrid();
+    const auto inheriting = rig.AddGrid();
+    const auto cloud = rig.AddCloud();
+    const auto handle = [](const std::uint32_t id)
+    {
+        return R::SelectionController::ToEntityHandle(id);
+    };
+    for (const auto id : {mesh, inheriting})
+    {
+        auto& vertices = rig.Scene().Raw().get<GS::Vertices>(handle(id)).Properties;
+        auto heat = vertices.GetOrAdd<float>("heat", 0.0f);
+        for (std::size_t i = 0; i < vertices.Size(); ++i)
+            heat[i] = float(i);
+    }
+    G::VisualizationConfig entityConfig{
+        .Source = G::VisualizationConfig::ColorSource::ScalarField, .ScalarFieldName = "heat"};
+    entityConfig.Scalar.Map = Extrinsic::Graphics::Colormap::Type::Coolwarm;
+    entityConfig.Scalar.AutoRange = false;
+    entityConfig.Scalar.RangeMax = 5.0f;
+    rig.Scene().Raw().emplace<G::VisualizationConfig>(handle(inheriting), entityConfig);
+    const auto surfaceOverride = [&](const std::uint32_t id)
+    {
+        const auto* overrides = rig.Scene().Raw().try_get<G::VisualizationLaneOverrides>(handle(id));
+        return overrides != nullptr && overrides->Surface.has_value();
+    };
+    rig.Run(
+        [&](Client& c)
+        {
+            bool isError = true;
+            const auto undoCount = [&]
+            {
+                return c.Tool("history")["undo_count"].get<int>();
+            };
+            const auto call = [&](const std::uint32_t id, const char* lane, Json extra)
+            {
+                Json arguments{{"entity", id}, {"lane", lane}};
+                arguments.update(extra);
+                return c.Request("tools/call", {{"name", "lane_style"}, {"arguments", arguments}});
+            };
+            const auto read = [&](const std::uint32_t id, const char* lane)
+            {
+                return c.Tool("lane_style", {{"entity", id}, {"lane", lane}}, &isError);
+            };
+            const Json::json_pointer errorCode{"/result/structuredContent/error/code"};
+            const int before = undoCount();
+
+            // A read writes nothing, also on a lane without any config.
+            const auto fresh = read(mesh, "surface");
+            rig.Check(!isError && fresh["status"] == "NoChange" && fresh["entity"] == mesh &&
+                    fresh.value("has_config", true) == false && fresh.contains("style"),
+                "a read: " + fresh.dump());
+            rig.Check(undoCount() == before && !surfaceOverride(mesh), "a read creates no config and no undo step");
+            for (const char* lane : {"edges", "points"})
+                rig.Check(!read(mesh, lane).empty() && !isError, std::string("a mesh's ") + lane + " lane is editable");
+            rig.Check(!read(cloud, "points").empty() && !isError, "a cloud's points lane is editable");
+            const auto noSurface = call(cloud, "surface", Json::object());
+            rig.Check(noSurface.contains(errorCode) && noSurface[errorCode] == "unsupported_geometry_domain",
+                "a cloud has no surface lane: " + noSurface.dump());
+            const auto unknown = call(999999u, "surface", Json::object());
+            rig.Check(unknown.contains(errorCode) && unknown[errorCode] == "stale_entity",
+                "an unknown entity: " + unknown.dump());
+
+            // A refused value changes nothing, even beside a valid one, before any write.
+            const auto mixed = call(mesh, "surface", {{"colormap", "Jet"}, {"range_min", 1e39}});
+            rig.Check(mixed.contains(errorCode) && mixed[errorCode] == "invalid_params", "refused: " + mixed.dump());
+            for (const Json& bad : {Json{{"colormap", "jet"}}, Json{{"range_mni", 2.0}}})
+            {
+                const auto refused = call(mesh, "surface", bad);
+                rig.Check(refused.contains(errorCode) && refused[errorCode] == "invalid_params",
+                    "refused by the schema: " + bad.dump() + " -> " + refused.dump());
+            }
+            rig.Check(undoCount() == before && !surfaceOverride(mesh), "refusals change nothing");
+
+            const auto set = c.Tool("lane_style",
+                Json{{"entity", mesh},
+                    {"lane", "surface"},
+                    {"source", "ScalarField"},
+                    {"scalar_field_name", "heat"},
+                    {"colormap", "Jet"},
+                    {"auto_range", false},
+                    {"range_min", 1.0},
+                    {"range_max", 7.0},
+                    {"bin_count", 6},
+                    {"isoline_count", 4}},
+                &isError);
+            const Json applied = set.value("style", Json::object());
+            rig.Check(!isError && set["status"] == "Applied" && applied.value("colormap", "") == "Jet" &&
+                    applied.value("scalar_field_name", "") == "heat" && applied.value("auto_range", true) == false &&
+                    applied.value("range_max", 0.0) == 7.0 && applied.value("bin_count", 0) == 6 &&
+                    applied.value("isoline_count", 0) == 4,
+                "the declared fields are set: " + set.dump());
+            rig.Check(undoCount() == before + 1 && surfaceOverride(mesh), "the change is one undo step");
+            const auto again = read(mesh, "surface");
+            rig.Check(again.value("style", Json::object()) == applied && again.value("has_config", false) == true,
+                "the lane keeps them: " + again.dump());
+            const auto undone = c.Tool("undo", Json::object(), &isError);
+            rig.Check(!isError && undone.contains("undone") && undone["undone"].size() == 1u, "undo: " + undone.dump());
+            const auto restored = read(mesh, "surface");
+            rig.Check(restored.value("style", Json::object()) == fresh.value("style", Json::object()) &&
+                    restored.value("has_config", true) == false && !surfaceOverride(mesh),
+                "undo restores the style: " + restored.dump());
+
+            // Inheritance: the entity's config shows on its lanes; the same value writes nothing; a
+            // changed one becomes the lane's own complete config, other lanes and the entity's untouched.
+            const auto inherited = read(inheriting, "surface");
+            rig.Check(inherited.value("has_config", false) == true &&
+                    inherited["style"].value("colormap", "") == "Coolwarm" &&
+                    inherited["style"].value("range_max", 0.0) == 5.0,
+                "the lane shows the entity's config: " + inherited.dump());
+            const int beforeInheritance = undoCount();
+            const auto same =
+                c.Tool("lane_style", {{"entity", inheriting}, {"lane", "surface"}, {"colormap", "Coolwarm"}}, &isError);
+            rig.Check(!isError && same["status"] == "NoChange" && undoCount() == beforeInheritance &&
+                    !surfaceOverride(inheriting),
+                "an inherited value written again changes nothing: " + same.dump());
+            const auto own =
+                c.Tool("lane_style", {{"entity", inheriting}, {"lane", "surface"}, {"colormap", "Jet"}}, &isError);
+            rig.Check(!isError && own["status"] == "Applied" && own["style"].value("colormap", "") == "Jet" &&
+                    own["style"].value("range_max", 0.0) == 5.0 && surfaceOverride(inheriting),
+                "a changed value keeps the inherited rest: " + own.dump());
+            Json expected = inherited["style"];
+            expected["colormap"] = "Jet";
+            const auto stored = read(inheriting, "surface");
+            rig.Check(stored.value("style", Json::object()) == expected,
+                "the server stores the inherited rest with only the colormap changed: " + stored.dump());
+            rig.Check(R::SameLaneVisualizationStyle(
+                          rig.Scene().Raw().get<G::VisualizationConfig>(handle(inheriting)), entityConfig),
+                "the entity's config is untouched");
+            rig.Check(
+                read(inheriting, "points")["style"].value("colormap", "") == "Coolwarm", "other lanes still inherit");
+            (void)c.Tool("undo", Json::object(), &isError);
+            rig.Check(!surfaceOverride(inheriting) &&
+                    read(inheriting, "surface")["style"].value("colormap", "") == "Coolwarm",
+                "undo restores inheritance");
         });
 }
 

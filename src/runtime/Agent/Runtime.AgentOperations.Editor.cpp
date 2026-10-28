@@ -50,9 +50,11 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Geometry.Properties.Types;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 
 #include "Agent/internal/Runtime.AgentOperations.Detail.hpp"
 #include "GeometryIntegration/internal/Runtime.GeometryVectorFieldStyleJson.hpp"
+#include "Visualization/internal/Runtime.LaneVisualizationStyleJson.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -729,6 +731,72 @@ namespace Extrinsic::Runtime
                 {"layers", VectorFieldLayersJson(LookupVectorFields(context, *entity).Model)}});
         }
 
+        // RUNTIME-336: a lane's color style through the lane style table (RUNTIME-329): the schema's
+        // style properties, the reading and the checks come from its declared rows; the change runs
+        // the panel's lane config command on the lane's window target (one undo step).
+        AgentOperationOutcome LaneStyle(const AgentOperationContext& context, std::string_view arguments)
+        {
+            constexpr const char* kUsage = "Pass {\"entity\": <stable id>, \"lane\": surface|edges|points} and the "
+                                           "style fields to change (see the schema).";
+            const auto args = ParseObject(arguments);
+            if (!args)
+                return InvalidParams(kUsage);
+            const auto entity = UInt(*args, "entity");
+            const auto lane = ParseLane(String(*args, "lane"));
+            if (!entity || !lane)
+                return InvalidParams(kUsage);
+            const auto prepared = PrepareSnapshot(context);
+            if (!prepared)
+                return Fail(kNoWorkspace);
+            // The panel shows each lane's style in its domain window.
+            const EditorDomainWindowKind kind = *lane == GeometryRenderLane::Surface ? EditorDomainWindowKind::Mesh
+                : *lane == GeometryRenderLane::Edges                                 ? EditorDomainWindowKind::Graph
+                                                     : EditorDomainWindowKind::PointCloud;
+            const auto window = BuildEditorDomainWindowModel(prepared->SnapshotQueries, kind, nullptr, *entity);
+            if (!window.HasSelectedEntity)
+                return UnknownEntity(*entity);
+            // The lane must exist for the entity (a point cloud has no surface), and the commands must run.
+            if (!window.VisualizationTargetAvailable || !window.VisualizationControlsAvailable)
+                return {.IsError = true,
+                    .Text = "Entity " + std::to_string(*entity) + " has no " + LaneName(*lane) + " lane style to edit.",
+                    .ErrorCode = ErrorCodeFor(EditorCommandStatus::UnsupportedGeometryDomain)};
+            Graphics::Components::VisualizationConfig config = window.Visualization.Visualization.Config;
+            Json fields = *args;
+            fields.erase("entity");
+            fields.erase("lane");
+            // A read runs no command: writing back what the panel shows would give a lane without a
+            // config one (has_config: false means the panel's starting point is shown; true, the
+            // lane's own config or the entity's it inherits).
+            if (fields.empty())
+                return Ok({{"status", DebugNameForEditorCommandStatus(EditorCommandStatus::NoChange)},
+                    {"entity", *entity},
+                    {"lane", LaneName(*lane)},
+                    {"has_config", window.Visualization.Visualization.HasConfig},
+                    {"style", LaneVisualizationStyleFieldsJson(config)}});
+            if (!ReadLaneVisualizationStyleFields(fields, config))
+                return InvalidParams("Invalid arguments: a value the lane style refuses; see the schema.");
+
+            const auto visualization = PrepareEditorVisualizationEditingFrame(*context.Attachment);
+            const EditorCommandStatus status = ApplyEditorVisualizationConfigCommand(visualization.Commands,
+                EditorVisualizationConfigCommand{.StableEntityId = *entity,
+                    .Target = window.VisualizationTarget,
+                    .EnableConfig = true,
+                    .Config = config});
+            if (status != EditorCommandStatus::Applied && status != EditorCommandStatus::NoChange)
+                return {.IsError = true,
+                    .Text =
+                        "The lane style command answered " + std::string(DebugNameForEditorCommandStatus(status)) + ".",
+                    .ErrorCode = ErrorCodeFor(status)};
+            // A changed style becomes the lane's own complete config (the panel's command): fields not
+            // passed keep the values the lane showed, inherited ones included, and stop following the
+            // entity's config; undo removes a newly created lane config again.
+            return Ok({{"status", DebugNameForEditorCommandStatus(status)},
+                {"entity", *entity},
+                {"lane", LaneName(*lane)},
+                {"has_config", status == EditorCommandStatus::Applied || window.Visualization.Visualization.HasConfig},
+                {"style", LaneVisualizationStyleFieldsJson(config)}});
+        }
+
         AgentOperationOutcome ShowProperty(const AgentOperationContext& context, std::string_view arguments)
         {
             const auto args = ParseObject(arguments);
@@ -1387,6 +1455,24 @@ namespace Extrinsic::Runtime
             }(),
             false,
             VectorField);
+        add(
+            "lane_style",
+            "Edit lane style",
+            "Set the color style of one render lane of an entity (surface, edges or points) like the Appearance panel's "
+            "visualization section: color source, uniform color, the scalar field and its colormap, auto or manual range, "
+            "bins and isolines, or a color buffer. Every field comes from the declared lane style table and is optional; the "
+            "call changes only the fields passed, as one undoable step, and replies with the lane's resulting style (a "
+            "call without style fields changes nothing and returns it). Refusals: invalid_params for a value the table "
+            "refuses, otherwise the snake-case command status as error code.",
+            []
+            {
+                Json schema = Json::parse(Schema(
+                    "{" + kEntityProperty + "," + LaneProperty("The render lane.") + "}", R"(["entity","lane"])"));
+                schema["properties"].update(LaneVisualizationStyleSchemaProperties());
+                return Dump(schema);
+            }(),
+            false,
+            LaneStyle);
         add("set_visibility",
             "Set visibility",
             "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points / Bounding box checkboxes; by default the "

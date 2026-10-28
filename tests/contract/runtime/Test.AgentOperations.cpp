@@ -1361,7 +1361,7 @@ TEST(AgentArgumentSchema, EveryRegisteredSchemaIsSupportedAndClosed)
              "select_entity", "set_camera", "set_visibility", "show_property", "undo", "vector_field", "vector_fields", "view_capture",
              "view_screenshot"})
         EXPECT_NE(registry.Find(name), nullptr) << name;
-    EXPECT_EQ(registry.Entries().size(), 47u);
+    EXPECT_EQ(registry.Entries().size(), 48u);
     for (const auto& spec : registry.Entries())
     {
         SCOPED_TRACE(spec.Name);

@@ -439,10 +439,14 @@ TEST(DeclaredFieldContracts, VectorFieldStyle)
     });
 }
 
-// The lane style has no agent surface, so no schema is compared.
 TEST(DeclaredFieldContracts, LaneVisualizationStyle)
 {
     using Config = Extrinsic::Graphics::Components::VisualizationConfig;
+    // RUNTIME-336: the lane_style agent tool offers the table, so its schema is checked too.
+    R::AgentOperationRegistry registry;
+    R::RegisterEditorAgentOperations(registry);
+    const auto* tool = registry.Find("lane_style");
+    ASSERT_NE(tool, nullptr);
     CheckEveryRow<Config>({
         .Fields = R::LaneVisualizationStyleFields(),
         .Defaults = {},
@@ -461,5 +465,7 @@ TEST(DeclaredFieldContracts, LaneVisualizationStyle)
         {
             return R::ReadLaneVisualizationStyleJson(R::LaneVisualizationStyleToJson(from), to);
         },
+        .Schema = tool->InputSchemaJson,
+        .Envelope = {{"entity", 1}, {"lane", "surface"}},
     });
 }
