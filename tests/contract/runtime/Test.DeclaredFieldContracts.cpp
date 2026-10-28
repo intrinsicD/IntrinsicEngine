@@ -41,7 +41,9 @@ namespace
     {
         Json Value;
         bool Accepted{false};
-        bool Direct{false}; // not expressible as JSON text (NaN, infinity): checked on the reader only
+        // Checked on the reader only: NaN and infinity (no JSON text) and doubles a float cannot hold,
+        // which the agent schema's "number" still offers.
+        bool ReaderOnly{false};
     };
 
     constexpr float kInf = std::numeric_limits<float>::infinity();
@@ -90,6 +92,11 @@ namespace
                 field.Min ? (field.ExclusiveMin ? std::floor(*field.Min) + 1.0 : std::ceil(*field.Min)) : 0.0, 0.0);
             const double hi = std::min(
                 field.Max ? (field.ExclusiveMax ? std::ceil(*field.Max) - 1.0 : std::floor(*field.Max)) : kMax, kMax);
+            if (!std::isfinite(lo) || !std::isfinite(hi) || lo > hi)
+            {
+                ADD_FAILURE() << field.Name << ": an empty or non-finite UInt range is not generated";
+                return cases;
+            }
             const auto u = [](const double v)
             {
                 return Json(static_cast<std::uint64_t>(v));
@@ -117,6 +124,20 @@ namespace
                 add(double(-1e30f), true);
             if (!field.Max)
                 add(double(1e30f), true);
+            // The tables tested here store Float rows as float: a double past float range, or so close
+            // to an exclusive bound that the stored float is the bound, is refused as stored.
+            std::vector<double> narrow;
+            if (!field.Min)
+                narrow.push_back(-1e39);
+            if (!field.Max)
+                narrow.push_back(1e39);
+            if (field.Min && field.ExclusiveMin)
+                narrow.push_back(std::nextafter(*field.Min, std::numeric_limits<double>::infinity()));
+            if (field.Max && field.ExclusiveMax)
+                narrow.push_back(std::nextafter(*field.Max, -std::numeric_limits<double>::infinity()));
+            for (const double x : narrow)
+                if (const float stored = float(x); !std::isfinite(stored) || !Inside(field, stored))
+                    cases.push_back({Json::parse(Json(x).dump()), false, true});
             const double integer = field.Min ? std::floor(*field.Min) + 1.0 : 1.0;
             add(Json(static_cast<std::int64_t>(integer)), Inside(field, integer));
             add("1", false);
@@ -163,7 +184,7 @@ namespace
             const auto refused = std::ranges::find_if(items,
                 [](const FieldCase& c)
                 {
-                    return !c.Accepted && !c.Direct;
+                    return !c.Accepted && !c.ReaderOnly;
                 });
             if (fill == items.end() || refused == items.end())
             {
@@ -198,7 +219,7 @@ namespace
             {
                 Json array = filled(n);
                 array[n - 1u] = item.Value;
-                if (item.Direct)
+                if (item.ReaderOnly)
                     cases.push_back({std::move(array), item.Accepted, true});
                 else
                     add(array, item.Accepted);
@@ -261,7 +282,7 @@ namespace
             for (const FieldCase& c : rows[row])
             {
                 const std::string label = name + "=" + c.Value.dump();
-                if (!table.Schema.empty() && !c.Direct)
+                if (!table.Schema.empty() && !c.ReaderOnly)
                 {
                     Json arguments = table.Envelope;
                     arguments[name] = c.Value;
@@ -329,6 +350,8 @@ TEST(DeclaredFieldContracts, GeneratorCases)
     const auto wide = CasesFor({.Name = "w", .Type = FT::UInt, .Min = -2.0, .Max = 1e10});
     EXPECT_EQ(VerdictOf(wide, "0"), true);
     EXPECT_EQ(VerdictOf(wide, "4294967296"), false);
+    static const R::ConfigFieldSpec kEmpty{.Name = "z", .Type = FT::UInt, .Max = -2.0};
+    EXPECT_NONFATAL_FAILURE((void)CasesFor(kEmpty), "empty or non-finite UInt range");
 
     const R::ConfigFieldSpec unit{.Name = "t", .Type = FT::Float, .Min = 0.0, .Max = 1.0, .ExclusiveMin = true};
     const auto units = CasesFor(unit);
@@ -343,11 +366,19 @@ TEST(DeclaredFieldContracts, GeneratorCases)
     EXPECT_TRUE(std::ranges::any_of(units,
         [](const FieldCase& c)
         {
-            return c.Direct && !c.Accepted;
+            return c.ReaderOnly && !c.Accepted;
         }));
     const auto open = CasesFor({.Name = "x", .Type = FT::Float});
     EXPECT_EQ(VerdictOf(open, Json(double(1e30f)).dump()), true);
     EXPECT_EQ(VerdictOf(open, Json(double(-1e30f)).dump()), true);
+    for (const auto& [cases, x] :
+        {std::pair{&open, 1e39}, std::pair{&open, -1e39}, std::pair{&units, std::nextafter(0.0, 1.0)}})
+        EXPECT_TRUE(std::ranges::any_of(*cases,
+            [x](const FieldCase& c)
+            {
+                return c.ReaderOnly && !c.Accepted && c.Value.dump() == Json(x).dump();
+            }))
+            << x << " is refused as the float it would be stored as";
 
     static constexpr std::array<std::string_view, 2> kTokens{"a", "B"};
     const auto tokens = CasesFor({.Name = "e", .Type = FT::StringEnum, .EnumValues = kTokens});

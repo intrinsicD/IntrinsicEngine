@@ -17,8 +17,9 @@ extern "C++"
         [[nodiscard]] nlohmann::json GeometryVectorFieldStyleToJson(
             const GeometryVectorFieldLayerRecipe& layer, GeometryVectorFieldStyleKeys keys);
         // Applies the style keys present in `object` (Scene: the keys scenes have always written
-        // are required) after checking each value's type and declared range; other keys are
-        // ignored. On a refused value `layer` is unchanged and the reason is returned.
+        // are required) after checking each value's type and declared range, as sent and as
+        // stored (a double a float cannot hold is refused); other keys are ignored. On a refused
+        // value `layer` is unchanged and the reason is returned.
         [[nodiscard]] std::optional<std::string> ReadGeometryVectorFieldStyleJson(
             const nlohmann::json& object, GeometryVectorFieldLayerRecipe& layer, GeometryVectorFieldStyleKeys keys);
         // JSON Schema `properties` of the style in agent names (types, bounds, enums, descriptions).

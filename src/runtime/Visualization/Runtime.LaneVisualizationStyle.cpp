@@ -282,9 +282,18 @@ extern "C++"
         {
             if (!values.is_object() || !ConfigDetail::CollectDeclaredFieldErrors(values, kSpecs).empty())
                 return false;
+            // The stored floats are checked too: 1e39 would become infinity.
+            Config applied = config;
+            Json stored = Json::object();
             for (const Row& row : kRows)
                 if (const auto it = values.find(std::string(row.Spec.Name)); it != values.end())
-                    row.Set(*it, config);
+                {
+                    row.Set(*it, applied);
+                    stored[std::string(row.Spec.Name)] = row.Get(applied, Encoding::Strict);
+                }
+            if (!ConfigDetail::CollectDeclaredFieldErrors(stored, kSpecs).empty())
+                return false;
+            config = std::move(applied);
             return true;
         }
     }

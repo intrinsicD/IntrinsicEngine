@@ -20,7 +20,8 @@ extern "C++"
         [[nodiscard]] nlohmann::json LaneVisualizationStyleFieldsJson(
             const Graphics::Components::VisualizationConfig& config);
         // Applies the fields present in `values` (by spec name, other keys ignored) after checking
-        // each; a refused value leaves `config` unchanged. The scene reader's core.
+        // each as sent and as stored (a double a float cannot hold is refused); a refused value
+        // leaves `config` unchanged. The scene reader's core.
         [[nodiscard]] bool ReadLaneVisualizationStyleFields(
             const nlohmann::json& values, Graphics::Components::VisualizationConfig& config);
     }

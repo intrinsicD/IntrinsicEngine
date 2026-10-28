@@ -153,8 +153,25 @@ python3 tools/agents/generate_session_brief.py --check
   O1-O4 done: item probes use two positions where the length allows; UInt ranges are cut to the
   32-bit domain; `GeneratorCases` covers Bool and String; a refused case carries the changes of the
   rows before and after it. Re-verified after them (focused suites and all eight mutations).
-- Open gap (B2, not changed): a finite double outside float range, e.g. `"length": 1e39`, passes
-  the declared check, then the setter stores infinity, which the command check refuses later; the
-  same holds for the lane's unbounded floats in scene files. Found by reading the code, not run.
-  Fix candidate: the Float check refuses values a float cannot hold, for float-backed rows. Operator
-  decision.
+- Gap (B2), recorded at first: a finite double outside float range, e.g. `"length": 1e39`, passed
+  the declared check, then the setter stored infinity, which the command check refused later; the
+  same for the lane's unbounded floats in scene files.
+- 2026-10-28: Operator: fix the gap ("Mach 1 - 3."). Not in the shared `CheckField`: some Float
+  rows are double-backed (`CoherentPointDriftConfig` `Tolerance`, `Sigma2Floor`). The two float-backed
+  readers (`ReadGeometryVectorFieldStyleJson`, `ReadLaneVisualizationStyleFields`) now apply to a
+  copy and check the applied fields once more as stored, then commit; this also refuses a double just
+  above an exclusive 0 (`length` 5e-324 would store 0). The generator adds these doubles (±1e39 on an
+  open side, `nextafter` inside an exclusive bound when the stored float lands on it) as reader-only
+  cases: the agent schema's `number` still offers them. Deferred, not inexpressible (Codex): exact
+  per-row bounds would be `-T < x < T` with `T = 2^128 - 2^103` (binary32 round to nearest), and
+  for `length` also `x > 2^-150`; plain `FLT_MAX`/`denorm_min` would refuse values that round
+  validly. The reader refuses before any change, so the broader schema loses nothing but an early
+  message. Before the fix both table tests failed on exactly these cases (`length` 1e39 and
+  5e-324, `color_range`, `range_min`/`range_max`, `isoline_width`, lane `color`, `isoline_color`,
+  `isoline_values`), `GeneratorCases` passed; after it the focused suites
+  `DeclaredFieldContracts|VectorFieldStyle|SandboxEditorUi|RuntimeSceneSerialization|AgentOperations`
+  pass 310/310. Other float-backed config owners were not surveyed for the same gap.
+- 2026-10-28: Codex review of the gap fix and of O1-O4 as committed in `cdbb3b885` (gap-fix diff
+  sha256 `5908f5c7…`): approve, no blocking finding. Optional: O1 an empty or non-finite UInt
+  range now fails the generator with a diagnostic instead of a cast (asserted in `GeneratorCases`);
+  O2 the schema gap described as deferred above.

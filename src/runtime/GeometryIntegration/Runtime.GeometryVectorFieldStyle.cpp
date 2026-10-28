@@ -202,9 +202,19 @@ extern "C++"
             }
             if (const auto errors = ConfigDetail::CollectDeclaredFieldErrors(values, kSpecs); !errors.empty())
                 return errors.front().Message;
+            // The stored floats are checked too: 1e39 would become infinity, a double just above an
+            // exclusive 0 would become 0.
+            Layer applied = layer;
+            Json stored = Json::object();
             for (const Row& row : kRows)
                 if (const auto it = values.find(std::string(row.Spec.Name)); it != values.end())
-                    row.Set(*it, layer);
+                {
+                    row.Set(*it, applied);
+                    stored[std::string(row.Spec.Name)] = row.Get(applied);
+                }
+            if (const auto errors = ConfigDetail::CollectDeclaredFieldErrors(stored, kSpecs); !errors.empty())
+                return errors.front().Message;
+            layer = std::move(applied);
             return std::nullopt;
         }
 
