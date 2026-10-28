@@ -7,7 +7,8 @@
 // record's buffer addresses; camera matrices and viewport come from the
 // GpuScene table. Nothing is expanded on the CPU.
 //
-// Contract with `VisualizationVectorFieldDrawRecord` (scalar layout):
+// Contract with `VisualizationVectorFieldDrawRecord` (scalar layout; both
+// structs come from common/vector_field_draw_record.glsl):
 //   * vectors are ordinary object-space vectors; the tip is
 //     anchor + Scale * (normalize ? normalize(v) : v), and both endpoints are
 //     transformed by ObjectToWorld (no normal-vector transform);
@@ -37,25 +38,16 @@
 
 #include "common/gpu_scene.glsl"
 
+#define VF_RECORD_PACKET(type, name) type name;
+#define VF_RECORD_STYLE(type, name) type name;
+#define VF_RECORD_DERIVED(type, name) type name;
 struct VectorFieldDrawRecord
 {
-    mat4 ObjectToWorld;
-    uint64_t PositionBufferBDA;
-    uint64_t VectorBufferBDA;
-    uint64_t RowBufferBDA;
-    uint ElementCount;
-    uint RowCount;
-    uint RowStride;
-    uint PackedColor;
-    float Scale;
-    float LineWidthPx;
-    uint Flags;
-    uint ColormapID;
-    uint64_t LengthBufferBDA;
-    uint64_t ColorBufferBDA;
-    float ColorRangeMin;
-    float ColorRangeMax;
+#include "common/vector_field_draw_record.glsl"
 };
+#undef VF_RECORD_PACKET
+#undef VF_RECORD_STYLE
+#undef VF_RECORD_DERIVED
 
 layout(buffer_reference, scalar) readonly buffer VectorFieldDrawRecordRef
 {

@@ -590,7 +590,12 @@ TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryPacketStateAndStri
 // and the colormap range; a named style buffer that did not resolve skips the packet.
 TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryLengthAndColorBuffers)
 {
+    // The bytes the shader reads (GRAPHICS-165 keeps them); a reordered or retyped row moves them.
     static_assert(sizeof(Graphics::VisualizationVectorFieldDrawRecord) == 144u);
+    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, ColormapID) == 116u);
+    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, LengthBufferBDA) == 120u);
+    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, ColorBufferBDA) == 128u);
+    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, ColorRangeMax) == 140u);
     Graphics::VectorFieldOverlayPacket colormap{
         .Name = "Test.VectorField.Colormap",
         .ElementCount = 4u,

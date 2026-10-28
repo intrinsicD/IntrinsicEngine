@@ -11,6 +11,7 @@ picking backlog work; theme priorities and rationale live in
 - `ARCH-020` — Moonshot program tracker (tasks/active/ARCH-020-moonshot-program-tracker.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
+- `GRAPHICS-165` — The vector-field draw record is declared once (moonshot M2, slice 6) (tasks/active/GRAPHICS-165-vector-field-draw-record-declared-once.md)
 - `HARDEN-090` — Consolidated src audit remediation (tasks/active/HARDEN-090-src-audit-remediation.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)

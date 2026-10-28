@@ -127,26 +127,20 @@ namespace Extrinsic::Graphics
             }
             result.RecordIndexForPacket[packetIndex] =
                 static_cast<std::uint32_t>(records.size());
-            records.push_back(VisualizationVectorFieldDrawRecord{
-                .ObjectToWorld = packet.ObjectToWorld,
-                .PositionBufferBDA = packet.PositionBufferBDA,
-                .VectorBufferBDA = packet.VectorBufferBDA,
-                .RowBufferBDA = packet.RowBufferBDA,
-                .ElementCount = packet.ElementCount,
-                .RowCount = packet.RowCount,
-                .RowStride = packet.RowStride,
-                .PackedColor = PackVertexColorUnorm4x8(packet.Style.Color),
-                .Scale = packet.Style.Scale,
-                .LineWidthPx = packet.Style.LineWidthPx,
-                .Flags = (packet.Style.NormalizeLength ? kVisualizationVectorFieldNormalizeFlag : 0u) |
-                    (packet.ColorMode == VectorFieldColorMode::Colormap ? kVisualizationVectorFieldColormapFlag : 0u) |
-                    (packet.ColorMode == VectorFieldColorMode::Rgba ? kVisualizationVectorFieldRgbaFlag : 0u),
-                .ColormapID = packet.ColorMode == VectorFieldColorMode::Colormap ? packet.ColormapBindlessIndex : 0u,
-                .LengthBufferBDA = packet.LengthBufferBDA,
-                .ColorBufferBDA = packet.ColorMode != VectorFieldColorMode::Uniform ? packet.ColorBufferBDA : 0u,
-                .ColorRangeMin = packet.Style.ColorRangeMin,
-                .ColorRangeMax = packet.Style.ColorRangeMax,
-            });
+            VisualizationVectorFieldDrawRecord& record = records.emplace_back();
+#define VF_RECORD_PACKET(type, name) record.name = packet.name;
+#define VF_RECORD_STYLE(type, name) record.name = packet.Style.name;
+#define VF_RECORD_DERIVED(type, name)
+#include "common/vector_field_draw_record.glsl"
+#undef VF_RECORD_PACKET
+#undef VF_RECORD_STYLE
+#undef VF_RECORD_DERIVED
+            record.PackedColor = PackVertexColorUnorm4x8(packet.Style.Color);
+            record.Flags = (packet.Style.NormalizeLength ? kVisualizationVectorFieldNormalizeFlag : 0u) |
+                (packet.ColorMode == VectorFieldColorMode::Colormap ? kVisualizationVectorFieldColormapFlag : 0u) |
+                (packet.ColorMode == VectorFieldColorMode::Rgba ? kVisualizationVectorFieldRgbaFlag : 0u);
+            record.ColormapID = packet.ColorMode == VectorFieldColorMode::Colormap ? packet.ColormapBindlessIndex : 0u;
+            record.ColorBufferBDA = packet.ColorMode != VectorFieldColorMode::Uniform ? packet.ColorBufferBDA : 0u;
         }
         if (records.empty())
         {

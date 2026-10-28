@@ -21,33 +21,34 @@ extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 export namespace Extrinsic::Graphics
 {
     // One record per renderable vector-field packet, read by
-    // `visualization_vector_field.vert` through the record buffer address
-    // (scalar layout; field order and offsets are part of the shader contract).
+    // `visualization_vector_field.vert` through the record buffer address. The rows
+    // are declared once in `assets/shaders/common/vector_field_draw_record.glsl`
+    // (GRAPHICS-165), which also gives the shader its struct and the upload helper its
+    // fill; every record is filled from its packet.
     struct VisualizationVectorFieldDrawRecord
     {
-        glm::mat4 ObjectToWorld{1.0f};
-        std::uint64_t PositionBufferBDA{0u};
-        std::uint64_t VectorBufferBDA{0u};
-        std::uint64_t RowBufferBDA{0u};
-        std::uint32_t ElementCount{0u};
-        std::uint32_t RowCount{0u};
-        std::uint32_t RowStride{1u};
-        std::uint32_t PackedColor{0u};
-        float Scale{1.0f};
-        float LineWidthPx{1.0f};
-        std::uint32_t Flags{0u};
-        std::uint32_t ColormapID{0u};
-        // Per-element float multipliers / colormap scalars or vec4 colors; 0 = none.
-        std::uint64_t LengthBufferBDA{0u};
-        std::uint64_t ColorBufferBDA{0u};
-        float ColorRangeMin{0.0f};
-        float ColorRangeMax{1.0f};
+        // The row file's GLSL type names.
+        using mat4 = glm::mat4;
+        using uint = std::uint32_t;
+        using uint64_t = std::uint64_t;
+#define VF_RECORD_PACKET(type, name) type name{};
+#define VF_RECORD_STYLE(type, name) type name{};
+#define VF_RECORD_DERIVED(type, name) type name{};
+#include "common/vector_field_draw_record.glsl"
+#undef VF_RECORD_PACKET
+#undef VF_RECORD_STYLE
+#undef VF_RECORD_DERIVED
     };
-    static_assert(sizeof(VisualizationVectorFieldDrawRecord) == 144u);
-    static_assert(offsetof(VisualizationVectorFieldDrawRecord, ColormapID) == 116u);
-    static_assert(offsetof(VisualizationVectorFieldDrawRecord, LengthBufferBDA) == 120u);
-    static_assert(offsetof(VisualizationVectorFieldDrawRecord, ColorBufferBDA) == 128u);
-    static_assert(offsetof(VisualizationVectorFieldDrawRecord, ColorRangeMax) == 140u);
+    // Each row type has its GLSL scalar size and alignment, so C++'s layout (each member
+    // aligned to its type, the struct to its largest member) is GLSL's scalar layout,
+    // padding and array stride included, for any rows.
+    static_assert(sizeof(VisualizationVectorFieldDrawRecord::mat4) == 64u &&
+        alignof(VisualizationVectorFieldDrawRecord::mat4) == 4u);
+    static_assert(sizeof(VisualizationVectorFieldDrawRecord::uint64_t) == 8u &&
+        alignof(VisualizationVectorFieldDrawRecord::uint64_t) == 8u);
+    static_assert(sizeof(VisualizationVectorFieldDrawRecord::uint) == 4u &&
+        alignof(VisualizationVectorFieldDrawRecord::uint) == 4u);
+    static_assert(sizeof(float) == 4u && alignof(float) == 4u);
 
     inline constexpr std::uint32_t kVisualizationVectorFieldNormalizeFlag = 1u;
     // The color buffer holds colormap scalars / RGBA colors.
