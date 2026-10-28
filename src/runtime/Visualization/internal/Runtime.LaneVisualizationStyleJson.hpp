@@ -1,4 +1,5 @@
-// JSON side of the lane visualization style table (RUNTIME-329): the scene file's keys.
+// JSON side of the lane visualization style table (RUNTIME-329): the scene file's keys, and the
+// flat object by spec name the scene reader checks (RUNTIME-330 generates its tests from it).
 // Include after <nlohmann/json.hpp> and `import Extrinsic.Graphics.Component.VisualizationConfig;`.
 #pragma once
 
@@ -15,5 +16,12 @@ extern "C++"
         // leaves `config` unchanged.
         [[nodiscard]] bool ReadLaneVisualizationStyleJson(
             const nlohmann::json& value, Graphics::Components::VisualizationConfig& config);
+        // Every field by spec name; an enum outside its tokens keeps its number (what the check reads).
+        [[nodiscard]] nlohmann::json LaneVisualizationStyleFieldsJson(
+            const Graphics::Components::VisualizationConfig& config);
+        // Applies the fields present in `values` (by spec name, other keys ignored) after checking
+        // each; a refused value leaves `config` unchanged. The scene reader's core.
+        [[nodiscard]] bool ReadLaneVisualizationStyleFields(
+            const nlohmann::json& values, Graphics::Components::VisualizationConfig& config);
     }
 }

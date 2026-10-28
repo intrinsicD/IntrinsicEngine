@@ -1301,6 +1301,7 @@ if(TARGET ExtrinsicRuntime)
         Test.AgentOperations.cpp
         Test.DiagnosticsStream.cpp
         Test.VectorFieldStyle.cpp
+        Test.DeclaredFieldContracts.cpp
         Test.ViewCapture.cpp
         Test.LaplacianEigenbasisOperations.cpp
         Test.HarmonicFieldOperations.cpp

@@ -247,7 +247,7 @@ extern "C++"
         {
             if (!value.is_object() || !value.contains("source"))
                 return false;
-            // Gather the present keys by spec name, check them all, then apply all or nothing.
+            // Gather the present keys by spec name; the flat reader checks them all, then applies all or nothing.
             Json values = Json::object();
             for (const Row& row : kRows)
             {
@@ -270,7 +270,17 @@ extern "C++"
                 if (present)
                     values[std::string(row.Spec.Name)] = *node;
             }
-            if (!ConfigDetail::CollectDeclaredFieldErrors(values, kSpecs).empty())
+            return ReadLaneVisualizationStyleFields(values, config);
+        }
+
+        Json LaneVisualizationStyleFieldsJson(const Config& config)
+        {
+            return Flat(config, Encoding::Strict);
+        }
+
+        bool ReadLaneVisualizationStyleFields(const Json& values, Config& config)
+        {
+            if (!values.is_object() || !ConfigDetail::CollectDeclaredFieldErrors(values, kSpecs).empty())
                 return false;
             for (const Row& row : kRows)
                 if (const auto it = values.find(std::string(row.Spec.Name)); it != values.end())

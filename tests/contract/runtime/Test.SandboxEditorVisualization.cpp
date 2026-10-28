@@ -2425,7 +2425,9 @@ TEST(SandboxEditorUi, VectorFieldCommandRejectsBadColormapsAndRanges)
     AddTriangleMeshSource(registry, mesh);
     registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    const Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
     const auto apply = [&](const Op op, Runtime::GeometryVectorFieldLayerRecipe layer)
     {
         return Runtime::ApplyEditorGeometryVectorFieldCommand(context,
@@ -2470,6 +2472,7 @@ TEST(SandboxEditorUi, VectorFieldCommandRejectsBadColormapsAndRanges)
             l.ColorRangeMin = std::numeric_limits<float>::quiet_NaN();
         }));
     EXPECT_EQ(*FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal"), base);
+    EXPECT_EQ(history.UndoCount(), 1u) << "a refused command records no undo step";
 
     Runtime::GeometryVectorFieldLayerRecipe valid = base;
     valid.ColorMap = Graphics::Colormap::Type::Jet;
@@ -2477,6 +2480,7 @@ TEST(SandboxEditorUi, VectorFieldCommandRejectsBadColormapsAndRanges)
     valid.ColorRangeMin = 10.0f;
     valid.ColorRangeMax = 20.0f;
     ASSERT_EQ(apply(Op::Update, valid), Runtime::EditorCommandStatus::Applied);
+    EXPECT_EQ(history.UndoCount(), 2u);
     EXPECT_EQ(*FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal"), valid);
 }
 
@@ -2786,6 +2790,8 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRefusesUndeclaredValues)
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
+    Runtime::EditorCommandHistory history;
+    context.CommandHistory = &history;
 
     const Runtime::EditorVisualizationConfigCommand valid{
         .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
@@ -2811,6 +2817,7 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRefusesUndeclaredValues)
             Runtime::EditorCommandStatus::InvalidVisualizationProperty);
         EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
     }
+    EXPECT_EQ(history.UndoCount(), 1u) << "a refused command records no undo step";
 
     // Numbers compare as numbers: -0 equals the stored 0, so nothing changes.
     auto negativeZero = valid;
@@ -2822,5 +2829,6 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRefusesUndeclaredValues)
     manyValues.Config.Scalar.Isolines.ValueCount = 20u;
     EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, manyValues), Runtime::EditorCommandStatus::Applied);
     EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Scalar.Isolines.ValueCount, 8u);
+    EXPECT_EQ(history.UndoCount(), 2u);
     EXPECT_EQ(Runtime::LaneVisualizationStyleFields().size(), 17u) << "serialized leaf fields";
 }
