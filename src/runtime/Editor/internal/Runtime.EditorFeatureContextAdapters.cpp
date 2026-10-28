@@ -51,6 +51,7 @@ import Extrinsic.Runtime.VertexAttributeBinding;
 import Geometry.Properties;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -269,12 +270,6 @@ namespace
         reason +=
             " importer supports this format; choose a supported asset format.";
         return reason;
-    }
-
-    [[nodiscard]] bool IsScalarVisualizationKind(
-        const Geometry::PropertyValueKind kind) noexcept
-    {
-        return GeometryPropertyComponentCount(kind) == 1u;
     }
 
     [[nodiscard]] bool DomainSupportsVisualizationConfig(
@@ -934,39 +929,20 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
 
         for (const std::string& name : properties.Properties())
         {
-            const Geometry::PropertyValueKind kind =
-                DetectGeometryPropertyValueKind(properties, name);
-            if (kind == Geometry::PropertyValueKind::Unknown)
+            // RUNTIME-335: the rule the encoder applies to the same scalar and color recipes.
+            const auto lane = FindLaneVisualizationProperty(properties, ToGeometryElementDomain(domain), name);
+            if (!lane)
                 continue;
-
-            const bool connectivity =
-                IsTopologyProperty(ToGeometryElementDomain(domain), name);
-            const bool scalar =
-                !connectivity && IsScalarVisualizationKind(kind);
-            const bool color =
-                !connectivity &&
-                (kind == Geometry::PropertyValueKind::Vec2 ||
-                 kind == Geometry::PropertyValueKind::Vec3 ||
-                 kind == Geometry::PropertyValueKind::Vec4);
-            const bool vector =
-                !connectivity && kind == Geometry::PropertyValueKind::Vec3;
-            const bool integer =
-                !connectivity && IsScalarVisualizationKind(kind);
-            if (!scalar && !color && !vector && !integer)
-            {
-                continue;
-            }
-
             out.push_back(EditorVisualizationPropertyInfo{
                 .Name = name,
                 .Domain = domain,
                 .ElementDomain = ToGeometryElementDomain(domain),
-                .ValueKind = kind,
+                .ValueKind = lane->Kind,
                 .ElementCount = properties.Size(),
-                .ScalarPresetAvailable = scalar,
-                .IsolinePresetAvailable = scalar,
-                .ColorBufferPresetAvailable = color || integer,
-                .VectorFieldCandidate = vector,
+                .ScalarPresetAvailable = lane->Scalar,
+                .IsolinePresetAvailable = lane->Scalar,
+                .ColorBufferPresetAvailable = lane->ColorBuffer,
+                .VectorFieldCandidate = lane->Kind == Geometry::PropertyValueKind::Vec3,
             });
         }
     }

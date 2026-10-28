@@ -235,6 +235,19 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view ToString(
         VisualizationRecipeStatus status) noexcept;
 
+    // RUNTIME-335: what a property can show as on a lane: a scalar field (one component) and a
+    // color buffer (one component as labels, or a vec2/vec3/vec4 color); a property of unknown kind
+    // or a connectivity/deletion row shows as neither. The one rule behind the lane panel's
+    // candidates, show_property's check and the scalar and color recipes below.
+    struct LaneVisualizationProperty
+    {
+        Geometry::PropertyValueKind Kind{Geometry::PropertyValueKind::Unknown};
+        bool Scalar{false};
+        bool ColorBuffer{false};
+    };
+    [[nodiscard]] std::optional<LaneVisualizationProperty> FindLaneVisualizationProperty(
+        const Geometry::PropertySet& properties, GeometryElementDomain domain, std::string_view name);
+
     [[nodiscard]] VisualizationEncodingResult EncodeVisualizationRecipe(
         const GeometryEntityAvailability& availability,
         const VisualizationRecipe& recipe);

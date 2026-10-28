@@ -77,6 +77,7 @@ import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
@@ -2318,6 +2319,83 @@ TEST(SandboxEditorProgressivePoisson, AdmissionUsesMetadataAndExecutionChecksFin
     EXPECT_NE(result.Message.find("finite"), std::string::npos);
     EXPECT_FALSE(properties.Exists(command.Config.Level.Name));
     EXPECT_TRUE(std::isinf(positions.Vector()[1].x));
+}
+
+// RUNTIME-335: the lane and the encoder share kind and topology eligibility: for every property of
+// the vertex and edge domains (valid values, default options), the lane offers it as a scalar field
+// or as a color buffer exactly when the encoder accepts it as that recipe. Values are still checked
+// by the encoder alone (a float label of 0.5 is offered but does not encode).
+TEST(SandboxEditorUi, LanePropertyCandidatesAreExactlyWhatTheEncoderAccepts)
+{
+    using Domain = Runtime::EditorVisualizationPropertyDomain;
+    using D = Runtime::GeometryElementDomain;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "LaneCandidates");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    (void)vertices.GetOrAdd<bool>("v:b", true);
+    (void)vertices.GetOrAdd<std::int32_t>("v:i", 1);
+    (void)vertices.GetOrAdd<std::int64_t>("v:i64", 1);
+    (void)vertices.GetOrAdd<std::uint32_t>("v:u", 1u);
+    (void)vertices.GetOrAdd<std::uint64_t>("v:q", 1u);
+    (void)vertices.GetOrAdd<float>("v:f", 1.0f);
+    (void)vertices.GetOrAdd<double>("v:d", 1.0);
+    (void)vertices.GetOrAdd<glm::vec2>("v:uv", glm::vec2{0.5f});
+    (void)vertices.GetOrAdd<glm::vec4>("v:rgba", glm::vec4{1.0f});
+    (void)vertices.GetOrAdd<bool>("v:deleted", false); // a topology property
+    vertices.GetOrAdd<float>("v:short", 1.0f).Vector().resize(vertices.Size() - 1u);
+    auto& edges = registry.Raw().get<GS::Edges>(mesh).Properties;
+    (void)edges.GetOrAdd<float>("e:f", 1.0f);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    const Runtime::EditorWorkspaceSnapshot snapshot = Runtime::BuildEditorWorkspaceSnapshot(context);
+    const Runtime::GeometryEntityAvailability availability = Runtime::BuildGeometryAvailability(registry.Raw(), mesh);
+
+    std::size_t offeredCount = 0u;
+    for (const auto& [domain, elementDomain, set] : {std::tuple{Domain::MeshVertices, D::MeshVertex, &vertices},
+             std::tuple{Domain::MeshEdges, D::MeshEdge, &edges}})
+    {
+        for (const std::string& name : set->Properties())
+        {
+            const auto* info = FindVisualizationProperty(snapshot.Visualization.Properties, domain, name);
+            const bool scalarOffered = info != nullptr && info->ScalarPresetAvailable;
+            const bool colorOffered = info != nullptr && info->ColorBufferPresetAvailable;
+            offeredCount += scalarOffered || colorOffered ? 1u : 0u;
+            const Runtime::GeometryPropertyRef source{elementDomain, name, Geometry::PropertyValueKind::Unknown};
+            const bool scalarEncoded = Runtime::EncodeVisualizationRecipe(availability,
+                {.Data = Runtime::ScalarVisualizationRecipe{.Source = source,
+                     .OutputName = name}}).Succeeded();
+            const bool colorEncoded = Runtime::EncodeVisualizationRecipe(availability,
+                {.Data = Runtime::ColorVisualizationRecipe{.Source = source,
+                     .OutputName = name}}).Succeeded();
+            EXPECT_EQ(scalarEncoded, scalarOffered) << "scalar " << name;
+            EXPECT_EQ(colorEncoded, colorOffered) << "color " << name;
+        }
+    }
+    EXPECT_GE(offeredCount, 11u) << "the six scalars, v:uv, v:rgba, the positions, normals and e:f";
+    // A topology row is refused as a source type, not reported missing.
+    const Runtime::GeometryPropertyRef deleted{D::MeshVertex, "v:deleted", Geometry::PropertyValueKind::Unknown};
+    EXPECT_EQ(Runtime::EncodeVisualizationRecipe(availability,
+                  {.Data = Runtime::ScalarVisualizationRecipe{.Source = deleted, .OutputName = "v:deleted"}})
+                  .Status,
+        Runtime::VisualizationRecipeStatus::UnsupportedSourceType);
+    EXPECT_EQ(Runtime::EncodeVisualizationRecipe(availability,
+                  {.Data = Runtime::ColorVisualizationRecipe{.Source = deleted, .OutputName = "v:deleted"}})
+                  .Status,
+        Runtime::VisualizationRecipeStatus::UnsupportedSourceType);
+    // A domain the encoder does not visualize keeps its own status, before the property rule.
+    const Runtime::GeometryPropertyRef halfedge{D::MeshHalfedge, "h:to_vertex", Geometry::PropertyValueKind::Unknown};
+    ASSERT_NE(Runtime::ResolveGeometryPropertySet(availability, D::MeshHalfedge), nullptr);
+    EXPECT_EQ(Runtime::EncodeVisualizationRecipe(availability,
+                  {.Data = Runtime::ScalarVisualizationRecipe{.Source = halfedge, .OutputName = "h:to_vertex"}})
+                  .Status,
+        Runtime::VisualizationRecipeStatus::UnsupportedDomain);
+    EXPECT_EQ(Runtime::EncodeVisualizationRecipe(availability,
+                  {.Data = Runtime::ColorVisualizationRecipe{.Source = halfedge, .OutputName = "h:to_vertex"}})
+                  .Status,
+        Runtime::VisualizationRecipeStatus::UnsupportedDomain);
 }
 
 TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)

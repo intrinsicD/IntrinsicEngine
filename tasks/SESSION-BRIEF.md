@@ -27,6 +27,7 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-332` — The vector-field test pins follow the rows (moonshot M2, slice 8) (tasks/active/RUNTIME-332-vector-field-pins-follow-the-rows.md)
 - `RUNTIME-333` — One predicate for per-arrow style properties (moonshot M2, slice 9) (tasks/active/RUNTIME-333-vector-field-style-property-one-predicate.md)
 - `RUNTIME-334` — The GPU-preview binding shares the per-arrow style rule (moonshot M2, slice 10) (tasks/active/RUNTIME-334-vector-field-gpu-front-shares-the-rule.md)
+- `RUNTIME-335` — One rule for a lane's scalar and color properties (moonshot M2, slice 11) (tasks/active/RUNTIME-335-lane-property-one-rule.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 - `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/active/UI-079-imguizmo-hidpi-operational-run.md)

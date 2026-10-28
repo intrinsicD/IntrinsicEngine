@@ -24,6 +24,7 @@ import Geometry.Properties;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 
@@ -1011,6 +1012,22 @@ namespace Extrinsic::Runtime
             return properties;
         };
 
+        // RUNTIME-335: an existing CPU property must pass the lane rule for the recipe it is used
+        // as; a domain the encoder does not visualize, a missing domain or a missing name keeps the
+        // status the encoding path gives it.
+        const auto laneEligible = [&availability, &result](const GeometryPropertyRef& source, const bool scalar)
+        {
+            const Geometry::PropertySet* properties = ResolveGeometryPropertySet(availability, source.Domain);
+            if (!ToVisualizationDomain(source.Domain).has_value() || properties == nullptr ||
+                !properties->Exists(source.Name))
+                return true;
+            const auto lane = FindLaneVisualizationProperty(*properties, source.Domain, source.Name);
+            if (lane && (scalar ? lane->Scalar : lane->ColorBuffer))
+                return true;
+            result.Status = VisualizationRecipeStatus::UnsupportedSourceType;
+            return false;
+        };
+
         const auto appendPropertyRecipe = [&result, &resolveSource](
             const GeometryPropertyRef& source,
             VisualizationEncodingOptions options,
@@ -1078,6 +1095,8 @@ namespace Extrinsic::Runtime
                         result.Status = VisualizationRecipeStatus::Encoded;
                         return;
                     }
+                    if (!laneEligible(authored.Source, true))
+                        return;
                     (void)appendPropertyRecipe(
                         authored.Source,
                         VisualizationEncodingOptions{
@@ -1098,6 +1117,8 @@ namespace Extrinsic::Runtime
                     auto interpretation = Graphics::Components::VisualizationConfig::ColorInterpretation::Components;
                     if constexpr (std::is_same_v<Recipe, ColorVisualizationRecipe>)
                         interpretation = authored.Interpretation;
+                    if (!laneEligible(authored.Source, false))
+                        return;
                     (void)appendPropertyRecipe(
                         authored.Source,
                         VisualizationEncodingOptions{
@@ -1407,6 +1428,20 @@ namespace Extrinsic::Runtime
     {
         VisualizationEncodingDiagnostics unused{};
         return ComputeRange(values, minValue, maxValue, unused, /*allowInfinite=*/true);
+    }
+
+    std::optional<LaneVisualizationProperty> FindLaneVisualizationProperty(
+        const Geometry::PropertySet& properties, const GeometryElementDomain domain, const std::string_view name)
+    {
+        using K = Geometry::PropertyValueKind;
+        const K kind = DetectGeometryPropertyValueKind(properties, std::string{name});
+        if (kind == K::Unknown || IsTopologyProperty(domain, name))
+            return std::nullopt;
+        const bool scalar = GeometryPropertyComponentCount(kind) == 1u;
+        const bool color = kind == K::Vec2 || kind == K::Vec3 || kind == K::Vec4;
+        if (!scalar && !color)
+            return std::nullopt;
+        return LaneVisualizationProperty{.Kind = kind, .Scalar = scalar, .ColorBuffer = true};
     }
 
     bool ConvertVisualizationScalars(
