@@ -601,13 +601,6 @@ namespace Extrinsic::Runtime
 
     namespace
     {
-        [[nodiscard]] bool IsScalarKind(const Geometry::PropertyValueKind kind) noexcept
-        {
-            using K = Geometry::PropertyValueKind;
-            return kind == K::Bool || kind == K::Int32 || kind == K::UInt32 || kind == K::UInt64 || kind == K::Float ||
-                kind == K::Double;
-        }
-
         // UI-083: binds a layer's length and color properties, a GPU preview front by address
         // (geometry.property-coherence), else the CPU style cache for a property the shared rule
         // accepts (RUNTIME-333: the editor offers exactly these). A property that resolves neither
@@ -833,12 +826,11 @@ namespace Extrinsic::Runtime
                     return std::nullopt;
                 // A name the CPU does not have yet is a pending float output; vec3/vec4 colors
                 // have no scalar fronts.
-                Geometry::PropertyValueKind kind = DetectGeometryPropertyValueKind(*properties, name);
-                if (kind == Geometry::PropertyValueKind::Unknown)
-                    kind = Geometry::PropertyValueKind::Float;
-                else if (!IsScalarKind(kind))
+                const auto kind = GeometryVectorFieldStyleFrontKind(properties, layer.Vector.Domain, name);
+                if (!kind)
                     return std::nullopt;
-                auto front = m_GpuPropertyObserver(m_World, entity, GeometryPropertyRef{layer.Vector.Domain, name, kind});
+                auto front =
+                    m_GpuPropertyObserver(m_World, entity, GeometryPropertyRef{layer.Vector.Domain, name, *kind});
                 if (!front || front->Address == 0u || front->Count != properties->Size())
                     return std::nullopt;
                 return front;

@@ -317,6 +317,17 @@ namespace Extrinsic::Runtime
         return GeometryVectorFieldStyleProperty{.Kind = kind, .Scalar = scalar};
     }
 
+    std::optional<Geometry::PropertyValueKind> GeometryVectorFieldStyleFrontKind(
+        const Geometry::PropertySet* properties, const GeometryElementDomain domain, const std::string_view name)
+    {
+        if (properties != nullptr && properties->Exists(name))
+        {
+            const auto style = FindGeometryVectorFieldStyleProperty(*properties, domain, name);
+            return style && style->Scalar ? std::optional{style->Kind} : std::nullopt;
+        }
+        return IsTopologyProperty(domain, name) ? std::nullopt : std::optional{Geometry::PropertyValueKind::Float};
+    }
+
     std::optional<std::string> CheckGeometryVectorFieldStyle(const Layer& layer)
     {
         const auto errors = ConfigDetail::CollectDeclaredFieldErrors(

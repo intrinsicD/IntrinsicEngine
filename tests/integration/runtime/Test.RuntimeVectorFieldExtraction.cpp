@@ -958,6 +958,59 @@ TEST(RuntimeVectorFieldExtraction, CpuStyleBindingMatchesOfferedProperties)
         << withLayer.Layers.front().Status;
 }
 
+// RUNTIME-334: a GPU preview front binds a per-arrow length only where the front rule allows it,
+// requested under that kind (a CPU scalar's own, Float for a pending name); a refused name is never
+// requested and draws its uniform length. Expectations are written out, not taken from the rule.
+TEST(RuntimeVectorFieldExtraction, GpuFrontBindingFollowsTheRule)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    auto& vertices = fixture.Scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<double>("v:d", 0.0).Vector() = {1.0, 2.0, 3.0, 4.0, 5.0};
+    (void)vertices.GetOrAdd<std::int64_t>("v:i64", 1);
+    (void)vertices.GetOrAdd<bool>("v:deleted", false);
+    vertices.GetOrAdd<float>("v:short", 1.0f).Vector().resize(vertices.Size() - 1u);
+    std::vector<Runtime::GeometryPropertyRef> requests;
+    fixture.Extraction.SetGpuPropertyObserver(
+        [&requests, &vertices, entity](auto, const auto observed, const Runtime::GeometryPropertyRef& property)
+            -> std::optional<Runtime::RenderExtractionCache::GpuPropertyFront>
+        {
+            EXPECT_EQ(observed, entity);
+            if (property.Name.starts_with("v:"))
+                EXPECT_EQ(property.Domain, D::MeshVertex) << property.Name;
+            requests.push_back(property);
+            return Runtime::RenderExtractionCache::GpuPropertyFront{.Buffer = {9, 1},
+                .Address = 0xABCD0000ull,
+                .Bytes = 4u * vertices.Size(),
+                .Count = static_cast<std::uint32_t>(vertices.Size()),
+                .Stamp = 1u,
+                .ScalarRange = std::array{0.0f, 1.0f}};
+        });
+    using K = Geometry::PropertyValueKind;
+    const std::vector<std::pair<std::string, std::optional<K>>> cases{{"v:d", K::Double},
+        {"v:pending", K::Float},
+        {"v:i64", std::nullopt},
+        {"v:short", std::nullopt},
+        {"v:deleted", std::nullopt},
+        {"v:halfedge", std::nullopt}};
+    for (const auto& [name, kind] : cases)
+    {
+        requests.clear();
+        const StyleUpload upload = ExtractStyle(fixture, entity, {Styled(name, "")});
+        ASSERT_TRUE(upload.Found && upload.Renderable) << name;
+        EXPECT_EQ(upload.LengthBDA == 0xABCD0000ull, kind.has_value()) << name;
+        if (!kind)
+        {
+            EXPECT_EQ(upload.LengthBDA, 0u) << name << ": the uniform length";
+            EXPECT_EQ(upload.Fallbacks, 1u) << name;
+        }
+        const auto asked = std::ranges::find(requests, name, &Runtime::GeometryPropertyRef::Name);
+        ASSERT_EQ(asked != requests.end(), kind.has_value()) << name;
+        if (kind)
+            EXPECT_EQ(asked->ValueKind, *kind) << name;
+    }
+}
+
 // RUNTIME-331: every pass-through style row reaches the packet from the authored layer, at a value
 // that is neither its default nor 0 (a bound, else the middle of its range).
 TEST(RuntimeVectorFieldExtraction, EveryPassThroughRowReachesThePacket)

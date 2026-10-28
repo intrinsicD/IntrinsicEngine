@@ -7,12 +7,14 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Geometry.Properties.Types;
+import Geometry.Properties;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Runtime.ConfigFieldSpec;
 #include "GeometryIntegration/internal/Runtime.GeometryVectorFieldStyleJson.hpp"
@@ -177,4 +179,31 @@ TEST(VectorFieldStyle, EveryFieldRoundTripsOnEverySurface)
     EXPECT_EQ(probe, defaults);
     scene.erase("lineWidthPx");
     EXPECT_TRUE(R::ReadGeometryVectorFieldStyleJson(scene, untouched, R::GeometryVectorFieldStyleKeys::Scene));
+}
+
+// RUNTIME-334: the kind under which a GPU preview front may bind a per-arrow style name, case by
+// case: a CPU scalar keeps its own kind, a name the CPU lacks is a pending float, everything else
+// (an unsupported kind, a non-scalar, a short property, a connectivity or deletion name) none.
+TEST(VectorFieldStyle, FrontKindFollowsTheStyleRule)
+{
+    using K = Geometry::PropertyValueKind;
+    Geometry::PropertySet properties;
+    properties.Resize(3u);
+    (void)properties.GetOrAdd<double>("v:d", 1.0);
+    (void)properties.GetOrAdd<float>("v:f", 1.0f);
+    (void)properties.GetOrAdd<std::int64_t>("v:i64", 1);
+    (void)properties.GetOrAdd<glm::vec3>("v:n", glm::vec3{0.0f});
+    (void)properties.GetOrAdd<bool>("v:deleted", false);
+    properties.GetOrAdd<float>("v:short", 1.0f).Vector().resize(2u);
+    const auto kind = [](const Geometry::PropertySet* set, const char* name)
+    {
+        return R::GeometryVectorFieldStyleFrontKind(set, R::GeometryElementDomain::MeshVertex, name);
+    };
+    EXPECT_EQ(kind(&properties, "v:d"), K::Double);
+    EXPECT_EQ(kind(&properties, "v:f"), K::Float);
+    EXPECT_EQ(kind(&properties, "v:absent"), K::Float) << "a pending output";
+    for (const char* refused : {"v:i64", "v:n", "v:short", "v:deleted", "v:halfedge"})
+        EXPECT_EQ(kind(&properties, refused), std::nullopt) << refused;
+    EXPECT_EQ(kind(nullptr, "v:absent"), K::Float);
+    EXPECT_EQ(kind(nullptr, "v:connectivity"), std::nullopt);
 }

@@ -2257,10 +2257,17 @@ ApplyEditorRenderHintCommand(
             return EditorVectorFieldStyleOption{.Name = name, .Kind = style->Kind, .Scalar = style->Scalar};
         }
 
-        // A style property a GPU preview carries without a CPU property is a pending float output.
-        [[nodiscard]] GeometryPropertyRef PendingStyleRef(const GeometryElementDomain domain, const std::string& name)
+        // The ref a GPU preview of style property `name` is looked up by, from the front rule shared
+        // with extraction (a name the CPU lacks is a pending float output); nothing when no front may
+        // bind it.
+        [[nodiscard]] std::optional<GeometryPropertyRef> PendingStyleRef(
+            const GeometryEntityAvailability& availability, const GeometryElementDomain domain, const std::string& name)
         {
-            return GeometryPropertyRef{.Domain = domain, .Name = name, .ValueKind = Geometry::PropertyValueKind::Float};
+            const auto kind =
+                GeometryVectorFieldStyleFrontKind(ResolveGeometryPropertySet(availability, domain), domain, name);
+            if (!kind)
+                return std::nullopt;
+            return GeometryPropertyRef{.Domain = domain, .Name = name, .ValueKind = *kind};
         }
 
         // Whether `name` can be the length (`color == false`) or color of a layer on `domain`.
@@ -2351,8 +2358,8 @@ ApplyEditorRenderHintCommand(
                     const char* what = color ? "color" : "length";
                     if (name.empty() || VectorFieldStyleResolves(availability, layer.Vector.Domain, name, color))
                         return;
-                    const bool pending =
-                        pendingResidentScalar && pendingResidentScalar(PendingStyleRef(layer.Vector.Domain, name));
+                    const auto ref = PendingStyleRef(availability, layer.Vector.Domain, name);
+                    const bool pending = ref && pendingResidentScalar && pendingResidentScalar(*ref);
                     status += (status.empty() ? "" : "; ") + std::string{"Per-arrow "} + what + " '" + name +
                         (pending ? "' from the GPU preview"
                                  : "' not found or not usable: uniform " + std::string{what});
@@ -2468,8 +2475,8 @@ ApplyEditorRenderHintCommand(
                 if (name.empty() || (previous != nullptr && name == old) ||
                     VectorFieldStyleResolves(availability, identity.Domain, name, color))
                     return true;
-                return context.PendingResidentScalar &&
-                    context.PendingResidentScalar(entity, PendingStyleRef(identity.Domain, name));
+                const auto ref = PendingStyleRef(availability, identity.Domain, name);
+                return ref && context.PendingResidentScalar && context.PendingResidentScalar(entity, *ref);
             };
             if (edited != nullptr &&
                 (!newNameResolves(

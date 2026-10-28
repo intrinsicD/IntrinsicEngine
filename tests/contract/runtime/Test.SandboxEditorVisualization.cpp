@@ -2711,6 +2711,73 @@ TEST(SandboxEditorUi, VectorFieldStyleNamesResolveOnceAndReportTheirFallback)
     EXPECT_EQ(ended.find("GPU preview"), std::string::npos) << ended;
 }
 
+// RUNTIME-334: even when every pending GPU lookup answers yes, a new style name is accepted, and a
+// bound name reported as a GPU preview, only where a front may bind it: a name the CPU lacks and that
+// is no connectivity or deletion name. Length and color alike.
+TEST(SandboxEditorUi, VectorFieldPendingStyleNamesFollowTheFrontRule)
+{
+    using D = Runtime::GeometryElementDomain;
+    using Op = Runtime::EditorVectorFieldOperation;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldPendingNames");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    (void)vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    (void)vertices.GetOrAdd<glm::vec2>("v:uv", glm::vec2{0.0f});
+    (void)vertices.GetOrAdd<bool>("v:deleted", false);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const Intrinsic::Tests::EditorFeatureTestContext features = MakeContext(registry, selection);
+    Runtime::EditorVisualizationEditingContext context = features;
+    // Only an eligible name may reach the lookup, under its domain and pending kind.
+    const auto expectPending = [](const Runtime::GeometryPropertyRef& ref)
+    {
+        EXPECT_EQ(ref.Domain, D::MeshVertex);
+        EXPECT_EQ(ref.Name, "v:pending");
+        EXPECT_EQ(ref.ValueKind, Geometry::PropertyValueKind::Float);
+        return true;
+    };
+    context.PendingResidentScalar = [&](const ECS::EntityHandle entity, const Runtime::GeometryPropertyRef& ref)
+    {
+        EXPECT_EQ(entity, mesh);
+        return expectPending(ref);
+    };
+    const auto apply = [&](const Op op, const Runtime::GeometryVectorFieldLayerRecipe& layer)
+    {
+        return Runtime::ApplyEditorGeometryVectorFieldCommand(context,
+            Runtime::EditorGeometryVectorFieldCommand{
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+                .Operation = op,
+                .Layer = layer,
+                .UseLayerStyle = true});
+    };
+    const Runtime::GeometryVectorFieldLayerRecipe base{.Vector = VectorRef(D::MeshVertex, "v:normal")};
+    ASSERT_EQ(apply(Op::Add, base), Runtime::EditorCommandStatus::Applied);
+    const auto rowStatus = [&](const std::string& length)
+    {
+        auto& recipe = registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
+        recipe.VectorFields.front().LengthProperty = length; // as a scene file would bind it
+        const auto model = Runtime::BuildEditorVectorFieldModel(
+            Runtime::BuildGeometryAvailability(registry.Raw(), mesh), &recipe, expectPending);
+        recipe.VectorFields.front().LengthProperty.clear();
+        return model.Layers.front().Status;
+    };
+    for (const auto& [name, accepted] : std::vector<std::pair<std::string, bool>>{
+             {"v:pending", true}, {"v:uv", false}, {"v:deleted", false}, {"v:halfedge", false}})
+    {
+        for (const bool color : {false, true})
+        {
+            Runtime::GeometryVectorFieldLayerRecipe layer = base;
+            (color ? layer.ColorProperty : layer.LengthProperty) = name;
+            EXPECT_EQ(apply(Op::Update, layer) == Runtime::EditorCommandStatus::Applied, accepted)
+                << (color ? "color " : "length ") << name;
+            (void)apply(Op::Update, base);
+        }
+        EXPECT_EQ(rowStatus(name).find("GPU preview") != std::string::npos, accepted)
+            << name << ": " << rowStatus(name);
+    }
+}
+
 TEST(SandboxEditorUi, VectorFieldAddCreatesPresentationTransactionallyAndUndoRestoresAbsence)
 {
     using D = Runtime::GeometryElementDomain;

@@ -395,6 +395,12 @@ export namespace Extrinsic::Runtime
     };
     [[nodiscard]] std::optional<GeometryVectorFieldStyleProperty> FindGeometryVectorFieldStyleProperty(
         const Geometry::PropertySet& properties, GeometryElementDomain domain, std::string_view name);
+    // RUNTIME-334: the kind under which a GPU preview front may bind `name` as a per-arrow style: a
+    // name the CPU has must pass the rule above as a scalar (its own kind); a name it lacks is a
+    // pending float output unless it is a connectivity or deletion name. Null `properties` means
+    // the CPU has no name yet. Extraction's front binding, the editor's status and the command ask it.
+    [[nodiscard]] std::optional<Geometry::PropertyValueKind> GeometryVectorFieldStyleFrontKind(
+        const Geometry::PropertySet* properties, GeometryElementDomain domain, std::string_view name);
 
     // Validates authored values only (no geometry access): supported domain,
     // named vec3 property, every style field against its declared spec, and a
