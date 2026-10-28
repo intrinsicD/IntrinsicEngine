@@ -24,6 +24,7 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.Runtime.GeometryProperty.Types;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
@@ -296,6 +297,24 @@ namespace Extrinsic::Runtime
     std::span<const GeometryVectorFieldStyleSlider> GeometryVectorFieldStyleSliders() noexcept
     {
         return kSliders;
+    }
+
+    std::optional<GeometryVectorFieldStyleProperty> FindGeometryVectorFieldStyleProperty(
+        const Geometry::PropertySet& properties, const GeometryElementDomain domain, const std::string_view name)
+    {
+        using K = Geometry::PropertyValueKind;
+        if (IsTopologyProperty(domain, name))
+            return std::nullopt;
+        const auto descriptors = properties.Descriptors();
+        const auto descriptor = std::ranges::find(descriptors, name, &Geometry::PropertyDescriptor::Name);
+        if (descriptor == descriptors.end() || descriptor->ElementCount != properties.Size())
+            return std::nullopt;
+        const K kind = descriptor->ValueKind;
+        const bool scalar = kind == K::Bool || kind == K::Int32 || kind == K::UInt32 || kind == K::UInt64 ||
+            kind == K::Float || kind == K::Double;
+        if (!scalar && kind != K::Vec3 && kind != K::Vec4)
+            return std::nullopt;
+        return GeometryVectorFieldStyleProperty{.Kind = kind, .Scalar = scalar};
     }
 
     std::optional<std::string> CheckGeometryVectorFieldStyle(const Layer& layer)

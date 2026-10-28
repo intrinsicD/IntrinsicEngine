@@ -2246,25 +2246,15 @@ ApplyEditorRenderHintCommand(
 
     namespace
     {
-        // UI-083: a property on `domain` with one value per element that can drive a per-arrow
-        // length (a scalar kind) or color (also vec3/vec4); connectivity and deletion rows are not
-        // element values. The one rule behind the model's candidates and the command's check.
+        // The model's candidate and the command's check for one name, from the shared rule
+        // (`FindGeometryVectorFieldStyleProperty`, which extraction uses too).
         [[nodiscard]] std::optional<EditorVectorFieldStyleOption> VectorFieldStyleOption(
             const Geometry::PropertySet& properties, const GeometryElementDomain domain, const std::string& name)
         {
-            using K = Geometry::PropertyValueKind;
-            if (IsTopologyProperty(domain, name))
+            const auto style = FindGeometryVectorFieldStyleProperty(properties, domain, name);
+            if (!style)
                 return std::nullopt;
-            const auto descriptors = properties.Descriptors();
-            const auto descriptor = std::ranges::find(descriptors, name, &Geometry::PropertyDescriptor::Name);
-            if (descriptor == descriptors.end() || descriptor->ElementCount != properties.Size())
-                return std::nullopt;
-            const K kind = descriptor->ValueKind;
-            const bool scalar = kind == K::Bool || kind == K::Int32 || kind == K::UInt32 || kind == K::UInt64 ||
-                kind == K::Float || kind == K::Double;
-            if (!scalar && kind != K::Vec3 && kind != K::Vec4)
-                return std::nullopt;
-            return EditorVectorFieldStyleOption{.Name = name, .Kind = kind, .Scalar = scalar};
+            return EditorVectorFieldStyleOption{.Name = name, .Kind = style->Kind, .Scalar = style->Scalar};
         }
 
         // A style property a GPU preview carries without a CPU property is a pending float output.

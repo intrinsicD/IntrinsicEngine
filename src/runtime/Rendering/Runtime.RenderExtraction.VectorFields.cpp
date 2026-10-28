@@ -609,8 +609,9 @@ namespace Extrinsic::Runtime
         }
 
         // UI-083: binds a layer's length and color properties, a GPU preview front by address
-        // (geometry.property-coherence), else the CPU style cache. A property that resolves
-        // neither way leaves the uniform length or color and is counted.
+        // (geometry.property-coherence), else the CPU style cache for a property the shared rule
+        // accepts (RUNTIME-333: the editor offers exactly these). A property that resolves neither
+        // way leaves the uniform length or color and is counted.
         template <typename EntityCache, typename ObserveFront>
         void BindVectorFieldStyle(const ObserveFront& observeFront,
             const std::uint32_t stableId,
@@ -630,6 +631,11 @@ namespace Extrinsic::Runtime
             {
                 return BuildKey(stableId, "vector.scalar", layer.Vector.Domain, name);
             };
+            const auto usableCache = [&](const std::string& name, const bool color)
+            {
+                const auto style = FindGeometryVectorFieldStyleProperty(properties, layer.Vector.Domain, name);
+                return style && (color || style->Scalar) ? styleCache(name) : nullptr;
+            };
 
             if (!layer.LengthProperty.empty())
             {
@@ -638,7 +644,8 @@ namespace Extrinsic::Runtime
                     inputs.LengthBDA = front->Address;
                     inputs.LengthStamp = front->Stamp;
                 }
-                else if (const auto* cache = styleCache(layer.LengthProperty); cache && cache->Kind == Kind::Scalar)
+                else if (const auto* cache = usableCache(layer.LengthProperty, false);
+                    cache && cache->Kind == Kind::Scalar)
                 {
                     inputs.LengthKey = scalarKey(layer.LengthProperty);
                     inputs.Lengths = cache->Scalars;
@@ -674,7 +681,7 @@ namespace Extrinsic::Runtime
                         autoRange = std::array{0.0f, 1.0f};
                 }
             }
-            else if (const auto* cache = styleCache(layer.ColorProperty); cache != nullptr)
+            else if (const auto* cache = usableCache(layer.ColorProperty, true); cache != nullptr)
             {
                 inputs.ColorStamp = cache->Stamp;
                 if (cache->Kind == Kind::Scalar)

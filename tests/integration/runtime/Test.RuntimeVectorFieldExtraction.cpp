@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -29,6 +30,7 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -576,6 +578,7 @@ namespace
     struct StyleUpload
     {
         bool Found{false};
+        bool Renderable{false};
         std::uint32_t Fallbacks{0u};
         Graphics::VectorFieldColorMode Mode{Graphics::VectorFieldColorMode::Uniform};
         float RangeMin{0.0f};
@@ -600,6 +603,7 @@ namespace
         if (packet == nullptr)
             return out;
         out.Found = true;
+        out.Renderable = Graphics::IsRenderableVectorFieldPacket(*packet);
         out.Mode = packet->ColorMode;
         out.RangeMin = packet->Style.ColorRangeMin;
         out.RangeMax = packet->Style.ColorRangeMax;
@@ -875,6 +879,83 @@ TEST(RuntimeVectorFieldExtraction, GpuPreviewFrontsDriveScalarStyleBuffers)
     upload = ExtractStyle(fixture, entity, {Styled("v:gpu_only", "")});
     EXPECT_EQ(upload.Fallbacks, 1u);
     EXPECT_EQ(upload.LengthBDA, 0u);
+}
+
+// RUNTIME-333: with no GPU preview, extraction binds a property as a layer's per-arrow length (a
+// scalar) or color exactly when the editor model offers it, from the one rule both use; any other
+// name leaves the layer drawing its uniform length or color. Vertex and edge domains, with deleted
+// rows kept in the property sets. A scene-bound name the rule refuses stays and is reported.
+TEST(RuntimeVectorFieldExtraction, CpuStyleBindingMatchesOfferedProperties)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, /*deleteTriangle=*/true);
+    auto& raw = fixture.Scene.Raw();
+    auto& vertices = raw.get<GS::Vertices>(entity).Properties;
+    auto& edges = raw.get<GS::Edges>(entity).Properties;
+    (void)vertices.GetOrAdd<bool>("v:b", true);
+    (void)vertices.GetOrAdd<std::int32_t>("v:i", 1);
+    (void)vertices.GetOrAdd<std::int64_t>("v:i64", 1);
+    (void)vertices.GetOrAdd<std::uint32_t>("v:u", 1u);
+    (void)vertices.GetOrAdd<std::uint64_t>("v:q", 1u);
+    (void)vertices.GetOrAdd<float>("v:f", 1.0f);
+    (void)vertices.GetOrAdd<double>("v:d", 1.0);
+    (void)vertices.GetOrAdd<glm::vec2>("v:uv", glm::vec2{1.0f});
+    (void)vertices.GetOrAdd<glm::vec4>("v:rgba", glm::vec4{1.0f});
+    (void)vertices.GetOrAdd<bool>("v:deleted", false); // a topology property, never a style
+    vertices.GetOrAdd<float>("v:short", 1.0f).Vector().resize(vertices.Size() - 1u);
+    (void)edges.GetOrAdd<float>("e:f", 1.0f);
+
+    const Runtime::GeometryEntityAvailability availability = Runtime::BuildGeometryAvailability(raw, entity);
+    const Runtime::EditorVectorFieldModel model = Runtime::BuildEditorVectorFieldModel(availability, nullptr);
+    std::size_t offeredCount = 0u;
+    std::size_t topologyCount = 0u;
+    for (const auto& [domain, vector, packetKey] :
+        {std::tuple{D::MeshVertex, "v:dir", ":v:dir"}, std::tuple{D::MeshEdge, "e:dir", ":e:dir"}})
+    {
+        const auto options = std::ranges::find(model.Domains, domain, &Runtime::EditorVectorFieldDomainOption::Domain);
+        ASSERT_NE(options, model.Domains.end());
+        const Geometry::PropertySet& properties = domain == D::MeshVertex ? vertices : edges;
+        for (const std::string& name : properties.Properties())
+        {
+            const auto option =
+                std::ranges::find(options->StyleProperties, name, &Runtime::EditorVectorFieldStyleOption::Name);
+            const bool offered = option != options->StyleProperties.end();
+            const bool scalar = offered && option->Scalar;
+            offeredCount += offered ? 1u : 0u;
+            topologyCount += Runtime::IsTopologyProperty(domain, name) ? 1u : 0u;
+
+            auto layer = Layer(domain, vector);
+            layer.LengthProperty = name;
+            const StyleUpload length = ExtractStyle(fixture, entity, {layer}, packetKey);
+            ASSERT_TRUE(length.Found && length.Renderable) << "length " << name;
+            EXPECT_EQ(length.LengthBDA != 0u, scalar) << "length " << name;
+            EXPECT_EQ(length.Fallbacks, scalar ? 0u : 1u) << "length " << name;
+            EXPECT_EQ(length.Mode, Graphics::VectorFieldColorMode::Uniform) << "length " << name;
+
+            layer = Layer(domain, vector);
+            layer.ColorProperty = name;
+            const StyleUpload color = ExtractStyle(fixture, entity, {layer}, packetKey);
+            ASSERT_TRUE(color.Found && color.Renderable) << "color " << name;
+            EXPECT_EQ(color.Mode != Graphics::VectorFieldColorMode::Uniform, offered) << "color " << name;
+            EXPECT_EQ(color.ColorBDA != 0u, offered) << "color " << name;
+            EXPECT_EQ(color.Fallbacks, offered ? 0u : 1u) << "color " << name;
+            EXPECT_EQ(color.LengthBDA, 0u) << "color " << name;
+        }
+    }
+    EXPECT_GE(offeredCount, 10u) << "the six vertex scalars, v:rgba, v:dir, the positions and e:f";
+    EXPECT_GE(topologyCount, 2u) << "each domain must hold a topology property to test the rule";
+
+    // A scene-bound name the rule refuses keeps its name; the layer row says it draws uniform.
+    auto bound = Layer(D::MeshVertex, "v:dir");
+    bound.LengthProperty = "v:deleted";
+    Recipe(fixture.Scene, entity).VectorFields = {bound};
+    const Runtime::EditorVectorFieldModel withLayer = Runtime::BuildEditorVectorFieldModel(
+        Runtime::BuildGeometryAvailability(raw, entity), &Recipe(fixture.Scene, entity));
+    ASSERT_EQ(withLayer.Layers.size(), 1u);
+    EXPECT_EQ(withLayer.Layers.front().Layer.LengthProperty, "v:deleted");
+    EXPECT_NE(
+        withLayer.Layers.front().Status.find("Per-arrow length 'v:deleted' not found or not usable: uniform length"), std::string::npos)
+        << withLayer.Layers.front().Status;
 }
 
 // RUNTIME-331: every pass-through style row reaches the packet from the authored layer, at a value

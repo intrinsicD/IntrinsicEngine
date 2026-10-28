@@ -384,6 +384,17 @@ export namespace Extrinsic::Runtime
         float GeometryVectorFieldLayerRecipe::* Member{nullptr};
     };
     [[nodiscard]] std::span<const GeometryVectorFieldStyleSlider> GeometryVectorFieldStyleSliders() noexcept;
+    // UI-083, RUNTIME-333: a property on `domain` with one value per element that can drive a
+    // per-arrow length (a scalar kind) or color (also vec3/vec4); connectivity and deletion rows
+    // are not element values. The one rule behind the editor's candidates, the command's check and
+    // extraction.
+    struct GeometryVectorFieldStyleProperty
+    {
+        Geometry::PropertyValueKind Kind{Geometry::PropertyValueKind::Unknown};
+        bool Scalar{false};
+    };
+    [[nodiscard]] std::optional<GeometryVectorFieldStyleProperty> FindGeometryVectorFieldStyleProperty(
+        const Geometry::PropertySet& properties, GeometryElementDomain domain, std::string_view name);
 
     // Validates authored values only (no geometry access): supported domain,
     // named vec3 property, every style field against its declared spec, and a
