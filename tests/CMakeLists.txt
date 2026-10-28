@@ -2207,6 +2207,8 @@ intrinsic_test_object_lib(GraphicsContractCpuTestObjs
         ${_graphics_contract_cpu_test_sources}
     DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
 )
+# RUNTIME-331: generic tests read the vector-field style rows (assets/shaders/common).
+target_include_directories(GraphicsContractCpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/assets/shaders)
 
 set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
@@ -2224,6 +2226,7 @@ intrinsic_test_object_lib(RuntimeGraphicsCpuTestObjs
         ${_runtime_graphics_cpu_test_sources}
     DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform glm::glm
 )
+target_include_directories(RuntimeGraphicsCpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/assets/shaders)
 
 # Promoted CPU integration checks that survived the legacy test-consumer
 # cleanup. Their dependency set is runtime/assets/core only.

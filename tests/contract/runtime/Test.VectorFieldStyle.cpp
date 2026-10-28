@@ -119,11 +119,23 @@ TEST(VectorFieldStyle, EveryFieldRoundTripsOnEverySurface)
     fixture.ColorAutoRange = false;
     fixture.ColorRangeMin = -2.0f;
     fixture.ColorRangeMax = 8.0f;
+    // RUNTIME-331: every other pass-through float at a declared bound that is not its default (else
+    // the middle of its range), so a new row needs no edit.
+    for (const R::GeometryVectorFieldStyleSlider& slider : R::GeometryVectorFieldStyleSliders())
+    {
+        float& value = fixture.*slider.Member;
+        if (value != defaults.*slider.Member)
+            continue;
+        const R::ConfigFieldSpec& spec = *R::FindConfigFieldSpec(R::GeometryVectorFieldStyleFields(), slider.Field);
+        const auto lo = static_cast<float>(*spec.Min), hi = static_cast<float>(*spec.Max);
+        value = hi != value ? hi : lo != value ? lo : (lo + hi) / 2.0f;
+    }
     std::string reason;
     ASSERT_TRUE(R::ValidateGeometryVectorFieldLayer(fixture, reason)) << reason;
 
-    // 13 style fields follow `Vector` in the recipe; the fixture changes each of them.
-    ASSERT_EQ(R::GeometryVectorFieldStyleFields().size(), 13u);
+    // 12 style fields plus one per pass-through row follow `Vector` in the recipe; the fixture
+    // changes each of them.
+    ASSERT_EQ(R::GeometryVectorFieldStyleFields().size(), 12u + R::GeometryVectorFieldStyleSliders().size());
     const Json fixtureJson = R::GeometryVectorFieldStyleToJson(fixture, R::GeometryVectorFieldStyleKeys::Agent);
     const Json defaultJson = R::GeometryVectorFieldStyleToJson(defaults, R::GeometryVectorFieldStyleKeys::Agent);
     for (const R::ConfigFieldSpec& field : R::GeometryVectorFieldStyleFields())

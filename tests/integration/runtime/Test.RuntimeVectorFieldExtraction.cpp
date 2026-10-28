@@ -877,6 +877,33 @@ TEST(RuntimeVectorFieldExtraction, GpuPreviewFrontsDriveScalarStyleBuffers)
     EXPECT_EQ(upload.LengthBDA, 0u);
 }
 
+// RUNTIME-331: every pass-through style row reaches the packet from the authored layer, at a value
+// that is neither its default nor 0 (a bound, else the middle of its range).
+TEST(RuntimeVectorFieldExtraction, EveryPassThroughRowReachesThePacket)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    auto layer = Layer(D::MeshVertex, "v:dir");
+    const Runtime::GeometryVectorFieldLayerRecipe defaults{};
+#define VF_STYLE_ROW(member, fallback, agentName, sceneKey, sceneRequired, label, help, lo, hi)                        \
+    layer.member = (hi) != (fallback) && (hi) != 0.0f ? (hi)                                                           \
+        : (lo) != (fallback) && (lo) != 0.0f          ? (lo)                                                           \
+                                                      : ((lo) + (hi)) / 2.0f;                                                   \
+    ASSERT_NE(layer.member, defaults.member) << #member;                                                               \
+    ASSERT_NE(layer.member, 0.0f) << #member;
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
+    Recipe(fixture.Scene, entity).VectorFields = {layer};
+
+    const auto frame = fixture.Extract();
+    const auto* packet = FindPacket(frame.World, ":v:dir");
+    ASSERT_NE(packet, nullptr);
+    EXPECT_TRUE(Graphics::IsRenderableVectorFieldPacket(*packet));
+#define VF_STYLE_ROW(member, ...) EXPECT_EQ(packet->Style.member, layer.member) << #member;
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
+}
+
 // RUNTIME-328: every uniform style value the layer draws with reaches the packet unchanged.
 TEST(RuntimeVectorFieldExtraction, EveryStyleFieldReachesThePacket)
 {

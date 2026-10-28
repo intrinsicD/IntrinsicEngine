@@ -206,11 +206,15 @@ namespace Extrinsic::Graphics
 
     bool IsValidVectorFieldGlyphStyle(const VectorFieldGlyphStyle& style, const VectorFieldColorMode colorMode) noexcept
     {
-        return IsFinite(style.Scale) && style.Scale > 0.f && IsFinite(style.Color) && IsFinite(style.LineWidthPx) &&
-            style.LineWidthPx >= kVectorFieldMinLineWidthPx && style.LineWidthPx <= kVectorFieldMaxLineWidthPx &&
+        bool passThrough = true; // each pass-through float finite and inside its row's bounds
+#define VF_STYLE_ROW(member, fallback, agentName, sceneKey, sceneRequired, label, help, lo, hi)                        \
+    passThrough = passThrough && IsFinite(style.member) && style.member >= (lo) && style.member <= (hi);
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
+        return passThrough && IsFinite(style.Scale) && style.Scale > 0.f && IsFinite(style.Color) &&
             (colorMode != VectorFieldColorMode::Colormap ||
-                (SupportedColormap(style.ColorMap) && IsFinite(style.ColorRangeMin) &&
-                    IsFinite(style.ColorRangeMax) && style.ColorRangeMin < style.ColorRangeMax)) &&
+                (SupportedColormap(style.ColorMap) && IsFinite(style.ColorRangeMin) && IsFinite(style.ColorRangeMax) &&
+                    style.ColorRangeMin < style.ColorRangeMax)) &&
             colorMode <= VectorFieldColorMode::Rgba;
     }
 

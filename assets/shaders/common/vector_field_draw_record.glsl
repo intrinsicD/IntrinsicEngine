@@ -17,7 +17,11 @@ VF_RECORD_PACKET(uint, RowCount)
 VF_RECORD_PACKET(uint, RowStride)
 VF_RECORD_DERIVED(uint, PackedColor)
 VF_RECORD_STYLE(float, Scale)
-VF_RECORD_STYLE(float, LineWidthPx)
+// The pass-through style rows (RUNTIME-331), copied from packet.Style as well.
+#define VF_STYLE_ROW(member, fallback, agentName, sceneKey, sceneRequired, label, help, lo, hi) \
+    VF_RECORD_STYLE(float, member)
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
 VF_RECORD_DERIVED(uint, Flags)
 VF_RECORD_DERIVED(uint, ColormapID)
 // Per-element float multipliers / colormap scalars or vec4 colors; 0 = none.

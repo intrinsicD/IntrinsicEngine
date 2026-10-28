@@ -181,7 +181,11 @@ export namespace Extrinsic::Runtime
         GeometryVectorFieldLengthMode LengthMode{
             GeometryVectorFieldLengthMode::Normalized};
         float Length{1.0f};
-        float LineWidthPx{2.0f};
+        // RUNTIME-331: the pass-through style floats (`LineWidthPx`), declared in
+        // `assets/shaders/common/vector_field_style_rows.glsl`.
+#define VF_STYLE_ROW(member, fallback, ...) float member{fallback};
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
         glm::vec4 Color{1.0f, 0.5f, 0.0f, 1.0f};
         bool DepthTested{true};
         // Draw every `Stride`-th live element; `MaxGlyphs` > 0 widens the
@@ -371,6 +375,15 @@ export namespace Extrinsic::Runtime
     // tokens), one per recipe field after `Vector`. The agent schema, scene keys and the
     // validator below come from the same rows; panels read names and bounds here.
     [[nodiscard]] std::span<const ConfigFieldSpec> GeometryVectorFieldStyleFields() noexcept;
+    // RUNTIME-331: one panel slider per pass-through style float, in row order: its label, its
+    // field name above (for the bounds) and the layer member it edits.
+    struct GeometryVectorFieldStyleSlider
+    {
+        std::string_view Label{};
+        std::string_view Field{};
+        float GeometryVectorFieldLayerRecipe::* Member{nullptr};
+    };
+    [[nodiscard]] std::span<const GeometryVectorFieldStyleSlider> GeometryVectorFieldStyleSliders() noexcept;
 
     // Validates authored values only (no geometry access): supported domain,
     // named vec3 property, every style field against its declared spec, and a

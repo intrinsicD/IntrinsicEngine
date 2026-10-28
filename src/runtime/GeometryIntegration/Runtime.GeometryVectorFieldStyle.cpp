@@ -67,62 +67,201 @@ namespace Extrinsic::Runtime
             return static_cast<std::size_t>(std::ranges::find(tokens, value.get<std::string>()) - tokens.begin());
         }
 
-        constexpr std::array<Row, 13> kRows{{
-            {{.Name = "visible", .Type = FT::Bool}, "enabled", true, {},
-                [](const Layer& l) { return Json(l.Enabled); }, [](const Json& v, Layer& l) { l.Enabled = v.get<bool>(); }},
-            {{.Name = "depth_tested", .Type = FT::Bool}, "depthTested", true, {},
-                [](const Layer& l) { return Json(l.DepthTested); },
-                [](const Json& v, Layer& l) { l.DepthTested = v.get<bool>(); }},
-            {{.Name = "length_mode", .Type = FT::StringEnum, .EnumNames = kLengthModeLabels, .EnumValues = kLengthModes},
-                "lengthMode", true, kLengthModeSceneTokens,
-                [](const Layer& l) { return Json(Token(kLengthModes, static_cast<std::size_t>(l.LengthMode))); },
-                [](const Json& v, Layer& l) { l.LengthMode = static_cast<GeometryVectorFieldLengthMode>(IndexOf(kLengthModes, v)); }},
-            {{.Name = "length", .Type = FT::Float,
-                 .Description = "Arrow length (normalized) or scale (raw); multiplies a length property.",
-                 .Min = 0.0, .ExclusiveMin = true},
-                "length", true, {}, [](const Layer& l) { return Json(l.Length); },
-                [](const Json& v, Layer& l) { l.Length = v.get<float>(); }},
-            {{.Name = "line_width", .Type = FT::Float, .Description = "Arrow width in pixels.",
-                 .Min = Graphics::kVectorFieldMinLineWidthPx, .Max = Graphics::kVectorFieldMaxLineWidthPx},
-                "lineWidthPx", true, {}, [](const Layer& l) { return Json(l.LineWidthPx); },
-                [](const Json& v, Layer& l) { l.LineWidthPx = v.get<float>(); }},
-            {{.Name = "color", .Type = FT::Array, .Description = "Uniform RGBA, drawn while color_property is Default.",
-                 .Item = &kColorComponent, .MinItems = 4u, .MaxItems = 4u},
-                "color", true, {},
-                [](const Layer& l) { return Json::array({l.Color.x, l.Color.y, l.Color.z, l.Color.w}); },
+        constexpr auto kRows = std::to_array<Row>({
+            {{.Name = "visible", .Type = FT::Bool},
+                "enabled",
+                true,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.Enabled);
+                },
                 [](const Json& v, Layer& l)
-                { l.Color = glm::vec4{v[0].get<float>(), v[1].get<float>(), v[2].get<float>(), v[3].get<float>()}; }},
-            {{.Name = "stride", .Type = FT::UInt, .Description = "Draw every n-th element.",
-                 .Min = 1.0, .Max = double(kMaxGeometryVectorFieldStride)},
-                "stride", true, {}, [](const Layer& l) { return Json(l.Stride); },
-                [](const Json& v, Layer& l) { l.Stride = v.get<std::uint32_t>(); }},
+                {
+                    l.Enabled = v.get<bool>();
+                }},
+            {{.Name = "depth_tested", .Type = FT::Bool},
+                "depthTested",
+                true,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.DepthTested);
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.DepthTested = v.get<bool>();
+                }},
+            {{.Name = "length_mode",
+                 .Type = FT::StringEnum,
+                 .EnumNames = kLengthModeLabels,
+                 .EnumValues = kLengthModes},
+                "lengthMode",
+                true,
+                kLengthModeSceneTokens,
+                [](const Layer& l)
+                {
+                    return Json(Token(kLengthModes, static_cast<std::size_t>(l.LengthMode)));
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.LengthMode = static_cast<GeometryVectorFieldLengthMode>(IndexOf(kLengthModes, v));
+                }},
+            {{.Name = "length",
+                 .Type = FT::Float,
+                 .Description = "Arrow length (normalized) or scale (raw); multiplies a length property.",
+                 .Min = 0.0,
+                 .ExclusiveMin = true},
+                "length",
+                true,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.Length);
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.Length = v.get<float>();
+                }},
+            // RUNTIME-331: the pass-through style floats.
+#define VF_STYLE_ROW(member, fallback, agentName, sceneKey, sceneRequired, label, help, lo, hi)                        \
+    {{.Name = #agentName, .Type = FT::Float, .Description = help, .Min = lo, .Max = hi},                               \
+        #sceneKey,                                                                                                     \
+        sceneRequired,                                                                                                 \
+        {},                                                                                                            \
+        [](const Layer& l)                                                                                             \
+        {                                                                                                              \
+            return Json(l.member);                                                                                     \
+        },                                                                                                             \
+        [](const Json& v, Layer& l)                                                                                    \
+        {                                                                                                              \
+            l.member = v.get<float>();                                                                                 \
+        }},
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
+            {{.Name = "color",
+                 .Type = FT::Array,
+                 .Description = "Uniform RGBA, drawn while color_property is Default.",
+                 .Item = &kColorComponent,
+                 .MinItems = 4u,
+                 .MaxItems = 4u},
+                "color",
+                true,
+                {},
+                [](const Layer& l)
+                {
+                    return Json::array({l.Color.x, l.Color.y, l.Color.z, l.Color.w});
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.Color = glm::vec4{v[0].get<float>(), v[1].get<float>(), v[2].get<float>(), v[3].get<float>()};
+                }},
+            {{.Name = "stride",
+                 .Type = FT::UInt,
+                 .Description = "Draw every n-th element.",
+                 .Min = 1.0,
+                 .Max = double(kMaxGeometryVectorFieldStride)},
+                "stride",
+                true,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.Stride);
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.Stride = v.get<std::uint32_t>();
+                }},
             {{.Name = "max_glyphs", .Type = FT::UInt, .Description = "At most this many arrows; 0 draws all."},
-                "maxGlyphs", true, {}, [](const Layer& l) { return Json(l.MaxGlyphs); },
-                [](const Json& v, Layer& l) { l.MaxGlyphs = v.get<std::uint32_t>(); }},
-            {{.Name = "length_property", .Type = FT::String,
+                "maxGlyphs",
+                true,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.MaxGlyphs);
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.MaxGlyphs = v.get<std::uint32_t>();
+                }},
+            {{.Name = "length_property",
+                 .Type = FT::String,
                  .Description = "Scalar property multiplying each arrow's length; empty is Default."},
-                "lengthProperty", false, {}, [](const Layer& l) { return Json(l.LengthProperty); },
-                [](const Json& v, Layer& l) { l.LengthProperty = v.get<std::string>(); }},
-            {{.Name = "color_property", .Type = FT::String,
+                "lengthProperty",
+                false,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.LengthProperty);
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.LengthProperty = v.get<std::string>();
+                }},
+            {{.Name = "color_property",
+                 .Type = FT::String,
                  .Description = "Scalar or vec3/vec4 property coloring each arrow; empty is Default."},
-                "colorProperty", false, {}, [](const Layer& l) { return Json(l.ColorProperty); },
-                [](const Json& v, Layer& l) { l.ColorProperty = v.get<std::string>(); }},
-            {{.Name = "colormap", .Type = FT::StringEnum, .EnumNames = kColormaps, .EnumValues = kColormaps}, "colorMap", false, {},
-                [](const Layer& l) { return Json(Token(kColormaps, static_cast<std::size_t>(l.ColorMap))); },
-                [](const Json& v, Layer& l) { l.ColorMap = static_cast<Graphics::Colormap::Type>(IndexOf(kColormaps, v)); }},
-            {{.Name = "color_auto_range", .Type = FT::Bool}, "colorAutoRange", false, {},
-                [](const Layer& l) { return Json(l.ColorAutoRange); },
-                [](const Json& v, Layer& l) { l.ColorAutoRange = v.get<bool>(); }},
-            {{.Name = "color_range", .Type = FT::Array, .Description = "Manual colormap range, min < max.",
-                 .Item = &kRangeEnd, .MinItems = 2u, .MaxItems = 2u},
-                "colorRange", false, {},
-                [](const Layer& l) { return Json::array({l.ColorRangeMin, l.ColorRangeMax}); },
+                "colorProperty",
+                false,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.ColorProperty);
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.ColorProperty = v.get<std::string>();
+                }},
+            {{.Name = "colormap", .Type = FT::StringEnum, .EnumNames = kColormaps, .EnumValues = kColormaps},
+                "colorMap",
+                false,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(Token(kColormaps, static_cast<std::size_t>(l.ColorMap)));
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.ColorMap = static_cast<Graphics::Colormap::Type>(IndexOf(kColormaps, v));
+                }},
+            {{.Name = "color_auto_range", .Type = FT::Bool},
+                "colorAutoRange",
+                false,
+                {},
+                [](const Layer& l)
+                {
+                    return Json(l.ColorAutoRange);
+                },
+                [](const Json& v, Layer& l)
+                {
+                    l.ColorAutoRange = v.get<bool>();
+                }},
+            {{.Name = "color_range",
+                 .Type = FT::Array,
+                 .Description = "Manual colormap range, min < max.",
+                 .Item = &kRangeEnd,
+                 .MinItems = 2u,
+                 .MaxItems = 2u},
+                "colorRange",
+                false,
+                {},
+                [](const Layer& l)
+                {
+                    return Json::array({l.ColorRangeMin, l.ColorRangeMax});
+                },
                 [](const Json& v, Layer& l)
                 {
                     l.ColorRangeMin = v[0].get<float>();
                     l.ColorRangeMax = v[1].get<float>();
                 }},
-        }};
+        });
+
+        constexpr auto kSliders = std::to_array<GeometryVectorFieldStyleSlider>({
+#define VF_STYLE_ROW(member, fallback, agentName, sceneKey, sceneRequired, label, help, lo, hi)                        \
+    {label, #agentName, &Layer::member},
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
+        });
 
         constexpr std::array<ConfigFieldSpec, kRows.size()> kSpecs = []
         {
@@ -152,6 +291,11 @@ namespace Extrinsic::Runtime
     std::span<const ConfigFieldSpec> GeometryVectorFieldStyleFields() noexcept
     {
         return kSpecs;
+    }
+
+    std::span<const GeometryVectorFieldStyleSlider> GeometryVectorFieldStyleSliders() noexcept
+    {
+        return kSliders;
     }
 
     std::optional<std::string> CheckGeometryVectorFieldStyle(const Layer& layer)

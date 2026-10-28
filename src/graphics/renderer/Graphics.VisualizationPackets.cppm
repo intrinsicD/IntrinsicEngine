@@ -125,16 +125,17 @@ export namespace Extrinsic::Graphics
         Rgba,
     };
 
-    inline constexpr float kVectorFieldMinLineWidthPx = 0.5f;
-    inline constexpr float kVectorFieldMaxLineWidthPx = 32.f;
-
     // RUNTIME-328: the uniform style of a vector-field draw, carried unchanged from extraction
     // through the packet inputs and the packet to the draw record.
     struct VectorFieldGlyphStyle
     {
         float Scale{1.f};
         bool NormalizeLength{true};
-        float LineWidthPx{2.f};
+        // RUNTIME-331: the pass-through style floats, from the layer unchanged
+        // (`assets/shaders/common/vector_field_style_rows.glsl`).
+#define VF_STYLE_ROW(member, fallback, ...) float member{fallback};
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
         glm::vec4 Color{1.f};
         // Selects the depth-tested or always-on-top pipeline variant.
         bool DepthTested{true};
@@ -145,7 +146,7 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] friend bool operator==(const VectorFieldGlyphStyle&, const VectorFieldGlyphStyle&) = default;
     };
 
-    // Finite positive scale, finite color, width in bounds; in colormap mode a supported
+    // Finite positive scale, finite color, pass-through floats in their bounds; in colormap mode a supported
     // colormap with a finite min < max. The one style rule of the append and the packet.
     [[nodiscard]] bool IsValidVectorFieldGlyphStyle(
         const VectorFieldGlyphStyle& style, VectorFieldColorMode colorMode) noexcept;

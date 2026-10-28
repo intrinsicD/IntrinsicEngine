@@ -808,16 +808,17 @@ namespace Extrinsic::Runtime
                 .RowsPrevalidated = true,
                 .Stride = ordered ? 1u : layer.Stride,
                 .MaxGlyphs = ordered ? 0u : layer.MaxGlyphs,
-                .DrawRowCount =
-                    ordered ? OrderedDrawRowCount(order->Rows.size(), layer.Stride, layer.MaxGlyphs) : 0u,
+                .DrawRowCount = ordered ? OrderedDrawRowCount(order->Rows.size(), layer.Stride, layer.MaxGlyphs) : 0u,
                 .ObjectToWorld = worldMatrix,
                 .Style = {.Scale = layer.Length,
-                          .NormalizeLength = layer.LengthMode == GeometryVectorFieldLengthMode::Normalized,
-                          .LineWidthPx = layer.LineWidthPx,
-                          .Color = layer.Color,
-                          .DepthTested = layer.DepthTested},
+                    .NormalizeLength = layer.LengthMode == GeometryVectorFieldLengthMode::Normalized,
+                    .Color = layer.Color,
+                    .DepthTested = layer.DepthTested},
                 .CopyPayloads = false,
             };
+#define VF_STYLE_ROW(member, ...) inputs.Style.member = layer.member;
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
             const auto observeFront =
                 [&](const std::string& name) -> std::optional<RenderExtractionCache::GpuPropertyFront>
             {

@@ -16,9 +16,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -530,6 +532,70 @@ TEST(VisualizationOverlayPassContract, UnresolvedVectorFieldBuffersSkipWithoutFa
     EXPECT_EQ(world.Visualization.OverlaySummary.VectorGlyphCount, 200000u);
 
     renderer->Shutdown();
+}
+
+// RUNTIME-331: every pass-through style row reaches the uploaded record from the packet, at a value
+// that is neither its default nor 0 (record members start at 0).
+TEST(VisualizationOverlayPassContract, EveryPassThroughRowReachesTheRecord)
+{
+    Graphics::VectorFieldOverlayPacket packet{
+        .Name = "Test.VectorField.PassThrough",
+        .ElementCount = 4u,
+        .RowCount = 4u,
+        .PositionBufferBDA = kAnchorBDA,
+        .VectorBufferBDA = kVectorBDA,
+    };
+    const Graphics::VectorFieldGlyphStyle defaults{};
+#define VF_STYLE_ROW(member, fallback, agentName, sceneKey, sceneRequired, label, help, lo, hi)                        \
+    packet.Style.member = (hi) != (fallback) && (hi) != 0.0f ? (hi)                                                    \
+        : (lo) != (fallback) && (lo) != 0.0f                 ? (lo)                                                    \
+                                                             : ((lo) + (hi)) / 2.0f;                                                   \
+    ASSERT_NE(packet.Style.member, defaults.member) << #member;                                                        \
+    ASSERT_NE(packet.Style.member, 0.0f) << #member;
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
+    ASSERT_TRUE(Graphics::IsRenderableVectorFieldPacket(packet));
+
+    MockDevice device;
+    device.FramesInFlight = 2u;
+    RHI::BufferManager bufferManager{device};
+    Graphics::VisualizationOverlayUploadHelper helper{device, bufferManager};
+    helper.BeginFrame(0u, device.FramesInFlight);
+    const std::array<Graphics::VectorFieldOverlayPacket, 1> packets{packet};
+    ASSERT_TRUE(helper.UploadVectorFields(packets).Uploaded);
+    ASSERT_FALSE(device.BufferWrites.empty());
+    const auto& write = device.BufferWrites.back();
+    ASSERT_EQ(write.Data.size(), sizeof(Graphics::VisualizationVectorFieldDrawRecord));
+    Graphics::VisualizationVectorFieldDrawRecord record{};
+    std::memcpy(&record, write.Data.data(), sizeof(record));
+#define VF_STYLE_ROW(member, ...) EXPECT_EQ(record.member, packet.Style.member) << #member;
+#include "common/vector_field_style_rows.glsl"
+#undef VF_STYLE_ROW
+}
+
+// RUNTIME-331: the glyph-style check bounds each pass-through float by its row; the width row is
+// 0.5 to 32 px. (The runtime refuses such widths earlier through the style table.)
+TEST(VisualizationOverlayPassContract, VectorFieldPacketWidthStaysInItsRowBounds)
+{
+    Graphics::VectorFieldOverlayPacket packet{
+        .Name = "Test.VectorField.Width",
+        .ElementCount = 4u,
+        .RowCount = 4u,
+        .PositionBufferBDA = kAnchorBDA,
+        .VectorBufferBDA = kVectorBDA,
+    };
+    const auto renderable = [&](const float width)
+    {
+        packet.Style.LineWidthPx = width;
+        return Graphics::IsRenderableVectorFieldPacket(packet);
+    };
+    EXPECT_TRUE(renderable(2.0f));
+    EXPECT_TRUE(renderable(0.5f));
+    EXPECT_TRUE(renderable(32.0f));
+    EXPECT_FALSE(renderable(std::nextafter(0.5f, 0.0f)));
+    EXPECT_FALSE(renderable(std::nextafter(32.0f, 64.0f)));
+    EXPECT_FALSE(renderable(std::numeric_limits<float>::quiet_NaN()));
+    EXPECT_FALSE(renderable(std::numeric_limits<float>::infinity()));
 }
 
 TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryPacketStateAndStrideSampling)

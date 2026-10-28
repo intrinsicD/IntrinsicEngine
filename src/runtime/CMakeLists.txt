@@ -313,6 +313,8 @@ target_sources(${target_name}
 )
 
 target_include_directories(${target_name} PUBLIC .)
+# RUNTIME-331: vector-field style rows declared once for C++ and GLSL.
+target_include_directories(${target_name} PRIVATE ${CMAKE_SOURCE_DIR}/assets/shaders)
 
 target_link_libraries(${target_name}
         PUBLIC

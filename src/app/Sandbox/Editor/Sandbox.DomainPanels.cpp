@@ -680,13 +680,17 @@ namespace Extrinsic::Sandbox::Editor
                 1.0e9f,
                 "%.4g",
                 ImGuiSliderFlags_AlwaysClamp);
-            const ConfigFieldSpec& width = spec("line_width");
-            changed |= ImGui::SliderFloat("Width (px)",
-                &layer.LineWidthPx,
-                static_cast<float>(*width.Min),
-                static_cast<float>(*width.Max),
-                "%.1f",
-                ImGuiSliderFlags_AlwaysClamp);
+            // RUNTIME-331: one slider per pass-through style float, bounded by its spec.
+            for (const GeometryVectorFieldStyleSlider& slider : GeometryVectorFieldStyleSliders())
+            {
+                const ConfigFieldSpec& field = spec(slider.Field);
+                changed |= ImGui::SliderFloat(slider.Label.data(),
+                    &(layer.*slider.Member),
+                    static_cast<float>(*field.Min),
+                    static_cast<float>(*field.Max),
+                    "%.1f",
+                    ImGuiSliderFlags_AlwaysClamp);
+            }
             changed |= styleCombo("Color property", layer.ColorProperty, false);
             // Question 7: the uniform color is active only on Default and keeps its value meanwhile;
             // a bound layer's color is not written.
