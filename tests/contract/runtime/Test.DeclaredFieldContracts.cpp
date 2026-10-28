@@ -22,6 +22,8 @@
 #include <gtest/gtest.h>
 #include <gtest/gtest-spi.h>
 #include <nlohmann/json.hpp>
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
@@ -33,6 +35,8 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.Properties.Types;
 #include "GeometryIntegration/internal/Runtime.GeometryVectorFieldStyleJson.hpp"
 #include "Visualization/internal/Runtime.LaneVisualizationStyleJson.hpp"
+#include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 namespace R = Extrinsic::Runtime;
 using Json = nlohmann::json;
 using FT = R::ConfigFieldType;
@@ -493,4 +497,39 @@ TEST(DeclaredFieldContracts, NestedObjectsRequireOnlyDeclaredMembers)
     };
     check(R::MakeClusteringConfigSectionRegistration().SchemaJson, {"properties"});
     check(R::MakeParameterizationConfigSectionRegistration().SchemaJson, {"lscm", "harmonic", "bff", "view", "atlas"});
+}
+
+// RUNTIME-340: an object-or-string field (a payload passed as an object or as its JSON text) is
+// accepted and refused as expected by the config check and by the agent validator on its generated
+// schema, also when nullable (Codex B1: null then passes both).
+TEST(DeclaredFieldContracts, ObjectOrStringCheckAgreesWithItsSchema)
+{
+    for (const bool nullable : {false, true})
+    {
+        SCOPED_TRACE(nullable ? "nullable" : "not nullable");
+        const std::array<R::ConfigFieldSpec, 1> fields{
+            {{.Name = "payload", .Type = FT::ObjectOrString, .Nullable = nullable}}};
+        // The section schema without its document keys, as a tool's input schema (ArgumentsSchema).
+        Json document = Json::parse(R::ConfigDetail::BuildSectionSchemaJson("", "", "", fields, Json::object()));
+        document.erase("$schema");
+        document.erase("$id");
+        const std::string schema = document.dump();
+        ASSERT_TRUE(R::IsSupportedAgentSchemaJson(schema)) << schema;
+        EXPECT_EQ(document["properties"]["payload"]["type"],
+            nullable ? Json::array({"object", "string", "null"}) : Json::array({"object", "string"}));
+        for (const auto& [value, accepted] : std::vector<std::pair<Json, bool>>{{Json::object(), true},
+                 {Json{{"a", 1}}, true},
+                 {"{}", true},
+                 {"", true},
+                 {nullptr, nullable},
+                 {1, false},
+                 {1.5, false},
+                 {true, false},
+                 {Json::array(), false}})
+        {
+            const Json payload{{"payload", value}};
+            EXPECT_EQ(R::ConfigDetail::CollectDeclaredFieldErrors(payload, fields).empty(), accepted) << value.dump();
+            EXPECT_EQ(!R::ValidateAgentArgumentsJson(schema, payload.dump()).has_value(), accepted) << value.dump();
+        }
+    }
 }

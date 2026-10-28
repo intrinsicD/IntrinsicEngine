@@ -347,6 +347,10 @@ namespace Extrinsic::Runtime::ConfigDetail
             case ConfigFieldType::Object:
                 // Nested fallback owners validate and merge their objects themselves.
                 return value.is_object() ? std::nullopt : std::optional{name + " must be an object."};
+            case ConfigFieldType::ObjectOrString:
+                // A string's content (the object as JSON text) is its consumer's to parse.
+                return value.is_object() || value.is_string() ? std::nullopt
+                                                              : std::optional{name + " must be an object or a string."};
             case ConfigFieldType::UIntArray:
                 if (!value.is_array()) return name + " must be an array of unsigned 32-bit integers.";
                 for (const auto& item : value)
@@ -489,6 +493,10 @@ namespace Extrinsic::Runtime::ConfigDetail
             case ConfigFieldType::UIntArray:
                 p["type"] = "array";
                 p["items"] = {{"type", "integer"}, {"minimum", 0}, {"maximum", std::numeric_limits<std::uint32_t>::max()}};
+                break;
+            case ConfigFieldType::ObjectOrString:
+                p["type"] =
+                    field.Nullable ? OJson::array({"object", "string", "null"}) : OJson::array({"object", "string"});
                 break;
             case ConfigFieldType::PropertyRef:
             {

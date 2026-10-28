@@ -1387,7 +1387,7 @@ namespace Extrinsic::Runtime
             AddOperation(registry, name, title, std::move(description), std::move(schema), readOnly, std::move(invoke), destructive, gpu);
         };
         // RUNTIME-337: arguments declared once; the schemas below are generated from them, except
-        // where JSON Schema says more than a field spec can (const, oneOf, a payload object or string).
+        // where JSON Schema says more than a field spec can (const, oneOf).
         using FT = ConfigFieldType;
         const ToolSchema none = ArgumentsSchema({});
         const AgentArgument path{.Spec = {.Name = "path",
@@ -1605,13 +1605,24 @@ namespace Extrinsic::Runtime
             ArgumentsSchema({SectionArgument(true)}),
             true,
             ConfigGet);
-        add("config_preview", "Validate config section",
+        // RUNTIME-340: a payload is an object or its JSON text (Payload() reads both).
+        const AgentArgument payload{.Spec = {.Name = "payload",
+                                        .Type = FT::ObjectOrString,
+                                        .Description = "Section payload; omitted fields keep their defaults."},
+            .Required = true};
+        add("config_preview",
+            "Validate config section",
             "Validate a section payload without applying it; returns the canonical payload or diagnostics.",
-            Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), true, ConfigPreview);
-        add("config_apply", "Apply config section",
+            ArgumentsSchema({SectionArgument(true), payload}),
+            true,
+            ConfigPreview);
+        add("config_apply",
+            "Apply config section",
             "Validate and apply a section payload to the running engine (same path as the panels; recorded as an agent change). "
             "The payload follows the section's schema from config_schema or config_get.",
-            Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), false, ConfigApply,
+            ArgumentsSchema({SectionArgument(true), payload}),
+            false,
+            ConfigApply,
             true); // engine config is not part of the undo history
         add("jobs_list", "Jobs",
             "Background jobs with token, state, progress and elapsed time; editor jobs also name the entity and output they "

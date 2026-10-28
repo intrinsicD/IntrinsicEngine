@@ -1530,7 +1530,7 @@ TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
         EXPECT_EQ(actual, expected);
     }
     EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
-    EXPECT_EQ(declared, 42u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, 44u) << "declared input schemas of " << registry.Entries().size() << " tools";
 }
 
 // RUNTIME-337: the shared declarations reach the registered schemas (not only synthetic ones): an
@@ -1588,4 +1588,10 @@ TEST(AgentArgumentSchema, RegisteredDeclaredArgumentsKeepTheirRules)
         R"({"entity":1,"a":{"domain":"MeshVertex","name":""},"b":{"domain":"MeshVertex","name":"v"}})"));
     EXPECT_FALSE(accepts("property_compare",
         R"({"entity":1,"a":{"domain":"Vertex","name":"u"},"b":{"domain":"MeshVertex","name":"v"}})"));
+    // RUNTIME-340: a section payload as an object or as its JSON text.
+    EXPECT_TRUE(accepts("config_apply", R"({"section":"sandbox.clustering","payload":{"k":4}})"));
+    EXPECT_TRUE(accepts("config_apply", R"({"section":"sandbox.clustering","payload":"{\"k\":4}"})"));
+    EXPECT_FALSE(accepts("config_apply", R"({"section":"sandbox.clustering","payload":4})"));
+    EXPECT_FALSE(accepts("config_apply", R"({"section":"sandbox.clustering"})"));
+    EXPECT_FALSE(accepts("config_preview", R"({"payload":{}})"));
 }

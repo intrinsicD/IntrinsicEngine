@@ -31,6 +31,7 @@ export namespace Extrinsic::Runtime
         StringEnum,  // one of EnumValues (wire tokens), optionally named by EnumNames
         Array,       // homogeneous Item with optional length bounds
         Object,      // nested Fields; schema only, owner retains merge/fallback semantics
+        ObjectOrString, // any JSON object, or a string (an object as JSON text; its consumer parses it)
     };
 
     struct ConfigFieldSpec

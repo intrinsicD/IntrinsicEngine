@@ -49,6 +49,27 @@
     ],
     "type": "object"
   },
+  "config_apply": {
+    "additionalProperties": false,
+    "properties": {
+      "payload": {
+        "description": "Section payload; omitted fields keep their defaults.",
+        "type": [
+          "object",
+          "string"
+        ]
+      },
+      "section": {
+        "description": "Config section name from config_sections, e.g. sandbox.property_smoothing.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "section",
+      "payload"
+    ],
+    "type": "object"
+  },
   "config_get": {
     "additionalProperties": false,
     "properties": {
@@ -59,6 +80,27 @@
     },
     "required": [
       "section"
+    ],
+    "type": "object"
+  },
+  "config_preview": {
+    "additionalProperties": false,
+    "properties": {
+      "payload": {
+        "description": "Section payload; omitted fields keep their defaults.",
+        "type": [
+          "object",
+          "string"
+        ]
+      },
+      "section": {
+        "description": "Config section name from config_sections, e.g. sandbox.property_smoothing.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "section",
+      "payload"
     ],
     "type": "object"
   },

@@ -350,9 +350,8 @@ namespace Extrinsic::Runtime::AgentDetail
         return R"({"type":"object","properties":)" + std::move(properties) + R"(,"required":)" +
                std::move(required) + R"(,"additionalProperties":false})";
     }
-    inline const std::string kEntityProperty = R"("entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Stable entity id from scene_entities."})";
-    inline const std::string kSectionProperty = R"("section":{"type":"string","description":"Config section name from config_sections, e.g. sandbox.property_smoothing."})";
-    inline const std::string kPayloadProperty = R"("payload":{"type":["object","string"],"description":"Section payload; omitted fields keep their defaults."})";
+    inline const std::string kEntityProperty =
+        R"("entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Stable entity id from scene_entities."})";
 
     // ---- declared arguments (RUNTIME-337; the declarations in Runtime.AgentArguments.hpp) ----
     inline std::span<const std::string_view> DomainTokens()
