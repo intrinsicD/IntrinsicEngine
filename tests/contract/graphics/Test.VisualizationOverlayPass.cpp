@@ -600,8 +600,8 @@ TEST(VisualizationOverlayPassContract, VectorFieldPacketWidthStaysInItsRowBounds
 
 TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryPacketStateAndStrideSampling)
 {
-    // The helper uploads one 128-byte record per renderable packet; the
-    // record is the shader contract (transform, buffers, sampling, style).
+    // The helper uploads one record per renderable packet; the record is the
+    // shader contract (transform, buffers, sampling, style).
     Graphics::VectorFieldOverlayPacket sampled{
         .Name = "Test.VectorField.Sampled",
         .RowBufferSourceKey = "rows",
@@ -652,16 +652,12 @@ TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryPacketStateAndStri
     EXPECT_EQ(record.Flags & Graphics::kVisualizationVectorFieldNormalizeFlag, 0u);
 }
 
-// UI-083: the 144-byte record carries the per-element length and color buffers, the color kind
-// and the colormap range; a named style buffer that did not resolve skips the packet.
+// UI-083: the record carries the per-element length and color buffers, the color kind and the
+// colormap range; a named style buffer that did not resolve skips the packet. (RUNTIME-332: no
+// size or offset literals; both record structs come from the shared rows, whose types the upload
+// helper checks against their GLSL scalar size and alignment.)
 TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryLengthAndColorBuffers)
 {
-    // The bytes the shader reads (GRAPHICS-165 keeps them); a reordered or retyped row moves them.
-    static_assert(sizeof(Graphics::VisualizationVectorFieldDrawRecord) == 144u);
-    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, ColormapID) == 116u);
-    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, LengthBufferBDA) == 120u);
-    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, ColorBufferBDA) == 128u);
-    static_assert(offsetof(Graphics::VisualizationVectorFieldDrawRecord, ColorRangeMax) == 140u);
     Graphics::VectorFieldOverlayPacket colormap{
         .Name = "Test.VectorField.Colormap",
         .ElementCount = 4u,

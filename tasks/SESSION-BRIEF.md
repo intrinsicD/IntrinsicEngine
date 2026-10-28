@@ -24,6 +24,7 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-329` — The lane visualization style is declared once (moonshot M2, slice 4) (tasks/active/RUNTIME-329-lane-visualization-style-declared-once.md)
 - `RUNTIME-330` — Contract tests generated from the declared field tables (moonshot M2, slice 5) (tasks/active/RUNTIME-330-declared-field-contract-tests.md)
 - `RUNTIME-331` — A pass-through vector-field style field is one row (moonshot M2, slice 7) (tasks/active/RUNTIME-331-vector-field-pass-through-style-rows.md)
+- `RUNTIME-332` — The vector-field test pins follow the rows (moonshot M2, slice 8) (tasks/active/RUNTIME-332-vector-field-pins-follow-the-rows.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 - `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/active/UI-079-imguizmo-hidpi-operational-run.md)
