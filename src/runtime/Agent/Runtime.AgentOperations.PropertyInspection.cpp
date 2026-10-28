@@ -1,13 +1,16 @@
 // JSON adapters for the same read-only property queries used by the Property Inspector.
 module;
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -27,6 +30,7 @@ import Extrinsic.Runtime.PropertyInspectionOperations;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Geometry.Properties.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
 #include "Agent/internal/Runtime.AgentOperations.Detail.hpp"
 
 namespace Extrinsic::Runtime
@@ -159,13 +163,39 @@ namespace Extrinsic::Runtime
         using namespace AgentDetail;
         const auto refFields = DomainProperty("Element domain from property_list.") + R"(,"name":{"type":"string","minLength":1})";
         const auto refSchema = Schema("{" + refFields + "}", R"(["domain","name"])" );
-        AddOperation(registry, "property_list", "Property catalog", "List all property domains, kinds, row counts and generations for an entity.",
-            Schema("{" + kEntityProperty + "}", R"(["entity"])"), true, PropertyList);
-        AddOperation(registry, "property_stats", "Property statistics", "Read finite/deleted/nonfinite counts, scalar or component/magnitude statistics and histograms. Deleted rows are excluded; no scene changes.",
-            Schema("{" + kEntityProperty + "," + refFields + R"(,"bins":{"type":"integer","minimum":0,"maximum":256,"default":32}})", R"(["entity","domain","name"])"), true, PropertyStats);
+        // RUNTIME-337: declared arguments (property_compare keeps its nested objects hand-written).
+        using FT = ConfigFieldType;
+        const AgentArgument domain = DomainArgument("Element domain from property_list.", true);
+        const AgentArgument name{.Spec = {.Name = "name", .Type = FT::String, .NonEmpty = true}, .Required = true};
+        AddOperation(registry,
+            "property_list",
+            "Property catalog",
+            "List all property domains, kinds, row counts and generations for an entity.",
+            ArgumentsSchema({EntityArgument()}),
+            true,
+            PropertyList);
+        AddOperation(registry,
+            "property_stats",
+            "Property statistics",
+            "Read finite/deleted/nonfinite counts, scalar or component/magnitude statistics and histograms. Deleted rows are excluded; no scene changes.",
+            ArgumentsSchema({EntityArgument(),
+                domain,
+                name,
+                {.Spec = {.Name = "bins", .Type = FT::UInt, .Min = 0.0, .Max = 256.0}, .Default = 32}}),
+            true,
+            PropertyStats);
         AddOperation(registry, "property_compare", "Compare property values", "Compare two properties on the same entity and element domain. Scalars may mix numeric kinds; vectors require matching dimensions. Deleted/nonfinite rows are excluded.",
             Schema("{" + kEntityProperty + ",\"a\":" + refSchema + ",\"b\":" + refSchema + "}", R"(["entity","a","b"])"), true, PropertyCompare);
-        AddOperation(registry, "property_values", "Property values", "Read a bounded page by storage index, including deleted flags. UInt64 values are exact decimal strings; NaN/+Infinity/-Infinity are explicit strings. Vector rows contain one cell per component.",
-            Schema("{" + kEntityProperty + "," + refFields + R"(,"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1,"maximum":65536,"default":256}})", R"(["entity","domain","name"])"), true, PropertyValues);
+        AddOperation(registry,
+            "property_values",
+            "Property values",
+            "Read a bounded page by storage index, including deleted flags. UInt64 values are exact decimal strings; NaN/+Infinity/-Infinity are explicit strings. Vector rows contain one cell per component.",
+            ArgumentsSchema({EntityArgument(),
+                domain,
+                name,
+                {.Spec = {.Name = "offset", .Type = FT::Int, .Min = 0.0}, .Default = 0},
+                {.Spec = {.Name = "limit", .Type = FT::UInt, .Min = 1.0, .Max = 65536.0}, .Default = 256}}),
+            true,
+            PropertyValues);
     }
 }

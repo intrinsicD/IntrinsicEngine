@@ -391,10 +391,5 @@ extern "C++"
             layer = std::move(applied);
             return std::nullopt;
         }
-
-        Json GeometryVectorFieldStyleSchemaProperties()
-        {
-            return Json::parse(ConfigDetail::BuildSectionSchemaJson("", "", "", kSpecs, Json::object()))["properties"];
-        }
     }
 }

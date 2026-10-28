@@ -92,6 +92,9 @@ export namespace Extrinsic::Runtime
         // May dispatch GPU work, which only progresses on presented frames: refused while the
         // viewport is not presentable, and a pending call fails with "viewport_not_presentable".
         bool NeedsPresentedFrame{false};
+        // RUNTIME-337: the input schema is generated from declared arguments (none hand-written),
+        // the measure of M2's "every tool generated".
+        bool DeclaredArguments{false};
         AgentOperationInvoker Invoke{};
     };
 

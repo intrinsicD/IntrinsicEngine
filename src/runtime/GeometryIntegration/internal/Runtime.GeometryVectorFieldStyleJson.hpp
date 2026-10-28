@@ -22,7 +22,5 @@ extern "C++"
         // value `layer` is unchanged and the reason is returned.
         [[nodiscard]] std::optional<std::string> ReadGeometryVectorFieldStyleJson(
             const nlohmann::json& object, GeometryVectorFieldLayerRecipe& layer, GeometryVectorFieldStyleKeys keys);
-        // JSON Schema `properties` of the style in agent names (types, bounds, enums, descriptions).
-        [[nodiscard]] nlohmann::json GeometryVectorFieldStyleSchemaProperties();
     }
 }

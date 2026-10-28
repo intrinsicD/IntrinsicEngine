@@ -22,6 +22,9 @@ import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.ConfigFieldSpec;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.LaneVisualizationStyle;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -1489,4 +1492,65 @@ TEST(AgentArgumentSchema, VectorFieldRangesAreRefusedBeforeTheCommand)
         EXPECT_EQ(outcome.ErrorCode, "invalid_params") << arguments << ": " << outcome.Text;
     }
     EXPECT_FALSE(history.CanUndo());
+}
+
+// RUNTIME-337: the tools whose input schema is generated from declared arguments, and only those,
+// have a baseline, the hand-written schema each replaced (captured at 36dd1fc81). The generated
+// schema equals it, descriptions and annotations included. Rows a style table gains later are
+// checked per row against the registered schema by DeclaredFieldContracts, not here.
+TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
+{
+    const auto registry = FullAgentRegistry();
+    std::ifstream file(std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
+        "data/agent_declared_tool_schemas.json");
+    const Json baseline = Json::parse(file, nullptr, false);
+    ASSERT_TRUE(baseline.is_object());
+    std::size_t declared = 0;
+    for (const auto& spec : registry.Entries())
+    {
+        SCOPED_TRACE(spec.Name);
+        EXPECT_EQ(spec.DeclaredArguments, baseline.contains(spec.Name));
+        if (!spec.DeclaredArguments || !baseline.contains(spec.Name))
+            continue;
+        ++declared;
+        Json actual = Json::parse(spec.InputSchemaJson);
+        const std::span<const R::ConfigFieldSpec> table = spec.Name == "vector_field"
+            ? R::GeometryVectorFieldStyleFields()
+            : spec.Name == "lane_style" ? R::LaneVisualizationStyleFields()
+                                        : std::span<const R::ConfigFieldSpec>{};
+        for (const R::ConfigFieldSpec& field : table)
+            if (!baseline[spec.Name]["properties"].contains(field.Name))
+                actual["properties"].erase(std::string(field.Name));
+        EXPECT_EQ(actual, baseline[spec.Name]);
+    }
+    EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
+    EXPECT_EQ(declared, 36u) << "declared input schemas of " << registry.Entries().size() << " tools";
+}
+
+// RUNTIME-337: the shared declarations reach the registered schemas (not only synthetic ones): an
+// entity id is 1..UINT32_MAX, required arguments are required, tokens are closed, and an offset
+// without a declared maximum stays unbounded.
+TEST(AgentArgumentSchema, RegisteredDeclaredArgumentsKeepTheirRules)
+{
+    const auto registry = FullAgentRegistry();
+    const auto accepts = [&](const char* tool, const char* arguments)
+    {
+        const auto* spec = registry.Find(tool);
+        return spec != nullptr && !R::ValidateAgentArgumentsJson(spec->InputSchemaJson, arguments).has_value();
+    };
+    EXPECT_TRUE(accepts("select_entity", R"({"entity":1})"));
+    EXPECT_TRUE(accepts("select_entity", R"({"entity":4294967295})"));
+    EXPECT_FALSE(accepts("select_entity", R"({"entity":0})"));
+    EXPECT_FALSE(accepts("select_entity", R"({"entity":4294967296})"));
+    EXPECT_FALSE(accepts("select_entity", R"({})"));
+    const char* values = R"({"entity":1,"domain":"MeshVertex","name":"v","offset":4294967296})";
+    EXPECT_TRUE(accepts("property_values", values));
+    EXPECT_FALSE(accepts("property_values", R"({"entity":1,"domain":"MeshVertex","name":"v","offset":-1})"));
+    EXPECT_FALSE(accepts("property_values", R"({"entity":1,"domain":"MeshVertex","offset":0})"));
+    EXPECT_FALSE(accepts("property_values", R"({"entity":1,"domain":"Vertex","name":"v"})"));
+    EXPECT_TRUE(accepts("run_mesh_operation", R"({"operation":"property_smoothing","entity":1})"));
+    EXPECT_FALSE(accepts("run_mesh_operation", R"({"operation":"mesh_denoise","entity":1})"));
+    EXPECT_FALSE(accepts("run_mesh_operation", R"({"entity":1})"));
+    EXPECT_TRUE(accepts("set_visibility", R"({"entity":1,"visible":false,"lane":"bounds"})"));
+    EXPECT_FALSE(accepts("lane_style", R"({"entity":1,"lane":"bounds"})"));
 }

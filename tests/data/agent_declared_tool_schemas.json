@@ -1,0 +1,944 @@
+{
+  "attribute_bindings": {
+    "additionalProperties": false,
+    "properties": {
+      "attribute": {
+        "description": "Render attribute (shader input) whose source property is chosen.",
+        "enum": [
+          "position",
+          "normal",
+          "texcoord",
+          "color",
+          "point_size",
+          "line_width"
+        ],
+        "type": "string"
+      },
+      "domain": {
+        "description": "Optional: only rows reading this element domain.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "lane": {
+        "description": "Optional: only this lane.",
+        "enum": [
+          "surface",
+          "edges",
+          "points"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  },
+  "config_get": {
+    "additionalProperties": false,
+    "properties": {
+      "section": {
+        "description": "Config section name from config_sections, e.g. sandbox.property_smoothing.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "section"
+    ],
+    "type": "object"
+  },
+  "config_schema": {
+    "additionalProperties": false,
+    "properties": {
+      "section": {
+        "description": "Config section name from config_sections, e.g. sandbox.property_smoothing.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  },
+  "config_sections": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "entity_properties": {
+    "additionalProperties": false,
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  },
+  "history": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "import_file": {
+    "additionalProperties": false,
+    "properties": {
+      "path": {
+        "description": "Absolute path, or relative to the first allowed root.",
+        "type": "string"
+      },
+      "wait": {
+        "default": false,
+        "description": "Answer once the import materialized or failed (reports the new entities) instead of when it is queued.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  },
+  "jobs_cancel": {
+    "additionalProperties": false,
+    "properties": {
+      "token": {
+        "description": "Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "token"
+    ],
+    "type": "object"
+  },
+  "jobs_list": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "lane_style": {
+    "additionalProperties": false,
+    "properties": {
+      "auto_range": {
+        "type": "boolean"
+      },
+      "bin_count": {
+        "maximum": 4294967295,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "color": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "color_buffer_name": {
+        "type": "string"
+      },
+      "color_interpretation": {
+        "enum": [
+          "components",
+          "normal_direction"
+        ],
+        "type": "string"
+      },
+      "colormap": {
+        "enum": [
+          "Viridis",
+          "Inferno",
+          "Plasma",
+          "Jet",
+          "Coolwarm",
+          "Heat"
+        ],
+        "type": "string",
+        "x-enum-names": [
+          "Viridis",
+          "Inferno",
+          "Plasma",
+          "Jet",
+          "Coolwarm",
+          "Heat"
+        ]
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "isoline_color": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "isoline_count": {
+        "maximum": 4294967295,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "isoline_values": {
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 8,
+        "type": "array"
+      },
+      "isoline_width": {
+        "type": "number"
+      },
+      "lane": {
+        "description": "The render lane.",
+        "enum": [
+          "surface",
+          "edges",
+          "points"
+        ],
+        "type": "string"
+      },
+      "range_max": {
+        "type": "number"
+      },
+      "range_min": {
+        "type": "number"
+      },
+      "scalar_domain": {
+        "enum": [
+          "Vertex",
+          "Edge",
+          "Face"
+        ],
+        "type": "string",
+        "x-enum-names": [
+          "Vertex",
+          "Edge",
+          "Face"
+        ]
+      },
+      "scalar_field_name": {
+        "type": "string"
+      },
+      "source": {
+        "enum": [
+          "Material",
+          "UniformColor",
+          "ScalarField",
+          "PerVertexBuffer",
+          "PerEdgeBuffer",
+          "PerFaceBuffer"
+        ],
+        "type": "string",
+        "x-enum-names": [
+          "Material",
+          "UniformColor",
+          "ScalarField",
+          "PerVertexBuffer",
+          "PerEdgeBuffer",
+          "PerFaceBuffer"
+        ]
+      },
+      "uniform_by_default": {
+        "type": "boolean"
+      },
+      "use_baked_texture": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "entity",
+      "lane"
+    ],
+    "type": "object"
+  },
+  "load_scene": {
+    "additionalProperties": false,
+    "properties": {
+      "path": {
+        "description": "Absolute path, or relative to the first allowed root.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  },
+  "log": {
+    "additionalProperties": false,
+    "properties": {
+      "limit": {
+        "default": 100,
+        "maximum": 1000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "min_level": {
+        "default": "info",
+        "enum": [
+          "debug",
+          "info",
+          "warning",
+          "error"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  },
+  "preview_keypoint_analysis": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "preview_kmeans": {
+    "additionalProperties": false,
+    "properties": {
+      "domain": {
+        "description": "Element domain of the positions; needed only while sandbox.clustering binds no properties.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "positions": {
+        "description": "Name of the vec3 position property.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  },
+  "preview_mesh_operation": {
+    "additionalProperties": false,
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "operation": {
+        "description": "Mesh-field operation; its settings come from the matching config section (config_apply first).",
+        "enum": [
+          "property_smoothing",
+          "spectral_modes",
+          "harmonic_field",
+          "scalar_gradient"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "operation",
+      "entity"
+    ],
+    "type": "object"
+  },
+  "preview_point_cloud_consolidation": {
+    "additionalProperties": false,
+    "properties": {
+      "domain": {
+        "description": "Element domain of the positions.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "positions": {
+        "default": "v:position",
+        "description": "Name of the vec3 position property.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity",
+      "domain"
+    ],
+    "type": "object"
+  },
+  "preview_point_sampling": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "preview_registration": {
+    "additionalProperties": false,
+    "properties": {
+      "method": {
+        "description": "icp uses sandbox.registration, cpd uses sandbox.coherent_point_drift (config_apply first).",
+        "enum": [
+          "icp",
+          "cpd"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "method"
+    ],
+    "type": "object"
+  },
+  "property_list": {
+    "additionalProperties": false,
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  },
+  "property_stats": {
+    "additionalProperties": false,
+    "properties": {
+      "bins": {
+        "default": 32,
+        "maximum": 256,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "domain": {
+        "description": "Element domain from property_list.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "name": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity",
+      "domain",
+      "name"
+    ],
+    "type": "object"
+  },
+  "property_values": {
+    "additionalProperties": false,
+    "properties": {
+      "domain": {
+        "description": "Element domain from property_list.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "limit": {
+        "default": 256,
+        "maximum": 65536,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "name": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "offset": {
+        "default": 0,
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "entity",
+      "domain",
+      "name"
+    ],
+    "type": "object"
+  },
+  "redo": {
+    "additionalProperties": false,
+    "properties": {
+      "steps": {
+        "default": 1,
+        "maximum": 64,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object"
+  },
+  "run_keypoint_analysis": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "run_kmeans": {
+    "additionalProperties": false,
+    "properties": {
+      "domain": {
+        "description": "Element domain of the positions; needed only while sandbox.clustering binds no properties.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "positions": {
+        "description": "Name of the vec3 position property.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  },
+  "run_mesh_operation": {
+    "additionalProperties": false,
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "operation": {
+        "description": "Mesh-field operation; its settings come from the matching config section (config_apply first).",
+        "enum": [
+          "property_smoothing",
+          "spectral_modes",
+          "harmonic_field",
+          "scalar_gradient"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "operation",
+      "entity"
+    ],
+    "type": "object"
+  },
+  "run_point_cloud_consolidation": {
+    "additionalProperties": false,
+    "properties": {
+      "domain": {
+        "description": "Element domain of the positions.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "positions": {
+        "default": "v:position",
+        "description": "Name of the vec3 position property.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity",
+      "domain"
+    ],
+    "type": "object"
+  },
+  "run_point_sampling": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "run_registration": {
+    "additionalProperties": false,
+    "properties": {
+      "method": {
+        "description": "icp uses sandbox.registration, cpd uses sandbox.coherent_point_drift (config_apply first).",
+        "enum": [
+          "icp",
+          "cpd"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "method"
+    ],
+    "type": "object"
+  },
+  "save_scene": {
+    "additionalProperties": false,
+    "properties": {
+      "overwrite": {
+        "default": false,
+        "type": "boolean"
+      },
+      "path": {
+        "description": "Absolute path, or relative to the first allowed root.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "type": "object"
+  },
+  "scene_entities": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "select_entity": {
+    "additionalProperties": false,
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  },
+  "set_visibility": {
+    "additionalProperties": false,
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "lane": {
+        "description": "Which lane; default the entity's primary one.",
+        "enum": [
+          "surface",
+          "edges",
+          "points",
+          "bounds"
+        ],
+        "type": "string"
+      },
+      "visible": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "entity",
+      "visible"
+    ],
+    "type": "object"
+  },
+  "show_property": {
+    "additionalProperties": false,
+    "properties": {
+      "domain": {
+        "description": "Optional: restrict to one element domain.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "name": {
+        "type": "string"
+      },
+      "normal_direction": {
+        "default": false,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "entity",
+      "name"
+    ],
+    "type": "object"
+  },
+  "undo": {
+    "additionalProperties": false,
+    "properties": {
+      "steps": {
+        "default": 1,
+        "maximum": 64,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object"
+  },
+  "vector_field": {
+    "additionalProperties": false,
+    "properties": {
+      "action": {
+        "enum": [
+          "add",
+          "update",
+          "remove"
+        ],
+        "type": "string"
+      },
+      "color": {
+        "description": "Uniform RGBA, drawn while color_property is Default.",
+        "items": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "maxItems": 4,
+        "minItems": 4,
+        "type": "array"
+      },
+      "color_auto_range": {
+        "type": "boolean"
+      },
+      "color_property": {
+        "description": "Scalar or vec3/vec4 property coloring each arrow; empty is Default.",
+        "type": "string"
+      },
+      "color_range": {
+        "description": "Manual colormap range, min < max.",
+        "items": {
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "colormap": {
+        "enum": [
+          "Viridis",
+          "Inferno",
+          "Plasma",
+          "Jet",
+          "Coolwarm",
+          "Heat"
+        ],
+        "type": "string",
+        "x-enum-names": [
+          "Viridis",
+          "Inferno",
+          "Plasma",
+          "Jet",
+          "Coolwarm",
+          "Heat"
+        ]
+      },
+      "depth_tested": {
+        "type": "boolean"
+      },
+      "domain": {
+        "description": "Element domain of the vec3 property.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "length": {
+        "description": "Arrow length (normalized) or scale (raw); multiplies a length property.",
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+      },
+      "length_mode": {
+        "enum": [
+          "normalized",
+          "raw"
+        ],
+        "type": "string",
+        "x-enum-names": [
+          "Normalized",
+          "Raw vectors (scaled)"
+        ]
+      },
+      "length_property": {
+        "description": "Scalar property multiplying each arrow's length; empty is Default.",
+        "type": "string"
+      },
+      "line_width": {
+        "description": "Arrow width in pixels.",
+        "maximum": 32.0,
+        "minimum": 0.5,
+        "type": "number"
+      },
+      "max_glyphs": {
+        "description": "At most this many arrows; 0 draws all.",
+        "maximum": 4294967295,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "property": {
+        "description": "The vec3 property the arrows draw.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "stride": {
+        "description": "Draw every n-th element.",
+        "maximum": 16777216,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "visible": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "entity",
+      "action",
+      "domain",
+      "property"
+    ],
+    "type": "object"
+  },
+  "vector_fields": {
+    "additionalProperties": false,
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  }
+}

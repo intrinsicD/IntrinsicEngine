@@ -12,8 +12,10 @@ module;
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -42,6 +44,8 @@ import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.ConfigFieldSpec;
+import Extrinsic.Runtime.LaneVisualizationStyle;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -306,6 +310,28 @@ namespace Extrinsic::Runtime
                 return out;
             }();
             return attributes;
+        }
+        // Declared enum tokens of tool arguments (RUNTIME-337).
+        constexpr std::array<std::string_view, 3> kVectorFieldActions{"add", "update", "remove"};
+        constexpr std::array<std::string_view, 4> kVisibilityLanes{"surface", "edges", "points", "bounds"};
+        constexpr std::array<std::string_view, 4> kLogLevels{"debug", "info", "warning", "error"};
+        std::span<const std::string_view> AttributeTokens()
+        {
+            static const auto tokens = []
+            {
+                std::vector<std::string_view> out;
+                for (const RenderAttribute attribute : TableAttributes())
+                    out.push_back(ToString(attribute));
+                return out;
+            }();
+            return tokens;
+        }
+        AgentArgument SectionArgument(const bool required)
+        {
+            return {.Spec = {.Name = "section",
+                        .Type = ConfigFieldType::String,
+                        .Description = "Config section name from config_sections, e.g. sandbox.property_smoothing."},
+                .Required = required};
         }
         std::string AttributeProperty()
         {
@@ -1346,42 +1372,79 @@ namespace Extrinsic::Runtime
 
     void RegisterEditorAgentOperations(AgentOperationRegistry& registry)
     {
-        const auto add = [&](const char* name, const char* title, std::string description, std::string schema,
-                             bool readOnly, AgentOperationInvoker invoke, bool destructive = false, bool gpu = false) {
+        const auto add = [&](const char* name,
+                             const char* title,
+                             std::string description,
+                             ToolSchema schema,
+                             bool readOnly,
+                             AgentOperationInvoker invoke,
+                             bool destructive = false,
+                             bool gpu = false)
+        {
             AddOperation(registry, name, title, std::move(description), std::move(schema), readOnly, std::move(invoke), destructive, gpu);
         };
-        const std::string& none = kNone;
+        // RUNTIME-337: arguments declared once; the schemas below are generated from them, except
+        // where JSON Schema says more than a field spec can (const, oneOf, nested required keys).
+        using FT = ConfigFieldType;
+        const ToolSchema none = ArgumentsSchema({});
+        const AgentArgument path{.Spec = {.Name = "path",
+                                     .Type = FT::String,
+                                     .Description = "Absolute path, or relative to the first allowed root."},
+            .Required = true};
         add("scene_entities", "Scene entities",
             "List scene entities with stable ids, names, selection and geometry element counts.", none, true, SceneEntities);
-        add("entity_properties", "Entity properties",
+        add("entity_properties",
+            "Entity properties",
             "List the properties of one entity (domain, name, value kind, element count).",
-            Schema("{" + kEntityProperty + "}", R"(["entity"])"), true, EntityProperties);
-        add("select_entity", "Select entity", "Select an entity in the editor, as a click in the hierarchy would.",
-            Schema("{" + kEntityProperty + "}", R"(["entity"])"), false, SelectEntity);
-        add("import_file", "Import file",
+            ArgumentsSchema({EntityArgument()}),
+            true,
+            EntityProperties);
+        add("select_entity",
+            "Select entity",
+            "Select an entity in the editor, as a click in the hierarchy would.",
+            ArgumentsSchema({EntityArgument()}),
+            false,
+            SelectEntity);
+        add("import_file",
+            "Import file",
             "Import a geometry/model file from inside an allowed root into the scene (same path as File > Import).",
-            Schema(R"({"path":{"type":"string","description":"Absolute path, or relative to the first allowed root."},"wait":{"type":"boolean","default":false,"description":"Answer once the import materialized or failed (reports the new entities) instead of when it is queued."}})", R"(["path"])"),
-            false, ImportFile);
-        add("save_scene", "Save scene",
+            ArgumentsSchema({path,
+                {.Spec = {.Name = "wait",
+                     .Type = FT::Bool,
+                     .Description = "Answer once the import materialized or failed (reports the new entities) instead "
+                                    "of when it is queued."},
+                    .Default = false}}),
+            false,
+            ImportFile);
+        add("save_scene",
+            "Save scene",
             "Save the scene document to a file inside an allowed root, like File > Save As. Refuses an existing file unless "
             "overwrite is true; the write is not part of the undo history. Answers when the save finished.",
-            Schema(R"({"path":{"type":"string","description":"Absolute path, or relative to the first allowed root."},"overwrite":{"type":"boolean","default":false}})", R"(["path"])"),
-            false, SaveScene, true);
-        add("load_scene", "Load scene",
+            ArgumentsSchema({path, {.Spec = {.Name = "overwrite", .Type = FT::Bool}, .Default = false}}),
+            false,
+            SaveScene,
+            true);
+        add("load_scene",
+            "Load scene",
             "Replace the scene document with a scene file from inside an allowed root, like File > Open: every entity of the "
             "current scene is dropped (save it first) and the undo history no longer covers it. Answers when loaded.",
-            Schema(R"({"path":{"type":"string","description":"Absolute path, or relative to the first allowed root."}})", R"(["path"])"),
-            false, LoadScene, true);
-        add("show_property", "Show property",
+            ArgumentsSchema({path}),
+            false,
+            LoadScene,
+            true);
+        add("show_property",
+            "Show property",
             "Color an entity by a property in the viewport, like a panel's Show button: scalars through the colormap, vectors "
             "as component colors (or normal directions). This is bind_attribute color on the property's domain (the one Color "
             "mechanism, the lane's visualization overlay): the last call wins and attribute_bindings shows it as the Color "
             "source; bind_attribute color with default: true clears it. normal_direction draws a vec3 as normal directions "
             "on the same overlay. Refusals carry the snake-case command status as error code; the reply carries the row.",
-            Schema("{" + kEntityProperty + R"(,"name":{"type":"string"},)" + DomainProperty("Optional: restrict to one element domain.") +
-                       R"(,"normal_direction":{"type":"boolean","default":false}})",
-                   R"(["entity","name"])"),
-            false, ShowProperty);
+            ArgumentsSchema({EntityArgument(),
+                {.Spec = {.Name = "name", .Type = FT::String}, .Required = true},
+                DomainArgument("Optional: restrict to one element domain."),
+                {.Spec = {.Name = "normal_direction", .Type = FT::Bool}, .Default = false}}),
+            false,
+            ShowProperty);
         add("attribute_bindings",
             "Render attribute sources",
             "List, per render lane of an entity (surface, edges, points: the Appearance panel's Faces, Edges and Vertices "
@@ -1391,10 +1454,13 @@ namespace Extrinsic::Runtime
             "the compatible candidate properties and the incompatible ones with their domain, typed status and reason. "
             "Optional lane, attribute and domain narrow the listing. Rows: " +
                 AttributeTableText(),
-            Schema("{" + kEntityProperty + "," + LaneProperty("Optional: only this lane.") + "," +
-                    DomainProperty("Optional: only rows reading this element domain.") + "," + AttributeProperty() +
-                    "}",
-                R"(["entity"])"),
+            ArgumentsSchema({EntityArgument(),
+                LaneArgument("Optional: only this lane."),
+                DomainArgument("Optional: only rows reading this element domain."),
+                {.Spec = {.Name = "attribute",
+                     .Type = FT::StringEnum,
+                     .Description = "Render attribute (shader input) whose source property is chosen.",
+                     .EnumValues = AttributeTokens()}}}),
             true,
             AttributeBindings);
         add(
@@ -1430,11 +1496,10 @@ namespace Extrinsic::Runtime
             "List an entity's Appearance vector fields like the panel's Vector fields section: per element domain the vec3 "
             "properties a field can draw and the style properties a field can take (scalar ones for length and color, "
             "vec3/vec4 for color), and every layer with its fields and status (a missing or GPU-preview style property).",
-            Schema("{" + kEntityProperty + "}", R"(["entity"])"),
+            ArgumentsSchema({EntityArgument()}),
             true,
             VectorFields);
-        add(
-            "vector_field",
+        add("vector_field",
             "Edit vector field",
             "Add, update or remove one Appearance vector field (identified by domain and vec3 property) through the panel's "
             "command; one undoable step each. add uses the panel's defaults (bounding-box length, palette color); update "
@@ -1443,20 +1508,19 @@ namespace Extrinsic::Runtime
             "vec3/vec4 as RGB(A); an invalid value draws the uniform color); \"\" restores Default. Refusals end with the "
             "snake-case command status as error code (invalid_visualization_property, stale_entity); bad arguments "
             "invalid_params. The reply lists the entity's layers.",
-            []
-            {
-                Json schema = Json::parse(Schema("{" + kEntityProperty +
-                        R"(,"action":{"type":"string","enum":["add","update","remove"]},)" +
-                        DomainProperty("Element domain of the vec3 property.") +
-                        R"(,"property":{"type":"string","minLength":1,"description":"The vec3 property the arrows draw."}})",
-                    R"(["entity","action","domain","property"])"));
-                schema["properties"].update(GeometryVectorFieldStyleSchemaProperties());
-                return Dump(schema);
-            }(),
+            ArgumentsSchema({EntityArgument(),
+                                {.Spec = {.Name = "action", .Type = FT::StringEnum, .EnumValues = kVectorFieldActions},
+                                    .Required = true},
+                                DomainArgument("Element domain of the vec3 property.", true),
+                                {.Spec = {.Name = "property",
+                                     .Type = FT::String,
+                                     .Description = "The vec3 property the arrows draw.",
+                                     .NonEmpty = true},
+                                    .Required = true}},
+                GeometryVectorFieldStyleFields()),
             false,
             VectorField);
-        add(
-            "lane_style",
+        add("lane_style",
             "Edit lane style",
             "Set the color style of one render lane of an entity (surface, edges or points) like the Appearance panel's "
             "visualization section: color source, uniform color, the scalar field and its colormap, auto or manual range, "
@@ -1464,22 +1528,19 @@ namespace Extrinsic::Runtime
             "call changes only the fields passed, as one undoable step, and replies with the lane's resulting style (a "
             "call without style fields changes nothing and returns it). Refusals: invalid_params for a value the table "
             "refuses, otherwise the snake-case command status as error code.",
-            []
-            {
-                Json schema = Json::parse(Schema(
-                    "{" + kEntityProperty + "," + LaneProperty("The render lane.") + "}", R"(["entity","lane"])"));
-                schema["properties"].update(LaneVisualizationStyleSchemaProperties());
-                return Dump(schema);
-            }(),
+            ArgumentsSchema({EntityArgument(), LaneArgument("The render lane.", true)}, LaneVisualizationStyleFields()),
             false,
             LaneStyle);
         add("set_visibility",
             "Set visibility",
             "Show or hide a lane of an entity like the appearance panel's Surface / Edges / Points / Bounding box checkboxes; by default the "
             "primary lane (the surface of a mesh, the edges of a graph, the points of a point cloud). One undoable step.",
-            Schema("{" + kEntityProperty +
-                    R"(,"visible":{"type":"boolean"},"lane":{"type":"string","enum":["surface","edges","points","bounds"],"description":"Which lane; default the entity's primary one."}})",
-                R"(["entity","visible"])"),
+            ArgumentsSchema({EntityArgument(),
+                {.Spec = {.Name = "visible", .Type = FT::Bool}, .Required = true},
+                {.Spec = {.Name = "lane",
+                     .Type = FT::StringEnum,
+                     .Description = "Which lane; default the entity's primary one.",
+                     .EnumValues = kVisibilityLanes}}}),
             false,
             SetVisibility);
         add("set_camera", "Set the main camera",
@@ -1499,19 +1560,27 @@ namespace Extrinsic::Runtime
                    R"("entities":{"type":"array","items":{"type":"integer","minimum":0,"maximum":4294967295},"description":"Stable ids for preset or focus."}})"),
             false, SetCamera);
         add("history", "Undo history", "Undo/redo availability, top labels, counts and dirty state.", none, true, History);
-        const std::string steps = Schema(R"({"steps":{"type":"integer","minimum":1,"maximum":64,"default":1}})");
+        const ToolSchema steps =
+            ArgumentsSchema({{.Spec = {.Name = "steps", .Type = FT::UInt, .Min = 1.0, .Max = 64.0}, .Default = 1}});
         add("undo", "Undo", "Undo editor commands, like Edit > Undo.", steps, false,
             [](const AgentOperationContext& c, std::string_view a) { return UndoRedo(c, a, true); });
         add("redo", "Redo", "Redo editor commands, like Edit > Redo.", steps, false,
             [](const AgentOperationContext& c, std::string_view a) { return UndoRedo(c, a, false); });
         add("config_sections", "Config sections", "List the engine config sections operations read their settings from.",
             none, true, ConfigSections);
-        add("config_schema", "Config schema",
+        add("config_schema",
+            "Config schema",
             "JSON Schema of the config section payloads (all sections, or one with 'section'): field descriptions, "
             "ranges, integer or string-token enums with optional x-enum-names, and property-reference kinds and domains.",
-            Schema("{" + kSectionProperty + "}"), true, ConfigSchema);
-        add("config_get", "Get config section", "Active payload, defaults and payload schema of one config section.",
-            Schema("{" + kSectionProperty + "}", R"(["section"])"), true, ConfigGet);
+            ArgumentsSchema({SectionArgument(false)}),
+            true,
+            ConfigSchema);
+        add("config_get",
+            "Get config section",
+            "Active payload, defaults and payload schema of one config section.",
+            ArgumentsSchema({SectionArgument(true)}),
+            true,
+            ConfigGet);
         add("config_preview", "Validate config section",
             "Validate a section payload without applying it; returns the canonical payload or diagnostics.",
             Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), true, ConfigPreview);
@@ -1534,15 +1603,25 @@ namespace Extrinsic::Runtime
             R"({"type":"object","properties":{)" + tokenProperty + "," + kEntityProperty +
                 R"(,"output":{"type":"string","description":"Output property name the editor job writes."},"timeout_ms":{"type":"integer","minimum":0,"maximum":60000,"default":30000}},"oneOf":[{"required":["token"]},{"required":["entity","output"]}],"additionalProperties":false})",
             true, JobsWait, false, true);
-        add("jobs_cancel", "Cancel a job",
+        add("jobs_cancel",
+            "Cancel a job",
             "Cancel an editor job (a jobs_list row with cancellable: true). It ends cancelled on a later frame and publishes "
             "nothing, so the scene and the undo history stay as they are; asset imports, scene files, k-means and consolidation "
             "runs cannot be cancelled.",
-            Schema("{" + tokenProperty + "}", R"(["token"])"), false, JobsCancel);
-        add("log", "Engine log",
+            ArgumentsSchema(
+                {{.Spec = {.Name = "token",
+                      .Type = FT::String,
+                      .Description = "Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1."},
+                    .Required = true}}),
+            false,
+            JobsCancel);
+        add("log",
+            "Engine log",
             "Recent engine log entries (warnings, errors, Vulkan validation messages).",
-            Schema(R"({"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100},"min_level":{"type":"string","enum":["debug","info","warning","error"],"default":"info"}})"),
-            true, Log);
+            ArgumentsSchema({{.Spec = {.Name = "limit", .Type = FT::UInt, .Min = 1.0, .Max = 1000.0}, .Default = 100},
+                {.Spec = {.Name = "min_level", .Type = FT::StringEnum, .EnumValues = kLogLevels}, .Default = "info"}}),
+            true,
+            Log);
         RegisterProcessingAgentOperations(registry);
         RegisterPropertyInspectionAgentOperations(registry);
         RegisterDiagnosticsAgentOperations(registry);

@@ -1,9 +1,9 @@
 // Shared helpers of the editor-backed agent operations (Editor.cpp, Operations.cpp): JSON
 // argument access, outcome builders, schema fragments, readiness and asynchronous
 // completion. Private to the Extrinsic.Runtime.AgentOperations implementation units: include it
-// after the module declaration and the imports, with a global module fragment that provides
-// <algorithm>, <cstdint>, <functional>, <memory>, <optional>, <string>, <string_view>, <utility>, <vector>
-// and <nlohmann/json.hpp>.
+// after the module declaration and the imports (Extrinsic.Runtime.ConfigFieldSpec among them), with a
+// global module fragment that provides <algorithm>, <array>, <cstdint>, <functional>, <initializer_list>,
+// <memory>, <optional>, <span>, <string>, <string_view>, <utility>, <vector> and <nlohmann/json.hpp>.
 #pragma once
 extern "C++"
 {
@@ -103,12 +103,6 @@ namespace Extrinsic::Runtime::AgentDetail
     {
         return R"("domain":{"type":"string","enum":[)" + DomainNames() + R"(],"description":")" + description + R"("})";
     }
-    inline const std::string kPositionsProperty =
-        R"("positions":{"type":"string","description":"Name of the vec3 position property."})";
-    inline const std::string kPositionsDefaultProperty =
-        R"("positions":{"type":"string","default":")" +
-        std::string{ECS::Components::GeometrySources::PropertyNames::kPosition} +
-        R"(","description":"Name of the vec3 position property."})";
     inline std::optional<GeometryElementDomain> ParseDomain(const std::optional<std::string>& name)
     {
         if (!name) return std::nullopt;
@@ -359,15 +353,87 @@ namespace Extrinsic::Runtime::AgentDetail
     inline const std::string kSectionProperty = R"("section":{"type":"string","description":"Config section name from config_sections, e.g. sandbox.property_smoothing."})";
     inline const std::string kPayloadProperty = R"("payload":{"type":["object","string"],"description":"Section payload; omitted fields keep their defaults."})";
 
-    inline const std::string kNone = Schema("{}");
-    // Registers one tool; `gpu` marks tools that may dispatch GPU work (NeedsPresentedFrame).
-    inline void AddOperation(AgentOperationRegistry& registry, const char* name, const char* title,
-                             std::string description, std::string schema, bool readOnly, AgentOperationInvoker invoke,
-                             bool destructive = false, bool gpu = false)
+    // ---- declared arguments (RUNTIME-337) ----------------------------------------------
+    // One tool argument declared once: its spec (name, type, bounds, enum tokens, description;
+    // descriptions and tokens must outlive the schema build), whether it is required and its
+    // default (null: none). The tool's input schema is generated from the list, so the agent's
+    // validator checks exactly the declared rules.
+    struct AgentArgument
     {
-        (void)registry.Register({.Name = name, .Title = title, .Description = std::move(description),
-                                 .InputSchemaJson = std::move(schema), .ReadOnly = readOnly, .Destructive = destructive,
-                                 .NeedsPresentedFrame = gpu, .Invoke = std::move(invoke)});
+        ConfigFieldSpec Spec{};
+        bool Required{false};
+        Json Default{};
+    };
+    // A tool's input schema text and whether it was generated from declared arguments.
+    struct ToolSchema
+    {
+        ToolSchema(std::string text) : Text(std::move(text)) {}
+        ToolSchema(const char* text) : Text(text) {}
+        ToolSchema(std::string text, const bool declared) : Text(std::move(text)), Declared(declared) {}
+        std::string Text;
+        bool Declared{false};
+    };
+    // The schema of `arguments`, followed by every field of `table` as an optional argument (a
+    // style table a tool takes whole). Defined beside ParamsSchema (Operations.cpp).
+    [[nodiscard]] ToolSchema ArgumentsSchema(
+        std::initializer_list<AgentArgument> arguments, std::span<const ConfigFieldSpec> table = {});
+
+    // The shared arguments, declared once.
+    inline AgentArgument EntityArgument(
+        const bool required = true, const std::string_view description = "Stable entity id from scene_entities.")
+    {
+        return {.Spec = {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = description, .Min = 1.0},
+            .Required = required};
+    }
+    inline std::span<const std::string_view> DomainTokens()
+    {
+        static const auto tokens = []
+        {
+            std::array<std::string_view, kLastDomain - kFirstDomain + 1u> out{};
+            for (unsigned i = kFirstDomain; i <= kLastDomain; ++i)
+                out[i - kFirstDomain] = ToString(static_cast<GeometryElementDomain>(i));
+            return out;
+        }();
+        return tokens;
+    }
+    inline AgentArgument DomainArgument(const std::string_view description, const bool required = false)
+    {
+        return {.Spec = {.Name = "domain",
+                    .Type = ConfigFieldType::StringEnum,
+                    .Description = description,
+                    .EnumValues = DomainTokens()},
+            .Required = required};
+    }
+    inline constexpr std::array<std::string_view, 3> kLaneTokens{"surface", "edges", "points"};
+    inline AgentArgument LaneArgument(const std::string_view description, const bool required = false)
+    {
+        return {.Spec = {.Name = "lane",
+                    .Type = ConfigFieldType::StringEnum,
+                    .Description = description,
+                    .EnumValues = kLaneTokens},
+            .Required = required};
+    }
+
+    // Registers one tool; `gpu` marks tools that may dispatch GPU work (NeedsPresentedFrame).
+    inline void AddOperation(AgentOperationRegistry& registry,
+        const char* name,
+        const char* title,
+        std::string description,
+        ToolSchema schema,
+        bool readOnly,
+        AgentOperationInvoker invoke,
+        bool destructive = false,
+        bool gpu = false)
+    {
+        (void)registry.Register({.Name = name,
+            .Title = title,
+            .Description = std::move(description),
+            .InputSchemaJson = std::move(schema.Text),
+            .ReadOnly = readOnly,
+            .Destructive = destructive,
+            .NeedsPresentedFrame = gpu,
+            .DeclaredArguments = schema.Declared,
+            .Invoke = std::move(invoke)});
     }
 }
 

@@ -8,6 +8,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -947,14 +948,27 @@ namespace Extrinsic::Runtime
 
     extern "C++" void RegisterProcessingAgentOperations(AgentOperationRegistry& registry)
     {
-        const auto add = [&](const char* name, const char* title, std::string description, std::string schema,
-                             bool readOnly, AgentOperationInvoker invoke, bool destructive = false, bool gpu = false) {
+        const auto add = [&](const char* name,
+                             const char* title,
+                             std::string description,
+                             ToolSchema schema,
+                             bool readOnly,
+                             AgentOperationInvoker invoke,
+                             bool destructive = false,
+                             bool gpu = false)
+        {
             AddOperation(registry, name, title, std::move(description), std::move(schema), readOnly, std::move(invoke), destructive, gpu);
         };
-        const std::string& none = kNone;
-        const std::string registration = Schema(
-            R"({"method":{"type":"string","enum":["icp","cpd"],"description":"icp uses sandbox.registration, cpd uses sandbox.coherent_point_drift (config_apply first)."}})",
-            R"(["method"])");
+        // RUNTIME-337: declared arguments, except the configured families (allOf of if/then per operation).
+        static constexpr std::array<std::string_view, 2> kRegistrationMethods{"icp", "cpd"};
+        const ToolSchema none = ArgumentsSchema({});
+        const ToolSchema registration =
+            ArgumentsSchema({{.Spec = {.Name = "method",
+                                  .Type = ConfigFieldType::StringEnum,
+                                  .Description = "icp uses sandbox.registration, cpd uses "
+                                                 "sandbox.coherent_point_drift (config_apply first).",
+                                  .EnumValues = kRegistrationMethods},
+                .Required = true}});
         add("preview_registration", "Preview registration",
             "Whether the configured ICP or Coherent Point Drift registration can run, and why not.", registration, true,
             [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, true); });
@@ -977,11 +991,17 @@ namespace Extrinsic::Runtime
         add("run_keypoint_analysis", "Run keypoint analysis",
             "Run sandbox.keypoint_analysis; GPU score and mask auto-accept in one undoable entry. Reports backend and IO.",
             none, false, [](const AgentOperationContext& c, std::string_view) { return RunKeypoints(c); }, false, true);
-        const std::string kmeansSchema = Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions; needed only while sandbox.clustering binds no properties.") +
-                       "," + kPositionsProperty + "}",
-                   R"(["entity"])");
-        const std::string consolidationSchema = Schema("{" + kEntityProperty + "," + DomainProperty("Element domain of the positions.") + "," + kPositionsDefaultProperty + "}",
-                   R"(["entity","domain"])");
+        const AgentArgument positions{.Spec = {.Name = "positions",
+                                          .Type = ConfigFieldType::String,
+                                          .Description = "Name of the vec3 position property."}};
+        const ToolSchema kmeansSchema = ArgumentsSchema({EntityArgument(),
+            DomainArgument(
+                "Element domain of the positions; needed only while sandbox.clustering binds no properties."),
+            positions});
+        AgentArgument positionsDefault = positions;
+        positionsDefault.Default = std::string{ECS::Components::GeometrySources::PropertyNames::kPosition};
+        const ToolSchema consolidationSchema = ArgumentsSchema(
+            {EntityArgument(), DomainArgument("Element domain of the positions.", true), positionsDefault});
         add("preview_kmeans", "Preview K-Means",
             "Whether K-Means can run on an entity with sandbox.clustering, and why not.", kmeansSchema, true, PreviewKMeansOperation);
         add("run_kmeans", "Run K-Means",
@@ -995,11 +1015,22 @@ namespace Extrinsic::Runtime
             "Consolidate the named vec3 point property of an entity using sandbox.point_cloud_consolidation; GPU runs "
             "auto-accept. Reports backend and IO.",
             consolidationSchema, false, RunConsolidation, false, true);
-        const std::string meshField = Schema(
-            R"({"operation":{"type":"string","enum":)" + OperationEnum("mesh_field") +
-                R"(,"description":"Mesh-field operation; its settings come from the matching config section (config_apply first)."},)" +
-                kEntityProperty + "}",
-            R"(["operation","entity"])");
+        static const std::vector<std::string_view> kMeshFieldOperations = []
+        {
+            std::vector<std::string_view> names;
+            for (const auto& op : ConfiguredOperations())
+                if (InFamily(op, "mesh_field"))
+                    names.emplace_back(op.Name);
+            return names;
+        }();
+        const ToolSchema meshField = ArgumentsSchema(
+            {{.Spec = {.Name = "operation",
+                  .Type = ConfigFieldType::StringEnum,
+                  .Description =
+                      "Mesh-field operation; its settings come from the matching config section (config_apply first).",
+                  .EnumValues = kMeshFieldOperations},
+                 .Required = true},
+                EntityArgument()});
         add("preview_mesh_operation", "Preview mesh operation",
             "Whether a mesh-field operation can run on an entity with the active settings, and why not. "
             "Alias of preview_operation limited to the mesh-field operations.", meshField, true,
@@ -1035,5 +1066,35 @@ namespace Extrinsic::Runtime
             "done. Operations: " + OperationSummary(nullptr) + ".",
             configuredSchema, false, [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, false, nullptr); },
             false, true); // several operations can select a Vulkan backend
+    }
+}
+
+// RUNTIME-337: a tool's input schema from its declared arguments, with the section schema generator
+// ParamsSchema uses (declared here, where the config codecs are included).
+extern "C++"
+{
+    namespace Extrinsic::Runtime::AgentDetail
+    {
+        ToolSchema ArgumentsSchema(
+            const std::initializer_list<AgentArgument> arguments, const std::span<const ConfigFieldSpec> table)
+        {
+            std::vector<ConfigFieldSpec> fields;
+            Json defaults = Json::object();
+            Json required = Json::array();
+            for (const AgentArgument& argument : arguments)
+            {
+                fields.push_back(argument.Spec);
+                if (!argument.Default.is_null())
+                    defaults[std::string(argument.Spec.Name)] = argument.Default;
+                if (argument.Required)
+                    required.push_back(std::string(argument.Spec.Name));
+            }
+            fields.insert(fields.end(), table.begin(), table.end());
+            Json schema = Json::parse(ConfigDetail::BuildSectionSchemaJson("", "", "", fields, defaults));
+            for (const char* key : {"$schema", "$id", "title", "description"})
+                schema.erase(key);
+            schema["required"] = std::move(required);
+            return {Dump(schema), true};
+        }
     }
 }

@@ -16,8 +16,6 @@ extern "C++"
         // leaves `config` unchanged.
         [[nodiscard]] bool ReadLaneVisualizationStyleJson(
             const nlohmann::json& value, Graphics::Components::VisualizationConfig& config);
-        // JSON Schema `properties` of the style by spec name (types, bounds, enums), for agent tools.
-        [[nodiscard]] nlohmann::json LaneVisualizationStyleSchemaProperties();
         // Every field by spec name; an enum outside its tokens keeps its number (what the check reads).
         [[nodiscard]] nlohmann::json LaneVisualizationStyleFieldsJson(
             const Graphics::Components::VisualizationConfig& config);

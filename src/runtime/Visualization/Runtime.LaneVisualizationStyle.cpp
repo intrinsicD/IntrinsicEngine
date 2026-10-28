@@ -273,11 +273,6 @@ extern "C++"
             return ReadLaneVisualizationStyleFields(values, config);
         }
 
-        Json LaneVisualizationStyleSchemaProperties()
-        {
-            return Json::parse(ConfigDetail::BuildSectionSchemaJson("", "", "", kSpecs, Json::object()))["properties"];
-        }
-
         Json LaneVisualizationStyleFieldsJson(const Config& config)
         {
             return Flat(config, Encoding::Strict);
