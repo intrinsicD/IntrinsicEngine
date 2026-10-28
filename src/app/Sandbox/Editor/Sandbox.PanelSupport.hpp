@@ -78,10 +78,10 @@ namespace Extrinsic::Sandbox::Editor
     };
 
     inline constexpr auto kUniformColorSource =
-        static_cast<decltype(Runtime::EditorVisualizationConfigModel{}.Source)>(1);
+        static_cast<decltype(Runtime::EditorVisualizationConfigModel{}.Config.Source)>(1);
 
     inline constexpr auto kScalarFieldSource =
-        static_cast<decltype(Runtime::EditorVisualizationConfigModel{}.Source)>(2);
+        static_cast<decltype(Runtime::EditorVisualizationConfigModel{}.Config.Source)>(2);
 
     void DrawBoundRenderStateRows(const Runtime::EditorBoundRenderStateModel& bound);
 

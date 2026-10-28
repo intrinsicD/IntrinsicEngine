@@ -45,6 +45,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Colormap;
+import Extrinsic.Runtime.LaneVisualizationStyle;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
@@ -194,10 +195,7 @@ TEST(SandboxEditorUi, UnbindingAColorPropertyRestoresTheLanesChosenUniformColor)
         {
             ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context,
                           Runtime::EditorVisualizationConfigCommand{.StableEntityId = stableId,
-                              .Target = Target::Surface,
-                              .Source = Source::UniformColor,
-                              .Color = chosen,
-                              .UniformByDefault = true}),
+                              .Target = Target::Surface, .Config = {.Source = Source::UniformColor, .Color = chosen, .UniformByDefault = true}}),
                 Runtime::EditorCommandStatus::Applied);
         }
         ASSERT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(context,
@@ -239,10 +237,7 @@ TEST(SandboxEditorUi, SwitchingTheSurfaceDomainKeepsTheLanesChosenUniformColor)
         context.VisualizationCommandsAvailable = true;
         ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context,
                       Runtime::EditorVisualizationConfigCommand{.StableEntityId = stableId,
-                          .Target = Runtime::EditorVisualizationTarget::Surface,
-                          .Source = uniform ? Source::UniformColor : Source::Material,
-                          .Color = chosen,
-                          .UniformByDefault = uniform}),
+                          .Target = Runtime::EditorVisualizationTarget::Surface, .Config = {.Source = uniform ? Source::UniformColor : Source::Material, .Color = chosen, .UniformByDefault = uniform}}),
             Runtime::EditorCommandStatus::Applied);
         ASSERT_EQ(Runtime::ApplyEditorRenderHintCommand(context,
                       Runtime::EditorRenderHintCommand{.StableEntityId = stableId,
@@ -745,11 +740,11 @@ TEST(SandboxEditorUi, LaneUniformColorStartsAtTheLaneDefault)
     registry.Raw().emplace<G::RenderPoints>(mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     using Kind = Runtime::EditorDomainWindowKind;
-    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::Mesh).Visualization.Visualization.Color,
+    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::Mesh).Visualization.Visualization.Config.Color,
         G::kDefaultSurfaceColor);
-    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::Graph).Visualization.Visualization.Color,
+    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::Graph).Visualization.Visualization.Config.Color,
         G::kDefaultLineAndPointColor);
-    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::PointCloud).Visualization.Visualization.Color,
+    EXPECT_EQ(Runtime::BuildEditorDomainWindowModel(context, Kind::PointCloud).Visualization.Visualization.Config.Color,
         G::kDefaultLineAndPointColor);
 }
 
@@ -1536,14 +1531,7 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
     const Runtime::EditorVisualizationConfigCommand scalar{
         .StableEntityId = stableId,
         .EnableConfig = true,
-        .Source = G::VisualizationConfig::ColorSource::ScalarField,
-        .ScalarFieldName = "curvature",
-        .ScalarDomain = G::VisualizationConfig::Domain::Face,
-        .ScalarAutoRange = false,
-        .ScalarRangeMin = -1.0f,
-        .ScalarRangeMax = 2.0f,
-        .ScalarBinCount = 4u,
-        .IsolineCount = 8u,
+        .Config = {.Source = G::VisualizationConfig::ColorSource::ScalarField, .ScalarFieldName = "curvature", .Scalar = {.RangeMin = -1.0f, .RangeMax = 2.0f, .AutoRange = false, .BinCount = 4u, .Isolines = {.Num = 8u}}, .ScalarDomain = G::VisualizationConfig::Domain::Face},
     };
 
     EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
@@ -1570,10 +1558,10 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
     Runtime::EditorWorkspaceSnapshot frame =
         Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Visualization.Visualization.HasConfig);
-    EXPECT_EQ(frame.Visualization.Visualization.Source,
+    EXPECT_EQ(frame.Visualization.Visualization.Config.Source,
               G::VisualizationConfig::ColorSource::ScalarField);
-    EXPECT_EQ(frame.Visualization.Visualization.ScalarFieldName, "curvature");
-    EXPECT_EQ(frame.Visualization.Visualization.IsolineCount, 8u);
+    EXPECT_EQ(frame.Visualization.Visualization.Config.ScalarFieldName, "curvature");
+    EXPECT_EQ(frame.Visualization.Visualization.Config.Scalar.Isolines.Num, 8u);
 
     EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
@@ -1583,15 +1571,7 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
     const Runtime::EditorVisualizationConfigCommand uniform{
         .StableEntityId = stableId,
         .EnableConfig = true,
-        .Source = G::VisualizationConfig::ColorSource::UniformColor,
-        .Color = glm::vec4{0.125f, 0.5f, 0.875f, 1.0f},
-        .ScalarFieldName = "curvature",
-        .ScalarDomain = G::VisualizationConfig::Domain::Face,
-        .ScalarAutoRange = false,
-        .ScalarRangeMin = -1.0f,
-        .ScalarRangeMax = 2.0f,
-        .ScalarBinCount = 4u,
-        .IsolineCount = 8u,
+        .Config = {.Source = G::VisualizationConfig::ColorSource::UniformColor, .Color = glm::vec4{0.125f, 0.5f, 0.875f, 1.0f}, .ScalarFieldName = "curvature", .Scalar = {.RangeMin = -1.0f, .RangeMax = 2.0f, .AutoRange = false, .BinCount = 4u, .Isolines = {.Num = 8u}}, .ScalarDomain = G::VisualizationConfig::Domain::Face},
     };
 
     EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
@@ -1616,12 +1596,12 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
 
     frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Visualization.Visualization.HasConfig);
-    EXPECT_EQ(frame.Visualization.Visualization.Source,
+    EXPECT_EQ(frame.Visualization.Visualization.Config.Source,
               G::VisualizationConfig::ColorSource::UniformColor);
-    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.x, 0.125f);
-    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.y, 0.5f);
-    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.z, 0.875f);
-    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.w, 1.0f);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Config.Color.x, 0.125f);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Config.Color.y, 0.5f);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Config.Color.z, 0.875f);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Config.Color.w, 1.0f);
 
     EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
@@ -1682,14 +1662,13 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsLaneOverrides)
         EXPECT_FALSE(configModel().HasConfig);
         registry.Raw().emplace<G::VisualizationConfig>(mesh, base);
         ASSERT_TRUE(configModel().HasConfig);
-        EXPECT_EQ(configModel().Color, base.Color);
+        EXPECT_EQ(configModel().Config.Color, base.Color);
 
         const Runtime::EditorVisualizationConfigCommand laneUniform{
             .StableEntityId = stableId,
             .Target = target,
             .EnableConfig = true,
-            .Source = G::VisualizationConfig::ColorSource::UniformColor,
-            .Color = glm::vec4{0.0f, 0.8f, 0.2f, 1.0f},
+            .Config = {.Source = G::VisualizationConfig::ColorSource::UniformColor, .Color = glm::vec4{0.0f, 0.8f, 0.2f, 1.0f}},
         };
 
         EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
@@ -1708,8 +1687,8 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsLaneOverrides)
         {
             const auto other = Runtime::BuildEditorDomainWindowModel(context, otherKind);
             ASSERT_TRUE(other.Visualization.Visualization.HasConfig);
-            EXPECT_EQ(other.Visualization.Visualization.Color,
-                      otherTarget == target ? laneUniform.Color : base.Color);
+            EXPECT_EQ(other.Visualization.Visualization.Config.Color,
+                      otherTarget == target ? laneUniform.Config.Color : base.Color);
         }
 
         const Runtime::EditorDomainWindowModel laneModel =
@@ -1717,7 +1696,7 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsLaneOverrides)
                 context,
                 windowKind);
         ASSERT_TRUE(laneModel.Visualization.Visualization.HasConfig);
-        EXPECT_EQ(laneModel.Visualization.Visualization.Color,
+        EXPECT_EQ(laneModel.Visualization.Visualization.Config.Color,
                   glm::vec4(0.0f, 0.8f, 0.2f, 1.0f));
         EXPECT_EQ(laneModel.Visualization.Target, target);
 
@@ -1728,12 +1707,12 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsLaneOverrides)
                   glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
         ASSERT_TRUE(configModel().HasConfig);
-        EXPECT_EQ(configModel().Color, base.Color);
+        EXPECT_EQ(configModel().Config.Color, base.Color);
 
         EXPECT_EQ(history.Redo().Status,
                   Runtime::EditorCommandHistoryStatus::Redone);
         ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
-        EXPECT_EQ(configModel().Color, laneUniform.Color);
+        EXPECT_EQ(configModel().Config.Color, laneUniform.Config.Color);
 
         EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                       context,
@@ -1746,7 +1725,7 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsLaneOverrides)
         EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
         EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
         ASSERT_TRUE(configModel().HasConfig);
-        EXPECT_EQ(configModel().Color, base.Color);
+        EXPECT_EQ(configModel().Config.Color, base.Color);
         registry.Raw().remove<G::VisualizationConfig>(mesh);
         EXPECT_FALSE(configModel().HasConfig);
     }
@@ -1772,9 +1751,7 @@ TEST(SandboxEditorUi,
                   Runtime::EditorVisualizationConfigCommand{
                       .StableEntityId = stableId,
                       .EnableConfig = true,
-                      .Source =
-                          G::VisualizationConfig::ColorSource::UniformColor,
-                      .Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f},
+                      .Config = {.Source = G::VisualizationConfig::ColorSource::UniformColor, .Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f}},
                   }),
               Runtime::EditorCommandStatus::Applied);
     ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
@@ -2176,12 +2153,11 @@ TEST(SandboxEditorUi,
   Runtime::EditorVisualizationConfigCommand command{
       .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
       .Target = Runtime::EditorVisualizationTarget::Surface,
-      .Source = G::VisualizationConfig::ColorSource::ScalarField,
-      .ScalarFieldName = "v:temperature",
+      .Config = {.Source = G::VisualizationConfig::ColorSource::ScalarField, .ScalarFieldName = "v:temperature"},
   };
   ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
             Runtime::EditorCommandStatus::Applied);
-  command.UseBakedTexture = true;
+  command.Config.UseBakedTexture = true;
   EXPECT_NE(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
             Runtime::EditorCommandStatus::Applied);
   const auto &stored = registry.Raw().get<G::VisualizationLaneOverrides>(mesh);
@@ -2219,10 +2195,7 @@ TEST(SandboxEditorUi,
   Runtime::EditorVisualizationConfigCommand command{
       .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
       .Target = Runtime::EditorVisualizationTarget::Surface,
-      .Source = G::VisualizationConfig::ColorSource::ScalarField,
-      .ScalarFieldName = "v:temperature",
-      .ScalarColormap = Extrinsic::Graphics::Colormap::Type::Plasma,
-      .UseBakedTexture = false,
+      .Config = {.Source = G::VisualizationConfig::ColorSource::ScalarField, .ScalarFieldName = "v:temperature", .Scalar = {.Map = Extrinsic::Graphics::Colormap::Type::Plasma}, .UseBakedTexture = false},
   };
   EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
             Runtime::EditorCommandStatus::Applied);
@@ -2268,22 +2241,20 @@ TEST(SandboxEditorUi, NormalInterpretationRejectsInvalidBindingsBeforeMutation)
     Runtime::EditorVisualizationConfigCommand command{
         .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
         .Target = Runtime::EditorVisualizationTarget::Surface,
-        .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
-        .ColorBufferName = "directions",
-        .Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection,
+        .Config = {.Source = G::VisualizationConfig::ColorSource::PerVertexBuffer, .ColorBufferName = "directions", .Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection},
     };
     ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command), Runtime::EditorCommandStatus::Applied);
     for (const auto source : {G::VisualizationConfig::ColorSource::ScalarField, G::VisualizationConfig::ColorSource::UniformColor})
     {
         auto invalid = command;
-        invalid.Source = source;
+        invalid.Config.Source = source;
         EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, invalid), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
     }
     for (const auto* name : {"rgba", "absent"})
     {
         auto invalid = command;
-        invalid.ColorBufferName = name;
-        invalid.UseBakedTexture = true;
+        invalid.Config.ColorBufferName = name;
+        invalid.Config.UseBakedTexture = true;
         EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, invalid), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
     }
     const auto& stored = registry.Raw().get<G::VisualizationLaneOverrides>(mesh).Surface;
@@ -2802,4 +2773,54 @@ TEST(SandboxEditorUi, BoundsHintWorksWithoutGeometryAndSupportsUndo)
                   context, {.StableEntityId = id, .SetBounds = true, .EnableBounds = false}),
         Runtime::EditorCommandStatus::Applied);
     EXPECT_FALSE(registry.Raw().all_of<G::RenderBounds>(entity));
+}
+
+// RUNTIME-329: the config command checks the declared lane style; an unsupported colormap or a
+// non-finite float is refused and the entity keeps its config.
+TEST(SandboxEditorUi, VisualizationConfigCommandRefusesUndeclaredValues)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "CheckedMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::EditorVisualizationConfigCommand valid{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .Config = {.Source = G::VisualizationConfig::ColorSource::UniformColor, .Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f}},
+    };
+    ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, valid), Runtime::EditorCommandStatus::Applied);
+
+    auto badMap = valid;
+    badMap.Config.Scalar.Map = Extrinsic::Graphics::Colormap::Type::Count;
+    auto badWidth = valid;
+    badWidth.Config.Scalar.Isolines.Width = std::numeric_limits<float>::quiet_NaN();
+    auto badSource = valid;
+    badSource.Config.Source = static_cast<G::VisualizationConfig::ColorSource>(42);
+    for (const auto& command : {badMap, badWidth, badSource})
+    {
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
+            Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+        EXPECT_TRUE(Runtime::SameLaneVisualizationStyle(registry.Raw().get<G::VisualizationConfig>(mesh), valid.Config));
+        // Checked before the no-change test and also when the command disables the config.
+        auto disabling = command;
+        disabling.EnableConfig = false;
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, disabling),
+            Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+        EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    }
+
+    // Numbers compare as numbers: -0 equals the stored 0, so nothing changes.
+    auto negativeZero = valid;
+    negativeZero.Config.Scalar.RangeMin = -0.0f;
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, negativeZero), Runtime::EditorCommandStatus::NoChange);
+
+    // A highlight count past the 8 slots still clamps and applies (the check sees the clamped config).
+    auto manyValues = valid;
+    manyValues.Config.Scalar.Isolines.ValueCount = 20u;
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, manyValues), Runtime::EditorCommandStatus::Applied);
+    EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Scalar.Isolines.ValueCount, 8u);
+    EXPECT_EQ(Runtime::LaneVisualizationStyleFields().size(), 17u) << "serialized leaf fields";
 }

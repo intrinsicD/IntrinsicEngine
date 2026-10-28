@@ -68,7 +68,7 @@ namespace Extrinsic::Sandbox::Editor
         using SurfaceDomain = decltype(EditorRenderHintModel{}.SurfaceDomainValue);
         using EdgeDomain = decltype(EditorRenderHintModel{}.EdgeDomainValue);
         using PointRenderType = decltype(EditorRenderHintModel{}.PointRenderTypeValue);
-        using VisualizationColorSource = decltype(EditorVisualizationConfigModel{}.Source);
+        using VisualizationColorSource = decltype(EditorVisualizationConfigModel{}.Config.Source);
 
         inline constexpr SurfaceDomain kSurfaceVertex = static_cast<SurfaceDomain>(0);
         inline constexpr SurfaceDomain kSurfaceFace = static_cast<SurfaceDomain>(1);
@@ -87,7 +87,7 @@ namespace Extrinsic::Sandbox::Editor
         [[nodiscard]] bool ColoredByProperty(const EditorVisualizationConfigModel& visualization) noexcept
         {
             return visualization.HasConfig &&
-                (visualization.Source == kScalarFieldSource || static_cast<int>(visualization.Source) >= 3);
+                (visualization.Config.Source == kScalarFieldSource || static_cast<int>(visualization.Config.Source) >= 3);
         }
 
         // One element index per element domain, shared by every property of that
@@ -468,11 +468,11 @@ namespace Extrinsic::Sandbox::Editor
         {
             const auto& visualization = lane.Visualization.Visualization;
             ImGui::SeparatorText(label.c_str());
-            glm::vec4 color = visualization.Color;
+            glm::vec4 color = visualization.Config.Color;
             ImGui::BeginDisabled(bound || !context.SceneAvailable || !lane.VisualizationControlsAvailable);
             ImGui::SetNextItemWidth(-FLT_MIN);
             const bool changed = ImGui::ColorEdit4("##Uniform color", &color.x);
-            if (!bound && visualization.Source != kUniformColorSource)
+            if (!bound && visualization.Config.Source != kUniformColorSource)
             {
                 ImGui::PushTextWrapPos(0.0f);
                 ImGui::TextDisabled("Drawn with its default color until you pick one.");
@@ -499,30 +499,29 @@ namespace Extrinsic::Sandbox::Editor
         {
             const auto& visualization = model.Visualization.Visualization;
             const auto& properties = model.Visualization.Properties;
-            const bool scalar = visualization.Source == kScalarFieldSource;
-            const bool color = static_cast<int>(visualization.Source) >= 3;
-            const std::string& propertyName = scalar ? visualization.ScalarFieldName : visualization.ColorBufferName;
+            const bool scalar = visualization.Config.Source == kScalarFieldSource;
+            const bool color = static_cast<int>(visualization.Config.Source) >= 3;
+            const std::string& propertyName = scalar ? visualization.Config.ScalarFieldName : visualization.Config.ColorBufferName;
             const char* preview = !visualization.HasConfig || (!scalar && !color)
-                ? (visualization.Source == kUniformColorSource ? "Uniform color" : "Material / default")
+                ? (visualization.Config.Source == kUniformColorSource ? "Uniform color" : "Material / default")
                 : propertyName.c_str();
             if (!ImGui::BeginCombo("Property", preview))
                 return;
             if (ImGui::Selectable(
-                    "Material / default", !visualization.HasConfig || visualization.Source == kMaterialSource))
+                    "Material / default", !visualization.HasConfig || visualization.Config.Source == kMaterialSource))
             {
                 // Keeps the lane's chosen color for a later "Uniform color".
                 lastStatus = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands,
                     EditorVisualizationConfigCommand{.StableEntityId = model.SelectedStableId,
                         .Target = model.VisualizationTarget,
                         .EnableConfig = true,
-                        .Source = kMaterialSource,
-                        .Color = visualization.Color});
+                        .Config = {.Source = kMaterialSource, .Color = visualization.Config.Color}});
             }
-            if (ImGui::Selectable("Uniform color", visualization.Source == kUniformColorSource))
+            if (ImGui::Selectable("Uniform color", visualization.Config.Source == kUniformColorSource))
             {
                 lastStatus = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands,
                     MakeUniformVisualizationConfigCommandFromModel(
-                        model.SelectedStableId, visualization, model.VisualizationTarget, visualization.Color));
+                        model.SelectedStableId, visualization, model.VisualizationTarget, visualization.Config.Color));
             }
             for (const auto& property : properties)
             {
@@ -536,7 +535,7 @@ namespace Extrinsic::Sandbox::Editor
                     ? 1
                     : 0;
                 const int activeDomain =
-                    scalar ? static_cast<int>(visualization.ScalarDomain) : static_cast<int>(visualization.Source) - 3;
+                    scalar ? static_cast<int>(visualization.Config.ScalarDomain) : static_cast<int>(visualization.Config.Source) - 3;
                 const bool selected =
                     property.Name == propertyName && (scalar || color) && propertyDomain == activeDomain;
                 if (ImGui::Selectable(label.c_str(), selected))
@@ -547,15 +546,15 @@ namespace Extrinsic::Sandbox::Editor
                             .Target = model.VisualizationTarget,
                             .Domain = property.Domain,
                             .Preset = property.ScalarPresetAvailable
-                                ? (visualization.IsolineCount > 0u ? EditorVisualizationPropertyPreset::Isoline
+                                ? (visualization.Config.Scalar.Isolines.Num > 0u ? EditorVisualizationPropertyPreset::Isoline
                                                                    : EditorVisualizationPropertyPreset::Scalar)
                                 : EditorVisualizationPropertyPreset::ColorBuffer,
                             .PropertyName = property.Name,
-                            .ScalarAutoRange = visualization.ScalarAutoRange,
-                            .ScalarRangeMin = visualization.ScalarRangeMin,
-                            .ScalarRangeMax = visualization.ScalarRangeMax,
-                            .ScalarBinCount = visualization.ScalarBinCount,
-                            .IsolineCount = visualization.IsolineCount,
+                            .ScalarAutoRange = visualization.Config.Scalar.AutoRange,
+                            .ScalarRangeMin = visualization.Config.Scalar.RangeMin,
+                            .ScalarRangeMax = visualization.Config.Scalar.RangeMax,
+                            .ScalarBinCount = visualization.Config.Scalar.BinCount,
+                            .IsolineCount = visualization.Config.Scalar.Isolines.Num,
                         });
                 }
                 if (selected)
@@ -570,12 +569,12 @@ namespace Extrinsic::Sandbox::Editor
             const EditorVisualizationTarget target,
             const bool canEditVisualization)
         {
-            if (!visualization.HasConfig || visualization.Source != kScalarFieldSource)
+            if (!visualization.HasConfig || visualization.Config.Source != kScalarFieldSource)
             {
                 return;
             }
             DrawScalarFieldColorControls(visualization, context, selectedStableId, target, canEditVisualization);
-            if (visualization.UseBakedTexture)
+            if (visualization.Config.UseBakedTexture)
             {
                 ImGui::TextDisabled("Binning and isolines are available with attribute rendering.");
                 return;
@@ -889,18 +888,18 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::BeginDisabled(!available);
   // Leave room for the right-hand labels so nothing clips at the default width.
             ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-            if (visualization.HasConfig && static_cast<int>(visualization.Source) >= 3)
+            if (visualization.HasConfig && static_cast<int>(visualization.Config.Source) >= 3)
             {
-                int interpretation = static_cast<int>(visualization.Interpretation);
+                int interpretation = static_cast<int>(visualization.Config.Interpretation);
                 if (DrawColorInterpretationCombo(interpretation))
                 {
                     auto command = MakeVisualizationConfigCommandFromModel(
                         model.SelectedStableId, visualization, model.VisualizationTarget);
-                    command.Interpretation = static_cast<decltype(command.Interpretation)>(interpretation);
+                    command.Config.Interpretation = static_cast<decltype(command.Config.Interpretation)>(interpretation);
                     lastStatus = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands, command);
                 }
             }
-            if (visualization.Source == kScalarFieldSource && ImGui::CollapsingHeader("Color mapping"))
+            if (visualization.Config.Source == kScalarFieldSource && ImGui::CollapsingHeader("Color mapping"))
                 DrawScalarVisualizationControls(
                     visualization, context, model.SelectedStableId, model.VisualizationTarget, available);
             ImGui::PopItemWidth();
@@ -1108,7 +1107,7 @@ namespace Extrinsic::Sandbox::Editor
                 visualization, context, model.SelectedStableId, model.VisualizationTarget, available);
             if (model.Kind == EditorDomainWindowKind::Mesh && ImGui::CollapsingHeader("Texture baking"))
             {
-                bool baked = visualization.UseBakedTexture;
+                bool baked = visualization.Config.UseBakedTexture;
                 const bool hasProperty = ColoredByProperty(visualization);
                 const bool canEnable = hasProperty && model.TextureBake.CanBake;
                 ImGui::BeginDisabled(!baked && !canEnable);
@@ -1116,7 +1115,7 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     auto command = MakeVisualizationConfigCommandFromModel(
                         model.SelectedStableId, visualization, model.VisualizationTarget);
-                    command.UseBakedTexture = baked;
+                    command.Config.UseBakedTexture = baked;
                     lastStatus = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands, command);
                 }
                 ImGui::EndDisabled();

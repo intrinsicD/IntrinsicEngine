@@ -2267,3 +2267,157 @@ TEST(RuntimeSceneSerialization, LargePropertyPayloadStaysCompactAndRoundTrips)
     ExpectSameProperty<glm::vec3>(loaded.Raw().get<GS::Vertices>(lcloud).Properties,
                                   vertices.Properties, "v:field");
 }
+
+// RUNTIME-329: the lane visualization style keeps its scene format (entity config and lane
+// override alike), and a config differing from the defaults in every field survives the trip.
+TEST(RuntimeSceneSerialization, VisualizationConfigJsonIsUnchanged)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    G::VisualizationConfig config{};
+    config.Source = G::VisualizationConfig::ColorSource::PerFaceBuffer;
+    config.Color = {0.25f, 0.5f, 0.75f, 0.5f};
+    config.UniformByDefault = true;
+    config.ScalarFieldName = "v:heat";
+    config.ScalarDomain = G::VisualizationConfig::Domain::Edge;
+    config.ColorBufferName = "f:rgb";
+    config.Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection;
+    config.UseBakedTexture = true;
+    config.Scalar.Map = Extrinsic::Graphics::Colormap::Type::Coolwarm;
+    config.Scalar.AutoRange = false;
+    config.Scalar.RangeMin = -2.0f;
+    config.Scalar.RangeMax = 8.0f;
+    config.Scalar.BinCount = 7u;
+    config.Scalar.Isolines.Num = 12u;
+    config.Scalar.Isolines.Color = {1.0f, 0.5f, 0.25f, 1.0f};
+    config.Scalar.Isolines.Width = 2.5f;
+    config.Scalar.Isolines.Values[0] = 0.5f;
+    config.Scalar.Isolines.Values[1] = -1.5f;
+    config.Scalar.Isolines.ValueCount = 2u;
+
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle entity = AddGeometryPresentationEntity(source);
+    source.Raw().emplace_or_replace<G::VisualizationConfig>(entity, config);
+    source.Raw().emplace_or_replace<G::VisualizationLaneOverrides>(entity).Points = config;
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "golden.json", backend).has_value());
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("golden.json"));
+    nlohmann::json render;
+    for (const auto& entityJson : parsed["entities"])
+        if (entityJson.contains("render") && entityJson["render"].contains("visualization"))
+            render = entityJson["render"];
+    const nlohmann::json golden = nlohmann::json::parse(R"({"color":[0.25,0.5,0.75,0.5],"colorBufferName":"f:rgb","colorInterpretation":"normal_direction","scalar":{"autoRange":false,"binCount":7,"isolines":{"color":[1.0,0.5,0.25,1.0],"num":12,"values":[0.5,-1.5],"width":2.5},"map":"Coolwarm","rangeMax":8.0,"rangeMin":-2.0},"scalarDomain":"Edge","scalarFieldName":"v:heat","source":"PerFaceBuffer","uniformByDefault":true,"useBakedTexture":true})");
+    EXPECT_EQ(render["visualization"], golden) << render["visualization"].dump();
+    EXPECT_EQ(render["visualizationLanes"]["points"], golden) << render["visualizationLanes"].dump();
+
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::DeserializeSceneDocument(loaded, parsed.dump()).has_value());
+    MemoryIOBackend again;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(loaded, "again.json", again).has_value());
+    EXPECT_EQ(nlohmann::json::parse(again.Text("again.json"))["entities"], parsed["entities"]);
+}
+
+// RUNTIME-329: characterization of the scene reader of the lane visualization style, through the
+// entity config and a lane override: what loads, what is ignored and what refuses the scene.
+TEST(RuntimeSceneSerialization, VisualizationConfigReaderKeepsItsLeniency)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle entity = AddGeometryPresentationEntity(source);
+    source.Raw().emplace_or_replace<G::VisualizationConfig>(entity);
+    source.Raw().emplace_or_replace<G::VisualizationLaneOverrides>(entity).Points = G::VisualizationConfig{};
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "base.json", backend).has_value());
+    const nlohmann::json base = nlohmann::json::parse(backend.Text("base.json"));
+    std::size_t index = base["entities"].size();
+    for (std::size_t i = 0u; i < base["entities"].size(); ++i)
+        if (base["entities"][i].contains("render") && base["entities"][i]["render"].contains("visualization"))
+            index = i;
+    ASSERT_LT(index, base["entities"].size());
+
+    // Loads `style` as the entity config (lane=false) or the points override; nullopt if refused.
+    const auto load = [&](const nlohmann::json& style, const bool lane) -> std::optional<G::VisualizationConfig>
+    {
+        nlohmann::json document = base;
+        auto& render = document["entities"][index]["render"];
+        (lane ? render["visualizationLanes"]["points"] : render["visualization"]) = style;
+        ECS::Scene::Registry loaded;
+        if (!Runtime::DeserializeSceneDocument(loaded, document.dump()).has_value())
+            return std::nullopt;
+        const ECS::EntityHandle e = FindEntityByName(loaded, "Mesh Entity");
+        if (lane)
+        {
+            const auto* overrides = loaded.Raw().try_get<G::VisualizationLaneOverrides>(e);
+            return overrides != nullptr ? overrides->Points : std::nullopt;
+        }
+        const auto* config = loaded.Raw().try_get<G::VisualizationConfig>(e);
+        return config != nullptr ? std::optional<G::VisualizationConfig>{*config} : std::nullopt;
+    };
+    const auto with = [](nlohmann::json patch)
+    {
+        nlohmann::json style = {{"source", "ScalarField"}};
+        style.merge_patch(patch);
+        return style;
+    };
+
+    for (const bool lane : {false, true})
+    {
+        SCOPED_TRACE(lane ? "lane override" : "entity config");
+        const auto sourceOnly = load({{"source", "UniformColor"}}, lane);
+        ASSERT_TRUE(sourceOnly.has_value());
+        EXPECT_EQ(sourceOnly->Source, G::VisualizationConfig::ColorSource::UniformColor);
+        EXPECT_EQ(sourceOnly->Scalar.Isolines.Width, G::VisualizationConfig{}.Scalar.Isolines.Width);
+        EXPECT_TRUE(load(with({{"futureKey", 1}, {"scalar", {{"futureKey", true}}}}), lane).has_value());
+
+        const std::array<std::string, 6> sources{
+            "Material", "UniformColor", "ScalarField", "PerVertexBuffer", "PerEdgeBuffer", "PerFaceBuffer"};
+        for (std::size_t i = 0u; i < sources.size(); ++i)
+        {
+            const auto loaded = load({{"source", sources[i]}}, lane);
+            ASSERT_TRUE(loaded.has_value()) << sources[i];
+            EXPECT_EQ(static_cast<std::size_t>(loaded->Source), i);
+        }
+        const std::array<std::string, 3> domains{"Vertex", "Edge", "Face"};
+        for (std::size_t i = 0u; i < domains.size(); ++i)
+            EXPECT_EQ(static_cast<std::size_t>(load(with({{"scalarDomain", domains[i]}}), lane)->ScalarDomain), i);
+        EXPECT_EQ(load(with({{"colorInterpretation", "normal_direction"}}), lane)->Interpretation,
+            G::VisualizationConfig::ColorInterpretation::NormalDirection);
+        EXPECT_EQ(load(with({{"colorInterpretation", "components"}}), lane)->Interpretation,
+            G::VisualizationConfig::ColorInterpretation::Components);
+        const std::array<std::string, 6> maps{"Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"};
+        for (std::size_t i = 0u; i < maps.size(); ++i)
+            EXPECT_EQ(static_cast<std::size_t>(load(with({{"scalar", {{"map", maps[i]}}}}), lane)->Scalar.Map), i);
+
+        const auto none = load(with({{"scalar", {{"isolines", {{"values", nlohmann::json::array()}}}}}}), lane);
+        ASSERT_TRUE(none.has_value());
+        EXPECT_EQ(none->Scalar.Isolines.ValueCount, 0u);
+        const auto eight = load(with({{"scalar", {{"isolines", {{"values", {1, 2, 3, 4, 5, 6, 7, 8.5}}}}}}}), lane);
+        ASSERT_TRUE(eight.has_value());
+        EXPECT_EQ(eight->Scalar.Isolines.ValueCount, 8u);
+        EXPECT_EQ(eight->Scalar.Isolines.Values[7], 8.5f);
+        EXPECT_EQ(load(with({{"scalar", {{"binCount", 4294967295u}}}}), lane)->Scalar.BinCount, 4294967295u);
+
+        for (const nlohmann::json& refused : {
+                 nlohmann::json{{"color", {1, 1, 1, 1}}},
+                 nlohmann::json{{"source", "Unknown"}},
+                 nlohmann::json{{"source", 2}},
+                 with({{"scalar", 3}}),
+                 with({{"scalar", {{"isolines", "none"}}}}),
+                 with({{"scalarDomain", "Corner"}}),
+                 with({{"colorInterpretation", "Components"}}),
+                 with({{"scalar", {{"map", "viridis"}}}}),
+                 with({{"color", {1, 1, 1}}}),
+                 with({{"uniformByDefault", 1}}),
+                 with({{"scalarFieldName", 7}}),
+                 with({{"scalar", {{"autoRange", "yes"}}}}),
+                 with({{"scalar", {{"rangeMin", "0"}}}}),
+                 with({{"scalar", {{"binCount", 4294967296u}}}}),
+                 with({{"scalar", {{"binCount", 2.5}}}}),
+                 with({{"scalar", {{"binCount", -1}}}}),
+                 with({{"scalar", {{"isolines", {{"num", -1}}}}}}),
+                 with({{"scalar", {{"isolines", {{"width", true}}}}}}),
+                 with({{"scalar", {{"isolines", {{"values", {1, 2, 3, 4, 5, 6, 7, 8, 9}}}}}}}),
+                 with({{"scalar", {{"isolines", {{"values", {1, "2"}}}}}}}),
+             })
+            EXPECT_FALSE(load(refused, lane).has_value()) << refused.dump();
+    }
+}

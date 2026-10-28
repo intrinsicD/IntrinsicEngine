@@ -919,16 +919,7 @@ TEST(VertexChannelBindings, RebindingColorKeepsOverlayStylingAndUndoRedoRestores
     Runtime::EditorVisualizationConfigCommand styled{
         .StableEntityId = id,
         .Target = Runtime::EditorVisualizationTarget::Surface,
-        .Source = G::VisualizationConfig::ColorSource::ScalarField,
-        .ScalarFieldName = "v:heat",
-        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
-        .ScalarAutoRange = false,
-        .ScalarRangeMin = -1.0f,
-        .ScalarRangeMax = 3.0f,
-        .ScalarBinCount = 4u,
-        .IsolineCount = 5u,
-        .ScalarColormap = Extrinsic::Graphics::Colormap::Type::Inferno,
-        .IsolineWidth = 2.5f,
+        .Config = {.Source = G::VisualizationConfig::ColorSource::ScalarField, .ScalarFieldName = "v:heat", .Scalar = {.Map = Extrinsic::Graphics::Colormap::Type::Inferno, .RangeMin = -1.0f, .RangeMax = 3.0f, .AutoRange = false, .BinCount = 4u, .Isolines = {.Num = 5u, .Width = 2.5f}}, .ScalarDomain = G::VisualizationConfig::Domain::Vertex},
     };
     ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(f.Context, styled), Cmd::Applied);
     const auto surface = [&] {
@@ -982,10 +973,7 @@ TEST(VertexChannelBindings, ShowPropertyAndColorBindingKeepTheLaneColormapAlike)
     Runtime::EditorVisualizationConfigCommand styled{
         .StableEntityId = id,
         .Target = Runtime::EditorVisualizationTarget::Surface,
-        .Source = G::VisualizationConfig::ColorSource::ScalarField,
-        .ScalarFieldName = "v:a",
-        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
-        .ScalarColormap = Extrinsic::Graphics::Colormap::Type::Inferno,
+        .Config = {.Source = G::VisualizationConfig::ColorSource::ScalarField, .ScalarFieldName = "v:a", .Scalar = {.Map = Extrinsic::Graphics::Colormap::Type::Inferno}, .ScalarDomain = G::VisualizationConfig::Domain::Vertex},
     };
     ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(f.Context, styled), Cmd::Applied);
     ASSERT_EQ(showProperty("v:b"), Cmd::Applied);

@@ -29,6 +29,7 @@ module;
 module Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.LaneVisualizationStyle;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
@@ -515,12 +516,12 @@ namespace Extrinsic::Sandbox::Editor
         const bool canEditVisualization)
     {
         if (!visualization.HasConfig ||
-            visualization.Source != kUniformColorSource)
+            visualization.Config.Source != kUniformColorSource)
         {
             return;
         }
 
-        glm::vec4 color = visualization.Color;
+        glm::vec4 color = visualization.Config.Color;
         if (ImGui::ColorEdit4("Color##uniform-visualization-color",
                               &color.x) &&
             canEditVisualization)
@@ -561,40 +562,34 @@ namespace Extrinsic::Sandbox::Editor
     {
         ImGui::SeparatorText("Scalar field");
         ImGui::Text("Property: %s",
-                    visualization.ScalarFieldName.empty()
+                    visualization.Config.ScalarFieldName.empty()
                         ? "<none>"
-                        : visualization.ScalarFieldName.c_str());
+                        : visualization.Config.ScalarFieldName.c_str());
 
-        int colormapIndex = static_cast<int>(visualization.ScalarColormap);
-        if (colormapIndex < 0 ||
-            colormapIndex >= static_cast<int>(kColormapNames.size()))
-        {
-            colormapIndex = 0;
-        }
-        if (ImGui::Combo("Colormap",
-                         &colormapIndex,
-                         kColormapNames.data(),
-                         static_cast<int>(kColormapNames.size())))
+        auto colormap = visualization.Config.Scalar.Map;
+        if (colormap >= decltype(colormap)::Count)
+            colormap = decltype(colormap)::Viridis; // shown as Viridis, as the renderer draws it
+        if (DrawSpecEnumCombo("Colormap", Runtime::LaneVisualizationStyleFields(), "colormap", colormap,
+                decltype(colormap)::Viridis))
         {
             EditorVisualizationConfigModel next = visualization;
-            next.ScalarColormap =
-                static_cast<decltype(next.ScalarColormap)>(colormapIndex);
+            next.Config.Scalar.Map = colormap;
             SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                             canEditVisualization);
         }
 
-        bool autoRange = visualization.ScalarAutoRange;
+        bool autoRange = visualization.Config.Scalar.AutoRange;
         if (ImGui::Checkbox("Auto range", &autoRange))
         {
             EditorVisualizationConfigModel next = visualization;
-            next.ScalarAutoRange = autoRange;
+            next.Config.Scalar.AutoRange = autoRange;
             SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                             canEditVisualization);
         }
-        if (!visualization.ScalarAutoRange)
+        if (!visualization.Config.Scalar.AutoRange)
         {
-            float rangeMinMax[2]{visualization.ScalarRangeMin,
-                                 visualization.ScalarRangeMax};
+            float rangeMinMax[2]{visualization.Config.Scalar.RangeMin,
+                                 visualization.Config.Scalar.RangeMax};
             if (ImGui::DragFloat2("Clamp min/max",
                                   rangeMinMax,
                                   0.01f,
@@ -604,8 +599,8 @@ namespace Extrinsic::Sandbox::Editor
                 rangeMinMax[0] < rangeMinMax[1])
             {
                 EditorVisualizationConfigModel next = visualization;
-                next.ScalarRangeMin = rangeMinMax[0];
-                next.ScalarRangeMax = rangeMinMax[1];
+                next.Config.Scalar.RangeMin = rangeMinMax[0];
+                next.Config.Scalar.RangeMax = rangeMinMax[1];
                 SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                                 canEditVisualization);
             }
@@ -619,53 +614,53 @@ namespace Extrinsic::Sandbox::Editor
         const EditorVisualizationTarget target,
         const bool canEditVisualization)
     {
-        int binCount = static_cast<int>(visualization.ScalarBinCount);
+        int binCount = static_cast<int>(visualization.Config.Scalar.BinCount);
         if (ImGui::DragInt("Bins (0 = continuous)", &binCount, 0.25f, 0, 64) &&
             binCount >= 0)
         {
             EditorVisualizationConfigModel next = visualization;
-            next.ScalarBinCount = static_cast<std::uint32_t>(binCount);
+            next.Config.Scalar.BinCount = static_cast<std::uint32_t>(binCount);
             SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                             canEditVisualization);
         }
 
         ImGui::SeparatorText("Isolines");
-        int isolineCount = static_cast<int>(visualization.IsolineCount);
+        int isolineCount = static_cast<int>(visualization.Config.Scalar.Isolines.Num);
         if (ImGui::DragInt("Count##isolines", &isolineCount, 0.25f, 0, 256) &&
             isolineCount >= 0)
         {
             EditorVisualizationConfigModel next = visualization;
-            next.IsolineCount = static_cast<std::uint32_t>(isolineCount);
+            next.Config.Scalar.Isolines.Num = static_cast<std::uint32_t>(isolineCount);
             SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                             canEditVisualization);
         }
-        float isolineWidth = visualization.IsolineWidth;
+        float isolineWidth = visualization.Config.Scalar.Isolines.Width;
         if (ImGui::DragFloat("Width##isolines", &isolineWidth, 0.05f, 0.1f, 16.0f) &&
             isolineWidth > 0.0f)
         {
             EditorVisualizationConfigModel next = visualization;
-            next.IsolineWidth = isolineWidth;
+            next.Config.Scalar.Isolines.Width = isolineWidth;
             SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                             canEditVisualization);
         }
-        glm::vec4 isolineColor = visualization.IsolineColor;
+        glm::vec4 isolineColor = visualization.Config.Scalar.Isolines.Color;
         if (ImGui::ColorEdit4("Color##isolines", &isolineColor.x))
         {
             EditorVisualizationConfigModel next = visualization;
-            next.IsolineColor = isolineColor;
+            next.Config.Scalar.Isolines.Color = isolineColor;
             SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                             canEditVisualization);
         }
 
         ImGui::TextUnformatted("Highlight isovalues");
-        for (std::uint32_t i = 0u; i < visualization.IsolineValueCount; ++i)
+        for (std::uint32_t i = 0u; i < visualization.Config.Scalar.Isolines.ValueCount; ++i)
         {
             ImGui::PushID(static_cast<int>(i));
-            float value = visualization.IsolineValues[i];
+            float value = visualization.Config.Scalar.Isolines.Values[i];
             if (ImGui::DragFloat("##isovalue", &value, 0.001f, 0.0f, 0.0f, "%.5f"))
             {
                 EditorVisualizationConfigModel next = visualization;
-                next.IsolineValues[i] = value;
+                next.Config.Scalar.Isolines.Values[i] = value;
                 SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                                 canEditVisualization);
             }
@@ -673,28 +668,28 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::SmallButton("Remove"))
             {
                 EditorVisualizationConfigModel next = visualization;
-                for (std::uint32_t j = i; j + 1u < next.IsolineValueCount; ++j)
+                for (std::uint32_t j = i; j + 1u < next.Config.Scalar.Isolines.ValueCount; ++j)
                 {
-                    next.IsolineValues[j] = next.IsolineValues[j + 1u];
+                    next.Config.Scalar.Isolines.Values[j] = next.Config.Scalar.Isolines.Values[j + 1u];
                 }
-                next.IsolineValueCount -= 1u;
+                next.Config.Scalar.Isolines.ValueCount -= 1u;
                 SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                                 canEditVisualization);
             }
             ImGui::PopID();
         }
-        if (visualization.IsolineValueCount <
-            visualization.IsolineValues.size())
+        if (visualization.Config.Scalar.Isolines.ValueCount <
+            visualization.Config.Scalar.Isolines.Values.size())
         {
             if (ImGui::SmallButton("Add isovalue"))
             {
                 EditorVisualizationConfigModel next = visualization;
-                const float seed = visualization.ScalarAutoRange
+                const float seed = visualization.Config.Scalar.AutoRange
                     ? 0.0f
-                    : 0.5f * (visualization.ScalarRangeMin +
-                              visualization.ScalarRangeMax);
-                next.IsolineValues[next.IsolineValueCount] = seed;
-                next.IsolineValueCount += 1u;
+                    : 0.5f * (visualization.Config.Scalar.RangeMin +
+                              visualization.Config.Scalar.RangeMax);
+                next.Config.Scalar.Isolines.Values[next.Config.Scalar.Isolines.ValueCount] = seed;
+                next.Config.Scalar.Isolines.ValueCount += 1u;
                 SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
                                                 canEditVisualization);
             }
@@ -819,7 +814,7 @@ namespace Extrinsic::Sandbox::Editor
         TextureBakeUiState* state,
         TextureBakeMutationUiState& mutation)
     {
-        using ColormapType = decltype(EditorVisualizationConfigModel{}.ScalarColormap);
+        using ColormapType = decltype(EditorVisualizationConfigModel{}.Config.Scalar.Map);
         std::optional<EditorUvRegenerationCommandResult>
             fallbackUvRegenerationResult{};
         std::optional<EditorUvRegenerationCommandResult>
@@ -1778,24 +1773,7 @@ namespace Extrinsic::Sandbox::Editor
             .StableEntityId = stableEntityId,
             .Target = target,
             .EnableConfig = true,
-            .Source = model.Source,
-            .Color = model.Color,
-            .UniformByDefault = model.UniformByDefault,
-            .ScalarFieldName = model.ScalarFieldName,
-            .ScalarDomain = model.ScalarDomain,
-            .ColorBufferName = model.ColorBufferName,
-            .Interpretation = model.Interpretation,
-            .ScalarAutoRange = model.ScalarAutoRange,
-            .ScalarRangeMin = model.ScalarRangeMin,
-            .ScalarRangeMax = model.ScalarRangeMax,
-            .ScalarBinCount = model.ScalarBinCount,
-            .IsolineCount = model.IsolineCount,
-            .ScalarColormap = model.ScalarColormap,
-            .IsolineWidth = model.IsolineWidth,
-            .IsolineColor = model.IsolineColor,
-            .IsolineValues = model.IsolineValues,
-            .IsolineValueCount = model.IsolineValueCount,
-            .UseBakedTexture = model.UseBakedTexture,
+            .Config = model.Config,
         };
     }
 
@@ -1807,11 +1785,11 @@ namespace Extrinsic::Sandbox::Editor
         const glm::vec4 color)
     {
         auto command = MakeVisualizationConfigCommandFromModel(stableEntityId, model, target);
-        command.Source = kUniformColorSource;
-        command.Color = color;
-        command.UniformByDefault = true;
-        command.Interpretation = {}; // a direction interpretation needs a color buffer
-        command.UseBakedTexture = false;
+        command.Config.Source = kUniformColorSource;
+        command.Config.Color = color;
+        command.Config.UniformByDefault = true;
+        command.Config.Interpretation = {}; // a direction interpretation needs a color buffer
+        command.Config.UseBakedTexture = false;
         return command;
     }
 

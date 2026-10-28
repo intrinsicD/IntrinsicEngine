@@ -19,6 +19,7 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringTypes.cppm
         Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
         GeometryIntegration/Runtime.GeometryPresentation.cppm
+        Visualization/Runtime.LaneVisualizationStyle.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm
         Rendering/Runtime.RenderArtifactPublication.cppm
         Rendering/Runtime.ViewCapture.cppm
@@ -150,6 +151,7 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
         GeometryIntegration/Runtime.GeometryPresentation.cpp
         GeometryIntegration/Runtime.GeometryVectorFieldStyle.cpp
+        Visualization/Runtime.LaneVisualizationStyle.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
         Rendering/Runtime.RenderArtifactPublication.cpp
         Rendering/Runtime.ViewCapture.cpp

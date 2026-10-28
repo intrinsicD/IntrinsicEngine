@@ -83,6 +83,7 @@ import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.LaneVisualizationStyle;
 
 #include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
 #include "Editor/internal/Runtime.EditorVisualizationHelpers.hpp"
@@ -133,27 +134,7 @@ namespace {
         [[nodiscard]] EditorVisualizationConfigModel FromVisualizationConfig(
             const G::VisualizationConfig& config)
         {
-            return EditorVisualizationConfigModel{
-                .HasConfig = true,
-                .Source = config.Source,
-                .Color = config.Color,
-                .UniformByDefault = config.UniformByDefault,
-                .ScalarFieldName = config.ScalarFieldName,
-                .ScalarDomain = config.ScalarDomain,
-                .ColorBufferName = config.ColorBufferName,
-                .Interpretation = config.Interpretation,
-                .ScalarAutoRange = config.Scalar.AutoRange,
-                .ScalarRangeMin = config.Scalar.RangeMin,
-                .ScalarRangeMax = config.Scalar.RangeMax,
-                .ScalarBinCount = config.Scalar.BinCount,
-                .IsolineCount = config.Scalar.Isolines.Num,
-                .ScalarColormap = config.Scalar.Map,
-                .IsolineWidth = config.Scalar.Isolines.Width,
-                .IsolineColor = config.Scalar.Isolines.Color,
-                .IsolineValues = config.Scalar.Isolines.Values,
-                .IsolineValueCount = config.Scalar.Isolines.ValueCount,
-                .UseBakedTexture = config.UseBakedTexture,
-            };
+            return EditorVisualizationConfigModel{.HasConfig = true, .Config = config};
         }
 
         [[nodiscard]] EditorVisualizationConfigModel
@@ -169,7 +150,7 @@ namespace {
             // Without a config the uniform color starts at what the lane draws.
             EditorVisualizationConfigModel model{};
             if (target == EditorVisualizationTarget::Edges || target == EditorVisualizationTarget::Points)
-                model.Color = G::kDefaultLineAndPointColor;
+                model.Config.Color = G::kDefaultLineAndPointColor;
             return model;
         }
 
@@ -1534,27 +1515,7 @@ namespace {
             }
 
             MixSignature(signature, 1u);
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(config->Source));
-            AppendVec4Signature(signature, config->Color);
-            MixSignature(signature, config->UniformByDefault ? 1u : 0u);
-            MixSignatureString(signature, config->ScalarFieldName);
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(config->Scalar.Map));
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(config->ScalarDomain));
-            MixSignatureString(signature, config->ColorBufferName);
-            MixSignature(signature, static_cast<std::uint64_t>(config->Interpretation));
-            MixSignature(signature, config->Scalar.AutoRange ? 1u : 0u);
-            MixSignatureFloat(signature, config->Scalar.RangeMin);
-            MixSignatureFloat(signature, config->Scalar.RangeMax);
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(config->Scalar.BinCount));
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(
-                             config->Scalar.Isolines.Num));
-            AppendVec4Signature(signature, config->Scalar.Isolines.Color);
-            MixSignatureFloat(signature, config->Scalar.Isolines.Width);
+            MixSignature(signature, LaneVisualizationStyleHash(*config));
         }
 
         [[nodiscard]] std::uint64_t VisualizationStateSignatureForEntity(

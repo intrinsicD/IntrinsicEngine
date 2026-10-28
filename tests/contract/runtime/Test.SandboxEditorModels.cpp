@@ -1809,22 +1809,22 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnConfigSignature)
     EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
     EXPECT_EQ(changed.ModelBuildStats.VisualizationModelBuilds, 1u);
     ASSERT_TRUE(changed.Visualization.Visualization.HasConfig);
-    EXPECT_EQ(changed.Visualization.Visualization.Source,
+    EXPECT_EQ(changed.Visualization.Visualization.Config.Source,
               G::VisualizationConfig::ColorSource::UniformColor);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.x, 0.125f);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.y, 0.5f);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.z, 0.875f);
-    EXPECT_EQ(changed.Visualization.Visualization.ScalarFieldName,
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Color.x, 0.125f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Color.y, 0.5f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Color.z, 0.875f);
+    EXPECT_EQ(changed.Visualization.Visualization.Config.ScalarFieldName,
               "curvature");
-    EXPECT_EQ(changed.Visualization.Visualization.ScalarDomain,
+    EXPECT_EQ(changed.Visualization.Visualization.Config.ScalarDomain,
               G::VisualizationConfig::Domain::Face);
-    EXPECT_FALSE(changed.Visualization.Visualization.ScalarAutoRange);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.ScalarRangeMin,
+    EXPECT_FALSE(changed.Visualization.Visualization.Config.Scalar.AutoRange);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Scalar.RangeMin,
                     -1.0f);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.ScalarRangeMax,
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Scalar.RangeMax,
                     2.0f);
-    EXPECT_EQ(changed.Visualization.Visualization.ScalarBinCount, 7u);
-    EXPECT_EQ(changed.Visualization.Visualization.IsolineCount, 5u);
+    EXPECT_EQ(changed.Visualization.Visualization.Config.Scalar.BinCount, 7u);
+    EXPECT_EQ(changed.Visualization.Visualization.Config.Scalar.Isolines.Num, 5u);
 
     const Runtime::EditorSelectedModelCacheStats cacheStats =
         cache.Stats();
@@ -1850,7 +1850,7 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesWhenOnlyTheUniformDefaul
     registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
     const auto first = Runtime::BuildEditorWorkspaceSnapshot(context, MakeOnlyVisualizationModelBuildRequest());
     ASSERT_TRUE(first.Visualization.Visualization.HasConfig);
-    EXPECT_FALSE(first.Visualization.Visualization.UniformByDefault);
+    EXPECT_FALSE(first.Visualization.Visualization.Config.UniformByDefault);
     const auto cached = Runtime::BuildEditorWorkspaceSnapshot(context, MakeOnlyVisualizationModelBuildRequest());
     ASSERT_EQ(cached.ModelBuildStats.VisualizationModelCacheHits, 1u) << "the unchanged state is cached";
 
@@ -1859,7 +1859,7 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesWhenOnlyTheUniformDefaul
     const auto changed = Runtime::BuildEditorWorkspaceSnapshot(context, MakeOnlyVisualizationModelBuildRequest());
     EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheMisses, 1u);
     EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
-    EXPECT_TRUE(changed.Visualization.Visualization.UniformByDefault);
+    EXPECT_TRUE(changed.Visualization.Visualization.Config.UniformByDefault);
 }
 TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnLaneOverrideSignature)
 {
@@ -1914,11 +1914,11 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnLaneOverrideSignature)
             Runtime::EditorDomainWindowKind::Mesh);
     ASSERT_TRUE(changed.HasSelectedEntity);
     ASSERT_TRUE(changed.Visualization.Visualization.HasConfig);
-    EXPECT_EQ(changed.Visualization.Visualization.Source,
+    EXPECT_EQ(changed.Visualization.Visualization.Config.Source,
               G::VisualizationConfig::ColorSource::UniformColor);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.x, 0.25f);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.y, 0.5f);
-    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Color.z, 0.75f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Color.x, 0.25f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Color.y, 0.5f);
+    EXPECT_FLOAT_EQ(changed.Visualization.Visualization.Config.Color.z, 0.75f);
 
     cacheStats = cache.Stats();
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
@@ -2713,18 +2713,11 @@ TEST(SandboxEditorUi, VisualizationPresetPreservesConfiguredScalarStyling)
         .StableEntityId = stableId,
         .Target = Target::Surface,
         .EnableConfig = true,
-        .Source = G::VisualizationConfig::ColorSource::ScalarField,
-        .ScalarFieldName = "v:temperature",
-        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
-        .ScalarAutoRange = true,
-        .IsolineCount = 6u,
-        .ScalarColormap = Graphics::Colormap::Type::Jet,
-        .IsolineWidth = 3.0f,
-        .IsolineColor = {1.0f, 0.0f, 0.0f, 1.0f},
+        .Config = {.Source = G::VisualizationConfig::ColorSource::ScalarField, .ScalarFieldName = "v:temperature", .Scalar = {.Map = Graphics::Colormap::Type::Jet, .AutoRange = true, .Isolines = {.Num = 6u, .Color = {1.0f, 0.0f, 0.0f, 1.0f}, .Width = 3.0f}}, .ScalarDomain = G::VisualizationConfig::Domain::Vertex},
     };
-    styled.IsolineValues[0] = 0.25f;
-    styled.IsolineValues[1] = 0.75f;
-    styled.IsolineValueCount = 2u;
+    styled.Config.Scalar.Isolines.Values[0] = 0.25f;
+    styled.Config.Scalar.Isolines.Values[1] = 0.75f;
+    styled.Config.Scalar.Isolines.ValueCount = 2u;
     EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
                   context,
                   styled),
@@ -3694,17 +3687,17 @@ TEST(SandboxEditorUi, SurfacePropertySelectorFollowsFaceDomainAndUndo)
     const auto *normal = FindVisualizationProperty(after.Visualization.Properties, Domain::MeshFaces, "f:normal");
     ASSERT_NE(normal, nullptr);
     EXPECT_TRUE(normal->ColorBufferPresetAvailable);
-    EXPECT_EQ(after.Visualization.Visualization.Source, G::VisualizationConfig::ColorSource::Material);
+    EXPECT_EQ(after.Visualization.Visualization.Config.Source, G::VisualizationConfig::ColorSource::Material);
     ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
     auto undone = model();
     EXPECT_NE(FindVisualizationProperty(undone.Visualization.Properties, Domain::MeshVertices, "v:heat"), nullptr);
-    EXPECT_EQ(undone.Visualization.Visualization.ScalarFieldName, "v:heat");
+    EXPECT_EQ(undone.Visualization.Visualization.Config.ScalarFieldName, "v:heat");
     ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
     ASSERT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(context,
         {.StableEntityId = id, .Target = Target::Surface, .Domain = Domain::MeshFaces,
          .Preset = Runtime::EditorVisualizationPropertyPreset::ColorBuffer, .PropertyName = "f:normal"}),
         Runtime::EditorCommandStatus::Applied);
-    EXPECT_EQ(model().Visualization.Visualization.Source, G::VisualizationConfig::ColorSource::PerFaceBuffer);
+    EXPECT_EQ(model().Visualization.Visualization.Config.Source, G::VisualizationConfig::ColorSource::PerFaceBuffer);
 }
 
 namespace
@@ -4034,4 +4027,74 @@ TEST(SandboxEditorWorkspaceContext,
     context.RenderRecipe.EngineConfigCommandsAvailable = true;
     frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     EXPECT_TRUE(frame.RenderGraph.GpuProfilingToggleAvailable);
+}
+
+// RUNTIME-329: the cache signature comes from the declared lane style, so a change to any field
+// refreshes the model; the hand-written signature left out the baked flag and the highlight values.
+TEST(SandboxEditorUi, VisualizationModelCacheSeesEveryStyleField)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::EditorSelectedModelCache cache{};
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+
+    G::VisualizationConfig config{};
+    config.Source = G::VisualizationConfig::ColorSource::ScalarField;
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
+    const auto build = [&] { return Runtime::BuildEditorWorkspaceSnapshot(context, MakeOnlyVisualizationModelBuildRequest()); };
+    (void)build();
+    ASSERT_EQ(build().ModelBuildStats.VisualizationModelCacheHits, 1u);
+
+    config.UseBakedTexture = true;
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
+    auto snapshot = build();
+    EXPECT_EQ(snapshot.ModelBuildStats.VisualizationModelBuilds, 1u);
+    EXPECT_TRUE(snapshot.Visualization.Visualization.Config.UseBakedTexture);
+
+    config.Scalar.Isolines.Values[0] = 0.25f;
+    config.Scalar.Isolines.ValueCount = 1u;
+    registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
+    snapshot = build();
+    EXPECT_EQ(snapshot.ModelBuildStats.VisualizationModelBuilds, 1u);
+    EXPECT_EQ(snapshot.Visualization.Visualization.Config.Scalar.Isolines.ValueCount, 1u);
+
+    // Same count, another active value; then float identities a textual comparison would merge.
+    const auto rebuildsAfter = [&](const auto& edit)
+    {
+        edit(config);
+        registry.Raw().emplace_or_replace<G::VisualizationConfig>(mesh, config);
+        return build().ModelBuildStats.VisualizationModelBuilds == 1u;
+    };
+    EXPECT_TRUE(rebuildsAfter([](G::VisualizationConfig& c) { c.Scalar.Isolines.Values[0] = 0.5f; }));
+    EXPECT_TRUE(rebuildsAfter([](G::VisualizationConfig& c) { c.Scalar.RangeMin = std::numeric_limits<float>::infinity(); }));
+    EXPECT_TRUE(rebuildsAfter([](G::VisualizationConfig& c) { c.Scalar.RangeMin = -std::numeric_limits<float>::infinity(); }));
+    EXPECT_TRUE(rebuildsAfter([](G::VisualizationConfig& c) { c.Scalar.RangeMax = 0.0f; }));
+    EXPECT_TRUE(rebuildsAfter([](G::VisualizationConfig& c) { c.Scalar.RangeMax = -0.0f; }));
+    EXPECT_FALSE(rebuildsAfter([](G::VisualizationConfig& c) { c.Scalar.Isolines.Values[5] = 9.0f; }))
+        << "an inactive highlight slot is not part of the style";
+    // Two sign flips at once and a moved string boundary must not cancel in the signature.
+    EXPECT_TRUE(rebuildsAfter([](G::VisualizationConfig& c)
+        {
+            c.Scalar.Isolines.Values = {0.25f, 0.5f};
+            c.Scalar.Isolines.ValueCount = 2u;
+        }));
+    EXPECT_TRUE(rebuildsAfter([](G::VisualizationConfig& c) { c.Scalar.Isolines.Values = {-0.25f, -0.5f}; }));
+    // Names built so that, without a length prefix, the field-name bytes run into the domain's: the
+    // string type tag (3, as 8 bytes) and "Vertex" move from one name into the other.
+    const std::string tag("\x03\0\0\0\0\0\0\0", 8u);
+    EXPECT_TRUE(rebuildsAfter([&](G::VisualizationConfig& c)
+        {
+            c.ScalarFieldName = "";
+            c.ColorBufferName = tag + "Vertex" + tag + "x";
+        }));
+    EXPECT_TRUE(rebuildsAfter([&](G::VisualizationConfig& c)
+        {
+            c.ScalarFieldName = tag + "Vertex" + tag;
+            c.ColorBufferName = "x";
+        }));
 }

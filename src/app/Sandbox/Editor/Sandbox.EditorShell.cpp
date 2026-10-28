@@ -491,13 +491,13 @@ namespace Extrinsic::Sandbox::Editor
             // Reapplying a preset preserves the target's tuned range and
             // binning.
             const bool scalarAutoRange =
-                visualization.HasConfig ? visualization.ScalarAutoRange : true;
+                visualization.HasConfig ? visualization.Config.Scalar.AutoRange : true;
             const float scalarRangeMin =
-                visualization.HasConfig ? visualization.ScalarRangeMin : 0.0f;
+                visualization.HasConfig ? visualization.Config.Scalar.RangeMin : 0.0f;
             const float scalarRangeMax =
-                visualization.HasConfig ? visualization.ScalarRangeMax : 1.0f;
+                visualization.HasConfig ? visualization.Config.Scalar.RangeMax : 1.0f;
             const std::uint32_t scalarBinCount =
-                visualization.HasConfig ? visualization.ScalarBinCount : 0u;
+                visualization.HasConfig ? visualization.Config.Scalar.BinCount : 0u;
 
             for (std::size_t i = 0u; i < properties.size(); ++i)
             {
@@ -628,7 +628,7 @@ namespace Extrinsic::Sandbox::Editor
             const EditorVisualizationTarget target,
             const bool canEditVisualization)
         {
-            if (!visualization.HasConfig || visualization.Source != kScalarFieldSource)
+            if (!visualization.HasConfig || visualization.Config.Source != kScalarFieldSource)
                 return;
             DrawScalarFieldColorControls(visualization, context, selectedStableId, target,
                                          canEditVisualization);
@@ -2042,7 +2042,7 @@ namespace Extrinsic::Sandbox::Editor
                         {
                             ImGui::Text("Visualization: %s",
                                         DebugNameForEditorVisualizationColorSource(
-                                            frame.Visualization.Visualization.Source));
+                                            frame.Visualization.Visualization.Config.Source));
                         }
                         else
                         {
@@ -2071,7 +2071,7 @@ namespace Extrinsic::Sandbox::Editor
                                     frame.Visualization.SelectedStableId,
                                     frame.Visualization.Visualization,
                                     EditorVisualizationTarget::Entity,
-                                    frame.Visualization.Visualization.Color));
+                                    frame.Visualization.Visualization.Config.Color));
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Clear vis"))

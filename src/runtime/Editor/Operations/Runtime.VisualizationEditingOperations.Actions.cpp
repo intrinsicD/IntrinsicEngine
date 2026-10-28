@@ -35,6 +35,7 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Runtime.LaneVisualizationStyle;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -81,26 +82,9 @@ namespace {
         [[nodiscard]] G::VisualizationConfig ToVisualizationConfig(
             const EditorVisualizationConfigCommand& command)
         {
-            G::VisualizationConfig config{};
-            config.Source = command.Source;
-            config.Color = command.Color;
-            config.UniformByDefault = command.UniformByDefault;
-            config.ScalarFieldName = command.ScalarFieldName;
-            config.ScalarDomain = command.ScalarDomain;
-            config.ColorBufferName = command.ColorBufferName;
-            config.Interpretation = command.Interpretation;
-            config.UseBakedTexture = command.UseBakedTexture;
-            config.Scalar.AutoRange = command.ScalarAutoRange;
-            config.Scalar.RangeMin = command.ScalarRangeMin;
-            config.Scalar.RangeMax = command.ScalarRangeMax;
-            config.Scalar.BinCount = command.ScalarBinCount;
-            config.Scalar.Map = command.ScalarColormap;
-            config.Scalar.Isolines.Num = command.IsolineCount;
-            config.Scalar.Isolines.Width = command.IsolineWidth;
-            config.Scalar.Isolines.Color = command.IsolineColor;
-            config.Scalar.Isolines.Values = command.IsolineValues;
+            G::VisualizationConfig config = command.Config;
             config.Scalar.Isolines.ValueCount = std::min<std::uint32_t>(
-                command.IsolineValueCount,
+                config.Scalar.Isolines.ValueCount,
                 G::ScalarFieldConfig::kMaxIsolineValues);
             return config;
         }
@@ -168,25 +152,9 @@ namespace {
 
         [[nodiscard]] bool SameVisualizationConfig(
             const G::VisualizationConfig& lhs,
-            const G::VisualizationConfig& rhs) noexcept
+            const G::VisualizationConfig& rhs)
         {
-            if (lhs.Scalar.Isolines.ValueCount != rhs.Scalar.Isolines.ValueCount)
-                return false;
-            for (std::uint32_t i = 0u; i < lhs.Scalar.Isolines.ValueCount; ++i)
-            {
-                if (lhs.Scalar.Isolines.Values[i] != rhs.Scalar.Isolines.Values[i])
-                    return false;
-            }
-            return lhs.Source == rhs.Source && lhs.Color.x == rhs.Color.x && lhs.Color.y == rhs.Color.y &&
-                lhs.Color.z == rhs.Color.z && lhs.Color.w == rhs.Color.w &&
-                lhs.UniformByDefault == rhs.UniformByDefault && lhs.ScalarFieldName == rhs.ScalarFieldName &&
-                lhs.ScalarDomain == rhs.ScalarDomain && lhs.ColorBufferName == rhs.ColorBufferName &&
-                lhs.Interpretation == rhs.Interpretation && lhs.UseBakedTexture == rhs.UseBakedTexture &&
-                lhs.Scalar.Map == rhs.Scalar.Map && lhs.Scalar.AutoRange == rhs.Scalar.AutoRange &&
-                lhs.Scalar.RangeMin == rhs.Scalar.RangeMin && lhs.Scalar.RangeMax == rhs.Scalar.RangeMax &&
-                lhs.Scalar.BinCount == rhs.Scalar.BinCount && lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num &&
-                lhs.Scalar.Isolines.Width == rhs.Scalar.Isolines.Width &&
-                lhs.Scalar.Isolines.Color == rhs.Scalar.Isolines.Color;
+            return SameLaneVisualizationStyle(lhs, rhs);
         }
 
         // A lane's Default is its last chosen uniform color (unflagged uniform configs from
@@ -201,8 +169,8 @@ namespace {
         void KeepUniformDefault(
             EditorVisualizationConfigCommand& command, const G::VisualizationConfig& existing) noexcept
         {
-            command.Color = existing.Color;
-            command.UniformByDefault = DrawsUniformDefault(existing);
+            command.Config.Color = existing.Color;
+            command.Config.UniformByDefault = DrawsUniformDefault(existing);
         }
 
         [[nodiscard]] bool SameOptionalVisualizationConfig(
@@ -1422,26 +1390,25 @@ ApplyEditorRenderHintCommand(
             return EditorCommandStatus::StaleEntity;
 
         using Interpretation = G::VisualizationConfig::ColorInterpretation;
-        if (command.Interpretation != Interpretation::Components &&
-            command.Interpretation != Interpretation::NormalDirection)
+        if (CheckLaneVisualizationStyle(ToVisualizationConfig(command)).has_value())
             return EditorCommandStatus::InvalidVisualizationProperty;
-        if (command.EnableConfig && command.Interpretation == Interpretation::NormalDirection)
+        if (command.EnableConfig && command.Config.Interpretation == Interpretation::NormalDirection)
         {
-            if (command.Source != G::VisualizationConfig::ColorSource::PerVertexBuffer &&
-                command.Source != G::VisualizationConfig::ColorSource::PerEdgeBuffer &&
-                command.Source != G::VisualizationConfig::ColorSource::PerFaceBuffer)
+            if (command.Config.Source != G::VisualizationConfig::ColorSource::PerVertexBuffer &&
+                command.Config.Source != G::VisualizationConfig::ColorSource::PerEdgeBuffer &&
+                command.Config.Source != G::VisualizationConfig::ColorSource::PerFaceBuffer)
                 return EditorCommandStatus::InvalidVisualizationProperty;
             const auto availability = BuildGeometryAvailability(raw, entity);
             const auto provenance = availability.Sources.ProvenanceDomain;
-            const auto domain = command.Source == G::VisualizationConfig::ColorSource::PerFaceBuffer
+            const auto domain = command.Config.Source == G::VisualizationConfig::ColorSource::PerFaceBuffer
                 ? GeometryElementDomain::MeshFace
-                : command.Source == G::VisualizationConfig::ColorSource::PerEdgeBuffer
+                : command.Config.Source == G::VisualizationConfig::ColorSource::PerEdgeBuffer
                     ? (provenance == GS::Domain::Graph ? GeometryElementDomain::GraphEdge : GeometryElementDomain::MeshEdge)
                     : provenance == GS::Domain::Graph ? GeometryElementDomain::GraphNode
                     : provenance == GS::Domain::PointCloud ? GeometryElementDomain::PointCloudPoint
                     : GeometryElementDomain::MeshVertex;
             if (!ResolveGeometryProperty(availability,
-                    GeometryPropertyRef{domain, command.ColorBufferName, Geometry::PropertyValueKind::Vec3},
+                    GeometryPropertyRef{domain, command.Config.ColorBufferName, Geometry::PropertyValueKind::Vec3},
                     ResolveGeometryElementCount(availability, domain)).Resolved())
                 return EditorCommandStatus::InvalidVisualizationProperty;
         }
@@ -1473,20 +1440,20 @@ ApplyEditorRenderHintCommand(
 
         if (after.has_value() && after->UseBakedTexture) {
           if (command.Target != EditorVisualizationTarget::Surface ||
-              (command.Source !=
+              (command.Config.Source !=
                    G::VisualizationConfig::ColorSource::ScalarField &&
-               command.Source !=
+               command.Config.Source !=
                    G::VisualizationConfig::ColorSource::PerVertexBuffer &&
-               command.Source !=
+               command.Config.Source !=
                    G::VisualizationConfig::ColorSource::PerFaceBuffer))
             return EditorCommandStatus::UnsupportedGeometryDomain;
 
-          const bool scalar = command.Source ==
+          const bool scalar = command.Config.Source ==
                               G::VisualizationConfig::ColorSource::ScalarField;
           const auto domain =
               scalar
-                  ? command.ScalarDomain
-                  : (command.Source ==
+                  ? command.Config.ScalarDomain
+                  : (command.Config.Source ==
                              G::VisualizationConfig::ColorSource::PerFaceBuffer
                          ? G::VisualizationConfig::Domain::Face
                          : G::VisualizationConfig::Domain::Vertex);
@@ -1498,7 +1465,7 @@ ApplyEditorRenderHintCommand(
                   : GeometryElementDomain::MeshVertex;
           const auto availability = BuildGeometryAvailability(raw, entity);
           const std::string &name =
-              scalar ? command.ScalarFieldName : command.ColorBufferName;
+              scalar ? command.Config.ScalarFieldName : command.Config.ColorBufferName;
           const auto resolved = ResolveGeometryProperty(
               availability,
               GeometryPropertyRef{.Domain = sourceDomain, .Name = name},
@@ -1514,15 +1481,15 @@ ApplyEditorRenderHintCommand(
                   .PropertyName = name,
                   .Encoder = ResolveSurfaceAppearanceEncoding(*after, resolved.ResolvedValueKind),
                   .RangePolicy =
-                      command.ScalarAutoRange
+                      command.Config.Scalar.AutoRange
                           ? PropertyTextureBakeRangePolicy::AutoFinite
                           : PropertyTextureBakeRangePolicy::Manual,
-                  .RangeMin = command.ScalarRangeMin,
-                  .RangeMax = command.ScalarRangeMax,
+                  .RangeMin = command.Config.Scalar.RangeMin,
+                  .RangeMax = command.Config.Scalar.RangeMax,
                   .PaddingTexels = 2u,
                   .OutputName = std::string{kSurfaceAppearanceTextureOutput},
                   .Storage = PropertyTextureBakeStorage::EncodedRgba,
-                  .EncodingColormap = command.ScalarColormap,
+                  .EncodingColormap = command.Config.Scalar.Map,
                   .BindGeneratedTexture = false,
               });
           if (!baked.Succeeded())
@@ -1606,15 +1573,15 @@ ApplyEditorRenderHintCommand(
             .StableEntityId = command.StableEntityId,
             .Target = command.Target,
             .EnableConfig = true,
-            .ScalarFieldName = command.PropertyName,
-            .ScalarDomain = OverlayLaneFor(command.Domain).VisDomain,
-            .ColorBufferName = command.PropertyName,
-            .Interpretation = command.Interpretation,
-            .ScalarAutoRange = command.ScalarAutoRange,
-            .ScalarRangeMin = command.ScalarRangeMin,
-            .ScalarRangeMax = command.ScalarRangeMax,
-            .ScalarBinCount = command.ScalarBinCount,
         };
+        configCommand.Config.ScalarFieldName = command.PropertyName;
+        configCommand.Config.ScalarDomain = OverlayLaneFor(command.Domain).VisDomain;
+        configCommand.Config.ColorBufferName = command.PropertyName;
+        configCommand.Config.Interpretation = command.Interpretation;
+        configCommand.Config.Scalar.AutoRange = command.ScalarAutoRange;
+        configCommand.Config.Scalar.RangeMin = command.ScalarRangeMin;
+        configCommand.Config.Scalar.RangeMax = command.ScalarRangeMax;
+        configCommand.Config.Scalar.BinCount = command.ScalarBinCount;
         // UI-032 — preset buttons switch the source/property but must not
         // clobber styling the user already configured on this target
         // (colormap, isoline width/color, highlight isovalues).
@@ -1623,12 +1590,12 @@ ApplyEditorRenderHintCommand(
             existing.has_value())
         {
             KeepUniformDefault(configCommand, *existing);
-            configCommand.ScalarColormap = existing->Scalar.Map;
-            configCommand.IsolineWidth = existing->Scalar.Isolines.Width;
-            configCommand.IsolineColor = existing->Scalar.Isolines.Color;
-            configCommand.IsolineValues = existing->Scalar.Isolines.Values;
-            configCommand.IsolineValueCount = existing->Scalar.Isolines.ValueCount;
-            configCommand.UseBakedTexture = existing->UseBakedTexture;
+            configCommand.Config.Scalar.Map = existing->Scalar.Map;
+            configCommand.Config.Scalar.Isolines.Width = existing->Scalar.Isolines.Width;
+            configCommand.Config.Scalar.Isolines.Color = existing->Scalar.Isolines.Color;
+            configCommand.Config.Scalar.Isolines.Values = existing->Scalar.Isolines.Values;
+            configCommand.Config.Scalar.Isolines.ValueCount = existing->Scalar.Isolines.ValueCount;
+            configCommand.Config.UseBakedTexture = existing->UseBakedTexture;
         }
 
         switch (command.Preset)
@@ -1639,9 +1606,9 @@ ApplyEditorRenderHintCommand(
             {
                 return EditorCommandStatus::InvalidVisualizationProperty;
             }
-            configCommand.Source =
+            configCommand.Config.Source =
                 G::VisualizationConfig::ColorSource::ScalarField;
-            configCommand.IsolineCount = 0u;
+            configCommand.Config.Scalar.Isolines.Num = 0u;
             break;
         case EditorVisualizationPropertyPreset::Isoline:
             if (command.IsolineCount == 0u ||
@@ -1650,13 +1617,13 @@ ApplyEditorRenderHintCommand(
             {
                 return EditorCommandStatus::InvalidVisualizationProperty;
             }
-            configCommand.Source =
+            configCommand.Config.Source =
                 G::VisualizationConfig::ColorSource::ScalarField;
-            configCommand.IsolineCount = command.IsolineCount;
+            configCommand.Config.Scalar.Isolines.Num = command.IsolineCount;
             break;
         case EditorVisualizationPropertyPreset::ColorBuffer:
-            configCommand.Source = OverlayLaneFor(command.Domain).BufferSource;
-            configCommand.IsolineCount = 0u;
+            configCommand.Config.Source = OverlayLaneFor(command.Domain).BufferSource;
+            configCommand.Config.Scalar.Isolines.Num = 0u;
             break;
         }
 
@@ -1719,46 +1686,46 @@ ApplyEditorRenderHintCommand(
                         EditorVisualizationConfigCommand config{
                             .StableEntityId = command.StableEntityId,
                             .Target = lane->Target,
-                            .Source = lane->BufferSource,
-                            .ScalarDomain = lane->VisDomain,
-                            .ColorBufferName = resolved.Source.Name,
                         };
+                        config.Config.Source = lane->BufferSource;
+                        config.Config.ScalarDomain = lane->VisDomain;
+                        config.Config.ColorBufferName = resolved.Source.Name;
                         const auto existing = EffectiveVisualizationConfigForTarget(
                             raw, entity, config.Target);
                         const bool hadLaneConfig = existing.has_value();
                         if (existing)
                         {
                             KeepUniformDefault(config, *existing);
-                            config.UseBakedTexture = existing->UseBakedTexture;
-                            config.ScalarColormap = existing->Scalar.Map;
-                            config.ScalarBinCount = existing->Scalar.BinCount;
-                            config.IsolineCount = existing->Scalar.Isolines.Num;
-                            config.IsolineWidth = existing->Scalar.Isolines.Width;
-                            config.IsolineColor = existing->Scalar.Isolines.Color;
-                            config.IsolineValues = existing->Scalar.Isolines.Values;
-                            config.IsolineValueCount = existing->Scalar.Isolines.ValueCount;
+                            config.Config.UseBakedTexture = existing->UseBakedTexture;
+                            config.Config.Scalar.Map = existing->Scalar.Map;
+                            config.Config.Scalar.BinCount = existing->Scalar.BinCount;
+                            config.Config.Scalar.Isolines.Num = existing->Scalar.Isolines.Num;
+                            config.Config.Scalar.Isolines.Width = existing->Scalar.Isolines.Width;
+                            config.Config.Scalar.Isolines.Color = existing->Scalar.Isolines.Color;
+                            config.Config.Scalar.Isolines.Values = existing->Scalar.Isolines.Values;
+                            config.Config.Scalar.Isolines.ValueCount = existing->Scalar.Isolines.ValueCount;
                         }
                         // A baked texture is built from CPU values, which a pending result lacks.
                         if (pendingResident)
-                            config.UseBakedTexture = false;
+                            config.Config.UseBakedTexture = false;
                         if constexpr (std::is_same_v<T, ColorVisualizationRecipe>)
-                            config.Interpretation = resolved.Interpretation;
+                            config.Config.Interpretation = resolved.Interpretation;
                         if constexpr (std::is_same_v<T, ScalarVisualizationRecipe>)
                         {
-                            config.Source = G::VisualizationConfig::ColorSource::ScalarField;
-                            config.ScalarFieldName = resolved.Source.Name;
-                            config.ScalarAutoRange = recipe.AutoRange;
-                            config.ScalarRangeMin = recipe.RangeMin;
-                            config.ScalarRangeMax = recipe.RangeMax;
+                            config.Config.Source = G::VisualizationConfig::ColorSource::ScalarField;
+                            config.Config.ScalarFieldName = resolved.Source.Name;
+                            config.Config.Scalar.AutoRange = recipe.AutoRange;
+                            config.Config.Scalar.RangeMin = recipe.RangeMin;
+                            config.Config.Scalar.RangeMax = recipe.RangeMax;
                             // Showing another property on a lane swaps the
                             // source and keeps that lane's colormap (panel,
                             // Color binding and show_property alike). An
                             // explicit recipe colormap wins; without one a
                             // lane that has no config gets the default.
                             if (recipe.Colormap.has_value())
-                                config.ScalarColormap = *recipe.Colormap;
+                                config.Config.Scalar.Map = *recipe.Colormap;
                             else if (!hadLaneConfig)
-                                config.ScalarColormap = Graphics::Colormap::Type::Viridis;
+                                config.Config.Scalar.Map = Graphics::Colormap::Type::Viridis;
                         }
                         // Property-only display requests use the same undoable lane state as Appearance.
                         return ApplyEditorVisualizationConfigCommand(context, config);
@@ -1918,9 +1885,7 @@ ApplyEditorRenderHintCommand(
                     EditorVisualizationConfigCommand{
                         .StableEntityId = command.StableEntityId,
                         .Target = lane,
-                        .Source = G::VisualizationConfig::ColorSource::UniformColor,
-                        .Color = stored->Color,
-                        .UniformByDefault = true,
+                        .Config = {.Source = G::VisualizationConfig::ColorSource::UniformColor, .Color = stored->Color, .UniformByDefault = true},
                     });
             }
             // Without an entity-level overlay the lane override is removed;
@@ -1935,7 +1900,7 @@ ApplyEditorRenderHintCommand(
                     .StableEntityId = command.StableEntityId,
                     .Target = lane,
                     .EnableConfig = entityOverlay,
-                    .Source = G::VisualizationConfig::ColorSource::Material,
+                    .Config = {.Source = G::VisualizationConfig::ColorSource::Material},
                 });
         }
 

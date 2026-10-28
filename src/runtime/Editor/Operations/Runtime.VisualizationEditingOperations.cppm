@@ -416,31 +416,11 @@ export namespace Extrinsic::Runtime
                    static_cast<bool>(ClearRecipe);
         }
     };
+    // RUNTIME-329: the lane style is the component itself, not a copy of its fields.
     struct EditorVisualizationConfigModel
     {
         bool HasConfig{false};
-        Graphics::Components::VisualizationConfig::ColorSource Source{
-            Graphics::Components::VisualizationConfig::ColorSource::Material};
-        glm::vec4 Color{Graphics::Components::kDefaultSurfaceColor};
-        bool UniformByDefault{false};
-        std::string ScalarFieldName{};
-        Graphics::Components::VisualizationConfig::Domain ScalarDomain{
-            Graphics::Components::VisualizationConfig::Domain::Vertex};
-        std::string ColorBufferName{};
-        Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
-        bool ScalarAutoRange{true};
-        float ScalarRangeMin{0.0f};
-        float ScalarRangeMax{1.0f};
-        std::uint32_t ScalarBinCount{0u};
-        std::uint32_t IsolineCount{0u};
-        // UI-032 — scalar styling controls.
-        Graphics::Colormap::Type ScalarColormap{Graphics::Colormap::Type::Viridis};
-        float IsolineWidth{1.5f};
-        glm::vec4 IsolineColor{0.0f, 0.0f, 0.0f, 1.0f};
-        std::array<float, Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
-            IsolineValues{};
-        std::uint32_t IsolineValueCount{0u};
-        bool UseBakedTexture{false};
+        Graphics::Components::VisualizationConfig Config{};
     };
     struct EditorVisualizationPropertyInfo
     {
@@ -506,28 +486,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         EditorVisualizationTarget Target{EditorVisualizationTarget::Entity};
         bool EnableConfig{true};
-        Graphics::Components::VisualizationConfig::ColorSource Source{
-            Graphics::Components::VisualizationConfig::ColorSource::UniformColor};
-        glm::vec4 Color{Graphics::Components::kDefaultSurfaceColor};
-        bool UniformByDefault{false};
-        std::string ScalarFieldName{};
-        Graphics::Components::VisualizationConfig::Domain ScalarDomain{
-            Graphics::Components::VisualizationConfig::Domain::Vertex};
-        std::string ColorBufferName{};
-        Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
-        bool ScalarAutoRange{true};
-        float ScalarRangeMin{0.0f};
-        float ScalarRangeMax{1.0f};
-        std::uint32_t ScalarBinCount{0u};
-        std::uint32_t IsolineCount{0u};
-        // UI-032 — scalar styling controls.
-        Graphics::Colormap::Type ScalarColormap{Graphics::Colormap::Type::Viridis};
-        float IsolineWidth{1.5f};
-        glm::vec4 IsolineColor{0.0f, 0.0f, 0.0f, 1.0f};
-        std::array<float, Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
-            IsolineValues{};
-        std::uint32_t IsolineValueCount{0u};
-        bool UseBakedTexture{false};
+        Graphics::Components::VisualizationConfig Config{
+            .Source = Graphics::Components::VisualizationConfig::ColorSource::UniformColor};
     };
     struct EditorVisualizationPropertyCommand
     {

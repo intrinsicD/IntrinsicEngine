@@ -249,18 +249,18 @@ TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
 TEST(SandboxDomainPanels, UniformColorCommandsDisableBakingAndRetainScalarStyle)
 {
     Runtime::EditorVisualizationConfigModel model{};
-    model.Source = decltype(model.Source)::ScalarField;
-    model.Color = {0.2f, 0.3f, 0.4f, 0.5f};
-    model.ScalarFieldName = "f:curvature";
-    model.ScalarDomain = decltype(model.ScalarDomain)::Face;
-    model.ScalarAutoRange = false;
-    model.ScalarRangeMin = -2.0f;
-    model.ScalarRangeMax = 3.0f;
-    model.ScalarColormap = decltype(model.ScalarColormap)::Inferno;
-    model.IsolineValues = {-1.0f, 0.5f, 2.0f};
-    model.IsolineValueCount = 3u;
-    model.UseBakedTexture = true;
-    model.Interpretation = decltype(model.Interpretation)::NormalDirection;
+    model.Config.Source = decltype(model.Config.Source)::ScalarField;
+    model.Config.Color = {0.2f, 0.3f, 0.4f, 0.5f};
+    model.Config.ScalarFieldName = "f:curvature";
+    model.Config.ScalarDomain = decltype(model.Config.ScalarDomain)::Face;
+    model.Config.Scalar.AutoRange = false;
+    model.Config.Scalar.RangeMin = -2.0f;
+    model.Config.Scalar.RangeMax = 3.0f;
+    model.Config.Scalar.Map = decltype(model.Config.Scalar.Map)::Inferno;
+    model.Config.Scalar.Isolines.Values = {-1.0f, 0.5f, 2.0f};
+    model.Config.Scalar.Isolines.ValueCount = 3u;
+    model.Config.UseBakedTexture = true;
+    model.Config.Interpretation = decltype(model.Config.Interpretation)::NormalDirection;
 
     const auto base = Editor::MakeVisualizationConfigCommandFromModel(
         42u, model, Runtime::EditorVisualizationTarget::Surface);
@@ -268,28 +268,28 @@ TEST(SandboxDomainPanels, UniformColorCommandsDisableBakingAndRetainScalarStyle)
     const auto uniform = Editor::MakeUniformVisualizationConfigCommandFromModel(
         42u, model, Runtime::EditorVisualizationTarget::Surface, replacement);
 
-    EXPECT_EQ(base.Source, decltype(model.Source)::ScalarField);
-    EXPECT_EQ(base.Color, model.Color);
-    EXPECT_TRUE(base.UseBakedTexture);
-    EXPECT_EQ(uniform.Source, decltype(model.Source)::UniformColor);
-    EXPECT_EQ(uniform.Color, replacement);
-    EXPECT_FALSE(uniform.UseBakedTexture);
-    EXPECT_EQ(base.Interpretation, decltype(model.Interpretation)::NormalDirection);
-    EXPECT_EQ(uniform.Interpretation, decltype(model.Interpretation)::Components)
+    EXPECT_EQ(base.Config.Source, decltype(model.Config.Source)::ScalarField);
+    EXPECT_EQ(base.Config.Color, model.Config.Color);
+    EXPECT_TRUE(base.Config.UseBakedTexture);
+    EXPECT_EQ(uniform.Config.Source, decltype(model.Config.Source)::UniformColor);
+    EXPECT_EQ(uniform.Config.Color, replacement);
+    EXPECT_FALSE(uniform.Config.UseBakedTexture);
+    EXPECT_EQ(base.Config.Interpretation, decltype(model.Config.Interpretation)::NormalDirection);
+    EXPECT_EQ(uniform.Config.Interpretation, decltype(model.Config.Interpretation)::Components)
         << "a direction interpretation is only valid on a color buffer";
     for (const auto* command : {&base, &uniform})
     {
         EXPECT_EQ(command->StableEntityId, 42u);
         EXPECT_EQ(command->Target, Runtime::EditorVisualizationTarget::Surface);
         EXPECT_TRUE(command->EnableConfig);
-        EXPECT_EQ(command->ScalarFieldName, "f:curvature");
-        EXPECT_EQ(command->ScalarDomain, decltype(model.ScalarDomain)::Face);
-        EXPECT_FALSE(command->ScalarAutoRange);
-        EXPECT_FLOAT_EQ(command->ScalarRangeMin, -2.0f);
-        EXPECT_FLOAT_EQ(command->ScalarRangeMax, 3.0f);
-        EXPECT_EQ(command->ScalarColormap, decltype(model.ScalarColormap)::Inferno);
-        EXPECT_EQ(command->IsolineValues, model.IsolineValues);
-        EXPECT_EQ(command->IsolineValueCount, 3u);
+        EXPECT_EQ(command->Config.ScalarFieldName, "f:curvature");
+        EXPECT_EQ(command->Config.ScalarDomain, decltype(model.Config.ScalarDomain)::Face);
+        EXPECT_FALSE(command->Config.Scalar.AutoRange);
+        EXPECT_FLOAT_EQ(command->Config.Scalar.RangeMin, -2.0f);
+        EXPECT_FLOAT_EQ(command->Config.Scalar.RangeMax, 3.0f);
+        EXPECT_EQ(command->Config.Scalar.Map, decltype(model.Config.Scalar.Map)::Inferno);
+        EXPECT_EQ(command->Config.Scalar.Isolines.Values, model.Config.Scalar.Isolines.Values);
+        EXPECT_EQ(command->Config.Scalar.Isolines.ValueCount, 3u);
     }
 }
 
@@ -310,20 +310,20 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
     });
     Runtime::EditorVisualizationConfigModel model;
     model.HasConfig = true;
-    model.Source = Editor::kScalarFieldSource;
-    model.Color = {0.2f, 0.4f, 0.6f, 1.0f};
-    model.ScalarFieldName = "curvature";
-    model.ColorBufferName = "saved-colors";
-    model.ScalarAutoRange = false;
-    model.ScalarRangeMin = -2.0f;
-    model.ScalarRangeMax = 6.0f;
-    model.ScalarColormap = decltype(model.ScalarColormap)::Plasma;
-    model.ScalarBinCount = 7u;
-    model.IsolineCount = 9u;
-    model.IsolineWidth = 2.5f;
-    model.IsolineColor = {0.8f, 0.6f, 0.4f, 1.0f};
-    model.IsolineValues = {1.0f, 3.0f, 5.0f};
-    model.IsolineValueCount = 3u;
+    model.Config.Source = Editor::kScalarFieldSource;
+    model.Config.Color = {0.2f, 0.4f, 0.6f, 1.0f};
+    model.Config.ScalarFieldName = "curvature";
+    model.Config.ColorBufferName = "saved-colors";
+    model.Config.Scalar.AutoRange = false;
+    model.Config.Scalar.RangeMin = -2.0f;
+    model.Config.Scalar.RangeMax = 6.0f;
+    model.Config.Scalar.Map = decltype(model.Config.Scalar.Map)::Plasma;
+    model.Config.Scalar.BinCount = 7u;
+    model.Config.Scalar.Isolines.Num = 9u;
+    model.Config.Scalar.Isolines.Width = 2.5f;
+    model.Config.Scalar.Isolines.Color = {0.8f, 0.6f, 0.4f, 1.0f};
+    model.Config.Scalar.Isolines.Values = {1.0f, 3.0f, 5.0f};
+    model.Config.Scalar.Isolines.ValueCount = 3u;
 
     for (const auto target : {Runtime::EditorVisualizationTarget::Entity,
                               Runtime::EditorVisualizationTarget::Surface})
@@ -372,20 +372,20 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
 
         const auto expectStyle = [&](const G::VisualizationConfig& config)
         {
-            EXPECT_EQ(config.Source, model.Source);
-            EXPECT_EQ(config.Color, model.Color);
-            EXPECT_EQ(config.ScalarFieldName, model.ScalarFieldName);
-            EXPECT_EQ(config.ColorBufferName, model.ColorBufferName);
-            EXPECT_EQ(config.Interpretation, model.Interpretation);
-            EXPECT_EQ(config.ScalarDomain, model.ScalarDomain);
-            EXPECT_FLOAT_EQ(config.Scalar.RangeMin, model.ScalarRangeMin);
-            EXPECT_FLOAT_EQ(config.Scalar.RangeMax, model.ScalarRangeMax);
-            EXPECT_EQ(config.Scalar.BinCount, model.ScalarBinCount);
-            EXPECT_EQ(config.Scalar.Map, model.ScalarColormap);
-            EXPECT_EQ(config.Scalar.Isolines.Num, model.IsolineCount);
-            EXPECT_FLOAT_EQ(config.Scalar.Isolines.Width, model.IsolineWidth);
-            EXPECT_EQ(config.Scalar.Isolines.Color, model.IsolineColor);
-            EXPECT_EQ(config.UseBakedTexture, model.UseBakedTexture);
+            EXPECT_EQ(config.Source, model.Config.Source);
+            EXPECT_EQ(config.Color, model.Config.Color);
+            EXPECT_EQ(config.ScalarFieldName, model.Config.ScalarFieldName);
+            EXPECT_EQ(config.ColorBufferName, model.Config.ColorBufferName);
+            EXPECT_EQ(config.Interpretation, model.Config.Interpretation);
+            EXPECT_EQ(config.ScalarDomain, model.Config.ScalarDomain);
+            EXPECT_FLOAT_EQ(config.Scalar.RangeMin, model.Config.Scalar.RangeMin);
+            EXPECT_FLOAT_EQ(config.Scalar.RangeMax, model.Config.Scalar.RangeMax);
+            EXPECT_EQ(config.Scalar.BinCount, model.Config.Scalar.BinCount);
+            EXPECT_EQ(config.Scalar.Map, model.Config.Scalar.Map);
+            EXPECT_EQ(config.Scalar.Isolines.Num, model.Config.Scalar.Isolines.Num);
+            EXPECT_FLOAT_EQ(config.Scalar.Isolines.Width, model.Config.Scalar.Isolines.Width);
+            EXPECT_EQ(config.Scalar.Isolines.Color, model.Config.Scalar.Isolines.Color);
+            EXPECT_EQ(config.UseBakedTexture, model.Config.UseBakedTexture);
         };
         reset();
         activate("Auto range", true);
@@ -393,8 +393,8 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
         const auto changed = current();
         EXPECT_TRUE(changed.Scalar.AutoRange);
         expectStyle(changed);
-        EXPECT_EQ(changed.Scalar.Isolines.Values, model.IsolineValues);
-        EXPECT_EQ(changed.Scalar.Isolines.ValueCount, model.IsolineValueCount);
+        EXPECT_EQ(changed.Scalar.Isolines.Values, model.Config.Scalar.Isolines.Values);
+        EXPECT_EQ(changed.Scalar.Isolines.ValueCount, model.Config.Scalar.Isolines.ValueCount);
 
         for (const char* label : {"Auto range", "Add isovalue", "Remove"})
         {
@@ -406,7 +406,7 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
         }
         for (const bool autoRange : {false, true})
         {
-            model.ScalarAutoRange = autoRange;
+            model.Config.Scalar.AutoRange = autoRange;
             reset();
             activate("Add isovalue", true);
             EXPECT_EQ(publications, 1u);
@@ -415,10 +415,10 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
             EXPECT_EQ(added.Scalar.AutoRange, autoRange);
             EXPECT_EQ(added.Scalar.Isolines.ValueCount, 4u);
             for (std::size_t i = 0; i < 3; ++i)
-                EXPECT_FLOAT_EQ(added.Scalar.Isolines.Values[i], model.IsolineValues[i]);
+                EXPECT_FLOAT_EQ(added.Scalar.Isolines.Values[i], model.Config.Scalar.Isolines.Values[i]);
             EXPECT_FLOAT_EQ(added.Scalar.Isolines.Values[3], autoRange ? 0.0f : 2.0f);
         }
-        model.ScalarAutoRange = false;
+        model.Config.Scalar.AutoRange = false;
         for (int remove = 0; remove < 3; ++remove)
         {
             reset();
@@ -430,14 +430,14 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
             EXPECT_EQ(removed.Scalar.Isolines.ValueCount, 2u);
             for (int i = 0; i < 2; ++i)
                 EXPECT_FLOAT_EQ(removed.Scalar.Isolines.Values[i],
-                                model.IsolineValues[i < remove ? i : i + 1]);
+                                model.Config.Scalar.Isolines.Values[i < remove ? i : i + 1]);
         }
-        model.IsolineValueCount = model.IsolineValues.size();
+        model.Config.Scalar.Isolines.ValueCount = model.Config.Scalar.Isolines.Values.size();
         reset();
         activate("Add isovalue", true);
         EXPECT_EQ(publications, 0u);
-        EXPECT_EQ(current().Scalar.Isolines.ValueCount, model.IsolineValues.size());
-        model.IsolineValueCount = 3u;
+        EXPECT_EQ(current().Scalar.Isolines.ValueCount, model.Config.Scalar.Isolines.Values.size());
+        model.Config.Scalar.Isolines.ValueCount = 3u;
     }
 }
 

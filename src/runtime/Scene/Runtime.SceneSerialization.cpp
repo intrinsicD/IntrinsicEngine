@@ -58,6 +58,7 @@ import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ViewCapture;
 
 #include "GeometryIntegration/internal/Runtime.GeometryVectorFieldStyleJson.hpp"
+#include "Visualization/internal/Runtime.LaneVisualizationStyleJson.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -681,69 +682,6 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] const char* VisualizationColorSourceToString(
-            const G::VisualizationConfig::ColorSource source) noexcept
-        {
-            switch (source)
-            {
-            case G::VisualizationConfig::ColorSource::Material: return "Material";
-            case G::VisualizationConfig::ColorSource::UniformColor: return "UniformColor";
-            case G::VisualizationConfig::ColorSource::ScalarField: return "ScalarField";
-            case G::VisualizationConfig::ColorSource::PerVertexBuffer: return "PerVertexBuffer";
-            case G::VisualizationConfig::ColorSource::PerEdgeBuffer: return "PerEdgeBuffer";
-            case G::VisualizationConfig::ColorSource::PerFaceBuffer: return "PerFaceBuffer";
-            }
-            return "Material";
-        }
-
-        [[nodiscard]] bool TryVisualizationColorSourceFromString(
-            const std::string_view value,
-            G::VisualizationConfig::ColorSource& out) noexcept
-        {
-            if (value == "Material")
-                out = G::VisualizationConfig::ColorSource::Material;
-            else if (value == "UniformColor")
-                out = G::VisualizationConfig::ColorSource::UniformColor;
-            else if (value == "ScalarField")
-                out = G::VisualizationConfig::ColorSource::ScalarField;
-            else if (value == "PerVertexBuffer")
-                out = G::VisualizationConfig::ColorSource::PerVertexBuffer;
-            else if (value == "PerEdgeBuffer")
-                out = G::VisualizationConfig::ColorSource::PerEdgeBuffer;
-            else if (value == "PerFaceBuffer")
-                out = G::VisualizationConfig::ColorSource::PerFaceBuffer;
-            else
-                return false;
-            return true;
-        }
-
-        [[nodiscard]] const char* VisualizationDomainToString(
-            const G::VisualizationConfig::Domain domain) noexcept
-        {
-            switch (domain)
-            {
-            case G::VisualizationConfig::Domain::Vertex: return "Vertex";
-            case G::VisualizationConfig::Domain::Edge: return "Edge";
-            case G::VisualizationConfig::Domain::Face: return "Face";
-            }
-            return "Vertex";
-        }
-
-        [[nodiscard]] bool TryVisualizationDomainFromString(
-            const std::string_view value,
-            G::VisualizationConfig::Domain& out) noexcept
-        {
-            if (value == "Vertex")
-                out = G::VisualizationConfig::Domain::Vertex;
-            else if (value == "Edge")
-                out = G::VisualizationConfig::Domain::Edge;
-            else if (value == "Face")
-                out = G::VisualizationConfig::Domain::Face;
-            else
-                return false;
-            return true;
-        }
-
         [[nodiscard]] const char* ColormapToString(
             const Graphics::Colormap::Type map) noexcept
         {
@@ -828,222 +766,13 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        [[nodiscard]] json VisualizationConfigToJson(
-            const G::VisualizationConfig& config)
-        {
-            return json{
-                {"source", VisualizationColorSourceToString(config.Source)},
-                {"color", Vec4ToJson(config.Color)},
-                {"uniformByDefault", config.UniformByDefault},
-                {"scalarFieldName", config.ScalarFieldName},
-                {"scalarDomain", VisualizationDomainToString(config.ScalarDomain)},
-                {"colorBufferName", config.ColorBufferName},
-                {"colorInterpretation",
-                    config.Interpretation == G::VisualizationConfig::ColorInterpretation::NormalDirection
-                        ? "normal_direction"
-                        : "components"},
-                {"useBakedTexture", config.UseBakedTexture},
-                {"scalar",
-                    json{
-                        {"map", ColormapToString(config.Scalar.Map)},
-                        {"autoRange", config.Scalar.AutoRange},
-                        {"rangeMin", config.Scalar.RangeMin},
-                        {"rangeMax", config.Scalar.RangeMax},
-                        {"binCount", config.Scalar.BinCount},
-                        {"isolines",
-                            json{
-                                {"num", config.Scalar.Isolines.Num},
-                                {"color", Vec4ToJson(config.Scalar.Isolines.Color)},
-                                {"width", config.Scalar.Isolines.Width},
-                                {"values",
-                                    json(std::vector<float>(config.Scalar.Isolines.Values.begin(),
-                                        config.Scalar.Isolines.Values.begin() +
-                                            std::min<std::size_t>(config.Scalar.Isolines.ValueCount,
-                                                config.Scalar.Isolines.Values.size())))},
-                            }},
-                    }},
-            };
-        }
-
-        [[nodiscard]] bool ReadVisualizationConfigFromJson(
-            const json& value,
-            G::VisualizationConfig& config)
-        {
-            if (!value.is_object() ||
-                !value.contains("source") ||
-                !value["source"].is_string())
-            {
-                return false;
-            }
-
-            if (!TryVisualizationColorSourceFromString(value["source"].get<std::string>(),
-                                                       config.Source))
-            {
-                return false;
-            }
-
-            if (value.contains("color") && !TryReadVec4(value["color"], config.Color))
-                return false;
-
-            if (value.contains("uniformByDefault"))
-            {
-                if (!value["uniformByDefault"].is_boolean())
-                    return false;
-                config.UniformByDefault = value["uniformByDefault"].get<bool>();
-            }
-
-            if (value.contains("colorInterpretation"))
-            {
-                const auto& interpretation = value["colorInterpretation"];
-                if (interpretation == "components")
-                    config.Interpretation = G::VisualizationConfig::ColorInterpretation::Components;
-                else if (interpretation == "normal_direction")
-                    config.Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection;
-                else
-                    return false;
-            }
-
-            if (value.contains("useBakedTexture"))
-            {
-                if (!value["useBakedTexture"].is_boolean())
-                    return false;
-                config.UseBakedTexture = value["useBakedTexture"].get<bool>();
-            }
-
-            if (value.contains("scalarFieldName"))
-            {
-                if (!value["scalarFieldName"].is_string())
-                    return false;
-                config.ScalarFieldName = value["scalarFieldName"].get<std::string>();
-            }
-
-            if (value.contains("scalarDomain"))
-            {
-                if (!value["scalarDomain"].is_string() ||
-                    !TryVisualizationDomainFromString(value["scalarDomain"].get<std::string>(),
-                                                      config.ScalarDomain))
-                {
-                    return false;
-                }
-            }
-
-            if (value.contains("colorBufferName"))
-            {
-                if (!value["colorBufferName"].is_string())
-                    return false;
-                config.ColorBufferName = value["colorBufferName"].get<std::string>();
-            }
-
-            if (value.contains("scalar"))
-            {
-                const json& scalar = value["scalar"];
-                if (!scalar.is_object())
-                    return false;
-
-                if (scalar.contains("map"))
-                {
-                    if (!scalar["map"].is_string() ||
-                        !TryColormapFromString(scalar["map"].get<std::string>(),
-                                               config.Scalar.Map))
-                    {
-                        return false;
-                    }
-                }
-
-                if (scalar.contains("autoRange"))
-                {
-                    if (!scalar["autoRange"].is_boolean())
-                        return false;
-                    config.Scalar.AutoRange = scalar["autoRange"].get<bool>();
-                }
-
-                if (scalar.contains("rangeMin"))
-                {
-                    if (!scalar["rangeMin"].is_number())
-                        return false;
-                    config.Scalar.RangeMin = scalar["rangeMin"].get<float>();
-                }
-
-                if (scalar.contains("rangeMax"))
-                {
-                    if (!scalar["rangeMax"].is_number())
-                        return false;
-                    config.Scalar.RangeMax = scalar["rangeMax"].get<float>();
-                }
-
-                if (scalar.contains("binCount"))
-                {
-                    if (!scalar["binCount"].is_number_unsigned())
-                        return false;
-                    const std::uint64_t bins = scalar["binCount"].get<std::uint64_t>();
-                    if (bins > UINT32_MAX)
-                        return false;
-                    config.Scalar.BinCount = static_cast<std::uint32_t>(bins);
-                }
-
-                if (scalar.contains("isolines"))
-                {
-                    const json& isolines = scalar["isolines"];
-                    if (!isolines.is_object())
-                        return false;
-
-                    if (isolines.contains("num"))
-                    {
-                        if (!isolines["num"].is_number_unsigned())
-                            return false;
-                        const std::uint64_t num = isolines["num"].get<std::uint64_t>();
-                        if (num > UINT32_MAX)
-                            return false;
-                        config.Scalar.Isolines.Num = static_cast<std::uint32_t>(num);
-                    }
-
-                    if (isolines.contains("color") &&
-                        !TryReadVec4(isolines["color"], config.Scalar.Isolines.Color))
-                    {
-                        return false;
-                    }
-
-                    if (isolines.contains("width"))
-                    {
-                        if (!isolines["width"].is_number())
-                            return false;
-                        config.Scalar.Isolines.Width = isolines["width"].get<float>();
-                    }
-
-                    // UI-032 — bounded explicit highlight isovalues.
-                    if (isolines.contains("values"))
-                    {
-                        const json& values = isolines["values"];
-                        if (!values.is_array() ||
-                            values.size() >
-                                G::ScalarFieldConfig::kMaxIsolineValues)
-                        {
-                            return false;
-                        }
-                        std::uint32_t count = 0u;
-                        for (const json& entry : values)
-                        {
-                            if (!entry.is_number())
-                                return false;
-                            config.Scalar.Isolines.Values[count] =
-                                entry.get<float>();
-                            ++count;
-                        }
-                        config.Scalar.Isolines.ValueCount = count;
-                    }
-                }
-            }
-
-            return true;
-        }
-
         [[nodiscard]] bool ApplyVisualizationConfigFromJson(
             entt::registry& raw,
             const ECS::EntityHandle entity,
             const json& value)
         {
             G::VisualizationConfig config{};
-            if (!ReadVisualizationConfigFromJson(value, config))
+            if (!ReadLaneVisualizationStyleJson(value, config))
                 return false;
 
             raw.emplace_or_replace<G::VisualizationConfig>(entity, std::move(config));
@@ -1055,11 +784,11 @@ namespace Extrinsic::Runtime
         {
             json lanes = json::object();
             if (overrides.Surface.has_value())
-                lanes["surface"] = VisualizationConfigToJson(*overrides.Surface);
+                lanes["surface"] = LaneVisualizationStyleToJson(*overrides.Surface);
             if (overrides.Edges.has_value())
-                lanes["edges"] = VisualizationConfigToJson(*overrides.Edges);
+                lanes["edges"] = LaneVisualizationStyleToJson(*overrides.Edges);
             if (overrides.Points.has_value())
-                lanes["points"] = VisualizationConfigToJson(*overrides.Points);
+                lanes["points"] = LaneVisualizationStyleToJson(*overrides.Points);
             return lanes;
         }
 
@@ -1079,7 +808,7 @@ namespace Extrinsic::Runtime
                     if (!value.contains(key))
                         return true;
                     G::VisualizationConfig config{};
-                    if (!ReadVisualizationConfigFromJson(value[key], config))
+                    if (!ReadLaneVisualizationStyleJson(value[key], config))
                         return false;
                     out = std::move(config);
                     return true;
@@ -1140,7 +869,7 @@ namespace Extrinsic::Runtime
 
             if (const auto* visualization = raw.try_get<G::VisualizationConfig>(entity))
             {
-                render["visualization"] = VisualizationConfigToJson(*visualization);
+                render["visualization"] = LaneVisualizationStyleToJson(*visualization);
                 hasAny = true;
             }
             if (const auto* overrides =
