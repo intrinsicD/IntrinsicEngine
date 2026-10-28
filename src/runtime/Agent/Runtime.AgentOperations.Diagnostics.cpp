@@ -26,7 +26,7 @@ namespace Extrinsic::Runtime
             const auto args = Json::parse(arguments, nullptr, false);
             auto fail = [] { return AgentOperationOutcome{.IsError = true,
                 .Text = "Expected since_cursor >= 0, levels [0=info,1=warning,2=error,3=debug], categories [strings], and limit 1..1000.",
-                .ErrorCode = "invalid_arguments"}; };
+                .ErrorCode = "invalid_params"}; };
             if (!args.is_object()) return fail();
             for (auto it = args.begin(); it != args.end(); ++it)
                 if (it.key() != "since_cursor" && it.key() != "levels" && it.key() != "categories" && it.key() != "limit") return fail();
@@ -97,7 +97,7 @@ namespace Extrinsic::Runtime
             .Invoke = [](const AgentOperationContext& context, const std::string_view arguments) {
                 const auto args = Json::parse(arguments, nullptr, false);
                 if (!args.is_object() || !args.empty())
-                    return AgentOperationOutcome{.IsError = true, .Text = "device_status expects an empty object.", .ErrorCode = "invalid_arguments"};
+                    return AgentOperationOutcome{.IsError = true, .Text = "device_status expects an empty object.", .ErrorCode = "invalid_params"};
                 return AgentOperationOutcome{.Text = DeviceJson(context.Diagnostics ? context.Diagnostics->ReadDeviceStatus() : EditorDeviceStatus{}).dump()};
             }});
     }

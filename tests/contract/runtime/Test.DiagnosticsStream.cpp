@@ -54,7 +54,7 @@ TEST(DiagnosticsStream, AgentRejectsMalformedFiltersAndBounds)
     {
         const auto result = R::InvokeAgentOperation(registry, "diagnostics_read", {}, args, true);
         EXPECT_TRUE(result.IsError) << args;
-        EXPECT_EQ(result.ErrorCode, "invalid_arguments") << args;
+        EXPECT_EQ(result.ErrorCode, "invalid_params") << args;
     }
     const auto result = R::InvokeAgentOperation(registry, "device_status", {}, "{}", true);
     ASSERT_FALSE(result.IsError);
