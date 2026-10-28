@@ -23,6 +23,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.VisualizationPackets;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
@@ -82,7 +83,7 @@ namespace Extrinsic::Runtime
                 "length", true, {}, [](const Layer& l) { return Json(l.Length); },
                 [](const Json& v, Layer& l) { l.Length = v.get<float>(); }},
             {{.Name = "line_width", .Type = FT::Float, .Description = "Arrow width in pixels.",
-                 .Min = kMinGeometryVectorFieldLineWidthPx, .Max = kMaxGeometryVectorFieldLineWidthPx},
+                 .Min = Graphics::kVectorFieldMinLineWidthPx, .Max = Graphics::kVectorFieldMaxLineWidthPx},
                 "lineWidthPx", true, {}, [](const Layer& l) { return Json(l.LineWidthPx); },
                 [](const Json& v, Layer& l) { l.LineWidthPx = v.get<float>(); }},
             {{.Name = "color", .Type = FT::Array, .Description = "Uniform RGBA, drawn while color_property is Default.",

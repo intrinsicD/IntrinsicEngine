@@ -1824,9 +1824,7 @@ TEST(RendererFrameLifecycle, ParallelRecordingRecordsDynamicUploadPassesThroughA
             // Stand-in resident addresses; unresolved packets are not drawn.
             .PositionBufferBDA = 0x10000u,
             .VectorBufferBDA = 0x20000u,
-            .Scale = 1.0f,
-            .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
-            .DepthTested = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f}, .DepthTested = true},
         },
     }};
     static const std::array<Extrinsic::Graphics::IsolineOverlayPacket, 1> kIsolines{{

@@ -260,11 +260,7 @@ struct VisualizationOverlayRunCapture
 			.Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Vertex,
 			.ElementCount = static_cast<std::uint32_t>(vectorPositions.size()),
 			.RowCount = static_cast<std::uint32_t>(vectorPositions.size()),
-			.Scale = 1.0f,
-			.NormalizeLength = false,
-			.LineWidthPx = 6.0f,
-			.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
-			.DepthTested = false,
+			.Style = {.Scale = 1.0f, .NormalizeLength = false, .LineWidthPx = 6.0f, .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f}, .DepthTested = false},
 		},
 	}};
 	const std::array<Extrinsic::Graphics::IsolineOverlayPacket, 1> isolines{{

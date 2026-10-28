@@ -125,6 +125,31 @@ export namespace Extrinsic::Graphics
         Rgba,
     };
 
+    inline constexpr float kVectorFieldMinLineWidthPx = 0.5f;
+    inline constexpr float kVectorFieldMaxLineWidthPx = 32.f;
+
+    // RUNTIME-328: the uniform style of a vector-field draw, carried unchanged from extraction
+    // through the packet inputs and the packet to the draw record.
+    struct VectorFieldGlyphStyle
+    {
+        float Scale{1.f};
+        bool NormalizeLength{true};
+        float LineWidthPx{2.f};
+        glm::vec4 Color{1.f};
+        // Selects the depth-tested or always-on-top pipeline variant.
+        bool DepthTested{true};
+        Colormap::Type ColorMap{Colormap::Type::Viridis};
+        float ColorRangeMin{0.f};
+        float ColorRangeMax{1.f};
+
+        [[nodiscard]] friend bool operator==(const VectorFieldGlyphStyle&, const VectorFieldGlyphStyle&) = default;
+    };
+
+    // Finite positive scale, finite color, width in bounds; in colormap mode a supported
+    // colormap with a finite min < max. The one style rule of the append and the packet.
+    [[nodiscard]] bool IsValidVectorFieldGlyphStyle(
+        const VectorFieldGlyphStyle& style, VectorFieldColorMode colorMode) noexcept;
+
     struct VectorFieldOverlayPacket
     {
         std::string Name{};
@@ -139,12 +164,7 @@ export namespace Extrinsic::Graphics
         std::uint64_t VectorBufferBDA{0u};
         std::uint64_t RowBufferBDA{0u};
         glm::mat4 ObjectToWorld{1.f};
-        float Scale{1.f};
-        bool NormalizeLength{true};
-        float LineWidthPx{2.f};
-        glm::vec4 Color{1.f};
-        // Selects the depth-tested or always-on-top pipeline variant.
-        bool DepthTested{true};
+        VectorFieldGlyphStyle Style{};
         // Per-element length multipliers (ScalarFloat, ElementCount values); empty key and
         // zero address: uniform length.
         std::string LengthBufferSourceKey{};
@@ -153,15 +173,9 @@ export namespace Extrinsic::Graphics
         // ScalarFloat for Colormap, RgbaFloat4 for Rgba; ElementCount values.
         std::string ColorBufferSourceKey{};
         std::uint64_t ColorBufferBDA{0u};
-        Colormap::Type ColorMap{Colormap::Type::Viridis};
-        float ColorRangeMin{0.f};
-        float ColorRangeMax{1.f};
         // Filled by the renderer from the colormap system; 0 (invalid) until it is ready.
         std::uint32_t ColormapBindlessIndex{0u};
     };
-
-    inline constexpr float kVectorFieldMinLineWidthPx = 0.5f;
-    inline constexpr float kVectorFieldMaxLineWidthPx = 32.f;
 
     // Instances drawn for a packet: ceil(RowCount / RowStride), 0 if invalid.
     [[nodiscard]] std::uint32_t VectorFieldGlyphCount(

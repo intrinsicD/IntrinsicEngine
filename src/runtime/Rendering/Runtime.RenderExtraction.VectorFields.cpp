@@ -118,27 +118,6 @@ namespace Extrinsic::Runtime
                 : 0u;
         }
 
-        // One enabled Appearance layer, flattened for extraction.
-        struct VectorFieldRequest
-        {
-            GeometryElementDomain Domain{GeometryElementDomain::Unknown};
-            std::string Property{};
-            std::string Name{};
-            float Scale{1.0f};
-            bool Normalize{true};
-            float LineWidthPx{2.0f};
-            glm::vec4 Color{1.0f};
-            bool DepthTested{true};
-            std::uint32_t Stride{1u};
-            std::uint32_t MaxGlyphs{0u};
-            std::string LengthProperty{};
-            std::string ColorProperty{};
-            Graphics::Colormap::Type ColorMap{Graphics::Colormap::Type::Viridis};
-            bool ColorAutoRange{true};
-            float ColorRangeMin{0.0f};
-            float ColorRangeMax{1.0f};
-        };
-
         // Rows whose `deleted` flag is set are dead; a missing flag means all live.
         void CollectLiveRows(const Geometry::PropertySet* properties,
                              const std::string_view deletedName,
@@ -635,7 +614,7 @@ namespace Extrinsic::Runtime
         template <typename EntityCache, typename ObserveFront>
         void BindVectorFieldStyle(const ObserveFront& observeFront,
             const std::uint32_t stableId,
-            const VectorFieldRequest& request,
+            const GeometryVectorFieldLayerRecipe& layer,
             const Geometry::PropertySet& properties,
             EntityCache& entityCache,
             const std::uint64_t frame,
@@ -645,23 +624,23 @@ namespace Extrinsic::Runtime
             using Kind = typename decltype(entityCache.Styles)::value_type::ValueKind;
             const auto styleCache = [&](const std::string& name)
             {
-                return EnsureStyleCache(entityCache, properties, request.Domain, name, frame, stats);
+                return EnsureStyleCache(entityCache, properties, layer.Vector.Domain, name, frame, stats);
             };
             const auto scalarKey = [&](const std::string& name)
             {
-                return BuildKey(stableId, "vector.scalar", request.Domain, name);
+                return BuildKey(stableId, "vector.scalar", layer.Vector.Domain, name);
             };
 
-            if (!request.LengthProperty.empty())
+            if (!layer.LengthProperty.empty())
             {
-                if (const auto front = observeFront(request.LengthProperty))
+                if (const auto front = observeFront(layer.LengthProperty))
                 {
                     inputs.LengthBDA = front->Address;
                     inputs.LengthStamp = front->Stamp;
                 }
-                else if (const auto* cache = styleCache(request.LengthProperty); cache && cache->Kind == Kind::Scalar)
+                else if (const auto* cache = styleCache(layer.LengthProperty); cache && cache->Kind == Kind::Scalar)
                 {
-                    inputs.LengthKey = scalarKey(request.LengthProperty);
+                    inputs.LengthKey = scalarKey(layer.LengthProperty);
                     inputs.Lengths = cache->Scalars;
                     inputs.LengthStamp = cache->Stamp;
                 }
@@ -671,13 +650,13 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            if (request.ColorProperty.empty())
+            if (layer.ColorProperty.empty())
                 return;
-            inputs.ColorMap = request.ColorMap;
-            inputs.ColorRangeMin = request.ColorRangeMin;
-            inputs.ColorRangeMax = request.ColorRangeMax;
+            inputs.Style.ColorMap = layer.ColorMap;
+            inputs.Style.ColorRangeMin = layer.ColorRangeMin;
+            inputs.Style.ColorRangeMax = layer.ColorRangeMax;
             std::optional<std::array<float, 2>> autoRange{};
-            if (const auto front = observeFront(request.ColorProperty))
+            if (const auto front = observeFront(layer.ColorProperty))
             {
                 inputs.ColorMode = Graphics::VectorFieldColorMode::Colormap;
                 inputs.ColorBDA = front->Address;
@@ -686,29 +665,29 @@ namespace Extrinsic::Runtime
                 {
                     autoRange = WidenGpuFrontScalarRange(*front->ScalarRange);
                 }
-                else if (request.ColorAutoRange)
+                else if (layer.ColorAutoRange)
                 {
                     // An existing property keeps its CPU auto range; a GPU-only one draws 0..1.
-                    if (const auto* cache = styleCache(request.ColorProperty); cache && cache->Kind == Kind::Scalar)
+                    if (const auto* cache = styleCache(layer.ColorProperty); cache && cache->Kind == Kind::Scalar)
                         autoRange = std::array{cache->AutoRangeMin, cache->AutoRangeMax};
                     else
                         autoRange = std::array{0.0f, 1.0f};
                 }
             }
-            else if (const auto* cache = styleCache(request.ColorProperty); cache != nullptr)
+            else if (const auto* cache = styleCache(layer.ColorProperty); cache != nullptr)
             {
                 inputs.ColorStamp = cache->Stamp;
                 if (cache->Kind == Kind::Scalar)
                 {
                     inputs.ColorMode = Graphics::VectorFieldColorMode::Colormap;
-                    inputs.ColorKey = scalarKey(request.ColorProperty);
+                    inputs.ColorKey = scalarKey(layer.ColorProperty);
                     inputs.ColorScalars = cache->Scalars;
                     autoRange = std::array{cache->AutoRangeMin, cache->AutoRangeMax};
                 }
                 else
                 {
                     inputs.ColorMode = Graphics::VectorFieldColorMode::Rgba;
-                    inputs.ColorKey = BuildKey(stableId, "vector.rgba", request.Domain, request.ColorProperty);
+                    inputs.ColorKey = BuildKey(stableId, "vector.rgba", layer.Vector.Domain, layer.ColorProperty);
                     inputs.ColorRgba = cache->Rgba;
                 }
             }
@@ -717,16 +696,16 @@ namespace Extrinsic::Runtime
                 ++stats.VectorFieldStyleFallbackCount;
                 return;
             }
-            if (request.ColorAutoRange && autoRange && std::isfinite((*autoRange)[0]) &&
+            if (layer.ColorAutoRange && autoRange && std::isfinite((*autoRange)[0]) &&
                 std::isfinite((*autoRange)[1]) && (*autoRange)[0] < (*autoRange)[1])
             {
-                inputs.ColorRangeMin = (*autoRange)[0];
-                inputs.ColorRangeMax = (*autoRange)[1];
+                inputs.Style.ColorRangeMin = (*autoRange)[0];
+                inputs.Style.ColorRangeMax = (*autoRange)[1];
             }
-            else if (request.ColorAutoRange)
+            else if (layer.ColorAutoRange)
             {
-                inputs.ColorRangeMin = 0.0f;
-                inputs.ColorRangeMax = 1.0f;
+                inputs.Style.ColorRangeMin = 0.0f;
+                inputs.Style.ColorRangeMax = 1.0f;
             }
         }
     }
@@ -738,34 +717,17 @@ namespace Extrinsic::Runtime
         const glm::mat4& worldMatrix,
         RuntimeRenderExtractionStats& stats)
     {
-        std::vector<VectorFieldRequest> requests{};
+        // Copied: building packets calls out (the GPU front observer) while the recipe is in the registry.
+        std::vector<GeometryVectorFieldLayerRecipe> layers{};
         if (const auto* recipe = registry.try_get<GeometryPresentationRecipe>(entity))
         {
             for (const GeometryVectorFieldLayerRecipe& layer : recipe->VectorFields)
             {
-                if (!layer.Enabled)
-                    continue;
-                requests.push_back(VectorFieldRequest{
-                    .Domain = layer.Vector.Domain,
-                    .Property = layer.Vector.Name,
-                    .Name = layer.Vector.Name,
-                    .Scale = layer.Length,
-                    .Normalize = layer.LengthMode == GeometryVectorFieldLengthMode::Normalized,
-                    .LineWidthPx = layer.LineWidthPx,
-                    .Color = layer.Color,
-                    .DepthTested = layer.DepthTested,
-                    .Stride = layer.Stride,
-                    .MaxGlyphs = layer.MaxGlyphs,
-                    .LengthProperty = layer.LengthProperty,
-                    .ColorProperty = layer.ColorProperty,
-                    .ColorMap = layer.ColorMap,
-                    .ColorAutoRange = layer.ColorAutoRange,
-                    .ColorRangeMin = layer.ColorRangeMin,
-                    .ColorRangeMax = layer.ColorRangeMax,
-                });
+                if (layer.Enabled)
+                    layers.push_back(layer);
             }
         }
-        if (requests.empty())
+        if (layers.empty())
             return;
 
         const std::uint64_t frame = m_VectorFieldFrame;
@@ -774,22 +736,22 @@ namespace Extrinsic::Runtime
         const GeometryEntityAvailability availability = BuildGeometryAvailability(registry, entity);
         const auto* bindings = registry.try_get<VertexChannelBindingSet>(entity);
 
-        for (const VectorFieldRequest& request : requests)
+        for (const GeometryVectorFieldLayerRecipe& layer : layers)
         {
             ++stats.VectorFieldLayerCount;
-            if (!SupportsGeometryVectorFieldDomain(request.Domain))
+            if (!SupportsGeometryVectorFieldDomain(layer.Vector.Domain))
             {
                 ++stats.VectorFieldUnavailableCount;
                 continue;
             }
             const GeometryPropertyResolution resolution = ResolveGeometryProperty(
                 availability,
-                request.Domain,
-                request.Property,
+                layer.Vector.Domain,
+                layer.Vector.Name,
                 Geometry::PropertyValueKind::Vec3,
-                ResolveGeometryElementCount(availability, request.Domain));
+                ResolveGeometryElementCount(availability, layer.Vector.Domain));
             const Geometry::PropertySet* properties =
-                ResolveGeometryPropertySet(availability, request.Domain);
+                ResolveGeometryPropertySet(availability, layer.Vector.Domain);
             if (!resolution.Resolved() || properties == nullptr ||
                 properties->Size() == 0u ||
                 properties->Size() > std::numeric_limits<std::uint32_t>::max())
@@ -799,9 +761,9 @@ namespace Extrinsic::Runtime
             }
 
             const VectorFieldAnchorCache* anchors = EnsureAnchorCache(
-                entityCache, availability, request.Domain, bindings, frame, stats);
+                entityCache, availability, layer.Vector.Domain, bindings, frame, stats);
             const VectorFieldPayloadCache* payload = EnsurePayloadCache(
-                entityCache, *properties, request.Domain, request.Property, frame, stats);
+                entityCache, *properties, layer.Vector.Domain, layer.Vector.Name, frame, stats);
             if (anchors == nullptr || payload == nullptr)
             {
                 ++stats.VectorFieldUnavailableCount;
@@ -811,49 +773,49 @@ namespace Extrinsic::Runtime
 
             // Point domains borrow their own displayed positions.
             const std::span<const glm::vec3> anchorValues = anchors->BorrowPositions
-                ? ResolveDisplayedPositions(*properties, request.Domain, bindings, AnchorLane(availability)).Values
+                ? ResolveDisplayedPositions(*properties, layer.Vector.Domain, bindings, AnchorLane(availability)).Values
                 : std::span<const glm::vec3>{anchors->Anchors};
             const std::span<const glm::vec3> vectorValues = payload->Borrow
-                ? properties->Get<glm::vec3>(request.Property).Span()
+                ? properties->Get<glm::vec3>(layer.Vector.Name).Span()
                 : std::span<const glm::vec3>{payload->Sanitized};
 
             // A valid glyph order draws a prefix instead of every n-th row: as many rows as the
             // stride would (ceil(L / Stride), so older layers keep their count), at most MaxGlyphs.
             const auto* order = EnsureOrderCache(
-                entityCache, *properties, request.Domain, anchors->Stamp, anchors->LiveRows, anchors->AllLive, frame);
+                entityCache, *properties, layer.Vector.Domain, anchors->Stamp, anchors->LiveRows, anchors->AllLive, frame);
             const bool ordered = order != nullptr;
             if (ordered)
                 ++stats.VectorFieldOrderedLayerCount;
 
             VectorFieldPacketInputs inputs{
-                .Name = BuildKey(stableId, "vector", request.Domain, request.Name),
-                .Domain = ToAttributeDomain(request.Domain),
+                .Name = BuildKey(stableId, "vector", layer.Vector.Domain, layer.Vector.Name),
+                .Domain = ToAttributeDomain(layer.Vector.Domain),
                 .ElementCount = static_cast<std::uint32_t>(properties->Size()),
-                .AnchorKey = BuildKey(stableId, "vector.anchor", request.Domain, {}),
+                .AnchorKey = BuildKey(stableId, "vector.anchor", layer.Vector.Domain, {}),
                 .Anchors = anchorValues,
                 .AnchorStamp = anchors->Stamp,
-                .VectorKey = BuildKey(stableId, "vector.value", request.Domain, request.Property),
+                .VectorKey = BuildKey(stableId, "vector.value", layer.Vector.Domain, layer.Vector.Name),
                 .Vectors = vectorValues,
                 .VectorStamp = payload->Stamp,
-                .RowKey = ordered      ? BuildKey(stableId, "vector.order", request.Domain, {})
+                .RowKey = ordered      ? BuildKey(stableId, "vector.order", layer.Vector.Domain, {})
                     : anchors->AllLive ? std::string{}
-                                       : BuildKey(stableId, "vector.rows", request.Domain, {}),
+                                       : BuildKey(stableId, "vector.rows", layer.Vector.Domain, {}),
                 .Rows = ordered        ? std::span<const std::uint32_t>{order->Rows}
                     : anchors->AllLive ? std::span<const std::uint32_t>{}
                                        : std::span<const std::uint32_t>{anchors->LiveRows},
                 .RowStamp = ordered ? order->Stamp : anchors->Stamp,
                     // Cache rows are produced from the element range at build.
                 .RowsPrevalidated = true,
-                .Stride = ordered ? 1u : request.Stride,
-                .MaxGlyphs = ordered ? 0u : request.MaxGlyphs,
+                .Stride = ordered ? 1u : layer.Stride,
+                .MaxGlyphs = ordered ? 0u : layer.MaxGlyphs,
                 .DrawRowCount =
-                    ordered ? OrderedDrawRowCount(order->Rows.size(), request.Stride, request.MaxGlyphs) : 0u,
+                    ordered ? OrderedDrawRowCount(order->Rows.size(), layer.Stride, layer.MaxGlyphs) : 0u,
                 .ObjectToWorld = worldMatrix,
-                .Scale = request.Scale,
-                .NormalizeLength = request.Normalize,
-                .LineWidthPx = request.LineWidthPx,
-                .Color = request.Color,
-                .DepthTested = request.DepthTested,
+                .Style = {.Scale = layer.Length,
+                          .NormalizeLength = layer.LengthMode == GeometryVectorFieldLengthMode::Normalized,
+                          .LineWidthPx = layer.LineWidthPx,
+                          .Color = layer.Color,
+                          .DepthTested = layer.DepthTested},
                 .CopyPayloads = false,
             };
             const auto observeFront =
@@ -868,12 +830,12 @@ namespace Extrinsic::Runtime
                     kind = Geometry::PropertyValueKind::Float;
                 else if (!IsScalarKind(kind))
                     return std::nullopt;
-                auto front = m_GpuPropertyObserver(m_World, entity, GeometryPropertyRef{request.Domain, name, kind});
+                auto front = m_GpuPropertyObserver(m_World, entity, GeometryPropertyRef{layer.Vector.Domain, name, kind});
                 if (!front || front->Address == 0u || front->Count != properties->Size())
                     return std::nullopt;
                 return front;
             };
-            BindVectorFieldStyle(observeFront, stableId, request, *properties, entityCache, frame, stats, inputs);
+            BindVectorFieldStyle(observeFront, stableId, layer, *properties, entityCache, frame, stats, inputs);
 
             VisualizationEncodingDiagnostics appendDiagnostics{};
             const VisualizationRecipeStatus status =

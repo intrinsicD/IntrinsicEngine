@@ -277,11 +277,7 @@ export namespace Extrinsic::Runtime
         // a changed count reuses the uploaded rows (UI-081 glyph order prefixes).
         std::uint32_t DrawRowCount{0u};
         glm::mat4 ObjectToWorld{1.0f};
-        float Scale{1.0f};
-        bool NormalizeLength{true};
-        float LineWidthPx{2.0f};
-        glm::vec4 Color{1.0f};
-        bool DepthTested{true};
+        Graphics::VectorFieldGlyphStyle Style{};
         bool CopyPayloads{true};
         // UI-083: optional per-element length multipliers (+inf marks an invalid value) and
         // colors (colormap scalars, +inf invalid; or RGBA, negative invalid). A nonzero address
@@ -297,9 +293,6 @@ export namespace Extrinsic::Runtime
         std::span<const glm::vec4> ColorRgba{};
         std::uint64_t ColorBDA{0u};
         std::uint64_t ColorStamp{0u};
-        Graphics::Colormap::Type ColorMap{Graphics::Colormap::Type::Viridis};
-        float ColorRangeMin{0.0f};
-        float ColorRangeMax{1.0f};
     };
 
     // The overlay's auto range (2-98 % quantiles from 64 values on, a constant range widened by

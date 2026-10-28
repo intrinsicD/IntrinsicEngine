@@ -601,8 +601,8 @@ namespace
             return out;
         out.Found = true;
         out.Mode = packet->ColorMode;
-        out.RangeMin = packet->ColorRangeMin;
-        out.RangeMax = packet->ColorRangeMax;
+        out.RangeMin = packet->Style.ColorRangeMin;
+        out.RangeMax = packet->Style.ColorRangeMax;
         out.LengthBDA = packet->LengthBufferBDA;
         out.ColorBDA = packet->ColorBufferBDA;
         if (packet->LengthBufferBDA >= 0x1'0000'0000ull)
@@ -875,4 +875,50 @@ TEST(RuntimeVectorFieldExtraction, GpuPreviewFrontsDriveScalarStyleBuffers)
     upload = ExtractStyle(fixture, entity, {Styled("v:gpu_only", "")});
     EXPECT_EQ(upload.Fallbacks, 1u);
     EXPECT_EQ(upload.LengthBDA, 0u);
+}
+
+// RUNTIME-328: every uniform style value the layer draws with reaches the packet unchanged.
+TEST(RuntimeVectorFieldExtraction, EveryStyleFieldReachesThePacket)
+{
+    Fixture fixture;
+    const ECS::EntityHandle entity = AddMesh(fixture.Scene, false);
+    fixture.Scene.Raw().get<GS::Vertices>(entity).Properties.GetOrAdd<float>("v:heat", 0.0f).Vector() =
+        {0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
+
+    // Differs from a default layer in every drawn field.
+    auto layer = Layer(D::MeshVertex, "v:dir");
+    layer.LengthMode = Runtime::GeometryVectorFieldLengthMode::Raw;
+    layer.Length = 0.75f;
+    layer.LineWidthPx = 5.5f;
+    layer.Color = {0.1f, 0.2f, 0.3f, 0.4f};
+    layer.DepthTested = false;
+    layer.ColorProperty = "v:heat";
+    layer.ColorMap = Graphics::Colormap::Type::Coolwarm;
+    layer.ColorAutoRange = false;
+    layer.ColorRangeMin = -3.0f;
+    layer.ColorRangeMax = 9.0f;
+    const Runtime::GeometryVectorFieldLayerRecipe defaults{};
+    ASSERT_NE(layer.LengthMode, defaults.LengthMode);
+    ASSERT_NE(layer.Length, defaults.Length);
+    ASSERT_NE(layer.LineWidthPx, defaults.LineWidthPx);
+    ASSERT_NE(layer.Color, defaults.Color);
+    ASSERT_NE(layer.DepthTested, defaults.DepthTested);
+    ASSERT_NE(layer.ColorMap, defaults.ColorMap);
+    ASSERT_NE(layer.ColorRangeMin, defaults.ColorRangeMin);
+    ASSERT_NE(layer.ColorRangeMax, defaults.ColorRangeMax);
+    Recipe(fixture.Scene, entity).VectorFields = {layer};
+
+    const auto frame = fixture.Extract();
+    const auto* packet = FindPacket(frame.World, ":v:dir");
+    ASSERT_NE(packet, nullptr);
+    EXPECT_TRUE(Graphics::IsRenderableVectorFieldPacket(*packet));
+    EXPECT_EQ(packet->Style.Scale, 0.75f);
+    EXPECT_FALSE(packet->Style.NormalizeLength);
+    EXPECT_EQ(packet->Style.LineWidthPx, 5.5f);
+    EXPECT_EQ(packet->Style.Color, (glm::vec4{0.1f, 0.2f, 0.3f, 0.4f}));
+    EXPECT_FALSE(packet->Style.DepthTested);
+    EXPECT_EQ(packet->ColorMode, Graphics::VectorFieldColorMode::Colormap);
+    EXPECT_EQ(packet->Style.ColorMap, Graphics::Colormap::Type::Coolwarm);
+    EXPECT_EQ(packet->Style.ColorRangeMin, -3.0f);
+    EXPECT_EQ(packet->Style.ColorRangeMax, 9.0f);
 }

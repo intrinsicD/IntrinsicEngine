@@ -2336,7 +2336,7 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarRecipesReachRenderWorld)
               0xAABB'1000u);
     EXPECT_EQ(world.Visualization.VectorFields.front().VectorBufferBDA,
               0xAABB'2000u);
-    EXPECT_FALSE(world.Visualization.VectorFields.front().DepthTested);
+    EXPECT_FALSE(world.Visualization.VectorFields.front().Style.DepthTested);
 
     ASSERT_EQ(world.Visualization.Isolines.size(), 1u);
     EXPECT_EQ(world.Visualization.Isolines.front().SourceScalarName,

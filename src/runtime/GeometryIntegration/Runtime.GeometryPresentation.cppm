@@ -209,8 +209,6 @@ export namespace Extrinsic::Runtime
 
     inline constexpr std::size_t kMaxGeometryVectorFieldLayers = 32u;
     inline constexpr std::uint32_t kMaxGeometryVectorFieldStride = 1u << 24u;
-    inline constexpr float kMinGeometryVectorFieldLineWidthPx = 0.5f;
-    inline constexpr float kMaxGeometryVectorFieldLineWidthPx = 32.0f;
 
     struct GeometryPresentationRecipe
     {

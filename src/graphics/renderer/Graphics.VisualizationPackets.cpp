@@ -53,13 +53,8 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] bool VectorFieldStyleValid(const VectorFieldOverlayPacket& packet) noexcept
         {
-            return IsFinite(packet.Scale) && packet.Scale > 0.f && IsFinite(packet.Color) && packet.RowStride > 0u &&
-                IsFinite(packet.LineWidthPx) && packet.LineWidthPx >= kVectorFieldMinLineWidthPx &&
-                packet.LineWidthPx <= kVectorFieldMaxLineWidthPx && IsFinite(packet.ObjectToWorld) &&
-                (packet.ColorMode != VectorFieldColorMode::Colormap ||
-                    (SupportedColormap(packet.ColorMap) && IsFinite(packet.ColorRangeMin) &&
-                        IsFinite(packet.ColorRangeMax) && packet.ColorRangeMin < packet.ColorRangeMax)) &&
-                packet.ColorMode <= VectorFieldColorMode::Rgba;
+            return packet.RowStride > 0u && IsFinite(packet.ObjectToWorld) &&
+                IsValidVectorFieldGlyphStyle(packet.Style, packet.ColorMode);
         }
 
         [[nodiscard]] bool ValidRange(const float minValue, const float maxValue) noexcept
@@ -207,6 +202,16 @@ namespace Extrinsic::Graphics
         }
         return packet.RowCount / packet.RowStride +
                (packet.RowCount % packet.RowStride != 0u ? 1u : 0u);
+    }
+
+    bool IsValidVectorFieldGlyphStyle(const VectorFieldGlyphStyle& style, const VectorFieldColorMode colorMode) noexcept
+    {
+        return IsFinite(style.Scale) && style.Scale > 0.f && IsFinite(style.Color) && IsFinite(style.LineWidthPx) &&
+            style.LineWidthPx >= kVectorFieldMinLineWidthPx && style.LineWidthPx <= kVectorFieldMaxLineWidthPx &&
+            (colorMode != VectorFieldColorMode::Colormap ||
+                (SupportedColormap(style.ColorMap) && IsFinite(style.ColorRangeMin) &&
+                    IsFinite(style.ColorRangeMax) && style.ColorRangeMin < style.ColorRangeMax)) &&
+            colorMode <= VectorFieldColorMode::Rgba;
     }
 
     bool IsRenderableVectorFieldPacket(const VectorFieldOverlayPacket& packet) noexcept

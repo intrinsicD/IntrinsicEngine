@@ -49,8 +49,7 @@ TEST(GraphicsVisualizationPackets, ValidPacketsProduceAcceptedDiagnosticsAndSumm
             .RowCount = 4u,
             .PositionBufferBDA = 0x3000u,
             .VectorBufferBDA = 0x4000u,
-            .Scale = 0.5f,
-            .Color = {0.f, 1.f, 0.f, 1.f},
+            .Style = {.Scale = 0.5f, .Color = {0.f, 1.f, 0.f, 1.f}},
         },
     }};
     const std::array<Graphics::IsolineOverlayPacket, 1> isolines{{
@@ -152,8 +151,7 @@ TEST(GraphicsVisualizationPackets, DomainMismatchesAndInvalidOverlayPacketsAreDi
             .RowCount = 8u,
             .PositionBufferBDA = 0x3000u,
             .VectorBufferBDA = 0u,
-            .Scale = -1.f,
-            .Color = {1.f, 0.f, 0.f, 1.f},
+            .Style = {.Scale = -1.f, .Color = {1.f, 0.f, 0.f, 1.f}},
         },
     }};
     const std::array<Graphics::IsolineOverlayPacket, 1> isolines{{

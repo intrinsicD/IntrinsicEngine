@@ -19,6 +19,7 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 - `RUNTIME-326` — The advertised agent schema is enforced at dispatch (moonshot M2, slice 1) (tasks/active/RUNTIME-326-agent-schema-enforced-at-dispatch.md)
 - `RUNTIME-327` — The vector-field style is declared once (moonshot M2, slice 2) (tasks/active/RUNTIME-327-vector-field-style-declared-once.md)
+- `RUNTIME-328` — The vector-field glyph style is carried once (moonshot M2, slice 3) (tasks/active/RUNTIME-328-vector-field-glyph-style-carried-once.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 - `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/active/UI-079-imguizmo-hidpi-operational-run.md)

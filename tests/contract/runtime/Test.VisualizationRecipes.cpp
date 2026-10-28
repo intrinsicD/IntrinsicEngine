@@ -308,9 +308,9 @@ TEST(VisualizationRecipes, EncodesVectorAndIsolineProperties)
     EXPECT_EQ(vectorPacket.VectorBufferSourceKey, "velocity.upload");
     EXPECT_EQ(vectorPacket.RowCount, vectorPacket.ElementCount);
     EXPECT_TRUE(vectorPacket.RowBufferSourceKey.empty());
-    EXPECT_FALSE(vectorPacket.NormalizeLength);
-    EXPECT_FLOAT_EQ(vectorPacket.Scale, 2.5f);
-    EXPECT_FALSE(vectorPacket.DepthTested);
+    EXPECT_FALSE(vectorPacket.Style.NormalizeLength);
+    EXPECT_FLOAT_EQ(vectorPacket.Style.Scale, 2.5f);
+    EXPECT_FALSE(vectorPacket.Style.DepthTested);
 
     const R::VisualizationEncodingResult isoline = R::EncodeVisualizationRecipe(
         source.Availability,
@@ -1100,4 +1100,37 @@ TEST(VisualizationRecipes, VectorFieldPacketDrawsAPrefixOfItsRows)
     R::VisualizationEncodingBatch more{};
     ASSERT_EQ(R::AppendVectorFieldPacket(more, inputs, nullptr), R::VisualizationRecipeStatus::Encoded);
     EXPECT_EQ(more.VectorFields.front().RowCount, 4u) << "clamped to the rows";
+}
+
+// RUNTIME-328: the append and the packet share one style check, so the append now refuses an
+// unsupported colormap or color mode instead of encoding a packet that would not draw.
+TEST(VisualizationRecipes, VectorFieldAppendRejectsUnsupportedColormapAndMode)
+{
+    const std::array<glm::vec3, 3> anchors{{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}}};
+    const std::array<glm::vec3, 3> vectors{{{0, 1, 0}, {0, 1, 0}, {0, 1, 0}}};
+    const std::array<float, 3> heat{{0.0f, 1.0f, 2.0f}};
+    R::VectorFieldPacketInputs inputs{
+        .Name = "field",
+        .ElementCount = 3u,
+        .AnchorKey = "anchors",
+        .Anchors = anchors,
+        .VectorKey = "vectors",
+        .Vectors = vectors,
+        .CopyPayloads = false,
+        .ColorMode = Extrinsic::Graphics::VectorFieldColorMode::Colormap,
+        .ColorKey = "heat",
+        .ColorScalars = heat,
+    };
+    R::VisualizationEncodingBatch batch{};
+    ASSERT_EQ(R::AppendVectorFieldPacket(batch, inputs, nullptr), R::VisualizationRecipeStatus::Encoded);
+
+    const std::size_t buffers = batch.PropertyBuffers.size();
+    R::VectorFieldPacketInputs badMap = inputs;
+    badMap.Style.ColorMap = Extrinsic::Graphics::Colormap::Type::Count;
+    EXPECT_EQ(R::AppendVectorFieldPacket(batch, badMap, nullptr), R::VisualizationRecipeStatus::InvalidRange);
+    R::VectorFieldPacketInputs badMode = inputs;
+    badMode.ColorMode = static_cast<Extrinsic::Graphics::VectorFieldColorMode>(255);
+    EXPECT_EQ(R::AppendVectorFieldPacket(batch, badMode, nullptr), R::VisualizationRecipeStatus::InvalidRange);
+    EXPECT_EQ(batch.VectorFields.size(), 1u);
+    EXPECT_EQ(batch.PropertyBuffers.size(), buffers) << "a refusal appends nothing";
 }

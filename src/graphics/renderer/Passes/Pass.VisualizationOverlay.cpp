@@ -67,10 +67,10 @@ namespace Extrinsic::Graphics
                 continue;
             }
 
-            const int packetDepthTested = packet.DepthTested ? 1 : 0;
+            const int packetDepthTested = packet.Style.DepthTested ? 1 : 0;
             if (packetDepthTested != lastDepthTested)
             {
-                cmd.BindPipeline(packet.DepthTested
+                cmd.BindPipeline(packet.Style.DepthTested
                     ? m_VectorFieldDepthTestedPipeline
                     : m_VectorFieldAlwaysOnTopPipeline);
                 lastDepthTested = packetDepthTested;

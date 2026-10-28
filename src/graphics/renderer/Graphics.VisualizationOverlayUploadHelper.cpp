@@ -135,17 +135,17 @@ namespace Extrinsic::Graphics
                 .ElementCount = packet.ElementCount,
                 .RowCount = packet.RowCount,
                 .RowStride = packet.RowStride,
-                .PackedColor = PackVertexColorUnorm4x8(packet.Color),
-                .Scale = packet.Scale,
-                .LineWidthPx = packet.LineWidthPx,
-                .Flags = (packet.NormalizeLength ? kVisualizationVectorFieldNormalizeFlag : 0u) |
+                .PackedColor = PackVertexColorUnorm4x8(packet.Style.Color),
+                .Scale = packet.Style.Scale,
+                .LineWidthPx = packet.Style.LineWidthPx,
+                .Flags = (packet.Style.NormalizeLength ? kVisualizationVectorFieldNormalizeFlag : 0u) |
                     (packet.ColorMode == VectorFieldColorMode::Colormap ? kVisualizationVectorFieldColormapFlag : 0u) |
                     (packet.ColorMode == VectorFieldColorMode::Rgba ? kVisualizationVectorFieldRgbaFlag : 0u),
                 .ColormapID = packet.ColorMode == VectorFieldColorMode::Colormap ? packet.ColormapBindlessIndex : 0u,
                 .LengthBufferBDA = packet.LengthBufferBDA,
                 .ColorBufferBDA = packet.ColorMode != VectorFieldColorMode::Uniform ? packet.ColorBufferBDA : 0u,
-                .ColorRangeMin = packet.ColorRangeMin,
-                .ColorRangeMax = packet.ColorRangeMax,
+                .ColorRangeMin = packet.Style.ColorRangeMin,
+                .ColorRangeMax = packet.Style.ColorRangeMax,
             });
         }
         if (records.empty())

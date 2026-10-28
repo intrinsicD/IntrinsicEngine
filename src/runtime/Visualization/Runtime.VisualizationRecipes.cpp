@@ -1193,10 +1193,10 @@ namespace Extrinsic::Runtime
                                   authored.DirtyStamp)
                             : authored.DirtyStamp,
                         // Explicit recipes scale raw object-space vectors.
-                        .Scale = authored.Scale,
-                        .NormalizeLength = false,
-                        .Color = authored.Color,
-                        .DepthTested = authored.DepthTested,
+                        .Style = {.Scale = authored.Scale,
+                                  .NormalizeLength = false,
+                                  .Color = authored.Color,
+                                  .DepthTested = authored.DepthTested},
                         .CopyPayloads = true,
                     };
                     if (positionProperties != nullptr)
@@ -1471,13 +1471,8 @@ namespace Extrinsic::Runtime
                     return VisualizationRecipeStatus::ElementCountMismatch;
             }
         }
-        if (!IsFinite(inputs.Scale) || inputs.Scale <= 0.0f ||
-            !IsFinite(inputs.Color) || !IsFinite(inputs.LineWidthPx) ||
-            inputs.LineWidthPx < Graphics::kVectorFieldMinLineWidthPx ||
-            inputs.LineWidthPx > Graphics::kVectorFieldMaxLineWidthPx)
-        {
+        if (!Graphics::IsValidVectorFieldGlyphStyle(inputs.Style, inputs.ColorMode))
             return VisualizationRecipeStatus::InvalidRange;
-        }
         using ColorMode = Graphics::VectorFieldColorMode;
         const bool lengthLent = inputs.LengthBDA == 0u && !inputs.LengthKey.empty();
         const bool colorLent = inputs.ColorMode != ColorMode::Uniform && inputs.ColorBDA == 0u;
@@ -1488,12 +1483,6 @@ namespace Extrinsic::Runtime
             (colorLent && inputs.ColorMode == ColorMode::Rgba && inputs.ColorRgba.size() != count))
         {
             return VisualizationRecipeStatus::ElementCountMismatch;
-        }
-        if (inputs.ColorMode == ColorMode::Colormap &&
-            (!IsFinite(inputs.ColorRangeMin) || !IsFinite(inputs.ColorRangeMax) ||
-                !(inputs.ColorRangeMin < inputs.ColorRangeMax)))
-        {
-            return VisualizationRecipeStatus::InvalidRange;
         }
         const bool hasRows = !inputs.Rows.empty() || !inputs.RowKey.empty();
         const std::uint32_t rowCount = hasRows
@@ -1640,19 +1629,12 @@ namespace Extrinsic::Runtime
             .PositionBufferBDA = inputs.AnchorBDA,
             .VectorBufferBDA = inputs.VectorBDA,
             .ObjectToWorld = inputs.ObjectToWorld,
-            .Scale = inputs.Scale,
-            .NormalizeLength = inputs.NormalizeLength,
-            .LineWidthPx = inputs.LineWidthPx,
-            .Color = inputs.Color,
-            .DepthTested = inputs.DepthTested,
+            .Style = inputs.Style,
             .LengthBufferSourceKey = lengthLent ? inputs.LengthKey : std::string{},
             .LengthBufferBDA = inputs.LengthBDA,
             .ColorMode = inputs.ColorMode,
             .ColorBufferSourceKey = colorLent ? inputs.ColorKey : std::string{},
             .ColorBufferBDA = inputs.ColorMode != ColorMode::Uniform ? inputs.ColorBDA : 0u,
-            .ColorMap = inputs.ColorMap,
-            .ColorRangeMin = inputs.ColorRangeMin,
-            .ColorRangeMax = inputs.ColorRangeMax,
         });
         return VisualizationRecipeStatus::Encoded;
     }

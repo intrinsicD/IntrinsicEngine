@@ -73,12 +73,10 @@ namespace
                 .RowCount     = 1u,
                 .PositionBufferBDA = kAnchorBDA,
                 .VectorBufferBDA   = kVectorBDA,
-                .Scale        = 1.0f,
-                .Color        = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-                .DepthTested  = true,
+                .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}, .DepthTested = true},
             },
         };
-        sPackets[0].DepthTested = depthTested;
+        sPackets[0].Style.DepthTested = depthTested;
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
             .VisualizationVectorFields =
@@ -133,7 +131,7 @@ TEST(VisualizationOverlayPassContract, RecipeDeclaresPassWhenOverlayPacketsExist
             .RowCount     = 4u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
+            .Style = {.Scale = 1.0f},
         },
     }};
     world.Visualization.VectorFields = vectorFields;
@@ -415,9 +413,7 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
             .RowCount     = 2u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
-            .DepthTested  = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f}, .DepthTested = true},
         },
         Graphics::VectorFieldOverlayPacket{
             .Name         = "Test.VectorField.B",
@@ -426,9 +422,7 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
             .RowCount     = 3u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
-            .DepthTested  = false,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, .DepthTested = false},
         },
         Graphics::VectorFieldOverlayPacket{
             .Name         = "Test.VectorField.C",
@@ -437,9 +431,7 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
             .RowCount     = 1u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
-            .DepthTested  = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f}, .DepthTested = true},
         },
     }};
 
@@ -500,9 +492,7 @@ TEST(VisualizationOverlayPassContract, UnresolvedVectorFieldBuffersSkipWithoutFa
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 200000u,
             .RowCount     = 200000u,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-            .DepthTested  = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}, .DepthTested = true},
         },
     }};
 
@@ -557,10 +547,7 @@ TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryPacketStateAndStri
         .VectorBufferBDA = kVectorBDA,
         .RowBufferBDA = 0x30000u,
         .ObjectToWorld = glm::mat4{2.0f},
-        .Scale = 0.25f,
-        .NormalizeLength = false,
-        .LineWidthPx = 3.0f,
-        .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+        .Style = {.Scale = 0.25f, .NormalizeLength = false, .LineWidthPx = 3.0f, .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f}},
     };
     Graphics::VectorFieldOverlayPacket unresolved = sampled;
     unresolved.RowBufferBDA = 0u;
@@ -610,14 +597,12 @@ TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryLengthAndColorBuff
         .RowCount = 4u,
         .PositionBufferBDA = kAnchorBDA,
         .VectorBufferBDA = kVectorBDA,
+        .Style = {.ColorMap = Graphics::Colormap::Type::Jet, .ColorRangeMin = 10.0f, .ColorRangeMax = 20.0f},
         .LengthBufferSourceKey = "lengths",
         .LengthBufferBDA = 0x40000u,
         .ColorMode = Graphics::VectorFieldColorMode::Colormap,
         .ColorBufferSourceKey = "heat",
         .ColorBufferBDA = 0x50000u,
-        .ColorMap = Graphics::Colormap::Type::Jet,
-        .ColorRangeMin = 10.0f,
-        .ColorRangeMax = 20.0f,
         .ColormapBindlessIndex = 7u,
     };
     Graphics::VectorFieldOverlayPacket rgba = colormap;
@@ -706,10 +691,10 @@ TEST(VisualizationOverlayPassContract, RendererResolvesVectorFieldStyleBuffersAn
         .VectorBufferSourceKey = "vectors",
         .ElementCount = 3u,
         .RowCount = 3u,
+        .Style = {.ColorMap = Graphics::Colormap::Type::Jet},
         .LengthBufferSourceKey = "lengths",
         .ColorMode = Graphics::VectorFieldColorMode::Colormap,
         .ColorBufferSourceKey = "lengths",
-        .ColorMap = Graphics::Colormap::Type::Jet,
     };
     Graphics::VectorFieldOverlayPacket wrongCount = base;
     wrongCount.Name = "Test.VectorField.WrongCount";
@@ -806,9 +791,7 @@ TEST(VisualizationOverlayPassContract, PerFrameBufferRecyclingDoesNotLeakVectorF
             .RowCount     = 4u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{1.0f},
-            .DepthTested  = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f}, .DepthTested = true},
         },
     }};
 
@@ -871,9 +854,7 @@ TEST(VisualizationOverlayPassContract, UploadHelperPartitionsStorageByFrameSlot)
             .RowCount     = 2u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{1.0f},
-            .DepthTested  = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f}, .DepthTested = true},
         },
     };
     static const Graphics::IsolineOverlayPacket kIsolines[1] = {
@@ -1153,9 +1134,7 @@ TEST(VisualizationOverlayPassContract, MixedLaneVectorFieldAndIsolineBothRecord)
             .RowCount     = 2u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
-            .DepthTested  = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f}, .DepthTested = true},
         },
     };
     static const Graphics::IsolineOverlayPacket kIsolines[1] = {
@@ -1247,9 +1226,7 @@ TEST(VisualizationOverlayPassContract, RetainedOverlayPacketLanesRecordTogether)
             .RowCount     = 1u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale = 1.0f,
-            .Color = glm::vec4{1.0f},
-            .DepthTested = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f}, .DepthTested = true},
         },
     }};
     static const std::array<Graphics::IsolineOverlayPacket, 1> kIsolines{{
@@ -1487,9 +1464,7 @@ TEST(VisualizationOverlayPassContract, PerLanePartialSkipKeepsSiblingLaneRecordi
             .RowCount     = 1u,
             .PositionBufferBDA = kAnchorBDA,
             .VectorBufferBDA   = kVectorBDA,
-            .Scale        = 1.0f,
-            .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
-            .DepthTested  = true,
+            .Style = {.Scale = 1.0f, .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f}, .DepthTested = true},
         },
     };
     static const Graphics::IsolineOverlayPacket kIsolines[1] = {

@@ -2294,7 +2294,7 @@ namespace Extrinsic::Graphics
                     if (packet.ColorMode == VectorFieldColorMode::Colormap &&
                         m_Subsystems.ColormapSystemRegistry.has_value())
                         packet.ColormapBindlessIndex =
-                            m_Subsystems.ColormapSystemRegistry->GetBindlessIndex(packet.ColorMap);
+                            m_Subsystems.ColormapSystemRegistry->GetBindlessIndex(packet.Style.ColorMap);
                     if (packet.RowBufferBDA == 0u && !packet.RowBufferSourceKey.empty())
                     {
                         const VisualizationPropertyBufferAddress* address =
