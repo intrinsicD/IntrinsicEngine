@@ -7,6 +7,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <span>
@@ -19,7 +20,10 @@ module;
 module Extrinsic.Runtime.AgentOperations;
 
 import Extrinsic.Core.Base64;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Runtime.ViewCapture;
+
+#include "Agent/internal/Runtime.AgentArguments.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -160,30 +164,86 @@ namespace Extrinsic::Runtime
             return outcome;
         }
 
-        constexpr std::string_view kRegionSchema =
-            R"("region":{"type":"string","enum":["viewport","window"],"description":"viewport: the 3D scene rectangle (default); window: the whole Sandbox window with its panels"},)"
-            R"("preset":{"type":"string","enum":["current","front","back","left","right","top","bottom","isometric"],"description":"Camera for the shot (default current); presets frame fit_entity or the whole scene, and the view is restored afterwards"},)"
-            R"("fit_entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Stable entity id a preset frames"},)"
-            R"("legend_entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Append a colormap strip for this entity's scalar coloring and return its range"})";
+        // RUNTIME-338: the arguments both tools take, declared once (preset tokens in kPresets' order).
+        constexpr std::array<std::string_view, 2> kRegions{"viewport", "window"};
+        std::span<const std::string_view> PresetTokens()
+        {
+            static const auto tokens = []
+            {
+                std::array<std::string_view, kPresets.size()> out{};
+                for (std::size_t i = 0; i < kPresets.size(); ++i)
+                    out[i] = ToString(kPresets[i]);
+                return out;
+            }();
+            return tokens;
+        }
+        using AgentDetail::AgentArgument;
+        AgentArgument RegionArgument()
+        {
+            return {
+                .Spec = {.Name = "region",
+                    .Type = ConfigFieldType::StringEnum,
+                    .Description =
+                        "viewport: the 3D scene rectangle (default); window: the whole Sandbox window with its panels",
+                    .EnumValues = kRegions}};
+        }
+        AgentArgument PresetArgument()
+        {
+            return {.Spec = {.Name = "preset",
+                        .Type = ConfigFieldType::StringEnum,
+                        .Description =
+                            "Camera for the shot (default current); presets frame fit_entity or the whole scene, and "
+                            "the view is restored afterwards",
+                        .EnumValues = PresetTokens()}};
+        }
+        // An optional entity id under its own name.
+        AgentArgument EntityIdArgument(const std::string_view name, const std::string_view description)
+        {
+            AgentArgument entity = AgentDetail::EntityArgument(false, description);
+            entity.Spec.Name = name;
+            return entity;
+        }
     }
 
     void RegisterViewCaptureAgentOperations(AgentOperationRegistry& registry)
     {
+        const AgentArgument fitEntity = EntityIdArgument("fit_entity", "Stable entity id a preset frames");
+        const AgentArgument legendEntity = EntityIdArgument(
+            "legend_entity", "Append a colormap strip for this entity's scalar coloring and return its range");
+        const auto screenshot =
+            AgentDetail::ArgumentsSchema({RegionArgument(), PresetArgument(), fitEntity, legendEntity});
+        const auto capture = AgentDetail::ArgumentsSchema({RegionArgument(),
+            PresetArgument(),
+            fitEntity,
+            legendEntity,
+            {.Spec = {.Name = "path",
+                 .Type = ConfigFieldType::String,
+                 .Description = "PNG file path, relative to the first allowed root"}},
+            {.Spec = {.Name = "path_only",
+                 .Type = ConfigFieldType::Bool,
+                 .Description = "Return only the saved path and size"}},
+            {.Spec = {.Name = "overwrite",
+                 .Type = ConfigFieldType::Bool,
+                 .Description = "Replace an existing file at path; default false, which fails with file_exists"}}});
         (void)registry.Register({
             .Name = "view_screenshot",
             .Title = "Look at the Sandbox",
-            .Description = "Returns a PNG of what the Sandbox shows right now (the 3D viewport by default, or the "
-                           "whole window with its panels) without writing a file; presets move the camera for the shot and restore it. "
-                           "Completes a few frames later.",
-            .InputSchemaJson = std::string(R"({"type":"object","properties":{)") + std::string(kRegionSchema) +
-                               R"(},"additionalProperties":false})",
+            .Description =
+                "Returns a PNG of what the Sandbox shows right now (the 3D viewport by default, or the "
+                "whole window with its panels) without writing a file; presets move the camera for the shot and restore it. "
+                "Completes a few frames later.",
+            .InputSchemaJson = screenshot.Text,
             .ReadOnly = true,
-            .Invoke = [](const AgentOperationContext& context, std::string_view argumentsJson)
+            .DeclaredArguments = screenshot.Declared,
+            .Invoke =
+                [](const AgentOperationContext& context, std::string_view argumentsJson)
             {
                 std::string error;
                 const auto args = ParseArguments(argumentsJson, error);
-                if (!args) return Fail(std::move(error));
-                if (!args->Path.empty() || args->PathOnly) return Fail("view_screenshot does not save files; use view_capture for a path.");
+                if (!args)
+                    return Fail(std::move(error));
+                if (!args->Path.empty() || args->PathOnly)
+                    return Fail("view_screenshot does not save files; use view_capture for a path.");
                 return StartCapture(context, ViewCaptureRequest{.Region = args->Region, .SaveToFile = false,
                                                                 .Preset = args->Preset, .FitEntity = args->FitEntity,
                                                                 .LegendEntity = args->LegendEntity}, true);
@@ -196,20 +256,21 @@ namespace Extrinsic::Runtime
                            "'path' must stay inside the Sandbox's allowed roots (default: screenshots/ with a "
                            "timestamped name); path_only skips returning the image. An existing file is "
                            "never replaced unless overwrite is true.",
-            .InputSchemaJson = std::string(R"({"type":"object","properties":{)") + std::string(kRegionSchema) +
-                               R"(,"path":{"type":"string","description":"PNG file path, relative to the first allowed root"},)"
-                               R"("path_only":{"type":"boolean","description":"Return only the saved path and size"},)"
-                               R"("overwrite":{"type":"boolean","description":"Replace an existing file at path; default false, which fails with file_exists"}},"additionalProperties":false})",
+            .InputSchemaJson = capture.Text,
             .ReadOnly = false,
             .Destructive = true, // writes a file the undo history does not track
-            .Invoke = [](const AgentOperationContext& context, std::string_view argumentsJson)
+            .DeclaredArguments = capture.Declared,
+            .Invoke =
+                [](const AgentOperationContext& context, std::string_view argumentsJson)
             {
                 std::string error;
                 const auto args = ParseArguments(argumentsJson, error);
-                if (!args) return Fail(std::move(error));
+                if (!args)
+                    return Fail(std::move(error));
                 // A given path names the file; otherwise a timestamped file goes to screenshots/.
                 const auto resolved = ResolveAgentPath(context, args->Path.empty() ? "screenshots" : args->Path);
-                if (!resolved) return Fail("path '" + args->Path + "' is outside the Sandbox's allowed roots.");
+                if (!resolved)
+                    return Fail("path '" + args->Path + "' is outside the Sandbox's allowed roots.");
                 if (!args->Path.empty() && !args->Overwrite)
                 {
                     std::error_code exists;

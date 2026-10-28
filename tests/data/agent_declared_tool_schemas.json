@@ -79,6 +79,53 @@
     "required": [],
     "type": "object"
   },
+  "device_status": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+  },
+  "diagnostics_read": {
+    "additionalProperties": false,
+    "properties": {
+      "categories": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 1000,
+        "type": "array"
+      },
+      "levels": {
+        "items": {
+          "enum": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "type": "integer",
+          "x-enum-names": [
+            "Info",
+            "Warning",
+            "Error",
+            "Debug"
+          ]
+        },
+        "type": "array"
+      },
+      "limit": {
+        "default": 1000,
+        "maximum": 1000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "since_cursor": {
+        "default": 0,
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
   "entity_properties": {
     "additionalProperties": false,
     "properties": {
@@ -939,6 +986,98 @@
     "required": [
       "entity"
     ],
+    "type": "object"
+  },
+  "view_capture": {
+    "additionalProperties": false,
+    "properties": {
+      "fit_entity": {
+        "description": "Stable entity id a preset frames",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "legend_entity": {
+        "description": "Append a colormap strip for this entity's scalar coloring and return its range",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "overwrite": {
+        "description": "Replace an existing file at path; default false, which fails with file_exists",
+        "type": "boolean"
+      },
+      "path": {
+        "description": "PNG file path, relative to the first allowed root",
+        "type": "string"
+      },
+      "path_only": {
+        "description": "Return only the saved path and size",
+        "type": "boolean"
+      },
+      "preset": {
+        "description": "Camera for the shot (default current); presets frame fit_entity or the whole scene, and the view is restored afterwards",
+        "enum": [
+          "current",
+          "front",
+          "back",
+          "left",
+          "right",
+          "top",
+          "bottom",
+          "isometric"
+        ],
+        "type": "string"
+      },
+      "region": {
+        "description": "viewport: the 3D scene rectangle (default); window: the whole Sandbox window with its panels",
+        "enum": [
+          "viewport",
+          "window"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "view_screenshot": {
+    "additionalProperties": false,
+    "properties": {
+      "fit_entity": {
+        "description": "Stable entity id a preset frames",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "legend_entity": {
+        "description": "Append a colormap strip for this entity's scalar coloring and return its range",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "preset": {
+        "description": "Camera for the shot (default current); presets frame fit_entity or the whole scene, and the view is restored afterwards",
+        "enum": [
+          "current",
+          "front",
+          "back",
+          "left",
+          "right",
+          "top",
+          "bottom",
+          "isometric"
+        ],
+        "type": "string"
+      },
+      "region": {
+        "description": "viewport: the 3D scene rectangle (default); window: the whole Sandbox window with its panels",
+        "enum": [
+          "viewport",
+          "window"
+        ],
+        "type": "string"
+      }
+    },
     "type": "object"
   }
 }

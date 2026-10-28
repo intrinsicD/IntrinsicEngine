@@ -1,12 +1,18 @@
 module;
+#include <array>
 #include <cstdint>
+#include <initializer_list>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <nlohmann/json.hpp>
 
 module Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Runtime.DiagnosticsStream;
+
+#include "Agent/internal/Runtime.AgentArguments.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -83,18 +89,37 @@ namespace Extrinsic::Runtime
 
     extern "C++" void RegisterDiagnosticsAgentOperations(AgentOperationRegistry& registry)
     {
-        (void)registry.Register({.Name = "diagnostics_read", .Title = "Read diagnostics",
-            .Description = "New log entries after an exclusive cursor with exact category and integer level filters. "
+        // RUNTIME-338: declared arguments; levels are the log levels' integer codes.
+        static constexpr std::array<std::string_view, 4> kLevelNames{"Info", "Warning", "Error", "Debug"};
+        static constexpr ConfigFieldSpec kLevel{.Type = ConfigFieldType::Enum, .EnumNames = kLevelNames};
+        static constexpr ConfigFieldSpec kCategory{.Type = ConfigFieldType::String};
+        const auto diagnostics = AgentDetail::ArgumentsSchema({
+            {.Spec = {.Name = "since_cursor", .Type = ConfigFieldType::Int, .Min = 0.0}, .Default = 0},
+            {.Spec = {.Name = "levels", .Type = ConfigFieldType::Array, .Item = &kLevel}},
+            {.Spec = {.Name = "categories", .Type = ConfigFieldType::Array, .Item = &kCategory, .MaxItems = 1000}},
+            {.Spec = {.Name = "limit", .Type = ConfigFieldType::UInt, .Min = 1.0, .Max = 1000.0}, .Default = 1000},
+        });
+        const auto device = AgentDetail::ArgumentsSchema({});
+        (void)registry.Register({.Name = "diagnostics_read",
+            .Title = "Read diagnostics",
+            .Description =
+                "New log entries after an exclusive cursor with exact category and integer level filters. "
                 "Returns next_cursor, dropped unread log count (including clear), device status and latest 256 operation records. "
                 "A cursor ahead of the current process restarts from zero with cursor_reset=true; discard prior cached entries. "
                 "Operation source: 0 Editor, 1 AgentCli; status: 0 pending, 1 succeeded, 2 failed, 3 abandoned. "
                 "Allocation bytes are process-wide tracked allocations during each call, not exclusive ownership. "
                 "Diagnostics readers do not record themselves. Empty categories means all; empty levels means none.",
-            .InputSchemaJson = R"({"type":"object","properties":{"since_cursor":{"type":"integer","minimum":0,"default":0},"levels":{"type":"array","items":{"type":"integer","enum":[0,1,2,3],"x-enum-names":["Info","Warning","Error","Debug"]}},"categories":{"type":"array","maxItems":1000,"items":{"type":"string"}},"limit":{"type":"integer","minimum":1,"maximum":1000,"default":1000}},"additionalProperties":false})",
+            .InputSchemaJson = diagnostics.Text,
+            .DeclaredArguments = diagnostics.Declared,
             .Invoke = ReadDiagnostics});
-        (void)registry.Register({.Name = "device_status", .Title = "Device status",
-            .Description = "Runtime startup requested/actual backend, fallback reason, live operational status and validation counters. Read-only.",
-            .Invoke = [](const AgentOperationContext& context, const std::string_view arguments) {
+        (void)registry.Register({.Name = "device_status",
+            .Title = "Device status",
+            .Description =
+                "Runtime startup requested/actual backend, fallback reason, live operational status and validation counters. Read-only.",
+            .InputSchemaJson = device.Text,
+            .DeclaredArguments = device.Declared,
+            .Invoke = [](const AgentOperationContext& context, const std::string_view arguments)
+            {
                 const auto args = Json::parse(arguments, nullptr, false);
                 if (!args.is_object() || !args.empty())
                     return AgentOperationOutcome{.IsError = true, .Text = "device_status expects an empty object.", .ErrorCode = "invalid_params"};

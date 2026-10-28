@@ -13,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <unistd.h>
+#include <vector>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 import Extrinsic.Runtime.AgentServer;
@@ -1497,7 +1498,9 @@ TEST(AgentArgumentSchema, VectorFieldRangesAreRefusedBeforeTheCommand)
 // RUNTIME-337: the tools whose input schema is generated from declared arguments, and only those,
 // have a baseline, the hand-written schema each replaced (captured at 36dd1fc81). The generated
 // schema equals it, descriptions and annotations included. Rows a style table gains later are
-// checked per row against the registered schema by DeclaredFieldContracts, not here.
+// checked per row against the registered schema by DeclaredFieldContracts, not here. A baseline
+// without "required" (the capture and diagnostics tools, RUNTIME-338) is compared as "required": [],
+// which JSON Schema defines as the same; the generator always writes it.
 TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
 {
     const auto registry = FullAgentRegistry();
@@ -1514,17 +1517,20 @@ TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
             continue;
         ++declared;
         Json actual = Json::parse(spec.InputSchemaJson);
+        Json expected = baseline[spec.Name];
+        if (!expected.contains("required"))
+            expected["required"] = Json::array();
         const std::span<const R::ConfigFieldSpec> table = spec.Name == "vector_field"
             ? R::GeometryVectorFieldStyleFields()
             : spec.Name == "lane_style" ? R::LaneVisualizationStyleFields()
                                         : std::span<const R::ConfigFieldSpec>{};
         for (const R::ConfigFieldSpec& field : table)
-            if (!baseline[spec.Name]["properties"].contains(field.Name))
+            if (!expected["properties"].contains(field.Name))
                 actual["properties"].erase(std::string(field.Name));
-        EXPECT_EQ(actual, baseline[spec.Name]);
+        EXPECT_EQ(actual, expected);
     }
     EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
-    EXPECT_EQ(declared, 36u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, 40u) << "declared input schemas of " << registry.Entries().size() << " tools";
 }
 
 // RUNTIME-337: the shared declarations reach the registered schemas (not only synthetic ones): an
@@ -1553,4 +1559,19 @@ TEST(AgentArgumentSchema, RegisteredDeclaredArgumentsKeepTheirRules)
     EXPECT_FALSE(accepts("run_mesh_operation", R"({"entity":1})"));
     EXPECT_TRUE(accepts("set_visibility", R"({"entity":1,"visible":false,"lane":"bounds"})"));
     EXPECT_FALSE(accepts("lane_style", R"({"entity":1,"lane":"bounds"})"));
+    // RUNTIME-338: the capture and diagnostics tools.
+    EXPECT_TRUE(accepts("diagnostics_read", R"({"since_cursor":4294967296,"levels":[0,3],"limit":1000})"));
+    EXPECT_FALSE(accepts("diagnostics_read", R"({"since_cursor":-1})"));
+    EXPECT_FALSE(accepts("diagnostics_read", R"({"levels":[4]})"));
+    EXPECT_FALSE(accepts("diagnostics_read", R"({"limit":0})"));
+    EXPECT_TRUE(
+        accepts("diagnostics_read", Json{{"categories", Json(std::vector<std::string>(1000, "c"))}}.dump().c_str()));
+    EXPECT_FALSE(
+        accepts("diagnostics_read", Json{{"categories", Json(std::vector<std::string>(1001, "c"))}}.dump().c_str()));
+    EXPECT_TRUE(accepts("view_capture", R"({"region":"window","preset":"isometric","fit_entity":1,"path":"a.png"})"));
+    EXPECT_FALSE(accepts("view_capture", R"({"fit_entity":0})"));
+    EXPECT_FALSE(accepts("view_capture", R"({"region":"screen"})"));
+    EXPECT_FALSE(accepts("view_screenshot", R"({"path":"a.png"})"));
+    EXPECT_TRUE(accepts("device_status", R"({})"));
+    EXPECT_FALSE(accepts("device_status", R"({"x":1})"));
 }

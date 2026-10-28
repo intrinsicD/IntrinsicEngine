@@ -265,6 +265,7 @@ target_sources(${target_name}
         Agent/Runtime.AgentOperations.PropertyInspection.cpp
         Agent/Runtime.AgentOperations.Operations.cpp
         Agent/internal/Runtime.AgentOperations.Detail.hpp
+        Agent/internal/Runtime.AgentArguments.hpp
         Agent/Runtime.AgentOperations.Capture.cpp
         Agent/Runtime.AgentServer.cpp
         Kernel/Runtime.InputActions.cpp

@@ -5,6 +5,7 @@
 // global module fragment that provides <algorithm>, <array>, <cstdint>, <functional>, <initializer_list>,
 // <memory>, <optional>, <span>, <string>, <string_view>, <utility>, <vector> and <nlohmann/json.hpp>.
 #pragma once
+#include "Agent/internal/Runtime.AgentArguments.hpp"
 extern "C++"
 {
 namespace Extrinsic::Runtime::AgentDetail
@@ -353,38 +354,7 @@ namespace Extrinsic::Runtime::AgentDetail
     inline const std::string kSectionProperty = R"("section":{"type":"string","description":"Config section name from config_sections, e.g. sandbox.property_smoothing."})";
     inline const std::string kPayloadProperty = R"("payload":{"type":["object","string"],"description":"Section payload; omitted fields keep their defaults."})";
 
-    // ---- declared arguments (RUNTIME-337) ----------------------------------------------
-    // One tool argument declared once: its spec (name, type, bounds, enum tokens, description;
-    // descriptions and tokens must outlive the schema build), whether it is required and its
-    // default (null: none). The tool's input schema is generated from the list, so the agent's
-    // validator checks exactly the declared rules.
-    struct AgentArgument
-    {
-        ConfigFieldSpec Spec{};
-        bool Required{false};
-        Json Default{};
-    };
-    // A tool's input schema text and whether it was generated from declared arguments.
-    struct ToolSchema
-    {
-        ToolSchema(std::string text) : Text(std::move(text)) {}
-        ToolSchema(const char* text) : Text(text) {}
-        ToolSchema(std::string text, const bool declared) : Text(std::move(text)), Declared(declared) {}
-        std::string Text;
-        bool Declared{false};
-    };
-    // The schema of `arguments`, followed by every field of `table` as an optional argument (a
-    // style table a tool takes whole). Defined beside ParamsSchema (Operations.cpp).
-    [[nodiscard]] ToolSchema ArgumentsSchema(
-        std::initializer_list<AgentArgument> arguments, std::span<const ConfigFieldSpec> table = {});
-
-    // The shared arguments, declared once.
-    inline AgentArgument EntityArgument(
-        const bool required = true, const std::string_view description = "Stable entity id from scene_entities.")
-    {
-        return {.Spec = {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = description, .Min = 1.0},
-            .Required = required};
-    }
+    // ---- declared arguments (RUNTIME-337; the declarations in Runtime.AgentArguments.hpp) ----
     inline std::span<const std::string_view> DomainTokens()
     {
         static const auto tokens = []
