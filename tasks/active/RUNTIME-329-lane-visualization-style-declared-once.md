@@ -170,3 +170,10 @@ python3 tools/agents/check_task_policy.py --root . --strict
   `MixSignature`; regressions for both collisions (mutation back to word mixing → red; length prefix
   removed → red). Delta review 2 (same thread): "approve", no remaining findings.
 - 2026-10-28: Final full CPU gate 5933/5933 on the approved diff.
+- 2026-10-28: Live check at `51d4dccf2` (same host and run as `RUNTIME-328`'s): `show_property`
+  colored the Duck's surface lane by mean curvature; the saved scene's `visualization` and
+  `visualizationLanes.surface` objects have the old keys and tokens; a hand-edited scene (Jet, manual
+  range, 6 bins, 10 isolines width 2.5, one highlight value) loaded and drew binned Jet with isolines;
+  saving it again gave the same entities up to float32 rounding; the same file with `"map": "jet"` was
+  refused (`SceneLoadFailed`, InvalidFormat) and the scene stayed; validation errors 0. Not checked:
+  the panel's colormap combo and the cache fix in the UI (no panel input through the agent socket).

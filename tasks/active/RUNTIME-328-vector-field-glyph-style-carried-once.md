@@ -125,3 +125,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
   `dda67a7abe7efc44445160fc65d55fdac863b199304f1efc75741fd7f439c209`): verdict "approve", no P1; N:
   record the count in `ARCH-020` (done). Duplication check (jscpd MCP, exact): no new clones in the
   touched files. Recursion protection instruction-only.
+- 2026-10-28: Live and Vulkan check at `51d4dccf2` (NVIDIA GeForce RTX 4090, driver 580.159.04, X11
+  :1, 1600x900 viewport, pixel ratio 1, validation on): gpu;vulkan smokes 50/50, no skips
+  (`VisualizationOverlay|VectorField|RuntimeSandboxAcceptance`, incl. the vector-field style,
+  length/color property and depth/length-mode readbacks). Running Sandbox through the agent socket:
+  a vertex field on the Duck took width, color, stride, length, normalized/raw mode, depth test on/off,
+  a scalar color property through Coolwarm/Jet with a manual range and clearing it again, each visible in
+  screenshots; pure red reads back (245,0,0); `line_width` 100 refused ("at most 32.0", the one graphics
+  bound); validation errors 0. Observation, not from this change: overlay colors are lit and
+  tone-mapped, so dark channels lift ((0.1,0.2,1) shows as (171,203,245)).
