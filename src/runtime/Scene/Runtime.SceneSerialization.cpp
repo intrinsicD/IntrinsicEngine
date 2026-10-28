@@ -57,6 +57,8 @@ import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ViewCapture;
 
+#include "GeometryIntegration/internal/Runtime.GeometryVectorFieldStyleJson.hpp"
+
 namespace Extrinsic::Runtime
 {
     namespace
@@ -1462,107 +1464,24 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // The style keys come from the declared table (RUNTIME-327) in their scene spelling.
         [[nodiscard]] json GeometryVectorFieldLayerToJson(
             const GeometryVectorFieldLayerRecipe& layer)
         {
-            return json{
-                {"property", GeometryPropertyRefToJson(layer.Vector)},
-                {"lengthMode", std::string(ToString(layer.LengthMode))},
-                {"length", layer.Length},
-                {"lineWidthPx", layer.LineWidthPx},
-                {"color", Vec4ToJson(layer.Color)},
-                {"depthTested", layer.DepthTested},
-                {"stride", layer.Stride},
-                {"maxGlyphs", layer.MaxGlyphs},
-                {"enabled", layer.Enabled},
-                {"lengthProperty", layer.LengthProperty},
-                {"colorProperty", layer.ColorProperty},
-                {"colorMap", ColormapToString(layer.ColorMap)},
-                {"colorAutoRange", layer.ColorAutoRange},
-                {"colorRange", json::array({layer.ColorRangeMin, layer.ColorRangeMax})},
-            };
+            json value = GeometryVectorFieldStyleToJson(layer, GeometryVectorFieldStyleKeys::Scene);
+            value["property"] = GeometryPropertyRefToJson(layer.Vector);
+            return value;
         }
 
-        // UI-083 keys are optional (scenes written before them load with the defaults); a key
-        // that is present must be well-formed.
-        [[nodiscard]] bool TryReadGeometryVectorFieldStyle(const json& value, GeometryVectorFieldLayerRecipe& out)
-        {
-            const auto readString = [&value](const char* key, std::string& target)
-            {
-                if (!value.contains(key))
-                    return true;
-                if (!value[key].is_string())
-                    return false;
-                target = value[key].get<std::string>();
-                return true;
-            };
-            if (!readString("lengthProperty", out.LengthProperty) || !readString("colorProperty", out.ColorProperty))
-            {
-                return false;
-            }
-            if (value.contains("colorMap") &&
-                (!value["colorMap"].is_string() ||
-                    !TryColormapFromString(value["colorMap"].get<std::string>(), out.ColorMap)))
-            {
-                return false;
-            }
-            if (value.contains("colorAutoRange"))
-            {
-                if (!value["colorAutoRange"].is_boolean())
-                    return false;
-                out.ColorAutoRange = value["colorAutoRange"].get<bool>();
-            }
-            if (value.contains("colorRange"))
-            {
-                const json& range = value["colorRange"];
-                if (!range.is_array() || range.size() != 2u || !range[0].is_number() || !range[1].is_number())
-                    return false;
-                out.ColorRangeMin = range[0].get<float>();
-                out.ColorRangeMax = range[1].get<float>();
-            }
-            return true;
-        }
-
-        // The keys before UI-083 are required: a partial layer is rejected
-        // rather than defaulted.
+        // The keys before UI-083 are required (a partial layer is rejected rather than
+        // defaulted); the UI-083 keys are optional so older scenes load with the defaults.
         [[nodiscard]] bool TryReadGeometryVectorFieldLayer(
             const json& value,
             GeometryVectorFieldLayerRecipe& out)
         {
-            if (!value.is_object() ||
-                !value.contains("property") ||
-                !value.contains("lengthMode") || !value["lengthMode"].is_string() ||
-                !value.contains("length") || !value["length"].is_number() ||
-                !value.contains("lineWidthPx") || !value["lineWidthPx"].is_number() ||
-                !value.contains("color") ||
-                !value.contains("depthTested") || !value["depthTested"].is_boolean() ||
-                !value.contains("stride") || !value["stride"].is_number_unsigned() ||
-                !value.contains("maxGlyphs") || !value["maxGlyphs"].is_number_unsigned() ||
-                !value.contains("enabled") || !value["enabled"].is_boolean())
-            {
-                return false;
-            }
-            if (!TryReadGeometryPropertyRef(value["property"], out.Vector) ||
-                !TryParseGeometryVectorFieldLengthMode(
-                    value["lengthMode"].get<std::string>(), out.LengthMode) ||
-                !TryReadVec4(value["color"], out.Color))
-            {
-                return false;
-            }
-            const std::uint64_t stride = value["stride"].get<std::uint64_t>();
-            const std::uint64_t maxGlyphs = value["maxGlyphs"].get<std::uint64_t>();
-            if (stride > std::numeric_limits<std::uint32_t>::max() ||
-                maxGlyphs > std::numeric_limits<std::uint32_t>::max())
-            {
-                return false;
-            }
-            out.Length = value["length"].get<float>();
-            out.LineWidthPx = value["lineWidthPx"].get<float>();
-            out.DepthTested = value["depthTested"].get<bool>();
-            out.Stride = static_cast<std::uint32_t>(stride);
-            out.MaxGlyphs = static_cast<std::uint32_t>(maxGlyphs);
-            out.Enabled = value["enabled"].get<bool>();
-            return TryReadGeometryVectorFieldStyle(value, out);
+            return value.is_object() && value.contains("property") &&
+                TryReadGeometryPropertyRef(value["property"], out.Vector) &&
+                !ReadGeometryVectorFieldStyleJson(value, out, GeometryVectorFieldStyleKeys::Scene);
         }
 
         [[nodiscard]] json GeometryPresentationRecipeToJson(

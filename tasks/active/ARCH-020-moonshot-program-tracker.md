@@ -39,7 +39,7 @@ contract_review: tracker only; each workstream task declares its own contracts
 |---|---|---|---|---|---|
 | 1 | M3/§6 | Baseline the scorecard | not opened | pending | Open a BENCH task; light experiment pre-flight (calibration run) |
 | 2 | M1 | Kernel-language decision (Slang) | `GRAPHICS-123` (backlog) | spike done, no-go on 2024.13 | Repeat the spike with the pinned port 2026.7.1 (two blocking defects, see Log); then GPU timing under an experiment pre-flight |
-| 3 | M2 | Declare once: operation schema | `RUNTIME-326` | slice 1 done (CPUContracted, Codex approved) | Slice 1 landed: every agent call is validated against its advertised schema at dispatch. Slice 2 (not opened): the vector-field style from one declaration (UI panel, command validation, agent schema, scene keys), counting files against UI-083 slice 4's 29; decide C++23 tables vs a schema compiler there |
+| 3 | M2 | Declare once: operation schema | `RUNTIME-326` (done), `RUNTIME-327` (active) | slice 2 done and pushed (CPUContracted, Codex approved) | Slice 1 landed (`7d967065e`): every agent call is validated against its advertised schema. Slice 2 `RUNTIME-327`: the vector-field style as one C++23 table row per field (agent schema/read/list, scene keys, command checks, panel names and bounds). Count for a style field that changes drawing: authoring files 5 → 3, rendering unchanged (up to 7) plus tests, so Q1's "29 files become 3 or fewer" is not met by this slice. Next M2 step: the rendering half (extraction's request copy, packet inputs) or the next recipe |
 | 4 | M4 | Scene graph and provenance prototype | not opened | pending | ADR after M2 slice 1 |
 | 5 | M3 | Build bake-off and content-addressed cache | `BUILD-005`/`BUILD-006`, `CI-016` | pending | Needs item 1's baseline first |
 | 6 | M5 | Visibility buffer spike, `GRAPHICS-125` evidence | not opened | pending | — |
@@ -51,7 +51,7 @@ contract_review: tracker only; each workstream task declares its own contracts
 ## Agents
 | Agent / session | Workstream | Started | State | Output |
 |---|---|---|---|---|
-| main session `849ae7d0` | 3 (`RUNTIME-326`) | 2026-10-27 | paused after slice 1, waiting for the operator | this tracker, `RUNTIME-326` |
+| main session `849ae7d0` | 3 (`RUNTIME-327`) | 2026-10-28 | paused after slice 2 (pushed); next M2 step not started | this tracker, `RUNTIME-326`, `RUNTIME-327` |
 | subagent of `849ae7d0` ("M1 Slang feasibility spike") | 2 (`GRAPHICS-123`) | 2026-10-27 | finished | `tasks/evidence/GRAPHICS-123/spike/FINDINGS.md` + `run_all.sh` (git-ignored, local) |
 
 ## Acceptance criteria
@@ -86,3 +86,12 @@ python3 tools/agents/generate_session_brief.py --check
   the tool's advertised schema (47 tools; before it, none named a bare unknown key with
   `invalid_params`). Codex plan review "revise" → folded in; code review "revise required"
   (regex termination, inexact numbers) → fixed; delta "approve". Next M2 step: slice 2 (row 3).
+- 2026-10-27: Main CI was red on `7d967065e`: `DiagnosticsStream.AgentRejectsMalformedFiltersAndBounds`
+  expected the diagnostics tools' own `invalid_arguments`, the dispatch now answers the lane-wide
+  `invalid_params` (the focused RUNTIME-326 run did not include that suite). Fixed by using
+  `invalid_params` in the two diagnostics tools too; full CPU gate 5924/5924 locally.
+- 2026-10-27: M2 slice 2 opened as `RUNTIME-327`; Codex plan review "revise", folded in.
+- 2026-10-27: `RUNTIME-327` implemented: authoring surface of a vector-field style field 5 → 3 files
+  (`GeometryPresentation.cppm` member, `GeometryVectorFieldStyle.cpp` row, `DomainPanels.cpp`
+  widget); rendering (up to 7 files) and tests unchanged, so Q1's whole-option target is still open.
+  Codex code review "revise required" (scene accepted the agent's length-mode tokens) → fixed.

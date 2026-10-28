@@ -17,6 +17,7 @@ export module Extrinsic.Runtime.GeometryPresentation;
 export import Extrinsic.Asset.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Colormap;
+import Extrinsic.Runtime.ConfigFieldSpec;
 export import Extrinsic.Runtime.GeometryAvailability;
 
 export namespace Extrinsic::Runtime
@@ -364,19 +365,18 @@ export namespace Extrinsic::Runtime
         std::string_view value,
         GeometryPresentationNormalSpace& out) noexcept;
 
-    [[nodiscard]] std::string_view ToString(
-        GeometryVectorFieldLengthMode value) noexcept;
-    [[nodiscard]] bool TryParseGeometryVectorFieldLengthMode(
-        std::string_view value,
-        GeometryVectorFieldLengthMode& out) noexcept;
-
     // Domains whose elements have a well-defined glyph anchor.
     [[nodiscard]] bool SupportsGeometryVectorFieldDomain(
         GeometryElementDomain domain) noexcept;
 
+    // RUNTIME-327: the declared style fields of a layer (agent names, types, bounds, enum
+    // tokens), one per recipe field after `Vector`. The agent schema, scene keys and the
+    // validator below come from the same rows; panels read names and bounds here.
+    [[nodiscard]] std::span<const ConfigFieldSpec> GeometryVectorFieldStyleFields() noexcept;
+
     // Validates authored values only (no geometry access): supported domain,
-    // named vec3 property, positive finite length, width, color in [0, 1],
-    // and stride. Returns false with a user-facing reason.
+    // named vec3 property, every style field against its declared spec, and a
+    // manual color range with min < max. Returns false with a user-facing reason.
     [[nodiscard]] bool ValidateGeometryVectorFieldLayer(
         const GeometryVectorFieldLayerRecipe& layer,
         std::string& reason);
@@ -466,4 +466,10 @@ export namespace Extrinsic::Runtime
         const GeometryPresentationRecipe& recipe,
         const GeometryPresentationRuntimeState& runtimeState = {},
         std::uint64_t observedSourceGeneration = 0u);
+}
+
+namespace Extrinsic::Runtime
+{
+    // The first style field that violates its declared spec (Runtime.GeometryVectorFieldStyle.cpp).
+    [[nodiscard]] std::optional<std::string> CheckGeometryVectorFieldStyle(const GeometryVectorFieldLayerRecipe& layer);
 }

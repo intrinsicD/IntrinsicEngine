@@ -156,17 +156,6 @@ namespace Extrinsic::Runtime
                  "PropertyBinding"},
             };
 
-        constexpr std::pair<GeometryVectorFieldLengthMode, std::string_view>
-            kVectorFieldLengthModes[]{
-                {GeometryVectorFieldLengthMode::Normalized, "Normalized"},
-                {GeometryVectorFieldLengthMode::Raw, "Raw"},
-            };
-
-        [[nodiscard]] bool UnitInterval(const float value) noexcept
-        {
-            return std::isfinite(value) && value >= 0.0f && value <= 1.0f;
-        }
-
         void AppendDiagnostic(
             GeometryPresentationSlotSnapshot& slot,
             std::string diagnostic)
@@ -399,19 +388,6 @@ namespace Extrinsic::Runtime
         return TryEnumFromString(value, kNormalSpaces, out);
     }
 
-    std::string_view ToString(
-        const GeometryVectorFieldLengthMode value) noexcept
-    {
-        return EnumToString(value, kVectorFieldLengthModes, "Normalized");
-    }
-
-    bool TryParseGeometryVectorFieldLengthMode(
-        const std::string_view value,
-        GeometryVectorFieldLengthMode& out) noexcept
-    {
-        return TryEnumFromString(value, kVectorFieldLengthModes, out);
-    }
-
     bool SupportsGeometryVectorFieldDomain(
         const GeometryElementDomain domain) noexcept
     {
@@ -451,45 +427,15 @@ namespace Extrinsic::Runtime
             reason = "vector field property must be a vec3";
             return false;
         }
-        if (!std::isfinite(layer.Length) || layer.Length <= 0.0f)
+        if (auto violation = CheckGeometryVectorFieldStyle(layer))
         {
-            reason = "vector length must be positive and finite";
-            return false;
-        }
-        if (!std::isfinite(layer.LineWidthPx) ||
-            layer.LineWidthPx < kMinGeometryVectorFieldLineWidthPx ||
-            layer.LineWidthPx > kMaxGeometryVectorFieldLineWidthPx)
-        {
-            reason = "vector line width must be between 0.5 and 32 pixels";
-            return false;
-        }
-        if (!UnitInterval(layer.Color.x) || !UnitInterval(layer.Color.y) ||
-            !UnitInterval(layer.Color.z) || !UnitInterval(layer.Color.w))
-        {
-            reason = "vector color components must be within [0, 1]";
-            return false;
-        }
-        if (layer.Stride == 0u || layer.Stride > kMaxGeometryVectorFieldStride)
-        {
-            reason = "vector sampling stride must be between 1 and 16777216";
-            return false;
-        }
-        if (layer.LengthMode != GeometryVectorFieldLengthMode::Normalized &&
-            layer.LengthMode != GeometryVectorFieldLengthMode::Raw)
-        {
-            reason = "unknown vector length mode";
-            return false;
-        }
-        if (static_cast<std::uint8_t>(layer.ColorMap) >= Graphics::Colormap::kColormapCount)
-        {
-            reason = "unknown vector colormap";
+            reason = "vector field " + *violation;
             return false;
         }
         // Checked with the auto range on too, so the remembered manual range stays usable.
-        if (!std::isfinite(layer.ColorRangeMin) || !std::isfinite(layer.ColorRangeMax) ||
-            !(layer.ColorRangeMin < layer.ColorRangeMax))
+        if (!(layer.ColorRangeMin < layer.ColorRangeMax))
         {
-            reason = "vector color range must be finite with min < max";
+            reason = "vector color range must have min < max";
             return false;
         }
         reason.clear();

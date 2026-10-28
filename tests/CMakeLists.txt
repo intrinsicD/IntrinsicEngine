@@ -1300,6 +1300,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PropertySmoothingWorkflows.cpp
         Test.AgentOperations.cpp
         Test.DiagnosticsStream.cpp
+        Test.VectorFieldStyle.cpp
         Test.ViewCapture.cpp
         Test.LaplacianEigenbasisOperations.cpp
         Test.HarmonicFieldOperations.cpp

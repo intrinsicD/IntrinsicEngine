@@ -1095,6 +1095,51 @@ TEST(RuntimeSceneSerialization, VectorFieldLayersRoundTripAcrossDomains)
     EXPECT_EQ(restored->Presentations.size(), 1u);
 }
 
+// RUNTIME-327: a layer with every style field set is written exactly as before the style table
+// (golden captured from the hand-written serializer) and reads back equal.
+TEST(RuntimeSceneSerialization, VectorFieldLayerJsonIsUnchanged)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle sourceEntity = AddGeometryPresentationEntity(source);
+    const Runtime::GeometryVectorFieldLayerRecipe layer{
+        .Vector = {.Domain = Runtime::GeometryElementDomain::MeshFace,
+            .Name = "f:flow",
+            .ValueKind = Geometry::PropertyValueKind::Vec3},
+        .LengthMode = Runtime::GeometryVectorFieldLengthMode::Raw,
+        .Length = 0.25f,
+        .LineWidthPx = 4.5f,
+        .Color = {0.25f, 0.5f, 0.75f, 0.5f},
+        .DepthTested = false,
+        .Stride = 3u,
+        .MaxGlyphs = 77u,
+        .Enabled = false,
+        .LengthProperty = "f:len",
+        .ColorProperty = "f:heat",
+        .ColorMap = Extrinsic::Graphics::Colormap::Type::Coolwarm,
+        .ColorAutoRange = false,
+        .ColorRangeMin = -2.0f,
+        .ColorRangeMax = 8.0f,
+    };
+    source.Raw().get<Runtime::GeometryPresentationRecipe>(sourceEntity).VectorFields = {layer};
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "golden.json", backend).has_value());
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("golden.json"));
+    nlohmann::json written;
+    for (const auto& entityJson : parsed["entities"])
+        if (entityJson.contains("geometryPresentation"))
+            written = entityJson["geometryPresentation"]["vectorFields"][0];
+    const nlohmann::json golden = nlohmann::json::parse(R"({"color":[0.25,0.5,0.75,0.5],"colorAutoRange":false,"colorMap":"Coolwarm","colorProperty":"f:heat","colorRange":[-2.0,8.0],"depthTested":false,"enabled":false,"length":0.25,"lengthMode":"Raw","lengthProperty":"f:len","lineWidthPx":4.5,"maxGlyphs":77,"property":{"domain":"MeshFace","name":"f:flow","valueKind":"Vec3"},"stride":3})");
+    EXPECT_EQ(written, golden) << written.dump();
+
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::DeserializeSceneDocument(loaded, parsed.dump()).has_value());
+    const auto* recipe =
+        loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(FindEntityByName(loaded, "Mesh Entity"));
+    ASSERT_NE(recipe, nullptr);
+    ASSERT_EQ(recipe->VectorFields.size(), 1u);
+    EXPECT_EQ(recipe->VectorFields.front(), layer);
+}
+
 // UI-083: per-arrow length and color keys round-trip, are optional for older scenes and are
 // rejected when present but malformed.
 TEST(RuntimeSceneSerialization, VectorFieldStyleKeysRoundTripAndStayOptional)

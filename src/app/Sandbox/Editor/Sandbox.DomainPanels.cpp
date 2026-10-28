@@ -39,6 +39,7 @@ import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -630,16 +631,15 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", row.Status.c_str());
 
             GeometryVectorFieldLayerRecipe layer = row.Layer;
+            // Names and bounds come from the declared style fields (RUNTIME-327).
+            const auto spec = [](const std::string_view name)
+            { return *FindConfigFieldSpec(GeometryVectorFieldStyleFields(), name); };
             bool changed = ImGui::Checkbox("Visible", &layer.Enabled);
             ImGui::SameLine();
             changed |= ImGui::Checkbox("Depth test", &layer.DepthTested);
 
-            int lengthMode = static_cast<int>(layer.LengthMode);
-            if (ImGui::Combo("Length mode", &lengthMode, "Normalized\0Raw vectors (scaled)\0"))
-            {
-                layer.LengthMode = static_cast<GeometryVectorFieldLengthMode>(lengthMode);
-                changed = true;
-            }
+            changed |= DrawSpecEnumCombo("Length mode", GeometryVectorFieldStyleFields(), "length_mode", layer.LengthMode,
+                GeometryVectorFieldLengthMode::Normalized);
             // UI-083: per-arrow inputs from properties on the field's domain; Default is none.
             static const std::vector<EditorVectorFieldStyleOption> kNoOptions{};
             const std::vector<EditorVectorFieldStyleOption>& styleOptions =
@@ -668,7 +668,8 @@ namespace Extrinsic::Sandbox::Editor
                 return picked;
             };
             changed |= styleCombo("Length property", layer.LengthProperty, true);
-            // The uniform length multiplies a bound property, so it stays editable.
+            // The uniform length multiplies a bound property, so it stays editable. The declared rule is
+            // only "positive and finite"; 1e-6..1e9 is this drag's own range (a drag needs finite ends).
             const char* lengthLabel =
                 layer.LengthMode == GeometryVectorFieldLengthMode::Normalized && layer.LengthProperty.empty()
                 ? "Length###length"
@@ -680,10 +681,11 @@ namespace Extrinsic::Sandbox::Editor
                 1.0e9f,
                 "%.4g",
                 ImGuiSliderFlags_AlwaysClamp);
+            const ConfigFieldSpec& width = spec("line_width");
             changed |= ImGui::SliderFloat("Width (px)",
                 &layer.LineWidthPx,
-                kMinGeometryVectorFieldLineWidthPx,
-                kMaxGeometryVectorFieldLineWidthPx,
+                static_cast<float>(*width.Min),
+                static_cast<float>(*width.Max),
                 "%.1f",
                 ImGuiSliderFlags_AlwaysClamp);
             changed |= styleCombo("Color property", layer.ColorProperty, false);
@@ -704,13 +706,8 @@ namespace Extrinsic::Sandbox::Editor
                 std::ranges::find(styleOptions, layer.ColorProperty, &EditorVectorFieldStyleOption::Name);
             if (!layer.ColorProperty.empty() && (bound == styleOptions.end() || bound->Scalar))
             {
-                int colormap =
-                    std::clamp(static_cast<int>(layer.ColorMap), 0, static_cast<int>(kColormapNames.size()) - 1);
-                if (ImGui::Combo("Colormap", &colormap, kColormapNames.data(), static_cast<int>(kColormapNames.size())))
-                {
-                    layer.ColorMap = static_cast<decltype(layer.ColorMap)>(colormap);
-                    changed = true;
-                }
+                changed |= DrawSpecEnumCombo("Colormap", GeometryVectorFieldStyleFields(), "colormap", layer.ColorMap,
+                    decltype(layer.ColorMap)::Viridis);
                 changed |= ImGui::Checkbox("Auto range", &layer.ColorAutoRange);
                 if (!layer.ColorAutoRange)
                 {
@@ -748,8 +745,9 @@ namespace Extrinsic::Sandbox::Editor
                     std::min<std::uint32_t>(layer.Stride, static_cast<std::uint32_t>(std::numeric_limits<int>::max())));
                 if (ImGui::InputInt("Every Nth element", &stride))
                 {
+                    const ConfigFieldSpec& strides = spec("stride");
                     layer.Stride = static_cast<std::uint32_t>(
-                        std::clamp(stride, 1, static_cast<int>(kMaxGeometryVectorFieldStride)));
+                        std::clamp(stride, static_cast<int>(*strides.Min), static_cast<int>(*strides.Max)));
                     changed = true;
                 }
                 int maxGlyphs = static_cast<int>(std::min<std::uint32_t>(

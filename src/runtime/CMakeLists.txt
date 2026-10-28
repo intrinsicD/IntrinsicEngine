@@ -149,6 +149,7 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
         GeometryIntegration/Runtime.GeometryPresentation.cpp
+        GeometryIntegration/Runtime.GeometryVectorFieldStyle.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
         Rendering/Runtime.RenderArtifactPublication.cpp
         Rendering/Runtime.ViewCapture.cpp
