@@ -56,6 +56,10 @@ export namespace Extrinsic::Runtime
         const ConfigFieldSpec* Fields{nullptr};
         std::size_t FieldCount{0u};
         bool IntegerRefKinds{false};
+        // RUNTIME-339: a member of an Object's Fields that the Object's generated schema lists as
+        // required. Schema only: config validation leaves nested objects to their owner, and a
+        // tool's top-level arguments use AgentArgument::Required instead.
+        bool Required{false};
     };
 
     [[nodiscard]] const ConfigFieldSpec* FindConfigFieldSpec(

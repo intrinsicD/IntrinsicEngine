@@ -468,17 +468,24 @@ namespace Extrinsic::Runtime::ConfigDetail
                 if (field.MaxItems) p["maxItems"] = *field.MaxItems;
                 break;
             case ConfigFieldType::Object:
+            {
                 p["type"] = "object";
                 p["properties"] = OJson::object();
+                OJson required = OJson::array();
                 for (const auto& child : std::span{field.Fields, field.FieldCount})
                 {
                     const nlohmann::json* childDefault = nullptr;
                     if (defaultValue && defaultValue->is_object())
                         if (const auto it = defaultValue->find(std::string(child.Name)); it != defaultValue->end()) childDefault = &*it;
                     p["properties"][std::string(child.Name)] = BuildFieldSchema(child, childDefault);
+                    if (child.Required)
+                        required.push_back(std::string(child.Name));
                 }
+                if (!required.empty())
+                    p["required"] = std::move(required);
                 p["additionalProperties"] = false;
                 break;
+            }
             case ConfigFieldType::UIntArray:
                 p["type"] = "array";
                 p["items"] = {{"type", "integer"}, {"minimum", 0}, {"maximum", std::numeric_limits<std::uint32_t>::max()}};

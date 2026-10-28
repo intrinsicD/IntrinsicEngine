@@ -483,6 +483,79 @@
     ],
     "type": "object"
   },
+  "property_compare": {
+    "additionalProperties": false,
+    "properties": {
+      "a": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "description": "Element domain from property_list.",
+            "enum": [
+              "MeshVertex",
+              "MeshEdge",
+              "MeshHalfedge",
+              "MeshFace",
+              "GraphNode",
+              "GraphHalfedge",
+              "GraphEdge",
+              "PointCloudPoint"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "name"
+        ],
+        "type": "object"
+      },
+      "b": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "description": "Element domain from property_list.",
+            "enum": [
+              "MeshVertex",
+              "MeshEdge",
+              "MeshHalfedge",
+              "MeshFace",
+              "GraphNode",
+              "GraphHalfedge",
+              "GraphEdge",
+              "PointCloudPoint"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "name"
+        ],
+        "type": "object"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "entity",
+      "a",
+      "b"
+    ],
+    "type": "object"
+  },
   "property_list": {
     "additionalProperties": false,
     "properties": {
@@ -757,6 +830,82 @@
     "required": [
       "entity"
     ],
+    "type": "object"
+  },
+  "set_camera": {
+    "additionalProperties": false,
+    "properties": {
+      "controller": {
+        "enum": [
+          "orbit",
+          "fly",
+          "free_look",
+          "top_down"
+        ],
+        "type": "string"
+      },
+      "entities": {
+        "description": "Stable ids for preset or focus.",
+        "items": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "focus": {
+        "description": "true: frame the entities or the selection.",
+        "type": "boolean"
+      },
+      "pose": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "target": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "up": {
+            "description": "Default [0,1,0].",
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          }
+        },
+        "required": [
+          "position",
+          "target"
+        ],
+        "type": "object"
+      },
+      "preset": {
+        "enum": [
+          "front",
+          "back",
+          "left",
+          "right",
+          "top",
+          "bottom",
+          "isometric"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [],
     "type": "object"
   },
   "set_visibility": {

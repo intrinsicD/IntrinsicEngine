@@ -161,9 +161,7 @@ namespace Extrinsic::Runtime
     extern "C++" void RegisterPropertyInspectionAgentOperations(AgentOperationRegistry& registry)
     {
         using namespace AgentDetail;
-        const auto refFields = DomainProperty("Element domain from property_list.") + R"(,"name":{"type":"string","minLength":1})";
-        const auto refSchema = Schema("{" + refFields + "}", R"(["domain","name"])" );
-        // RUNTIME-337: declared arguments (property_compare keeps its nested objects hand-written).
+        // RUNTIME-337: declared arguments; RUNTIME-339: property_compare's nested references too.
         using FT = ConfigFieldType;
         const AgentArgument domain = DomainArgument("Element domain from property_list.", true);
         const AgentArgument name{.Spec = {.Name = "name", .Type = FT::String, .NonEmpty = true}, .Required = true};
@@ -184,8 +182,28 @@ namespace Extrinsic::Runtime
                 {.Spec = {.Name = "bins", .Type = FT::UInt, .Min = 0.0, .Max = 256.0}, .Default = 32}}),
             true,
             PropertyStats);
-        AddOperation(registry, "property_compare", "Compare property values", "Compare two properties on the same entity and element domain. Scalars may mix numeric kinds; vectors require matching dimensions. Deleted/nonfinite rows are excluded.",
-            Schema("{" + kEntityProperty + ",\"a\":" + refSchema + ",\"b\":" + refSchema + "}", R"(["entity","a","b"])"), true, PropertyCompare);
+        // a and b: the same domain and name, as required members of a nested object.
+        const auto member = [](AgentArgument argument)
+        {
+            argument.Spec.Required = true;
+            return argument.Spec;
+        };
+        const std::array<ConfigFieldSpec, 2> referenceFields{member(domain), member(name)};
+        const auto reference = [&](const std::string_view key) -> AgentArgument
+        {
+            return {.Spec = {.Name = key,
+                        .Type = FT::Object,
+                        .Fields = referenceFields.data(),
+                        .FieldCount = referenceFields.size()},
+                .Required = true};
+        };
+        AddOperation(registry,
+            "property_compare",
+            "Compare property values",
+            "Compare two properties on the same entity and element domain. Scalars may mix numeric kinds; vectors require matching dimensions. Deleted/nonfinite rows are excluded.",
+            ArgumentsSchema({EntityArgument(), reference("a"), reference("b")}),
+            true,
+            PropertyCompare);
         AddOperation(registry,
             "property_values",
             "Property values",

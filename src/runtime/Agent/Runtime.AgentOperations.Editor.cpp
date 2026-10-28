@@ -315,6 +315,9 @@ namespace Extrinsic::Runtime
         constexpr std::array<std::string_view, 3> kVectorFieldActions{"add", "update", "remove"};
         constexpr std::array<std::string_view, 4> kVisibilityLanes{"surface", "edges", "points", "bounds"};
         constexpr std::array<std::string_view, 4> kLogLevels{"debug", "info", "warning", "error"};
+        constexpr std::array<std::string_view, 4> kCameraControllers{"orbit", "fly", "free_look", "top_down"};
+        constexpr std::array<std::string_view, 7> kCameraPresets{
+            "front", "back", "left", "right", "top", "bottom", "isometric"};
         std::span<const std::string_view> AttributeTokens()
         {
             static const auto tokens = []
@@ -1384,7 +1387,7 @@ namespace Extrinsic::Runtime
             AddOperation(registry, name, title, std::move(description), std::move(schema), readOnly, std::move(invoke), destructive, gpu);
         };
         // RUNTIME-337: arguments declared once; the schemas below are generated from them, except
-        // where JSON Schema says more than a field spec can (const, oneOf, nested required keys).
+        // where JSON Schema says more than a field spec can (const, oneOf, a payload object or string).
         using FT = ConfigFieldType;
         const ToolSchema none = ArgumentsSchema({});
         const AgentArgument path{.Spec = {.Name = "path",
@@ -1543,22 +1546,43 @@ namespace Extrinsic::Runtime
                      .EnumValues = kVisibilityLanes}}}),
             false,
             SetVisibility);
-        add("set_camera", "Set the main camera",
+        // RUNTIME-339: pose's position and target are required members of the nested object.
+        const ConfigFieldSpec number{.Type = FT::Float};
+        const ConfigFieldSpec stableId{.Type = FT::UInt};
+        const auto vec3 = [&](const std::string_view name, const std::string_view description, const bool required)
+        {
+            return ConfigFieldSpec{.Name = name,
+                .Type = FT::Array,
+                .Description = description,
+                .Item = &number,
+                .MinItems = 3,
+                .MaxItems = 3,
+                .Required = required};
+        };
+        const std::array<ConfigFieldSpec, 3> pose{
+            vec3("position", {}, true), vec3("target", {}, true), vec3("up", "Default [0,1,0].", false)};
+        add("set_camera",
+            "Set the main camera",
             "Control the main camera like the Camera panel. Pass exactly one of: controller (orbit, fly, free look or top down; "
             "keeps the current view), pose (position, target and optional up: the camera looks from position at target; the "
             "result reports up_ignored for controllers without roll and position_clamped when the orbit radius was limited), "
             "preset (front, back, left, right, top, bottom or isometric, framing 'entities' or everything with world bounds) "
             "or focus (frame 'entities' or the selection, keeping the direction). Returns the previous and current pose. A view "
             "the controller cannot look along is refused (UnsupportedCameraPose) and nothing changes. Not undoable.",
-            Schema(R"({"controller":{"type":"string","enum":["orbit","fly","free_look","top_down"]},)"
-                   R"("pose":{"type":"object","properties":{"position":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
-                   R"("target":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3},)"
-                   R"("up":{"type":"array","items":{"type":"number"},"minItems":3,"maxItems":3,"description":"Default [0,1,0]."}},)"
-                   R"("required":["position","target"],"additionalProperties":false},)"
-                   R"("preset":{"type":"string","enum":["front","back","left","right","top","bottom","isometric"]},)"
-                   R"("focus":{"type":"boolean","description":"true: frame the entities or the selection."},)"
-                   R"("entities":{"type":"array","items":{"type":"integer","minimum":0,"maximum":4294967295},"description":"Stable ids for preset or focus."}})"),
-            false, SetCamera);
+            ArgumentsSchema({
+                {.Spec = {.Name = "controller", .Type = FT::StringEnum, .EnumValues = kCameraControllers}},
+                {.Spec = {.Name = "pose", .Type = FT::Object, .Fields = pose.data(), .FieldCount = pose.size()}},
+                {.Spec = {.Name = "preset", .Type = FT::StringEnum, .EnumValues = kCameraPresets}},
+                {.Spec = {.Name = "focus",
+                     .Type = FT::Bool,
+                     .Description = "true: frame the entities or the selection."}},
+                {.Spec = {.Name = "entities",
+                     .Type = FT::Array,
+                     .Description = "Stable ids for preset or focus.",
+                     .Item = &stableId}},
+            }),
+            false,
+            SetCamera);
         add("history", "Undo history", "Undo/redo availability, top labels, counts and dirty state.", none, true, History);
         const ToolSchema steps =
             ArgumentsSchema({{.Spec = {.Name = "steps", .Type = FT::UInt, .Min = 1.0, .Max = 64.0}, .Default = 1}});

@@ -23,6 +23,8 @@
 #include <gtest/gtest-spi.h>
 #include <nlohmann/json.hpp>
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProperty.Types;
@@ -468,4 +470,27 @@ TEST(DeclaredFieldContracts, LaneVisualizationStyle)
         .Schema = tool->InputSchemaJson,
         .Envelope = {{"entity", 1}, {"lane", "surface"}},
     });
+}
+
+// RUNTIME-339: a nested object's schema lists required members only where they are declared. The
+// config sections' Objects (clustering's property bindings, parameterization's five strategy and
+// view groups) declare none, so their schemas keep having no "required" key; set_camera and
+// property_compare are pinned with theirs by AgentOperations.DeclaredSchemasEqualTheHandWrittenBaseline.
+TEST(DeclaredFieldContracts, NestedObjectsRequireOnlyDeclaredMembers)
+{
+    const auto check = [](const std::string& sectionSchema, std::initializer_list<const char*> objects)
+    {
+        const Json schema = Json::parse(sectionSchema, nullptr, false);
+        ASSERT_TRUE(schema.is_object());
+        for (const char* name : objects)
+        {
+            SCOPED_TRACE(name);
+            const Json& object = schema["properties"][name];
+            ASSERT_TRUE(object.is_object() && object.contains("properties")) << object.dump();
+            EXPECT_FALSE(object["properties"].empty());
+            EXPECT_FALSE(object.contains("required")) << object.dump();
+        }
+    };
+    check(R::MakeClusteringConfigSectionRegistration().SchemaJson, {"properties"});
+    check(R::MakeParameterizationConfigSectionRegistration().SchemaJson, {"lscm", "harmonic", "bff", "view", "atlas"});
 }

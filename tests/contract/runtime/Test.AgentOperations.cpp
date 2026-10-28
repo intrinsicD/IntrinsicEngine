@@ -1530,7 +1530,7 @@ TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
         EXPECT_EQ(actual, expected);
     }
     EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
-    EXPECT_EQ(declared, 40u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, 42u) << "declared input schemas of " << registry.Entries().size() << " tools";
 }
 
 // RUNTIME-337: the shared declarations reach the registered schemas (not only synthetic ones): an
@@ -1574,4 +1574,18 @@ TEST(AgentArgumentSchema, RegisteredDeclaredArgumentsKeepTheirRules)
     EXPECT_FALSE(accepts("view_screenshot", R"({"path":"a.png"})"));
     EXPECT_TRUE(accepts("device_status", R"({})"));
     EXPECT_FALSE(accepts("device_status", R"({"x":1})"));
+    // RUNTIME-339: required members of nested objects.
+    EXPECT_TRUE(accepts("set_camera", R"({"pose":{"position":[0,0,1],"target":[0,0,0],"up":[0,1,0]}})"));
+    EXPECT_FALSE(accepts("set_camera", R"({"pose":{"position":[0,0,1]}})"));
+    EXPECT_FALSE(accepts("set_camera", R"({"pose":{"position":[0,1],"target":[0,0,0]}})"));
+    EXPECT_FALSE(accepts("set_camera", R"({"pose":{"position":[0,0,1],"target":[0,0,0],"roll":0}})"));
+    const char* compare =
+        R"({"entity":1,"a":{"domain":"MeshVertex","name":"u"},"b":{"domain":"MeshVertex","name":"v"}})";
+    EXPECT_TRUE(accepts("property_compare", compare));
+    EXPECT_FALSE(accepts(
+        "property_compare", R"({"entity":1,"a":{"domain":"MeshVertex"},"b":{"domain":"MeshVertex","name":"v"}})"));
+    EXPECT_FALSE(accepts("property_compare",
+        R"({"entity":1,"a":{"domain":"MeshVertex","name":""},"b":{"domain":"MeshVertex","name":"v"}})"));
+    EXPECT_FALSE(accepts("property_compare",
+        R"({"entity":1,"a":{"domain":"Vertex","name":"u"},"b":{"domain":"MeshVertex","name":"v"}})"));
 }
