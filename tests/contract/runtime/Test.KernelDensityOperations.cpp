@@ -154,7 +154,7 @@ TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
     auto config = Config(entity, D::MeshFace);
     config.Bandwidth = 5;
     C::EngineConfigSectionRegistry registry;
-    ASSERT_TRUE(registry.Register(R::MakeKernelDensityConfigSectionRegistration()));
+    ASSERT_TRUE(registry.Register(R::MakeDerivedSectionRegistration<R::kKernelDensitySection>()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
     R::EditorProcessingContext context{.Scene = &scene};
@@ -175,15 +175,15 @@ TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
     EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshFace).Exists("density"));
     ASSERT_TRUE(R::ApplyEditorKernelDensityConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorKernelDensityConfig(commands));
-    EXPECT_EQ(R::SerializeKernelDensityConfig(*R::GetEditorKernelDensityConfig(commands)),
-              R::SerializeKernelDensityConfig(config));
+    EXPECT_EQ(R::SerializeDerivedSection<R::kKernelDensitySection>(*R::GetEditorKernelDensityConfig(commands)),
+        R::SerializeDerivedSection<R::kKernelDensitySection>(config));
     ASSERT_TRUE(R::ApplyEditorConfiguredKernelDensity(commands).Succeeded());
     EXPECT_EQ(previews, 1);
     EXPECT_EQ(applies, 1);
     for (auto payload : {R"({"backend":"vulkan"})", R"({"k_neighbors":-1})", R"({"bandwidth":-1})",
                          R"({"gpu_query_batch_size":0})", R"({"bandwidth":1e100})", R"({"bandwidth":1e-100})", R"({"unknown":1})",
                          R"({"density":{"domain":"unknown","name":"x","kind":"uint32"}})"})
-        EXPECT_FALSE(R::ValidateKernelDensityConfigSection(payload, {}, "test").Usable()) << payload;
+        EXPECT_FALSE(R::ValidateDerivedSection<R::kKernelDensitySection>(payload, {}, "test").Usable()) << payload;
     config.Bandwidth = -1;
     EXPECT_FALSE(R::ApplyEditorKernelDensityConfig(commands, config).Succeeded());
     EXPECT_EQ(applies, 1);
@@ -430,8 +430,8 @@ TEST(KernelDensity, DoubleTargetUsesSharedCheckedScalarPublication)
     auto config=Config(entity,D::MeshFace);
     config.Density.ValueKind=Geometry::PropertyValueKind::Double;
     Extrinsic::Core::Config::EngineConfig document;
-    R::SetKernelDensityConfig(document,config);
-    const auto decoded=R::GetKernelDensityConfig(document);
+    R::SetDerivedSection<R::kKernelDensitySection>(document, config);
+    const auto decoded = R::GetDerivedSection<R::kKernelDensitySection>(document);
     ASSERT_TRUE(decoded);
     EXPECT_EQ(decoded->Density,config.Density);
     R::EditorCommandHistory history;

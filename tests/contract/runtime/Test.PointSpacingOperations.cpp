@@ -243,7 +243,7 @@ TEST(PointSpacingConfig, RoundTripAndSharedPreviewApplyRun)
     auto config = Config(entity, D::MeshFace);
     config.ScaleFactor = 5;
     C::EngineConfigSectionRegistry registry;
-    ASSERT_TRUE(registry.Register(R::MakePointSpacingConfigSectionRegistration()));
+    ASSERT_TRUE(registry.Register(R::MakeDerivedSectionRegistration<R::kPointSpacingSection>()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
     R::EditorProcessingContext context{.Scene = &scene};
@@ -264,15 +264,15 @@ TEST(PointSpacingConfig, RoundTripAndSharedPreviewApplyRun)
     EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshFace).Exists("radii"));
     ASSERT_TRUE(R::ApplyEditorPointSpacingConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorPointSpacingConfig(commands));
-    EXPECT_EQ(R::SerializePointSpacingConfig(*R::GetEditorPointSpacingConfig(commands)),
-              R::SerializePointSpacingConfig(config));
+    EXPECT_EQ(R::SerializeDerivedSection<R::kPointSpacingSection>(*R::GetEditorPointSpacingConfig(commands)),
+        R::SerializeDerivedSection<R::kPointSpacingSection>(config));
     ASSERT_TRUE(R::ApplyEditorConfiguredPointSpacing(commands).Succeeded());
     EXPECT_EQ(previews, 1);
     EXPECT_EQ(applies, 1);
     for (auto payload : {R"({"backend":"vulkan"})", R"({"k_neighbors":-1})", R"({"scale_factor":-1})",
                          R"({"gpu_query_batch_size":0})", R"({"scale_factor":1e100})", R"({"scale_factor":1e-100})", R"({"unknown":1})",
                          R"({"radii":{"domain":"unknown","name":"x","kind":"uint32"}})"})
-        EXPECT_FALSE(R::ValidatePointSpacingConfigSection(payload, {}, "test").Usable()) << payload;
+        EXPECT_FALSE(R::ValidateDerivedSection<R::kPointSpacingSection>(payload, {}, "test").Usable()) << payload;
     config.ScaleFactor = -1;
     EXPECT_FALSE(R::ApplyEditorPointSpacingConfig(commands, config).Succeeded());
     EXPECT_EQ(applies, 1);
@@ -461,11 +461,12 @@ TEST(PointSpacingOperations, ScalarStorageChoicesRoundTripAndUndo)
         config.KNeighbors=1;
         config.ScaleFactor=1;
         config.Radii.ValueKind=kind;
-        const auto payload=R::SerializePointSpacingConfig(config);
-        EXPECT_TRUE(R::ValidatePointSpacingConfigSection(payload,{},R::kPointSpacingConfigSectionName).Usable());
+        const auto payload = R::SerializeDerivedSection<R::kPointSpacingSection>(config);
+        EXPECT_TRUE(R::ValidateDerivedSection<R::kPointSpacingSection>(payload, {}, R::kPointSpacingConfigSectionName)
+                .Usable());
         Extrinsic::Core::Config::EngineConfig document;
-        R::SetPointSpacingConfig(document,config);
-        const auto decoded=R::GetPointSpacingConfig(document);
+        R::SetDerivedSection<R::kPointSpacingSection>(document, config);
+        const auto decoded = R::GetDerivedSection<R::kPointSpacingSection>(document);
         ASSERT_TRUE(decoded);
         EXPECT_EQ(decoded->Radii,config.Radii);
         R::EditorCommandHistory history;

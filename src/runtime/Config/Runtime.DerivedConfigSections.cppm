@@ -1,35 +1,55 @@
-// A config section's codec derived from its bound rows (RUNTIME-346, ADR 0031 Decision 2): parse,
-// serialize, validation, get, set and registration. Rows are UInt and Float rows bound to number
-// members, StringEnum rows bound to an enum (enumerator i is token EnumValues[i]) and PropertyRef
-// rows bound to a GeometryPropertyRef. The payload is checked before conversion, in the stage order
-// of the hand-written point codecs. Every Float row refuses a positive value that stores as zero,
-// and the cross-field Check runs after the references: a section whose rules differ (outlier
-// analysis' mode-dependent radius, density weights' order) needs that stated before it moves here.
-// Include after Runtime.ConfigFieldJson.hpp, with the core config modules imported.
-#pragma once
+// A config section's codec derived from its bound rows (RUNTIME-346, ADR 0031 Decision 2), an exported
+// module since RUNTIME-351: an operation's interface exports its section declaration and callers use
+// the generic functions below (serialize, validate, get, set, registration). Rows are UInt and Float
+// rows bound to number members, StringEnum rows bound to an enum (enumerator i is token
+// EnumValues[i]) and PropertyRef rows bound to a GeometryPropertyRef. The payload is checked before
+// conversion, in the stage order of the hand-written point codecs. Every Float row refuses a positive
+// value that stores as zero, and the cross-field Check runs after the references: a section whose
+// rules differ (outlier analysis' mode-dependent radius, density weights' order) needs that stated
+// before it moves here. The config helper headers are in the purview with their own linkage:
+// reachable where a generic function is instantiated, not exported.
+module;
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <nlohmann/json.hpp>
+export module Extrinsic.Runtime.DerivedConfigSections;
+export import Extrinsic.Runtime.ConfigFieldSpec;
+export import Extrinsic.Core.Config.Engine;
+export import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.GeometryProperty.Types;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 
-extern "C++"
+export extern "C++"
 {
-    namespace Extrinsic::Runtime::ConfigDetail
+    namespace Extrinsic::Runtime
     {
         template <class Cfg> struct DerivedConfigSection
         {
+            using Config = Cfg;
             std::string_view Name{}, SchemaId{}, Title{};
             std::uint32_t Version{1};
             std::span<const BoundField<Cfg>> Rows{};
             std::span<const ConfigFieldSpec> Fields{}; // SpecsOf(Rows), the section's exported table
             std::string_view ObjectError{}, UnknownFieldPrefix{};
-            // The cross-field rule, checked on the converted record; empty when it holds.
+        // The cross-field rule, checked on the converted record; empty when it holds.
             std::string_view (*Check)(const Cfg&){nullptr};
-            // The exported validator: the registration stores it and Get validates with it.
-            SectionValidatorFn Validate{nullptr};
         };
 
-        // Every row has the accessor its type needs and matches its spec in Fields, so a codec never
-        // calls a missing accessor or looks up a field another table declares.
+    // Every row has the accessor its type needs and matches its spec in Fields, so a codec never
+    // calls a missing accessor or looks up a field another table declares.
         template <class Cfg> [[nodiscard]] constexpr bool IsDerivable(const DerivedConfigSection<Cfg>& section)
         {
-            if (section.Rows.size() != section.Fields.size() || section.Validate == nullptr)
+            if (section.Rows.size() != section.Fields.size())
                 return false;
             for (std::size_t i = 0; i < section.Rows.size(); ++i)
             {
@@ -45,7 +65,13 @@ extern "C++"
             }
             return true;
         }
+    }
+}
 
+extern "C++"
+{
+    namespace Extrinsic::Runtime::ConfigDetail
+    {
         template <class Cfg>
         [[nodiscard]] std::string SerializeDerivedConfig(const DerivedConfigSection<Cfg>& section, const Cfg& config)
         {
@@ -140,11 +166,12 @@ extern "C++"
         }
 
         template <class Cfg>
-        [[nodiscard]] std::optional<Cfg> GetDerivedConfig(
-            const DerivedConfigSection<Cfg>& section, const Core::Config::EngineConfig& config)
+        [[nodiscard]] std::optional<Cfg> GetDerivedConfig(const DerivedConfigSection<Cfg>& section,
+            const Core::Config::EngineConfig& config,
+            const SectionValidatorFn validate)
         {
             const auto payload = FindValidatedCanonicalPayload(
-                config, section.Name, section.SchemaId, section.Version, nullptr, section.Validate);
+                config, section.Name, section.SchemaId, section.Version, nullptr, validate);
             if (!payload)
                 return std::nullopt;
             return ParseDerivedConfig(section, ParseConfigJson(*payload, true));
@@ -162,19 +189,59 @@ extern "C++"
 
         template <class Cfg>
         [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeDerivedRegistration(
-            const DerivedConfigSection<Cfg>& section)
+            const DerivedConfigSection<Cfg>& section, const SectionValidatorFn validate)
         {
             const std::string defaults = SerializeDerivedConfig(section, Cfg{});
             return MakeSectionRegistration(section.Name,
                 section.SchemaId,
                 section.Version,
                 defaults,
-                section.Validate,
+                validate,
                 BuildSectionSchemaJson(section.SchemaId,
                     section.Title,
                     "Validated " + std::string(section.Title) + " configuration.",
                     section.Fields,
                     ParseConfigJson(defaults, true)));
+        }
+    }
+}
+
+export extern "C++"
+{
+    namespace Extrinsic::Runtime
+    {
+    // The generic codec of one section declaration (an `inline constexpr DerivedConfigSection` with
+    // static storage). ValidateDerivedSection<Section> has the exact section validator type, so the
+    // registration stores it and Get validates with it.
+        template <const auto& Section>
+        using DerivedSectionConfig = typename std::remove_cvref_t<decltype(Section)>::Config;
+
+        template <const auto& Section>
+        [[nodiscard]] std::string SerializeDerivedSection(const DerivedSectionConfig<Section>& config)
+        {
+            return ConfigDetail::SerializeDerivedConfig(Section, config);
+        }
+        template <const auto& Section>
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateDerivedSection(
+            const std::string_view payload, const std::string_view, const std::string_view subject)
+        {
+            return ConfigDetail::ValidateDerivedConfig(Section, payload, subject);
+        }
+        template <const auto& Section>
+        [[nodiscard]] std::optional<DerivedSectionConfig<Section>> GetDerivedSection(
+            const Core::Config::EngineConfig& config)
+        {
+            return ConfigDetail::GetDerivedConfig(Section, config, &ValidateDerivedSection<Section>);
+        }
+        template <const auto& Section>
+        void SetDerivedSection(Core::Config::EngineConfig& config, const DerivedSectionConfig<Section>& value)
+        {
+            ConfigDetail::SetDerivedConfig(Section, config, value);
+        }
+        template <const auto& Section>
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeDerivedSectionRegistration()
+        {
+            return ConfigDetail::MakeDerivedRegistration(Section, &ValidateDerivedSection<Section>);
         }
     }
 }

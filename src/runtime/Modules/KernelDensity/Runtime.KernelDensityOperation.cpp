@@ -1,5 +1,5 @@
-// Kernel density, declared once (RUNTIME-349, ADR 0031 Decision 8): its config section derived from the
-// bound rows, its definition on the operation runtime, and its entry points.
+// Kernel density on the operation runtime (RUNTIME-349, ADR 0031 Decision 8): its definition and entry
+// points; its config section is declared in the interface (RUNTIME-351).
 module;
 #include <algorithm>
 #include <array>
@@ -19,7 +19,6 @@ module;
 #include <vector>
 #include <glm/vec3.hpp>
 #include <entt/entity/registry.hpp>
-#include <nlohmann/json.hpp>
 module Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.OperationRuntime;
 import Extrinsic.Runtime.ConfigFieldSpec;
@@ -29,135 +28,28 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Geometry.PointCloud.Utils;
-#include "Config/internal/Runtime.PointConfigJson.hpp"
-#include "Config/internal/Runtime.ConfigFieldJson.hpp"
-#include "Config/internal/Runtime.DerivedConfigSection.hpp"
 
 namespace Extrinsic::Runtime
 {
-    namespace
-    {
-        constexpr Geometry::PropertyValueKind kFloatKind[]{Geometry::PropertyValueKind::Float};
-        constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
-        constexpr std::string_view kKernelDensityBackend[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
-        constexpr std::string_view kKernelDensityBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
-        constexpr std::array kKernelDensityRows{
-            Bind<&KernelDensityConfig::StableEntityId>(
-                {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."}),
-            Bind<&KernelDensityConfig::KNeighbors>(
-                {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors."}),
-            Bind<&KernelDensityConfig::GpuQueryBatchSize>({.Name = "gpu_query_batch_size",
-                .Type = ConfigFieldType::UInt,
-                .Description = "Gpu query batch size.",
-                .Min = 1,
-                .Max = 16384,
-                .Refusal = "GPU query batch size must be 1..16384."}),
-            Bind<&KernelDensityConfig::Backend>({.Name = "backend",
-                .Type = ConfigFieldType::StringEnum,
-                .Description = "Backend.",
-                .EnumNames = kKernelDensityBackendNames,
-                .EnumValues = kKernelDensityBackend,
-                .Refusal = "Unknown density backend."}),
-            Bind<&KernelDensityConfig::Bandwidth>({.Name = "bandwidth",
-                .Type = ConfigFieldType::Float,
-                .Description =
-                    "Zero selects automatic bandwidth; positive values must remain positive in float storage.",
-                .Min = 0,
-                .Max = double(std::numeric_limits<float>::max()),
-                .Refusal = "Positive bandwidth must remain positive in float storage."}),
-            Bind<&KernelDensityConfig::Positions>({.Name = "positions",
-                .Type = ConfigFieldType::PropertyRef,
-                .Description = "Position and density bindings must have distinct names on the same element domain.",
-                .RefKinds = kVec3Kind}),
-            Bind<&KernelDensityConfig::Density>({.Name = "density",
-                .Type = ConfigFieldType::PropertyRef,
-                .Description = "Density.",
-                .RefKinds = kFloatKind,
-                .AnyScalar = true}),
-        };
-        constexpr auto kKernelDensityFields = SpecsOf(kKernelDensityRows);
-    }
-    extern "C++" std::span<const BoundField<KernelDensityConfig>> KernelDensityConfigRows() noexcept
-    {
-        return kKernelDensityRows;
-    }
+    template std::string SerializeDerivedSection<kKernelDensitySection>(const KernelDensityConfig&);
+    template Core::Config::EngineConfigSectionValidationResult ValidateDerivedSection<kKernelDensitySection>(
+        std::string_view, std::string_view, std::string_view);
+    template std::optional<KernelDensityConfig> GetDerivedSection<kKernelDensitySection>(
+        const Core::Config::EngineConfig&);
+    template void SetDerivedSection<kKernelDensitySection>(Core::Config::EngineConfig&, const KernelDensityConfig&);
+    template Core::Config::EngineConfigSectionRegistration MakeDerivedSectionRegistration<kKernelDensitySection>();
 }
 
-// The section's exported functions keep global-module attachment, as their interface declares them.
+// The backend's name is the row's token, so the codec and the owner's names cannot drift apart; it
+// keeps global-module attachment, as its interface declares it.
 extern "C++"
 {
     namespace Extrinsic::Runtime
     {
-        namespace
-        {
-            constexpr ConfigDetail::DerivedConfigSection<KernelDensityConfig> kKernelDensitySection{
-                .Name = kKernelDensityConfigSectionName,
-                .SchemaId = kKernelDensityConfigSectionSchemaId,
-                .Title = "KernelDensity",
-                .Rows = kKernelDensityRows,
-                .Fields = kKernelDensityFields,
-                .ObjectError = "Kernel density config must be an object.",
-                .UnknownFieldPrefix = "Unknown density field: ",
-                .Check = [](const KernelDensityConfig& c) -> std::string_view
-                {
-                    return c.Positions.Domain != c.Density.Domain || c.Positions.Name == c.Density.Name
-                        ? "Position and density must be distinct properties on the same domain."
-                        : "";
-                },
-                .Validate = &ValidateKernelDensityConfigSection};
-            static_assert(ConfigDetail::IsDerivable(kKernelDensitySection));
-        // Rows paired with a different table, by name or by type, are refused (the check's witnesses).
-            constexpr auto kKernelDensityRenamed = []
-            {
-                auto fields = kKernelDensityFields;
-                fields[1].Name = "other";
-                return fields;
-            }();
-            constexpr auto kKernelDensityRetyped = []
-            {
-                auto fields = kKernelDensityFields;
-                fields[1].Type = ConfigFieldType::Float;
-                return fields;
-            }();
-            static_assert(!ConfigDetail::IsDerivable(
-                ConfigDetail::DerivedConfigSection<KernelDensityConfig>{.Rows = kKernelDensityRows,
-                    .Fields = kKernelDensityRenamed,
-                    .Validate = &ValidateKernelDensityConfigSection}));
-            static_assert(!ConfigDetail::IsDerivable(
-                ConfigDetail::DerivedConfigSection<KernelDensityConfig>{.Rows = kKernelDensityRows,
-                    .Fields = kKernelDensityRetyped,
-                    .Validate = &ValidateKernelDensityConfigSection}));
-        }
-    // The row's tokens, so the codec and the owner's names cannot drift apart.
         const char* ToString(KernelDensityBackend b) noexcept
         {
             const auto i = std::to_underlying(b);
             return i < std::size(kKernelDensityBackend) ? kKernelDensityBackend[i].data() : "invalid";
-        }
-        std::string SerializeKernelDensityConfig(const KernelDensityConfig& c)
-        {
-            return ConfigDetail::SerializeDerivedConfig(kKernelDensitySection, c);
-        }
-        Core::Config::EngineConfigSectionValidationResult ValidateKernelDensityConfigSection(
-            std::string_view payload, std::string_view, std::string_view subject)
-        {
-            return ConfigDetail::ValidateDerivedConfig(kKernelDensitySection, payload, subject);
-        }
-        std::optional<KernelDensityConfig> GetKernelDensityConfig(const Core::Config::EngineConfig& c)
-        {
-            return ConfigDetail::GetDerivedConfig(kKernelDensitySection, c);
-        }
-        void SetKernelDensityConfig(Core::Config::EngineConfig& c, const KernelDensityConfig& value)
-        {
-            ConfigDetail::SetDerivedConfig(kKernelDensitySection, c, value);
-        }
-        std::span<const ConfigFieldSpec> KernelDensityConfigFieldSpecs() noexcept
-        {
-            return kKernelDensityFields;
-        }
-        Core::Config::EngineConfigSectionRegistration MakeKernelDensityConfigSectionRegistration()
-        {
-            return ConfigDetail::MakeDerivedRegistration(kKernelDensitySection);
         }
     }
 }
@@ -191,8 +83,8 @@ namespace Extrinsic::Runtime
             }
             static Core::Config::EngineConfigSectionValidationResult Validate(const Params& c)
             {
-                return ValidateKernelDensityConfigSection(
-                    SerializeKernelDensityConfig(c), {}, kKernelDensityConfigSectionName);
+                return ValidateDerivedSection<kKernelDensitySection>(
+                    SerializeDerivedSection<kKernelDensitySection>(c), {}, kKernelDensityConfigSectionName);
             }
             static Graphics::PointScalarGpuParams GpuParams(const Params& c)
             {
@@ -265,17 +157,17 @@ namespace Extrinsic::Runtime
         const EditorProcessingCommands& commands, const KernelDensityConfig& config, std::string sourceId)
     {
         return ApplyOperationConfig(commands,
-            ValidateKernelDensityConfigSection(
-                SerializeKernelDensityConfig(config), {}, kKernelDensityConfigSectionName),
+            ValidateDerivedSection<kKernelDensitySection>(
+                SerializeDerivedSection<kKernelDensitySection>(config), {}, kKernelDensityConfigSectionName),
             sourceId.empty() ? std::string{kKernelDensityConfigSectionName} : sourceId,
             [&](Core::Config::EngineConfig& candidate)
             {
-                SetKernelDensityConfig(candidate, config);
+                SetDerivedSection<kKernelDensitySection>(candidate, config);
             });
     }
     std::optional<KernelDensityConfig> GetEditorKernelDensityConfig(const EditorProcessingCommands& commands)
     {
         const Core::Config::EngineConfig* active = ActiveOperationConfig(commands);
-        return active ? GetKernelDensityConfig(*active) : std::nullopt;
+        return active ? GetDerivedSection<kKernelDensitySection>(*active) : std::nullopt;
     }
 } // namespace Extrinsic::Runtime

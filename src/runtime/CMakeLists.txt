@@ -80,6 +80,7 @@ target_sources(${target_name}
         Config/Runtime.EngineConfigBoot.cppm
         Config/Runtime.EngineConfigControl.cppm
         Config/Runtime.ConfigFieldSpec.cppm
+        Config/Runtime.DerivedConfigSections.cppm
         Agent/Runtime.AgentOperations.cppm
         Agent/Runtime.AgentServer.cppm
         Kernel/Runtime.FramePacingDiagnostics.cppm

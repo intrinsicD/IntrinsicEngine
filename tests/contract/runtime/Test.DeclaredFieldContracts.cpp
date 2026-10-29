@@ -935,25 +935,27 @@ namespace
             {"kernel_density",
                 "density",
                 "bandwidth",
-                R::SerializeKernelDensityConfig({}),
-                R::SerializeKernelDensityConfig(density),
-                R::SerializeKernelDensityConfig({.Backend = static_cast<R::KernelDensityBackend>(7)}),
+                R::SerializeDerivedSection<R::kKernelDensitySection>({}),
+                R::SerializeDerivedSection<R::kKernelDensitySection>(density),
+                R::SerializeDerivedSection<R::kKernelDensitySection>(
+                    {.Backend = static_cast<R::KernelDensityBackend>(7)}),
                 [](const std::string_view payload)
                 {
-                    return R::ValidateKernelDensityConfigSection(payload, {}, "golden");
+                    return R::ValidateDerivedSection<R::kKernelDensitySection>(payload, {}, "golden");
                 },
-                R::MakeKernelDensityConfigSectionRegistration()},
+                R::MakeDerivedSectionRegistration<R::kKernelDensitySection>()},
             {"point_spacing",
                 "radii",
                 "scale_factor",
-                R::SerializePointSpacingConfig({}),
-                R::SerializePointSpacingConfig(spacing),
-                R::SerializePointSpacingConfig({.Backend = static_cast<R::PointSpacingBackend>(7)}),
+                R::SerializeDerivedSection<R::kPointSpacingSection>({}),
+                R::SerializeDerivedSection<R::kPointSpacingSection>(spacing),
+                R::SerializeDerivedSection<R::kPointSpacingSection>(
+                    {.Backend = static_cast<R::PointSpacingBackend>(7)}),
                 [](const std::string_view payload)
                 {
-                    return R::ValidatePointSpacingConfigSection(payload, {}, "golden");
+                    return R::ValidateDerivedSection<R::kPointSpacingSection>(payload, {}, "golden");
                 },
-                R::MakePointSpacingConfigSectionRegistration()},
+                R::MakeDerivedSectionRegistration<R::kPointSpacingSection>()},
         };
     }
     // One payload per refusal path, then valid ones; $O is the section's output field, $F its float field.
@@ -1054,4 +1056,28 @@ TEST(DeclaredFieldContracts, ConfigSectionCodecsMatchTheirGolden)
         for (std::size_t i = 0; i < outcome["cases"].size(); ++i)
             EXPECT_EQ(outcome["cases"][i], expected["cases"][i]) << outcome["cases"][i]["payload"];
     }
+}
+
+// RUNTIME-351: the two derived sections are derivable, and the check refuses rows paired with a
+// different table, by name or by type (its witnesses, moved here from the operation units).
+namespace
+{
+    constexpr auto kKernelDensityRenamed = []
+    {
+        auto fields = R::kKernelDensityFields;
+        fields[1].Name = "other";
+        return fields;
+    }();
+    constexpr auto kKernelDensityRetyped = []
+    {
+        auto fields = R::kKernelDensityFields;
+        fields[1].Type = R::ConfigFieldType::Float;
+        return fields;
+    }();
+    static_assert(R::IsDerivable(R::kKernelDensitySection));
+    static_assert(R::IsDerivable(R::kPointSpacingSection));
+    static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
+        .Rows = R::kKernelDensityRows, .Fields = kKernelDensityRenamed}));
+    static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
+        .Rows = R::kKernelDensityRows, .Fields = kKernelDensityRetyped}));
 }

@@ -94,8 +94,7 @@ contract_review: the operation runtime becomes an exported framework module for 
 ## Acceptance criteria
 - [x] Technical test passed (or the fallback taken and reported); framework module exported.
 - [x] Both definitions in their modules; codec and editor files lose them; suites green.
-- [ ] Layering rule with its test; Codex plan and code review; structural checks pass. (Rule, test and
-      checks done; the code review said revise, its fixes are confirmed in `RUNTIME-351`'s review.)
+- [x] Layering rule with its test; Codex plan and code review; structural checks pass.
 
 ## Verification
 ```bash
@@ -171,3 +170,5 @@ python3 tools/repo/check_layering.py --root src --strict
   264); `RUNTIME-351` created with a removal budget and the early warning that the phase 1 gate
   (150) looks out of reach without deeper cuts. These fixes go to the next block's review
   (`RUNTIME-351`). After them: 806 (805 passed, 1 skipped by design).
+- 2026-10-29: Codex (in `RUNTIME-351`'s plan review, `plan351.answer.md`, Object B): B1 and B2 of the
+  code review confirmed resolved in `a3dd0663a`.

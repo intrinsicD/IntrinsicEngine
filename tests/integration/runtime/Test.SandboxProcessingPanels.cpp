@@ -230,10 +230,10 @@ namespace
         EXPECT_EQ(R::GetOutlierAnalysisConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetKeypointAnalysisConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDescriptorAnalysisConfig(config)->StableEntityId, expected);
-        EXPECT_EQ(R::GetKernelDensityConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetDerivedSection<R::kKernelDensitySection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDensityWeightConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetPointConstructionConfig(config)->StableEntityId, expected);
-        EXPECT_EQ(R::GetPointSpacingConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetDerivedSection<R::kPointSpacingSection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetBilateralFilterConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetRegistrationConfig(config)->SourceStableEntityId, expected);
         EXPECT_EQ(R::GetRegistrationConfig(config)->TargetStableEntityId, target);
@@ -1301,75 +1301,326 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
         int ChoiceIndex{2}, ExpectedBackend{2};
     };
     const std::array controls{
-        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }, 1, 1},
-        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "CPU KD-tree",
-            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }, 0, 0},
-        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "Vulkan LBVH (resident PCA)",
-            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }},
-        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "Vulkan (GPU property residency, double precision)",
-            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }, 3, 2},
-        Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }, 1, 1},
-        Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "CPU octree",
-            [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }, 0, 0},
-        Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "Vulkan LBVH",
-            [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }},
-        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }, 1, 1},
-        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "CPU KD-tree",
-            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }, 0, 0},
-        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan LBVH neighborhoods",
-            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }},
-        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan",
-            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }, 3, 2},
-        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Backend", "Vulkan",
-            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); },1,3},
-        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Backend", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }, 1, 1},
-        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Backend", "CPU KD-tree",
-            [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }, 0, 0},
-        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Backend", "Vulkan LBVH",
-            [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }},
-        Control{"view.kernel_density", "Kernel Density", "Backend", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }, 1, 1},
-        Control{"view.kernel_density", "Kernel Density", "Backend", "CPU octree",
-            [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }, 0, 0},
-        Control{"view.kernel_density", "Kernel Density", "Backend", "Vulkan LBVH",
-            [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }},
-        Control{"view.density_weights", "Compact Density Weights", "Backend", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }, 1, 1},
-        Control{"view.density_weights", "Compact Density Weights", "Backend", "CPU KD-tree",
-            [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }, 0, 0},
-        Control{"view.density_weights", "Compact Density Weights", "Backend", "Vulkan LBVH",
-            [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }},
-        Control{"view.point_construction", "Construct from Points", "Backend", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }, 1, 1},
-        Control{"view.point_construction", "Construct from Points", "Backend", "CPU reference",
-            [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }, 0, 0},
-        Control{"view.point_construction", "Construct from Points", "Backend", "Vulkan LBVH",
-            [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }},
-        Control{"view.point_spacing", "Point Spacing and Radii", "Backend", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }, 1, 1},
-        Control{"view.point_spacing", "Point Spacing and Radii", "Backend", "CPU octree",
-            [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }, 0, 0},
-        Control{"view.point_spacing", "Point Spacing and Radii", "Backend", "Vulkan LBVH",
-            [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }},
-        Control{"view.bilateral_filter", "Bilateral Point Filter", "Backend", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }, 1, 1},
-        Control{"view.bilateral_filter", "Bilateral Point Filter", "Backend", "CPU octree",
-            [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }, 0, 0},
-        Control{"view.bilateral_filter", "Bilateral Point Filter", "Backend", "Vulkan LBVH",
-            [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }},
-        Control{"view.registration", "ICP Registration", "Backend##ICP", "CPU LBVH (cached)",
-            [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }, 1, 1},
-        Control{"view.registration", "ICP Registration", "Backend##ICP", "CPU KD-tree (reference)",
-            [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }, 0, 0},
-        Control{"view.registration", "ICP Registration", "Backend##ICP", "Vulkan LBVH (CPU solve)",
-            [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }},
-        Control{"view.coherent_point_drift", "Coherent Point Drift", "Backend (E-step)##CPD",
+        Control{"view.normal_estimation",
+            "Normal Estimation",
+            "Backend##Normals",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetNormalEstimationConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.normal_estimation",
+            "Normal Estimation",
+            "Backend##Normals",
+            "CPU KD-tree",
+            [](const auto& c)
+            {
+                return int(R::GetNormalEstimationConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.normal_estimation",
+            "Normal Estimation",
+            "Backend##Normals",
+            "Vulkan LBVH (resident PCA)",
+            [](const auto& c)
+            {
+                return int(R::GetNormalEstimationConfig(c)->Backend);
+            }},
+        Control{"view.normal_estimation",
+            "Normal Estimation",
+            "Backend##Normals",
+            "Vulkan (GPU property residency, double precision)",
+            [](const auto& c)
+            {
+                return int(R::GetNormalEstimationConfig(c)->Backend);
+            },
+            3,
+            2},
+        Control{"view.outlier_analysis",
+            "Outlier Analysis",
+            "Backend",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetOutlierAnalysisConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.outlier_analysis",
+            "Outlier Analysis",
+            "Backend",
+            "CPU octree",
+            [](const auto& c)
+            {
+                return int(R::GetOutlierAnalysisConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.outlier_analysis",
+            "Outlier Analysis",
+            "Backend",
+            "Vulkan LBVH",
+            [](const auto& c)
+            {
+                return int(R::GetOutlierAnalysisConfig(c)->Backend);
+            }},
+        Control{"view.keypoint_analysis",
+            "ISS Keypoint Analysis",
+            "Acceleration",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetKeypointAnalysisConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.keypoint_analysis",
+            "ISS Keypoint Analysis",
+            "Acceleration",
+            "CPU KD-tree",
+            [](const auto& c)
+            {
+                return int(R::GetKeypointAnalysisConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.keypoint_analysis",
+            "ISS Keypoint Analysis",
+            "Acceleration",
+            "Vulkan LBVH neighborhoods",
+            [](const auto& c)
+            {
+                return int(R::GetKeypointAnalysisConfig(c)->Backend);
+            }},
+        Control{"view.keypoint_analysis",
+            "ISS Keypoint Analysis",
+            "Acceleration",
+            "Vulkan",
+            [](const auto& c)
+            {
+                return int(R::GetKeypointAnalysisConfig(c)->Backend);
+            },
+            3,
+            2},
+        Control{"view.keypoint_analysis",
+            "ISS Keypoint Analysis",
+            "Backend",
+            "Vulkan",
+            [](const auto& c)
+            {
+                return int(R::GetKeypointAnalysisConfig(c)->Backend);
+            },
+            1,
+            3},
+        Control{"view.descriptor_analysis",
+            "FPFH Descriptor Analysis",
+            "Backend",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetDescriptorAnalysisConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.descriptor_analysis",
+            "FPFH Descriptor Analysis",
+            "Backend",
+            "CPU KD-tree",
+            [](const auto& c)
+            {
+                return int(R::GetDescriptorAnalysisConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.descriptor_analysis",
+            "FPFH Descriptor Analysis",
+            "Backend",
+            "Vulkan LBVH",
+            [](const auto& c)
+            {
+                return int(R::GetDescriptorAnalysisConfig(c)->Backend);
+            }},
+        Control{"view.kernel_density",
+            "Kernel Density",
+            "Backend",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetDerivedSection<R::kKernelDensitySection>(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.kernel_density",
+            "Kernel Density",
+            "Backend",
+            "CPU octree",
+            [](const auto& c)
+            {
+                return int(R::GetDerivedSection<R::kKernelDensitySection>(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.kernel_density",
+            "Kernel Density",
+            "Backend",
+            "Vulkan LBVH",
+            [](const auto& c)
+            {
+                return int(R::GetDerivedSection<R::kKernelDensitySection>(c)->Backend);
+            }},
+        Control{"view.density_weights",
+            "Compact Density Weights",
+            "Backend",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetDensityWeightConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.density_weights",
+            "Compact Density Weights",
+            "Backend",
+            "CPU KD-tree",
+            [](const auto& c)
+            {
+                return int(R::GetDensityWeightConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.density_weights",
+            "Compact Density Weights",
+            "Backend",
+            "Vulkan LBVH",
+            [](const auto& c)
+            {
+                return int(R::GetDensityWeightConfig(c)->Backend);
+            }},
+        Control{"view.point_construction",
+            "Construct from Points",
+            "Backend",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetPointConstructionConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.point_construction",
+            "Construct from Points",
+            "Backend",
+            "CPU reference",
+            [](const auto& c)
+            {
+                return int(R::GetPointConstructionConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.point_construction",
+            "Construct from Points",
+            "Backend",
+            "Vulkan LBVH",
+            [](const auto& c)
+            {
+                return int(R::GetPointConstructionConfig(c)->Backend);
+            }},
+        Control{"view.point_spacing",
+            "Point Spacing and Radii",
+            "Backend",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetDerivedSection<R::kPointSpacingSection>(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.point_spacing",
+            "Point Spacing and Radii",
+            "Backend",
+            "CPU octree",
+            [](const auto& c)
+            {
+                return int(R::GetDerivedSection<R::kPointSpacingSection>(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.point_spacing",
+            "Point Spacing and Radii",
+            "Backend",
+            "Vulkan LBVH",
+            [](const auto& c)
+            {
+                return int(R::GetDerivedSection<R::kPointSpacingSection>(c)->Backend);
+            }},
+        Control{"view.bilateral_filter",
+            "Bilateral Point Filter",
+            "Backend",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetBilateralFilterConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.bilateral_filter",
+            "Bilateral Point Filter",
+            "Backend",
+            "CPU octree",
+            [](const auto& c)
+            {
+                return int(R::GetBilateralFilterConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.bilateral_filter",
+            "Bilateral Point Filter",
+            "Backend",
+            "Vulkan LBVH",
+            [](const auto& c)
+            {
+                return int(R::GetBilateralFilterConfig(c)->Backend);
+            }},
+        Control{"view.registration",
+            "ICP Registration",
+            "Backend##ICP",
+            "CPU LBVH (cached)",
+            [](const auto& c)
+            {
+                return int(R::GetRegistrationConfig(c)->Backend);
+            },
+            1,
+            1},
+        Control{"view.registration",
+            "ICP Registration",
+            "Backend##ICP",
+            "CPU KD-tree (reference)",
+            [](const auto& c)
+            {
+                return int(R::GetRegistrationConfig(c)->Backend);
+            },
+            0,
+            0},
+        Control{"view.registration",
+            "ICP Registration",
+            "Backend##ICP",
+            "Vulkan LBVH (CPU solve)",
+            [](const auto& c)
+            {
+                return int(R::GetRegistrationConfig(c)->Backend);
+            }},
+        Control{"view.coherent_point_drift",
+            "Coherent Point Drift",
+            "Backend (E-step)##CPD",
             "Vulkan (dense on the GPU while wide, fp32 terms)",
-            [](const auto& c) { return int(R::GetCoherentPointDriftConfig(c)->EStep); }, 6, 6},
+            [](const auto& c)
+            {
+                return int(R::GetCoherentPointDriftConfig(c)->EStep);
+            },
+            6,
+            6},
     };
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen(controls.front().Window, true));
     std::size_t action = 0;
@@ -1584,18 +1835,18 @@ TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithou
         R::EditorProcessingContext referenceContext{.Scene=&scene};
         if (spacing)
         {
-            auto c = *R::GetPointSpacingConfig(config);
+            auto c = *R::GetDerivedSection<R::kPointSpacingSection>(config);
             c.KNeighbors = 3; c.ScaleFactor = 1.5f; c.Radii.Name = output;
-            R::SetPointSpacingConfig(config, c);
+            R::SetDerivedSection<R::kPointSpacingSection>(config, c);
             c.StableEntityId = R::SelectionController::ToStableEntityId(entity);
             c.Radii.Name = "reference_scalar";
             ASSERT_TRUE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
         }
         else
         {
-            auto c = *R::GetKernelDensityConfig(config);
+            auto c = *R::GetDerivedSection<R::kKernelDensitySection>(config);
             c.KNeighbors = 3; c.Bandwidth = 0.5f; c.Density.Name = output;
-            R::SetKernelDensityConfig(config, c);
+            R::SetDerivedSection<R::kKernelDensitySection>(config, c);
             c.StableEntityId = R::SelectionController::ToStableEntityId(entity);
             c.Density.Name = "reference_scalar";
             ASSERT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
@@ -3327,11 +3578,11 @@ TEST(SandboxProcessingPanels, KernelDensityPanelShowsItsRunForTheOutputItWrites)
     PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
     ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-    auto density = *R::GetKernelDensityConfig(config);
+    auto density = *R::GetDerivedSection<R::kKernelDensitySection>(config);
     density.KNeighbors = 3;
     density.Bandwidth = 0.5f;
     density.Density.Name = "progress_density";
-    R::SetKernelDensityConfig(config, density);
+    R::SetDerivedSection<R::kKernelDensitySection>(config, density);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
     auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
@@ -4918,7 +5169,9 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         density.Density.Domain=spacing.Radii.Domain=weights.Weights.Domain=R::GeometryElementDomain::MeshVertex;
         density.Backend=R::KernelDensityBackend::VulkanLBVH;spacing.Backend=R::PointSpacingBackend::VulkanLBVH;weights.Backend=R::DensityWeightBackend::VulkanLBVH;
         auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
-        R::SetKernelDensityConfig(config,density);R::SetPointSpacingConfig(config,spacing);R::SetDensityWeightConfig(config,weights);
+        R::SetDerivedSection<R::kKernelDensitySection>(config, density);
+        R::SetDerivedSection<R::kPointSpacingSection>(config, spacing);
+        R::SetDensityWeightConfig(config, weights);
         ASSERT_TRUE(h.Apply(config));ASSERT_TRUE(h.Selection().SetSelectedEntity(scene,entity));
         const char* ids[]={"view.kernel_density","view.point_spacing","view.density_weights"};
         const char* titles[]={"Kernel Density","Point Spacing and Radii","Compact Density Weights"};
@@ -5066,8 +5319,8 @@ TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
         density.Backend = R::KernelDensityBackend::VulkanLBVH;
         spacing.Backend = R::PointSpacingBackend::VulkanLBVH;
         auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-        R::SetKernelDensityConfig(config, density);
-        R::SetPointSpacingConfig(config, spacing);
+        R::SetDerivedSection<R::kKernelDensitySection>(config, density);
+        R::SetDerivedSection<R::kPointSpacingSection>(config, spacing);
         ASSERT_TRUE(h.Apply(config));
         ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
         const char* title = method == 0 ? "Kernel Density" : "Point Spacing and Radii";
@@ -5927,12 +6180,12 @@ TEST(SandboxProcessingPanels, ARunStartedElsewhereShowsForTheDraftsOutput)
     PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
     ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-    auto density = *R::GetKernelDensityConfig(config);
+    auto density = *R::GetDerivedSection<R::kKernelDensitySection>(config);
     density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
     density.KNeighbors = 3;
     density.Bandwidth = 0.5f;
     density.Density.Name = "elsewhere_density";
-    R::SetKernelDensityConfig(config, density);
+    R::SetDerivedSection<R::kKernelDensitySection>(config, density);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
     R::EditorProcessingCommands commands{};
@@ -6088,12 +6341,12 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
             [](PanelHarness& h, const std::uint32_t id)
         {
             auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-            auto density = *R::GetKernelDensityConfig(config);
+            auto density = *R::GetDerivedSection<R::kKernelDensitySection>(config);
             density.StableEntityId = id;
             density.KNeighbors = 3;
             density.Bandwidth = 0.5f;
             density.Density.Name = "duplicate_density";
-            R::SetKernelDensityConfig(config, density);
+            R::SetDerivedSection<R::kKernelDensitySection>(config, density);
             EXPECT_TRUE(h.Apply(config));
             return std::function<R::EditorCommandStatus(const R::EditorProcessingCommands&, std::function<void()>)>(
                 [density](const R::EditorProcessingCommands& commands, std::function<void()> done) {

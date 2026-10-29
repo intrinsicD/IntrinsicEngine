@@ -48,32 +48,23 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakePointSamplingConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeOutlierAnalysisConfigSectionRegistration()) ||
-            !registry.Register(Runtime::MakeKernelDensityConfigSectionRegistration()) ||
-            !registry.Register(Runtime::MakePointSpacingConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kKernelDensitySection>()) ||
+            !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kPointSpacingSection>()) ||
             !registry.Register(Runtime::MakeBilateralFilterConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDescriptorAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDensityWeightConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakePointConstructionConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeClusteringConfigSectionRegistration(std::move(callbacks.Clustering))) ||
+            !registry.Register(Runtime::MakeCurvatureSegmentationConfigSectionRegistration(
+                std::move(callbacks.CurvatureSegmentation))) ||
             !registry.Register(
-                Runtime::MakeClusteringConfigSectionRegistration(
-                    std::move(callbacks.Clustering))) ||
+                Runtime::MakeProgressivePoissonConfigSectionRegistration(std::move(callbacks.ProgressivePoisson))) ||
             !registry.Register(
-                Runtime::MakeCurvatureSegmentationConfigSectionRegistration(
-                    std::move(callbacks.CurvatureSegmentation))) ||
-            !registry.Register(
-                Runtime::MakeProgressivePoissonConfigSectionRegistration(
-                    std::move(callbacks.ProgressivePoisson))) ||
-            !registry.Register(
-                Runtime::MakeParameterizationConfigSectionRegistration(
-                    std::move(callbacks.Parameterization))) ||
-            !registry.Register(
-                Runtime::
-                    MakePointCloudConsolidationConfigSectionRegistration(
-                        std::move(callbacks.PointCloudConsolidation))) ||
-            !registry.Register(
-                Runtime::MakePhysicsModuleConfigSectionRegistration(
-                    std::move(callbacks.Physics))))
+                Runtime::MakeParameterizationConfigSectionRegistration(std::move(callbacks.Parameterization))) ||
+            !registry.Register(Runtime::MakePointCloudConsolidationConfigSectionRegistration(
+                std::move(callbacks.PointCloudConsolidation))) ||
+            !registry.Register(Runtime::MakePhysicsModuleConfigSectionRegistration(std::move(callbacks.Physics))))
         {
             std::terminate();
         }

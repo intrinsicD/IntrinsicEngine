@@ -1172,28 +1172,72 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
         bool (*Get)(const CoreConfig::EngineConfig&);
     };
     const Case cases[]{
-        {Runtime::kBilateralFilterConfigSectionName, Runtime::kBilateralFilterConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetBilateralFilterConfig(c).has_value(); }},
-        {Runtime::kKernelDensityConfigSectionName, Runtime::kKernelDensityConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetKernelDensityConfig(c).has_value(); }},
-        {Runtime::kDensityWeightConfigSectionName, Runtime::kDensityWeightConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetDensityWeightConfig(c).has_value(); }},
-        {Runtime::kPointSpacingConfigSectionName, Runtime::kPointSpacingConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetPointSpacingConfig(c).has_value(); }},
-        {Runtime::kKeypointAnalysisConfigSectionName, Runtime::kKeypointAnalysisConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetKeypointAnalysisConfig(c).has_value(); }},
-        {Runtime::kOutlierAnalysisConfigSectionName, Runtime::kOutlierAnalysisConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetOutlierAnalysisConfig(c).has_value(); }},
-        {Runtime::kDescriptorAnalysisConfigSectionName, Runtime::kDescriptorAnalysisConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetDescriptorAnalysisConfig(c).has_value(); }},
-        {Runtime::kNormalEstimationConfigSectionName, Runtime::kNormalEstimationConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetNormalEstimationConfig(c).has_value(); }},
-        {Runtime::kPointConstructionConfigSectionName, Runtime::kPointConstructionConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetPointConstructionConfig(c).has_value(); }},
-        {Runtime::kRegistrationConfigSectionName, Runtime::kRegistrationConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetRegistrationConfig(c).has_value(); }},
-        {Runtime::kMeshCurvatureConfigSectionName, Runtime::kMeshCurvatureConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c) { return Runtime::GetMeshCurvatureConfig(c).has_value(); }},
+        {Runtime::kBilateralFilterConfigSectionName,
+            Runtime::kBilateralFilterConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetBilateralFilterConfig(c).has_value();
+            }},
+        {Runtime::kKernelDensityConfigSectionName,
+            Runtime::kKernelDensityConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetDerivedSection<Runtime::kKernelDensitySection>(c).has_value();
+            }},
+        {Runtime::kDensityWeightConfigSectionName,
+            Runtime::kDensityWeightConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetDensityWeightConfig(c).has_value();
+            }},
+        {Runtime::kPointSpacingConfigSectionName,
+            Runtime::kPointSpacingConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetDerivedSection<Runtime::kPointSpacingSection>(c).has_value();
+            }},
+        {Runtime::kKeypointAnalysisConfigSectionName,
+            Runtime::kKeypointAnalysisConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetKeypointAnalysisConfig(c).has_value();
+            }},
+        {Runtime::kOutlierAnalysisConfigSectionName,
+            Runtime::kOutlierAnalysisConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetOutlierAnalysisConfig(c).has_value();
+            }},
+        {Runtime::kDescriptorAnalysisConfigSectionName,
+            Runtime::kDescriptorAnalysisConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetDescriptorAnalysisConfig(c).has_value();
+            }},
+        {Runtime::kNormalEstimationConfigSectionName,
+            Runtime::kNormalEstimationConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetNormalEstimationConfig(c).has_value();
+            }},
+        {Runtime::kPointConstructionConfigSectionName,
+            Runtime::kPointConstructionConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetPointConstructionConfig(c).has_value();
+            }},
+        {Runtime::kRegistrationConfigSectionName,
+            Runtime::kRegistrationConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetRegistrationConfig(c).has_value();
+            }},
+        {Runtime::kMeshCurvatureConfigSectionName,
+            Runtime::kMeshCurvatureConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c)
+            {
+                return Runtime::GetMeshCurvatureConfig(c).has_value();
+            }},
     };
     for (const auto& test : cases)
     {
@@ -1298,12 +1342,20 @@ TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContrac
         MakeOutlierAnalysisConfigSectionRegistration, SetOutlierAnalysisConfig, GetOutlierAnalysisConfig,
         ZeroGpuQueryBatch<OutlierAnalysisConfig>);
     ExpectPointConfigSectionContract<KernelDensityConfig>(kKernelDensityConfigSectionName,
-        kKernelDensityConfigSectionSchemaId, SerializeKernelDensityConfig, ValidateKernelDensityConfigSection,
-        MakeKernelDensityConfigSectionRegistration, SetKernelDensityConfig, GetKernelDensityConfig,
+        kKernelDensityConfigSectionSchemaId,
+        SerializeDerivedSection<kKernelDensitySection>,
+        ValidateDerivedSection<kKernelDensitySection>,
+        MakeDerivedSectionRegistration<kKernelDensitySection>,
+        SetDerivedSection<kKernelDensitySection>,
+        GetDerivedSection<kKernelDensitySection>,
         ZeroGpuQueryBatch<KernelDensityConfig>);
     ExpectPointConfigSectionContract<PointSpacingConfig>(kPointSpacingConfigSectionName,
-        kPointSpacingConfigSectionSchemaId, SerializePointSpacingConfig, ValidatePointSpacingConfigSection,
-        MakePointSpacingConfigSectionRegistration, SetPointSpacingConfig, GetPointSpacingConfig,
+        kPointSpacingConfigSectionSchemaId,
+        SerializeDerivedSection<kPointSpacingSection>,
+        ValidateDerivedSection<kPointSpacingSection>,
+        MakeDerivedSectionRegistration<kPointSpacingSection>,
+        SetDerivedSection<kPointSpacingSection>,
+        GetDerivedSection<kPointSpacingSection>,
         ZeroGpuQueryBatch<PointSpacingConfig>);
     ExpectPointConfigSectionContract<DensityWeightConfig>(kDensityWeightConfigSectionName,
         kDensityWeightConfigSectionSchemaId, SerializeDensityWeightConfig, ValidateDensityWeightConfigSection,
@@ -1333,41 +1385,62 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         Validator Validate;
     };
     const std::array<Family, 7> writers{{
-        {"BilateralFilter", +[](const Runtime::GeometryPropertyRef& ref) {
-            Runtime::BilateralFilterConfig config;
-            config.Positions = ref;
-            return Runtime::SerializeBilateralFilterConfig(config);
-        }, Runtime::ValidateBilateralFilterConfigSection},
-        {"KernelDensity", +[](const Runtime::GeometryPropertyRef& ref) {
-            Runtime::KernelDensityConfig config;
-            config.Positions = ref;
-            return Runtime::SerializeKernelDensityConfig(config);
-        }, Runtime::ValidateKernelDensityConfigSection},
-        {"PointSpacing", +[](const Runtime::GeometryPropertyRef& ref) {
-            Runtime::PointSpacingConfig config;
-            config.Positions = ref;
-            return Runtime::SerializePointSpacingConfig(config);
-        }, Runtime::ValidatePointSpacingConfigSection},
-        {"OutlierAnalysis", +[](const Runtime::GeometryPropertyRef& ref) {
-            Runtime::OutlierAnalysisConfig config;
-            config.Positions = ref;
-            return Runtime::SerializeOutlierAnalysisConfig(config);
-        }, Runtime::ValidateOutlierAnalysisConfigSection},
-        {"KeypointAnalysis", +[](const Runtime::GeometryPropertyRef& ref) {
-            Runtime::KeypointAnalysisConfig config;
-            config.Positions = ref;
-            return Runtime::SerializeKeypointAnalysisConfig(config);
-        }, Runtime::ValidateKeypointAnalysisConfigSection},
-        {"DescriptorAnalysis", +[](const Runtime::GeometryPropertyRef& ref) {
-            Runtime::DescriptorAnalysisConfig config;
-            config.Positions = ref;
-            return Runtime::SerializeDescriptorAnalysisConfig(config);
-        }, Runtime::ValidateDescriptorAnalysisConfigSection},
-        {"DensityWeight", +[](const Runtime::GeometryPropertyRef& ref) {
-            Runtime::DensityWeightConfig config;
-            config.Positions = ref;
-            return Runtime::SerializeDensityWeightConfig(config);
-        }, Runtime::ValidateDensityWeightConfigSection},
+        {"BilateralFilter",
+            +[](const Runtime::GeometryPropertyRef& ref)
+            {
+                Runtime::BilateralFilterConfig config;
+                config.Positions = ref;
+                return Runtime::SerializeBilateralFilterConfig(config);
+            },
+            Runtime::ValidateBilateralFilterConfigSection},
+        {"KernelDensity",
+            +[](const Runtime::GeometryPropertyRef& ref)
+            {
+                Runtime::KernelDensityConfig config;
+                config.Positions = ref;
+                return Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(config);
+            },
+            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>},
+        {"PointSpacing",
+            +[](const Runtime::GeometryPropertyRef& ref)
+            {
+                Runtime::PointSpacingConfig config;
+                config.Positions = ref;
+                return Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>(config);
+            },
+            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>},
+        {"OutlierAnalysis",
+            +[](const Runtime::GeometryPropertyRef& ref)
+            {
+                Runtime::OutlierAnalysisConfig config;
+                config.Positions = ref;
+                return Runtime::SerializeOutlierAnalysisConfig(config);
+            },
+            Runtime::ValidateOutlierAnalysisConfigSection},
+        {"KeypointAnalysis",
+            +[](const Runtime::GeometryPropertyRef& ref)
+            {
+                Runtime::KeypointAnalysisConfig config;
+                config.Positions = ref;
+                return Runtime::SerializeKeypointAnalysisConfig(config);
+            },
+            Runtime::ValidateKeypointAnalysisConfigSection},
+        {"DescriptorAnalysis",
+            +[](const Runtime::GeometryPropertyRef& ref)
+            {
+                Runtime::DescriptorAnalysisConfig config;
+                config.Positions = ref;
+                return Runtime::SerializeDescriptorAnalysisConfig(config);
+            },
+            Runtime::ValidateDescriptorAnalysisConfigSection},
+        {"DensityWeight",
+            +[](const Runtime::GeometryPropertyRef& ref)
+            {
+                Runtime::DensityWeightConfig config;
+                config.Positions = ref;
+                return Runtime::SerializeDensityWeightConfig(config);
+            },
+            Runtime::ValidateDensityWeightConfigSection},
     }};
     struct Case
     {
@@ -1469,10 +1542,12 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
     };
     check(Runtime::BilateralFilterConfig{}, &Runtime::BilateralFilterConfig::Positions,
           Runtime::SerializeBilateralFilterConfig);
-    check(Runtime::KernelDensityConfig{}, &Runtime::KernelDensityConfig::Positions,
-          Runtime::SerializeKernelDensityConfig);
-    check(Runtime::PointSpacingConfig{}, &Runtime::PointSpacingConfig::Positions,
-          Runtime::SerializePointSpacingConfig);
+    check(Runtime::KernelDensityConfig{},
+        &Runtime::KernelDensityConfig::Positions,
+        Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>);
+    check(Runtime::PointSpacingConfig{},
+        &Runtime::PointSpacingConfig::Positions,
+        Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>);
     check(Runtime::OutlierAnalysisConfig{}, &Runtime::OutlierAnalysisConfig::Positions,
           Runtime::SerializeOutlierAnalysisConfig);
     check(Runtime::KeypointAnalysisConfig{}, &Runtime::KeypointAnalysisConfig::Positions,
@@ -1493,7 +1568,7 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
     Runtime::KernelDensityConfig invalid;
     invalid.Positions.Name = "v:\xff";
     // Runtime builds disable exceptions; the strict JSON policy aborts.
-    EXPECT_DEATH((void)Runtime::SerializeKernelDensityConfig(invalid), "");
+    EXPECT_DEATH((void)Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(invalid), "");
 }
 
 TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValidation)
@@ -1511,46 +1586,117 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
         std::string_view PositionField{"positions"};
     };
     const std::array families{
-        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection,
-            "Bilateral filter config must be an object.", "Unknown output field: ",
+        Family{"BilateralFilter",
+            Runtime::ValidateBilateralFilterConfigSection,
+            "Bilateral filter config must be an object.",
+            "Unknown output field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size", "iterations"},
-            [](std::uint32_t id) { Runtime::BilateralFilterConfig c; c.StableEntityId = id; return Runtime::SerializeBilateralFilterConfig(c); }},
-        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection,
-            "Kernel density config must be an object.", "Unknown density field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::BilateralFilterConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeBilateralFilterConfig(c);
+            }},
+        Family{"KernelDensity",
+            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
+            "Kernel density config must be an object.",
+            "Unknown density field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size"},
-            [](std::uint32_t id) { Runtime::KernelDensityConfig c; c.StableEntityId = id; return Runtime::SerializeKernelDensityConfig(c); }},
-        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection,
-            "Point spacing config must be an object.", "Unknown radii field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::KernelDensityConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(c);
+            }},
+        Family{"PointSpacing",
+            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+            "Point spacing config must be an object.",
+            "Unknown radii field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size"},
-            [](std::uint32_t id) { Runtime::PointSpacingConfig c; c.StableEntityId = id; return Runtime::SerializePointSpacingConfig(c); }},
-        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection,
-            "Outlier analysis config must be an object.", "Unknown outlier field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::PointSpacingConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>(c);
+            }},
+        Family{"OutlierAnalysis",
+            Runtime::ValidateOutlierAnalysisConfigSection,
+            "Outlier analysis config must be an object.",
+            "Unknown outlier field: ",
             {"entity", "k_neighbors", "minimum_neighbors", "gpu_query_batch_size"},
-            [](std::uint32_t id) { Runtime::OutlierAnalysisConfig c; c.StableEntityId = id; return Runtime::SerializeOutlierAnalysisConfig(c); }},
-        Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection,
-            "Keypoint analysis config must be an object.", "Unknown keypoint field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::OutlierAnalysisConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeOutlierAnalysisConfig(c);
+            }},
+        Family{"KeypointAnalysis",
+            Runtime::ValidateKeypointAnalysisConfigSection,
+            "Keypoint analysis config must be an object.",
+            "Unknown keypoint field: ",
             {"entity", "minimum_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"},
-            [](std::uint32_t id) { Runtime::KeypointAnalysisConfig c; c.StableEntityId = id; return Runtime::SerializeKeypointAnalysisConfig(c); }},
-        Family{"DescriptorAnalysis", Runtime::ValidateDescriptorAnalysisConfigSection,
-            "Descriptor analysis config must be an object.", "Unknown descriptor field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::KeypointAnalysisConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeKeypointAnalysisConfig(c);
+            }},
+        Family{"DescriptorAnalysis",
+            Runtime::ValidateDescriptorAnalysisConfigSection,
+            "Descriptor analysis config must be an object.",
+            "Unknown descriptor field: ",
             {"entity", "max_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"},
-            [](std::uint32_t id) { Runtime::DescriptorAnalysisConfig c; c.StableEntityId = id; return Runtime::SerializeDescriptorAnalysisConfig(c); }},
-        Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection,
-            "Density weight config must be an object.", "Unknown density weight field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::DescriptorAnalysisConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeDescriptorAnalysisConfig(c);
+            }},
+        Family{"DensityWeight",
+            Runtime::ValidateDensityWeightConfigSection,
+            "Density weight config must be an object.",
+            "Unknown density weight field: ",
             {"entity", "gpu_query_batch_size", "gpu_radius_capacity"},
-            [](std::uint32_t id) { Runtime::DensityWeightConfig c; c.StableEntityId = id; return Runtime::SerializeDensityWeightConfig(c); }},
-        Family{"NormalEstimation", Runtime::ValidateNormalEstimationConfigSection,
-            "Normal estimation config must be an object.", "Unknown normal field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::DensityWeightConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeDensityWeightConfig(c);
+            }},
+        Family{"NormalEstimation",
+            Runtime::ValidateNormalEstimationConfigSection,
+            "Normal estimation config must be an object.",
+            "Unknown normal field: ",
             {"entity", "k_neighbors", "minimum_neighbors", "orientation", "weighting", "gpu_query_batch_size"},
-            [](std::uint32_t id) { Runtime::NormalEstimationConfig c; c.StableEntityId = id; return Runtime::SerializeNormalEstimationConfig(c); }},
-        Family{"PointConstruction", Runtime::ValidatePointConstructionConfigSection,
-            "Point construction config must be an object.", "Unknown construction field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::NormalEstimationConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializeNormalEstimationConfig(c);
+            }},
+        Family{"PointConstruction",
+            Runtime::ValidatePointConstructionConfigSection,
+            "Point construction config must be an object.",
+            "Unknown construction field: ",
             {"entity", "resolution", "k_neighbors", "normal_k_neighbors", "gpu_query_batch_size", "max_grid_vertices"},
-            [](std::uint32_t id) { Runtime::PointConstructionConfig c; c.StableEntityId = id; return Runtime::SerializePointConstructionConfig(c); }},
-        Family{"Registration", Runtime::ValidateRegistrationConfigSection,
-            "Registration config must be an object.", "Unknown registration field: ",
+            [](std::uint32_t id)
+            {
+                Runtime::PointConstructionConfig c;
+                c.StableEntityId = id;
+                return Runtime::SerializePointConstructionConfig(c);
+            }},
+        Family{"Registration",
+            Runtime::ValidateRegistrationConfigSection,
+            "Registration config must be an object.",
+            "Unknown registration field: ",
             {"source_entity", "target_entity", "max_iterations", "trajectory_step"},
-            [](std::uint32_t id) { Runtime::RegistrationConfig c; c.SourceStableEntityId = id; return Runtime::SerializeRegistrationConfig(c); }, "source_positions"},
+            [](std::uint32_t id)
+            {
+                Runtime::RegistrationConfig c;
+                c.SourceStableEntityId = id;
+                return Runtime::SerializeRegistrationConfig(c);
+            },
+            "source_positions"},
     };
     for (const auto& family : families)
     {
@@ -1632,13 +1778,24 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
         std::string_view BackendError;
     };
     const std::array families{
-        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection, {"scale_factor"}, "Unknown radii backend."},
-        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection,
-            {"spatial_sigma", "normal_sigma"}, "Unknown output backend."},
-        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection, {"bandwidth"}, "Unknown density backend."},
-        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection,
-            {"radius", "stddev_multiplier", "score_threshold"}, "Unknown outlier backend."},
-        Family{"PointConstruction", Runtime::ValidatePointConstructionConfigSection,
+        Family{"PointSpacing",
+            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+            {"scale_factor"},
+            "Unknown radii backend."},
+        Family{"BilateralFilter",
+            Runtime::ValidateBilateralFilterConfigSection,
+            {"spatial_sigma", "normal_sigma"},
+            "Unknown output backend."},
+        Family{"KernelDensity",
+            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
+            {"bandwidth"},
+            "Unknown density backend."},
+        Family{"OutlierAnalysis",
+            Runtime::ValidateOutlierAnalysisConfigSection,
+            {"radius", "stddev_multiplier", "score_threshold"},
+            "Unknown outlier backend."},
+        Family{"PointConstruction",
+            Runtime::ValidatePointConstructionConfigSection,
             {"bounding_box_padding", "normal_agreement_power", "kernel_sigma_scale", "min_distance_epsilon"},
             "Unknown construction backend."},
     };
@@ -1687,10 +1844,14 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
         }
     }
     for (const auto overflow : {R"({"scale_factor":1e400})", R"({"scale_factor":-1e400})"})
-        reject(Runtime::ValidatePointSpacingConfigSection, overflow, "Point spacing config must be an object.");
-    reject(Runtime::ValidatePointSpacingConfigSection, R"({"scale_factor":1e-50})",
+        reject(Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+            overflow,
+            "Point spacing config must be an object.");
+    reject(Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+        R"({"scale_factor":1e-50})",
         "Positive scale factor must remain positive in float storage.");
-    reject(Runtime::ValidateKernelDensityConfigSection, R"({"bandwidth":1e-50})",
+    reject(Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
+        R"({"bandwidth":1e-50})",
         "Positive bandwidth must remain positive in float storage.");
     reject(Runtime::ValidateBilateralFilterConfigSection, R"({"spatial_sigma":1e-50,"normal_sigma":-1})",
         "normal_sigma must be a finite nonnegative float.");
@@ -1737,16 +1898,18 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
         "Position and weight bindings need distinct canonical vec3/float properties on the same domain.";
     const std::array families{
         Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection, typed, domain},
-        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection, typed, domain},
-        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection, typed, domain},
+        Family{"KernelDensity", Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>, typed, domain},
+        Family{"PointSpacing", Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>, typed, domain},
         Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection, typed, domain},
         Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
         Family{"DescriptorAnalysis", Runtime::ValidateDescriptorAnalysisConfigSection, descriptor, descriptor},
         Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection, density, density},
-        Family{"NormalEstimation", Runtime::ValidateNormalEstimationConfigSection,
+        Family{"NormalEstimation",
+            Runtime::ValidateNormalEstimationConfigSection,
             "positions requires domain, nonempty name and kind=vec3.",
             "positions has an unknown element domain."},
-        Family{"PointConstruction", Runtime::ValidatePointConstructionConfigSection,
+        Family{"PointConstruction",
+            Runtime::ValidatePointConstructionConfigSection,
             "Inputs require canonical vec3 property references.",
             "Inputs require canonical vec3 property references."},
     };
@@ -1806,15 +1969,20 @@ TEST(SandboxConfigSections, PointPropertyFieldsPreserveKindsAndFirstErrorOrder)
         std::vector<std::pair<std::string, std::string>> Fields;
     };
     const std::array families{
-        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection,
+        Family{"BilateralFilter",
+            Runtime::ValidateBilateralFilterConfigSection,
             {{"positions", "vec3"}, {"normals", "vec3"}, {"output", "vec3"}}},
-        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection,
+        Family{"KernelDensity",
+            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
             {{"positions", "vec3"}, {"density", "float"}}},
-        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection,
+        Family{"PointSpacing",
+            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
             {{"positions", "vec3"}, {"radii", "float"}}},
-        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection,
+        Family{"OutlierAnalysis",
+            Runtime::ValidateOutlierAnalysisConfigSection,
             {{"positions", "vec3"}, {"mask", "uint32"}, {"score", "float"}}},
-        Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection,
+        Family{"KeypointAnalysis",
+            Runtime::ValidateKeypointAnalysisConfigSection,
             {{"positions", "vec3"}, {"mask", "uint32"}, {"score", "float"}}},
     };
     const auto binding = [](const std::string& key, const std::string& kind)
@@ -1892,14 +2060,20 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
     {
         SCOPED_TRACE("KernelDensity");
         using C = Runtime::KernelDensityConfig;
-        check(C{}, {&C::Positions, &C::Density}, Runtime::SetKernelDensityConfig,
-            Runtime::GetKernelDensityConfig, Runtime::SerializeKernelDensityConfig);
+        check(C{},
+            {&C::Positions, &C::Density},
+            Runtime::SetDerivedSection<Runtime::kKernelDensitySection>,
+            Runtime::GetDerivedSection<Runtime::kKernelDensitySection>,
+            Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>);
     }
     {
         SCOPED_TRACE("PointSpacing");
         using C = Runtime::PointSpacingConfig;
-        check(C{}, {&C::Positions, &C::Radii}, Runtime::SetPointSpacingConfig,
-            Runtime::GetPointSpacingConfig, Runtime::SerializePointSpacingConfig);
+        check(C{},
+            {&C::Positions, &C::Radii},
+            Runtime::SetDerivedSection<Runtime::kPointSpacingSection>,
+            Runtime::GetDerivedSection<Runtime::kPointSpacingSection>,
+            Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>);
     }
     {
         SCOPED_TRACE("OutlierAnalysis");

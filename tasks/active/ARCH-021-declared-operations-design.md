@@ -28,6 +28,9 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
     the per-operation session structure, keeping every behavioural assertion, recorded in ADR 0031 as
     the reading of the phase 1 gate; 2 fix the Vulkan path's empty message for a mismatched index
     snapshot now, as its own slice with a GPU regression test)
+29. (2026-10-29) "ok, then do 1." (answer to: the phase 1 gate's 150 lines per operation looks out of
+    reach; 1 build `RUNTIME-351` as planned and measure, then bring options; 2 deeper cuts first;
+    3 pause and decide the gate now)
 
 ## Goal
 - `docs/adr/0031-declared-operations.md`: an operation is one typed definition (parameters declared

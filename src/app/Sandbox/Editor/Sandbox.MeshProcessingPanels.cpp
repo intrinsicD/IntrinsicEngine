@@ -2649,7 +2649,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         const auto active = Runtime::GetEditorKernelDensityConfig(context.PointFields.Commands)
                                 .value_or(Runtime::KernelDensityConfig{});
-        const auto serialized = Runtime::SerializeKernelDensityConfig(active);
+        const auto serialized = Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(active);
         Density.Synchronize(active, serialized);
         auto& config = Density.Draft;
         bool changed = false;
@@ -2671,7 +2671,7 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::Combo("Backend",
                 &backend,
                 OwnerConfigEnumLabels<Runtime::KernelDensityBackend, 3>(
-                    Runtime::KernelDensityConfigFieldSpecs(), "backend")
+                    std::span<const Runtime::ConfigFieldSpec>(Runtime::kKernelDensityFields), "backend")
                     .data(),
                 3))
         {
@@ -3062,7 +3062,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         const auto active =
             Runtime::GetEditorPointSpacingConfig(context.PointFields.Commands).value_or(Runtime::PointSpacingConfig{});
-        const auto serialized = Runtime::SerializePointSpacingConfig(active);
+        const auto serialized = Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>(active);
         Spacing.Synchronize(active, serialized);
         auto& config = Spacing.Draft;
         bool changed = false;
@@ -3084,7 +3084,7 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::Combo("Backend",
                 &backend,
                 OwnerConfigEnumLabels<Runtime::PointSpacingBackend, 3>(
-                    Runtime::PointSpacingConfigFieldSpecs(), "backend")
+                    std::span<const Runtime::ConfigFieldSpec>(Runtime::kPointSpacingFields), "backend")
                     .data(),
                 3))
         {

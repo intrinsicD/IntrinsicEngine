@@ -289,8 +289,22 @@ TEST_P(PointScalarTransaction,MissingDeviceRefusesAdmission)
 TEST_P(PointScalarTransaction,ConfigRoundTrip)
 {
     auto config=R::CreateReferenceEngineConfig();
-    if(GetParam()==0){R::SetKernelDensityConfig(config,Density);const auto restored=R::GetKernelDensityConfig(config);ASSERT_TRUE(restored);EXPECT_EQ(R::SerializeKernelDensityConfig(*restored),R::SerializeKernelDensityConfig(Density));}
-    if(GetParam()==1){R::SetPointSpacingConfig(config,Spacing);const auto restored=R::GetPointSpacingConfig(config);ASSERT_TRUE(restored);EXPECT_EQ(R::SerializePointSpacingConfig(*restored),R::SerializePointSpacingConfig(Spacing));}
+    if (GetParam() == 0)
+    {
+        R::SetDerivedSection<R::kKernelDensitySection>(config, Density);
+        const auto restored = R::GetDerivedSection<R::kKernelDensitySection>(config);
+        ASSERT_TRUE(restored);
+        EXPECT_EQ(R::SerializeDerivedSection<R::kKernelDensitySection>(*restored),
+            R::SerializeDerivedSection<R::kKernelDensitySection>(Density));
+    }
+    if (GetParam() == 1)
+    {
+        R::SetDerivedSection<R::kPointSpacingSection>(config, Spacing);
+        const auto restored = R::GetDerivedSection<R::kPointSpacingSection>(config);
+        ASSERT_TRUE(restored);
+        EXPECT_EQ(R::SerializeDerivedSection<R::kPointSpacingSection>(*restored),
+            R::SerializeDerivedSection<R::kPointSpacingSection>(Spacing));
+    }
     if(GetParam()==2){R::SetDensityWeightConfig(config,Weight);const auto restored=R::GetDensityWeightConfig(config);ASSERT_TRUE(restored);EXPECT_EQ(R::SerializeDensityWeightConfig(*restored),R::SerializeDensityWeightConfig(Weight));}
 }
 INSTANTIATE_TEST_SUITE_P(ThreeMethods,PointScalarTransaction,::testing::Values(0,1,2));
