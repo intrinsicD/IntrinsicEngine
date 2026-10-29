@@ -1075,8 +1075,9 @@ extern "C++"
 {
     namespace Extrinsic::Runtime::AgentDetail
     {
-        ToolSchema ArgumentsSchema(
-            const std::initializer_list<AgentArgument> arguments, const std::span<const ConfigFieldSpec> table)
+        ToolSchema ArgumentsSchema(const std::initializer_list<AgentArgument> arguments,
+            const std::span<const ConfigFieldSpec> table,
+            const std::initializer_list<std::initializer_list<std::string_view>> alternatives)
         {
             std::vector<ConfigFieldSpec> fields;
             Json defaults = Json::object();
@@ -1094,6 +1095,13 @@ extern "C++"
             for (const char* key : {"$schema", "$id", "title", "description"})
                 schema.erase(key);
             schema["required"] = std::move(required);
+            for (const auto& names : alternatives)
+            {
+                Json set = Json::array();
+                for (const std::string_view name : names)
+                    set.push_back(std::string(name));
+                schema["oneOf"].push_back({{"required", std::move(set)}});
+            }
             return {Dump(schema), true};
         }
     }

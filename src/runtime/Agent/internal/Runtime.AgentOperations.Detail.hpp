@@ -100,10 +100,6 @@ namespace Extrinsic::Runtime::AgentDetail
         }();
         return names;
     }
-    inline std::string DomainProperty(const std::string& description)
-    {
-        return R"("domain":{"type":"string","enum":[)" + DomainNames() + R"(],"description":")" + description + R"("})";
-    }
     inline std::optional<GeometryElementDomain> ParseDomain(const std::optional<std::string>& name)
     {
         if (!name) return std::nullopt;
@@ -350,8 +346,6 @@ namespace Extrinsic::Runtime::AgentDetail
         return R"({"type":"object","properties":)" + std::move(properties) + R"(,"required":)" +
                std::move(required) + R"(,"additionalProperties":false})";
     }
-    inline const std::string kEntityProperty =
-        R"("entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Stable entity id from scene_entities."})";
 
     // ---- declared arguments (RUNTIME-337; the declarations in Runtime.AgentArguments.hpp) ----
     inline std::span<const std::string_view> DomainTokens()

@@ -1530,7 +1530,7 @@ TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
         EXPECT_EQ(actual, expected);
     }
     EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
-    EXPECT_EQ(declared, 44u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, 46u) << "declared input schemas of " << registry.Entries().size() << " tools";
 }
 
 // RUNTIME-337: the shared declarations reach the registered schemas (not only synthetic ones): an
@@ -1594,4 +1594,30 @@ TEST(AgentArgumentSchema, RegisteredDeclaredArgumentsKeepTheirRules)
     EXPECT_FALSE(accepts("config_apply", R"({"section":"sandbox.clustering","payload":4})"));
     EXPECT_FALSE(accepts("config_apply", R"({"section":"sandbox.clustering"})"));
     EXPECT_FALSE(accepts("config_preview", R"({"payload":{}})"));
+    // RUNTIME-341: alternative argument sets (exactly one) and a true-only flag.
+    const auto bind = [](const char* rest)
+    {
+        return std::string(R"({"entity":1,"lane":"surface","attribute":"color")") + rest + "}";
+    };
+    EXPECT_TRUE(accepts("bind_attribute", bind(R"(,"property":"v:u")").c_str()));
+    EXPECT_TRUE(accepts("bind_attribute", bind(R"(,"default":true)").c_str()));
+    EXPECT_FALSE(accepts("bind_attribute", bind(R"(,"property":"v:u","default":true)").c_str()));
+    EXPECT_FALSE(accepts("bind_attribute", bind("").c_str()));
+    EXPECT_FALSE(accepts("bind_attribute", bind(R"(,"default":false)").c_str()));
+    EXPECT_FALSE(accepts("bind_attribute", bind(R"(,"property":"")").c_str()));
+    EXPECT_TRUE(accepts("jobs_wait", R"({"token":"3:1"})"));
+    EXPECT_TRUE(accepts("jobs_wait", R"({"entity":1,"output":"v:out","timeout_ms":60000})"));
+    EXPECT_FALSE(accepts("jobs_wait", R"({"entity":1})"));
+    EXPECT_FALSE(accepts("jobs_wait", R"({"token":"3:1","entity":1,"output":"v:out"})"));
+    EXPECT_FALSE(accepts("jobs_wait", R"({})"));
+    EXPECT_FALSE(accepts("jobs_wait", R"({"token":"3:1","timeout_ms":60001})"));
+    // A token with only one of entity and output matches exactly one branch, so the schema takes it;
+    // the handler stays stricter and refuses it as before (Codex O1).
+    for (const char* mixed : {R"({"token":"3:1","entity":1})", R"({"token":"3:1","output":"v:out"})"})
+    {
+        EXPECT_TRUE(accepts("jobs_wait", mixed)) << mixed;
+        EXPECT_EQ(R::InvokeAgentOperation(registry, "jobs_wait", R::AgentOperationContext{}, mixed, false).ErrorCode,
+            "invalid_params")
+            << mixed;
+    }
 }

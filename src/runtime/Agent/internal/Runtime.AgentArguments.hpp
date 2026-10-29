@@ -29,9 +29,12 @@ extern "C++"
             bool Declared{false};
         };
     // The schema of `arguments`, followed by every field of `table` as an optional argument (a
-    // style table a tool takes whole). Defined beside ParamsSchema (Operations.cpp).
-        [[nodiscard]] ToolSchema ArgumentsSchema(
-            std::initializer_list<AgentArgument> arguments, std::span<const ConfigFieldSpec> table = {});
+    // style table a tool takes whole). With `alternatives`, a call names exactly one of these
+    // argument sets (JSON Schema oneOf of required sets; RUNTIME-341). Defined beside ParamsSchema
+    // (Operations.cpp).
+        [[nodiscard]] ToolSchema ArgumentsSchema(std::initializer_list<AgentArgument> arguments,
+            std::span<const ConfigFieldSpec> table = {},
+            std::initializer_list<std::initializer_list<std::string_view>> alternatives = {});
 
     // The entity argument, shared by most tools (the other shared ones in Detail.hpp).
         inline AgentArgument EntityArgument(

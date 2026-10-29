@@ -304,6 +304,8 @@ namespace Extrinsic::Runtime::ConfigDetail
             {
             case ConfigFieldType::Bool:
                 if (!value.is_boolean()) return name + " must be boolean.";
+                if (field.OnlyTrue && !value.get<bool>())
+                    return name + " must be true.";
                 return std::nullopt;
             case ConfigFieldType::UInt:
                 if (!value.is_number_unsigned() || value.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
@@ -424,7 +426,11 @@ namespace Extrinsic::Runtime::ConfigDetail
             };
             switch (field.Type)
             {
-            case ConfigFieldType::Bool: p["type"] = "boolean"; break;
+            case ConfigFieldType::Bool:
+                p["type"] = "boolean";
+                if (field.OnlyTrue)
+                    p["const"] = true;
+                break;
             case ConfigFieldType::UInt:
                 p["type"] = "integer";
                 p["minimum"] = std::int64_t(field.Min.value_or(0.0));

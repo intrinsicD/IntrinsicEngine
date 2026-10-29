@@ -499,6 +499,29 @@ TEST(DeclaredFieldContracts, NestedObjectsRequireOnlyDeclaredMembers)
     check(R::MakeParameterizationConfigSectionRegistration().SchemaJson, {"lscm", "harmonic", "bff", "view", "atlas"});
 }
 
+namespace
+{
+    // One field's generated schema property, after checking that the config check and the agent
+    // validator on the section schema (without its document keys, as ArgumentsSchema strips them)
+    // each give every case its expected verdict.
+    Json ExpectCheckAndSchemaVerdicts(const R::ConfigFieldSpec& field, const std::vector<std::pair<Json, bool>>& cases)
+    {
+        const std::array<R::ConfigFieldSpec, 1> fields{field};
+        Json document = Json::parse(R::ConfigDetail::BuildSectionSchemaJson("", "", "", fields, Json::object()));
+        document.erase("$schema");
+        document.erase("$id");
+        const std::string schema = document.dump();
+        EXPECT_TRUE(R::IsSupportedAgentSchemaJson(schema)) << schema;
+        for (const auto& [value, accepted] : cases)
+        {
+            const Json payload{{std::string(field.Name), value}};
+            EXPECT_EQ(R::ConfigDetail::CollectDeclaredFieldErrors(payload, fields).empty(), accepted) << value.dump();
+            EXPECT_EQ(!R::ValidateAgentArgumentsJson(schema, payload.dump()).has_value(), accepted) << value.dump();
+        }
+        return document["properties"][std::string(field.Name)];
+    }
+}
+
 // RUNTIME-340: an object-or-string field (a payload passed as an object or as its JSON text) is
 // accepted and refused as expected by the config check and by the agent validator on its generated
 // schema, also when nullable (Codex B1: null then passes both).
@@ -507,29 +530,31 @@ TEST(DeclaredFieldContracts, ObjectOrStringCheckAgreesWithItsSchema)
     for (const bool nullable : {false, true})
     {
         SCOPED_TRACE(nullable ? "nullable" : "not nullable");
-        const std::array<R::ConfigFieldSpec, 1> fields{
-            {{.Name = "payload", .Type = FT::ObjectOrString, .Nullable = nullable}}};
-        // The section schema without its document keys, as a tool's input schema (ArgumentsSchema).
-        Json document = Json::parse(R::ConfigDetail::BuildSectionSchemaJson("", "", "", fields, Json::object()));
-        document.erase("$schema");
-        document.erase("$id");
-        const std::string schema = document.dump();
-        ASSERT_TRUE(R::IsSupportedAgentSchemaJson(schema)) << schema;
-        EXPECT_EQ(document["properties"]["payload"]["type"],
-            nullable ? Json::array({"object", "string", "null"}) : Json::array({"object", "string"}));
-        for (const auto& [value, accepted] : std::vector<std::pair<Json, bool>>{{Json::object(), true},
-                 {Json{{"a", 1}}, true},
-                 {"{}", true},
-                 {"", true},
-                 {nullptr, nullable},
-                 {1, false},
-                 {1.5, false},
-                 {true, false},
-                 {Json::array(), false}})
-        {
-            const Json payload{{"payload", value}};
-            EXPECT_EQ(R::ConfigDetail::CollectDeclaredFieldErrors(payload, fields).empty(), accepted) << value.dump();
-            EXPECT_EQ(!R::ValidateAgentArgumentsJson(schema, payload.dump()).has_value(), accepted) << value.dump();
-        }
+        const Json property =
+            ExpectCheckAndSchemaVerdicts({.Name = "payload", .Type = FT::ObjectOrString, .Nullable = nullable},
+                {{Json::object(), true},
+                    {Json{{"a", 1}}, true},
+                    {"{}", true},
+                    {"", true},
+                    {nullptr, nullable},
+                    {1, false},
+                    {1.5, false},
+                    {true, false},
+                    {Json::array(), false}});
+        EXPECT_EQ(
+            property["type"], nullable ? Json::array({"object", "string", "null"}) : Json::array({"object", "string"}));
+    }
+}
+
+// RUNTIME-341: a true-only flag (bind_attribute's default) accepts only true, in the config check
+// and in the agent validator on its generated schema; a plain Bool still takes false in both.
+TEST(DeclaredFieldContracts, OnlyTrueCheckAgreesWithItsSchema)
+{
+    for (const bool onlyTrue : {false, true})
+    {
+        SCOPED_TRACE(onlyTrue ? "only true" : "plain");
+        const Json property = ExpectCheckAndSchemaVerdicts({.Name = "flag", .Type = FT::Bool, .OnlyTrue = onlyTrue},
+            {{true, true}, {false, !onlyTrue}, {1, false}, {"true", false}, {nullptr, false}});
+        EXPECT_EQ(property.contains("const"), onlyTrue) << property.dump();
     }
 }

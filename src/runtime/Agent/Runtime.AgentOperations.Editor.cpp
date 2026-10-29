@@ -336,13 +336,6 @@ namespace Extrinsic::Runtime
                         .Description = "Config section name from config_sections, e.g. sandbox.property_smoothing."},
                 .Required = required};
         }
-        std::string AttributeProperty()
-        {
-            std::string names;
-            for (const RenderAttribute attribute : TableAttributes())
-                names += std::string(names.empty() ? "" : ",") + "\"" + std::string(ToString(attribute)) + "\"";
-            return R"("attribute":{"type":"string","enum":[)" + names + R"(],"description":"Render attribute (shader input) whose source property is chosen."})";
-        }
         // Lanes by the names set_visibility uses.
         const char* LaneName(const GeometryRenderLane lane)
         {
@@ -357,11 +350,6 @@ namespace Extrinsic::Runtime
                 if (name && *name == LaneName(lane))
                     return lane;
             return std::nullopt;
-        }
-        std::string LaneProperty(const std::string& description)
-        {
-            return R"("lane":{"type":"string","enum":["surface","edges","points"],"description":")" + description +
-                "\"}";
         }
         // One line per lane row: attribute, accepted type, source domains and what Default draws.
         std::string AttributeTableText()
@@ -1386,8 +1374,8 @@ namespace Extrinsic::Runtime
         {
             AddOperation(registry, name, title, std::move(description), std::move(schema), readOnly, std::move(invoke), destructive, gpu);
         };
-        // RUNTIME-337: arguments declared once; the schemas below are generated from them, except
-        // where JSON Schema says more than a field spec can (const, oneOf).
+        // RUNTIME-337: arguments declared once; every schema below is generated from them
+        // (RUNTIME-341: with alternative argument sets and true-only flags).
         using FT = ConfigFieldType;
         const ToolSchema none = ArgumentsSchema({});
         const AgentArgument path{.Spec = {.Name = "path",
@@ -1448,6 +1436,10 @@ namespace Extrinsic::Runtime
                 {.Spec = {.Name = "normal_direction", .Type = FT::Bool}, .Default = false}}),
             false,
             ShowProperty);
+        const ConfigFieldSpec attribute{.Name = "attribute",
+            .Type = FT::StringEnum,
+            .Description = "Render attribute (shader input) whose source property is chosen.",
+            .EnumValues = AttributeTokens()};
         add("attribute_bindings",
             "Render attribute sources",
             "List, per render lane of an entity (surface, edges, points: the Appearance panel's Faces, Edges and Vertices "
@@ -1460,14 +1452,10 @@ namespace Extrinsic::Runtime
             ArgumentsSchema({EntityArgument(),
                 LaneArgument("Optional: only this lane."),
                 DomainArgument("Optional: only rows reading this element domain."),
-                {.Spec = {.Name = "attribute",
-                     .Type = FT::StringEnum,
-                     .Description = "Render attribute (shader input) whose source property is chosen.",
-                     .EnumValues = AttributeTokens()}}}),
+                {.Spec = attribute}}),
             true,
             AttributeBindings);
-        add(
-            "bind_attribute",
+        add("bind_attribute",
             "Bind render attribute source",
             "Choose the property that feeds one render attribute of one render lane of an entity, like the Appearance "
             "panel's source selector (ApplyEditorAttributeBindingCommand): pass property (a compatible candidate from "
@@ -1480,18 +1468,22 @@ namespace Extrinsic::Runtime
             "attribute_source_missing, attribute_source_type_mismatch, attribute_source_count_mismatch, "
             "attribute_source_non_finite, stale_entity; bad arguments invalid_params. Rows: " +
                 AttributeTableText(),
-            []
-            {
-                Json schema = Json::parse(Schema("{" + kEntityProperty + "," + LaneProperty("Render lane of the row.") +
-                        "," + AttributeProperty() + "," +
-                        DomainProperty(
-                            "Element domain of the source property; needed only when the lane reads that name on several.") +
-                        R"(,"property":{"type":"string","minLength":1,"description":"Source property."},)"
-                        R"("default":{"type":"boolean","const":true,"description":"Restore the default source."}})",
-                    R"(["entity","lane","attribute"])"));
-                schema["oneOf"] = Json::array({Json{{"required", {"property"}}}, Json{{"required", {"default"}}}});
-                return Dump(schema);
-            }(),
+            ArgumentsSchema(
+                {EntityArgument(),
+                    LaneArgument("Render lane of the row.", true),
+                    {.Spec = attribute, .Required = true},
+                    DomainArgument(
+                        "Element domain of the source property; needed only when the lane reads that name on several."),
+                    {.Spec = {.Name = "property",
+                         .Type = FT::String,
+                         .Description = "Source property.",
+                         .NonEmpty = true}},
+                    {.Spec = {.Name = "default",
+                         .Type = FT::Bool,
+                         .Description = "Restore the default source.",
+                         .OnlyTrue = true}}},
+                {},
+                {{"property"}, {"default"}}),
             false,
             BindAttribute);
         add("vector_fields",
@@ -1628,26 +1620,36 @@ namespace Extrinsic::Runtime
             "Background jobs with token, state, progress and elapsed time; editor jobs also name the entity and output they "
             "write, the requested and resolved backend (cpu, gpu_compute, gpu_graphics, auto; null while unknown), the run's "
             "diagnostic and whether jobs_cancel accepts them (cancellable).", none, true, JobsList);
-        const std::string tokenProperty = R"("token":{"type":"string","description":"Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1."})";
-        add("jobs_wait", "Wait for a job",
+        const AgentArgument token{
+            .Spec = {.Name = "token",
+                .Type = FT::String,
+                .Description = "Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1."}};
+        add("jobs_wait",
+            "Wait for a job",
             "Wait until a job ended (finished: true) or timeout_ms passed (timed_out: true), while frames keep running. Name the "
             "job by token, or by entity and output (the newest editor run writing that output when called). A job that ended "
             "and was reaped between two polls answers finished with reaped: true (its last seen terminal state, or \"ended\" when it was last seen still running; scene_replaced if the scene changed meanwhile). Ends with an error "
             "when the job is unknown or already reaped when called (unknown_job), the scene is replaced (scene_replaced), the workspace detaches or "
             "the window is minimized (viewport_not_presentable).",
-            R"({"type":"object","properties":{)" + tokenProperty + "," + kEntityProperty +
-                R"(,"output":{"type":"string","description":"Output property name the editor job writes."},"timeout_ms":{"type":"integer","minimum":0,"maximum":60000,"default":30000}},"oneOf":[{"required":["token"]},{"required":["entity","output"]}],"additionalProperties":false})",
-            true, JobsWait, false, true);
+            ArgumentsSchema(
+                {token,
+                    EntityArgument(false),
+                    {.Spec = {.Name = "output",
+                         .Type = FT::String,
+                         .Description = "Output property name the editor job writes."}},
+                    {.Spec = {.Name = "timeout_ms", .Type = FT::UInt, .Min = 0.0, .Max = 60000.0}, .Default = 30000}},
+                {},
+                {{"token"}, {"entity", "output"}}),
+            true,
+            JobsWait,
+            false,
+            true);
         add("jobs_cancel",
             "Cancel a job",
             "Cancel an editor job (a jobs_list row with cancellable: true). It ends cancelled on a later frame and publishes "
             "nothing, so the scene and the undo history stay as they are; asset imports, scene files, k-means and consolidation "
             "runs cannot be cancelled.",
-            ArgumentsSchema(
-                {{.Spec = {.Name = "token",
-                      .Type = FT::String,
-                      .Description = "Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1."},
-                    .Required = true}}),
+            ArgumentsSchema({{.Spec = token.Spec, .Required = true}}),
             false,
             JobsCancel);
         add("log",

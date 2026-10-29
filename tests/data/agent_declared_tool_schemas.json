@@ -49,6 +49,80 @@
     ],
     "type": "object"
   },
+  "bind_attribute": {
+    "additionalProperties": false,
+    "oneOf": [
+      {
+        "required": [
+          "property"
+        ]
+      },
+      {
+        "required": [
+          "default"
+        ]
+      }
+    ],
+    "properties": {
+      "attribute": {
+        "description": "Render attribute (shader input) whose source property is chosen.",
+        "enum": [
+          "position",
+          "normal",
+          "texcoord",
+          "color",
+          "point_size",
+          "line_width"
+        ],
+        "type": "string"
+      },
+      "default": {
+        "const": true,
+        "description": "Restore the default source.",
+        "type": "boolean"
+      },
+      "domain": {
+        "description": "Element domain of the source property; needed only when the lane reads that name on several.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "lane": {
+        "description": "Render lane of the row.",
+        "enum": [
+          "surface",
+          "edges",
+          "points"
+        ],
+        "type": "string"
+      },
+      "property": {
+        "description": "Source property.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity",
+      "lane",
+      "attribute"
+    ],
+    "type": "object"
+  },
   "config_apply": {
     "additionalProperties": false,
     "properties": {
@@ -224,6 +298,45 @@
     "additionalProperties": false,
     "properties": {},
     "required": [],
+    "type": "object"
+  },
+  "jobs_wait": {
+    "additionalProperties": false,
+    "oneOf": [
+      {
+        "required": [
+          "token"
+        ]
+      },
+      {
+        "required": [
+          "entity",
+          "output"
+        ]
+      }
+    ],
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "output": {
+        "description": "Output property name the editor job writes.",
+        "type": "string"
+      },
+      "timeout_ms": {
+        "default": 30000,
+        "maximum": 60000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "token": {
+        "description": "Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1.",
+        "type": "string"
+      }
+    },
     "type": "object"
   },
   "lane_style": {

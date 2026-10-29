@@ -61,6 +61,10 @@ export namespace Extrinsic::Runtime
         // required. Schema only: config validation leaves nested objects to their owner, and a
         // tool's top-level arguments use AgentArgument::Required instead.
         bool Required{false};
+        // RUNTIME-341: a Bool that accepts only true (a flag whose absence means false); its
+        // schema is const true. The operation params' Bool reader does not read it (no table sets it).
+        // Not combined with Nullable: const true would refuse the null the check accepts.
+        bool OnlyTrue{false};
     };
 
     [[nodiscard]] const ConfigFieldSpec* FindConfigFieldSpec(
