@@ -10,6 +10,7 @@ module;
 #include <array>
 #include <cstddef>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <format>
 #include <limits>
@@ -183,6 +184,12 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
+        // RUNTIME-348: results the operation runtime stores itself. The panel shows their transfer
+        // counters but never folds a finished transaction into them: the stored result may be a newer run's.
+        template <class Result>
+        constexpr bool kStoredByOperationRuntime = std::same_as<Result, Runtime::EditorKernelDensityResult> ||
+            std::same_as<Result, Runtime::EditorPointSpacingResult>;
+
         template <class State, class Sink>
         bool DrawPointScalarTransaction(const Runtime::EditorProcessingCommands& commands,
             Runtime::EditorPointScalarTransactionHandle& run,
@@ -201,11 +208,13 @@ namespace Extrinsic::Sandbox::Editor
                 phase == Runtime::EditorGpuTransactionPhase::Accepting ||
                 phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept;
             // External producers deliver their diagnostics through their own completion sink.
-            constexpr bool scalarDiagnostics =
+            constexpr bool foldsTerminal =
                 requires { Runtime::UpdateEditorPointScalarResult(*state.LastResult, snapshot); };
+            constexpr bool showsTransfer =
+                foldsTerminal || kStoredByOperationRuntime<typename decltype(state.LastResult)::value_type>;
             if (!active)
             {
-                if constexpr (scalarDiagnostics)
+                if constexpr (foldsTerminal)
                 {
                     if (state.LastResult)
                     {
@@ -220,7 +229,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", snapshot.Message.c_str());
             GpuTransactionRowView row{
                 .Phase = phase, .CanAccept = snapshot.CanAccept, .AcceptRefusal = snapshot.AcceptRefusalReason};
-            if constexpr (scalarDiagnostics)
+            if constexpr (showsTransfer)
                 row.Io = GpuTransactionIo{.UploadBytes = snapshot.GpuInputUploadBytes,
                     .CacheHits = snapshot.GpuInputCacheHits,
                     .CpuReadbackBytes = snapshot.CpuStageReadbackBytes};
@@ -2628,8 +2637,10 @@ namespace Extrinsic::Sandbox::Editor
 
     void MeshProcessingPanels::Impl::DrawDensityWindow(bool& open, const SandboxEditorContext& context)
     {
-        if (context.PointFields.Results.LastKernelDensityResult)
-            Density.LastResult = context.PointFields.Results.LastKernelDensityResult;
+        // RUNTIME-348: the operation runtime stores every run's result; the panel only reads it.
+        if (const auto stored = context.PointFields.Results.Last<Runtime::EditorKernelDensityResult>())
+            Density.LastResult = *stored;
+        const std::function<void(Runtime::EditorKernelDensityResult)> noSessionSink{};
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Kernel Density", &open))
         {
@@ -2673,8 +2684,8 @@ namespace Extrinsic::Sandbox::Editor
             "Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
         if (config.Backend == Runtime::KernelDensityBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-        const bool scalarActive = DrawPointScalarTransaction(
-            context.PointFields.Commands, DensityTransaction, Density, context.PointFields.ResultSinks.KernelDensity);
+        const bool scalarActive =
+            DrawPointScalarTransaction(context.PointFields.Commands, DensityTransaction, Density, noSessionSink);
         DrawProcessingExecution(
             context.PointFields.Commands,
             Density,
@@ -2696,10 +2707,9 @@ namespace Extrinsic::Sandbox::Editor
                         Runtime::StartEditorKernelDensityTransaction(context.PointFields.Commands, config, result);
                     return result;
                 }
-                return Runtime::ApplyEditorConfiguredKernelDensity(
-                    context.PointFields.Commands, context.PointFields.ResultSinks.KernelDensity);
+                return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands, noSessionSink);
             },
-            context.PointFields.ResultSinks.KernelDensity,
+            noSessionSink,
             "Estimate density",
             "Controls were rejected by density config validation.",
             "Density config was rejected.",
@@ -2731,8 +2741,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Density",
                 Density.LastResult,
-                Runtime::EditorPointFieldResultSlot::KernelDensity,
-                context.PointFields.ResultSinks.DismissResult);
+                &Runtime::OperationResultKey<Runtime::EditorKernelDensityResult>::Tag,
+                context.PointFields.DismissResult);
         }
         ImGui::End();
     }
@@ -3040,8 +3050,10 @@ namespace Extrinsic::Sandbox::Editor
 
     void MeshProcessingPanels::Impl::DrawSpacingWindow(bool& open, const SandboxEditorContext& context)
     {
-        if (context.PointFields.Results.LastPointSpacingResult)
-            Spacing.LastResult = context.PointFields.Results.LastPointSpacingResult;
+        // RUNTIME-348: the operation runtime stores every run's result; the panel only reads it.
+        if (const auto stored = context.PointFields.Results.Last<Runtime::EditorPointSpacingResult>())
+            Spacing.LastResult = *stored;
+        const std::function<void(Runtime::EditorPointSpacingResult)> noSessionSink{};
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Point Spacing and Radii", &open))
         {
@@ -3085,8 +3097,8 @@ namespace Extrinsic::Sandbox::Editor
             "Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
         if (config.Backend == Runtime::PointSpacingBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-        const bool scalarActive = DrawPointScalarTransaction(
-            context.PointFields.Commands, SpacingTransaction, Spacing, context.PointFields.ResultSinks.PointSpacing);
+        const bool scalarActive =
+            DrawPointScalarTransaction(context.PointFields.Commands, SpacingTransaction, Spacing, noSessionSink);
         DrawProcessingExecution(
             context.PointFields.Commands,
             Spacing,
@@ -3108,10 +3120,9 @@ namespace Extrinsic::Sandbox::Editor
                         Runtime::StartEditorPointSpacingTransaction(context.PointFields.Commands, config, result);
                     return result;
                 }
-                return Runtime::ApplyEditorConfiguredPointSpacing(
-                    context.PointFields.Commands, context.PointFields.ResultSinks.PointSpacing);
+                return Runtime::ApplyEditorConfiguredPointSpacing(context.PointFields.Commands, noSessionSink);
             },
-            context.PointFields.ResultSinks.PointSpacing,
+            noSessionSink,
             "Estimate radii",
             "Controls were rejected by radii config validation.",
             "Spacing config was rejected.",
@@ -3151,8 +3162,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Spacing",
                 Spacing.LastResult,
-                Runtime::EditorPointFieldResultSlot::PointSpacing,
-                context.PointFields.ResultSinks.DismissResult);
+                &Runtime::OperationResultKey<Runtime::EditorPointSpacingResult>::Tag,
+                context.PointFields.DismissResult);
         }
         ImGui::End();
     }

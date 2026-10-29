@@ -74,6 +74,9 @@ namespace Extrinsic::Runtime
         SpatialIndexHandle Index{};
         EditorPointScalarTransactionSnapshot Result{};
         std::function<void(EditorPointScalarTransactionSnapshot)> Sink{};
+        // RUNTIME-348: the operation runtime's retention, called before the sink at the one terminal
+        // delivery; Accept may replace the sink, never this.
+        std::function<void(EditorPointScalarTransactionSnapshot)> Retain{};
     };
     namespace
     {
@@ -358,6 +361,8 @@ namespace Extrinsic::Runtime
                     raw->Result.Phase = raw->Core.Phase;
                     raw->Result.Status = status;
                     raw->Result.Message = std::move(message);
+                    if (auto retain = std::move(raw->Retain))
+                        retain(raw->Result);
                     if (auto sink = std::move(raw->Sink))
                         sink(raw->Result);
                 }};
@@ -432,7 +437,8 @@ namespace Extrinsic::Runtime
                 std::function<void(EditorPointScalarTransactionSnapshot)> sink,
                 bool automatic,
                 Graphics::GpuPropertyResidency* testResidency,
-                const EditorPointScalarTransactionSnapshot& testResult)
+                const EditorPointScalarTransactionSnapshot& testResult,
+                std::function<void(EditorPointScalarTransactionSnapshot)> retain)
             {
                 auto* residency = testResidency
                     ? testResidency
@@ -450,6 +456,7 @@ namespace Extrinsic::Runtime
                 w->Capture = std::move(capture);
                 w->Entity = entity;
                 w->Positions = std::move(positions);
+                w->Retain = std::move(retain);
                 w->Params = params;
                 w->Label = std::move(label);
                 t.AutoAccept = automatic;
@@ -462,7 +469,10 @@ namespace Extrinsic::Runtime
                     .OutputName = w->Capture->Output.Name,
                     .RequestedDomain = EditorJobDomain::GpuCompute};
                 if (residency->HasRing(Typed(w).Key))
+                {
+                    result.OutputBusy = true;
                     return refuse("Scalar output awaits Accept or Discard.");
+                }
                 w->Result.LiveCount = w->Capture->LiveCount;
                 if (testResidency)
                 {
@@ -485,6 +495,7 @@ namespace Extrinsic::Runtime
                 {
                     result.Status = refused->Status;
                     result.Message = std::move(refused->Message);
+                    result.OutputBusy = true;
                     return {};
                 }
                 std::shared_ptr<const SpatialIndexSnapshot> snapshot;

@@ -1200,7 +1200,16 @@ namespace
                 p.Get<glm::vec3>("samples")[64]={std::numeric_limits<float>::quiet_NaN(),0,0};
                 p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
             }
-            PointFieldSinks.KernelDensity=[this](auto result){Results.push_back(std::move(result));};
+            DensitySink = [this](auto result)
+            {
+                Results.push_back(std::move(result));
+            };
+            // RUNTIME-348: automatic GPU runs keep their results in the store, without a panel.
+            Context.OperationResults = &Store;
+            Context.AttachmentActive = []
+            {
+                return true;
+            };
         }
         void Frame(double,double) override
         {
@@ -1279,7 +1288,10 @@ namespace
                 for(unsigned d=1;d<=8;++d)
                 {
                     auto c=Config(d);c.Backend=Runtime::KernelDensityBackend::CpuOctree;
-                    const auto result=Runtime::ApplyEditorKernelDensityCommand(Runtime::BindEditorProcessingCommands(Context), c, PointFieldSinks.KernelDensity);
+                    const auto result =
+                        Runtime::ApplyEditorKernelDensityCommand(Runtime::BindEditorProcessingCommands(Context),
+                            c,
+                            {}); // RUNTIME-348: an inline run now calls its sink; the reference needs none
                     ASSERT_TRUE(result.Succeeded())<<result.Message;
                     Reference.push_back(std::as_const(Props(d)).Get<float>("density").Vector());
                     Props(d).Get<float>("density").Vector().assign(Props(d).Size(),77.f);
@@ -1301,7 +1313,8 @@ namespace
                 }
                 for(unsigned d=1;d<=8;++d)
                 {
-                    const auto result=Runtime::ApplyEditorKernelDensityCommand(Runtime::BindEditorProcessingCommands(Context), Config(d), PointFieldSinks.KernelDensity);
+                    const auto result = Runtime::ApplyEditorKernelDensityCommand(
+                        Runtime::BindEditorProcessingCommands(Context), Config(d), DensitySink);
                     if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
                 }
             }
@@ -1317,14 +1330,16 @@ namespace
                     c.Bandwidth=1;c.GpuQueryBatchSize=4096;
                 }
                 else Props(8).Get<float>("density").Vector().assign(Props(8).Size(),77);
-                const auto result=Runtime::ApplyEditorKernelDensityCommand(Runtime::BindEditorProcessingCommands(Context), c, PointFieldSinks.KernelDensity);
+                const auto result = Runtime::ApplyEditorKernelDensityCommand(
+                    Runtime::BindEditorProcessingCommands(Context), c, DensitySink);
                 if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
                 if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
             }
         }
         void Shutdown() override {Context={};}
         Runtime::EditorProcessingContext Context{};
-        Runtime::EditorPointFieldResultSinks PointFieldSinks{};
+        std::function<void(Runtime::EditorKernelDensityResult)> DensitySink{};
+        Runtime::OperationResultStore Store{};
         Runtime::EditorCommandHistory History{};
         std::vector<entt::entity> Entities;
         std::vector<std::vector<float>> Reference;
@@ -1348,6 +1363,12 @@ TEST(PointLBVHGpuSmoke, KernelDensityPublishesAcrossDomainsAndPreservesCandidate
     engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
     EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    // RUNTIME-348: the newest run's result is the stored one.
+    const auto stored = run->Store.Last<Runtime::EditorKernelDensityResult>();
+    ASSERT_TRUE(stored);
+    ASSERT_FALSE(run->Results.empty());
+    EXPECT_EQ(stored->Status, run->Results.back().Status);
+    EXPECT_EQ(stored->Message, run->Results.back().Message);
     if(const auto* output=std::getenv("INTRINSIC_DENSITY_BENCHMARK_OUTPUT"))
     {
         nlohmann::json json{{"benchmark_id","geometry.point_lbvh.density_runtime_smoke"},
@@ -1438,7 +1459,15 @@ namespace
                 p.Get<glm::vec3>("samples")[64]={std::numeric_limits<float>::quiet_NaN(),0,0};
                 p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
             }
-            PointFieldSinks.PointSpacing=[this](auto result){Results.push_back(std::move(result));};
+            SpacingSink = [this](auto result)
+            {
+                Results.push_back(std::move(result));
+            };
+            Context.OperationResults = &Store;
+            Context.AttachmentActive = []
+            {
+                return true;
+            };
         }
         void Frame(double,double) override
         {
@@ -1526,7 +1555,10 @@ namespace
                 for(unsigned d=1;d<=8;++d)
                 {
                     auto c=Config(d);c.Backend=Runtime::PointSpacingBackend::CpuOctree;
-                    const auto result=Runtime::ApplyEditorPointSpacingCommand(Runtime::BindEditorProcessingCommands(Context), c, PointFieldSinks.PointSpacing);
+                    const auto result =
+                        Runtime::ApplyEditorPointSpacingCommand(Runtime::BindEditorProcessingCommands(Context),
+                            c,
+                            {}); // RUNTIME-348: an inline run now calls its sink; the reference needs none
                     ASSERT_TRUE(result.Succeeded())<<result.Message;
                     ReferenceResults.push_back(result);
                     Reference.push_back(std::as_const(Props(d)).Get<float>("radii").Vector());
@@ -1549,7 +1581,8 @@ namespace
                 }
                 for(unsigned d=1;d<=8;++d)
                 {
-                    const auto result=Runtime::ApplyEditorPointSpacingCommand(Runtime::BindEditorProcessingCommands(Context), Config(d), PointFieldSinks.PointSpacing);
+                    const auto result = Runtime::ApplyEditorPointSpacingCommand(
+                        Runtime::BindEditorProcessingCommands(Context), Config(d), SpacingSink);
                     if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
                 }
             }
@@ -1565,14 +1598,16 @@ namespace
                     c.ScaleFactor=1;c.GpuQueryBatchSize=4096;
                 }
                 else Props(8).Get<float>("radii").Vector().assign(Props(8).Size(),77);
-                const auto result=Runtime::ApplyEditorPointSpacingCommand(Runtime::BindEditorProcessingCommands(Context), c, PointFieldSinks.PointSpacing);
+                const auto result = Runtime::ApplyEditorPointSpacingCommand(
+                    Runtime::BindEditorProcessingCommands(Context), c, SpacingSink);
                 if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
                 if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
             }
         }
         void Shutdown() override {Context={};}
         Runtime::EditorProcessingContext Context{};
-        Runtime::EditorPointFieldResultSinks PointFieldSinks{};
+        std::function<void(Runtime::EditorPointSpacingResult)> SpacingSink{};
+        Runtime::OperationResultStore Store{};
         Runtime::EditorCommandHistory History{};
         std::vector<entt::entity> Entities;
         std::vector<std::vector<float>> Reference;
@@ -1596,6 +1631,12 @@ TEST(PointLBVHGpuSmoke, PointSpacingPublishesAcrossDomainsAndPreservesCandidateP
     engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
     EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    // RUNTIME-348: the newest run's result is the stored one.
+    const auto stored = run->Store.Last<Runtime::EditorPointSpacingResult>();
+    ASSERT_TRUE(stored);
+    ASSERT_FALSE(run->Results.empty());
+    EXPECT_EQ(stored->Status, run->Results.back().Status);
+    EXPECT_EQ(stored->Message, run->Results.back().Message);
     if(const auto* output=std::getenv("INTRINSIC_SPACING_BENCHMARK_OUTPUT"))
     {
         nlohmann::json json{{"benchmark_id","geometry.point_lbvh.spacing_runtime_smoke"},

@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 113 |
+| `runtime` | 114 |
 
 ## Modules
 
@@ -407,6 +407,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EditorWindowRegistry` | `src/runtime/Editor/Runtime.EditorWindowRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWorkspaceAttachment` | `src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWorkspaceSnapshots` | `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm` | `runtime` |
+| `Extrinsic.Runtime.OperationResults` | `src/runtime/Editor/Runtime.OperationResults.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
@@ -476,4 +477,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **449**
+Total modules: **450**

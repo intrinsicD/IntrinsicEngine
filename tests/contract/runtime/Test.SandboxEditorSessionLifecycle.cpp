@@ -810,10 +810,20 @@ TEST(SandboxEditorSessionLifecycle, MeshFieldFramesRetainCurvatureAndRejectExpir
     engine.Shutdown();
 }
 
+// RUNTIME-348 rewrote this test for the session's operation result store (operator decision 28): the
+// guarantees are the same (frames copy, a newer result replaces, dismissal per operation, an expired
+// frame neither delivers nor dismisses), but results now arrive through runs of the operations, here
+// immediate refusals, which the runtime stores.
 TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndRejectExpiredDelivery)
 {
     Runtime::Engine engine{HeadlessConfig()};
     engine.Initialize();
+    using Density = Runtime::EditorKernelDensityResult;
+    using Spacing = Runtime::EditorPointSpacingResult;
+    const Runtime::KernelDensityConfig missingDensity{.StableEntityId = 0xFFFFFFF0u};
+    const Runtime::PointSpacingConfig missingSpacing{.StableEntityId = 0xFFFFFFF0u};
+    const Runtime::KernelDensityConfig invalidDensity{.Backend = static_cast<Runtime::KernelDensityBackend>(7)};
+    const Runtime::PointSpacingConfig invalidSpacing{.Backend = static_cast<Runtime::PointSpacingBackend>(7)};
     Runtime::EditorPointFieldPreparedFrame expired{};
     {
         Runtime::EditorWorkspaceAttachment attachment;
@@ -822,46 +832,46 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
         const auto empty = Runtime::PrepareEditorPointFieldFrame(attachment);
         ASSERT_TRUE(empty.Commands.IsBound());
-        ASSERT_TRUE(empty.ResultSinks.KernelDensity);
-        ASSERT_TRUE(empty.ResultSinks.PointSpacing);
-        EXPECT_FALSE(empty.Results.LastKernelDensityResult);
-        EXPECT_FALSE(empty.Results.LastPointSpacingResult);
-        empty.ResultSinks.KernelDensity({.Message="density"});
-        empty.ResultSinks.PointSpacing({.Message="spacing"});
+        ASSERT_TRUE(empty.DismissResult);
+        EXPECT_FALSE(empty.Results.Last<Density>());
+        EXPECT_FALSE(empty.Results.Last<Spacing>());
+        (void)Runtime::ApplyEditorKernelDensityCommand(empty.Commands, missingDensity, {});
+        (void)Runtime::ApplyEditorPointSpacingCommand(empty.Commands, missingSpacing, {});
         const auto first = Runtime::PrepareEditorPointFieldFrame(attachment);
-        ASSERT_TRUE(first.Results.LastKernelDensityResult);
-        ASSERT_TRUE(first.Results.LastPointSpacingResult);
-        EXPECT_EQ(first.Results.LastKernelDensityResult->Message,"density");
-        EXPECT_EQ(first.Results.LastPointSpacingResult->Message,"spacing");
-        EXPECT_FALSE(empty.Results.LastKernelDensityResult);
-        empty.ResultSinks.KernelDensity({.Message="replacement"});
-        EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.LastKernelDensityResult->Message,"replacement");
-        EXPECT_EQ(first.Results.LastKernelDensityResult->Message,"density");
-        empty.ResultSinks.DismissResult(Runtime::EditorPointFieldResultSlot::KernelDensity);
+        ASSERT_TRUE(first.Results.Last<Density>());
+        ASSERT_TRUE(first.Results.Last<Spacing>());
+        EXPECT_EQ(first.Results.Last<Density>()->Message, "Density target entity is stale or missing.");
+        EXPECT_EQ(first.Results.Last<Spacing>()->Message, "Radii target entity is stale or missing.");
+        EXPECT_FALSE(empty.Results.Last<Density>());
+        (void)Runtime::ApplyEditorKernelDensityCommand(empty.Commands, invalidDensity, {});
+        EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Density>()->Message,
+            "Unknown density backend.");
+        EXPECT_EQ(first.Results.Last<Density>()->Message, "Density target entity is stale or missing.");
+        Runtime::DismissOperationResult<Density>(empty.DismissResult);
         const auto dismissed = Runtime::PrepareEditorPointFieldFrame(attachment);
-        EXPECT_FALSE(dismissed.Results.LastKernelDensityResult);
-        ASSERT_TRUE(dismissed.Results.LastPointSpacingResult);
+        EXPECT_FALSE(dismissed.Results.Last<Density>());
+        ASSERT_TRUE(dismissed.Results.Last<Spacing>());
         expired = empty;
         attachment.Detach();
         EXPECT_FALSE(expired.Commands.IsBound());
         EXPECT_FALSE(Runtime::GetEditorPointSpacingConfig(expired.Commands));
         EXPECT_FALSE(Runtime::PreviewEditorKernelDensityCommand(expired.Commands, {}).Enabled);
-        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.LastPointSpacingResult);
+        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Spacing>());
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
         const auto current = Runtime::PrepareEditorPointFieldFrame(attachment);
-        current.ResultSinks.PointSpacing({.Message="new attachment"});
-        expired.ResultSinks.PointSpacing({.Message="old attachment"});
-        expired.ResultSinks.DismissResult(Runtime::EditorPointFieldResultSlot::PointSpacing);
+        (void)Runtime::ApplyEditorPointSpacingCommand(current.Commands, missingSpacing, {});
+        (void)Runtime::ApplyEditorPointSpacingCommand(expired.Commands, invalidSpacing, {});
+        Runtime::DismissOperationResult<Spacing>(expired.DismissResult);
         const auto fresh = Runtime::PrepareEditorPointFieldFrame(attachment);
-        ASSERT_TRUE(fresh.Results.LastPointSpacingResult);
-        EXPECT_EQ(fresh.Results.LastPointSpacingResult->Message,"new attachment");
-        current.ResultSinks.DismissResult(Runtime::EditorPointFieldResultSlot::PointSpacing);
-        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.LastPointSpacingResult);
+        ASSERT_TRUE(fresh.Results.Last<Spacing>());
+        EXPECT_EQ(fresh.Results.Last<Spacing>()->Message, "Radii target entity is stale or missing.");
+        Runtime::DismissOperationResult<Spacing>(current.DismissResult);
+        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Spacing>());
         expired = current;
     }
-    expired.ResultSinks.KernelDensity({.Message="after destruction"});
-    expired.ResultSinks.DismissResult(Runtime::EditorPointFieldResultSlot::KernelDensity);
+    (void)Runtime::ApplyEditorKernelDensityCommand(expired.Commands, missingDensity, {});
+    Runtime::DismissOperationResult<Density>(expired.DismissResult);
     EXPECT_FALSE(Runtime::PreviewEditorPointSpacingCommand(expired.Commands, {}).Enabled);
     engine.Shutdown();
 }
@@ -3685,6 +3695,72 @@ TEST_F(EditorQueuedPointJobs, DuplicateSubmissionAnswersPendingWithTheSharedMess
     const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
     ExpectDuplicateRefused("Bilateral filter", [&](auto done) {
         return Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral, done); });
+}
+
+// RUNTIME-348: a queued run whose attachment is detached and replaced, or destroyed, before it delivers
+// neither calls its sink nor touches the next session's operation results (the store write checks the
+// attachment epoch before it dereferences the store).
+TEST_F(EditorQueuedPointJobs, OutlivedRunsStoreNothingInTheNextSession)
+{
+    unsigned calls{0u};
+    std::vector<Runtime::JobToken> outlived;
+    const auto remember = [&](const Runtime::EditorProcessingCommands& commands)
+    {
+        for (const auto& job : Runtime::GetEditorJobs(commands))
+            if (Runtime::IsActiveEditorJobState(job.State) &&
+                std::find(outlived.begin(), outlived.end(), job.Token) == outlived.end())
+                outlived.push_back(job.Token);
+    };
+    {
+        Runtime::EditorWorkspaceAttachment other;
+        other.Attach(Engine.Worlds(), Engine.Services());
+        ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(other));
+        const auto fields = Runtime::PrepareEditorPointFieldFrame(other).Commands;
+        ASSERT_EQ(Runtime::ApplyEditorKernelDensityCommand(fields,
+                      Density,
+                      [&](auto)
+                      {
+                          ++calls;
+                      })
+                      .Status,
+            Runtime::EditorCommandStatus::Pending);
+        remember(fields);
+    }
+    const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    auto spacing = Spacing;
+    spacing.Radii.Name = "outlived_radii";
+    ASSERT_EQ(Runtime::ApplyEditorPointSpacingCommand(fields,
+                  spacing,
+                  [&](auto)
+                  {
+                      ++calls;
+                  })
+                  .Status,
+        Runtime::EditorCommandStatus::Pending);
+    remember(fields);
+    ASSERT_EQ(outlived.size(), 2u) << "both runs are queued jobs";
+    Attachment.Detach();
+    Attachment.Attach(Engine.Worlds(), Engine.Services());
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(Attachment));
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    ASSERT_TRUE(DrainJobsUntil(
+        [&]
+        {
+            return std::all_of(outlived.begin(),
+                outlived.end(),
+                [&](const Runtime::JobToken token)
+                {
+                    const auto state = jobs.GetState(token);
+                    return state != Runtime::JobState::AwaitingDependencies && state != Runtime::JobState::Queued &&
+                        state != Runtime::JobState::Running && state != Runtime::JobState::AwaitingGate &&
+                        state != Runtime::JobState::AwaitingApply;
+                });
+        }))
+        << "the outlived runs finished";
+    EXPECT_EQ(calls, 0u);
+    const auto results = Runtime::PrepareEditorPointFieldFrame(Attachment).Results;
+    EXPECT_FALSE(results.Last<Runtime::EditorKernelDensityResult>());
+    EXPECT_FALSE(results.Last<Runtime::EditorPointSpacingResult>());
 }
 
 TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)

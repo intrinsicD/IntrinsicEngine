@@ -10,9 +10,12 @@
 #include <glm/vec2.hpp>
 #include <algorithm>
 #include <array>
+#include <concepts>
 #include <functional>
+#include <type_traits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <string_view>
 #include <vector>
 
@@ -93,6 +96,8 @@ import Extrinsic.Runtime.SpatialIndexCache;
 #include "TestImGuiFrameScope.hpp"
 #include "TextureBakeHarness.hpp"
 #include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
+// Test seam (RUNTIME-348): the session's processing context, to bind a test transaction to its store.
+#include "../../../src/runtime/Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
 namespace R = Extrinsic::Runtime;
 namespace Editor = Extrinsic::Sandbox::Editor;
@@ -4922,6 +4927,9 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         context.JobCommands.Submit=[&](R::JobDesc job,const auto&)->R::JobToken {
             return applied?h.Engine->Jobs().Submit(std::move(job)):R::JobToken{};
         };
+        // RUNTIME-348: the transaction is bound to the session's result store (the panel's own runs are)
+        // once the first frame shows the session, keeping this test's job surface for the failed case.
+        R::EditorProcessingCommands sessionCommands{};
         // Seed device diagnostics through the existing mock-front seam; no device execution is claimed.
         R::EditorPointScalarTransactionSnapshot diagnostics;
         diagnostics.GpuInputUploadBytes=36;diagnostics.CpuStageReadbackBytes=12;
@@ -4929,33 +4937,86 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         diagnostics.Statistics.Mean=3;diagnostics.Statistics.Minimum=2;diagnostics.Statistics.Maximum=4;
         diagnostics.Statistics.Bandwidth=1;diagnostics.Statistics.AverageSpacing=2;
         bool kept=false;
-        const auto observer=h.Shell.AddFrameObserver([&](const Editor::SandboxEditorContext& frame){
-            const auto check=[&](const auto& result){
-                if(!result || result->Status!=R::EditorCommandStatus::Applied)return false;
-                EXPECT_EQ(result->WrittenCount,rows.Size());EXPECT_EQ(result->ActualBackend,"vulkan_lbvh");
-                EXPECT_EQ(result->GpuInputUploadBytes,36u);EXPECT_EQ(result->CpuStageReadbackBytes,12u);
-                EXPECT_EQ(result->GpuInputCacheHits,1u);EXPECT_EQ(result->GpuQueryBatches,1u);
-                return true;};
-            if(method==0 && check(frame.PointFields.Results.LastKernelDensityResult)){
-                kept=true;EXPECT_EQ(frame.PointFields.Results.LastKernelDensityResult->MeanDensity,3);}
-            if(method==1 && check(frame.PointFields.Results.LastPointSpacingResult)){
-                kept=true;EXPECT_EQ(frame.PointFields.Results.LastPointSpacingResult->MeanRadius,3);}
-            if(method==2 && check(frame.PointAnalysis.Results.LastDensityWeightResult)){
-                kept=true;EXPECT_EQ(frame.PointAnalysis.Results.LastDensityWeightResult->MaxWeight,4);}
-        });
-        const auto commands=R::BindEditorProcessingCommands(context);
+        const auto observer = h.Shell.AddFrameObserver(
+            [&](const Editor::SandboxEditorContext& frame)
+            {
+                if (!sessionCommands.IsBound())
+                    sessionCommands = frame.PointFields.Commands;
+                const auto check = [&](const auto& result)
+                {
+                    if (!result || result->Status != R::EditorCommandStatus::Applied)
+                        return false;
+                    EXPECT_EQ(result->WrittenCount, rows.Size());
+                    EXPECT_EQ(result->ActualBackend, "vulkan_lbvh");
+                    EXPECT_EQ(result->GpuInputUploadBytes, 36u);
+                    EXPECT_EQ(result->CpuStageReadbackBytes, 12u);
+                    EXPECT_EQ(result->GpuInputCacheHits, 1u);
+                    EXPECT_EQ(result->GpuQueryBatches, 1u);
+                    return true;
+                };
+                if (method == 0 && check(frame.PointFields.Results.Last<R::EditorKernelDensityResult>()))
+                {
+                    kept = true;
+                    EXPECT_EQ(frame.PointFields.Results.Last<R::EditorKernelDensityResult>()->MeanDensity, 3);
+                }
+                if (method == 1 && check(frame.PointFields.Results.Last<R::EditorPointSpacingResult>()))
+                {
+                    kept = true;
+                    EXPECT_EQ(frame.PointFields.Results.Last<R::EditorPointSpacingResult>()->MeanRadius, 3);
+                }
+                if (method == 2 && check(frame.PointAnalysis.Results.LastDensityWeightResult))
+                {
+                    kept = true;
+                    EXPECT_EQ(frame.PointAnalysis.Results.LastDensityWeightResult->MaxWeight, 4);
+                }
+            });
+        R::EditorProcessingCommands commands{};
         const auto make=[&]{
             std::vector<float> values(rows.Size(),3);
             if(method==0)return R::MakeEditorKernelDensityTransactionForTest(commands,density,values,residency,diagnostics);
             if(method==1)return R::MakeEditorPointSpacingTransactionForTest(commands,spacing,values,residency,diagnostics);
             return R::MakeEditorDensityWeightTransactionForTest(commands,weights,values,residency,diagnostics);};
-        auto run=make();ASSERT_TRUE(run);h.Panels.InjectPointScalarTransactionForTest(method,run);
-        int frames=0,terminalFrame=0;bool checked=false;
+        R::EditorPointScalarTransactionHandle run{};
+        int frames = 0, terminalFrame = 0, started = 0;
+        bool checked = false, transferShown = false;
         h.Driver->OnFrame=[&](R::Engine& engine){
             if(++frames>40){ADD_FAILURE()<<"scalar terminal result was not displayed";engine.RequestExit();return;}
+            if (!run)
+            {
+                if (!sessionCommands.IsBound())
+                    return;
+                const auto& session = R::EditorProcessingCommandsAccess::Resolve(sessionCommands);
+                context.OperationResults = session.OperationResults;
+                context.AttachmentActive = session.AttachmentActive;
+                commands = R::BindEditorProcessingCommands(context);
+                run = make();
+                if (!run)
+                {
+                    ADD_FAILURE() << "no scalar transaction";
+                    engine.RequestExit();
+                    return;
+                }
+                h.Panels.InjectPointScalarTransactionForTest(method, run);
+                started = frames;
+                return;
+            }
             auto* window=ImGui::FindWindowByName(titles[method]);if(!window)return;
             ImGui::SetWindowSize(window,{800,1800});ImGui::SetWindowPos(window,{0,0});
-            if(frames==5)ImGui::ActivateItemByID(window->GetID("Accept##Scalar"));
+            // The transfer counters are shown while the run awaits Accept (RUNTIME-348 keeps them).
+            if (frames == started + 2)
+            {
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            }
+            if (frames == started + 4)
+            {
+                const std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                ImGui::LogFinish();
+                transferShown = text.find("Input upload: 36 bytes; residency hits: 1") != std::string::npos;
+            }
+            if (frames == started + 5)
+                ImGui::ActivateItemByID(window->GetID("Accept##Scalar"));
             const auto state=R::SnapshotEditorPointScalar(commands,run);
             if(state.Phase!=Phase::Applied && state.Phase!=Phase::Failed)return;
             if(!terminalFrame){terminalFrame=frames;return;}
@@ -4966,10 +5027,147 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
                 EXPECT_FALSE(state.Message.empty());EXPECT_NE(text.find(state.Message),std::string::npos)<<text;
                 checked=true;engine.RequestExit();}
         };
-        h.Engine->Run();EXPECT_TRUE(checked);EXPECT_EQ(kept,applied);h.Shell.RemoveFrameObserver(observer);
+        h.Engine->Run();
+        EXPECT_TRUE(checked);
+        EXPECT_EQ(kept, applied);
+        EXPECT_TRUE(transferShown);
+        h.Shell.RemoveFrameObserver(observer);
         auto pending=make();ASSERT_TRUE(pending);h.Panels.InjectPointScalarTransactionForTest(method,pending);
         h.Panels.Unregister();EXPECT_EQ(R::SnapshotEditorPointScalar(commands,pending).Phase,Phase::Discarded);
         EXPECT_EQ(rows.Exists(method==0?density.Density.Name:method==1?spacing.Radii.Name:weights.Weights.Name),applied);
+    }
+}
+
+// RUNTIME-348: when another caller's newer result B is stored before the panel's older GPU run A ends,
+// the panel keeps showing B; it never folds A's terminal answer into B (not even for one frame).
+TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
+{
+    using Phase = R::EditorGpuTransactionPhase;
+    for (unsigned method = 0; method < 2; ++method)
+    {
+        SCOPED_TRACE(method);
+        PanelHarness h;
+        Extrinsic::Tests::MockDevice device;
+        Extrinsic::Graphics::GpuPropertyResidency residency{device};
+        device.TransferQueue.AcceptBufferUploads = true;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        scene.Raw().emplace<Extrinsic::ECS::Components::Transform::Component>(entity);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+        (void)mesh.AddTriangle(a, b, c);
+        GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+        auto& rows = scene.Raw().get<GS::Vertices>(entity).Properties;
+        R::KernelDensityConfig density;
+        R::PointSpacingConfig spacing;
+        density.StableEntityId = spacing.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+        density.Positions.Domain = spacing.Positions.Domain = R::GeometryElementDomain::MeshVertex;
+        density.Density.Domain = spacing.Radii.Domain = R::GeometryElementDomain::MeshVertex;
+        density.Backend = R::KernelDensityBackend::VulkanLBVH;
+        spacing.Backend = R::PointSpacingBackend::VulkanLBVH;
+        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+        R::SetKernelDensityConfig(config, density);
+        R::SetPointSpacingConfig(config, spacing);
+        ASSERT_TRUE(h.Apply(config));
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        const char* title = method == 0 ? "Kernel Density" : "Point Spacing and Radii";
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(method == 0 ? "view.kernel_density" : "view.point_spacing", true));
+        R::EditorProcessingCommands sessionCommands{};
+        const auto observer = h.Shell.AddFrameObserver(
+            [&](const Editor::SandboxEditorContext& frame)
+            {
+                if (!sessionCommands.IsBound())
+                    sessionCommands = frame.PointFields.Commands;
+            });
+        // Run A: the panel's transaction on this test's job surface, bound to the session's store.
+        R::EditorProcessingContext context;
+        context.Scene = &scene;
+        context.JobCommands.Submit = [&](R::JobDesc job, const auto&)
+        {
+            return h.Engine->Jobs().Submit(std::move(job));
+        };
+        R::EditorProcessingCommands commands{};
+        R::EditorPointScalarTransactionHandle run{};
+        const std::string newer =
+            method == 0 ? "Density target entity is stale or missing." : "Radii target entity is stale or missing.";
+        int frames = 0, started = 0, terminalFrame = 0;
+        bool checked = false;
+        std::string terminalMessage;
+        h.Driver->OnFrame = [&](R::Engine& engine)
+        {
+            if (++frames > 60)
+            {
+                ADD_FAILURE() << "the run did not end";
+                engine.RequestExit();
+                return;
+            }
+            if (!run)
+            {
+                if (!sessionCommands.IsBound())
+                    return;
+                const auto& session = R::EditorProcessingCommandsAccess::Resolve(sessionCommands);
+                context.OperationResults = session.OperationResults;
+                context.AttachmentActive = session.AttachmentActive;
+                commands = R::BindEditorProcessingCommands(context);
+                std::vector<float> values(rows.Size(), 3);
+                run = method == 0 ? R::MakeEditorKernelDensityTransactionForTest(commands, density, values, residency)
+                                  : R::MakeEditorPointSpacingTransactionForTest(commands, spacing, values, residency);
+                if (!run)
+                {
+                    ADD_FAILURE() << "no scalar transaction";
+                    engine.RequestExit();
+                    return;
+                }
+                h.Panels.InjectPointScalarTransactionForTest(method, run);
+                started = frames;
+                return;
+            }
+            auto* window = ImGui::FindWindowByName(title);
+            if (!window)
+                return;
+            ImGui::SetWindowSize(window, {800, 1800});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (frames == started + 2)
+            {
+                // Run B, started elsewhere after A: an immediate refusal, the newest stored result.
+                auto missing = density;
+                auto missingSpacing = spacing;
+                missing.StableEntityId = missingSpacing.StableEntityId = 0xFFFFFFF0u;
+                const auto refused = method == 0
+                    ? R::ApplyEditorKernelDensityCommand(sessionCommands, missing, {}).Message
+                    : R::ApplyEditorPointSpacingCommand(sessionCommands, missingSpacing, {}).Message;
+                EXPECT_EQ(refused, newer);
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            }
+            if (frames == started + 4)
+                ImGui::ActivateItemByID(window->GetID("Accept##Scalar"));
+            const auto state = R::SnapshotEditorPointScalar(commands, run);
+            if (state.Phase != Phase::Applied && state.Phase != Phase::Failed)
+                return;
+            if (!terminalFrame)
+            {
+                terminalFrame = frames;
+                terminalMessage = state.Message;
+                return;
+            }
+            if (frames == terminalFrame + 3)
+            {
+                const std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                ImGui::LogFinish();
+                EXPECT_EQ(state.Phase, Phase::Applied);
+                ASSERT_FALSE(terminalMessage.empty());
+                EXPECT_EQ(text.find(terminalMessage), std::string::npos)
+                    << "the older run's answer was shown: " << text;
+                EXPECT_NE(text.find(newer), std::string::npos) << text;
+                checked = true;
+                engine.RequestExit();
+            }
+        };
+        h.Engine->Run();
+        EXPECT_TRUE(checked);
+        h.Shell.RemoveFrameObserver(observer);
     }
 }
 
@@ -5790,7 +5988,14 @@ namespace
         std::function<std::function<R::EditorCommandStatus(const R::EditorProcessingCommands&, std::function<void()>)>(
             PanelHarness&, std::uint32_t)> Configure;
         std::function<R::EditorProcessingCommands(const Editor::SandboxEditorContext&)> Commands;
-        std::function<std::optional<R::EditorCommandStatus>(const Editor::SandboxEditorContext&)> PanelResult;
+        // The panel's stored result: its status and message (RUNTIME-348: for operations on the operation
+        // runtime the slot also holds runs started elsewhere).
+        std::function<std::optional<std::pair<R::EditorCommandStatus, std::string>>(
+            const Editor::SandboxEditorContext&)>
+            PanelResult;
+        // For an operation on the operation runtime, the elsewhere run's stored Pending message; the
+        // others keep an empty slot until that run delivers.
+        std::optional<std::string> ElsewherePending{};
     };
 
     void ExpectDuplicateRefusalIsNotThePanelsResult(const DuplicateCase& c)
@@ -5804,7 +6009,7 @@ namespace
         const auto elsewhereCommand = c.Configure(h, R::SelectionController::ToStableEntityId(entity));
         ASSERT_TRUE(h.Shell.SetEditorWindowOpen(c.WindowId, true));
         R::EditorProcessingCommands commands{};
-        std::optional<R::EditorCommandStatus> panelResult;
+        std::optional<std::pair<R::EditorCommandStatus, std::string>> panelResult;
         const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
             .Id = "test.duplicate_observer", .MenuPath = {"View"}, .Title = "Duplicate observer", .OpenByDefault = true,
             .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
@@ -5844,7 +6049,16 @@ namespace
             {
                 text = ImGui::GetCurrentContext()->LogBuffer.c_str();
                 ImGui::LogFinish();
-                EXPECT_FALSE(panelResult.has_value()) << "the refusal is not the panel's result";
+                // RUNTIME-348 (operator decision 28): an operation on the runtime keeps the elsewhere run's
+                // Pending unchanged; the refusal never becomes the panel's result.
+                if (c.ElsewherePending)
+                {
+                    EXPECT_TRUE(panelResult && panelResult->first == R::EditorCommandStatus::Pending &&
+                        panelResult->second == *c.ElsewherePending)
+                        << "the duplicate leaves the elsewhere run's Pending in the slot";
+                }
+                else
+                    EXPECT_FALSE(panelResult.has_value()) << "the refusal is not the panel's result";
                 release.store(true, std::memory_order_release);
             }
             if (step > 8 && !deliveredAt && delivered) deliveredAt = frame;
@@ -5856,7 +6070,9 @@ namespace
         EXPECT_TRUE(delivered);
         EXPECT_TRUE(std::as_const(props).Exists(c.Output));
         EXPECT_NE(text.find("already has an active"), std::string::npos) << text;
-        EXPECT_FALSE(panelResult == R::EditorCommandStatus::Pending)
+        if (c.ElsewherePending)
+            EXPECT_TRUE(panelResult) << "the elsewhere run's result replaced its Pending";
+        EXPECT_FALSE(panelResult && panelResult->first == R::EditorCommandStatus::Pending)
             << "the panel never reads Pending after the active run delivered elsewhere";
         EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
     }
@@ -5864,10 +6080,13 @@ namespace
 
 TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
 {
-    ExpectDuplicateRefusalIsNotThePanelsResult({
-        .WindowId = "view.kernel_density", .Title = "Kernel Density", .Button = "Estimate density",
+    ExpectDuplicateRefusalIsNotThePanelsResult({.WindowId = "view.kernel_density",
+        .Title = "Kernel Density",
+        .Button = "Estimate density",
         .Output = "duplicate_density",
-        .Configure = [](PanelHarness& h, const std::uint32_t id) {
+        .Configure =
+            [](PanelHarness& h, const std::uint32_t id)
+        {
             auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
             auto density = *R::GetKernelDensityConfig(config);
             density.StableEntityId = id;
@@ -5881,14 +6100,25 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
                     return R::ApplyEditorKernelDensityCommand(commands, density,
                         [done](R::EditorKernelDensityResult) { done(); }).Status; });
         },
-        .Commands = [](const Editor::SandboxEditorContext& context) { return context.PointFields.Commands; },
-        .PanelResult = [](const Editor::SandboxEditorContext& context) -> std::optional<R::EditorCommandStatus> {
-            const auto& r = context.PointFields.Results.LastKernelDensityResult;
-            return r ? std::optional{r->Status} : std::nullopt; }});
-    ExpectDuplicateRefusalIsNotThePanelsResult({
-        .WindowId = "view.outlier_analysis", .Title = "Outlier Analysis", .Button = "Detect outliers",
+        .Commands =
+            [](const Editor::SandboxEditorContext& context)
+        {
+            return context.PointFields.Commands;
+        },
+        .PanelResult = [](const Editor::SandboxEditorContext& context)
+            -> std::optional<std::pair<R::EditorCommandStatus, std::string>>
+        {
+            const auto r = context.PointFields.Results.Last<R::EditorKernelDensityResult>();
+            return r ? std::optional{std::pair{r->Status, r->Message}} : std::nullopt;
+        },
+        .ElsewherePending = "Density estimation queued."});
+    ExpectDuplicateRefusalIsNotThePanelsResult({.WindowId = "view.outlier_analysis",
+        .Title = "Outlier Analysis",
+        .Button = "Detect outliers",
         .Output = "duplicate_outliers",
-        .Configure = [](PanelHarness& h, const std::uint32_t id) {
+        .Configure =
+            [](PanelHarness& h, const std::uint32_t id)
+        {
             auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
             auto outliers = *R::GetOutlierAnalysisConfig(config);
             outliers.StableEntityId = id;
@@ -5903,10 +6133,17 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
                     return R::ApplyEditorOutlierAnalysisCommand(commands, outliers,
                         [done](R::EditorOutlierAnalysisResult) { done(); }).Status; });
         },
-        .Commands = [](const Editor::SandboxEditorContext& context) { return context.PointAnalysis.Commands; },
-        .PanelResult = [](const Editor::SandboxEditorContext& context) -> std::optional<R::EditorCommandStatus> {
+        .Commands =
+            [](const Editor::SandboxEditorContext& context)
+        {
+            return context.PointAnalysis.Commands;
+        },
+        .PanelResult = [](const Editor::SandboxEditorContext& context)
+            -> std::optional<std::pair<R::EditorCommandStatus, std::string>>
+        {
             const auto& r = context.PointAnalysis.Results.LastOutlierAnalysisResult;
-            return r ? std::optional{r->Status} : std::nullopt; }});
+            return r ? std::optional{std::pair{r->Status, r->Message}} : std::nullopt;
+        }});
 }
 
 // UI-073: the texture bake controls show the run of the bake they submitted, through the shared

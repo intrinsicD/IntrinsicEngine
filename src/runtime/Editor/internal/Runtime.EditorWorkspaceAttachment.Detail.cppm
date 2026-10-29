@@ -9,6 +9,7 @@ module;
 export module Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.OperationResults;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -28,7 +29,6 @@ namespace Extrinsic::Runtime
         struct EditorSceneEditingContext;
         struct EditorVisualizationEditingContext;
         struct EditorRenderRecipeEditingContext;
-        struct EditorPointFieldResultSinks;
         struct EditorPointAnalysisResultSinks;
         struct EditorPointSetResultSinks;
         struct EditorPointConstructionResultSinks;
@@ -38,7 +38,6 @@ namespace Extrinsic::Runtime
         struct EditorMeshFieldResultSinks;
         struct EditorMeshTopologyResultSinks;
         struct EditorParameterizationResultSinks;
-        struct EditorPointFieldResultsSnapshot;
         struct EditorPointAnalysisResultsSnapshot;
         struct EditorPointSetResultsSnapshot;
         struct EditorPointConstructionResultsSnapshot;
@@ -66,7 +65,9 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
     {
         struct EditorFeatureResultBindings
         {
-            const EditorPointFieldResultSinks* PointFieldResultSinks{};
+            // RUNTIME-348: the declared operations' results and their guarded dismiss.
+            const OperationResultStore* OperationResults{};
+            const OperationResultDismiss* DismissOperationResult{};
             const EditorPointAnalysisResultSinks* PointAnalysisResultSinks{};
             const EditorPointSetResultSinks* PointSetResultSinks{};
             const EditorPointConstructionResultSinks* PointConstructionResultSinks{};
@@ -76,7 +77,6 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
             const EditorMeshFieldResultSinks* MeshFieldResultSinks{};
             const EditorMeshTopologyResultSinks* MeshTopologyResultSinks{};
             const EditorParameterizationResultSinks* ParameterizationResultSinks{};
-            const EditorPointFieldResultsSnapshot* PointFieldResults{};
             const EditorPointAnalysisResultsSnapshot* PointAnalysisResults{};
             const EditorPointSetResultsSnapshot* PointSetResults{};
             const EditorPointConstructionResultsSnapshot* PointConstructionResults{};

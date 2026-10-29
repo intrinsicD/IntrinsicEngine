@@ -1331,6 +1331,7 @@ if(TARGET ExtrinsicRuntime)
     Test.PointConstructionOperations.cpp
     Test.PointSpacingOperations.cpp
     Test.QueuedEditorJobContract.cpp
+    Test.OperationResults.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
         Test.ProceduralGeometryExtraction.cpp

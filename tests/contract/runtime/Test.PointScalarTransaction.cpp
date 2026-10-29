@@ -1,5 +1,7 @@
 #include <cstdint>
 #include <limits>
+#include <optional>
+#include <utility>
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -394,6 +396,76 @@ TEST_P(PointScalarTransaction, AcceptSinkDeliveredExactlyOnce)
     }).Status,R::EditorCommandStatus::Pending);
     ASSERT_TRUE(Jobs.DrainUntilTerminal());EXPECT_EQ(calls,1u);
     R::DiscardEditorPointScalar(Commands(),run);EXPECT_EQ(calls,1u);
+}
+// RUNTIME-348: the operation runtime keeps a GPU run's results in the session's store without a panel:
+// its started answer, then its terminal result under the same run, also when Accept brings its own sink.
+TEST_P(PointScalarTransaction, GpuResultsAreRetainedWithoutThePanel)
+{
+    if (GetParam() == 2)
+        GTEST_SKIP() << "density weights is not on the operation runtime";
+    R::OperationResultStore store;
+    Context.OperationResults = &store;
+    Context.AttachmentActive = []
+    {
+        return true;
+    };
+    const auto stored = [&]() -> std::optional<std::pair<R::EditorCommandStatus, std::size_t>>
+    {
+        const auto copy = store.Copy();
+        if (GetParam() == 0)
+            if (const auto r = copy.Last<R::EditorKernelDensityResult>())
+                return std::pair{r->Status, r->WrittenCount};
+        if (GetParam() == 1)
+            if (const auto r = copy.Last<R::EditorPointSpacingResult>())
+                return std::pair{r->Status, r->WrittenCount};
+        return std::nullopt;
+    };
+    auto run = Ready();
+    ASSERT_TRUE(run);
+    ASSERT_TRUE(stored()) << "the started answer is stored";
+    EXPECT_EQ(stored()->second, 0u);
+    const auto started = stored()->first;
+    EXPECT_FALSE(Ready(5.0f)) << "the output's ring awaits Accept or Discard";
+    EXPECT_EQ(stored()->first, started) << "a start refused because another run owns the output is not stored";
+    unsigned calls = 0;
+    ASSERT_EQ(R::AcceptEditorPointScalar(Commands(),
+                  run,
+                  [&](auto)
+                  {
+                      ++calls;
+                  })
+                  .Status,
+        R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    EXPECT_EQ(calls, 1u);
+    ASSERT_TRUE(stored());
+    EXPECT_EQ(stored()->first, R::EditorCommandStatus::Applied) << "Accept's sink does not replace the retention";
+    EXPECT_EQ(stored()->second, R::SnapshotEditorPointScalar(Commands(), run).LiveCount) << "the folded result";
+    auto discarded = Ready(4.0f);
+    ASSERT_TRUE(discarded);
+    R::DiscardEditorPointScalar(Commands(), discarded);
+    ASSERT_TRUE(stored());
+    EXPECT_EQ(stored()->first, R::SnapshotEditorPointScalar(Commands(), discarded).Status) << "a discard is stored too";
+    EXPECT_EQ(stored()->second, 0u);
+    // A run whose Accept cannot be submitted fails; its failure is stored before its sink runs.
+    Context.JobCommands.Submit = [](R::JobDesc, R::EditorJobIdentity)
+    {
+        return R::JobToken{};
+    };
+    auto failing = Ready(6.0f);
+    ASSERT_TRUE(failing);
+    bool sinkSawFailure = false;
+    (void)R::AcceptEditorPointScalar(Commands(),
+        failing,
+        [&](const R::EditorPointScalarTransactionSnapshot& s)
+        {
+            ASSERT_TRUE(stored());
+            sinkSawFailure = stored()->first == s.Status;
+        });
+    EXPECT_EQ(R::SnapshotEditorPointScalar(Commands(), failing).Phase, R::EditorGpuTransactionPhase::Failed);
+    EXPECT_TRUE(sinkSawFailure);
+    ASSERT_TRUE(stored());
+    EXPECT_EQ(stored()->first, R::SnapshotEditorPointScalar(Commands(), failing).Status) << "a failure is stored too";
 }
 TEST_P(PointScalarTransaction, ReplacedRingRefusesAcceptAndDiscardPreservesReplacement)
 {

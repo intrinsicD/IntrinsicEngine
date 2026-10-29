@@ -48,38 +48,23 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    enum class EditorPointFieldResultSlot : std::uint8_t { KernelDensity, PointSpacing };
-    // C++ linkage permits incomplete borrowed declarations in private workspace
-    // bindings without making sibling feature modules import this family.
-    extern "C++"
-    {
-        struct EditorPointFieldResultSinks
-        {
-            std::function<void(EditorPointFieldResultSlot)> DismissResult{};
-            std::function<void(EditorKernelDensityResult)> KernelDensity{};
-            std::function<void(EditorPointSpacingResult)> PointSpacing{};
-        };
-        struct EditorPointFieldResultsSnapshot
-        {
-            std::optional<EditorKernelDensityResult> LastKernelDensityResult{};
-            std::optional<EditorPointSpacingResult> LastPointSpacingResult{};
-        };
-    }
+    // RUNTIME-348: the results come from the session's operation result store (a copy for the
+    // frame) and are dismissed through it; the operation runtime writes them.
     struct EditorPointFieldPreparedFrame
     {
         EditorProcessingCommands Commands{};
-        EditorPointFieldResultSinks ResultSinks{};
-        EditorPointFieldResultsSnapshot Results{};
+        OperationResultSnapshot Results{};
+        OperationResultDismiss DismissResult{};
     };
 
     [[nodiscard]] EditorPointFieldPreparedFrame PrepareEditorPointFieldFrame(const EditorWorkspaceAttachment&);
 
-    // Apply returns immediate outcomes directly. onComplete receives only the
-    // terminal outcome of a newly queued job while its attachment remains active.
-    // Pending for an already active output observes that job and registers no
-    // additional callback. Configured Apply follows the same delivery contract.
-    // Fold complete transaction diagnostics into the method result retained by the caller.
-    void UpdateEditorPointScalarResult(EditorKernelDensityResult&, const EditorPointScalarTransactionSnapshot&);
+    // Apply returns immediate outcomes directly. onComplete receives the terminal
+    // outcome of a newly queued job while its attachment remains active, or the
+    // inline outcome when no job lane exists (RUNTIME-348). Pending for an already
+    // active output observes that job and registers no additional callback. Every
+    // outcome but that duplicate refusal is stored in the session's operation results.
+    // Configured Apply follows the same delivery contract.
     // Start*Transaction: null handle with the reason in the result when refused; an active job on
     // the same output answers Pending with the shared "already has an active" message.
     [[nodiscard]] EditorPointScalarTransactionHandle StartEditorKernelDensityTransaction(
@@ -94,8 +79,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<KernelDensityConfig> GetEditorKernelDensityConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorKernelDensityResult ApplyEditorConfiguredKernelDensity(const EditorProcessingCommands&, std::function<void(EditorKernelDensityResult)> onComplete = {});
 
-    // Fold complete transaction diagnostics into the method result retained by the caller.
-    void UpdateEditorPointScalarResult(EditorPointSpacingResult&, const EditorPointScalarTransactionSnapshot&);
     [[nodiscard]] EditorPointScalarTransactionHandle StartEditorPointSpacingTransaction(
         const EditorProcessingCommands&,const PointSpacingConfig&,EditorPointSpacingResult&,
         std::function<void(EditorPointSpacingResult)> onComplete={});

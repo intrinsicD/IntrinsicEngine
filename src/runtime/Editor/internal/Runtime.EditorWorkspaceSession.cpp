@@ -134,7 +134,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         std::uint64_t m_LastObservedRuntimeSceneFileSequence{0};
         std::optional<EditorFileImportResult> m_LastImportResult{};
         std::optional<EditorSceneFileResult> m_LastSceneFileResult{};
-        EditorPointFieldResultsSnapshot m_PointFieldResults{};
+        OperationResultStore m_OperationResults{};
+        OperationResultDismiss m_DismissOperationResult{};
         EditorPointAnalysisResultsSnapshot m_PointAnalysisResults{};
         EditorNormalResultsSnapshot m_NormalResults{};
         EditorRegistrationResultsSnapshot m_RegistrationResults{};
@@ -144,7 +145,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         EditorPointSetResultsSnapshot m_PointSetResults{};
         EditorPointConstructionResultsSnapshot m_PointConstructionResults{};
         EditorPointCloudServiceResultsSnapshot m_PointCloudServiceResults{};
-        EditorPointFieldResultSinks m_PointFieldResultSinks{};
         EditorPointAnalysisResultSinks m_PointAnalysisResultSinks{};
         EditorNormalResultSinks m_NormalResultSinks{};
         EditorRegistrationResultSinks m_RegistrationResultSinks{};
@@ -759,14 +759,10 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_PointCloudServices.PointCloudConsolidation =
             m_PointCloudConsolidationService;
         m_ResultBindings.PointCloudServices = &m_PointCloudServices;
-        m_PointFieldResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this](EditorPointFieldResultSlot slot)
+        m_DismissOperationResult = [epoch = m_AttachmentEpoch, this](const void* key)
         {
-            if (!AttachmentEpochIsActive(epoch)) return;
-            switch (slot)
-            {
-            case EditorPointFieldResultSlot::KernelDensity: m_PointFieldResults.LastKernelDensityResult.reset(); break;
-            case EditorPointFieldResultSlot::PointSpacing: m_PointFieldResults.LastPointSpacingResult.reset(); break;
-            }
+            if (AttachmentEpochIsActive(epoch))
+                m_OperationResults.Dismiss(key);
         };
         m_PointAnalysisResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this](EditorPointAnalysisResultSlot slot)
         {
@@ -880,10 +876,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         };
         m_PointAnalysisResultSinks.OutlierAnalysis =
             retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastOutlierAnalysisResult);
-        m_PointFieldResultSinks.KernelDensity =
-            retain(m_PointFieldResults, &EditorPointFieldResultsSnapshot::LastKernelDensityResult);
-        m_PointFieldResultSinks.PointSpacing =
-            retain(m_PointFieldResults, &EditorPointFieldResultsSnapshot::LastPointSpacingResult);
         m_PointSetResultSinks.BilateralFilter =
             retain(m_PointSetResults, &EditorPointSetResultsSnapshot::LastBilateralFilterResult);
         m_PointAnalysisResultSinks.KeypointAnalysis =
@@ -904,7 +896,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             context.LastSceneFileResult = &*m_LastSceneFileResult;
         if (m_LastImportResult.has_value())
             context.LastAssetImportResult = &*m_LastImportResult;
-        m_ResultBindings.PointFieldResults = &m_PointFieldResults;
+        m_ResultBindings.OperationResults = &m_OperationResults;
         m_ResultBindings.PointAnalysisResults = &m_PointAnalysisResults;
         m_ResultBindings.NormalResults = &m_NormalResults;
         m_ResultBindings.RegistrationResults = &m_RegistrationResults;
@@ -914,7 +906,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_ResultBindings.PointSetResults = &m_PointSetResults;
         m_ResultBindings.PointConstructionResults = &m_PointConstructionResults;
         m_ResultBindings.PointCloudServiceResults = &m_PointCloudServiceResults;
-        m_ResultBindings.PointFieldResultSinks = &m_PointFieldResultSinks;
+        m_ResultBindings.DismissOperationResult = &m_DismissOperationResult;
         m_ResultBindings.PointAnalysisResultSinks = &m_PointAnalysisResultSinks;
         m_ResultBindings.NormalResultSinks = &m_NormalResultSinks;
         m_ResultBindings.RegistrationResultSinks = &m_RegistrationResultSinks;
@@ -989,6 +981,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         // Capture only after epoch guards and config/job callbacks are installed.
         m_ProcessingContext = MakeEditorProcessingContext(context);
         m_ProcessingContext.PointInputReadiness = m_PointInputReadiness;
+        m_ProcessingContext.OperationResults = &m_OperationResults;
         BeginEditorPointInputReadinessFrame(*m_PointInputReadiness);
         m_LastFrame = BuildEditorWorkspaceSnapshot(
             MakeEditorWorkspaceSnapshotContext(context, m_ProcessingContext),
@@ -1074,7 +1067,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_LastObservedRuntimeSceneFileSequence = 0u;
         m_LastImportResult.reset();
         m_LastSceneFileResult.reset();
-        m_PointFieldResults = {};
+        m_OperationResults.Clear();
         m_PointAnalysisResults = {};
         m_NormalResults = {};
         m_RegistrationResults = {};
@@ -1084,7 +1077,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_PointSetResults = {};
         m_PointConstructionResults = {};
         m_PointCloudServiceResults = {};
-        m_PointFieldResultSinks = {};
+        m_DismissOperationResult = {};
         m_PointAnalysisResultSinks = {};
         m_NormalResultSinks = {};
         m_RegistrationResultSinks = {};

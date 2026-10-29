@@ -13,6 +13,7 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.EditorCommandHistory;
 export import Extrinsic.Runtime.EditorJobProjection;
+export import Extrinsic.Runtime.OperationResults;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 // These services are borrowed only; their existing owners expose matching C++ linkage.
@@ -69,6 +70,9 @@ export namespace Extrinsic::Runtime
             // Prepared sessions share deferred point-input verdicts. Standalone
             // contexts without this state perform synchronous preflight.
             std::shared_ptr<EditorPointInputReadinessState> PointInputReadiness{};
+            // RUNTIME-348: the session's results of declared operations, written by the operation
+            // runtime while AttachmentActive() holds; null in contexts without a session.
+            OperationResultStore* OperationResults{};
         };
     }
 

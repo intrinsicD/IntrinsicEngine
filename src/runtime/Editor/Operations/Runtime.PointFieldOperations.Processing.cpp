@@ -153,11 +153,6 @@ namespace Extrinsic::Runtime
         using KernelDensityRuntime = OperationRuntime<KernelDensityOperation>;
         using PointSpacingRuntime = OperationRuntime<PointSpacingOperation>;
     }
-    void UpdateEditorPointScalarResult(
-        EditorKernelDensityResult& result, const EditorPointScalarTransactionSnapshot& snapshot)
-    {
-        KernelDensityRuntime::FoldTransaction(result, snapshot);
-    }
     EditorPointScalarTransactionHandle StartEditorKernelDensityTransaction(const EditorProcessingCommands& commands,
         const KernelDensityConfig& config,
         EditorKernelDensityResult& result,
@@ -195,11 +190,6 @@ namespace Extrinsic::Runtime
     {
         return KernelDensityRuntime::ApplyConfigured(
             commands, GetEditorKernelDensityConfig(commands), std::move(onComplete));
-    }
-    void UpdateEditorPointScalarResult(
-        EditorPointSpacingResult& result, const EditorPointScalarTransactionSnapshot& snapshot)
-    {
-        PointSpacingRuntime::FoldTransaction(result, snapshot);
     }
     EditorPointScalarTransactionHandle StartEditorPointSpacingTransaction(const EditorProcessingCommands& commands,
         const PointSpacingConfig& config,

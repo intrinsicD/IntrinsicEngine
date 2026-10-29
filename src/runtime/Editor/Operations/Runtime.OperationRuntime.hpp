@@ -204,9 +204,23 @@ extern "C++"
                     r.WrittenCount = r.LiveCount;
             }
 
-        // The GPU shape: today's scalar transaction (stages 4-8 run inside it).
+        // Stage 8's slot (RUNTIME-348): the session's store, written before any sink runs and only while
+        // the attachment is active. A duplicate refusal never writes it (it answers for another run).
+            static std::uint64_t BeginRun(const EditorProcessingContext& context)
+            {
+                return context.OperationResults ? context.OperationResults->BeginRun() : 0u;
+            }
+            static Result Keep(const EditorProcessingContext& context, std::uint64_t invocation, Result result)
+            {
+                RetainOperationResult(context.OperationResults, context.AttachmentActive, invocation, result);
+                return result;
+            }
+
+        // The GPU shape: today's scalar transaction (stages 4-8 run inside it). The store keeps its
+        // started answer and, through the transaction's retention hook, its terminal result.
             static EditorPointScalarTransactionHandle StartGpu(const EditorProcessingContext& ctx,
                 const std::shared_ptr<Work>& w,
+                std::uint64_t invocation,
                 Result& result,
                 std::function<void(Result)> sink,
                 bool automatic,
@@ -232,9 +246,19 @@ extern "C++"
                     },
                     automatic,
                     test,
-                    diagnostics);
+                    diagnostics,
+                    [w, store = ctx.OperationResults, active = ctx.AttachmentActive, invocation](
+                        EditorPointScalarTransactionSnapshot s)
+                    {
+                        auto terminal = w->Result;
+                        FoldTransaction(terminal, s);
+                        RetainOperationResult(store, active, invocation, terminal);
+                    });
                 FoldTransaction(w->Result, state);
                 result = w->Result;
+                // A start refused because another run owns the output answers for that run.
+                if (!state.OutputBusy)
+                    (void)Keep(ctx, invocation, result);
                 return run;
             }
 
@@ -253,26 +277,33 @@ extern "C++"
                 return BuildPointInputCatalog(EditorProcessingCommandsAccess::Resolve(commands), id, MinimumLiveCount);
             }
 
-        // Stages 1-8. Without a job lane, 5-7 run inline and the result is returned without the sink.
+        // Stages 1-8. Immediate failures are stored and returned; without a job lane 5-8 run inline and
+        // the result is stored, delivered to the sink once and returned; a queued run stores its Pending
+        // and later its terminal result, which the sink receives once.
             static Result Apply(
                 const EditorProcessingCommands& commands, const Params& config, std::function<void(Result)> onComplete)
             {
                 const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+                const std::uint64_t invocation = BeginRun(context);
                 std::string diagnostic;
                 auto w = Capture(context, config, diagnostic);
-                const auto report = [&config, &w](EditorCommandStatus status, std::string message)
+                const auto answer = [&config, &w](EditorCommandStatus status, std::string message)
                 {
                     auto result = w ? w->Result : Def::InitialResult(config);
                     result.Status = status;
                     result.Message = std::move(message);
                     return result;
                 };
+                const auto report = [&](EditorCommandStatus status, std::string message)
+                {
+                    return Keep(context, invocation, answer(status, std::move(message)));
+                };
                 if (!w)
                     return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
                 if (w->Config.Backend == Backend::VulkanLBVH)
                 {
                     Result result;
-                    (void)StartGpu(context, w, result, std::move(onComplete), true);
+                    (void)StartGpu(context, w, invocation, result, std::move(onComplete), true);
                     return result;
                 }
             // Stage 4: the shared index, acquired after capture.
@@ -297,7 +328,10 @@ extern "C++"
                 if (!context.JobCommands.Available())
                 {
                     Execute(*w);
-                    return Publish(context, w);
+                    const Result result = Keep(context, invocation, Publish(context, w));
+                    if (onComplete)
+                        onComplete(result);
+                    return result;
                 }
                 const auto& output = Def::Output(w->Config);
                 const EditorJobIdentity identity{.EntityId = config.StableEntityId,
@@ -307,11 +341,21 @@ extern "C++"
                     .RequestedDomain = EditorJobDomainOfBackend(ToString(w->Config.Backend))};
                 const std::string label = JoinOperationText({Def::Noun, " estimation"});
                 if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
-                    return report(EditorCommandStatus::Pending, std::move(busy->Message));
+                    return answer(EditorCommandStatus::Pending, std::move(busy->Message));
                 auto queued = w->Result;
                 queued.Message = label + " queued.";
-                const MeshSupport::QueuedJobDelivery<Result> delivery{
-                    context, std::move(onComplete), std::move(queued), label};
+                const MeshSupport::QueuedJobDelivery<Result> delivery{context,
+                    [store = context.OperationResults,
+                        active = context.AttachmentActive,
+                        invocation,
+                        sink = std::move(onComplete)](Result result)
+                    {
+                        RetainOperationResult(store, active, invocation, result);
+                        if (sink)
+                            sink(std::move(result));
+                    },
+                    std::move(queued),
+                    label};
                 JobDesc desc{.DebugName = label,
                     .Scope = context.World,
                     .Work = [w](const JobCancellation&) -> JobResultEnvelope
@@ -340,9 +384,9 @@ extern "C++"
                 if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
                 {
                     w->Abandoned = true;
-                    return delivery.Rejected();
+                    return Keep(context, invocation, delivery.Rejected());
                 }
-                return delivery.Pending();
+                return Keep(context, invocation, delivery.Pending());
             }
 
             static Result ApplyConfigured(const EditorProcessingCommands& commands,
@@ -350,8 +394,13 @@ extern "C++"
                 std::function<void(Result)> onComplete)
             {
                 if (!config)
-                    return {.Status = EditorCommandStatus::InvalidProcessingParameters,
-                        .Message = JoinOperationText({Def::Noun, " estimation config is unavailable."})};
+                {
+                    const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+                    return Keep(context,
+                        BeginRun(context),
+                        {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                            .Message = JoinOperationText({Def::Noun, " estimation config is unavailable."})});
+                }
                 return Apply(commands, *config, std::move(onComplete));
             }
 
@@ -362,6 +411,7 @@ extern "C++"
                 std::function<void(Result)> sink)
             {
                 const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
+                const std::uint64_t invocation = BeginRun(ctx);
                 std::string why;
                 auto w = Capture(ctx, config, why);
                 if (!w || config.Backend != Backend::VulkanLBVH)
@@ -369,9 +419,10 @@ extern "C++"
                     result = Def::InitialResult(config);
                     result.Status = EditorCommandStatus::InvalidProcessingParameters;
                     result.Message = w ? "GPU transaction requires vulkan_lbvh." : why;
+                    result = Keep(ctx, invocation, std::move(result));
                     return {};
                 }
-                return StartGpu(ctx, w, result, std::move(sink), false);
+                return StartGpu(ctx, w, invocation, result, std::move(sink), false);
             }
 
         // A transaction over given values on a test residency, captured as the CPU reference would be.
@@ -392,7 +443,7 @@ extern "C++"
                 w->Result.RequestedBackend = config.Backend;
                 w->AfterValues = std::move(values);
                 Result result;
-                return StartGpu(ctx, w, result, {}, false, &residency, diagnostics);
+                return StartGpu(ctx, w, BeginRun(ctx), result, {}, false, &residency, diagnostics);
             }
         };
     }

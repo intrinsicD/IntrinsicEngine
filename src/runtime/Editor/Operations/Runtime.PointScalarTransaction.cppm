@@ -25,6 +25,9 @@ export namespace Extrinsic::Runtime
         EditorCommandStatus Status{EditorCommandStatus::Pending};
         std::string Message{}, AcceptRefusalReason{};
         bool CanAccept{}, IndexReused{};
+        // RUNTIME-348: a start refused because another run owns the output (an active job, or a
+        // transaction awaiting Accept or Discard); that run's result keeps the operation's slot.
+        bool OutputBusy{};
         std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
         std::uint32_t GpuQueryBatches{};
         std::size_t LiveCount{};

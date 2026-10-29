@@ -48,6 +48,7 @@ target_sources(${target_name}
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm
         Editor/Runtime.EditorCommandHistory.cppm
         Editor/Runtime.EditorCommon.cppm
+        Editor/Runtime.OperationResults.cppm
         Editor/Runtime.EditorProcessing.cppm
         Editor/Operations/Runtime.PointScalarTransaction.cppm
         Editor/Operations/Runtime.PropertyInspectionOperations.cppm
