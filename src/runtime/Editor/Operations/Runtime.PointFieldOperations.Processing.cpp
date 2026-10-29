@@ -31,13 +31,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Geometry.Properties;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
-#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
-#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
-#include "Editor/Operations/Runtime.OperationRuntime.hpp"
+import Extrinsic.Runtime.OperationRuntime;
 
 // Kernel density and point spacing each publish one kNN-derived scalar per live sample. Each is a
 // definition the operation runtime drives (RUNTIME-347): names, config, statistics, self-neighbor

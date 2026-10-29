@@ -2,10 +2,54 @@
 // stages 1 resolve, 2-3 readiness and capture, 4 acquire, 5 execute, 6 gate, 7 publish, 8 deliver.
 // This is its pilot specialization: point samples in, one float column out, from kNN rows (kernel
 // density, point spacing). A definition declares names, parameters, its output and a pure Compute.
-// Include after the GeometryProcessingOperations PointFields, JobFailure, RadiusRows and GpuScalar
-// headers; RUNTIME-349 turns it into the exported framework module.
-#pragma once
-extern "C++"
+// RUNTIME-349: an exported module for operation modules (ADR 0031 Decision 7). The editor helpers
+// the templates call are included in its purview as global-module declarations: reachable where an
+// operation module instantiates the runtime, not exported.
+module;
+#include <algorithm>
+#include <chrono>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <glm/vec3.hpp>
+#include <entt/entity/registry.hpp>
+export module Extrinsic.Runtime.OperationRuntime;
+export import Extrinsic.Runtime.EditorProcessing;
+export import Extrinsic.Runtime.PointScalarTransaction;
+export import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Core.Error;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.GpuPropertyResidency;
+import Extrinsic.Graphics.PointScalarAnalysis;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.WorldHandle;
+import Geometry.Properties;
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
+export extern "C++"
 {
     namespace Extrinsic::Runtime::GeometryProcessingDetail
     {

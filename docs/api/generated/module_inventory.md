@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 114 |
+| `runtime` | 115 |
 
 ## Modules
 
@@ -382,6 +382,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.MeshFieldOperations` | `src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshTopologyOperations` | `src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.NormalOperations` | `src/runtime/Editor/Operations/Runtime.NormalOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.OperationRuntime` | `src/runtime/Editor/Operations/Runtime.OperationRuntime.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationOperations` | `src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointAnalysisOperations` | `src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudServiceOperations` | `src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm` | `runtime` |
@@ -477,4 +478,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **450**
+Total modules: **451**

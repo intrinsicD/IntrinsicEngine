@@ -219,3 +219,8 @@ python3 tools/repo/check_layering.py --root src --strict
   After it: 804/804.
 - 2026-10-29: Codex second delta review (`review348c.answer.md`): approve; B2's two-run case
   covered (B stored before A is accepted, continuous capture to after A ends, the old fold fails it).
+- 2026-10-29: Correction (found in the `RUNTIME-349` spike review): the counts in this log include
+  tests skipped by design, because ctest's summary counts a skipped test as passed: "802/802",
+  "803/803" and "804/804" each include the skipped density weights case of
+  `GpuResultsAreRetainedWithoutThePanel`, and "57/57" includes the opt-in
+  `METHOD056VulkanCpdEStep.ScalingProfile`. No test failed.

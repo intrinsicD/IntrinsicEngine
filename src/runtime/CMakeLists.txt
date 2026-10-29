@@ -52,6 +52,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorProcessing.cppm
         Editor/Operations/Runtime.PointScalarTransaction.cppm
         Editor/Operations/Runtime.PropertyInspectionOperations.cppm
+        Editor/Operations/Runtime.OperationRuntime.cppm
         Editor/Operations/Runtime.PointFieldOperations.cppm
         Editor/Operations/Runtime.PointAnalysisOperations.cppm
         Editor/Operations/Runtime.PointSetOperations.cppm
