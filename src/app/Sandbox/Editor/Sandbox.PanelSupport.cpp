@@ -2382,6 +2382,54 @@ namespace Extrinsic::Sandbox::Editor
         DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, name), defaultValue ? "on" : "off");
     }
 
+    std::string BoundFieldLabel(const std::string_view name)
+    {
+        std::string label{name};
+        std::ranges::replace(label, '_', ' ');
+        if (!label.empty())
+            label[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(label[0])));
+        return label;
+    }
+
+    bool DrawFieldControl(
+        const Runtime::ConfigFieldSpec& field, const std::string_view id, double& wire, const double defaultWire)
+    {
+        const std::span<const Runtime::ConfigFieldSpec> fields(&field, 1u);
+        const std::string label = BoundFieldLabel(field.Name) + "##" + std::string(id);
+        switch (field.Type)
+        {
+        case Runtime::ConfigFieldType::Bool:
+        {
+            bool value = wire != 0.0;
+            bool changed = false;
+            DrawSpecCheckbox(label.c_str(), fields, field.Name, value, defaultWire != 0.0, changed);
+            wire = value ? 1.0 : 0.0;
+            return changed;
+        }
+        case Runtime::ConfigFieldType::UInt:
+            if (field.Max.value_or(double(std::numeric_limits<std::uint32_t>::max())) >
+                double(std::numeric_limits<int>::max()))
+            {
+                auto value = static_cast<std::uint32_t>(wire);
+                if (!DrawSpecInputUInt(
+                        label.c_str(), fields, field.Name, value, static_cast<std::uint32_t>(defaultWire)))
+                    return false;
+                wire = value;
+                return true;
+            }
+            {
+                int value = static_cast<int>(wire);
+                if (!DrawSpecDragInt(label.c_str(), fields, field.Name, value, static_cast<int>(defaultWire)))
+                    return false;
+                wire = value;
+                return true;
+            }
+        case Runtime::ConfigFieldType::Float:
+            return DrawSpecDragDouble(label.c_str(), fields, field.Name, wire, defaultWire, 0.01f, "%.6g");
+        default: return false; // enums, strings, references and arrays: the panels draw them (readiness, pickers)
+        }
+    }
+
     std::string_view ColorInterpretationComboTooltip() noexcept
     {
         return "How the property becomes a color.\n"

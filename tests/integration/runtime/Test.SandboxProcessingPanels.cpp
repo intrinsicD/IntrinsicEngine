@@ -4195,9 +4195,225 @@ TEST(SandboxProcessingPanels, TopologyPanelDragsShowTheTableBounds)
         const auto* field = R::FindConfigFieldSpec(test.Fields, test.Field);
         ASSERT_NE(field, nullptr);
         ASSERT_TRUE(field->Max.has_value());
-        const std::string shown = "{ " + (test.Real ? std::format("{:.3f}", *field->Max) : std::to_string(static_cast<long long>(*field->Max))) +
-                                  " } " + test.Label;
+        // RUNTIME-344: generated float drags show %.6g.
+        const std::string shown = "{ " +
+            (test.Real ? std::format("{:.6g}", *field->Max) : std::to_string(static_cast<long long>(*field->Max))) +
+            " } " + test.Label;
         EXPECT_NE(drawn.find(shown), std::string::npos) << shown << " in " << drawn;
+    }
+}
+
+// RUNTIME-344: every declared field of the four topology commands has a control in its panel, labeled by its
+// name; only the fields a panel draws by hand (they preview each option's readiness or pair with a property
+// picker) are left out. The expected labels come from the bound rows, so a field added later needs a control too.
+TEST(SandboxProcessingPanels, TopologyPanelsDrawEveryDeclaredField)
+{
+    const auto label = [](const std::string_view name)
+    {
+        std::string text{name};
+        std::ranges::replace(text, '_', ' ');
+        text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+        return text;
+    };
+    const auto labels = [&](const auto rows, const std::initializer_list<std::string_view> handDrawn)
+    {
+        std::vector<std::string> out;
+        for (const auto& row : rows)
+            if (row.Get != nullptr && !std::ranges::contains(handDrawn, row.Spec.Name))
+                out.push_back(label(row.Spec.Name));
+        return out;
+    };
+    struct Case
+    {
+        const char* Window;
+        const char* Title;
+        const char* Header;
+        std::vector<std::string> Labels;
+    };
+    const std::array cases{
+        Case{"mesh.processing.denoise",
+            "Mesh / Processing / Denoise",
+            nullptr,
+            labels(R::EditorMeshDenoiseFields(), {})},
+        Case{"mesh.processing.remesh",
+            "Mesh / Processing / Remesh",
+            nullptr,
+            labels(R::EditorMeshRemeshFields(), {"mode", "sizing_law", "project_to_surface"})},
+        Case{"mesh.processing.subdivide",
+            "Mesh / Processing / Subdivide",
+            nullptr,
+            labels(R::EditorMeshSubdivideFields(), {"operator", "preserve_loop_feature_edges"})},
+        Case{"mesh.processing.simplify",
+            "Mesh / Processing / Simplify",
+            "Feature-aware (FA-QEM) weights##MeshSimplify",
+            labels(R::EditorMeshSimplifyFields(), {"metric"})},
+    };
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Window);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(test.Window, true));
+        int frames = 0;
+        std::string drawn;
+        h.Driver->OnFrame = [&](R::Engine& engine)
+        {
+            ++frames;
+            auto* window = ImGui::FindWindowByName(test.Title);
+            if (window)
+            {
+                ImGui::SetWindowSize(window, {750, 1600});
+                ImGui::SetWindowPos(window, {0, 0});
+            }
+            if (window && test.Header != nullptr && frames == 8)
+                window->StateStorage.SetInt(window->GetID(test.Header), 1);
+            if (frames == 12)
+            {
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            }
+            if (frames == 14)
+            {
+                drawn = ImGui::GetCurrentContext()->LogBuffer.c_str();
+                ImGui::LogFinish();
+                engine.RequestExit();
+            }
+        };
+        h.Engine->Run();
+        for (const std::string& expected : test.Labels)
+            EXPECT_NE(drawn.find(expected), std::string::npos) << expected << " in " << drawn;
+    }
+}
+
+// RUNTIME-344: an edit in a generated control reaches the command the panel runs: a denoise checkbox toggles and
+// stays toggled, the typed epsilon keeps 1e-6, and an edited iteration count is what the run reports; an unsigned
+// input keeps a value past int's range (4294967295, which also lets the mesh subdivide to 32 faces), and the newly
+// exposed face cap of 16 refuses that subdivision.
+TEST(SandboxProcessingPanels, TopologyPanelEditsReachTheCommand)
+{
+    const auto logged = [](ImGuiWindow* window)
+    {
+        (void)window;
+        ImGui::GetCurrentContext()->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        ImGui::GetCurrentContext()->LogWindow = nullptr;
+    };
+    {
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.denoise", true));
+        int frames = 0;
+        std::string drawn, result;
+        h.Driver->OnFrame = [&](R::Engine& engine)
+        {
+            if (++frames > 400)
+            {
+                ADD_FAILURE() << "Denoise UI did not complete";
+                engine.RequestExit();
+                return;
+            }
+            auto* window = ImGui::FindWindowByName("Mesh / Processing / Denoise");
+            if (!window)
+                return;
+            ImGui::SetWindowSize(window, {750, 1600});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (frames == 8)
+                ImGui::FocusWindow(window);
+            if (frames == 10)
+                ImGui::ActivateItemByID(window->GetID("Preserve boundary##MeshDenoise"));
+            if (frames >= 14 && frames < 20)
+                EditScalarControl(window, "Normal iterations##MeshDenoise", frames - 14, "3");
+            if (frames >= 22 && frames < 28)
+                EditScalarControl(window, "Degenerate normal length epsilon##MeshDenoise", frames - 22, "1e-6");
+            if (frames == 30)
+                logged(window);
+            if (frames == 32)
+            {
+                drawn = ImGui::GetCurrentContext()->LogBuffer.c_str();
+                ImGui::LogFinish();
+            }
+            if (frames == 34)
+                ImGui::ActivateItemByID(window->GetID("Denoise##MeshDenoise"));
+            if (frames >= 36 && frames % 2 == 0)
+                logged(window);
+            if (frames >= 37 && frames % 2 == 1)
+            {
+                const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+                ImGui::LogFinish();
+                if (const auto at = text.find("Iterations: normals="); at != std::string::npos)
+                {
+                    result = text.substr(at, text.find('\n', at) - at);
+                    engine.RequestExit();
+                }
+            }
+        };
+        h.Engine->Run();
+        EXPECT_NE(drawn.find("[ ] Preserve boundary"), std::string::npos) << drawn;
+        EXPECT_NE(drawn.find("1e-06"), std::string::npos) << drawn;
+        EXPECT_EQ(result.rfind("Iterations: normals=3 ", 0), 0u) << result;
+    }
+    for (const char* cap : {"4294967295", "16"})
+    {
+        SCOPED_TRACE(cap);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.subdivide", true));
+        const bool refuse = std::string_view(cap) == "16";
+        int frames = 0;
+        std::string drawn, result;
+        h.Driver->OnFrame = [&](R::Engine& engine)
+        {
+            if (++frames > 400)
+            {
+                ADD_FAILURE() << "Subdivision UI did not complete";
+                engine.RequestExit();
+                return;
+            }
+            auto* window = ImGui::FindWindowByName("Mesh / Processing / Subdivide");
+            if (!window)
+                return;
+            ImGui::SetWindowSize(window, {750, 1200});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (frames >= 10 && frames < 16)
+                EditScalarControl(window, "Max output faces##MeshSubdivide", frames - 10, cap);
+            if (frames == 18)
+                logged(window);
+            if (frames == 20)
+            {
+                drawn = ImGui::GetCurrentContext()->LogBuffer.c_str();
+                ImGui::LogFinish();
+            }
+            if (frames == 22)
+                ImGui::ActivateItemByID(window->GetID("Subdivide##MeshSubdivide"));
+            if (frames >= 26 && frames % 2 == 0)
+                logged(window);
+            if (frames >= 27 && frames % 2 == 1)
+            {
+                const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+                ImGui::LogFinish();
+                if (const auto at = text.find("Last subdivide run: ");
+                    at != std::string::npos && text.find("Last subdivide run: none") == std::string::npos)
+                {
+                    result = text.substr(at, text.find('\n', at) - at);
+                    engine.RequestExit();
+                }
+            }
+        };
+        h.Engine->Run();
+        EXPECT_NE(drawn.find(cap), std::string::npos) << drawn;
+        ASSERT_FALSE(result.empty());
+        EXPECT_EQ(result.find("Applied") == std::string::npos, refuse) << result;
+        EXPECT_EQ(scene.Raw().get<GS::Faces>(entity).Properties.Size(), refuse ? 8u : 32u) << result;
     }
 }
 

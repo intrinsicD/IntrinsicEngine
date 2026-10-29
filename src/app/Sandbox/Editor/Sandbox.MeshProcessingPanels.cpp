@@ -282,11 +282,7 @@ namespace Extrinsic::Sandbox::Editor
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshDenoiseResult> LastResult{};
             std::int32_t Stage{0};
-            std::int32_t NormalIterations{5};
-            std::int32_t VertexIterations{10};
-            double SigmaSpatial{0.0};
-            double SigmaRange{0.0};
-            bool PreserveBoundary{true};
+            Runtime::EditorMeshDenoiseCommand Params{}; // RUNTIME-344: the declared fields, drawn from their rows
         };
 
         using CurvatureState = ProcessingDraftState<Runtime::MeshCurvatureConfig, Runtime::EditorMeshCurvatureResult>;
@@ -304,11 +300,7 @@ namespace Extrinsic::Sandbox::Editor
             OperationRunSlot Run{};
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshRemeshResult> LastResult{};
-            std::int32_t Mode{0};
-            std::int32_t SizingLaw{0};
-            std::int32_t Iterations{1};
-            double TargetEdgeLength{0.0};
-            bool ProjectToSurface{false};
+            Runtime::EditorMeshRemeshCommand Params{};
         };
 
         struct SubdivideState
@@ -316,11 +308,7 @@ namespace Extrinsic::Sandbox::Editor
             OperationRunSlot Run{};
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshSubdivideResult> LastResult{};
-            std::int32_t Operator{0};
-            std::int32_t Iterations{1};
-            bool PreserveLoopFeatures{false};
-            Runtime::GeometryPropertyRef FeatureEdges{
-                Runtime::GeometryElementDomain::MeshEdge, "e:feature", Geometry::PropertyValueKind::Bool};
+            Runtime::EditorMeshSubdivideCommand Params{};
         };
 
         struct SimplifyState
@@ -328,16 +316,7 @@ namespace Extrinsic::Sandbox::Editor
             OperationRunSlot Run{};
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshSimplifyResult> LastResult{};
-            std::int32_t Metric{1};
-            std::int32_t TargetFaces{0};
-            double MaxError{0.0};
-            bool PreserveBoundary{true};
-            double FeatureAngleThresholdDegrees{45.0};
-            double NormalWeight{1.0};
-            double BoundaryWeight{1.0};
-            double CurvatureWeight{1.0};
-            bool PreserveSharpFeatures{true};
-            bool PreserveUvSeams{true};
+            Runtime::EditorMeshSimplifyCommand Params{};
         };
 
         struct NormalsState
@@ -969,34 +948,23 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndCombo();
         }
 
-        const auto fields = Runtime::EditorMeshDenoiseFieldSpecs();
-        const Runtime::EditorMeshDenoiseCommand defaults{};
-        DrawSpecDragInt("Normal iterations##MeshDenoise",
-            fields,
-            "normal_iterations",
-            Denoise.NormalIterations,
-            int(defaults.NormalIterations));
-        DrawSpecDragInt("Vertex iterations##MeshDenoise",
-            fields,
-            "vertex_iterations",
-            Denoise.VertexIterations,
-            int(defaults.VertexIterations));
-        DrawSpecDragDouble(
-            "Sigma spatial##MeshDenoise", fields, "sigma_spatial", Denoise.SigmaSpatial, defaults.SigmaSpatial, 0.01f);
-        DrawSpecDragDouble(
-            "Sigma range##MeshDenoise", fields, "sigma_range", Denoise.SigmaRange, defaults.SigmaRange, 0.01f);
-        ImGui::Checkbox("Preserve boundary##MeshDenoise", &Denoise.PreserveBoundary);
-        DrawSpecFieldHint(fields, "preserve_boundary", defaults.PreserveBoundary ? "on" : "off");
+        // RUNTIME-344: the declared fields from their rows; the epsilon (1e-12 by default) is typed, not dragged.
+        DrawBoundFields(Runtime::EditorMeshDenoiseFields(),
+            Denoise.Params,
+            "MeshDenoise",
+            [](const std::string_view name)
+            {
+                return name != "degenerate_normal_length_epsilon";
+            });
+        DrawSpecInputDouble((BoundFieldLabel("degenerate_normal_length_epsilon") + "##MeshDenoise").c_str(),
+            Runtime::EditorMeshDenoiseFieldSpecs(),
+            "degenerate_normal_length_epsilon",
+            Denoise.Params.DegenerateNormalLengthEpsilon,
+            Runtime::EditorMeshDenoiseCommand{}.DegenerateNormalLengthEpsilon);
 
-        const Runtime::EditorMeshDenoiseCommand command{
-            .StableEntityId = model.SelectedStableId,
-            .Stage = stage,
-            .NormalIterations = static_cast<std::uint32_t>(Denoise.NormalIterations),
-            .VertexIterations = static_cast<std::uint32_t>(Denoise.VertexIterations),
-            .SigmaSpatial = Denoise.SigmaSpatial,
-            .SigmaRange = Denoise.SigmaRange,
-            .PreserveBoundary = Denoise.PreserveBoundary,
-        };
+        Runtime::EditorMeshDenoiseCommand command = Denoise.Params;
+        command.StableEntityId = model.SelectedStableId;
+        command.Stage = stage;
         const auto readiness = Runtime::PreviewEditorMeshDenoiseCommand(context.MeshTopology.Commands, command);
         if (DrawProcessingActionButton("Denoise##MeshDenoise", readiness))
         {
@@ -1529,11 +1497,7 @@ namespace Extrinsic::Sandbox::Editor
         if (context.MeshTopology.Results.LastMeshRemeshResult.has_value())
             Remesh.LastResult = *context.MeshTopology.Results.LastMeshRemeshResult;
         ImGui::SeparatorText("Remesh");
-        Remesh.Mode = std::clamp(Remesh.Mode, 0, static_cast<std::int32_t>(kMeshRemeshModes.size() - 1u));
-        Remesh.SizingLaw =
-            std::clamp(Remesh.SizingLaw, 0, static_cast<std::int32_t>(kMeshRemeshSizingLaws.size() - 1u));
-        const auto fields = Runtime::EditorMeshRemeshFieldSpecs();
-        const Runtime::EditorMeshRemeshCommand defaults{};
+        auto& params = Remesh.Params;
 
         // Probe options independently of unrelated draft settings so a blocked
         // combination does not prevent choosing a supported alternative.
@@ -1541,17 +1505,15 @@ namespace Extrinsic::Sandbox::Editor
         {
             return Runtime::PreviewEditorMeshRemeshCommand(context.MeshTopology.Commands, command);
         };
-        if (ImGui::BeginCombo("Mode##MeshRemesh",
-                Runtime::DebugNameForEditorMeshRemeshMode(FromIndex(kMeshRemeshModes, Remesh.Mode))))
+        if (ImGui::BeginCombo("Mode##MeshRemesh", Runtime::DebugNameForEditorMeshRemeshMode(params.Mode)))
         {
-            for (std::size_t i = 0u; i < kMeshRemeshModes.size(); ++i)
+            for (const auto option : kMeshRemeshModes)
             {
-                const auto option = kMeshRemeshModes[i];
                 const auto readiness = preview({.StableEntityId = model.SelectedStableId, .Mode = option});
                 ImGui::BeginDisabled(!readiness.Enabled);
-                const bool selected = Remesh.Mode == static_cast<std::int32_t>(i);
+                const bool selected = params.Mode == option;
                 if (ImGui::Selectable(Runtime::DebugNameForEditorMeshRemeshMode(option), selected))
-                    Remesh.Mode = static_cast<std::int32_t>(i);
+                    params.Mode = option;
                 if (selected)
                     ImGui::SetItemDefaultFocus();
                 ImGui::EndDisabled();
@@ -1559,27 +1521,17 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
-        DrawSpecDragInt("Iterations##MeshRemesh", fields, "iterations", Remesh.Iterations, int(defaults.Iterations));
-        DrawSpecDragDouble("Target edge length##MeshRemesh",
-            fields,
-            "target_edge_length",
-            Remesh.TargetEdgeLength,
-            defaults.TargetEdgeLength,
-            0.01f);
-
-        const auto mode = FromIndex(kMeshRemeshModes, Remesh.Mode);
-        if (ImGui::BeginCombo("Sizing law##MeshRemesh",
-                Runtime::DebugNameForEditorMeshRemeshSizingLaw(FromIndex(kMeshRemeshSizingLaws, Remesh.SizingLaw))))
+        if (ImGui::BeginCombo(
+                "Sizing law##MeshRemesh", Runtime::DebugNameForEditorMeshRemeshSizingLaw(params.SizingLaw)))
         {
-            for (std::size_t i = 0u; i < kMeshRemeshSizingLaws.size(); ++i)
+            for (const auto option : kMeshRemeshSizingLaws)
             {
-                const auto option = kMeshRemeshSizingLaws[i];
                 const auto readiness =
-                    preview({.StableEntityId = model.SelectedStableId, .Mode = mode, .SizingLaw = option});
+                    preview({.StableEntityId = model.SelectedStableId, .Mode = params.Mode, .SizingLaw = option});
                 ImGui::BeginDisabled(!readiness.Enabled);
-                const bool selected = Remesh.SizingLaw == static_cast<std::int32_t>(i);
+                const bool selected = params.SizingLaw == option;
                 if (ImGui::Selectable(Runtime::DebugNameForEditorMeshRemeshSizingLaw(option), selected))
-                    Remesh.SizingLaw = static_cast<std::int32_t>(i);
+                    params.SizingLaw = option;
                 if (selected)
                     ImGui::SetItemDefaultFocus();
                 ImGui::EndDisabled();
@@ -1588,21 +1540,24 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndCombo();
         }
         ImGui::TextDisabled("Sizing law applies to adaptive remeshing.");
-        const auto projection = preview(
-            {.StableEntityId = model.SelectedStableId, .Mode = mode, .ProjectToSurface = !Remesh.ProjectToSurface});
+        // RUNTIME-344: the other declared fields from their rows; mode, sizing law and projection preview each option.
+        DrawBoundFields(Runtime::EditorMeshRemeshFields(),
+            params,
+            "MeshRemesh",
+            [](const std::string_view name)
+            {
+                return name != "mode" && name != "sizing_law" && name != "project_to_surface";
+            });
+        const auto projection = preview({.StableEntityId = model.SelectedStableId,
+            .Mode = params.Mode,
+            .ProjectToSurface = !params.ProjectToSurface});
         ImGui::BeginDisabled(!projection.Enabled);
-        ImGui::Checkbox("Project to surface##MeshRemesh", &Remesh.ProjectToSurface);
+        ImGui::Checkbox("Project to surface##MeshRemesh", &params.ProjectToSurface);
         ImGui::EndDisabled();
         DrawDisabledReasonTooltip(projection.DisabledReason);
 
-        const Runtime::EditorMeshRemeshCommand command{
-            .StableEntityId = model.SelectedStableId,
-            .Mode = mode,
-            .SizingLaw = FromIndex(kMeshRemeshSizingLaws, Remesh.SizingLaw),
-            .Iterations = static_cast<std::uint32_t>(Remesh.Iterations),
-            .TargetEdgeLength = Remesh.TargetEdgeLength,
-            .ProjectToSurface = Remesh.ProjectToSurface,
-        };
+        Runtime::EditorMeshRemeshCommand command = params;
+        command.StableEntityId = model.SelectedStableId;
         if (DrawProcessingActionButton("Remesh##MeshRemesh", preview(command)))
         {
             PublishCommandResult(Remesh.LastResult,
@@ -1655,26 +1610,21 @@ namespace Extrinsic::Sandbox::Editor
         if (context.MeshTopology.Results.LastMeshSubdivideResult.has_value())
             Subdivide.LastResult = *context.MeshTopology.Results.LastMeshSubdivideResult;
         ImGui::SeparatorText("Subdivide");
-        Subdivide.Operator =
-            std::clamp(Subdivide.Operator, 0, static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
-        const auto fields = Runtime::EditorMeshSubdivideFieldSpecs();
-        const Runtime::EditorMeshSubdivideCommand defaults{};
+        auto& params = Subdivide.Params;
         const auto preview = [&](const Runtime::EditorMeshSubdivideCommand& command)
         {
             return Runtime::PreviewEditorMeshSubdivideCommand(context.MeshTopology.Commands, command);
         };
-        if (ImGui::BeginCombo("Operator##MeshSubdivide",
-                Runtime::DebugNameForEditorMeshSubdivideOperator(
-                    FromIndex(kMeshSubdivideOperators, Subdivide.Operator))))
+        if (ImGui::BeginCombo(
+                "Operator##MeshSubdivide", Runtime::DebugNameForEditorMeshSubdivideOperator(params.Operator)))
         {
-            for (std::size_t i = 0u; i < kMeshSubdivideOperators.size(); ++i)
+            for (const auto option : kMeshSubdivideOperators)
             {
-                const auto option = kMeshSubdivideOperators[i];
                 const auto readiness = preview({.StableEntityId = model.SelectedStableId, .Operator = option});
                 ImGui::BeginDisabled(!readiness.Enabled);
-                const bool selected = Subdivide.Operator == static_cast<std::int32_t>(i);
+                const bool selected = params.Operator == option;
                 if (ImGui::Selectable(Runtime::DebugNameForEditorMeshSubdivideOperator(option), selected))
-                    Subdivide.Operator = static_cast<std::int32_t>(i);
+                    params.Operator = option;
                 if (selected)
                     ImGui::SetItemDefaultFocus();
                 ImGui::EndDisabled();
@@ -1682,15 +1632,22 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
-        DrawSpecDragInt(
-            "Iterations##MeshSubdivide", fields, "iterations", Subdivide.Iterations, int(defaults.Iterations));
-        const auto op = FromIndex(kMeshSubdivideOperators, Subdivide.Operator);
+        // RUNTIME-344: the other declared fields from their rows; the operator and the Loop features preview
+        // their readiness, the latter beside its edge property picker.
+        DrawBoundFields(Runtime::EditorMeshSubdivideFields(),
+            params,
+            "MeshSubdivide",
+            [](const std::string_view name)
+            {
+                return name != "operator" && name != "preserve_loop_feature_edges";
+            });
+        const auto op = params.Operator;
         if (op != Runtime::EditorMeshSubdivideOperator::Loop)
-            Subdivide.PreserveLoopFeatures = false;
+            params.PreserveLoopFeatureEdges = false;
         if (op == Runtime::EditorMeshSubdivideOperator::Loop)
             DrawProcessingPropertyInput("Feature edges##MeshSubdivide",
                 model.PropertyCatalog,
-                Subdivide.FeatureEdges,
+                params.FeatureEdges,
                 [](const Runtime::GeometryPropertyRef& ref)
                 {
                     return ref.Domain == Runtime::GeometryElementDomain::MeshEdge &&
@@ -1699,20 +1656,15 @@ namespace Extrinsic::Sandbox::Editor
                 });
         const auto feature = preview({.StableEntityId = model.SelectedStableId,
             .Operator = op,
-            .PreserveLoopFeatureEdges = !Subdivide.PreserveLoopFeatures,
-            .FeatureEdges = Subdivide.FeatureEdges});
+            .PreserveLoopFeatureEdges = !params.PreserveLoopFeatureEdges,
+            .FeatureEdges = params.FeatureEdges});
         ImGui::BeginDisabled(!feature.Enabled);
-        ImGui::Checkbox("Preserve Loop features##MeshSubdivide", &Subdivide.PreserveLoopFeatures);
+        ImGui::Checkbox("Preserve Loop features##MeshSubdivide", &params.PreserveLoopFeatureEdges);
         ImGui::EndDisabled();
         DrawDisabledReasonTooltip(feature.DisabledReason);
 
-        const Runtime::EditorMeshSubdivideCommand command{
-            .StableEntityId = model.SelectedStableId,
-            .Operator = op,
-            .Iterations = static_cast<std::uint32_t>(Subdivide.Iterations),
-            .PreserveLoopFeatureEdges = Subdivide.PreserveLoopFeatures,
-            .FeatureEdges = Subdivide.FeatureEdges,
-        };
+        Runtime::EditorMeshSubdivideCommand command = params;
+        command.StableEntityId = model.SelectedStableId;
         if (DrawProcessingActionButton("Subdivide##MeshSubdivide", preview(command)))
         {
             PublishCommandResult(Subdivide.LastResult,
@@ -1761,86 +1713,43 @@ namespace Extrinsic::Sandbox::Editor
         if (context.MeshTopology.Results.LastMeshSimplifyResult.has_value())
             Simplify.LastResult = *context.MeshTopology.Results.LastMeshSimplifyResult;
         ImGui::SeparatorText("Simplify");
-        Simplify.Metric = std::clamp(Simplify.Metric, 0, static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
-        const auto fields = Runtime::EditorMeshSimplifyFieldSpecs();
-        const Runtime::EditorMeshSimplifyCommand defaults{};
-        const Runtime::EditorMeshSimplifyMetric metric = FromIndex(kMeshSimplifyMetrics, Simplify.Metric);
-        if (ImGui::BeginCombo("Metric##MeshSimplify", Runtime::DebugNameForEditorMeshSimplifyMetric(metric)))
+        auto& params = Simplify.Params;
+        if (ImGui::BeginCombo("Metric##MeshSimplify", Runtime::DebugNameForEditorMeshSimplifyMetric(params.Metric)))
         {
-            for (std::size_t i = 0u; i < kMeshSimplifyMetrics.size(); ++i)
+            for (const auto option : kMeshSimplifyMetrics)
             {
-                const bool selected = Simplify.Metric == static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(Runtime::DebugNameForEditorMeshSimplifyMetric(kMeshSimplifyMetrics[i]), selected))
-                {
-                    Simplify.Metric = static_cast<std::int32_t>(i);
-                }
+                const bool selected = params.Metric == option;
+                if (ImGui::Selectable(Runtime::DebugNameForEditorMeshSimplifyMetric(option), selected))
+                    params.Metric = option;
                 if (selected)
                     ImGui::SetItemDefaultFocus();
             }
             ImGui::EndCombo();
         }
-
-        DrawSpecDragInt(
-            "Target faces##MeshSimplify", fields, "target_faces", Simplify.TargetFaces, int(defaults.TargetFaces));
-        DrawSpecDragDouble("Max error (0 = unlimited)##MeshSimplify",
-            fields,
-            "max_error",
-            Simplify.MaxError,
-            defaults.MaxError,
-            0.001f,
-            "%.6g");
-        ImGui::Checkbox("Preserve boundary##MeshSimplify", &Simplify.PreserveBoundary);
-        DrawSpecFieldHint(fields, "preserve_boundary", defaults.PreserveBoundary ? "on" : "off");
-
-        const bool faQem = metric == Runtime::EditorMeshSimplifyMetric::FA_QEM;
+        // RUNTIME-344: the other declared fields from their rows; the FA-QEM ones inside their header.
+        const auto faQemField = [](const std::string_view name)
+        {
+            return name == "feature_angle_threshold_degrees" || name == "normal_weight" || name == "boundary_weight" ||
+                name == "curvature_weight" || name == "preserve_sharp_features" || name == "preserve_uv_seams";
+        };
+        const auto rows = Runtime::EditorMeshSimplifyFields();
+        DrawBoundFields(rows,
+            params,
+            "MeshSimplify",
+            [&](const std::string_view name)
+            {
+                return name != "metric" && !faQemField(name);
+            });
+        const bool faQem = params.Metric == Runtime::EditorMeshSimplifyMetric::FA_QEM;
         if (!faQem)
             ImGui::BeginDisabled();
         if (ImGui::CollapsingHeader("Feature-aware (FA-QEM) weights##MeshSimplify"))
-        {
-            DrawSpecDragDouble("Feature angle (deg)##MeshSimplify",
-                fields,
-                "feature_angle_threshold_degrees",
-                Simplify.FeatureAngleThresholdDegrees,
-                defaults.FeatureAngleThresholdDegrees,
-                0.5f,
-                "%.1f");
-            DrawSpecDragDouble("Normal weight##MeshSimplify",
-                fields,
-                "normal_weight",
-                Simplify.NormalWeight,
-                defaults.NormalWeight,
-                0.01f);
-            DrawSpecDragDouble("Boundary weight##MeshSimplify",
-                fields,
-                "boundary_weight",
-                Simplify.BoundaryWeight,
-                defaults.BoundaryWeight,
-                0.01f);
-            DrawSpecDragDouble("Curvature weight##MeshSimplify",
-                fields,
-                "curvature_weight",
-                Simplify.CurvatureWeight,
-                defaults.CurvatureWeight,
-                0.01f);
-            ImGui::Checkbox("Preserve sharp features##MeshSimplify", &Simplify.PreserveSharpFeatures);
-            ImGui::Checkbox("Preserve UV seams##MeshSimplify", &Simplify.PreserveUvSeams);
-        }
+            DrawBoundFields(rows, params, "MeshSimplify", faQemField);
         if (!faQem)
             ImGui::EndDisabled();
 
-        const Runtime::EditorMeshSimplifyCommand command{
-            .StableEntityId = model.SelectedStableId,
-            .Metric = metric,
-            .TargetFaces = static_cast<std::size_t>(Simplify.TargetFaces),
-            .MaxError = Simplify.MaxError,
-            .PreserveBoundary = Simplify.PreserveBoundary,
-            .FeatureAngleThresholdDegrees = Simplify.FeatureAngleThresholdDegrees,
-            .NormalWeight = Simplify.NormalWeight,
-            .BoundaryWeight = Simplify.BoundaryWeight,
-            .CurvatureWeight = Simplify.CurvatureWeight,
-            .PreserveSharpFeatures = Simplify.PreserveSharpFeatures,
-            .PreserveUvSeams = Simplify.PreserveUvSeams,
-        };
+        Runtime::EditorMeshSimplifyCommand command = params;
+        command.StableEntityId = model.SelectedStableId;
         const auto readiness = Runtime::PreviewEditorMeshSimplifyCommand(context.MeshTopology.Commands, command);
         if (DrawProcessingActionButton("Simplify##MeshSimplify", readiness))
         {

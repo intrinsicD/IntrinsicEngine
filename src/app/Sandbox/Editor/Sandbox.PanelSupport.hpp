@@ -454,6 +454,36 @@ namespace Extrinsic::Sandbox::Editor
     void DrawSpecCheckbox(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
                           bool& value, bool defaultValue, bool& changed);
 
+    // RUNTIME-344: controls generated from a command's bound fields (Runtime::BoundField), so a declared
+    // field gets its control, label, range and hint from its one declaration. The label is the field's name
+    // ("normal_iterations" -> "Normal iterations").
+    [[nodiscard]] std::string BoundFieldLabel(std::string_view name);
+    // One field's control over its wire number (Bool 0 or 1): a checkbox, an unsigned drag (an input for a
+    // range past int) or a float drag (%.6g, speed 0.01), labeled "<BoundFieldLabel>##<id>". Other types draw
+    // nothing: the panels draw their enums (with readiness previews or readable names) and pickers. True when
+    // changed.
+    bool DrawFieldControl(const Runtime::ConfigFieldSpec& field, std::string_view id, double& wire, double defaultWire);
+    // Every bound row of `rows` that `keep(name)` keeps, in table order, as its control writing `command`.
+    template <class Cmd, class Keep>
+    bool DrawBoundFields(
+        const std::span<const Runtime::BoundField<Cmd>> rows, Cmd& command, const std::string_view id, const Keep& keep)
+    {
+        const Cmd defaults{};
+        bool changed = false;
+        for (const Runtime::BoundField<Cmd>& row : rows)
+        {
+            if (row.Get == nullptr || !keep(row.Spec.Name))
+                continue;
+            double wire = Runtime::FieldNumber(row, command);
+            if (DrawFieldControl(row.Spec, id, wire, Runtime::FieldNumber(row, defaults)))
+            {
+                Runtime::SetFieldNumber(row, command, wire);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
     extern "C++"
     {
         struct SandboxEditorFrame final : Runtime::EditorWorkspaceSnapshot
