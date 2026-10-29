@@ -22,6 +22,10 @@ contract_review: kernel density and point spacing get their agent row, section r
     rewritten, keeping every behavioural assertion)
 29. (2026-10-29) "ok, then do 1." (answer to: 1 build `RUNTIME-351` as planned and measure the phase 1
     gate, then bring options if it is missed; 2 deeper cuts first; 3 pause and decide the gate now)
+30. (2026-10-30) "do 3." (answer to: 1 full scope as reviewed; 2 block 2 plus the size count without
+    build time and memory; 3 stop building now: count the size on today's state, report the gate as
+    missed, and decide next: deeper cuts, an ADR amendment for generic entry points, a revised gate, or
+    phase 2)
 
 ## Goal
 - ADR 0031 Decision 7 (exposure: `OperationRow<Def>`, `RegisterOperationSection<Def>`, a default
@@ -78,6 +82,39 @@ Blocks, each built, tested and reviewed before the next.
    session-owned state, the GPU transaction row, execution diagnostics, progress, show, dismiss and
    the result lines (`Describe(result)`); display labels kept apart from the schema descriptions, no
    added ID scope. The two hand-written windows go only when the panel tests pass unchanged.
+   **Block 2's own plan (2026-10-29, after block 1):**
+   - The agent row and the section registration are already one call per operation
+     (`ConfigSourced<Result>(...)` in `Runtime.AgentOperations.Operations.cpp`, one line plus the
+     import in `Sandbox.ConfigSections.cpp`); a generic builder would need a descriptor carrying the
+     same name, family, section, frame and entry points, moving lines rather than removing them. They
+     stay as they are (stated, not built).
+   - The panel: one generic `DrawPointScalarOperationWindow<Panel>` in `Sandbox.MeshProcessingPanels.cpp`
+     replaces `DrawDensityWindow` and `DrawSpacingWindow` (about 230 lines). Per operation, the
+     interface exports a panel descriptor `<Op>Panel` of display text (kept apart from the schema
+     descriptions) and two member pointers, and the unit defines `Describe(result)` (the
+     operation's own result lines as strings). Window registration, state types
+     (`ProcessingDraftState`), transaction handles and the test hook stay.
+   - **Panel contract** (today's two windows, item by item; every label and ID unchanged):
+     1. first-use size 460 x 600; window title `Title` ("Kernel Density", "Point Spacing and Radii");
+     2. the stored result read from the store; the draft synchronized with the active section;
+     3. `DrawProcessingEntity("Entity##<Suffix>")` (Suffix "Density", "Spacing");
+     4. `DrawProcessingPointInput("Positions##<Suffix>")` over the operation's input catalog; a change
+        sets the output's domain to the positions' domain;
+     5. `DrawProcessingScalarOutput(<OutputLabel>)` ("Density property", "Radii property");
+     6. `Combo("Backend")` with the section's backend names;
+     7. `InputScalar("Neighbors k", U32)`; `InputFloat(<FloatLabel>)` ("Bandwidth (0 = automatic)",
+        "Radius scale") on `FloatField`; the description text;
+     8. `InputScalar("GPU query batch size", U32)` only for `vulkan_lbvh`;
+     9. the scalar GPU transaction row; `DrawProcessingExecution` with preview, config apply, the run
+        (GPU start for `vulkan_lbvh`, the configured apply otherwise), `ActionLabel` ("Estimate
+        density", "Estimate radii"), the two rejection texts and the output key;
+     10. progress `Run.Draw(<ProgressId>)` ("density_progress", "spacing_progress"), the Vulkan note,
+         `DrawProcessingPropertyShowButton(<ShowLabel>)` and its diagnostic;
+     11. the result block: separator, status, requested and ran backends, live and total, the
+         operation's `Describe` lines, the message, `Dismiss##<Suffix>`.
+   - Tests: every panel test unchanged (they click these labels and IDs); a new test that each
+     `Describe` returns today's lines for a given result; mutations: a descriptor label changed (a
+     panel test red), the domain synchronization removed, the GPU-only field always shown.
 3. **The gate, measured.**
    - **Size (static, deterministic):** per operation, its "adding an operation" footprint (files and
      lines: own files, and each line it adds to shared files: exports, menus, state, build lists,
@@ -103,9 +140,10 @@ Blocks, each built, tested and reviewed before the next.
 - Mutations per block, named in the block's plan.
 
 ## Acceptance criteria
-- [ ] Generic section functions; generated agent row, section registration and default panel for
-      both operations.
-- [ ] Phase 1 gate measured and reported: size, and build time and memory under pre-flight.
+- [x] Generic section functions (block 1). Generated panel and agent row not built (operator,
+      question 30).
+- [x] Phase 1 gate's size criterion measured and reported (missed); build time and memory not
+      measured (operator, question 30: stop building, count the size, report).
 
 ## Verification
 ```bash
@@ -153,3 +191,40 @@ python3 tools/repo/check_layering.py --root src --strict
   renames name-only. B1 the plan had made build time and memory conditional on the size result,
   which question 29 did not authorize (and the plan review did not propose): the condition is
   removed; all three are measured. O1 `<limits>` included in both interfaces.
+- 2026-10-29: Codex review of block 2's plan (`plan351b.answer.md`): revise. B1 keeping the agent's
+  four-line `ConfigSourced` row does not meet ADR 0031's definition-derived one-line exposure: build
+  `OperationRow` over the definition, or record it as unmet for the operator (the section
+  registration may stay: it is already derived). B2 the panel contract needs six more items
+  (stored result read before `Begin`; draft synchronized only when `Begin` succeeds; the empty
+  completion sink; the transaction's activity passed to execution readiness; the current
+  `{entity, output}` reference passed to progress; dismissal of the local result and the right
+  stored slot) and the result formatting frozen (density one statistics line, spacing three, all
+  `%.5g`, wrapped versus unwrapped text). B3 the uncovered contract items need named
+  characterization tests for both operations (positions on another domain update the output; the
+  GPU batch field absent for both CPU backends and present for Vulkan; edits reach the intended
+  members; a rejected draft leaves the active config; dismissal holds on the next frame; exact
+  `Describe` lines with distinct values), shown on today's windows first, then by mutation. O1
+  descriptor placement sound. Status: paused for the operator's scope decision (the remaining work
+  grew; see the report of 2026-10-29).
+- 2026-10-30: Operator (question 30): stop building; count the size on today's state, report the gate
+  as missed and decide next. Block 2 and the build time and memory measurement are not done.
+  **Phase 1 gate, size criterion, at `3a66c3efb`** (ADR 0031 accounting: every line of the
+  operation's own files and every operation-specific line in shared files; tests apart; a file
+  counted when it names the operation outside `src/geometry` and documentation; the panel counted as
+  its whole window function plus its other lines; one unrelated match in the consolidation module
+  excluded; method, scripts and result: `docs/reports/2026-10-30-phase-1-gate-footprint.md`):
+
+  | | files touched | operation-specific lines | gate |
+  |---|---|---|---|
+  | kernel density | 13 (own: interface 160, unit 173, test; shared: panel 127, agent row 4, section registration 2, build list 2, legacy capability enum 5, point field facade 1, module inventory 1, tool schema baseline 2, tests/CMakeLists) | 477 | 9 files (3 own), 150 lines: **missed** |
+  | point spacing | 11 (own: interface 161, unit 179, test; shared: panel 135, agent row 4, registration 2, build list 2, facade 1, inventory 1, schema baseline 2, tests/CMakeLists) | 487 | **missed** |
+
+  The same count at the pre-pilot commit `f96a13e2d` (estimate: the operations' blocks inside
+  shared files counted whole, session lines undercounted; same report): kernel density 16 files,
+  about 391 lines; point spacing 14 files, about 395 lines. So the pilot removed 3 files per
+  operation but its own lines grew by about 20%; the three framework modules hold 887 lines, about
+  690 of them new (the family template they replace was 195). Why the lines grew: the moved code is
+  now clang-formatted (the old files were dense), each unit carries about 35 lines of module and
+  include boilerplate, the non-template entry points stay (ADR 0031's boundary), and the panel (about
+  130 lines) is unchanged. The two pilot operations were the most factored ones before (one shared
+  family template), so they could show the least saving.

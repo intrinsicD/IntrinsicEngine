@@ -31,6 +31,10 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
 29. (2026-10-29) "ok, then do 1." (answer to: the phase 1 gate's 150 lines per operation looks out of
     reach; 1 build `RUNTIME-351` as planned and measure, then bring options; 2 deeper cuts first;
     3 pause and decide the gate now)
+30. (2026-10-30) "do 3." (answer to: 1 full scope as reviewed; 2 block 2 plus the size count without
+    build time and memory; 3 stop building now: count the size on today's state, report the gate as
+    missed, and decide next: deeper cuts, an ADR amendment for generic entry points, a revised gate, or
+    phase 2)
 
 ## Goal
 - `docs/adr/0031-declared-operations.md`: an operation is one typed definition (parameters declared
@@ -117,3 +121,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - 2026-10-29: Operator decision (question 28): the phase 1 gate's "existing tests pass unchanged"
   keeps every behavioural assertion; tests that pin the per-operation structure the runtime
   replaces may be rewritten, each listed in its task. Recorded in ADR 0031 (Validation, Gates).
+- 2026-10-30: Phase 1 gate (`RUNTIME-351`, operator question 30): the size criterion is **missed** for
+  both pilot operations: kernel density 13 files and 477 operation-specific lines, point spacing 11
+  and 487 (limits 9 and 150); pre-pilot estimate 16/391 and 14/395. Files per operation fell by 3,
+  lines rose by about 20%; about 690 lines of framework are new. Build time and memory were not
+  measured. Per ADR 0031 a missed size threshold is an implementation failure to fix within the
+  phase; the operator decides how to proceed (options reported 2026-10-30).
