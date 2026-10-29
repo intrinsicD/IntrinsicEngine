@@ -296,19 +296,6 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             return message;
         }
 
-        // Compose an entity model matrix (translate * rotate * scale) from its
-        // local Transform::Component so ICP can run in world space.
-        [[nodiscard]] glm::mat4 ModelMatrixFromTransform(
-            const ECSC::Transform::Component& transform) noexcept
-        {
-            glm::mat4 model = glm::mat4_cast(transform.Rotation);
-            model[0] *= transform.Scale.x;
-            model[1] *= transform.Scale.y;
-            model[2] *= transform.Scale.z;
-            model[3] = glm::vec4(transform.Position, 1.0f);
-            return model;
-        }
-
         [[nodiscard]] glm::vec3 ComputePointCentroid(
             const std::span<const glm::vec3> points) noexcept
         {
@@ -410,7 +397,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             const std::vector<glm::vec3>& points,
             const ECSC::Transform::Component& transform)
         {
-            const glm::mat4 model = ModelMatrixFromTransform(transform);
+            const glm::mat4 model = ECSC::Transform::GetMatrix(transform);
             std::vector<glm::vec3> world;
             world.reserve(points.size());
             for (const glm::vec3& point : points)
@@ -548,10 +535,9 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             std::vector<glm::vec3> targetWorldNormals{};
             if (!state->NormalBinding.Points.empty())
             {
-                const glm::mat4 targetModel =
-                    state->TargetHadTransform
-                        ? ModelMatrixFromTransform(state->TargetBeforeTransform)
-                        : glm::mat4(1.0f);
+                const glm::mat4 targetModel = state->TargetHadTransform
+                    ? ECSC::Transform::GetMatrix(state->TargetBeforeTransform)
+                    : glm::mat4(1.0f);
                 const RegistrationNormalStatus worldStatus =
                     TransformRegistrationNormalsToWorld(
                         state->NormalBinding.Points,
@@ -1163,7 +1149,7 @@ ApplyRegistrationChecked(
         }
         if (command.Variant == EditorICPVariant::PointToPlane)
         {
-            const auto model = targetTransform ? ModelMatrixFromTransform(*targetTransform) : glm::mat4(1.f);
+            const auto model = targetTransform ? ECSC::Transform::GetMatrix(*targetTransform) : glm::mat4(1.f);
             RegistrationNormalStatus status;
             if (preview)
             {

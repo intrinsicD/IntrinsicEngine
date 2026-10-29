@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <limits>
 
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
 
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
@@ -221,4 +224,40 @@ TEST(ECSTransformHierarchy, PureCompositionRejectsBrokenCyclesAndNonfiniteChains
     hierarchy.Parent = entt::null;
     raw.get<Components::Transform::Component>(child).Position.x = std::numeric_limits<float>::infinity();
     EXPECT_FALSE(TransformSystem::TryComposeWorldMatrix(raw, child).has_value());
+}
+
+// RUNTIME-345: the model matrix the registration, CPD, sampling and spatial-index code wrote out by hand comes from
+// the transform module: GetMatrix equals their float formula (for finite values, up to the sign of zero),
+// GetMatrixDouble their double formula exactly.
+TEST(ECSTransformHierarchy, ModelMatricesEqualTheColumnScaledFormula)
+{
+    using namespace Extrinsic::ECS::Components;
+    const Transform::Component transform{.Position = {1.5f, -2.0f, 0.25f},
+        .Rotation = glm::normalize(glm::quat(0.9f, 0.1f, -0.3f, 0.2f)),
+        .Scale = {2.0f, 0.5f, 3.0f}};
+    glm::mat4 expected = glm::mat4_cast(transform.Rotation);
+    expected[0] *= transform.Scale.x;
+    expected[1] *= transform.Scale.y;
+    expected[2] *= transform.Scale.z;
+    expected[3] = glm::vec4(transform.Position, 1.0f);
+    const glm::mat4 actual = Transform::GetMatrix(transform);
+    glm::dmat4 expectedDouble = glm::mat4_cast(glm::dquat(transform.Rotation));
+    expectedDouble[0] *= double(transform.Scale.x);
+    expectedDouble[1] *= double(transform.Scale.y);
+    expectedDouble[2] *= double(transform.Scale.z);
+    expectedDouble[3] = glm::dvec4(glm::dvec3(transform.Position), 1.0);
+    const glm::dmat4 actualDouble = Transform::GetMatrixDouble(transform);
+    for (int column = 0; column < 4; ++column)
+        for (int row = 0; row < 4; ++row)
+        {
+            EXPECT_EQ(actual[column][row], expected[column][row]) << column << "," << row;
+            EXPECT_EQ(actualDouble[column][row], expectedDouble[column][row]) << column << "," << row;
+            EXPECT_NEAR(actualDouble[column][row], double(actual[column][row]), 1e-6) << column << "," << row;
+        }
+    // The one difference from the hand-written float formula: GetMatrix composes by multiplication, so a negative
+    // zero translation comes out as positive zero (equal as a number); finite values are otherwise identical.
+    const Transform::Component negativeZero{.Position = {-0.0f, 1.0f, 2.0f}};
+    EXPECT_EQ(Transform::GetMatrix(negativeZero)[3][0], 0.0f);
+    EXPECT_FALSE(std::signbit(Transform::GetMatrix(negativeZero)[3][0])) << "positive zero";
+    EXPECT_TRUE(std::signbit(Transform::GetMatrixDouble(negativeZero)[3][0])) << "the double form keeps the sign";
 }

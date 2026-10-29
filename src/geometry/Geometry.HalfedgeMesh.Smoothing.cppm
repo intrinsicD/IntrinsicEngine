@@ -80,6 +80,15 @@ export namespace Geometry::Smoothing
         std::span<const PropertyEdge> edges, const PropertyFilterParams& params,
         std::span<const std::size_t> fixedRows = {},
         std::span<const double> lumpedMass = {});
+    // RUNTIME-345: the graph Laplacian L = D - W of `edges` over `count` rows: -w at (a, b) and (b, a)
+    // and each row's degree (its edge weights summed in edge order) on the diagonal, added once; repeated
+    // edges add up, a self-loop cancels, and entries that sum to exactly zero are dropped (tolerance 0).
+    // Weights are taken as given, signed included (the callers pass nonnegative ones: the harmonic field
+    // validates them, the property graph clamps cotangent weights). The build is invalid (`Valid` false,
+    // the offending entry dropped) for an endpoint outside `count` or a non-finite entry as added, such as
+    // a degree overflowing to infinity; callers must check `Valid`. Repeated pairs are merged after that
+    // check, so signed weights whose finite entries sum past the double range are not caught.
+    [[nodiscard]] Sparse::SparseBuildResult BuildGraphLaplacian(std::size_t count, std::span<const PropertyEdge> edges);
     // Symmetric union kNN; excludes self IDs and retains distinct coincident samples.
     [[nodiscard]] std::optional<std::vector<PropertyEdge>> BuildPropertyNeighborhood(
         std::span<const glm::vec3> positions, std::uint32_t k,

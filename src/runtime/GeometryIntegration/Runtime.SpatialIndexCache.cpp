@@ -51,13 +51,7 @@ namespace Extrinsic::Runtime
             const auto* scene = worlds ? worlds->Get(world) : nullptr;
             if (scene && scene->IsValid(entity))
                 if (const auto* transform = scene->Raw().try_get<ECS::Components::Transform::Component>(entity))
-                {
-                    matrix = glm::mat4_cast(transform->Rotation);
-                    matrix[0] *= transform->Scale.x;
-                    matrix[1] *= transform->Scale.y;
-                    matrix[2] *= transform->Scale.z;
-                    matrix[3] = glm::vec4(transform->Position, 1.f);
-                }
+                    matrix = ECS::Components::Transform::GetMatrix(*transform);
             return matrix;
         }
         std::uint32_t CompactSlot(const SpatialIndexSnapshot& snapshot, std::uint32_t slot)

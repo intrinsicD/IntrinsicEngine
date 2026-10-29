@@ -53,6 +53,16 @@ namespace Extrinsic::ECS::Components::Transform
         return mat;
     }
 
+    [[nodiscard]] glm::dmat4 GetMatrixDouble(const Component& transform)
+    {
+        glm::dmat4 matrix = glm::mat4_cast(glm::dquat(transform.Rotation));
+        matrix[0] *= double(transform.Scale.x);
+        matrix[1] *= double(transform.Scale.y);
+        matrix[2] *= double(transform.Scale.z);
+        matrix[3] = glm::dvec4(glm::dvec3(transform.Position), 1.0);
+        return matrix;
+    }
+
     [[nodiscard]] bool TryDecomposeMatrix(const glm::mat4& matrix, Component& outTransform)
     {
         constexpr float kScaleEpsilon = 1e-8f;

@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 import Geometry.HarmonicField;
+import Geometry.HalfedgeMesh.Smoothing;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.DEC;
 import Geometry.Properties;
@@ -367,4 +368,73 @@ TEST(HarmonicField, RandomWalkerKeepsUnseededComponentsAndRejectsMissingSeeds)
     EXPECT_EQ(kept.Weights, (std::vector<double>{1, 1, 0, 0}));
     EXPECT_FALSE(H::PropagateLabels(labels, 0, edges, {.Unconstrained = H::UnconstrainedPolicy::ZeroMean}).Success);
     EXPECT_FALSE(H::PropagateLabels(std::vector<std::int32_t>{0, 0}, 0, Path(2), {}).Success);
+}
+
+// RUNTIME-345: the shared graph Laplacian L = D - W (the harmonic field's and the eigenbasis'): -w off the diagonal,
+// the degree on it, rows summing to zero; a repeated edge adds its weight again.
+TEST(HarmonicField, GraphLaplacianIsDegreeMinusWeights)
+{
+    const std::vector<Geometry::Smoothing::PropertyEdge> edges{{0, 1, 2.0}, {1, 2, 0.5}, {0, 1, 1.0}};
+    const auto built = Geometry::Smoothing::BuildGraphLaplacian(3, edges);
+    ASSERT_TRUE(built.Valid);
+    const double expected[3][3] = {{3.0, -3.0, 0.0}, {-3.0, 3.5, -0.5}, {0.0, -0.5, 0.5}};
+    const auto& m = built.Matrix;
+    for (std::size_t row = 0; row < 3; ++row)
+    {
+        double dense[3] = {0.0, 0.0, 0.0};
+        for (auto k = m.RowOffsets[row]; k < m.RowOffsets[row + 1]; ++k)
+            dense[m.ColIndices[k]] += m.Values[k];
+        for (std::size_t column = 0; column < 3; ++column)
+            EXPECT_DOUBLE_EQ(dense[column], expected[row][column]) << row << "," << column;
+    }
+    EXPECT_FALSE(Geometry::Smoothing::BuildGraphLaplacian(2, edges).Valid) << "an edge outside the rows";
+
+    // A self-loop cancels (it adds -2w and +2w on its diagonal); a tiny positive weight is kept (drop tolerance 0);
+    // the degree is summed in edge order: 1e16 + 1 + 1 rounds to 1e16, the reverse order would give 1e16 + 2.
+    const auto entry = [](const Geometry::Sparse::SparseMatrix& matrix, const std::size_t row, const std::size_t column)
+    {
+        double value = 0.0;
+        for (auto k = matrix.RowOffsets[row]; k < matrix.RowOffsets[row + 1]; ++k)
+            if (matrix.ColIndices[k] == column)
+                value += matrix.Values[k];
+        return value;
+    };
+    const std::vector<Geometry::Smoothing::PropertyEdge> loop{{0, 0, 5.0}, {0, 1, 1.0}};
+    const auto withLoop = Geometry::Smoothing::BuildGraphLaplacian(2, loop);
+    ASSERT_TRUE(withLoop.Valid);
+    EXPECT_EQ(entry(withLoop.Matrix, 0, 0), 1.0);
+    const std::vector<Geometry::Smoothing::PropertyEdge> tiny{{0, 1, 1e-300}};
+    const auto kept = Geometry::Smoothing::BuildGraphLaplacian(2, tiny);
+    ASSERT_TRUE(kept.Valid);
+    EXPECT_EQ(entry(kept.Matrix, 0, 0), 1e-300);
+    EXPECT_EQ(entry(kept.Matrix, 0, 1), -1e-300);
+    const std::vector<Geometry::Smoothing::PropertyEdge> mixed{{0, 1, 1e16}, {0, 2, 1.0}, {0, 3, 1.0}};
+    const auto ordered = Geometry::Smoothing::BuildGraphLaplacian(4, mixed);
+    ASSERT_TRUE(ordered.Valid);
+    EXPECT_EQ(entry(ordered.Matrix, 0, 0), 1e16);
+    // Signed weights are taken as given; a non-finite entry (a weight or an overflowing degree) is invalid.
+    const auto negative =
+        Geometry::Smoothing::BuildGraphLaplacian(2, std::vector<Geometry::Smoothing::PropertyEdge>{{0, 1, -2.0}});
+    ASSERT_TRUE(negative.Valid);
+    EXPECT_EQ(entry(negative.Matrix, 0, 1), 2.0);
+    EXPECT_EQ(entry(negative.Matrix, 0, 0), -2.0);
+    EXPECT_FALSE(Geometry::Smoothing::BuildGraphLaplacian(
+        2, std::vector<Geometry::Smoothing::PropertyEdge>{{0, 1, std::numeric_limits<double>::infinity()}})
+            .Valid);
+    EXPECT_FALSE(Geometry::Smoothing::BuildGraphLaplacian(
+        3, std::vector<Geometry::Smoothing::PropertyEdge>{{0, 1, 1e308}, {0, 2, 1e308}})
+            .Valid);
+}
+
+// RUNTIME-345 (Codex review): a Laplacian that does not assemble fails the solve instead of solving what is left.
+// Row 0's degree overflows (2 x 1e308); before the check the builder dropped it and the solve succeeded anyway.
+TEST(HarmonicField, OverflowingDegreeFailsTheSolve)
+{
+    const auto r = H::Solve(std::vector<double>{0, 0, 0},
+        1,
+        std::vector<Edge>{{0, 1, 1e308}, {0, 2, 1e308}},
+        {},
+        std::vector<std::size_t>{1, 2},
+        std::vector<H::SoftConstraint>{{0, 1.0}});
+    EXPECT_FALSE(r.Success) << "values " << (r.Values.empty() ? -1.0 : r.Values[0]);
 }

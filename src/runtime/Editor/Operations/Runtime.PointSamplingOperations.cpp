@@ -68,13 +68,7 @@ namespace Extrinsic::Runtime
 
         glm::dmat4 ModelMatrix(const ECSC::Transform::Component* transform)
         {
-            if (transform == nullptr) return glm::dmat4(1.0);
-            glm::dmat4 model = glm::dmat4(glm::mat4_cast(glm::dquat(transform->Rotation)));
-            model[0] *= double(transform->Scale.x);
-            model[1] *= double(transform->Scale.y);
-            model[2] *= double(transform->Scale.z);
-            model[3] = glm::dvec4(glm::dvec3(transform->Position), 1.0);
-            return model;
+            return transform == nullptr ? glm::dmat4(1.0) : ECSC::Transform::GetMatrixDouble(*transform);
         }
 
         struct Captured

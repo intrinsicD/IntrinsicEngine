@@ -33,6 +33,9 @@ export namespace Extrinsic::ECS::Components::Transform
     };
 
     [[nodiscard]] glm::mat4 GetMatrix(const Component& transform);
+    // RUNTIME-345: the same translation x rotation x scale matrix computed in double (the rotation
+    // from the quaternion promoted to double), for operations that work in double precision.
+    [[nodiscard]] glm::dmat4 GetMatrixDouble(const Component& transform);
 
     // Extract finite TRS components, discarding shear/perspective. Reject singular
     // scale or nonfinite input/output; failure leaves outTransform unchanged.

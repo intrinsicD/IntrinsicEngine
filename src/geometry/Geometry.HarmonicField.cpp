@@ -4,6 +4,7 @@
 module;
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -36,18 +37,14 @@ namespace Geometry::HarmonicField
             std::vector<std::vector<std::pair<std::size_t, double>>> Rows;
         };
 
-        RowMatrix BuildLaplacian(std::size_t count, std::span<const Smoothing::PropertyEdge> edges)
+        // RUNTIME-345: the shared L = D - W; nothing when it does not assemble (a degree overflowing to
+        // infinity is dropped by the builder, so its matrix must not be used).
+        std::optional<RowMatrix> BuildLaplacian(std::size_t count, std::span<const Smoothing::PropertyEdge> edges)
         {
-            Sparse::SparseBuilder builder(count, count);
-            builder.Reserve(4 * edges.size());
-            for (const auto& edge : edges)
-            {
-                builder.Add(edge.A, edge.A, edge.Weight);
-                builder.Add(edge.B, edge.B, edge.Weight);
-                builder.Add(edge.A, edge.B, -edge.Weight);
-                builder.Add(edge.B, edge.A, -edge.Weight);
-            }
-            const auto csr = builder.Build().Matrix;
+            const auto built = Smoothing::BuildGraphLaplacian(count, edges);
+            if (!built.Valid)
+                return std::nullopt;
+            const auto& csr = built.Matrix;
             RowMatrix matrix;
             matrix.Rows.resize(count);
             for (std::size_t row = 0; row < count; ++row)
@@ -265,7 +262,10 @@ namespace Geometry::HarmonicField
         };
         if (freeRows.empty()) return finish();
 
-        auto system = BuildLaplacian(count, edges);
+        auto laplacianRows = BuildLaplacian(count, edges);
+        if (!laplacianRows)
+            return fail("Unable to assemble the Laplacian (an edge degree is not finite).");
+        auto system = std::move(*laplacianRows);
         if (params.Order != FieldOrder::Harmonic)
         {
             const auto laplacian = system;

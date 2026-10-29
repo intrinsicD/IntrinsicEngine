@@ -291,19 +291,8 @@ namespace Extrinsic::Runtime
             const std::size_t n = samples.Slots.size();
             rows.resize(n);
             for (std::size_t i = 0; i < n; ++i) rows[i] = i;
-            // A = D - W over the compact rows; M is the lumped area or unit mass.
-            std::vector<double> degree(n, 0.0);
-            Sp::SparseBuilder builder(n, n);
-            builder.Reserve(2 * graph.Edges.size() + n);
-            for (const auto& edge : graph.Edges)
-            {
-                builder.Add(edge.A, edge.B, -edge.Weight);
-                builder.Add(edge.B, edge.A, -edge.Weight);
-                degree[edge.A] += edge.Weight;
-                degree[edge.B] += edge.Weight;
-            }
-            for (std::size_t i = 0; i < n; ++i) builder.Add(i, i, degree[i]);
-            auto laplacian = builder.Build();
+            // A = D - W over the compact rows (the geometry library's Laplacian); M is the lumped area or unit mass.
+            auto laplacian = Geometry::Smoothing::BuildGraphLaplacian(n, graph.Edges);
             if (!laplacian.Valid) return fail("Unable to assemble the Laplacian.");
             system = std::move(laplacian.Matrix);
             mass = {n, graph.Mass.empty() ? std::vector<double>(n, 1.0) : graph.Mass};

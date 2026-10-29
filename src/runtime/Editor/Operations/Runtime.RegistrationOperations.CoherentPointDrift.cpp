@@ -120,16 +120,6 @@ namespace Extrinsic::Runtime
         using EditorFeatureDetail::ToEditorCommandStatus;
         using Phase = EditorCoherentPointDriftPhase;
 
-        glm::dmat4 ModelMatrix(const ECSC::Transform::Component& transform)
-        {
-            glm::dmat4 model = glm::dmat4(glm::mat4_cast(glm::dquat(transform.Rotation)));
-            model[0] *= double(transform.Scale.x);
-            model[1] *= double(transform.Scale.y);
-            model[2] *= double(transform.Scale.z);
-            model[3] = glm::dvec4(glm::dvec3(transform.Position), 1.0);
-            return model;
-        }
-
         CPD::Variant ToVariant(CoherentPointDriftMethod method) noexcept
         {
             switch (method)
@@ -280,8 +270,8 @@ namespace Extrinsic::Runtime
             const auto* targetTransform = raw.try_get<ECSC::Transform::Component>(*target);
             run->TargetHadTransform = targetTransform != nullptr;
             if (targetTransform) run->TargetBefore = *targetTransform;
-            run->SourceModel = sourceTransform ? ModelMatrix(*sourceTransform) : glm::dmat4(1.0);
-            run->TargetModel = targetTransform ? ModelMatrix(*targetTransform) : glm::dmat4(1.0);
+            run->SourceModel = sourceTransform ? ECSC::Transform::GetMatrixDouble(*sourceTransform) : glm::dmat4(1.0);
+            run->TargetModel = targetTransform ? ECSC::Transform::GetMatrixDouble(*targetTransform) : glm::dmat4(1.0);
             for (const auto& p : sourceCapture.Points) run->SourceWorld.push_back(glm::vec3(run->SourceModel * glm::dvec4(glm::dvec3(p), 1.0)));
             for (const auto& p : targetCapture.Points) run->TargetWorld.push_back(glm::vec3(run->TargetModel * glm::dvec4(glm::dvec3(p), 1.0)));
             run->Source = std::move(sourceCapture);

@@ -50,6 +50,26 @@ namespace Geometry::Smoothing
             std::isfinite(p.RangeSigma) && p.RangeSigma > 0;
     }
 
+    Sparse::SparseBuildResult BuildGraphLaplacian(const std::size_t count, const std::span<const PropertyEdge> edges)
+    {
+        std::vector<double> degree(count, 0.0);
+        Sparse::SparseBuilder builder(count, count);
+        builder.Reserve(2 * edges.size() + count);
+        for (const PropertyEdge& edge : edges)
+        {
+            builder.Add(edge.A, edge.B, -edge.Weight);
+            builder.Add(edge.B, edge.A, -edge.Weight);
+            if (edge.A < count && edge.B < count)
+            {
+                degree[edge.A] += edge.Weight;
+                degree[edge.B] += edge.Weight;
+            }
+        }
+        for (std::size_t i = 0; i < count; ++i)
+            builder.Add(i, i, degree[i]);
+        return builder.Build();
+    }
+
     std::optional<std::vector<PropertyEdge>> BuildPropertyNeighborhood(
         std::span<const glm::vec3> positions, std::uint32_t k,
         PropertyWeight weight, double sigma)
