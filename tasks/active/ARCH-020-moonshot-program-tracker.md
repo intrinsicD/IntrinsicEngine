@@ -52,7 +52,7 @@ contract_review: tracker only; each workstream task declares its own contracts
 | Agent / session | Workstream | Started | State | Output |
 |---|---|---|---|---|
 | main session `849ae7d0` | 3 (`RUNTIME-327`) | 2026-10-28 | stopped (login expired during the `RUNTIME-330` plan review) | this tracker, `RUNTIME-326`..`RUNTIME-329`, `RUNTIME-330` plan |
-| main session `e4afcc21` | 3 (`RUNTIME-330`, `GRAPHICS-165`, `RUNTIME-331`..`RUNTIME-345`) | 2026-10-28 | running (ADR 0031 proposed, `ARCH-021`; awaiting the operator's decision) | `RUNTIME-330` (`cdbb3b885`, `8be58c2ec`), `GRAPHICS-165` |
+| main session `e4afcc21` | 3 (`RUNTIME-330`, `GRAPHICS-165`, `RUNTIME-331`..`RUNTIME-345`) | 2026-10-28 | running (ADR 0031 accepted 2026-10-29; phase 0 next: `RUNTIME-346` derived config codecs for kernel density and point spacing, then `RUNTIME-347` the operation runtime with both migrated, then `RUNTIME-348` GPU shape and exposure; operation table for the projection in progress) | `RUNTIME-330` (`cdbb3b885`, `8be58c2ec`), `GRAPHICS-165` |
 | subagent of `849ae7d0` ("M1 Slang feasibility spike") | 2 (`GRAPHICS-123`) | 2026-10-27 | finished | `tasks/evidence/GRAPHICS-123/spike/FINDINGS.md` + `run_all.sh` (git-ignored, local) |
 
 ## Acceptance criteria

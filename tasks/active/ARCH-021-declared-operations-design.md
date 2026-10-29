@@ -22,6 +22,8 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
     in a better way?"
 26. (2026-10-29) "Yes. Please design this properly" (answer to: write a design document for a new
     operation contract, have it reviewed, and pick the pilot)
+27. (2026-10-29) "Do 1. - 3." (answer to: 1 accept ADR 0031; 2 lift the "no generic property-write
+    API" limit for operations; 3 start phase 0 and then the phase 1 pilot)
 
 ## Goal
 - `docs/adr/0031-declared-operations.md`: an operation is one typed definition (parameters declared
@@ -52,8 +54,8 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
 ## Acceptance criteria
 - [x] ADR 0031 written in the repository's ADR format and listed in `docs/adr/index.md`.
 - [x] Independent review (Codex, fresh session) and its findings resolved or answered.
-- [ ] The operator decides on the ADR (accept, change, or reject) and on superseding the two earlier
-      limits (Decision 8); the decision is recorded here and in the ADR's status.
+- [x] The operator decides on the ADR (accept, change, or reject) and on superseding the two earlier
+      limits (Decision 9); the decision is recorded here and in the ADR's status.
 
 ## Verification
 ```bash
@@ -88,3 +90,6 @@ python3 tools/docs/check_doc_links.py --root . --strict
   its own).
 - 2026-10-29: Codex third delta review (`adr0031d.answer.md`): approve as a proposed design for the
   operator's decision; N2 and N4 resolved, no new contradiction. Open: the operator's decision.
+- 2026-10-29: Operator decision (question 27): ADR 0031 accepted; the "no generic property-write
+  API" scope limit is lifted for operations (Decision 9); phase 0 and then phase 1 start as their own
+  tasks (`RUNTIME-346` onwards, listed in `ARCH-020`).

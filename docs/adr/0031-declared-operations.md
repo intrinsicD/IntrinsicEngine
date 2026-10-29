@@ -1,6 +1,6 @@
 # ADR 0031: Declared operations over one shared operation runtime
 
-- **Status:** Proposed
+- **Status:** Accepted (operator, 2026-10-29: "Do 1. - 3.": accept, lift the property-write limit for operations, start phase 0 and the pilot)
 - **Date:** 2026-10-29
 - **Owners:** runtime (editor operations), with geometry and Sandbox app owners for their seams
 - **Related tasks:** `ARCH-021` (this design), `ARCH-020` (moonshot tracker, M2), `RUNTIME-343`,
