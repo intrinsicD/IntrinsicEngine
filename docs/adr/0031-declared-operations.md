@@ -432,7 +432,11 @@ method-specific steps:
   tests pass unchanged, including messages and statuses; the agent tool schemas stay equal to the
   committed baseline; derived codecs pass golden round trips; incremental rebuild after editing one
   definition and a controlled clean build are each no more than 10% slower; peak memory on the
-  largest test input does not grow.
+  largest test input does not grow. "Existing tests pass unchanged" covers every behavioural
+  assertion (messages, statuses, computed values, history and undo): those stay as they are. Tests
+  that pin the per-operation structure the runtime replaces (result sink and snapshot structs, the
+  source text of a panel) may be rewritten to the generic structure; each rewrite is listed in its
+  task (operator decision, 2026-10-29).
 - **After phase 2 (the architectural decision):** outlier analysis on the contract keeps its tests,
   its custom publication fits Decision 5 without bypassing stages 1-4, 6 and 8, and its
   operation-specific code falls by at least 40%. Adding an option to a migrated operation touches

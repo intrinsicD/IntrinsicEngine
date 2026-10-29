@@ -24,6 +24,10 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
     operation contract, have it reviewed, and pick the pilot)
 27. (2026-10-29) "Do 1. - 3." (answer to: 1 accept ADR 0031; 2 lift the "no generic property-write
     API" limit for operations; 3 start phase 0 and then the phase 1 pilot)
+28. (2026-10-29) "Please do 1. and 2." (answer to: 1 may `RUNTIME-348`/`349` rewrite tests that pin
+    the per-operation session structure, keeping every behavioural assertion, recorded in ADR 0031 as
+    the reading of the phase 1 gate; 2 fix the Vulkan path's empty message for a mismatched index
+    snapshot now, as its own slice with a GPU regression test)
 
 ## Goal
 - `docs/adr/0031-declared-operations.md`: an operation is one typed definition (parameters declared
@@ -107,3 +111,6 @@ python3 tools/docs/check_doc_links.py --root . --strict
   again before publication. Trigger: the first migrated definition whose method polls (CPD, UV
   regeneration, point construction), or phase 2 if outlier analysis' compute is chunked. Removing
   it for good would need an ADR amendment.
+- 2026-10-29: Operator decision (question 28): the phase 1 gate's "existing tests pass unchanged"
+  keeps every behavioural assertion; tests that pin the per-operation structure the runtime
+  replaces may be rewritten, each listed in its task. Recorded in ADR 0031 (Validation, Gates).
