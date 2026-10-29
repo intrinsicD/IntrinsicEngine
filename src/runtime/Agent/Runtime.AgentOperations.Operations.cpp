@@ -1015,14 +1015,17 @@ namespace Extrinsic::Runtime
             "Consolidate the named vec3 point property of an entity using sandbox.point_cloud_consolidation; GPU runs "
             "auto-accept. Reports backend and IO.",
             consolidationSchema, false, RunConsolidation, false, true);
-        static const std::vector<std::string_view> kMeshFieldOperations = []
+        // Operation names in table order (`family` nullptr: every operation).
+        const auto operationNames = [](const char* family)
         {
             std::vector<std::string_view> names;
             for (const auto& op : ConfiguredOperations())
-                if (InFamily(op, "mesh_field"))
+                if (InFamily(op, family))
                     names.emplace_back(op.Name);
             return names;
-        }();
+        };
+        static const std::vector<std::string_view> kMeshFieldOperations = operationNames("mesh_field");
+        static const std::vector<std::string_view> kOperations = operationNames(nullptr);
         const ToolSchema meshField = ArgumentsSchema(
             {{.Spec = {.Name = "operation",
                   .Type = ConfigFieldType::StringEnum,
@@ -1040,19 +1043,33 @@ namespace Extrinsic::Runtime
             "with the active config section; undoable like the panel button. Alias of run_operation limited to these.",
             meshField, false, [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, false, "mesh_field"); },
             false, true); // property smoothing may select a Vulkan backend that waits on readback
-        // Per-operation `params` schemas: JSON Schema if/then keyed on the operation.
-        std::string paramsRules;
+        // RUNTIME-342: per-operation `params` rules, each generated from the operation's field table.
+        std::vector<ArgumentCase> paramsCases;
         for (const auto& op : ConfiguredOperations())
             if (!op.ParamsSchemaJson.empty())
-                paramsRules += std::string(paramsRules.empty() ? "" : ",") + R"({"if":{"properties":{"operation":{"const":")" + op.Name +
-                               R"("}},"required":["operation"]},"then":{"properties":{"params":)" + op.ParamsSchemaJson + "}}}";
-        const std::string configured = Schema(
-            R"({"operation":{"type":"string","enum":)" + OperationEnum(nullptr) +
-                R"(,"description":"Operation; its settings come from its config section (config_apply first)."},)" +
-                R"("entity":{"type":"integer","minimum":1,"maximum":4294967295,"description":"Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity."},)" +
-                R"("params":{"type":"object","description":"Explicit settings of the operations listed with 'params' (the schema per operation is in allOf, keys, defaults and ranges are in the description); omitted keys keep their defaults; enums take their name or integer code. Refused for operations that read a config section."}})",
-            R"(["operation"])");
-        const std::string configuredSchema = configured.substr(0, configured.size() - 1) + R"(,"allOf":[)" + paramsRules + "]}";
+                paramsCases.push_back({.Argument = "operation",
+                    .Value = op.Name,
+                    .Property = "params",
+                    .Schema = Json::parse(op.ParamsSchemaJson)});
+        const ToolSchema configuredSchema = ArgumentsSchema(
+            {{.Spec = {.Name = "operation",
+                  .Type = ConfigFieldType::StringEnum,
+                  .Description = "Operation; its settings come from its config section (config_apply first).",
+                  .EnumValues = kOperations},
+                 .Required = true},
+                EntityArgument(false,
+                    "Stable entity id from scene_entities; required for operations marked 'entity argument', refused "
+                    "for those whose section names the entity."),
+                {.Spec = {.Name = "params",
+                     .Type = ConfigFieldType::Object,
+                     .Description =
+                         "Explicit settings of the operations listed with 'params' (the schema per operation is "
+                         "in allOf, keys, defaults and ranges are in the description); omitted keys keep their "
+                         "defaults; enums take their name or integer code. Refused for operations that read a "
+                         "config section."}}},
+            {},
+            {},
+            paramsCases);
         add("preview_operation", "Preview operation",
             "Whether a configured editor operation can run with the active settings, and why not. Operations: " +
                 OperationSummary(nullptr) + ".",
@@ -1077,7 +1094,8 @@ extern "C++"
     {
         ToolSchema ArgumentsSchema(const std::initializer_list<AgentArgument> arguments,
             const std::span<const ConfigFieldSpec> table,
-            const std::initializer_list<std::initializer_list<std::string_view>> alternatives)
+            const std::initializer_list<std::initializer_list<std::string_view>> alternatives,
+            const std::span<const ArgumentCase> cases)
         {
             std::vector<ConfigFieldSpec> fields;
             Json defaults = Json::object();
@@ -1101,6 +1119,16 @@ extern "C++"
                 for (const std::string_view name : names)
                     set.push_back(std::string(name));
                 schema["oneOf"].push_back({{"required", std::move(set)}});
+            }
+            for (const ArgumentCase& c : cases)
+            {
+                const std::string argument{c.Argument};
+                Json condition = Json::object();
+                condition["properties"][argument]["const"] = std::string(c.Value);
+                condition["required"] = Json::array({argument});
+                Json then = Json::object();
+                then["properties"][std::string(c.Property)] = c.Schema;
+                schema["allOf"].push_back({{"if", std::move(condition)}, {"then", std::move(then)}});
             }
             return {Dump(schema), true};
         }

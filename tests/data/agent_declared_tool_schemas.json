@@ -580,6 +580,520 @@
     ],
     "type": "object"
   },
+  "preview_operation": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_denoise"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "degenerate_normal_length_epsilon": {
+                  "default": 1e-12,
+                  "description": "Face normals shorter than this count as degenerate.",
+                  "exclusiveMinimum": 0.0,
+                  "type": "number"
+                },
+                "normal_iterations": {
+                  "default": 5,
+                  "description": "Normal filtering iterations.",
+                  "maximum": 4096,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "preserve_boundary": {
+                  "default": true,
+                  "description": "Keep boundary vertices fixed.",
+                  "type": "boolean"
+                },
+                "sigma_range": {
+                  "default": 0.0,
+                  "description": "Range sigma; 0 derives it from the mesh.",
+                  "maximum": 1000000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "sigma_spatial": {
+                  "default": 0.0,
+                  "description": "Spatial sigma; 0 derives it from the mesh.",
+                  "maximum": 1000000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "vertex_iterations": {
+                  "default": 10,
+                  "description": "Vertex update iterations.",
+                  "maximum": 4096,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_remesh"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "approximation_error": {
+                  "default": 0.01,
+                  "description": "Allowed approximation error; must be above 0 for the error-bounded Taubin sizing law.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "curvature_adaptation": {
+                  "default": 1.0,
+                  "description": "Adaptive mode: curvature influence.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "iterations": {
+                  "default": 1,
+                  "description": "Remeshing iterations.",
+                  "maximum": 64,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "lambda": {
+                  "default": 0.5,
+                  "description": "Tangential smoothing weight.",
+                  "exclusiveMinimum": 0.0,
+                  "type": "number"
+                },
+                "max_reference_projection_distance": {
+                  "default": 0.0,
+                  "description": "Largest projection distance; 0 means unlimited.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "mode": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "uniform",
+                        "adaptive"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Uniform or curvature-adaptive edge lengths.",
+                  "x-enum-names": [
+                    "uniform",
+                    "adaptive"
+                  ]
+                },
+                "preserve_boundary": {
+                  "default": true,
+                  "description": "Keep boundary edges.",
+                  "type": "boolean"
+                },
+                "project_to_surface": {
+                  "default": false,
+                  "description": "Project results back onto the input surface.",
+                  "type": "boolean"
+                },
+                "reference_projection_k": {
+                  "default": 16,
+                  "description": "Neighbors used for surface projection.",
+                  "maximum": 4096,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "sizing_law": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "mean_curvature",
+                        "error_bounded_taubin"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Adaptive sizing law.",
+                  "x-enum-names": [
+                    "mean_curvature",
+                    "error_bounded_taubin"
+                  ]
+                },
+                "target_edge_length": {
+                  "default": 0.0,
+                  "description": "Target edge length; 0 uses the mean edge length.",
+                  "minimum": 0.0,
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_subdivide"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "iterations": {
+                  "default": 1,
+                  "description": "Subdivision steps; every step multiplies the face count (4x for Loop).",
+                  "maximum": 10,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "max_output_faces": {
+                  "default": 0,
+                  "description": "Refuse results above this face count; 0 means unlimited.",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "operator": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "loop",
+                        "catmull_clark",
+                        "sqrt3"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Subdivision scheme.",
+                  "x-enum-names": [
+                    "loop",
+                    "catmull_clark",
+                    "sqrt3"
+                  ]
+                },
+                "preserve_loop_feature_edges": {
+                  "default": false,
+                  "description": "Loop: keep creases on the e:feature edges.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_simplify"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "boundary_weight": {
+                  "default": 1.0,
+                  "description": "fa_qem: boundary weight.",
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "curvature_weight": {
+                  "default": 1.0,
+                  "description": "fa_qem: curvature weight.",
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "feature_angle_threshold_degrees": {
+                  "default": 45.0,
+                  "description": "fa_qem: sharp feature angle.",
+                  "maximum": 180.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "max_error": {
+                  "default": 0.0,
+                  "description": "Largest error per collapse; 0 means unlimited. One of target_faces or max_error must be positive.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "metric": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "classical_qem",
+                        "fa_qem"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 1,
+                  "description": "Collapse error metric.",
+                  "x-enum-names": [
+                    "classical_qem",
+                    "fa_qem"
+                  ]
+                },
+                "normal_weight": {
+                  "default": 1.0,
+                  "description": "fa_qem: normal weight.",
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "preserve_boundary": {
+                  "default": true,
+                  "description": "Keep boundary vertices.",
+                  "type": "boolean"
+                },
+                "preserve_sharp_features": {
+                  "default": true,
+                  "description": "Pin sharp feature vertices.",
+                  "type": "boolean"
+                },
+                "preserve_uv_seams": {
+                  "default": true,
+                  "description": "Pin UV seam vertices.",
+                  "type": "boolean"
+                },
+                "target_faces": {
+                  "default": 0,
+                  "description": "Stop at this face count; 0 disables. One of target_faces or max_error must be positive.",
+                  "maximum": 1000000000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "scalar_ridge"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "hessian_ridge",
+                        "watershed"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Ridge detector.",
+                  "x-enum-names": [
+                    "hessian_ridge",
+                    "watershed"
+                  ]
+                },
+                "minimum_persistence": {
+                  "default": 0.05,
+                  "description": "Watershed: basin persistence as a fraction of the range.",
+                  "maximum": 0.5,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "minimum_sharpness": {
+                  "default": 0.01,
+                  "description": "Hessian: weakest accepted sharpness.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "minimum_strength": {
+                  "default": 0.01,
+                  "description": "Weakest accepted strength.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "property": {
+                  "default": "v:mean_curvature",
+                  "description": "Vertex scalar property to trace; any bindable scalar of the entity.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "publish_graph": {
+                  "default": true,
+                  "description": "Publish the curves as a new graph entity (one undo step).",
+                  "type": "boolean"
+                },
+                "publish_mesh_features": {
+                  "default": false,
+                  "description": "Also publish vertex and edge feature properties on the mesh (a second undo step).",
+                  "type": "boolean"
+                },
+                "radius_ratio": {
+                  "default": 0.02,
+                  "description": "Hessian fit radius as a fraction of the diagonal.",
+                  "maximum": 0.25,
+                  "minimum": 0.005,
+                  "type": "number"
+                },
+                "require_persistence": {
+                  "default": false,
+                  "description": "Hessian: keep only curves found at another scale too.",
+                  "type": "boolean"
+                },
+                "ridges": {
+                  "default": true,
+                  "description": "Trace ridges.",
+                  "type": "boolean"
+                },
+                "scale": {
+                  "default": 1,
+                  "description": "Hessian scale: 0 (0.5x), 1 (1x) or 2 (2x radius).",
+                  "maximum": 2,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "valleys": {
+                  "default": true,
+                  "description": "Trace valleys.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    ],
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "operation": {
+        "description": "Operation; its settings come from its config section (config_apply first).",
+        "enum": [
+          "property_smoothing",
+          "spectral_modes",
+          "harmonic_field",
+          "scalar_gradient",
+          "mesh_curvature",
+          "geodesics",
+          "curvature_segmentation",
+          "normal_estimation",
+          "kernel_density",
+          "point_spacing",
+          "outlier_analysis",
+          "density_weight",
+          "descriptor_analysis",
+          "bilateral_filter",
+          "point_construction",
+          "mesh_denoise",
+          "mesh_remesh",
+          "mesh_subdivide",
+          "mesh_simplify",
+          "scalar_ridge",
+          "progressive_poisson",
+          "parameterization"
+        ],
+        "type": "string"
+      },
+      "params": {
+        "description": "Explicit settings of the operations listed with 'params' (the schema per operation is in allOf, keys, defaults and ranges are in the description); omitted keys keep their defaults; enums take their name or integer code. Refused for operations that read a config section.",
+        "type": "object"
+      }
+    },
+    "required": [
+      "operation"
+    ],
+    "type": "object"
+  },
   "preview_point_cloud_consolidation": {
     "additionalProperties": false,
     "properties": {
@@ -888,6 +1402,520 @@
     "required": [
       "operation",
       "entity"
+    ],
+    "type": "object"
+  },
+  "run_operation": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_denoise"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "degenerate_normal_length_epsilon": {
+                  "default": 1e-12,
+                  "description": "Face normals shorter than this count as degenerate.",
+                  "exclusiveMinimum": 0.0,
+                  "type": "number"
+                },
+                "normal_iterations": {
+                  "default": 5,
+                  "description": "Normal filtering iterations.",
+                  "maximum": 4096,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "preserve_boundary": {
+                  "default": true,
+                  "description": "Keep boundary vertices fixed.",
+                  "type": "boolean"
+                },
+                "sigma_range": {
+                  "default": 0.0,
+                  "description": "Range sigma; 0 derives it from the mesh.",
+                  "maximum": 1000000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "sigma_spatial": {
+                  "default": 0.0,
+                  "description": "Spatial sigma; 0 derives it from the mesh.",
+                  "maximum": 1000000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "vertex_iterations": {
+                  "default": 10,
+                  "description": "Vertex update iterations.",
+                  "maximum": 4096,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_remesh"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "approximation_error": {
+                  "default": 0.01,
+                  "description": "Allowed approximation error; must be above 0 for the error-bounded Taubin sizing law.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "curvature_adaptation": {
+                  "default": 1.0,
+                  "description": "Adaptive mode: curvature influence.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "iterations": {
+                  "default": 1,
+                  "description": "Remeshing iterations.",
+                  "maximum": 64,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "lambda": {
+                  "default": 0.5,
+                  "description": "Tangential smoothing weight.",
+                  "exclusiveMinimum": 0.0,
+                  "type": "number"
+                },
+                "max_reference_projection_distance": {
+                  "default": 0.0,
+                  "description": "Largest projection distance; 0 means unlimited.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "mode": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "uniform",
+                        "adaptive"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Uniform or curvature-adaptive edge lengths.",
+                  "x-enum-names": [
+                    "uniform",
+                    "adaptive"
+                  ]
+                },
+                "preserve_boundary": {
+                  "default": true,
+                  "description": "Keep boundary edges.",
+                  "type": "boolean"
+                },
+                "project_to_surface": {
+                  "default": false,
+                  "description": "Project results back onto the input surface.",
+                  "type": "boolean"
+                },
+                "reference_projection_k": {
+                  "default": 16,
+                  "description": "Neighbors used for surface projection.",
+                  "maximum": 4096,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "sizing_law": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "mean_curvature",
+                        "error_bounded_taubin"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Adaptive sizing law.",
+                  "x-enum-names": [
+                    "mean_curvature",
+                    "error_bounded_taubin"
+                  ]
+                },
+                "target_edge_length": {
+                  "default": 0.0,
+                  "description": "Target edge length; 0 uses the mean edge length.",
+                  "minimum": 0.0,
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_subdivide"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "iterations": {
+                  "default": 1,
+                  "description": "Subdivision steps; every step multiplies the face count (4x for Loop).",
+                  "maximum": 10,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "max_output_faces": {
+                  "default": 0,
+                  "description": "Refuse results above this face count; 0 means unlimited.",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "operator": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "loop",
+                        "catmull_clark",
+                        "sqrt3"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Subdivision scheme.",
+                  "x-enum-names": [
+                    "loop",
+                    "catmull_clark",
+                    "sqrt3"
+                  ]
+                },
+                "preserve_loop_feature_edges": {
+                  "default": false,
+                  "description": "Loop: keep creases on the e:feature edges.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "mesh_simplify"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "boundary_weight": {
+                  "default": 1.0,
+                  "description": "fa_qem: boundary weight.",
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "curvature_weight": {
+                  "default": 1.0,
+                  "description": "fa_qem: curvature weight.",
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "feature_angle_threshold_degrees": {
+                  "default": 45.0,
+                  "description": "fa_qem: sharp feature angle.",
+                  "maximum": 180.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "max_error": {
+                  "default": 0.0,
+                  "description": "Largest error per collapse; 0 means unlimited. One of target_faces or max_error must be positive.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "metric": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "classical_qem",
+                        "fa_qem"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 1,
+                  "description": "Collapse error metric.",
+                  "x-enum-names": [
+                    "classical_qem",
+                    "fa_qem"
+                  ]
+                },
+                "normal_weight": {
+                  "default": 1.0,
+                  "description": "fa_qem: normal weight.",
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "preserve_boundary": {
+                  "default": true,
+                  "description": "Keep boundary vertices.",
+                  "type": "boolean"
+                },
+                "preserve_sharp_features": {
+                  "default": true,
+                  "description": "Pin sharp feature vertices.",
+                  "type": "boolean"
+                },
+                "preserve_uv_seams": {
+                  "default": true,
+                  "description": "Pin UV seam vertices.",
+                  "type": "boolean"
+                },
+                "target_faces": {
+                  "default": 0,
+                  "description": "Stop at this face count; 0 disables. One of target_faces or max_error must be positive.",
+                  "maximum": 1000000000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "operation": {
+              "const": "scalar_ridge"
+            }
+          },
+          "required": [
+            "operation"
+          ]
+        },
+        "then": {
+          "properties": {
+            "params": {
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        0,
+                        1
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "enum": [
+                        "hessian_ridge",
+                        "watershed"
+                      ],
+                      "type": "string"
+                    }
+                  ],
+                  "default": 0,
+                  "description": "Ridge detector.",
+                  "x-enum-names": [
+                    "hessian_ridge",
+                    "watershed"
+                  ]
+                },
+                "minimum_persistence": {
+                  "default": 0.05,
+                  "description": "Watershed: basin persistence as a fraction of the range.",
+                  "maximum": 0.5,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "minimum_sharpness": {
+                  "default": 0.01,
+                  "description": "Hessian: weakest accepted sharpness.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "minimum_strength": {
+                  "default": 0.01,
+                  "description": "Weakest accepted strength.",
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "property": {
+                  "default": "v:mean_curvature",
+                  "description": "Vertex scalar property to trace; any bindable scalar of the entity.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "publish_graph": {
+                  "default": true,
+                  "description": "Publish the curves as a new graph entity (one undo step).",
+                  "type": "boolean"
+                },
+                "publish_mesh_features": {
+                  "default": false,
+                  "description": "Also publish vertex and edge feature properties on the mesh (a second undo step).",
+                  "type": "boolean"
+                },
+                "radius_ratio": {
+                  "default": 0.02,
+                  "description": "Hessian fit radius as a fraction of the diagonal.",
+                  "maximum": 0.25,
+                  "minimum": 0.005,
+                  "type": "number"
+                },
+                "require_persistence": {
+                  "default": false,
+                  "description": "Hessian: keep only curves found at another scale too.",
+                  "type": "boolean"
+                },
+                "ridges": {
+                  "default": true,
+                  "description": "Trace ridges.",
+                  "type": "boolean"
+                },
+                "scale": {
+                  "default": 1,
+                  "description": "Hessian scale: 0 (0.5x), 1 (1x) or 2 (2x radius).",
+                  "maximum": 2,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "valleys": {
+                  "default": true,
+                  "description": "Trace valleys.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    ],
+    "properties": {
+      "entity": {
+        "description": "Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "operation": {
+        "description": "Operation; its settings come from its config section (config_apply first).",
+        "enum": [
+          "property_smoothing",
+          "spectral_modes",
+          "harmonic_field",
+          "scalar_gradient",
+          "mesh_curvature",
+          "geodesics",
+          "curvature_segmentation",
+          "normal_estimation",
+          "kernel_density",
+          "point_spacing",
+          "outlier_analysis",
+          "density_weight",
+          "descriptor_analysis",
+          "bilateral_filter",
+          "point_construction",
+          "mesh_denoise",
+          "mesh_remesh",
+          "mesh_subdivide",
+          "mesh_simplify",
+          "scalar_ridge",
+          "progressive_poisson",
+          "parameterization"
+        ],
+        "type": "string"
+      },
+      "params": {
+        "description": "Explicit settings of the operations listed with 'params' (the schema per operation is in allOf, keys, defaults and ranges are in the description); omitted keys keep their defaults; enums take their name or integer code. Refused for operations that read a config section.",
+        "type": "object"
+      }
+    },
+    "required": [
+      "operation"
     ],
     "type": "object"
   },

@@ -30,7 +30,8 @@ export namespace Extrinsic::Runtime
         PropertyRef, // {"domain","name","kind"} property binding
         StringEnum,  // one of EnumValues (wire tokens), optionally named by EnumNames
         Array,       // homogeneous Item with optional length bounds
-        Object,      // nested Fields; schema only, owner retains merge/fallback semantics
+        Object,      // nested Fields; schema only, owner retains merge/fallback semantics; without
+                     // Fields any object (RUNTIME-342)
         ObjectOrString, // any JSON object, or a string (an object as JSON text; its consumer parses it)
     };
 

@@ -1527,10 +1527,22 @@ TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
         for (const R::ConfigFieldSpec& field : table)
             if (!expected["properties"].contains(field.Name))
                 actual["properties"].erase(std::string(field.Name));
+        // RUNTIME-342: run_/preview_operation's per-operation params come from each operation's field
+        // table; like style rows, a field a table gains later is left out, every baselined field is
+        // compared whole (Codex B1). Branches pair by position; a moved branch differs below.
+        if (actual.contains("allOf") && expected.contains("allOf"))
+            for (std::size_t i = 0; i < std::min(actual["allOf"].size(), expected["allOf"].size()); ++i)
+            {
+                Json& fields = actual["allOf"][i]["then"]["properties"]["params"]["properties"];
+                const Json& baselined = expected["allOf"][i]["then"]["properties"]["params"]["properties"];
+                for (auto it = fields.begin(); it != fields.end();)
+                    it = baselined.contains(it.key()) ? std::next(it) : fields.erase(it);
+            }
         EXPECT_EQ(actual, expected);
     }
     EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
-    EXPECT_EQ(declared, 46u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, 48u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, registry.Entries().size()) << "RUNTIME-342: every tool's input schema is generated";
 }
 
 // RUNTIME-337: the shared declarations reach the registered schemas (not only synthetic ones): an
@@ -1620,4 +1632,14 @@ TEST(AgentArgumentSchema, RegisteredDeclaredArgumentsKeepTheirRules)
             "invalid_params")
             << mixed;
     }
+    // RUNTIME-342: an operation's params follow its field table; other operations take any object
+    // (their handlers refuse params where a section is read).
+    EXPECT_TRUE(
+        accepts("run_operation", R"({"operation":"mesh_denoise","entity":1,"params":{"normal_iterations":5}})"));
+    EXPECT_FALSE(
+        accepts("run_operation", R"({"operation":"mesh_denoise","entity":1,"params":{"normal_iterations":0}})"));
+    EXPECT_FALSE(accepts("run_operation", R"({"operation":"mesh_denoise","entity":1,"params":{"unknown_key":1}})"));
+    EXPECT_FALSE(accepts("run_operation", R"({"entity":1})"));
+    EXPECT_FALSE(accepts("preview_operation", R"({"operation":"no_such_operation"})"));
+    EXPECT_TRUE(accepts("preview_operation", R"({"operation":"geodesics","params":{}})"));
 }

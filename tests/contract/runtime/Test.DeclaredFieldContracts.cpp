@@ -558,3 +558,12 @@ TEST(DeclaredFieldContracts, OnlyTrueCheckAgreesWithItsSchema)
         EXPECT_EQ(property.contains("const"), onlyTrue) << property.dump();
     }
 }
+
+// RUNTIME-342: an Object without member fields is an open object (run_operation's params, whose
+// members each operation's case declares), in the config check and the agent validator alike.
+TEST(DeclaredFieldContracts, ObjectWithoutFieldsIsOpen)
+{
+    const Json property = ExpectCheckAndSchemaVerdicts({.Name = "params", .Type = FT::Object},
+        {{Json::object(), true}, {Json{{"a", 1}}, true}, {Json::array(), false}, {"x", false}, {1, false}});
+    EXPECT_EQ(property, (Json{{"type", "object"}}));
+}

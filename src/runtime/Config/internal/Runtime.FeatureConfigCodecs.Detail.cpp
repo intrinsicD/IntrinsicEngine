@@ -480,6 +480,9 @@ namespace Extrinsic::Runtime::ConfigDetail
             case ConfigFieldType::Object:
             {
                 p["type"] = "object";
+                // RUNTIME-342: without member fields, any object (what CheckField accepts).
+                if (field.Fields == nullptr)
+                    break;
                 p["properties"] = OJson::object();
                 OJson required = OJson::array();
                 for (const auto& child : std::span{field.Fields, field.FieldCount})

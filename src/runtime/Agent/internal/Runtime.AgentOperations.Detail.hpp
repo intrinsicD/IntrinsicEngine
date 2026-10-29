@@ -341,12 +341,6 @@ namespace Extrinsic::Runtime::AgentDetail
         return outcome;
     }
 
-    inline std::string Schema(std::string properties, std::string required = "[]")
-    {
-        return R"({"type":"object","properties":)" + std::move(properties) + R"(,"required":)" +
-               std::move(required) + R"(,"additionalProperties":false})";
-    }
-
     // ---- declared arguments (RUNTIME-337; the declarations in Runtime.AgentArguments.hpp) ----
     inline std::span<const std::string_view> DomainTokens()
     {
