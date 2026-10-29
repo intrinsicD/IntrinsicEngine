@@ -36,6 +36,29 @@ RETIRED_KMEANS_NAMES = ("Extrinsic.Runtime.KMeansBackend", "Extrinsic.Runtime.KM
 RUN_FRAME = ("void Engine::RunFrame()", "bool Engine::IsRunning() const noexcept")
 
 RULES: list[Rule] = [
+    # --- OperationModuleBoundary (RUNTIME-349, ADR 0031 Decision 7) ------------------------
+    # Operation modules reach the editor only through Extrinsic.Runtime.OperationRuntime. The two
+    # owners are temporary exceptions (AGENTS.md §13), removed by RUNTIME-352 by 2026-12-31; their
+    # exact includes and their count are pinned, so neither gains or swaps one.
+    Rule("OperationModuleBoundary", "ModulesIncludeNoEditorInternals",
+         trees=("src/runtime/Modules",),
+         owners=(('#include "Editor/internal/', (
+                     "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",
+                     "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp")),
+                 ('#include "Editor/Operations/', (
+                     "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",)))),
+    Rule("OperationModuleBoundary", "GrandfatheredIncludesArePinned/clustering",
+         files=("src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",),
+         require=('#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"',
+                  '#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"'),
+         count=(('#include "Editor/', 2),)),
+    Rule("OperationModuleBoundary", "GrandfatheredIncludesArePinned/consolidation",
+         files=("src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp",),
+         require=('#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"',
+                  '#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"',
+                  '#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"'),
+         count=(('#include "Editor/', 3),)),
+
     # --- RenderWorldPoolEngineWiring ------------------------------------------------
     Rule("RenderWorldPoolEngineWiring", "ConfiguresPrivatePoolFromExtractionMode",
          files=(ENGINE,),

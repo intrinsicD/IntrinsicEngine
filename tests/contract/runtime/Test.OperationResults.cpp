@@ -29,6 +29,23 @@ namespace
     {
         std::string Message;
     };
+    // Operation tags (RUNTIME-349): the store keys by the operation, its Result is the payload.
+    struct FirstOperation
+    {
+        using Result = First;
+    };
+    struct SecondOperation
+    {
+        using Result = Second;
+    };
+    struct AlsoFirstOperation
+    {
+        using Result = First;
+    };
+    struct NeverStored
+    {
+        using Result = std::string;
+    };
 
     // A point cloud of eight live samples with a kernel density config on it.
     struct Fixture
@@ -67,7 +84,7 @@ namespace
         }
         [[nodiscard]] std::shared_ptr<const R::EditorKernelDensityResult> Last() const
         {
-            return Store.Copy().Last<R::EditorKernelDensityResult>();
+            return Store.Copy().Last<R::KernelDensityOperation>();
         }
     };
 }
@@ -77,30 +94,46 @@ TEST(OperationResults, StoreKeepsTheNewestRunPerResultType)
     R::OperationResultStore store;
     const auto a = store.BeginRun(), b = store.BeginRun();
     EXPECT_LT(a, b);
-    EXPECT_TRUE(store.Store(b, First{"b"}));
-    EXPECT_FALSE(store.Store(a, First{"a"})) << "an older run never replaces a newer one";
-    EXPECT_EQ(store.Last<First>()->Message, "b");
-    EXPECT_TRUE(store.Store(b, First{"b again"})) << "the same run replaces its earlier answer";
-    EXPECT_TRUE(store.Store(a, Second{"other"})) << "operations are ordered separately";
-    EXPECT_FALSE(store.Last<std::string>());
+    EXPECT_TRUE(store.Store<FirstOperation>(b, First{"b"}));
+    EXPECT_FALSE(store.Store<FirstOperation>(a, First{"a"})) << "an older run never replaces a newer one";
+    EXPECT_EQ(store.Last<FirstOperation>()->Message, "b");
+    EXPECT_TRUE(store.Store<FirstOperation>(b, First{"b again"})) << "the same run replaces its earlier answer";
+    EXPECT_TRUE(store.Store<SecondOperation>(a, Second{"other"})) << "operations are ordered separately";
+    EXPECT_FALSE(store.Last<NeverStored>());
     const auto copy = store.Copy();
-    EXPECT_TRUE(store.Store(store.BeginRun(), First{"c"}));
-    EXPECT_EQ(copy.Last<First>()->Message, "b again") << "a frame's copy does not change";
-    EXPECT_EQ(store.Last<First>()->Message, "c");
-    EXPECT_EQ(store.Last<Second>()->Message, "other");
+    EXPECT_TRUE(store.Store<FirstOperation>(store.BeginRun(), First{"c"}));
+    EXPECT_EQ(copy.Last<FirstOperation>()->Message, "b again") << "a frame's copy does not change";
+    EXPECT_EQ(store.Last<FirstOperation>()->Message, "c");
+    EXPECT_EQ(store.Last<SecondOperation>()->Message, "other");
+}
+
+// RUNTIME-349: the key is the operation, not its result type, so two operations sharing a result type
+// keep separate slots (keyed by result type they collided).
+TEST(OperationResults, DefinitionsSharingAResultTypeStaySeparate)
+{
+    R::OperationResultStore store;
+    const auto first = store.BeginRun(), later = store.BeginRun();
+    ASSERT_TRUE(store.Store<AlsoFirstOperation>(later, First{"also"}));
+    EXPECT_TRUE(store.Store<FirstOperation>(first, First{"first"}))
+        << "an older run of another operation is not barred";
+    EXPECT_EQ(store.Last<FirstOperation>()->Message, "first");
+    EXPECT_EQ(store.Last<AlsoFirstOperation>()->Message, "also");
+    store.Dismiss(&R::OperationResultKey<FirstOperation>::Tag);
+    EXPECT_FALSE(store.Last<FirstOperation>());
+    EXPECT_TRUE(store.Last<AlsoFirstOperation>());
 }
 
 TEST(OperationResults, DismissClearsTheBarrierButNotTheCounter)
 {
     R::OperationResultStore store;
     const auto old = store.BeginRun(), newer = store.BeginRun();
-    ASSERT_TRUE(store.Store(newer, First{"newer"}));
-    store.Dismiss(&R::OperationResultKey<First>::Tag);
-    EXPECT_FALSE(store.Last<First>());
-    EXPECT_TRUE(store.Store(old, First{"late"})) << "after a dismiss any run's delivery fills the slot";
+    ASSERT_TRUE(store.Store<FirstOperation>(newer, First{"newer"}));
+    store.Dismiss(&R::OperationResultKey<FirstOperation>::Tag);
+    EXPECT_FALSE(store.Last<FirstOperation>());
+    EXPECT_TRUE(store.Store<FirstOperation>(old, First{"late"})) << "after a dismiss any run's delivery fills the slot";
     EXPECT_GT(store.BeginRun(), newer);
     store.Clear();
-    EXPECT_FALSE(store.Last<First>());
+    EXPECT_FALSE(store.Last<FirstOperation>());
     EXPECT_GT(store.BeginRun(), newer + 1u) << "a reset does not reuse ids";
 }
 
@@ -112,13 +145,13 @@ TEST(OperationResults, RetainStoresOnlyWhileTheAttachmentIsActive)
     {
         return active;
     };
-    R::RetainOperationResult(&store, attachment, 1u, First{"detached"});
-    R::RetainOperationResult(&store, {}, 1u, First{"no attachment"});
-    R::RetainOperationResult<First>(nullptr, attachment, 1u, First{"no store"});
-    EXPECT_FALSE(store.Last<First>());
+    R::RetainOperationResult<FirstOperation>(&store, attachment, 1u, First{"detached"});
+    R::RetainOperationResult<FirstOperation>(&store, {}, 1u, First{"no attachment"});
+    R::RetainOperationResult<FirstOperation>(nullptr, attachment, 1u, First{"no store"});
+    EXPECT_FALSE(store.Last<FirstOperation>());
     active = true;
-    R::RetainOperationResult(&store, attachment, 1u, First{"attached"});
-    EXPECT_EQ(store.Last<First>()->Message, "attached");
+    R::RetainOperationResult<FirstOperation>(&store, attachment, 1u, First{"attached"});
+    EXPECT_EQ(store.Last<FirstOperation>()->Message, "attached");
 }
 
 TEST(OperationResults, OlderRunNeverReplacesNewer)

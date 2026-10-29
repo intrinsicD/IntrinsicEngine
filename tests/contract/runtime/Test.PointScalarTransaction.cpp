@@ -413,10 +413,10 @@ TEST_P(PointScalarTransaction, GpuResultsAreRetainedWithoutThePanel)
     {
         const auto copy = store.Copy();
         if (GetParam() == 0)
-            if (const auto r = copy.Last<R::EditorKernelDensityResult>())
+            if (const auto r = copy.Last<R::KernelDensityOperation>())
                 return std::pair{r->Status, r->WrittenCount};
         if (GetParam() == 1)
-            if (const auto r = copy.Last<R::EditorPointSpacingResult>())
+            if (const auto r = copy.Last<R::PointSpacingOperation>())
                 return std::pair{r->Status, r->WrittenCount};
         return std::nullopt;
     };

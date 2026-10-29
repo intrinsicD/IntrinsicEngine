@@ -92,9 +92,10 @@ contract_review: the operation runtime becomes an exported framework module for 
   implicitly, so its removal need not fail.)
 
 ## Acceptance criteria
-- [ ] Technical test passed (or the fallback taken and reported); framework module exported.
-- [ ] Both definitions in their modules; codec and editor files lose them; suites green.
-- [ ] Layering rule with its test; Codex plan and code review; structural checks pass.
+- [x] Technical test passed (or the fallback taken and reported); framework module exported.
+- [x] Both definitions in their modules; codec and editor files lose them; suites green.
+- [ ] Layering rule with its test; Codex plan and code review; structural checks pass. (Rule, test and
+      checks done; the code review said revise, its fixes are confirmed in `RUNTIME-351`'s review.)
 
 ## Verification
 ```bash
@@ -133,3 +134,40 @@ python3 tools/repo/check_layering.py --root src --strict
   counts a skipped test as passed). The exported surface (the definition concept, the runtime and
   its nested `Work`, `PointSamplesInput`, `JoinOperationText`) hides the editor helpers' names but
   not their shapes; stated, not changed.
+- 2026-10-29: Placement (Plan steps 2-4) implemented:
+  - each operation's interface (`Modules/<Op>/Runtime.<Op>Config.cppm`) holds the record, the result,
+    the tag `<Op>Operation`, `<Op>ConfigRows()` and the entry points; its implementation unit
+    `Runtime.<Op>Operation.cpp` holds the rows and section (moved from the codec file, whose
+    exported functions keep global-module attachment), the definition, the entry points and the
+    config wrappers through the framework module's `ApplyOperationConfig`/`ActiveOperationConfig`;
+  - `Runtime.PointFieldOperations.Processing.cpp` and `.cpp` are gone; the facade keeps the frame and
+    re-exports both modules (frozen); the codec file keeps outlier analysis and density weights;
+  - the store keys by the operation tag (`Store<Op>`, `Last<Op>`, payload `Op::Result`; the runtime
+    concept requires `Def::Operation` with the same result);
+  - rule `OperationModuleBoundary` (owners: the two grandfathered files; their include counts
+    pinned) with removal task `RUNTIME-352` (expiry 2026-12-31) and its ctest suite;
+  - structural test rewrites (operator decision 28): `ConfigPropertyTypes` without the two
+    interfaces, which join `PointFieldResults` (no point cloud algorithm modules); `Family` checks the
+    two implementation units instead of the deleted files; `RuntimeReuseDriftGuard`'s literal
+    allowlist loses the two interfaces, which use `PropertyNames::kPosition` now; the key change in
+    the tests (`Last<Op>`); the cross-table `IsDerivable` witness renames a field of its own table.
+  Tests: `OperationResults.DefinitionsSharingAResultTypeStaySeparate` (red before as a compile
+  failure: the old API keys by the result type; red by mutation: keying by `Operation::Result`
+  again fails it and the dismiss test). The rule names a new offender (mutation: an editor include
+  added to the kernel density unit); its self-check passes. Results: the list plus
+  `OperationModuleBoundary` 806 (805 passed, 1 skipped by design); Vulkan 57 (56 passed, 1 skipped
+  by design); config codec golden unchanged; changed lines clang-format 20.1.8; module inventory
+  current. Lines: `src` +178 net (the two units 2x ~265 replace ~541 lines; interfaces, the
+  framework helpers and each unit's module boilerplate add the rest); `src/runtime/Editor` 52,190.
+  (The first version of this entry put each operation's own code at about 330 lines; ADR 0031 counts
+  every line of the operation's own files: see the next entry.)
+- 2026-10-29: Codex code review (`review349b.answer.md`): revise. Behaviour preserved (rows, tokens,
+  sections, codec and registration bodies, results and entry points identical by token comparison;
+  global-module attachment kept; `kPosition` equals the literal). B1 the 19 family checks also
+  forbid `Extrinsic.Runtime.KernelDensityConfig` and `Extrinsic.Runtime.PointSpacingConfig` now (all
+  35 locality checks pass). B2 the grandfathered files' exact include strings are pinned besides
+  their count (swapping one for another editor header fails, shown). O1 the accounting: own files
+  382 lines for kernel density (interface 101, implementation 281) and 367 for point spacing (103,
+  264); `RUNTIME-351` created with a removal budget and the early warning that the phase 1 gate
+  (150) looks out of reach without deeper cuts. These fixes go to the next block's review
+  (`RUNTIME-351`). After them: 806 (805 passed, 1 skipped by design).

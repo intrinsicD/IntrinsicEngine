@@ -818,8 +818,8 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
 {
     Runtime::Engine engine{HeadlessConfig()};
     engine.Initialize();
-    using Density = Runtime::EditorKernelDensityResult;
-    using Spacing = Runtime::EditorPointSpacingResult;
+    using Density = Runtime::KernelDensityOperation;
+    using Spacing = Runtime::PointSpacingOperation;
     const Runtime::KernelDensityConfig missingDensity{.StableEntityId = 0xFFFFFFF0u};
     const Runtime::PointSpacingConfig missingSpacing{.StableEntityId = 0xFFFFFFF0u};
     const Runtime::KernelDensityConfig invalidDensity{.Backend = static_cast<Runtime::KernelDensityBackend>(7)};
@@ -3759,8 +3759,8 @@ TEST_F(EditorQueuedPointJobs, OutlivedRunsStoreNothingInTheNextSession)
         << "the outlived runs finished";
     EXPECT_EQ(calls, 0u);
     const auto results = Runtime::PrepareEditorPointFieldFrame(Attachment).Results;
-    EXPECT_FALSE(results.Last<Runtime::EditorKernelDensityResult>());
-    EXPECT_FALSE(results.Last<Runtime::EditorPointSpacingResult>());
+    EXPECT_FALSE(results.Last<Runtime::KernelDensityOperation>());
+    EXPECT_FALSE(results.Last<Runtime::PointSpacingOperation>());
 }
 
 TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)

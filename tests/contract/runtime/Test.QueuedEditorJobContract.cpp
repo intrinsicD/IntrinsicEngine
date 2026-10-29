@@ -594,7 +594,8 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         "ProcessingCompilationLocality.ConfigPropertyTypes",
         "ProcessingCompilationLocality.ConsolidationContracts",
     };
-    constexpr std::array<std::string_view, 22> allowedPositionLiterals{
+    // RUNTIME-349: kernel density and point spacing left the boundary and use kPosition.
+    constexpr std::array<std::string_view, 20> allowedPositionLiterals{
         "GeometryIntegration/Runtime.GeometryProperty.Types.cpp",
         "Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm",
         "Modules/Clustering/Runtime.ClusteringTypes.cppm",
@@ -605,7 +606,6 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         "Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm",
         "Modules/Geodesics/Runtime.GeodesicsConfig.cpp",
         "Modules/Geodesics/Runtime.GeodesicsConfig.cppm",
-        "Modules/KernelDensity/Runtime.KernelDensityConfig.cppm",
         "Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm",
         "Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm",
         "Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm",
@@ -613,7 +613,6 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm",
         "Modules/PointConstruction/Runtime.PointConstructionConfig.cppm",
         "Modules/PointSampling/Runtime.PointSamplingConfig.cppm",
-        "Modules/PointSpacing/Runtime.PointSpacingConfig.cppm",
         "Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm",
         "Modules/Registration/Runtime.CoherentPointDriftConfig.cppm",
         "Modules/Registration/Runtime.RegistrationConfig.cppm",

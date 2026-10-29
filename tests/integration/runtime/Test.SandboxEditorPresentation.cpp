@@ -1006,8 +1006,8 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
         "context.MeshTopology.ResultSinks.MeshSimplify",
         "context.Normals.ResultSinks.NormalEstimation",
         "context.PointAnalysis.ResultSinks.OutlierAnalysis",
-        "context.PointFields.Results.Last<Runtime::EditorKernelDensityResult>()",
-        "context.PointFields.Results.Last<Runtime::EditorPointSpacingResult>()",
+        "context.PointFields.Results.Last<Runtime::KernelDensityOperation>()",
+        "context.PointFields.Results.Last<Runtime::PointSpacingOperation>()",
         "context.Registration.ResultSinks.Registration",
     }};
     for (const std::string_view required : commands)

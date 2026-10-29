@@ -33,11 +33,9 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyT
         --check-source src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cppm
         --check-source src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cpp
         --check-source src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
-        --check-source src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
         --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cppm
         --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
-        --check-source src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
         --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         --check-source src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
         --check-source src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm
@@ -87,8 +85,9 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.Processing.cpp
+        # RUNTIME-349: kernel density and point spacing live in their operation modules.
+        --check-source src/runtime/Modules/KernelDensity/Runtime.KernelDensityOperation.cpp
+        --check-source src/runtime/Modules/PointSpacing/Runtime.PointSpacingOperation.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         --forbid-module Extrinsic.ECS.Component.Transform
@@ -104,10 +103,13 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
+# RUNTIME-349: the two operation interfaces reach the editor's processing surface (their entry points),
+# never the point cloud algorithms; their implementation units call those.
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointFieldResults
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm
-        --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp
+        --check-source src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
+        --check-source src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
         --forbid-module Geometry.PointCloud.Utils
         --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
@@ -146,6 +148,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
@@ -168,6 +172,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.UnrelatedAdapte
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
@@ -179,6 +185,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisTe
         --check-source tests/contract/runtime/Test.OutlierAnalysis.cpp
         --check-source tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
@@ -194,6 +202,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Normals
         --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
         --forbid-module Extrinsic.Runtime.RegistrationOperations
@@ -263,7 +273,9 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalTests
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
-        --forbid-module Extrinsic.Runtime.PointFieldOperations)
+        --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshSupport
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
@@ -272,6 +284,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshSupport
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.RegistrationOperations
         --forbid-module Extrinsic.Runtime.ParameterizationOperations
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
@@ -295,6 +309,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSet
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.RegistrationOperations
@@ -310,6 +326,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointConstructi
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.RegistrationOperations
@@ -328,6 +346,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointCloudServi
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.RegistrationOperations
@@ -348,6 +368,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Discovery
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
@@ -361,12 +383,16 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetTests
         --check-source tests/contract/runtime/Test.BilateralFilterOperations.cpp
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointConstructionTests
         --check-source tests/contract/runtime/Test.PointConstructionOperations.cpp
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Registration
@@ -379,6 +405,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Registration
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.ParameterizationOperations
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
@@ -397,6 +425,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Parameterizatio
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.RegistrationOperations
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
@@ -421,6 +451,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshField
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.RegistrationOperations
         --forbid-module Extrinsic.Runtime.ParameterizationOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
@@ -436,6 +468,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ScalarRidges
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.RegistrationOperations
         --forbid-module Extrinsic.Runtime.ParameterizationOperations
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
@@ -475,6 +509,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopology
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.RegistrationOperations
         --forbid-module Extrinsic.Runtime.ParameterizationOperations
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
@@ -490,6 +526,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshFieldTests
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.RegistrationOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.ParameterizationOperations
@@ -502,6 +540,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.RegistrationTes
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.KernelDensityConfig
+        --forbid-module Extrinsic.Runtime.PointSpacingConfig
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
@@ -3041,6 +3081,7 @@ if(Python3_Interpreter_FOUND)
         set_tests_properties(${suite}.SourceRules PROPERTIES LABELS "${ARGN}")
     endfunction()
     intrinsic_add_source_rules_test(RenderWorldPoolEngineWiring contract runtime)
+    intrinsic_add_source_rules_test(OperationModuleBoundary contract runtime)
     intrinsic_add_source_rules_test(RendererRhiBoundary contract graphics)
     intrinsic_add_source_rules_test(EcsLayeringBoundaries contract ecs)
     intrinsic_add_source_rules_test(PlatformLayering unit contract platform headless)

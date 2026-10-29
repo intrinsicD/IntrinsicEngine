@@ -1,7 +1,7 @@
 // Results of declared operations (ADR 0031 Decision 7, RUNTIME-348): per operation, the newest run's
 // result. The workspace session owns one store; the operation runtime writes it whoever started the
-// run, and panels read a frame's copy. Keyed by result type: each operation has its own result type,
-// and the definitions are not visible to the readers yet (RUNTIME-349 reconciles the key).
+// run, and panels read a frame's copy. Keyed by the operation's definition tag (`Operation::Result`
+// is the payload), so key and payload cannot be chosen apart (RUNTIME-349).
 module;
 #include <cstdint>
 #include <functional>
@@ -12,8 +12,8 @@ export module Extrinsic.Runtime.OperationResults;
 
 export namespace Extrinsic::Runtime
 {
-    // The address of Tag is the key of an operation's results; it names the stored type.
-    template <class Result> struct OperationResultKey
+    // The address of Tag is the key of an operation's results; the operation names the stored type.
+    template <class Operation> struct OperationResultKey
     {
         static constexpr char Tag{};
     };
@@ -22,11 +22,11 @@ export namespace Extrinsic::Runtime
     class OperationResultSnapshot
     {
     public:
-        template <class Result> [[nodiscard]] std::shared_ptr<const Result> Last() const
+        template <class Operation> [[nodiscard]] std::shared_ptr<const typename Operation::Result> Last() const
         {
-            const Entry* entry = Find(&OperationResultKey<Result>::Tag);
-            // The key was stored together with this type (Store<Result>), so the cast is exact.
-            return entry ? std::static_pointer_cast<const Result>(entry->Result) : nullptr;
+            const Entry* entry = Find(&OperationResultKey<Operation>::Tag);
+            // The key was stored with Operation::Result (Store<Operation>), so the cast is exact.
+            return entry ? std::static_pointer_cast<const typename Operation::Result>(entry->Result) : nullptr;
         }
 
     protected:
@@ -59,9 +59,10 @@ export namespace Extrinsic::Runtime
 
         // Refused (false) when a newer run's result is stored; an equal id replaces, so a run's
         // terminal result replaces its first answer.
-        template <class Result> bool Store(const std::uint64_t invocation, Result result)
+        template <class Operation> bool Store(const std::uint64_t invocation, typename Operation::Result result)
         {
-            const void* key = &OperationResultKey<Result>::Tag;
+            using Result = typename Operation::Result;
+            const void* key = &OperationResultKey<Operation>::Tag;
             Entry* entry = nullptr;
             for (Entry& candidate : m_Entries)
                 if (candidate.Key == key)
@@ -101,21 +102,21 @@ export namespace Extrinsic::Runtime
 
     // A frame's dismiss of one operation's result (a no-op once its session is gone).
     using OperationResultDismiss = std::function<void(const void* key)>;
-    template <class Result> void DismissOperationResult(const OperationResultDismiss& dismiss)
+    template <class Operation> void DismissOperationResult(const OperationResultDismiss& dismiss)
     {
         if (dismiss)
-            dismiss(&OperationResultKey<Result>::Tag);
+            dismiss(&OperationResultKey<Operation>::Tag);
     }
 
     // The runtime's write: only while the attachment that owns `store` is active (the check reads only
     // the attachment epoch, so a delivery that outlives its session stores nothing).
-    template <class Result>
+    template <class Operation>
     void RetainOperationResult(OperationResultStore* store,
         const std::function<bool()>& attachmentActive,
         const std::uint64_t invocation,
-        const Result& result)
+        const typename Operation::Result& result)
     {
         if (store && attachmentActive && attachmentActive())
-            (void)store->Store(invocation, result);
+            (void)store->template Store<Operation>(invocation, result);
     }
 }

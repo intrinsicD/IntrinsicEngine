@@ -162,7 +162,8 @@ target_sources(${target_name}
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
         Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp
         Editor/Operations/Runtime.PointScalarTransaction.cpp
-        Editor/Operations/Runtime.PointFieldOperations.Processing.cpp
+        Modules/KernelDensity/Runtime.KernelDensityOperation.cpp
+        Modules/PointSpacing/Runtime.PointSpacingOperation.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
@@ -217,7 +218,6 @@ target_sources(${target_name}
         Editor/Operations/Runtime.PointSetOperations.Processing.cpp
     Editor/Runtime.EditorProcessing.cpp
     Editor/Operations/Runtime.PropertyInspectionOperations.cpp
-    Editor/Operations/Runtime.PointFieldOperations.cpp
     Editor/Operations/Runtime.PointAnalysisOperations.cpp
         Editor/Operations/Runtime.PointCloudServiceOperations.cpp
         Editor/Operations/Runtime.NormalOperations.cpp

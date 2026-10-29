@@ -4954,15 +4954,15 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
                     EXPECT_EQ(result->GpuQueryBatches, 1u);
                     return true;
                 };
-                if (method == 0 && check(frame.PointFields.Results.Last<R::EditorKernelDensityResult>()))
+                if (method == 0 && check(frame.PointFields.Results.Last<R::KernelDensityOperation>()))
                 {
                     kept = true;
-                    EXPECT_EQ(frame.PointFields.Results.Last<R::EditorKernelDensityResult>()->MeanDensity, 3);
+                    EXPECT_EQ(frame.PointFields.Results.Last<R::KernelDensityOperation>()->MeanDensity, 3);
                 }
-                if (method == 1 && check(frame.PointFields.Results.Last<R::EditorPointSpacingResult>()))
+                if (method == 1 && check(frame.PointFields.Results.Last<R::PointSpacingOperation>()))
                 {
                     kept = true;
-                    EXPECT_EQ(frame.PointFields.Results.Last<R::EditorPointSpacingResult>()->MeanRadius, 3);
+                    EXPECT_EQ(frame.PointFields.Results.Last<R::PointSpacingOperation>()->MeanRadius, 3);
                 }
                 if (method == 2 && check(frame.PointAnalysis.Results.LastDensityWeightResult))
                 {
@@ -6108,7 +6108,7 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
         .PanelResult = [](const Editor::SandboxEditorContext& context)
             -> std::optional<std::pair<R::EditorCommandStatus, std::string>>
         {
-            const auto r = context.PointFields.Results.Last<R::EditorKernelDensityResult>();
+            const auto r = context.PointFields.Results.Last<R::KernelDensityOperation>();
             return r ? std::optional{std::pair{r->Status, r->Message}} : std::nullopt;
         },
         .ElsewherePending = "Density estimation queued."});

@@ -1364,7 +1364,7 @@ TEST(PointLBVHGpuSmoke, KernelDensityPublishesAcrossDomainsAndPreservesCandidate
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
     EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
     // RUNTIME-348: the newest run's result is the stored one.
-    const auto stored = run->Store.Last<Runtime::EditorKernelDensityResult>();
+    const auto stored = run->Store.Last<Runtime::KernelDensityOperation>();
     ASSERT_TRUE(stored);
     ASSERT_FALSE(run->Results.empty());
     EXPECT_EQ(stored->Status, run->Results.back().Status);
@@ -1632,7 +1632,7 @@ TEST(PointLBVHGpuSmoke, PointSpacingPublishesAcrossDomainsAndPreservesCandidateP
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
     EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
     // RUNTIME-348: the newest run's result is the stored one.
-    const auto stored = run->Store.Last<Runtime::EditorPointSpacingResult>();
+    const auto stored = run->Store.Last<Runtime::PointSpacingOperation>();
     ASSERT_TRUE(stored);
     ASSERT_FALSE(run->Results.empty());
     EXPECT_EQ(stored->Status, run->Results.back().Status);

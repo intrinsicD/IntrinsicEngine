@@ -70,6 +70,8 @@ export extern "C++"
             const Graphics::PointScalarGpuStats& stats,
             PointSamplesInput input) {
             typename Def::Backend;
+            typename Def::Operation; // the exported tag its results are stored under
+            requires std::same_as<typename Def::Operation::Result, typename Def::Result>;
             Def::Backend::CpuOctree;
             Def::Backend::CpuLBVH;
             Def::Backend::VulkanLBVH;
@@ -256,7 +258,8 @@ export extern "C++"
             }
             static Result Keep(const EditorProcessingContext& context, std::uint64_t invocation, Result result)
             {
-                RetainOperationResult(context.OperationResults, context.AttachmentActive, invocation, result);
+                RetainOperationResult<typename Def::Operation>(
+                    context.OperationResults, context.AttachmentActive, invocation, result);
                 return result;
             }
 
@@ -296,7 +299,7 @@ export extern "C++"
                     {
                         auto terminal = w->Result;
                         FoldTransaction(terminal, s);
-                        RetainOperationResult(store, active, invocation, terminal);
+                        RetainOperationResult<typename Def::Operation>(store, active, invocation, terminal);
                     });
                 FoldTransaction(w->Result, state);
                 result = w->Result;
@@ -394,7 +397,7 @@ export extern "C++"
                         invocation,
                         sink = std::move(onComplete)](Result result)
                     {
-                        RetainOperationResult(store, active, invocation, result);
+                        RetainOperationResult<typename Def::Operation>(store, active, invocation, result);
                         if (sink)
                             sink(std::move(result));
                     },
@@ -490,5 +493,26 @@ export extern "C++"
                 return StartGpu(ctx, w, BeginRun(ctx), result, {}, false, &residency, diagnostics);
             }
         };
+    }
+}
+
+export extern "C++"
+{
+    namespace Extrinsic::Runtime
+    {
+    // An operation's config surface (RUNTIME-349): its section applied through the editor's config
+    // control, and the active config. Operation modules reach the editor only through this module.
+        inline RuntimeEngineConfigApplyResult ApplyOperationConfig(const EditorProcessingCommands& commands,
+            const Core::Config::EngineConfigSectionValidationResult& validation,
+            const std::string& sourceId,
+            const std::function<void(Core::Config::EngineConfig&)>& update)
+        {
+            return ApplyEditorProcessingConfig(commands, validation, sourceId, update);
+        }
+        inline const Core::Config::EngineConfig* ActiveOperationConfig(const EditorProcessingCommands& commands)
+        {
+            const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+            return context.EngineConfigControlState ? &context.EngineConfigControlState->ActiveConfig : nullptr;
+        }
     }
 }

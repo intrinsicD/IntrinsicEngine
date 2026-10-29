@@ -2638,7 +2638,7 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::Impl::DrawDensityWindow(bool& open, const SandboxEditorContext& context)
     {
         // RUNTIME-348: the operation runtime stores every run's result; the panel only reads it.
-        if (const auto stored = context.PointFields.Results.Last<Runtime::EditorKernelDensityResult>())
+        if (const auto stored = context.PointFields.Results.Last<Runtime::KernelDensityOperation>())
             Density.LastResult = *stored;
         const std::function<void(Runtime::EditorKernelDensityResult)> noSessionSink{};
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
@@ -2741,7 +2741,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Density",
                 Density.LastResult,
-                &Runtime::OperationResultKey<Runtime::EditorKernelDensityResult>::Tag,
+                &Runtime::OperationResultKey<Runtime::KernelDensityOperation>::Tag,
                 context.PointFields.DismissResult);
         }
         ImGui::End();
@@ -3051,7 +3051,7 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::Impl::DrawSpacingWindow(bool& open, const SandboxEditorContext& context)
     {
         // RUNTIME-348: the operation runtime stores every run's result; the panel only reads it.
-        if (const auto stored = context.PointFields.Results.Last<Runtime::EditorPointSpacingResult>())
+        if (const auto stored = context.PointFields.Results.Last<Runtime::PointSpacingOperation>())
             Spacing.LastResult = *stored;
         const std::function<void(Runtime::EditorPointSpacingResult)> noSessionSink{};
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
@@ -3162,7 +3162,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Spacing",
                 Spacing.LastResult,
-                &Runtime::OperationResultKey<Runtime::EditorPointSpacingResult>::Tag,
+                &Runtime::OperationResultKey<Runtime::PointSpacingOperation>::Tag,
                 context.PointFields.DismissResult);
         }
         ImGui::End();

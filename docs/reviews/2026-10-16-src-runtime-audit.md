@@ -362,7 +362,7 @@ markiert; seine alten Engine-Getter wurden nicht als aktueller Architekturfehler
 
 [GeometryProcessingOperations.Normals.cpp](../../src/runtime/Editor/Operations/Runtime.NormalOperations.Processing.cpp):21
 implementiert `NormalOperations`,
-[GeometryProcessingOperations.Density.cpp](../../src/runtime/Editor/Operations/Runtime.PointFieldOperations.Processing.cpp):16
+[GeometryProcessingOperations.Density.cpp](../../src/runtime/Modules/KernelDensity/Runtime.KernelDensityOperation.cpp):16
 implementiert `PointFieldOperations`. Neue Familien wie PointSampling sind bereits passend benannt.
 
 Bei einer ausdrücklich mechanischen Bereinigung Basenames an Owner angleichen,
