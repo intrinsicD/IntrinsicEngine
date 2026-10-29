@@ -2,6 +2,8 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
@@ -438,4 +440,53 @@ TEST(KernelDensity, DoubleTargetUsesSharedCheckedScalarPublication)
     EXPECT_TRUE(props.Get<double>(config.Density.Name));
     ASSERT_TRUE(history.Undo().Succeeded());
     EXPECT_FALSE(props.Exists(config.Density.Name));
+}
+
+// RUNTIME-347 characterization, written before the operation runtime replaced the family template: a
+// queued run whose input or output changed after submission ends at the job gate (the shared
+// unpublished wording), not at publication's own currentness check ("... changed before publication.").
+TEST(KernelDensityOperations, StaleQueuedRunsEndAtTheGate)
+{
+    for (unsigned change = 0; change < 3; ++change)
+        for (const bool spacing : {false, true})
+        {
+            SCOPED_TRACE(testing::Message() << change << (spacing ? " spacing" : " density"));
+            Extrinsic::ECS::Scene::Registry scene;
+            const auto entity = Make(scene, D::MeshVertex);
+            const auto density = Config(entity, D::MeshVertex);
+            const R::PointSpacingConfig radii{.StableEntityId = density.StableEntityId,
+                .Positions = density.Positions,
+                .Radii = {D::MeshVertex, "radii", Geometry::PropertyValueKind::Float},
+                .KNeighbors = 2};
+            auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+            Intrinsic::Tests::EditorFeatureTestContext context;
+            context.Scene = &scene;
+            R::EditorCommandHistory history;
+            context.CommandHistory = &history;
+            Extrinsic::Tests::EditorJobHarness jobs;
+            jobs.Attach(context);
+            std::optional<R::EditorCommandStatus> status;
+            std::string message;
+            const auto deliver = [&](const auto& result)
+            {
+                status = result.Status;
+                message = result.Message;
+            };
+            const auto queued = spacing ? R::ApplyEditorPointSpacingCommand(context, radii, deliver).Status
+                                        : R::ApplyEditorKernelDensityCommand(context, density, deliver).Status;
+            ASSERT_EQ(queued, R::EditorCommandStatus::Pending);
+            switch (change)
+            {
+            case 0: props.Get<glm::vec3>("samples")[0].x += 1; break;
+            case 1: props.GetOrAdd<bool>("v:deleted")[0] = true; break;
+            case 2: props.GetOrAdd<float>(spacing ? "radii" : "density")[0] = 77; break;
+            }
+            ASSERT_TRUE(jobs.DrainUntilTerminal());
+            ASSERT_TRUE(status);
+            EXPECT_EQ(*status, R::EditorCommandStatus::StaleEntity);
+            EXPECT_EQ(message,
+                std::string(spacing ? "Radii" : "Density") +
+                    " estimation was cancelled or its source became stale; nothing was applied.");
+            EXPECT_FALSE(history.CanUndo());
+        }
 }

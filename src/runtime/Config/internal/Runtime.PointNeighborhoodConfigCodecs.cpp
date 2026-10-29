@@ -373,6 +373,21 @@ namespace Extrinsic::Runtime
             },
             .Validate = &ValidateKernelDensityConfigSection};
         static_assert(ConfigDetail::IsDerivable(kKernelDensitySection));
+        // Rows paired with another table, by name or by type, are refused (the check's witnesses).
+        constexpr auto kKernelDensityRetyped = []
+        {
+            auto fields = kKernelDensityFields;
+            fields[1].Type = ConfigFieldType::Float;
+            return fields;
+        }();
+        static_assert(!ConfigDetail::IsDerivable(
+            ConfigDetail::DerivedConfigSection<KernelDensityConfig>{.Rows = kKernelDensityRows,
+                .Fields = kPointSpacingFields,
+                .Validate = &ValidateKernelDensityConfigSection}));
+        static_assert(!ConfigDetail::IsDerivable(
+            ConfigDetail::DerivedConfigSection<KernelDensityConfig>{.Rows = kKernelDensityRows,
+                .Fields = kKernelDensityRetyped,
+                .Validate = &ValidateKernelDensityConfigSection}));
     }
     // The row's tokens, so the codec and the owner's names cannot drift apart.
     const char* ToString(KernelDensityBackend b) noexcept

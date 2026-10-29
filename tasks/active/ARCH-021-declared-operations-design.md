@@ -101,3 +101,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
   estimated.
   Codex (`RUNTIME-346` code review) spot-checked kernel_density (matches) and glyph_order (output
   is a float column; the agent's split over-counted its ranges by 72 lines): corrected.
+- 2026-10-29: Staged deferral (`RUNTIME-347`, Codex plan review B4): Decision 3's `OperationContext`
+  (cancellation polling inside `Compute`) is not built in the pilot, because neither pilot method
+  takes a cancellation; the job service already skips work cancelled before it starts and checks
+  again before publication. Trigger: the first migrated definition whose method polls (CPD, UV
+  regeneration, point construction), or phase 2 if outlier analysis' compute is chunked. Removing
+  it for good would need an ADR amendment.
