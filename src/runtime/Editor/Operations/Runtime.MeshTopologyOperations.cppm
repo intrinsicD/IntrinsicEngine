@@ -301,6 +301,11 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::span<const ConfigFieldSpec> EditorMeshRemeshFieldSpecs() noexcept;
     [[nodiscard]] std::span<const ConfigFieldSpec> EditorMeshSubdivideFieldSpecs() noexcept;
     [[nodiscard]] std::span<const ConfigFieldSpec> EditorMeshSimplifyFieldSpecs() noexcept;
+    // RUNTIME-343: the same fields, each bound to the command member it sets.
+    [[nodiscard]] std::span<const BoundField<EditorMeshDenoiseCommand>> EditorMeshDenoiseFields() noexcept;
+    [[nodiscard]] std::span<const BoundField<EditorMeshRemeshCommand>> EditorMeshRemeshFields() noexcept;
+    [[nodiscard]] std::span<const BoundField<EditorMeshSubdivideCommand>> EditorMeshSubdivideFields() noexcept;
+    [[nodiscard]] std::span<const BoundField<EditorMeshSimplifyCommand>> EditorMeshSimplifyFields() noexcept;
 
     // Incomplete borrowed containers keep sibling workspace features independent
     // of mesh-topology records; prepared frames copy their values.

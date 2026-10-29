@@ -85,6 +85,8 @@ export namespace Extrinsic::Runtime
     inline constexpr double kScalarRidgeMaxRadiusRatio = 0.25;
     inline constexpr double kScalarRidgeMaxMinimumPersistence = 0.5;
     [[nodiscard]] std::span<const ConfigFieldSpec> EditorScalarRidgeFieldSpecs() noexcept;
+    // RUNTIME-343: the same fields bound to the command members they set (the property has no accessors).
+    [[nodiscard]] std::span<const BoundField<EditorScalarRidgeCommand>> EditorScalarRidgeFields() noexcept;
 
     // Admission: the property, method, ranges and outputs; the entity's geometry is checked when it runs.
     [[nodiscard]] ActionReadiness PreviewEditorScalarRidgeCommand(

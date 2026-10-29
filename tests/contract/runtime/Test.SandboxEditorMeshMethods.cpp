@@ -1226,6 +1226,28 @@ TEST(SandboxEditorUi, MeshTopologyOptionAdmissionSharesValidationAndPermitsRecov
         rejectRemesh(invalid, Status::InvalidProcessingParameters);
         context.*test.Capability = true;
     }
+    // RUNTIME-343: approximation_error is held to its declared minimum of 0 under every sizing law
+    // (before, the mean-curvature law only required it finite; the error-bounded law still needs it
+    // above 0). Refusals carry the shared status and the preview's reason (checkRejected).
+    const auto remeshWith = [&](const Runtime::EditorMeshRemeshSizingLaw law, const double error)
+    {
+        return Runtime::EditorMeshRemeshCommand{.StableEntityId = id,
+            .Mode = law == Runtime::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin
+                ? Runtime::EditorMeshRemeshMode::Adaptive
+                : Runtime::EditorMeshRemeshMode::Uniform,
+            .SizingLaw = law,
+            .ApproximationError = error};
+    };
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    for (const auto law :
+        {Runtime::EditorMeshRemeshSizingLaw::MeanCurvature, Runtime::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin})
+        for (const double error : {-0.5, nan})
+            rejectRemesh(remeshWith(law, error), Status::InvalidProcessingParameters);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, remeshWith(Runtime::EditorMeshRemeshSizingLaw::MeanCurvature, 0.0))
+            .Enabled);
+    rejectRemesh(
+        remeshWith(Runtime::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin, 0.0), Status::InvalidProcessingParameters);
     struct SubdivideCase { Runtime::EditorMeshSubdivideCommand Command; bool Context::*Capability; };
     const std::array subdivideCases{
         SubdivideCase{{.StableEntityId = id}, &Context::MeshSubdivideLoopKernelAvailable},

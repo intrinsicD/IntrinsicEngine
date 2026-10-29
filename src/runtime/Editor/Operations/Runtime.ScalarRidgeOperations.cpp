@@ -49,36 +49,57 @@ namespace
 {
     using FT = ConfigFieldType;
     constexpr std::array<std::string_view, 2> kMethodNames{"hessian_ridge", "watershed"};
-    constexpr std::array kRidgeFields{
-        ConfigFieldSpec{.Name = "property", .Type = FT::String, .Description = "Vertex scalar property to trace; any bindable scalar of the entity.", .NonEmpty = true},
-        ConfigFieldSpec{.Name = "method", .Type = FT::Enum, .Description = "Ridge detector.", .EnumNames = kMethodNames},
-        ConfigFieldSpec{.Name = "radius_ratio", .Type = FT::Float, .Description = "Hessian fit radius as a fraction of the diagonal.",
-                        .Min = kScalarRidgeMinRadiusRatio, .Max = kScalarRidgeMaxRadiusRatio},
-        ConfigFieldSpec{.Name = "scale", .Type = FT::UInt, .Description = "Hessian scale: 0 (0.5x), 1 (1x) or 2 (2x radius).", .Min = 0.0, .Max = 2.0},
-        ConfigFieldSpec{.Name = "minimum_sharpness", .Type = FT::Float, .Description = "Hessian: weakest accepted sharpness.", .Min = 0.0},
-        ConfigFieldSpec{.Name = "minimum_strength", .Type = FT::Float, .Description = "Weakest accepted strength.", .Min = 0.0},
-        ConfigFieldSpec{.Name = "ridges", .Type = FT::Bool, .Description = "Trace ridges."},
-        ConfigFieldSpec{.Name = "valleys", .Type = FT::Bool, .Description = "Trace valleys."},
-        ConfigFieldSpec{.Name = "require_persistence", .Type = FT::Bool, .Description = "Hessian: keep only curves found at another scale too."},
-        ConfigFieldSpec{.Name = "minimum_persistence", .Type = FT::Float, .Description = "Watershed: basin persistence as a fraction of the range.",
-                        .Min = 0.0, .Max = kScalarRidgeMaxMinimumPersistence},
-        ConfigFieldSpec{.Name = "publish_graph", .Type = FT::Bool, .Description = "Publish the curves as a new graph entity (one undo step)."},
-        ConfigFieldSpec{.Name = "publish_mesh_features", .Type = FT::Bool, .Description = "Also publish vertex and edge feature properties on the mesh (a second undo step)."},
+    // RUNTIME-343: each field declared once with the command member it sets; the property is a
+    // reference the command reads itself (no accessors).
+    using Ridge = EditorScalarRidgeCommand;
+    constexpr std::array kRidgeRows{
+        BoundField<Ridge>{.Spec = {.Name = "property",
+                              .Type = FT::String,
+                              .Description = "Vertex scalar property to trace; any bindable scalar of the entity.",
+                              .NonEmpty = true}},
+        Bind<&Ridge::Method>(
+            {.Name = "method", .Type = FT::Enum, .Description = "Ridge detector.", .EnumNames = kMethodNames}),
+        Bind<&Ridge::RadiusRatio>({.Name = "radius_ratio",
+            .Type = FT::Float,
+            .Description = "Hessian fit radius as a fraction of the diagonal.",
+            .Min = kScalarRidgeMinRadiusRatio,
+            .Max = kScalarRidgeMaxRadiusRatio}),
+        Bind<&Ridge::Scale>({.Name = "scale",
+            .Type = FT::UInt,
+            .Description = "Hessian scale: 0 (0.5x), 1 (1x) or 2 (2x radius).",
+            .Min = 0.0,
+            .Max = 2.0}),
+        Bind<&Ridge::MinimumSharpness>({.Name = "minimum_sharpness",
+            .Type = FT::Float,
+            .Description = "Hessian: weakest accepted sharpness.",
+            .Min = 0.0}),
+        Bind<&Ridge::MinimumStrength>(
+            {.Name = "minimum_strength", .Type = FT::Float, .Description = "Weakest accepted strength.", .Min = 0.0}),
+        Bind<&Ridge::Ridges>({.Name = "ridges", .Type = FT::Bool, .Description = "Trace ridges."}),
+        Bind<&Ridge::Valleys>({.Name = "valleys", .Type = FT::Bool, .Description = "Trace valleys."}),
+        Bind<&Ridge::RequirePersistence>({.Name = "require_persistence",
+            .Type = FT::Bool,
+            .Description = "Hessian: keep only curves found at another scale too."}),
+        Bind<&Ridge::MinimumPersistence>({.Name = "minimum_persistence",
+            .Type = FT::Float,
+            .Description = "Watershed: basin persistence as a fraction of the range.",
+            .Min = 0.0,
+            .Max = kScalarRidgeMaxMinimumPersistence}),
+        Bind<&Ridge::PublishGraph>({.Name = "publish_graph",
+            .Type = FT::Bool,
+            .Description = "Publish the curves as a new graph entity (one undo step)."}),
+        Bind<&Ridge::PublishMeshFeatures>({.Name = "publish_mesh_features",
+            .Type = FT::Bool,
+            .Description = "Also publish vertex and edge feature properties on the mesh (a second undo step)."}),
     };
-    [[nodiscard]] bool InRange(const std::string_view name, const double value) noexcept
-    {
-        const ConfigFieldSpec* field = FindConfigFieldSpec(kRidgeFields, name);
-        return field != nullptr && AcceptsConfigFieldNumber(*field, value);
-    }
+    constexpr auto kRidgeFields = SpecsOf(kRidgeRows);
     // The parameter rules shared by the preview and the command; nullopt when they hold.
     [[nodiscard]] std::optional<std::string> ScalarRidgeParameterProblem(const EditorScalarRidgeCommand& command)
     {
         if (command.Property.Domain != GeometryElementDomain::MeshVertex || !command.Property.HasName())
             return "Choose a scalar mesh vertex property.";
-        if ((command.Method != EditorScalarExtremaMethod::Watershed && command.Method != EditorScalarExtremaMethod::HessianRidge) ||
-            !InRange("scale", command.Scale) || !InRange("radius_ratio", command.RadiusRatio) ||
-            !InRange("minimum_sharpness", command.MinimumSharpness) || !InRange("minimum_strength", command.MinimumStrength) ||
-            !InRange("minimum_persistence", command.MinimumPersistence) || (!command.Ridges && !command.Valleys))
+        if (!FieldsInDeclaredRange(std::span<const BoundField<Ridge>>(kRidgeRows), command) ||
+            (!command.Ridges && !command.Valleys))
             return "Choose a method, values inside the accepted ranges and at least one of ridges or valleys.";
         if (!command.PublishGraph && !command.PublishMeshFeatures)
             return "Publish the curve graph, mesh features, or both.";
@@ -87,6 +108,10 @@ namespace
 }
 
     std::span<const ConfigFieldSpec> EditorScalarRidgeFieldSpecs() noexcept { return kRidgeFields; }
+    std::span<const BoundField<EditorScalarRidgeCommand>> EditorScalarRidgeFields() noexcept
+    {
+        return kRidgeRows;
+    }
     ActionReadiness PreviewEditorScalarRidgeCommand(const EditorProcessingCommands& commands, const EditorScalarRidgeCommand& command)
     {
         if (EditorProcessingCommandsAccess::Resolve(commands).Scene == nullptr) return {false, "Scene is unavailable."};

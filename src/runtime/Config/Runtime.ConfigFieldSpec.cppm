@@ -4,12 +4,15 @@
 // Integer and string enum payloads retain the representation chosen by their owner.
 module;
 
+#include <array>
 #include <cstdint>
 #include <cstddef>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 
 export module Extrinsic.Runtime.ConfigFieldSpec;
 
@@ -82,4 +85,80 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool AcceptsConfigFieldNumber(const ConfigFieldSpec& field, double value) noexcept;
     // Exact membership in EnumValues; an empty value list accepts no token.
     [[nodiscard]] bool AcceptsConfigFieldToken(const ConfigFieldSpec& field, std::string_view value) noexcept;
+
+    // RUNTIME-343: a command's field declared once together with the member it sets, so the
+    // command's range check, the agent's params and the panel read one table. Get and Set read and
+    // write the member as a double (Bool 0 or 1, an enum its enumerator value): lossless for the
+    // members bound so far (32-bit integers, float, double, bool, small enums, and size_t within its
+    // declared range). Set takes a value its member can hold (a caller checks the declared range
+    // first). FieldNumber gives the field's wire number (an Enum adds its Min). A row without
+    // accessors is a field its owner reads itself (a property reference).
+    template <class Cmd> struct BoundField
+    {
+        ConfigFieldSpec Spec{};
+        double (*Get)(const Cmd&){nullptr};
+        void (*Set)(Cmd&, double){nullptr};
+    };
+
+    template <class> struct BoundMember;
+    template <class C, class T> struct BoundMember<T C::*>
+    {
+        using Command = C;
+        using Type = T;
+    };
+
+    // The row of `spec` bound to `Member` (a pointer to a numeric, bool or enum member).
+    template <auto Member> [[nodiscard]] constexpr auto Bind(const ConfigFieldSpec& spec)
+    {
+        using Cmd = typename BoundMember<decltype(Member)>::Command;
+        using T = typename BoundMember<decltype(Member)>::Type;
+        return BoundField<Cmd>{.Spec = spec,
+            .Get = [](const Cmd& command) -> double
+            {
+                if constexpr (std::is_enum_v<T>)
+                    return static_cast<double>(std::to_underlying(command.*Member));
+                else
+                    return static_cast<double>(command.*Member);
+            },
+            .Set =
+                [](Cmd& command, const double value)
+            {
+                if constexpr (std::is_same_v<T, bool>)
+                    command.*Member = value != 0.0;
+                else if constexpr (std::is_enum_v<T>)
+                    command.*Member = static_cast<T>(static_cast<std::underlying_type_t<T>>(value));
+                else
+                    command.*Member = static_cast<T>(value);
+            }};
+    }
+
+    // The specs of `rows`, in order: the plain table schemas, checks and hints read.
+    template <class Cmd, std::size_t N>
+    [[nodiscard]] constexpr std::array<ConfigFieldSpec, N> SpecsOf(const std::array<BoundField<Cmd>, N>& rows)
+    {
+        std::array<ConfigFieldSpec, N> specs{};
+        for (std::size_t i = 0; i < N; ++i)
+            specs[i] = rows[i].Spec;
+        return specs;
+    }
+
+    template <class Cmd> [[nodiscard]] double FieldNumber(const BoundField<Cmd>& row, const Cmd& command)
+    {
+        return row.Get(command) + (row.Spec.Type == ConfigFieldType::Enum ? row.Spec.Min.value_or(0.0) : 0.0);
+    }
+    template <class Cmd> void SetFieldNumber(const BoundField<Cmd>& row, Cmd& command, const double wire)
+    {
+        row.Set(command, wire - (row.Spec.Type == ConfigFieldType::Enum ? row.Spec.Min.value_or(0.0) : 0.0));
+    }
+
+    // Every bound numeric or enum field of `command` is accepted by its spec (a Bool always is).
+    template <class Cmd>
+    [[nodiscard]] bool FieldsInDeclaredRange(const std::span<const BoundField<Cmd>> rows, const Cmd& command)
+    {
+        for (const BoundField<Cmd>& row : rows)
+            if (row.Get != nullptr && row.Spec.Type != ConfigFieldType::Bool &&
+                !AcceptsConfigFieldNumber(row.Spec, FieldNumber(row, command)))
+                return false;
+        return true;
+    }
 }

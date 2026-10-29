@@ -27,6 +27,8 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProperty.Types;
@@ -566,4 +568,330 @@ TEST(DeclaredFieldContracts, ObjectWithoutFieldsIsOpen)
     const Json property = ExpectCheckAndSchemaVerdicts({.Name = "params", .Type = FT::Object},
         {{Json::object(), true}, {Json{{"a", 1}}, true}, {Json::array(), false}, {"x", false}, {1, false}});
     EXPECT_EQ(property, (Json{{"type", "object"}}));
+}
+
+namespace
+{
+    // A command with one bound row set by its field name, recording the names checked so a row no
+    // expectation names fails the test.
+    template <class Cmd> struct BoundRows
+    {
+        std::span<const R::BoundField<Cmd>> Rows;
+        std::vector<std::string> Checked{};
+
+        Cmd With(const std::string_view name, const double wire)
+        {
+            Cmd command{};
+            const auto row = std::ranges::find(Rows,
+                name,
+                [](const R::BoundField<Cmd>& r)
+                {
+                    return r.Spec.Name;
+                });
+            EXPECT_NE(row, Rows.end()) << name;
+            if (row != Rows.end())
+            {
+                R::SetFieldNumber(*row, command, wire);
+                EXPECT_EQ(R::FieldNumber(*row, command), wire) << name;
+                for (const R::BoundField<Cmd>& other : Rows)
+                    if (&other != &*row && other.Get != nullptr)
+                        EXPECT_EQ(R::FieldNumber(other, command), R::FieldNumber(other, Cmd{}))
+                            << name << " also changed " << other.Spec.Name;
+                Checked.emplace_back(name);
+            }
+            return command;
+        }
+        ~BoundRows()
+        {
+            for (const R::BoundField<Cmd>& row : Rows)
+                EXPECT_TRUE(row.Get == nullptr || std::ranges::contains(Checked, std::string(row.Spec.Name)))
+                    << row.Spec.Name << " has no expectation";
+        }
+    };
+}
+
+// RUNTIME-343: each field of the explicit-parameter commands is declared once with the member it
+// sets. Setting a field by name reaches exactly the member of that name (an independent
+// expectation per field, so two rows bound to each other's members fail), and the generic range
+// check refuses a value just outside each numeric field's declared range.
+TEST(DeclaredFieldContracts, BoundFieldsReachTheirNamedMembers)
+{
+    using R::EditorMeshDenoiseCommand, R::EditorMeshRemeshCommand, R::EditorMeshSubdivideCommand,
+        R::EditorMeshSimplifyCommand, R::EditorScalarRidgeCommand;
+    {
+        BoundRows<EditorMeshDenoiseCommand> d{R::EditorMeshDenoiseFields()};
+        EXPECT_EQ(d.With("normal_iterations", 7).NormalIterations, 7u);
+        EXPECT_EQ(d.With("vertex_iterations", 8).VertexIterations, 8u);
+        EXPECT_EQ(d.With("sigma_spatial", 0.25).SigmaSpatial, 0.25);
+        EXPECT_EQ(d.With("sigma_range", 0.5).SigmaRange, 0.5);
+        EXPECT_FALSE(d.With("preserve_boundary", 0).PreserveBoundary);
+        EXPECT_EQ(d.With("degenerate_normal_length_epsilon", 1e-6).DegenerateNormalLengthEpsilon, 1e-6);
+    }
+    {
+        BoundRows<EditorMeshRemeshCommand> r{R::EditorMeshRemeshFields()};
+        EXPECT_EQ(r.With("mode", 1).Mode, R::EditorMeshRemeshMode::Adaptive);
+        EXPECT_EQ(r.With("sizing_law", 1).SizingLaw, R::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin);
+        EXPECT_EQ(r.With("iterations", 3).Iterations, 3u);
+        EXPECT_EQ(r.With("target_edge_length", 0.1).TargetEdgeLength, 0.1);
+        EXPECT_EQ(r.With("lambda", 0.25).Lambda, 0.25);
+        EXPECT_EQ(r.With("curvature_adaptation", 2.0).CurvatureAdaptation, 2.0);
+        EXPECT_EQ(r.With("approximation_error", 0.02).ApproximationError, 0.02);
+        EXPECT_FALSE(r.With("preserve_boundary", 0).PreserveBoundary);
+        EXPECT_TRUE(r.With("project_to_surface", 1).ProjectToSurface);
+        EXPECT_EQ(r.With("reference_projection_k", 8).ReferenceProjectionK, 8u);
+        EXPECT_EQ(r.With("max_reference_projection_distance", 0.3).MaxReferenceProjectionDistance, 0.3);
+    }
+    {
+        BoundRows<EditorMeshSubdivideCommand> s{R::EditorMeshSubdivideFields()};
+        EXPECT_EQ(s.With("operator", 2).Operator, R::EditorMeshSubdivideOperator::Sqrt3);
+        EXPECT_EQ(s.With("iterations", 2).Iterations, 2u);
+        EXPECT_TRUE(s.With("preserve_loop_feature_edges", 1).PreserveLoopFeatureEdges);
+        EXPECT_EQ(s.With("max_output_faces", 1000).MaxOutputFaces, 1000u);
+    }
+    {
+        BoundRows<EditorMeshSimplifyCommand> s{R::EditorMeshSimplifyFields()};
+        EXPECT_EQ(s.With("metric", 0).Metric, R::EditorMeshSimplifyMetric::ClassicalQEM);
+        EXPECT_EQ(s.With("target_faces", 100).TargetFaces, 100u);
+        EXPECT_EQ(s.With("max_error", 0.1).MaxError, 0.1);
+        EXPECT_FALSE(s.With("preserve_boundary", 0).PreserveBoundary);
+        EXPECT_EQ(s.With("feature_angle_threshold_degrees", 30.0).FeatureAngleThresholdDegrees, 30.0);
+        EXPECT_EQ(s.With("normal_weight", 2.0).NormalWeight, 2.0);
+        EXPECT_EQ(s.With("boundary_weight", 3.0).BoundaryWeight, 3.0);
+        EXPECT_EQ(s.With("curvature_weight", 4.0).CurvatureWeight, 4.0);
+        EXPECT_FALSE(s.With("preserve_sharp_features", 0).PreserveSharpFeatures);
+        EXPECT_FALSE(s.With("preserve_uv_seams", 0).PreserveUvSeams);
+    }
+    {
+        BoundRows<EditorScalarRidgeCommand> g{R::EditorScalarRidgeFields()};
+        EXPECT_EQ(g.With("method", 1).Method, R::EditorScalarExtremaMethod::Watershed);
+        EXPECT_EQ(g.With("radius_ratio", 0.05).RadiusRatio, 0.05);
+        EXPECT_EQ(g.With("scale", 2).Scale, 2u);
+        EXPECT_EQ(g.With("minimum_sharpness", 0.1).MinimumSharpness, 0.1);
+        EXPECT_EQ(g.With("minimum_strength", 0.2).MinimumStrength, 0.2);
+        EXPECT_FALSE(g.With("ridges", 0).Ridges);
+        EXPECT_FALSE(g.With("valleys", 0).Valleys);
+        EXPECT_TRUE(g.With("require_persistence", 1).RequirePersistence);
+        EXPECT_EQ(g.With("minimum_persistence", 0.1).MinimumPersistence, 0.1);
+        EXPECT_FALSE(g.With("publish_graph", 0).PublishGraph);
+        EXPECT_TRUE(g.With("publish_mesh_features", 1).PublishMeshFeatures);
+    }
+    // The only row without accessors is the ridge's property reference, which its owner reads.
+    std::vector<std::string> unbound;
+    const auto collect = [&](const auto rows)
+    {
+        for (const auto& row : rows)
+            if (row.Get == nullptr)
+                unbound.emplace_back(row.Spec.Name);
+    };
+    collect(R::EditorMeshDenoiseFields());
+    collect(R::EditorMeshRemeshFields());
+    collect(R::EditorMeshSubdivideFields());
+    collect(R::EditorMeshSimplifyFields());
+    collect(R::EditorScalarRidgeFields());
+    EXPECT_EQ(unbound, std::vector<std::string>{"property"});
+}
+
+// RUNTIME-343: the generic range check refuses, for each command, a value just outside every
+// numeric field's declared range and an enum value past its names (members set directly, each a
+// value the member can hold; subdivide's max_output_faces has none, its range is its whole
+// uint32_t); the defaults pass.
+TEST(DeclaredFieldContracts, BoundFieldsRefuseValuesOutsideTheirRanges)
+{
+    const auto refused = [](const auto rows, auto command, const auto& change)
+    {
+        EXPECT_TRUE(R::FieldsInDeclaredRange(rows, command));
+        change(command);
+        return !R::FieldsInDeclaredRange(rows, command);
+    };
+    const auto denoise = [&](const auto& change)
+    {
+        return refused(R::EditorMeshDenoiseFields(), R::EditorMeshDenoiseCommand{}, change);
+    };
+    EXPECT_TRUE(denoise(
+        [](auto& c)
+        {
+            c.NormalIterations = 0u;
+        }));
+    EXPECT_TRUE(denoise(
+        [](auto& c)
+        {
+            c.VertexIterations = R::kMeshDenoiseMaxIterations + 1u;
+        }));
+    EXPECT_TRUE(denoise(
+        [](auto& c)
+        {
+            c.SigmaSpatial = -1.0;
+        }));
+    EXPECT_TRUE(denoise(
+        [](auto& c)
+        {
+            c.SigmaRange = 1.0e7;
+        }));
+    EXPECT_TRUE(denoise(
+        [](auto& c)
+        {
+            c.DegenerateNormalLengthEpsilon = 0.0;
+        }));
+    const auto remesh = [&](const auto& change)
+    {
+        return refused(R::EditorMeshRemeshFields(), R::EditorMeshRemeshCommand{}, change);
+    };
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.Mode = static_cast<R::EditorMeshRemeshMode>(2);
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.SizingLaw = static_cast<R::EditorMeshRemeshSizingLaw>(2);
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.Iterations = 0u;
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.TargetEdgeLength = -1.0;
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.Lambda = 0.0;
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.CurvatureAdaptation = -1.0;
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.ApproximationError = -1.0;
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.ReferenceProjectionK = R::kMeshRemeshMaxProjectionNeighbors + 1u;
+        }));
+    EXPECT_TRUE(remesh(
+        [](auto& c)
+        {
+            c.MaxReferenceProjectionDistance = -1.0;
+        }));
+    const auto subdivide = [&](const auto& change)
+    {
+        return refused(R::EditorMeshSubdivideFields(), R::EditorMeshSubdivideCommand{}, change);
+    };
+    EXPECT_TRUE(subdivide(
+        [](auto& c)
+        {
+            c.Operator = static_cast<R::EditorMeshSubdivideOperator>(3);
+        }));
+    EXPECT_TRUE(subdivide(
+        [](auto& c)
+        {
+            c.Iterations = R::kMeshSubdivideMaxIterations + 1u;
+        }));
+    const auto simplify = [&](const auto& change)
+    {
+        return refused(R::EditorMeshSimplifyFields(), R::EditorMeshSimplifyCommand{}, change);
+    };
+    EXPECT_TRUE(simplify(
+        [](auto& c)
+        {
+            c.Metric = static_cast<R::EditorMeshSimplifyMetric>(2);
+        }));
+    EXPECT_TRUE(simplify(
+        [](auto& c)
+        {
+            c.TargetFaces = 2'000'000'000u;
+        }));
+    EXPECT_TRUE(simplify(
+        [](auto& c)
+        {
+            c.MaxError = -1.0;
+        }));
+    EXPECT_TRUE(simplify(
+        [](auto& c)
+        {
+            c.FeatureAngleThresholdDegrees = 181.0;
+        }));
+    EXPECT_TRUE(simplify(
+        [](auto& c)
+        {
+            c.NormalWeight = 1001.0;
+        }));
+    EXPECT_TRUE(simplify(
+        [](auto& c)
+        {
+            c.BoundaryWeight = -1.0;
+        }));
+    EXPECT_TRUE(simplify(
+        [](auto& c)
+        {
+            c.CurvatureWeight = 1001.0;
+        }));
+    const auto ridge = [&](const auto& change)
+    {
+        return refused(R::EditorScalarRidgeFields(), R::EditorScalarRidgeCommand{}, change);
+    };
+    EXPECT_TRUE(ridge(
+        [](auto& c)
+        {
+            c.Method = static_cast<R::EditorScalarExtremaMethod>(2);
+        }));
+    EXPECT_TRUE(ridge(
+        [](auto& c)
+        {
+            c.RadiusRatio = R::kScalarRidgeMaxRadiusRatio * 2.0;
+        }));
+    EXPECT_TRUE(ridge(
+        [](auto& c)
+        {
+            c.Scale = 3u;
+        }));
+    EXPECT_TRUE(ridge(
+        [](auto& c)
+        {
+            c.MinimumSharpness = -1.0;
+        }));
+    EXPECT_TRUE(ridge(
+        [](auto& c)
+        {
+            c.MinimumStrength = -1.0;
+        }));
+    EXPECT_TRUE(ridge(
+        [](auto& c)
+        {
+            c.MinimumPersistence = -0.1;
+        }));
+}
+
+// RUNTIME-343: an Enum's wire number adds its declared Min (no current command uses a Min, so a
+// local one shows the offset).
+TEST(DeclaredFieldContracts, BoundEnumFieldsOffsetTheirWireCode)
+{
+    enum class Kind : std::uint8_t
+    {
+        A,
+        B,
+        C
+    };
+    struct Command
+    {
+        Kind Value{Kind::A};
+    };
+    static constexpr std::array<std::string_view, 3> kNames{"a", "b", "c"};
+    static constexpr auto kRow =
+        R::Bind<&Command::Value>({.Name = "kind", .Type = FT::Enum, .Min = 1.0, .EnumNames = kNames});
+    Command command{};
+    EXPECT_EQ(R::FieldNumber(kRow, command), 1.0);
+    R::SetFieldNumber(kRow, command, 3.0);
+    EXPECT_EQ(command.Value, Kind::C);
+    EXPECT_TRUE(R::FieldsInDeclaredRange(std::span<const R::BoundField<Command>>(&kRow, 1), command));
+    command.Value = static_cast<Kind>(3);
+    EXPECT_FALSE(R::FieldsInDeclaredRange(std::span<const R::BoundField<Command>>(&kRow, 1), command));
 }

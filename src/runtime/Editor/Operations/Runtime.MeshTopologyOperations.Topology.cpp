@@ -69,14 +69,6 @@ import Geometry.HalfedgeMesh.Subdivision;
 
 namespace Extrinsic::Runtime::MeshTopologyDetail
 {
-    // A command value against its declared field range (EditorMesh*FieldSpecs).
-    [[nodiscard]] bool InFieldRange(const std::span<const ConfigFieldSpec> fields, const std::string_view name,
-                                    const double value) noexcept
-    {
-        const ConfigFieldSpec* field = FindConfigFieldSpec(fields, name);
-        return field != nullptr && AcceptsConfigFieldNumber(*field, value);
-    }
-
     namespace
     {
         bool IsPositiveFinite(const double value) noexcept
@@ -93,31 +85,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         namespace CatmullClark = Geometry::CatmullClark;
         namespace Sqrt3Subdivide = Geometry::SubdivisionSqrt3;
         namespace Simpl = Geometry::Simplification;
-        inline constexpr std::array<EditorMeshRemeshMode, 2>
-            kMeshRemeshModes{{
-                EditorMeshRemeshMode::Uniform,
-                EditorMeshRemeshMode::Adaptive,
-            }};
         inline constexpr std::array<EditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
                 EditorMeshDenoiseStage::FullBilateral,
-            }};
-
-        inline constexpr std::array<EditorMeshRemeshSizingLaw, 2>
-            kMeshRemeshSizingLaws{{
-                EditorMeshRemeshSizingLaw::MeanCurvature,
-                EditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
-            }};
-        inline constexpr std::array<EditorMeshSimplifyMetric, 2>
-            kMeshSimplifyMetrics{{
-                EditorMeshSimplifyMetric::ClassicalQEM,
-                EditorMeshSimplifyMetric::FA_QEM,
-            }};
-        inline constexpr std::array<EditorMeshSubdivideOperator, 3>
-            kMeshSubdivideOperators{{
-                EditorMeshSubdivideOperator::Loop,
-                EditorMeshSubdivideOperator::CatmullClark,
-                EditorMeshSubdivideOperator::Sqrt3,
             }};
 
         [[nodiscard]] Core::ErrorCode ErrorForDenoiseStatus(
@@ -423,39 +393,6 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             message += ", moved=0.";
             return message;
         }
-
-        [[nodiscard]] bool ValidMeshRemeshMode(
-            const EditorMeshRemeshMode mode) noexcept
-        {
-            return std::find(kMeshRemeshModes.begin(),
-                             kMeshRemeshModes.end(),
-                             mode) != kMeshRemeshModes.end();
-        }
-
-        [[nodiscard]] bool ValidMeshRemeshSizingLaw(
-            const EditorMeshRemeshSizingLaw sizingLaw) noexcept
-        {
-            return std::find(kMeshRemeshSizingLaws.begin(),
-                             kMeshRemeshSizingLaws.end(),
-                             sizingLaw) != kMeshRemeshSizingLaws.end();
-        }
-
-        [[nodiscard]] bool ValidMeshSubdivideOperator(
-            const EditorMeshSubdivideOperator op) noexcept
-        {
-            return std::find(kMeshSubdivideOperators.begin(),
-                             kMeshSubdivideOperators.end(),
-                             op) != kMeshSubdivideOperators.end();
-        }
-
-        [[nodiscard]] bool ValidMeshSimplifyMetric(
-            const EditorMeshSimplifyMetric metric) noexcept
-        {
-            return std::find(kMeshSimplifyMetrics.begin(),
-                             kMeshSimplifyMetrics.end(),
-                             metric) != kMeshSimplifyMetrics.end();
-        }
-
 
         // One side of a topology edit. The mesh is what the entity's
         // topology is published from; the stored snapshot, present on the
@@ -2496,12 +2433,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 std::find(kMeshDenoiseStages.begin(),
                           kMeshDenoiseStages.end(),
                           command.Stage) != kMeshDenoiseStages.end();
-            if (!validStage ||
-                !InFieldRange(EditorMeshDenoiseFieldSpecs(), "normal_iterations", command.NormalIterations) ||
-                !InFieldRange(EditorMeshDenoiseFieldSpecs(), "vertex_iterations", command.VertexIterations) ||
-                !InFieldRange(EditorMeshDenoiseFieldSpecs(), "sigma_spatial", command.SigmaSpatial) ||
-                !InFieldRange(EditorMeshDenoiseFieldSpecs(), "sigma_range", command.SigmaRange) ||
-                !InFieldRange(EditorMeshDenoiseFieldSpecs(), "degenerate_normal_length_epsilon", command.DegenerateNormalLengthEpsilon))
+            if (!validStage || !FieldsInDeclaredRange(EditorMeshDenoiseFields(), command))
             {
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
@@ -2545,14 +2477,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             const bool hasStopCriterion =
                 command.TargetFaces > 0u || command.MaxError > 0.0;
             const auto fields = EditorMeshSimplifyFieldSpecs();
-            if (!ValidMeshSimplifyMetric(command.Metric) ||
-                !hasStopCriterion ||
-                !InFieldRange(fields, "target_faces", static_cast<double>(command.TargetFaces)) ||
-                !InFieldRange(fields, "max_error", command.MaxError) ||
-                !InFieldRange(fields, "normal_weight", command.NormalWeight) ||
-                !InFieldRange(fields, "boundary_weight", command.BoundaryWeight) ||
-                !InFieldRange(fields, "curvature_weight", command.CurvatureWeight) ||
-                !InFieldRange(fields, "feature_angle_threshold_degrees", command.FeatureAngleThresholdDegrees))
+            if (!hasStopCriterion || !FieldsInDeclaredRange(EditorMeshSimplifyFields(), command))
             {
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
@@ -2601,19 +2526,11 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Message = "Scene registry is unavailable for mesh remesh.";
                 return std::nullopt;
             }
-            if (!ValidMeshRemeshMode(command.Mode) ||
-                !ValidMeshRemeshSizingLaw(command.SizingLaw) ||
-                !InFieldRange(EditorMeshRemeshFieldSpecs(), "iterations", command.Iterations) ||
-                !InFieldRange(EditorMeshRemeshFieldSpecs(), "target_edge_length", command.TargetEdgeLength) ||
-                !InFieldRange(EditorMeshRemeshFieldSpecs(), "reference_projection_k", command.ReferenceProjectionK) ||
-                !InFieldRange(EditorMeshRemeshFieldSpecs(), "lambda", command.Lambda) ||
-                !InFieldRange(EditorMeshRemeshFieldSpecs(), "curvature_adaptation", command.CurvatureAdaptation) ||
-                !InFieldRange(EditorMeshRemeshFieldSpecs(), "max_reference_projection_distance", command.MaxReferenceProjectionDistance) ||
-                !std::isfinite(command.ApproximationError) ||
+            // RUNTIME-343: every declared field, so approximation_error is also held to its minimum of 0.
+            if (!FieldsInDeclaredRange(EditorMeshRemeshFields(), command) ||
                 (command.ProjectToSurface && command.ReferenceProjectionK == 0u) ||
-                (command.SizingLaw ==
-                     EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
-                 !IsPositiveFinite(command.ApproximationError)))
+                (command.SizingLaw == EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
+                    !IsPositiveFinite(command.ApproximationError)))
             {
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
@@ -2688,12 +2605,12 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Message = "Scene registry is unavailable for mesh subdivide.";
                 return std::nullopt;
             }
-            if (!ValidMeshSubdivideOperator(command.Operator) ||
-                !InFieldRange(EditorMeshSubdivideFieldSpecs(), "iterations", command.Iterations) ||
+            if (!FieldsInDeclaredRange(EditorMeshSubdivideFields(), command) ||
                 (command.PreserveLoopFeatureEdges &&
-                 (!command.FeatureEdges.HasName() || command.FeatureEdges.Domain != GeometryElementDomain::MeshEdge ||
-                  GeometryPropertyComponentCount(command.FeatureEdges.ValueKind) != 1 ||
-                  IsTopologyProperty(command.FeatureEdges.Domain, command.FeatureEdges.Name))))
+                    (!command.FeatureEdges.HasName() ||
+                        command.FeatureEdges.Domain != GeometryElementDomain::MeshEdge ||
+                        GeometryPropertyComponentCount(command.FeatureEdges.ValueKind) != 1 ||
+                        IsTopologyProperty(command.FeatureEdges.Domain, command.FeatureEdges.Name))))
             {
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
@@ -3205,56 +3122,118 @@ ApplyEditorMeshSimplifyCommand(
         {
             return {.Name = name, .Type = FT::Bool, .Description = description};
         }
-        constexpr std::array kDenoiseFields{
-            Count("normal_iterations", "Normal filtering iterations.", 1.0, double(kMeshDenoiseMaxIterations)),
-            Count("vertex_iterations", "Vertex update iterations.", 1.0, double(kMeshDenoiseMaxIterations)),
-            Real("sigma_spatial", "Spatial sigma; 0 derives it from the mesh.", 0.0, 1.0e6),
-            Real("sigma_range", "Range sigma; 0 derives it from the mesh.", 0.0, 1.0e6),
-            Flag("preserve_boundary", "Keep boundary vertices fixed."),
-            Real("degenerate_normal_length_epsilon", "Face normals shorter than this count as degenerate.", 0.0, kUnbounded, true),
+        // RUNTIME-343: each field declared once with the command member it sets.
+        using Denoise = EditorMeshDenoiseCommand;
+        using RemeshCmd = EditorMeshRemeshCommand;
+        using Subdivide = EditorMeshSubdivideCommand;
+        using Simplify = EditorMeshSimplifyCommand;
+        constexpr std::array kDenoiseRows{
+            Bind<&Denoise::NormalIterations>(
+                Count("normal_iterations", "Normal filtering iterations.", 1.0, double(kMeshDenoiseMaxIterations))),
+            Bind<&Denoise::VertexIterations>(
+                Count("vertex_iterations", "Vertex update iterations.", 1.0, double(kMeshDenoiseMaxIterations))),
+            Bind<&Denoise::SigmaSpatial>(
+                Real("sigma_spatial", "Spatial sigma; 0 derives it from the mesh.", 0.0, 1.0e6)),
+            Bind<&Denoise::SigmaRange>(Real("sigma_range", "Range sigma; 0 derives it from the mesh.", 0.0, 1.0e6)),
+            Bind<&Denoise::PreserveBoundary>(Flag("preserve_boundary", "Keep boundary vertices fixed.")),
+            Bind<&Denoise::DegenerateNormalLengthEpsilon>(Real("degenerate_normal_length_epsilon",
+                "Face normals shorter than this count as degenerate.",
+                0.0,
+                kUnbounded,
+                true)),
         };
-        constexpr std::array kRemeshFields{
-            ConfigFieldSpec{.Name = "mode", .Type = FT::Enum, .Description = "Uniform or curvature-adaptive edge lengths.",
-                            .EnumNames = kRemeshModeNames},
-            ConfigFieldSpec{.Name = "sizing_law", .Type = FT::Enum, .Description = "Adaptive sizing law.",
-                            .EnumNames = kRemeshSizingNames},
-            Count("iterations", "Remeshing iterations.", 1.0, double(kMeshRemeshMaxIterations)),
-            Real("target_edge_length", "Target edge length; 0 uses the mean edge length.", 0.0, kUnbounded),
-            Real("lambda", "Tangential smoothing weight.", 0.0, kUnbounded, true),
-            Real("curvature_adaptation", "Adaptive mode: curvature influence.", 0.0, kUnbounded),
-            Real("approximation_error", "Allowed approximation error; must be above 0 for the error-bounded Taubin sizing law.", 0.0, kUnbounded),
-            Flag("preserve_boundary", "Keep boundary edges."),
-            Flag("project_to_surface", "Project results back onto the input surface."),
-            Count("reference_projection_k", "Neighbors used for surface projection.", 0.0, double(kMeshRemeshMaxProjectionNeighbors)),
-            Real("max_reference_projection_distance", "Largest projection distance; 0 means unlimited.", 0.0, kUnbounded),
+        constexpr std::array kRemeshRows{
+            Bind<&RemeshCmd::Mode>(ConfigFieldSpec{.Name = "mode",
+                .Type = FT::Enum,
+                .Description = "Uniform or curvature-adaptive edge lengths.",
+                .EnumNames = kRemeshModeNames}),
+            Bind<&RemeshCmd::SizingLaw>(ConfigFieldSpec{.Name = "sizing_law",
+                .Type = FT::Enum,
+                .Description = "Adaptive sizing law.",
+                .EnumNames = kRemeshSizingNames}),
+            Bind<&RemeshCmd::Iterations>(
+                Count("iterations", "Remeshing iterations.", 1.0, double(kMeshRemeshMaxIterations))),
+            Bind<&RemeshCmd::TargetEdgeLength>(
+                Real("target_edge_length", "Target edge length; 0 uses the mean edge length.", 0.0, kUnbounded)),
+            Bind<&RemeshCmd::Lambda>(Real("lambda", "Tangential smoothing weight.", 0.0, kUnbounded, true)),
+            Bind<&RemeshCmd::CurvatureAdaptation>(
+                Real("curvature_adaptation", "Adaptive mode: curvature influence.", 0.0, kUnbounded)),
+            Bind<&RemeshCmd::ApproximationError>(Real("approximation_error",
+                "Allowed approximation error; must be above 0 for the error-bounded Taubin sizing law.",
+                0.0,
+                kUnbounded)),
+            Bind<&RemeshCmd::PreserveBoundary>(Flag("preserve_boundary", "Keep boundary edges.")),
+            Bind<&RemeshCmd::ProjectToSurface>(
+                Flag("project_to_surface", "Project results back onto the input surface.")),
+            Bind<&RemeshCmd::ReferenceProjectionK>(Count("reference_projection_k",
+                "Neighbors used for surface projection.",
+                0.0,
+                double(kMeshRemeshMaxProjectionNeighbors))),
+            Bind<&RemeshCmd::MaxReferenceProjectionDistance>(Real("max_reference_projection_distance",
+                "Largest projection distance; 0 means unlimited.",
+                0.0,
+                kUnbounded)),
         };
-        constexpr std::array kSubdivideFields{
-            ConfigFieldSpec{.Name = "operator", .Type = FT::Enum, .Description = "Subdivision scheme.",
-                            .EnumNames = kSubdivideOperatorNames},
-            Count("iterations", "Subdivision steps; every step multiplies the face count (4x for Loop).", 1.0,
-                  double(kMeshSubdivideMaxIterations)),
-            Flag("preserve_loop_feature_edges", "Loop: keep creases on the e:feature edges."),
-            Count("max_output_faces", "Refuse results above this face count; 0 means unlimited.", 0.0, 4294967295.0),
+        constexpr std::array kSubdivideRows{
+            Bind<&Subdivide::Operator>(ConfigFieldSpec{.Name = "operator",
+                .Type = FT::Enum,
+                .Description = "Subdivision scheme.",
+                .EnumNames = kSubdivideOperatorNames}),
+            Bind<&Subdivide::Iterations>(Count("iterations",
+                "Subdivision steps; every step multiplies the face count (4x for Loop).",
+                1.0,
+                double(kMeshSubdivideMaxIterations))),
+            Bind<&Subdivide::PreserveLoopFeatureEdges>(
+                Flag("preserve_loop_feature_edges", "Loop: keep creases on the e:feature edges.")),
+            Bind<&Subdivide::MaxOutputFaces>(Count(
+                "max_output_faces", "Refuse results above this face count; 0 means unlimited.", 0.0, 4294967295.0)),
         };
-        constexpr std::array kSimplifyFields{
-            ConfigFieldSpec{.Name = "metric", .Type = FT::Enum, .Description = "Collapse error metric.",
-                            .EnumNames = kSimplifyMetricNames},
-            Count("target_faces", "Stop at this face count; 0 disables. One of target_faces or max_error must be positive.", 0.0,
-                  kMeshSimplifyMaxTargetFaces),
-            Real("max_error", "Largest error per collapse; 0 means unlimited. One of target_faces or max_error must be positive.",
-                 0.0, kUnbounded),
-            Flag("preserve_boundary", "Keep boundary vertices."),
-            Real("feature_angle_threshold_degrees", "fa_qem: sharp feature angle.", 0.0, 180.0),
-            Real("normal_weight", "fa_qem: normal weight.", 0.0, 1000.0),
-            Real("boundary_weight", "fa_qem: boundary weight.", 0.0, 1000.0),
-            Real("curvature_weight", "fa_qem: curvature weight.", 0.0, 1000.0),
-            Flag("preserve_sharp_features", "Pin sharp feature vertices."),
-            Flag("preserve_uv_seams", "Pin UV seam vertices."),
+        constexpr std::array kSimplifyRows{
+            Bind<&Simplify::Metric>(ConfigFieldSpec{.Name = "metric",
+                .Type = FT::Enum,
+                .Description = "Collapse error metric.",
+                .EnumNames = kSimplifyMetricNames}),
+            Bind<&Simplify::TargetFaces>(Count("target_faces",
+                "Stop at this face count; 0 disables. One of target_faces or max_error must be positive.",
+                0.0,
+                kMeshSimplifyMaxTargetFaces)),
+            Bind<&Simplify::MaxError>(Real("max_error",
+                "Largest error per collapse; 0 means unlimited. One of target_faces or max_error must be positive.",
+                0.0,
+                kUnbounded)),
+            Bind<&Simplify::PreserveBoundary>(Flag("preserve_boundary", "Keep boundary vertices.")),
+            Bind<&Simplify::FeatureAngleThresholdDegrees>(
+                Real("feature_angle_threshold_degrees", "fa_qem: sharp feature angle.", 0.0, 180.0)),
+            Bind<&Simplify::NormalWeight>(Real("normal_weight", "fa_qem: normal weight.", 0.0, 1000.0)),
+            Bind<&Simplify::BoundaryWeight>(Real("boundary_weight", "fa_qem: boundary weight.", 0.0, 1000.0)),
+            Bind<&Simplify::CurvatureWeight>(Real("curvature_weight", "fa_qem: curvature weight.", 0.0, 1000.0)),
+            Bind<&Simplify::PreserveSharpFeatures>(Flag("preserve_sharp_features", "Pin sharp feature vertices.")),
+            Bind<&Simplify::PreserveUvSeams>(Flag("preserve_uv_seams", "Pin UV seam vertices.")),
         };
+        constexpr auto kDenoiseFields = SpecsOf(kDenoiseRows);
+        constexpr auto kRemeshFields = SpecsOf(kRemeshRows);
+        constexpr auto kSubdivideFields = SpecsOf(kSubdivideRows);
+        constexpr auto kSimplifyFields = SpecsOf(kSimplifyRows);
     }
     std::span<const ConfigFieldSpec> EditorMeshDenoiseFieldSpecs() noexcept { return kDenoiseFields; }
     std::span<const ConfigFieldSpec> EditorMeshRemeshFieldSpecs() noexcept { return kRemeshFields; }
     std::span<const ConfigFieldSpec> EditorMeshSubdivideFieldSpecs() noexcept { return kSubdivideFields; }
     std::span<const ConfigFieldSpec> EditorMeshSimplifyFieldSpecs() noexcept { return kSimplifyFields; }
+    std::span<const BoundField<EditorMeshDenoiseCommand>> EditorMeshDenoiseFields() noexcept
+    {
+        return kDenoiseRows;
+    }
+    std::span<const BoundField<EditorMeshRemeshCommand>> EditorMeshRemeshFields() noexcept
+    {
+        return kRemeshRows;
+    }
+    std::span<const BoundField<EditorMeshSubdivideCommand>> EditorMeshSubdivideFields() noexcept
+    {
+        return kSubdivideRows;
+    }
+    std::span<const BoundField<EditorMeshSimplifyCommand>> EditorMeshSimplifyFields() noexcept
+    {
+        return kSimplifyRows;
+    }
 
 } // namespace Extrinsic::Runtime

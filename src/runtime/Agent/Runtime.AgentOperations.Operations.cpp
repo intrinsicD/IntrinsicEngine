@@ -181,61 +181,78 @@ namespace Extrinsic::Runtime
         template <class Cmd>
         using ParamSpecs = std::vector<ParamSpec<Cmd>>;
 
-        template <class Cmd, class T>
-        ParamSpec<Cmd> Param(const std::span<const ConfigFieldSpec> fields, const std::string_view name, T Cmd::* member)
+        // RUNTIME-343: a field's mapping from its bound row, the owner's one declaration of the field
+        // and its member; a row without accessors (a property reference) has its own builder.
+        template <class Cmd> ParamSpec<Cmd> Param(const BoundField<Cmd>& row)
         {
             const Cmd defaults{};
             ParamSpec<Cmd> spec;
-            spec.Field = FindConfigFieldSpec(fields, name);
-            if (spec.Field == nullptr) return spec;
-            const ConfigFieldSpec& field = *spec.Field;
+            if (row.Get == nullptr)
+                return spec;
+            spec.Field = &row.Spec;
+            const ConfigFieldSpec& field = row.Spec;
             const std::string range = DescribeConfigFieldRange(field);
             switch (field.Type)
             {
             case ConfigFieldType::Bool:
-                spec.Default = Json(static_cast<bool>(defaults.*member));
-                spec.Set = [member](Cmd& command, const Json& value) -> std::string {
-                    if (!value.is_boolean()) return "must be true or false";
-                    command.*member = static_cast<T>(value.get<bool>());
+                spec.Default = Json(row.Get(defaults) != 0.0);
+                spec.Set = [&row](Cmd& command, const Json& value) -> std::string
+                {
+                    if (!value.is_boolean())
+                        return "must be true or false";
+                    row.Set(command, value.get<bool>() ? 1.0 : 0.0);
                     return {};
                 };
                 break;
             case ConfigFieldType::Enum:
             {
                 const auto first = static_cast<std::int64_t>(field.Min.value_or(0.0));
-                spec.Default = Json(static_cast<std::int64_t>(defaults.*member) + first);
-                spec.Set = [member, &field, first, range](Cmd& command, const Json& value) -> std::string {
+                spec.Default = Json(static_cast<std::int64_t>(FieldNumber(row, defaults)));
+                spec.Set = [&row, first, range](Cmd& command, const Json& value) -> std::string
+                {
+                    const auto names = row.Spec.EnumNames;
                     if (value.is_number_integer())
                     {
                         const auto code = value.get<std::int64_t>();
-                        if (code < first || code >= first + std::int64_t(field.EnumNames.size())) return "must be " + range;
-                        command.*member = static_cast<T>(code - first);
+                        if (code < first || code >= first + std::int64_t(names.size()))
+                            return "must be " + range;
+                        SetFieldNumber(row, command, double(code));
                         return {};
                     }
                     if (value.is_string())
-                        for (std::size_t i = 0; i < field.EnumNames.size(); ++i)
-                            if (field.EnumNames[i] == value.get<std::string>()) { command.*member = static_cast<T>(i); return {}; }
+                        for (std::size_t i = 0; i < names.size(); ++i)
+                            if (names[i] == value.get<std::string>())
+                            {
+                                SetFieldNumber(row, command, double(first + std::int64_t(i)));
+                                return {};
+                            }
                     return "must be " + range;
                 };
                 break;
             }
             case ConfigFieldType::UInt:
             case ConfigFieldType::Int:
-                spec.Default = Json(static_cast<std::int64_t>(defaults.*member));
-                spec.Set = [member, &field, range](Cmd& command, const Json& value) -> std::string {
-                    if (!value.is_number_integer()) return "must be an integer";
+                spec.Default = Json(static_cast<std::int64_t>(row.Get(defaults)));
+                spec.Set = [&row, range](Cmd& command, const Json& value) -> std::string
+                {
+                    if (!value.is_number_integer())
+                        return "must be an integer";
                     const double number = value.is_number_unsigned() ? double(value.get<std::uint64_t>()) : double(value.get<std::int64_t>());
-                    if (!AcceptsConfigFieldNumber(field, number)) return "must be " + (range.empty() ? std::string("in range") : range);
-                    command.*member = static_cast<T>(number);
+                    if (!AcceptsConfigFieldNumber(row.Spec, number))
+                        return "must be " + (range.empty() ? std::string("in range") : range);
+                    row.Set(command, number);
                     return {};
                 };
                 break;
             case ConfigFieldType::Float:
-                spec.Default = Json(static_cast<double>(defaults.*member));
-                spec.Set = [member, &field, range](Cmd& command, const Json& value) -> std::string {
-                    if (!value.is_number()) return "must be a number";
-                    if (!AcceptsConfigFieldNumber(field, value.get<double>())) return "must be " + (range.empty() ? std::string("finite") : range);
-                    command.*member = static_cast<T>(value.get<double>());
+                spec.Default = Json(row.Get(defaults));
+                spec.Set = [&row, range](Cmd& command, const Json& value) -> std::string
+                {
+                    if (!value.is_number())
+                        return "must be a number";
+                    if (!AcceptsConfigFieldNumber(row.Spec, value.get<double>()))
+                        return "must be " + (range.empty() ? std::string("finite") : range);
+                    row.Set(command, value.get<double>());
                     return {};
                 };
                 break;
@@ -244,6 +261,15 @@ namespace Extrinsic::Runtime
                 break;
             }
             return spec;
+        }
+        // Every bound row's mapping, in table order (rows without accessors are left to their builder).
+        template <class Cmd> ParamSpecs<Cmd> ParamsOf(const std::span<const BoundField<Cmd>> rows)
+        {
+            ParamSpecs<Cmd> specs;
+            for (const BoundField<Cmd>& row : rows)
+                if (row.Get != nullptr)
+                    specs.push_back(Param(row));
+            return specs;
         }
         // A property name; the command's GeometryPropertyRef keeps its other fields until resolved.
         template <class Cmd>
@@ -469,41 +495,42 @@ namespace Extrinsic::Runtime
                     [](const auto& c, auto onComplete) { return ApplyEditorConfiguredPointConstruction(c, std::move(onComplete)); }));
                 // -- topology editing and ridges: explicit params over the command defaults
                 ops.push_back(ExplicitOperation<EditorMeshDenoiseResult, EditorMeshDenoiseCommand>(
-                    "mesh_denoise", "mesh_topology", EditorMeshDenoiseFieldSpecs(),
-                    ParamSpecs<EditorMeshDenoiseCommand>{
-                        Param(EditorMeshDenoiseFieldSpecs(), "normal_iterations", &EditorMeshDenoiseCommand::NormalIterations),
-                        Param(EditorMeshDenoiseFieldSpecs(), "vertex_iterations", &EditorMeshDenoiseCommand::VertexIterations),
-                        Param(EditorMeshDenoiseFieldSpecs(), "sigma_spatial", &EditorMeshDenoiseCommand::SigmaSpatial),
-                        Param(EditorMeshDenoiseFieldSpecs(), "sigma_range", &EditorMeshDenoiseCommand::SigmaRange),
-                        Param(EditorMeshDenoiseFieldSpecs(), "preserve_boundary", &EditorMeshDenoiseCommand::PreserveBoundary),
-                        Param(EditorMeshDenoiseFieldSpecs(), "degenerate_normal_length_epsilon", &EditorMeshDenoiseCommand::DegenerateNormalLengthEpsilon)},
+                    "mesh_denoise",
+                    "mesh_topology",
+                    EditorMeshDenoiseFieldSpecs(),
+                    ParamsOf(EditorMeshDenoiseFields()),
                     &PrepareEditorMeshTopologyFrame,
-                    [](const auto& c, const EditorMeshDenoiseCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshDenoiseCommand(c, cmd); },
-                    [](const auto& c, const EditorMeshDenoiseCommand& cmd, auto onComplete) { return ApplyEditorMeshDenoiseCommand(c, cmd, std::move(onComplete)); },
-                    [](const EditorMeshDenoiseResult& r) {
+                    [](const auto& c, const EditorMeshDenoiseCommand& cmd) -> std::optional<ActionReadiness>
+                    {
+                        return PreviewEditorMeshDenoiseCommand(c, cmd);
+                    },
+                    [](const auto& c, const EditorMeshDenoiseCommand& cmd, auto onComplete)
+                    {
+                        return ApplyEditorMeshDenoiseCommand(c, cmd, std::move(onComplete));
+                    },
+                    [](const EditorMeshDenoiseResult& r)
+                    {
                         Json out = ResultJson(r);
                         out["moved_vertices"] = r.MovedVertexCount;
                         out["pinned_boundary_vertices"] = r.PinnedBoundaryVertexCount;
                         return out;
                     }));
                 ops.push_back(ExplicitOperation<EditorMeshRemeshResult, EditorMeshRemeshCommand>(
-                    "mesh_remesh", "mesh_topology", EditorMeshRemeshFieldSpecs(),
-                    ParamSpecs<EditorMeshRemeshCommand>{
-                        Param(EditorMeshRemeshFieldSpecs(), "mode", &EditorMeshRemeshCommand::Mode),
-                        Param(EditorMeshRemeshFieldSpecs(), "sizing_law", &EditorMeshRemeshCommand::SizingLaw),
-                        Param(EditorMeshRemeshFieldSpecs(), "iterations", &EditorMeshRemeshCommand::Iterations),
-                        Param(EditorMeshRemeshFieldSpecs(), "target_edge_length", &EditorMeshRemeshCommand::TargetEdgeLength),
-                        Param(EditorMeshRemeshFieldSpecs(), "lambda", &EditorMeshRemeshCommand::Lambda),
-                        Param(EditorMeshRemeshFieldSpecs(), "curvature_adaptation", &EditorMeshRemeshCommand::CurvatureAdaptation),
-                        Param(EditorMeshRemeshFieldSpecs(), "approximation_error", &EditorMeshRemeshCommand::ApproximationError),
-                        Param(EditorMeshRemeshFieldSpecs(), "preserve_boundary", &EditorMeshRemeshCommand::PreserveBoundary),
-                        Param(EditorMeshRemeshFieldSpecs(), "project_to_surface", &EditorMeshRemeshCommand::ProjectToSurface),
-                        Param(EditorMeshRemeshFieldSpecs(), "reference_projection_k", &EditorMeshRemeshCommand::ReferenceProjectionK),
-                        Param(EditorMeshRemeshFieldSpecs(), "max_reference_projection_distance", &EditorMeshRemeshCommand::MaxReferenceProjectionDistance)},
+                    "mesh_remesh",
+                    "mesh_topology",
+                    EditorMeshRemeshFieldSpecs(),
+                    ParamsOf(EditorMeshRemeshFields()),
                     &PrepareEditorMeshTopologyFrame,
-                    [](const auto& c, const EditorMeshRemeshCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshRemeshCommand(c, cmd); },
-                    [](const auto& c, const EditorMeshRemeshCommand& cmd, auto onComplete) { return ApplyEditorMeshRemeshCommand(c, cmd, std::move(onComplete)); },
-                    [](const EditorMeshRemeshResult& r) {
+                    [](const auto& c, const EditorMeshRemeshCommand& cmd) -> std::optional<ActionReadiness>
+                    {
+                        return PreviewEditorMeshRemeshCommand(c, cmd);
+                    },
+                    [](const auto& c, const EditorMeshRemeshCommand& cmd, auto onComplete)
+                    {
+                        return ApplyEditorMeshRemeshCommand(c, cmd, std::move(onComplete));
+                    },
+                    [](const EditorMeshRemeshResult& r)
+                    {
                         Json out = TopologyJson(r);
                         out["splits"] = r.SplitCount;
                         out["collapses"] = r.CollapseCount;
@@ -511,33 +538,39 @@ namespace Extrinsic::Runtime
                         return out;
                     }));
                 ops.push_back(ExplicitOperation<EditorMeshSubdivideResult, EditorMeshSubdivideCommand>(
-                    "mesh_subdivide", "mesh_topology", EditorMeshSubdivideFieldSpecs(),
-                    ParamSpecs<EditorMeshSubdivideCommand>{
-                        Param(EditorMeshSubdivideFieldSpecs(), "operator", &EditorMeshSubdivideCommand::Operator),
-                        Param(EditorMeshSubdivideFieldSpecs(), "iterations", &EditorMeshSubdivideCommand::Iterations),
-                        Param(EditorMeshSubdivideFieldSpecs(), "preserve_loop_feature_edges", &EditorMeshSubdivideCommand::PreserveLoopFeatureEdges),
-                        Param(EditorMeshSubdivideFieldSpecs(), "max_output_faces", &EditorMeshSubdivideCommand::MaxOutputFaces)},
+                    "mesh_subdivide",
+                    "mesh_topology",
+                    EditorMeshSubdivideFieldSpecs(),
+                    ParamsOf(EditorMeshSubdivideFields()),
                     &PrepareEditorMeshTopologyFrame,
-                    [](const auto& c, const EditorMeshSubdivideCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshSubdivideCommand(c, cmd); },
-                    [](const auto& c, const EditorMeshSubdivideCommand& cmd, auto onComplete) { return ApplyEditorMeshSubdivideCommand(c, cmd, std::move(onComplete)); },
-                    [](const EditorMeshSubdivideResult& r) { return TopologyJson(r); }));
+                    [](const auto& c, const EditorMeshSubdivideCommand& cmd) -> std::optional<ActionReadiness>
+                    {
+                        return PreviewEditorMeshSubdivideCommand(c, cmd);
+                    },
+                    [](const auto& c, const EditorMeshSubdivideCommand& cmd, auto onComplete)
+                    {
+                        return ApplyEditorMeshSubdivideCommand(c, cmd, std::move(onComplete));
+                    },
+                    [](const EditorMeshSubdivideResult& r)
+                    {
+                        return TopologyJson(r);
+                    }));
                 ops.push_back(ExplicitOperation<EditorMeshSimplifyResult, EditorMeshSimplifyCommand>(
-                    "mesh_simplify", "mesh_topology", EditorMeshSimplifyFieldSpecs(),
-                    ParamSpecs<EditorMeshSimplifyCommand>{
-                        Param(EditorMeshSimplifyFieldSpecs(), "metric", &EditorMeshSimplifyCommand::Metric),
-                        Param(EditorMeshSimplifyFieldSpecs(), "target_faces", &EditorMeshSimplifyCommand::TargetFaces),
-                        Param(EditorMeshSimplifyFieldSpecs(), "max_error", &EditorMeshSimplifyCommand::MaxError),
-                        Param(EditorMeshSimplifyFieldSpecs(), "preserve_boundary", &EditorMeshSimplifyCommand::PreserveBoundary),
-                        Param(EditorMeshSimplifyFieldSpecs(), "feature_angle_threshold_degrees", &EditorMeshSimplifyCommand::FeatureAngleThresholdDegrees),
-                        Param(EditorMeshSimplifyFieldSpecs(), "normal_weight", &EditorMeshSimplifyCommand::NormalWeight),
-                        Param(EditorMeshSimplifyFieldSpecs(), "boundary_weight", &EditorMeshSimplifyCommand::BoundaryWeight),
-                        Param(EditorMeshSimplifyFieldSpecs(), "curvature_weight", &EditorMeshSimplifyCommand::CurvatureWeight),
-                        Param(EditorMeshSimplifyFieldSpecs(), "preserve_sharp_features", &EditorMeshSimplifyCommand::PreserveSharpFeatures),
-                        Param(EditorMeshSimplifyFieldSpecs(), "preserve_uv_seams", &EditorMeshSimplifyCommand::PreserveUvSeams)},
+                    "mesh_simplify",
+                    "mesh_topology",
+                    EditorMeshSimplifyFieldSpecs(),
+                    ParamsOf(EditorMeshSimplifyFields()),
                     &PrepareEditorMeshTopologyFrame,
-                    [](const auto& c, const EditorMeshSimplifyCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorMeshSimplifyCommand(c, cmd); },
-                    [](const auto& c, const EditorMeshSimplifyCommand& cmd, auto onComplete) { return ApplyEditorMeshSimplifyCommand(c, cmd, std::move(onComplete)); },
-                    [](const EditorMeshSimplifyResult& r) {
+                    [](const auto& c, const EditorMeshSimplifyCommand& cmd) -> std::optional<ActionReadiness>
+                    {
+                        return PreviewEditorMeshSimplifyCommand(c, cmd);
+                    },
+                    [](const auto& c, const EditorMeshSimplifyCommand& cmd, auto onComplete)
+                    {
+                        return ApplyEditorMeshSimplifyCommand(c, cmd, std::move(onComplete));
+                    },
+                    [](const EditorMeshSimplifyResult& r)
+                    {
                         Json out = TopologyJson(r);
                         out["collapses"] = r.CollapseCount;
                         out["max_collapse_error"] = r.MaxCollapseError;
@@ -545,24 +578,28 @@ namespace Extrinsic::Runtime
                     }));
                 // The ridge property is picked from the catalog like the panel's combo (vertex scalars).
                 ops.push_back(ExplicitOperation<EditorScalarRidgeResult, EditorScalarRidgeCommand>(
-                    "scalar_ridge", "mesh_analysis", EditorScalarRidgeFieldSpecs(),
-                    ParamSpecs<EditorScalarRidgeCommand>{
-                        NameParam(EditorScalarRidgeFieldSpecs(), "property", &EditorScalarRidgeCommand::Property),
-                        Param(EditorScalarRidgeFieldSpecs(), "method", &EditorScalarRidgeCommand::Method),
-                        Param(EditorScalarRidgeFieldSpecs(), "radius_ratio", &EditorScalarRidgeCommand::RadiusRatio),
-                        Param(EditorScalarRidgeFieldSpecs(), "scale", &EditorScalarRidgeCommand::Scale),
-                        Param(EditorScalarRidgeFieldSpecs(), "minimum_sharpness", &EditorScalarRidgeCommand::MinimumSharpness),
-                        Param(EditorScalarRidgeFieldSpecs(), "minimum_strength", &EditorScalarRidgeCommand::MinimumStrength),
-                        Param(EditorScalarRidgeFieldSpecs(), "ridges", &EditorScalarRidgeCommand::Ridges),
-                        Param(EditorScalarRidgeFieldSpecs(), "valleys", &EditorScalarRidgeCommand::Valleys),
-                        Param(EditorScalarRidgeFieldSpecs(), "require_persistence", &EditorScalarRidgeCommand::RequirePersistence),
-                        Param(EditorScalarRidgeFieldSpecs(), "minimum_persistence", &EditorScalarRidgeCommand::MinimumPersistence),
-                        Param(EditorScalarRidgeFieldSpecs(), "publish_graph", &EditorScalarRidgeCommand::PublishGraph),
-                        Param(EditorScalarRidgeFieldSpecs(), "publish_mesh_features", &EditorScalarRidgeCommand::PublishMeshFeatures)},
+                    "scalar_ridge",
+                    "mesh_analysis",
+                    EditorScalarRidgeFieldSpecs(),
+                    []
+                    {
+                        // The property row (first in the table) has its own builder.
+                        auto specs = ParamsOf(EditorScalarRidgeFields());
+                        specs.insert(specs.begin(),
+                            NameParam(EditorScalarRidgeFieldSpecs(), "property", &EditorScalarRidgeCommand::Property));
+                        return specs;
+                    }(),
                     &PrepareEditorMeshFieldFrame,
-                    [](const auto& c, const EditorScalarRidgeCommand& cmd) -> std::optional<ActionReadiness> { return PreviewEditorScalarRidgeCommand(c, cmd); },
-                    [](const auto& c, const EditorScalarRidgeCommand& cmd, auto) { return ApplyEditorScalarRidgeCommand(c, cmd); },
-                    [](const EditorScalarRidgeResult& r) {
+                    [](const auto& c, const EditorScalarRidgeCommand& cmd) -> std::optional<ActionReadiness>
+                    {
+                        return PreviewEditorScalarRidgeCommand(c, cmd);
+                    },
+                    [](const auto& c, const EditorScalarRidgeCommand& cmd, auto)
+                    {
+                        return ApplyEditorScalarRidgeCommand(c, cmd);
+                    },
+                    [](const EditorScalarRidgeResult& r)
+                    {
                         Json out = ResultJson(r);
                         out["output_entity"] = r.OutputEntityId;
                         out["ridge_segments"] = r.RidgeSegmentCount;
@@ -573,11 +610,14 @@ namespace Extrinsic::Runtime
                         out["milliseconds"] = r.ComputeMilliseconds;
                         return out;
                     },
-                    [](const OperationCall& call, EditorScalarRidgeCommand& command) -> std::string {
+                    [](const OperationCall& call, EditorScalarRidgeCommand& command) -> std::string
+                    {
                         const auto params = call.Args.find("params");
-                        if (params == call.Args.end() || !params->contains("property")) return {};
+                        if (params == call.Args.end() || !params->contains("property"))
+                            return {};
                         const auto inspector = BuildEditorInspectorModel(call.Prepared.SnapshotQueries, nullptr, command.StableEntityId);
-                        if (!inspector.HasEntity) return "No entity with id " + std::to_string(command.StableEntityId) + ".";
+                        if (!inspector.HasEntity)
+                            return "No entity with id " + std::to_string(command.StableEntityId) + ".";
                         const auto row = std::ranges::find_if(inspector.PropertyCatalog.Rows, [&](const EditorPropertyCatalogRow& r) {
                             return r.Name == command.Property.Name && !r.Internal && r.Bindable &&
                                    r.Descriptor.Domain == GeometryElementDomain::MeshVertex &&
