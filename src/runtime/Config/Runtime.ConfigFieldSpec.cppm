@@ -69,6 +69,10 @@ export namespace Extrinsic::Runtime
         // schema is const true. The operation params' Bool reader does not read it (no table sets it).
         // Not combined with Nullable: const true would refuse the null the check accepts.
         bool OnlyTrue{false};
+        // RUNTIME-346: a derived section codec's message for the one check this row's type owns
+        // (UInt: its range; StringEnum: its token; Float: a positive value that stores as zero);
+        // empty keeps the generic text.
+        std::string_view Refusal{};
     };
 
     [[nodiscard]] const ConfigFieldSpec* FindConfigFieldSpec(
@@ -91,13 +95,15 @@ export namespace Extrinsic::Runtime
     // write the member as a double (Bool 0 or 1, an enum its enumerator value): lossless for the
     // members bound so far (32-bit integers, float, double, bool, small enums, and size_t within its
     // declared range). Set takes a value its member can hold (a caller checks the declared range
-    // first). FieldNumber gives the field's wire number (an Enum adds its Min). A row without
-    // accessors is a field its owner reads itself (a property reference).
+    // first). FieldNumber gives the field's wire number (an Enum adds its Min). A property
+    // reference is bound through Ref instead (RUNTIME-346); a row with neither is a field its owner
+    // reads itself.
     template <class Cmd> struct BoundField
     {
         ConfigFieldSpec Spec{};
         double (*Get)(const Cmd&){nullptr};
         void (*Set)(Cmd&, double){nullptr};
+        GeometryPropertyRef Cmd::* Ref{nullptr};
     };
 
     template <class> struct BoundMember;
@@ -107,29 +113,33 @@ export namespace Extrinsic::Runtime
         using Type = T;
     };
 
-    // The row of `spec` bound to `Member` (a pointer to a numeric, bool or enum member).
+    // The row of `spec` bound to `Member` (a pointer to a numeric, bool, enum or property
+    // reference member).
     template <auto Member> [[nodiscard]] constexpr auto Bind(const ConfigFieldSpec& spec)
     {
         using Cmd = typename BoundMember<decltype(Member)>::Command;
         using T = typename BoundMember<decltype(Member)>::Type;
-        return BoundField<Cmd>{.Spec = spec,
-            .Get = [](const Cmd& command) -> double
-            {
-                if constexpr (std::is_enum_v<T>)
-                    return static_cast<double>(std::to_underlying(command.*Member));
-                else
-                    return static_cast<double>(command.*Member);
-            },
-            .Set =
-                [](Cmd& command, const double value)
-            {
-                if constexpr (std::is_same_v<T, bool>)
-                    command.*Member = value != 0.0;
-                else if constexpr (std::is_enum_v<T>)
-                    command.*Member = static_cast<T>(static_cast<std::underlying_type_t<T>>(value));
-                else
-                    command.*Member = static_cast<T>(value);
-            }};
+        if constexpr (std::is_same_v<T, GeometryPropertyRef>)
+            return BoundField<Cmd>{.Spec = spec, .Ref = Member};
+        else
+            return BoundField<Cmd>{.Spec = spec,
+                .Get = [](const Cmd& command) -> double
+                {
+                    if constexpr (std::is_enum_v<T>)
+                        return static_cast<double>(std::to_underlying(command.*Member));
+                    else
+                        return static_cast<double>(command.*Member);
+                },
+                .Set =
+                    [](Cmd& command, const double value)
+                {
+                    if constexpr (std::is_same_v<T, bool>)
+                        command.*Member = value != 0.0;
+                    else if constexpr (std::is_enum_v<T>)
+                        command.*Member = static_cast<T>(static_cast<std::underlying_type_t<T>>(value));
+                    else
+                        command.*Member = static_cast<T>(value);
+                }};
     }
 
     // The specs of `rows`, in order: the plain table schemas, checks and hints read.

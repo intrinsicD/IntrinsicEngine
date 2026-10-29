@@ -381,7 +381,8 @@ method-specific steps:
 - Phase 0: `BindRef`/`BindToken`/`BindEntity` and the payload-first codec; the property-write
   transaction for scalar columns; the operation runtime with stages 1-8, the `PointSamples` kind,
   the scalar GPU shape, result slots; the framework module and the layering rule; a table of named
-  operations with their measured removable code (the projection basis).
+  operations with their measured removable code (the projection basis:
+  `docs/architecture/declared-operations-table.md`, an estimate until phase 2 measures).
 - Phase 1: kernel density and point spacing (implementation shakedown).
 - Phase 2: outlier analysis (two outputs, GPU, custom publication): the architectural test.
 - Phase 3: mesh remesh (topology replacement, explicit parameters, argument entity).

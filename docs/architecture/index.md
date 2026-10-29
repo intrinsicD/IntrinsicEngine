@@ -91,6 +91,7 @@ Status labels:
 | `ground-up-redesign-blueprint-2026.md` | archival | Vision/blueprint context. |
 | `ground-up-redesign-vision.md` | archival | Vision narrative; non-normative. |
 | `moonshot.md` | roadmap | Twelve-month moonshot (pillars M1–M11); a proposal, not a claim. |
+| `declared-operations-table.md` | roadmap | ADR 0031's named operations with lines now and estimated kept (the phase 2 projection basis); an estimate, not a measurement. |
 | `htex-halfedge-patch-system.md` | legacy-background | Geometry method background; its test-only `Geometry.HtexPatch` prototype was removed. |
 | `parameterization-mapping-roadmap.md` | roadmap | GEOM-011 planning note for parameterization, atlas, distortion, and surface-map packs. |
 | `post-merge-audit-checklist.md` | migration | Temporary migration review artifact. |

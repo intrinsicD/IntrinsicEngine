@@ -93,3 +93,11 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - 2026-10-29: Operator decision (question 27): ADR 0031 accepted; the "no generic property-write
   API" scope limit is lifted for operations (Decision 9); phase 0 and then phase 1 start as their own
   tasks (`RUNTIME-346` onwards, listed in `ARCH-020`).
+- 2026-10-29: The named operation table (read-only agent, phase 0 follow-up) is
+  `docs/architecture/declared-operations-table.md`: 30 operations, about 50,290 lines now, about
+  16,630 estimated kept, conservative removable 24,200-27,800 (the phase 2 gate asks for 5,000 net).
+  Four sizes spot-checked against the code (consolidation module 5,750, clustering 2,774,
+  `Outliers.cpp` 1,055 lines, the kernel density panel range). The framework's own size is not
+  estimated.
+  Codex (`RUNTIME-346` code review) spot-checked kernel_density (matches) and glyph_order (output
+  is a float column; the agent's split over-counted its ranges by 72 lines): corrected.

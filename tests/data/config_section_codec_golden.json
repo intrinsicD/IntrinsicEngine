@@ -1,0 +1,560 @@
+{
+  "kernel_density": {
+    "cases": [
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Kernel density config must be an object."
+        ],
+        "payload": "[]",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown density field: bogus"
+        ],
+        "payload": "{\"bogus\":1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "k_neighbors must be an unsigned 32-bit integer."
+        ],
+        "payload": "{\"k_neighbors\":-1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "k_neighbors must be an unsigned 32-bit integer."
+        ],
+        "payload": "{\"k_neighbors\":1.5}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "entity must be an unsigned 32-bit integer."
+        ],
+        "payload": "{\"entity\":4294967296}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"gpu_query_batch_size\":0}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"gpu_query_batch_size\":16385}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown density backend."
+        ],
+        "payload": "{\"backend\":\"gpu\"}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown density backend."
+        ],
+        "payload": "{\"backend\":1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "bandwidth must be a finite nonnegative float."
+        ],
+        "payload": "{\"bandwidth\":-1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "bandwidth must be a finite nonnegative float."
+        ],
+        "payload": "{\"bandwidth\":\"x\"}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Positive bandwidth must remain positive in float storage."
+        ],
+        "payload": "{\"bandwidth\":1e-50}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "bandwidth must be a finite nonnegative float."
+        ],
+        "payload": "{\"bandwidth\":1e39}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "positions needs a canonical typed property reference."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "positions needs a canonical typed property reference."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"float\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown element domain."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"Nowhere\",\"name\":\"p\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Position and density must be distinct properties on the same domain."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"density\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"float\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Position and density must be distinct properties on the same domain."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"density\":{\"domain\":\"MeshFace\",\"name\":\"q\",\"kind\":\"float\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "density needs a canonical typed property reference."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"density\":{\"domain\":\"MeshVertex\",\"name\":\"q\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_lbvh\",\"bandwidth\":0.5,\"density\":{\"domain\":\"MeshVertex\",\"kind\":\"double\",\"name\":\"q\"},\"entity\":3,\"gpu_query_batch_size\":4096,\"k_neighbors\":4,\"positions\":{\"domain\":\"MeshVertex\",\"kind\":\"vec3\",\"name\":\"p\"}}",
+        "fields": 6,
+        "messages": [],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"density\":{\"domain\":\"MeshVertex\",\"name\":\"q\",\"kind\":\"double\"},\"k_neighbors\":4,\"bandwidth\":0.5,\"backend\":\"cpu_lbvh\",\"entity\":3}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"bandwidth\":0.0,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":15,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+        "fields": 0,
+        "messages": [],
+        "payload": "{}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"vulkan_lbvh\",\"bandwidth\":0.25,\"density\":{\"domain\":\"PointCloudPoint\",\"kind\":\"double\",\"name\":\"d\"},\"entity\":7,\"gpu_query_batch_size\":128,\"k_neighbors\":9,\"positions\":{\"domain\":\"PointCloudPoint\",\"kind\":\"vec3\",\"name\":\"p\"}}",
+        "fields": 7,
+        "messages": [],
+        "payload": "{\"backend\":\"vulkan_lbvh\",\"bandwidth\":0.25,\"density\":{\"domain\":\"PointCloudPoint\",\"kind\":\"double\",\"name\":\"d\"},\"entity\":7,\"gpu_query_batch_size\":128,\"k_neighbors\":9,\"positions\":{\"domain\":\"PointCloudPoint\",\"kind\":\"vec3\",\"name\":\"p\"}}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"bandwidth\":0.10000000149011612,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":15,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"bandwidth\":0.1}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"bandwidth\":-0.0,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":15,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"bandwidth\":-0.0}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"bandwidth\":3.0,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":15,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"bandwidth\":3}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"bandwidth\":0.0,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":4294967295,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"k_neighbors\":4294967295}",
+        "usable": true
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"gpu_query_batch_size\":0,\"backend\":\"gpu\"}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown density backend."
+        ],
+        "payload": "{\"backend\":\"gpu\",\"bandwidth\":-1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Positive bandwidth must remain positive in float storage."
+        ],
+        "payload": "{\"bandwidth\":1e-50,\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown density field: bogus"
+        ],
+        "payload": "{\"k_neighbors\":-1,\"bogus\":1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"\",\"kind\":\"vec3\"},\"gpu_query_batch_size\":0}",
+        "usable": false
+      }
+    ],
+    "defaults": "{\"backend\":\"cpu_octree\",\"bandwidth\":0.0,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":15,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+    "invalid_enum": "{\"backend\":\"invalid\",\"bandwidth\":0.0,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":15,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+    "non_default": "{\"backend\":\"vulkan_lbvh\",\"bandwidth\":0.25,\"density\":{\"domain\":\"PointCloudPoint\",\"kind\":\"double\",\"name\":\"d\"},\"entity\":7,\"gpu_query_batch_size\":128,\"k_neighbors\":9,\"positions\":{\"domain\":\"PointCloudPoint\",\"kind\":\"vec3\",\"name\":\"p\"}}",
+    "registration": {
+      "name": "sandbox.kernel_density",
+      "payload": "{\"backend\":\"cpu_octree\",\"bandwidth\":0.0,\"density\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"},\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":15,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}}",
+      "schema": "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"intrinsic.runtime.sandbox.kernel_density\",\"title\":\"KernelDensity\",\"description\":\"Validated KernelDensity configuration.\",\"type\":\"object\",\"properties\":{\"entity\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":4294967295,\"description\":\"Entity.\",\"default\":0},\"k_neighbors\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":4294967295,\"description\":\"K neighbors.\",\"default\":15},\"gpu_query_batch_size\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":16384,\"description\":\"Gpu query batch size.\",\"default\":4096},\"backend\":{\"type\":\"string\",\"enum\":[\"cpu_octree\",\"cpu_lbvh\",\"vulkan_lbvh\"],\"x-enum-names\":[\"CPU octree\",\"CPU LBVH (cached)\",\"Vulkan LBVH\"],\"description\":\"Backend.\",\"default\":\"cpu_octree\"},\"bandwidth\":{\"type\":\"number\",\"minimum\":0.0,\"maximum\":3.4028234663852886e+38,\"description\":\"Zero selects automatic bandwidth; positive values must remain positive in float storage.\",\"default\":0.0},\"positions\":{\"type\":\"object\",\"properties\":{\"domain\":{\"type\":\"string\",\"enum\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"]},\"name\":{\"type\":\"string\",\"minLength\":1},\"kind\":{\"type\":\"string\",\"enum\":[\"vec3\"]}},\"required\":[\"domain\",\"name\",\"kind\"],\"additionalProperties\":false,\"x-property-kinds\":[\"vec3\"],\"x-domains\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"],\"description\":\"Position and density bindings must have distinct names on the same element domain.\",\"default\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}},\"density\":{\"type\":\"object\",\"properties\":{\"domain\":{\"type\":\"string\",\"enum\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"]},\"name\":{\"type\":\"string\",\"minLength\":1},\"kind\":{\"type\":\"string\",\"enum\":[\"bool\",\"int32\",\"uint32\",\"uint64\",\"float\",\"double\"]}},\"required\":[\"domain\",\"name\",\"kind\"],\"additionalProperties\":false,\"x-property-kinds\":[\"bool\",\"int32\",\"uint32\",\"uint64\",\"float\",\"double\"],\"x-domains\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"],\"description\":\"Density.\",\"default\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"density\"}}},\"additionalProperties\":false}",
+      "schema_id": "intrinsic.runtime.sandbox.kernel_density",
+      "version": 1
+    }
+  },
+  "point_spacing": {
+    "cases": [
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Point spacing config must be an object."
+        ],
+        "payload": "[]",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown radii field: bogus"
+        ],
+        "payload": "{\"bogus\":1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "k_neighbors must be an unsigned 32-bit integer."
+        ],
+        "payload": "{\"k_neighbors\":-1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "k_neighbors must be an unsigned 32-bit integer."
+        ],
+        "payload": "{\"k_neighbors\":1.5}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "entity must be an unsigned 32-bit integer."
+        ],
+        "payload": "{\"entity\":4294967296}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"gpu_query_batch_size\":0}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"gpu_query_batch_size\":16385}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown radii backend."
+        ],
+        "payload": "{\"backend\":\"gpu\"}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown radii backend."
+        ],
+        "payload": "{\"backend\":1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "scale_factor must be a finite nonnegative float."
+        ],
+        "payload": "{\"scale_factor\":-1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "scale_factor must be a finite nonnegative float."
+        ],
+        "payload": "{\"scale_factor\":\"x\"}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Positive scale factor must remain positive in float storage."
+        ],
+        "payload": "{\"scale_factor\":1e-50}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "scale_factor must be a finite nonnegative float."
+        ],
+        "payload": "{\"scale_factor\":1e39}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "positions needs a canonical typed property reference."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "positions needs a canonical typed property reference."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"float\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown element domain."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"Nowhere\",\"name\":\"p\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Position and radii must be distinct properties on the same domain."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"radii\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"float\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Position and radii must be distinct properties on the same domain."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"radii\":{\"domain\":\"MeshFace\",\"name\":\"q\",\"kind\":\"float\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "radii needs a canonical typed property reference."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"radii\":{\"domain\":\"MeshVertex\",\"name\":\"q\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_lbvh\",\"entity\":3,\"gpu_query_batch_size\":4096,\"k_neighbors\":4,\"positions\":{\"domain\":\"MeshVertex\",\"kind\":\"vec3\",\"name\":\"p\"},\"radii\":{\"domain\":\"MeshVertex\",\"kind\":\"double\",\"name\":\"q\"},\"scale_factor\":0.5}",
+        "fields": 6,
+        "messages": [],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"p\",\"kind\":\"vec3\"},\"radii\":{\"domain\":\"MeshVertex\",\"name\":\"q\",\"kind\":\"double\"},\"k_neighbors\":4,\"scale_factor\":0.5,\"backend\":\"cpu_lbvh\",\"entity\":3}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":6,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":1.0}",
+        "fields": 0,
+        "messages": [],
+        "payload": "{}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_lbvh\",\"entity\":7,\"gpu_query_batch_size\":64,\"k_neighbors\":3,\"positions\":{\"domain\":\"MeshVertex\",\"kind\":\"vec3\",\"name\":\"p\"},\"radii\":{\"domain\":\"MeshVertex\",\"kind\":\"float\",\"name\":\"r\"},\"scale_factor\":1.5}",
+        "fields": 7,
+        "messages": [],
+        "payload": "{\"backend\":\"cpu_lbvh\",\"entity\":7,\"gpu_query_batch_size\":64,\"k_neighbors\":3,\"positions\":{\"domain\":\"MeshVertex\",\"kind\":\"vec3\",\"name\":\"p\"},\"radii\":{\"domain\":\"MeshVertex\",\"kind\":\"float\",\"name\":\"r\"},\"scale_factor\":1.5}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":6,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":0.10000000149011612}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"scale_factor\":0.1}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":6,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":-0.0}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"scale_factor\":-0.0}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":6,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":3.0}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"scale_factor\":3}",
+        "usable": true
+      },
+      {
+        "canonical": "{\"backend\":\"cpu_octree\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":4294967295,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":1.0}",
+        "fields": 1,
+        "messages": [],
+        "payload": "{\"k_neighbors\":4294967295}",
+        "usable": true
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"gpu_query_batch_size\":0,\"backend\":\"gpu\"}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown radii backend."
+        ],
+        "payload": "{\"backend\":\"gpu\",\"scale_factor\":-1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Positive scale factor must remain positive in float storage."
+        ],
+        "payload": "{\"scale_factor\":1e-50,\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"\",\"kind\":\"vec3\"}}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "Unknown radii field: bogus"
+        ],
+        "payload": "{\"k_neighbors\":-1,\"bogus\":1}",
+        "usable": false
+      },
+      {
+        "canonical": "",
+        "fields": 0,
+        "messages": [
+          "GPU query batch size must be 1..16384."
+        ],
+        "payload": "{\"positions\":{\"domain\":\"MeshVertex\",\"name\":\"\",\"kind\":\"vec3\"},\"gpu_query_batch_size\":0}",
+        "usable": false
+      }
+    ],
+    "defaults": "{\"backend\":\"cpu_octree\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":6,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":1.0}",
+    "invalid_enum": "{\"backend\":\"invalid\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":6,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":1.0}",
+    "non_default": "{\"backend\":\"cpu_lbvh\",\"entity\":7,\"gpu_query_batch_size\":64,\"k_neighbors\":3,\"positions\":{\"domain\":\"MeshVertex\",\"kind\":\"vec3\",\"name\":\"p\"},\"radii\":{\"domain\":\"MeshVertex\",\"kind\":\"float\",\"name\":\"r\"},\"scale_factor\":1.5}",
+    "registration": {
+      "name": "sandbox.point_spacing",
+      "payload": "{\"backend\":\"cpu_octree\",\"entity\":0,\"gpu_query_batch_size\":4096,\"k_neighbors\":6,\"positions\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"},\"radii\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"},\"scale_factor\":1.0}",
+      "schema": "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\"intrinsic.runtime.sandbox.point_spacing\",\"title\":\"PointSpacing\",\"description\":\"Validated PointSpacing configuration.\",\"type\":\"object\",\"properties\":{\"entity\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":4294967295,\"description\":\"Entity.\",\"default\":0},\"k_neighbors\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":4294967295,\"description\":\"K neighbors.\",\"default\":6},\"gpu_query_batch_size\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":16384,\"description\":\"Gpu query batch size.\",\"default\":4096},\"backend\":{\"type\":\"string\",\"enum\":[\"cpu_octree\",\"cpu_lbvh\",\"vulkan_lbvh\"],\"x-enum-names\":[\"CPU octree\",\"CPU LBVH (cached)\",\"Vulkan LBVH\"],\"description\":\"Backend.\",\"default\":\"cpu_octree\"},\"scale_factor\":{\"type\":\"number\",\"minimum\":0.0,\"maximum\":3.4028234663852886e+38,\"description\":\"Nonnegative radius scale factor; positive values must remain positive in float storage.\",\"default\":1.0},\"positions\":{\"type\":\"object\",\"properties\":{\"domain\":{\"type\":\"string\",\"enum\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"]},\"name\":{\"type\":\"string\",\"minLength\":1},\"kind\":{\"type\":\"string\",\"enum\":[\"vec3\"]}},\"required\":[\"domain\",\"name\",\"kind\"],\"additionalProperties\":false,\"x-property-kinds\":[\"vec3\"],\"x-domains\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"],\"description\":\"Position and radii bindings must have distinct names on the same element domain.\",\"default\":{\"domain\":\"Unknown\",\"kind\":\"vec3\",\"name\":\"v:position\"}},\"radii\":{\"type\":\"object\",\"properties\":{\"domain\":{\"type\":\"string\",\"enum\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"]},\"name\":{\"type\":\"string\",\"minLength\":1},\"kind\":{\"type\":\"string\",\"enum\":[\"bool\",\"int32\",\"uint32\",\"uint64\",\"float\",\"double\"]}},\"required\":[\"domain\",\"name\",\"kind\"],\"additionalProperties\":false,\"x-property-kinds\":[\"bool\",\"int32\",\"uint32\",\"uint64\",\"float\",\"double\"],\"x-domains\":[\"Unknown\",\"MeshVertex\",\"MeshEdge\",\"MeshHalfedge\",\"MeshFace\",\"GraphNode\",\"GraphHalfedge\",\"GraphEdge\",\"PointCloudPoint\"],\"description\":\"Radii.\",\"default\":{\"domain\":\"Unknown\",\"kind\":\"float\",\"name\":\"radii\"}}},\"additionalProperties\":false}",
+      "schema_id": "intrinsic.runtime.sandbox.point_spacing",
+      "version": 1
+    }
+  }
+}

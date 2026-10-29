@@ -10,6 +10,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <initializer_list>
 #include <limits>
@@ -27,6 +29,8 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.KernelDensityConfig;
+import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.ConfigFieldSpec;
@@ -894,4 +898,160 @@ TEST(DeclaredFieldContracts, BoundEnumFieldsOffsetTheirWireCode)
     EXPECT_TRUE(R::FieldsInDeclaredRange(std::span<const R::BoundField<Command>>(&kRow, 1), command));
     command.Value = static_cast<Kind>(3);
     EXPECT_FALSE(R::FieldsInDeclaredRange(std::span<const R::BoundField<Command>>(&kRow, 1), command));
+}
+
+namespace
+{
+    // RUNTIME-346: a config section's observable codec behaviour, so a derived codec is held to the
+    // hand-written one it replaces: canonical output of the defaults and of a fully non-default record, the
+    // outcome of one payload per refusal path and of valid payloads, and the registration's default payload
+    // and schema. The golden file was captured from the hand-written codecs before they were replaced.
+    using SectionValidation = Extrinsic::Core::Config::EngineConfigSectionValidationResult;
+    struct SectionCodec
+    {
+        std::string Name, Output, FloatField, Defaults, NonDefault, InvalidEnum;
+        std::function<SectionValidation(std::string_view)> Validate;
+        Extrinsic::Core::Config::EngineConfigSectionRegistration Registration;
+    };
+    std::vector<SectionCodec> GoldenSections()
+    {
+        using D = R::GeometryElementDomain;
+        using K = Geometry::PropertyValueKind;
+        const R::KernelDensityConfig density{.StableEntityId = 7,
+            .Backend = R::KernelDensityBackend::VulkanLBVH,
+            .Positions = {.Domain = D::PointCloudPoint, .Name = "p", .ValueKind = K::Vec3},
+            .Density = {.Domain = D::PointCloudPoint, .Name = "d", .ValueKind = K::Double},
+            .KNeighbors = 9,
+            .GpuQueryBatchSize = 128,
+            .Bandwidth = 0.25f};
+        const R::PointSpacingConfig spacing{.StableEntityId = 7,
+            .Backend = R::PointSpacingBackend::CpuLBVH,
+            .Positions = {.Domain = D::MeshVertex, .Name = "p", .ValueKind = K::Vec3},
+            .Radii = {.Domain = D::MeshVertex, .Name = "r", .ValueKind = K::Float},
+            .KNeighbors = 3,
+            .GpuQueryBatchSize = 64,
+            .ScaleFactor = 1.5f};
+        return {
+            {"kernel_density",
+                "density",
+                "bandwidth",
+                R::SerializeKernelDensityConfig({}),
+                R::SerializeKernelDensityConfig(density),
+                R::SerializeKernelDensityConfig({.Backend = static_cast<R::KernelDensityBackend>(7)}),
+                [](const std::string_view payload)
+                {
+                    return R::ValidateKernelDensityConfigSection(payload, {}, "golden");
+                },
+                R::MakeKernelDensityConfigSectionRegistration()},
+            {"point_spacing",
+                "radii",
+                "scale_factor",
+                R::SerializePointSpacingConfig({}),
+                R::SerializePointSpacingConfig(spacing),
+                R::SerializePointSpacingConfig({.Backend = static_cast<R::PointSpacingBackend>(7)}),
+                [](const std::string_view payload)
+                {
+                    return R::ValidatePointSpacingConfigSection(payload, {}, "golden");
+                },
+                R::MakePointSpacingConfigSectionRegistration()},
+        };
+    }
+    // One payload per refusal path, then valid ones; $O is the section's output field, $F its float field.
+    std::vector<std::string> GoldenPayloads(const SectionCodec& section)
+    {
+        const std::string p = R"("positions":{"domain":"MeshVertex","name":"p","kind":"vec3"})";
+        std::vector<std::string> payloads{R"([])",
+            R"({"bogus":1})",
+            R"({"k_neighbors":-1})",
+            R"({"k_neighbors":1.5})",
+            R"({"entity":4294967296})",
+            R"({"gpu_query_batch_size":0})",
+            R"({"gpu_query_batch_size":16385})",
+            R"({"backend":"gpu"})",
+            R"({"backend":1})",
+            R"({"$F":-1})",
+            R"({"$F":"x"})",
+            R"({"$F":1e-50})",
+            R"({"$F":1e39})",
+            R"({"positions":{"domain":"MeshVertex","name":"","kind":"vec3"}})",
+            R"({"positions":{"domain":"MeshVertex","name":"p","kind":"float"}})",
+            R"({"positions":{"domain":"Nowhere","name":"p","kind":"vec3"}})",
+            "{" + p + R"(,"$O":{"domain":"MeshVertex","name":"p","kind":"float"}})",
+            "{" + p + R"(,"$O":{"domain":"MeshFace","name":"q","kind":"float"}})",
+            "{" + p + R"(,"$O":{"domain":"MeshVertex","name":"q","kind":"vec3"}})",
+            "{" + p +
+                R"(,"$O":{"domain":"MeshVertex","name":"q","kind":"double"},"k_neighbors":4,"$F":0.5,"backend":"cpu_lbvh","entity":3})",
+            R"({})",
+            section.NonDefault,
+            // Normalization: the canonical output is the converted record (a float rounds; -0 stays a float zero).
+            R"({"$F":0.1})",
+            R"({"$F":-0.0})",
+            R"({"$F":3})",
+            R"({"k_neighbors":4294967295})",
+            // Precedence: with two refusals the earlier stage reports.
+            R"({"gpu_query_batch_size":0,"backend":"gpu"})",
+            R"({"backend":"gpu","$F":-1})",
+            R"({"$F":1e-50,"positions":{"domain":"MeshVertex","name":"","kind":"vec3"}})",
+            R"({"k_neighbors":-1,"bogus":1})",
+            R"({"positions":{"domain":"MeshVertex","name":"","kind":"vec3"},"gpu_query_batch_size":0})"};
+        for (std::string& payload : payloads)
+            for (const auto& [key, value] :
+                {std::pair{std::string("$O"), section.Output}, {std::string("$F"), section.FloatField}})
+                for (auto at = payload.find(key); at != std::string::npos; at = payload.find(key))
+                    payload.replace(at, key.size(), value);
+        return payloads;
+    }
+    Json GoldenOutcome(const SectionCodec& section)
+    {
+        Json cases = Json::array();
+        for (const std::string& payload : GoldenPayloads(section))
+        {
+            const SectionValidation result = section.Validate(payload);
+            Json messages = Json::array();
+            for (const auto& diagnostic : result.Diagnostics)
+                messages.push_back(diagnostic.Message);
+            cases.push_back({{"payload", payload},
+                {"usable", result.Usable()},
+                {"canonical", result.CanonicalPayloadJson},
+                {"fields", result.ParsedFieldCount},
+                {"messages", messages}});
+        }
+        const auto& registration = section.Registration;
+        return {{"defaults", section.Defaults},
+            {"non_default", section.NonDefault},
+            {"invalid_enum", section.InvalidEnum},
+            {"cases", cases},
+            {"registration",
+                {{"name", registration.DefaultSection.Name},
+                    {"schema_id", registration.DefaultSection.SchemaId},
+                    {"version", registration.DefaultSection.SchemaVersion},
+                    {"payload", registration.DefaultSection.PayloadJson},
+                    {"schema", registration.SchemaJson}}}};
+    }
+    std::filesystem::path GoldenPath()
+    {
+        return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
+            "data/config_section_codec_golden.json";
+    }
+}
+
+TEST(DeclaredFieldContracts, ConfigSectionCodecsMatchTheirGolden)
+{
+    std::ifstream file(GoldenPath());
+    const Json golden = Json::parse(file, nullptr, false);
+    ASSERT_TRUE(golden.is_object());
+    for (const SectionCodec& section : GoldenSections())
+    {
+        SCOPED_TRACE(section.Name);
+        ASSERT_TRUE(golden.contains(section.Name));
+        const Json outcome = GoldenOutcome(section);
+        const Json& expected = golden[section.Name];
+        EXPECT_EQ(outcome["defaults"], expected["defaults"]);
+        EXPECT_EQ(outcome["non_default"], expected["non_default"]);
+        EXPECT_EQ(outcome["invalid_enum"], expected["invalid_enum"]);
+        EXPECT_EQ(outcome["registration"], expected["registration"]);
+        ASSERT_EQ(outcome["cases"].size(), expected["cases"].size());
+        for (std::size_t i = 0; i < outcome["cases"].size(); ++i)
+            EXPECT_EQ(outcome["cases"][i], expected["cases"][i]) << outcome["cases"][i]["payload"];
+    }
 }
