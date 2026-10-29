@@ -15,7 +15,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
     enum class PointIndexState { Ready, Unavailable, Mismatched };
     // Main-thread admission after caller preflight. Unavailable leaves lease outputs
-    // untouched; Mismatched retains the acquired lease and reuse flag for reporting.
+    // untouched; Mismatched retains the acquired lease and reuse flag for reporting and writes a
+    // diagnostic (callers with their own wording ignore it).
     [[nodiscard]] PointIndexState AcquirePointIndex(
         SpatialIndexCache&, WorldHandle, entt::entity, const GeometryPropertyRef& positions,
         std::span<const std::uint32_t> slots, std::span<const glm::vec3> points,

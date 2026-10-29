@@ -139,6 +139,68 @@ namespace
         }
         void Shutdown() override {R::DiscardEditorPointScalar({},Run);Run.reset();Context={};}
     };
+    // RUNTIME-350: a GPU start whose shared index snapshot does not match the captured samples
+    // refuses with a reason; it refused with an empty message.
+    class MismatchApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        R::EditorProcessingContext Context{};
+        Extrinsic::ECS::Scene::Registry Captured{};
+        R::KernelDensityConfig Density{};
+        std::optional<R::EditorKernelDensityResult> Refused{};
+        bool Started{};
+        static void Fill(Extrinsic::ECS::Scene::Registry& scene, entt::entity entity, float shift)
+        {
+            auto& rows = scene.Raw().emplace<GS::Vertices>(entity).Properties;
+            rows.Resize(16);
+            auto positions = rows.GetOrAdd<glm::vec3>("v:position");
+            for (std::size_t i = 0; i < 16; ++i)
+                positions[i] = {float(i % 4) * 0.25f + shift, float(i / 4) * 0.25f, 0};
+        }
+        void Resolve() override
+        {
+            auto& indexed = *Kernel().Worlds().Get(Kernel().ActiveWorld());
+            const auto entity = indexed.Create();
+            Fill(indexed, entity, 0);
+            // The captured scene has the same entity id with shifted positions.
+            for (auto e = Captured.Create(); e != entity; e = Captured.Create())
+                if (entt::to_integral(e) > entt::to_integral(entity))
+                {
+                    ADD_FAILURE() << "entity ids differ";
+                    return;
+                }
+            Fill(Captured, entity, 1);
+            Context.Scene = &Captured;
+            Context.World = Kernel().ActiveWorld();
+            Context.Device = &Kernel().GetDevice();
+            Context.SpatialIndices = Kernel().Services().Find<R::SpatialIndexCache>();
+            Context.JobCommands.Submit = [this](R::JobDesc job, R::EditorJobIdentity)
+            {
+                return Kernel().Jobs().Submit(std::move(job));
+            };
+            Density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+            Density.Backend = R::KernelDensityBackend::VulkanLBVH;
+            Density.Positions.Domain = Density.Density.Domain = R::GeometryElementDomain::PointCloudPoint;
+            Density.Density.Name = "scalar";
+            Density.KNeighbors = 4;
+        }
+        void Frame(double, double) override
+        {
+            if (Started || !Kernel().GetDevice().IsOperational() || !Context.SpatialIndices)
+                return;
+            Started = true;
+            R::EditorKernelDensityResult result;
+            const auto run =
+                R::StartEditorKernelDensityTransaction(R::BindEditorProcessingCommands(Context), Density, result);
+            EXPECT_FALSE(run);
+            Refused = result;
+            Kernel().RequestExit();
+        }
+        void Shutdown() override
+        {
+            Context = {};
+        }
+    };
 }
 TEST(RUNTIME298PointScalarResidency,ParityResidentSecondRunAndDiscard)
 {
@@ -154,4 +216,35 @@ TEST(RUNTIME298PointScalarResidency,ParityResidentSecondRunAndDiscard)
     // count and width reuse a retired one and still match the CPU reference above.
     EXPECT_EQ(run->Final.WorkspaceLeases,run->Starts);
     EXPECT_GT(run->Final.WorkspaceReuses,0u);
+}
+TEST(RUNTIME350IndexMismatch, GpuStartExplainsAMismatchedSnapshot)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    auto config = R::CreateReferenceEngineConfig();
+    config.Window.Width = 128;
+    config.Window.Height = 128;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    auto app = std::make_unique<MismatchApp>();
+    auto* run = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.Initialize();
+    struct Shutdown
+    {
+        R::Engine& Engine;
+        ~Shutdown()
+        {
+            Engine.Shutdown();
+        }
+    } shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64())
+        GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_TRUE(run->Refused);
+    EXPECT_EQ(run->Refused->Status, R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(run->Refused->Message, "Spatial index snapshot does not match the selected samples.");
 }

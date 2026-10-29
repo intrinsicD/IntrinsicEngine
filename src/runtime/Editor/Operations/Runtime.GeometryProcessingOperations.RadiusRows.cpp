@@ -31,8 +31,10 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         handle = acquired.Handle;
         snapshot = cache.Snapshot(acquired.Handle);
         reused = acquired.Reused;
-        return SpatialIndexSnapshotMatches(snapshot.get(), slots, points)
-            ? PointIndexState::Ready : PointIndexState::Mismatched;
+        if (SpatialIndexSnapshotMatches(snapshot.get(), slots, points))
+            return PointIndexState::Ready;
+        diagnostic = "Spatial index snapshot does not match the selected samples.";
+        return PointIndexState::Mismatched;
     }
 
     bool AppendPointKnnRows(
