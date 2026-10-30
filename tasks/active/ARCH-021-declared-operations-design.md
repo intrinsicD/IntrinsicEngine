@@ -35,6 +35,9 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
     build time and memory; 3 stop building now: count the size on today's state, report the gate as
     missed, and decide next: deeper cuts, an ADR amendment for generic entry points, a revised gate, or
     phase 2)
+31. (2026-10-30) "do 1." (answer to: after the phase 1 gate's size miss, 1 move density weights, an
+    unfactored 860-line near copy, onto the operation runtime to measure the saving where the
+    duplication is real; 2 phase 2 directly; 3 deeper cuts to the pilot; 4 revise the gate; 5 stop)
 
 ## Goal
 - `docs/adr/0031-declared-operations.md`: an operation is one typed definition (parameters declared

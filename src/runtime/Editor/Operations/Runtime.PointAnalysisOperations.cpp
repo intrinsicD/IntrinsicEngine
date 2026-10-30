@@ -38,20 +38,6 @@ namespace Extrinsic::Runtime
         if (!context.EngineConfigControlState) return std::nullopt;
         return GetKeypointAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
     }
-    RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(
-        const EditorProcessingCommands& commands, const DensityWeightConfig& config, std::string sourceId)
-    {
-        return ApplyEditorProcessingConfig(commands,
-            ValidateDensityWeightConfigSection(SerializeDensityWeightConfig(config), {}, kDensityWeightConfigSectionName),
-            sourceId.empty() ? std::string{kDensityWeightConfigSectionName} : sourceId,
-            [&](Core::Config::EngineConfig& candidate) { SetDensityWeightConfig(candidate, config); });
-    }
-    std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(const EditorProcessingCommands& commands)
-    {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (!context.EngineConfigControlState) return std::nullopt;
-        return GetDensityWeightConfig(context.EngineConfigControlState->ActiveConfig);
-    }
     RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(
         const EditorProcessingCommands& commands, const DescriptorAnalysisConfig& config, std::string sourceId)
     {

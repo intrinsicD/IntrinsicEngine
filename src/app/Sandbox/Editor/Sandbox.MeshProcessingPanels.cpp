@@ -188,13 +188,13 @@ namespace Extrinsic::Sandbox::Editor
         // counters but never folds a finished transaction into them: the stored result may be a newer run's.
         template <class Result>
         constexpr bool kStoredByOperationRuntime = std::same_as<Result, Runtime::EditorKernelDensityResult> ||
-            std::same_as<Result, Runtime::EditorPointSpacingResult>;
+            std::same_as<Result, Runtime::EditorPointSpacingResult> ||
+            std::same_as<Result, Runtime::EditorDensityWeightResult>;
 
-        template <class State, class Sink>
+        template <class State>
         bool DrawPointScalarTransaction(const Runtime::EditorProcessingCommands& commands,
             Runtime::EditorPointScalarTransactionHandle& run,
-            State& state,
-            const Sink& sink)
+            State& state)
         {
             if (!run)
             {
@@ -207,22 +207,9 @@ namespace Extrinsic::Sandbox::Editor
             const bool active = phase == Runtime::EditorGpuTransactionPhase::Running ||
                 phase == Runtime::EditorGpuTransactionPhase::Accepting ||
                 phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept;
-            // External producers deliver their diagnostics through their own completion sink.
-            constexpr bool foldsTerminal =
-                requires { Runtime::UpdateEditorPointScalarResult(*state.LastResult, snapshot); };
-            constexpr bool showsTransfer =
-                foldsTerminal || kStoredByOperationRuntime<typename decltype(state.LastResult)::value_type>;
+            constexpr bool showsTransfer = kStoredByOperationRuntime<typename decltype(state.LastResult)::value_type>;
             if (!active)
             {
-                if constexpr (foldsTerminal)
-                {
-                    if (state.LastResult)
-                    {
-                        auto result = *state.LastResult;
-                        Runtime::UpdateEditorPointScalarResult(result, snapshot);
-                        PublishCommandResult(state.LastResult, std::move(result), sink);
-                    }
-                }
                 run.reset();
                 return false;
             }
@@ -2399,10 +2386,8 @@ namespace Extrinsic::Sandbox::Editor
         else if (config.Backend == Runtime::KeypointAnalysisBackend::VulkanCompute)
             ImGui::TextWrapped(
                 "Spacing, covariance, saliency and suppression run on Vulkan in bounded traversal pages. Requires shader double precision.");
-        const bool keypointActive = DrawPointScalarTransaction(context.PointAnalysis.Commands,
-            KeypointTransaction,
-            Keypoints,
-            context.PointAnalysis.ResultSinks.KeypointAnalysis);
+        const bool keypointActive =
+            DrawPointScalarTransaction(context.PointAnalysis.Commands, KeypointTransaction, Keypoints);
         DrawProcessingExecution(
             context.PointAnalysis.Commands,
             Keypoints,
@@ -2684,8 +2669,7 @@ namespace Extrinsic::Sandbox::Editor
             "Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
         if (config.Backend == Runtime::KernelDensityBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-        const bool scalarActive =
-            DrawPointScalarTransaction(context.PointFields.Commands, DensityTransaction, Density, noSessionSink);
+        const bool scalarActive = DrawPointScalarTransaction(context.PointFields.Commands, DensityTransaction, Density);
         DrawProcessingExecution(
             context.PointFields.Commands,
             Density,
@@ -2749,8 +2733,11 @@ namespace Extrinsic::Sandbox::Editor
 
     void MeshProcessingPanels::Impl::DrawDensityWeightsWindow(bool& open, const SandboxEditorContext& context)
     {
-        if (context.PointAnalysis.Results.LastDensityWeightResult)
-            DensityWeights.LastResult = context.PointAnalysis.Results.LastDensityWeightResult;
+        // RUNTIME-353: the operation runtime stores every run's result (the session store, which the point
+        // field frame copies whole); the panel only reads it.
+        if (const auto stored = context.PointFields.Results.Last<Runtime::DensityWeightOperation>())
+            DensityWeights.LastResult = *stored;
+        const std::function<void(Runtime::EditorDensityWeightResult)> noSessionSink{};
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Compact Density Weights", &open))
         {
@@ -2810,10 +2797,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped(
                 "Vulkan collects complete conservative radius candidates. Overflow fails without changing the output and suggests a smaller radius. Subnormal coordinate components are unsupported.");
         }
-        const bool scalarActive = DrawPointScalarTransaction(context.PointAnalysis.Commands,
-            WeightTransaction,
-            DensityWeights,
-            context.PointAnalysis.ResultSinks.DensityWeight);
+        const bool scalarActive =
+            DrawPointScalarTransaction(context.PointAnalysis.Commands, WeightTransaction, DensityWeights);
         DrawProcessingExecution(
             context.PointAnalysis.Commands,
             DensityWeights,
@@ -2835,10 +2820,9 @@ namespace Extrinsic::Sandbox::Editor
                         Runtime::StartEditorDensityWeightTransaction(context.PointAnalysis.Commands, config, result);
                     return result;
                 }
-                return Runtime::ApplyEditorConfiguredDensityWeight(
-                    context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DensityWeight);
+                return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands, noSessionSink);
             },
-            context.PointAnalysis.ResultSinks.DensityWeight,
+            noSessionSink,
             "Compute compact weights",
             "Controls were rejected by density config validation.",
             "Density config was rejected.",
@@ -2878,8 +2862,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##DensityWeights",
                 DensityWeights.LastResult,
-                Runtime::EditorPointAnalysisResultSlot::DensityWeight,
-                context.PointAnalysis.ResultSinks.DismissResult);
+                &Runtime::OperationResultKey<Runtime::DensityWeightOperation>::Tag,
+                context.PointFields.DismissResult);
         }
         ImGui::End();
     }
@@ -3097,8 +3081,7 @@ namespace Extrinsic::Sandbox::Editor
             "Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
         if (config.Backend == Runtime::PointSpacingBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-        const bool scalarActive =
-            DrawPointScalarTransaction(context.PointFields.Commands, SpacingTransaction, Spacing, noSessionSink);
+        const bool scalarActive = DrawPointScalarTransaction(context.PointFields.Commands, SpacingTransaction, Spacing);
         DrawProcessingExecution(
             context.PointFields.Commands,
             Spacing,

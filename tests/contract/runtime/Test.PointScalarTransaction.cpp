@@ -375,6 +375,8 @@ TEST_P(PointScalarTransaction, AutomaticSupportRadiusResolvesBeforeVulkanSubmiss
     EXPECT_NE(refused.Message.find("float64"),std::string::npos)<<refused.Message;
     EXPECT_EQ(submissions,0u);
     Device.ShaderFloat64=true;
+    // Readiness never runs the automatic analysis (RUNTIME-353): it would refuse these samples.
+    EXPECT_TRUE(R::PreviewEditorDensityWeightCommand(Commands(),Weight).Enabled);
     const auto coincident=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
     EXPECT_EQ(coincident.Status,R::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_NE(coincident.Message.find("Automatic support radius"),std::string::npos)<<coincident.Message;
@@ -415,8 +417,6 @@ TEST_P(PointScalarTransaction, AcceptSinkDeliveredExactlyOnce)
 // its started answer, then its terminal result under the same run, also when Accept brings its own sink.
 TEST_P(PointScalarTransaction, GpuResultsAreRetainedWithoutThePanel)
 {
-    if (GetParam() == 2)
-        GTEST_SKIP() << "density weights is not on the operation runtime";
     R::OperationResultStore store;
     Context.OperationResults = &store;
     Context.AttachmentActive = []
@@ -431,6 +431,9 @@ TEST_P(PointScalarTransaction, GpuResultsAreRetainedWithoutThePanel)
                 return std::pair{r->Status, r->WrittenCount};
         if (GetParam() == 1)
             if (const auto r = copy.Last<R::PointSpacingOperation>())
+                return std::pair{r->Status, r->WrittenCount};
+        if (GetParam() == 2)
+            if (const auto r = copy.Last<R::DensityWeightOperation>())
                 return std::pair{r->Status, r->WrittenCount};
         return std::nullopt;
     };

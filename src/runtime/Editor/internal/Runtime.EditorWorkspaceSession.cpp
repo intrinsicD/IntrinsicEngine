@@ -771,7 +771,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             {
             case EditorPointAnalysisResultSlot::OutlierAnalysis: m_PointAnalysisResults.LastOutlierAnalysisResult.reset(); break;
             case EditorPointAnalysisResultSlot::KeypointAnalysis: m_PointAnalysisResults.LastKeypointAnalysisResult.reset(); break;
-            case EditorPointAnalysisResultSlot::DensityWeight: m_PointAnalysisResults.LastDensityWeightResult.reset(); break;
             case EditorPointAnalysisResultSlot::DescriptorAnalysis: m_PointAnalysisResults.LastDescriptorAnalysisResult.reset(); break;
             }
         };
@@ -882,8 +881,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastKeypointAnalysisResult);
         m_PointAnalysisResultSinks.DescriptorAnalysis =
             retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastDescriptorAnalysisResult);
-        m_PointAnalysisResultSinks.DensityWeight =
-            retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastDensityWeightResult);
         m_PointConstructionResultSinks.PointConstruction =
             retain(m_PointConstructionResults, &EditorPointConstructionResultsSnapshot::LastPointConstructionResult);
         context.PendingAssetImportPath =

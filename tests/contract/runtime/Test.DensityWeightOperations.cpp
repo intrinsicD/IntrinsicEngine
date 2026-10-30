@@ -417,3 +417,71 @@ TEST(DensityWeight, DoubleTargetUsesSharedCheckedScalarPublication)
     ASSERT_TRUE(history.Undo().Succeeded());
     EXPECT_FALSE(props.Exists(config.Weights.Name));
 }
+
+// RUNTIME-353: density weights on the operation runtime keep their delivery and refusal behaviour
+// and store every run's result in the session's operation result store.
+TEST(DensityWeightOperations, RefusedTransactionStartKeepsTheCallersOtherFields)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::PointCloudPoint);
+    const auto c = Config(entity, D::PointCloudPoint);
+    R::EditorDensityWeightResult result{.Message = "earlier", .MinWeight = 5, .MaxWeight = 6};
+    EXPECT_FALSE(R::StartEditorDensityWeightTransaction(R::BindEditorProcessingCommands({.Scene = &scene}), c, result));
+    EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(result.Message, "GPU transaction requires vulkan_lbvh.");
+    EXPECT_EQ(result.RequestedBackend, c.Backend);
+    EXPECT_EQ(result.Weights, c.Weights);
+    EXPECT_EQ(result.MinWeight, 5);
+    EXPECT_EQ(result.MaxWeight, 6);
+}
+
+TEST(DensityWeightOperations, EveryRunReachesTheOperationResultStore)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::PointCloudPoint);
+    auto c = Config(entity, D::PointCloudPoint);
+    R::EditorCommandHistory history;
+    R::OperationResultStore store;
+    bool active = true;
+    R::EditorProcessingContext inlineContext{.Scene = &scene, .CommandHistory = &history};
+    inlineContext.OperationResults = &store;
+    inlineContext.AttachmentActive = [&]
+    {
+        return active;
+    };
+    const auto last = [&]
+    {
+        return store.Copy().Last<R::DensityWeightOperation>();
+    };
+    // Inline: stored, returned, and (as before) not delivered to the sink.
+    unsigned deliveries = 0;
+    const auto inlineResult = R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(inlineContext),
+        c,
+        [&](R::EditorDensityWeightResult)
+        {
+            ++deliveries;
+        });
+    ASSERT_TRUE(inlineResult.Succeeded()) << inlineResult.Message;
+    EXPECT_EQ(deliveries, 0u);
+    ASSERT_TRUE(last());
+    EXPECT_EQ(last()->Message, inlineResult.Message);
+    // An immediate refusal is stored.
+    auto missing = c;
+    missing.StableEntityId = std::numeric_limits<std::uint32_t>::max();
+    const auto refused = R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(inlineContext), missing);
+    EXPECT_EQ(refused.Status, R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(last()->Message, "Density-weight target is stale or missing.");
+    // Queued: the pending answer, then the terminal result from the job.
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(inlineContext);
+    c.Weights.Name = "queued_weights";
+    const auto queued = R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(inlineContext), c);
+    ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
+    EXPECT_EQ(last()->Message, "Density weights queued.");
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    EXPECT_EQ(last()->Status, R::EditorCommandStatus::Applied) << last()->Message;
+    // A refused GPU start is stored too.
+    R::EditorDensityWeightResult started;
+    EXPECT_FALSE(R::StartEditorDensityWeightTransaction(R::BindEditorProcessingCommands(inlineContext), c, started));
+    EXPECT_EQ(last()->Message, "GPU transaction requires vulkan_lbvh.");
+}

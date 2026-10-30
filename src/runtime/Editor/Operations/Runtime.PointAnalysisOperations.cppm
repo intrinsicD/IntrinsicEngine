@@ -1,7 +1,8 @@
-// Point-analysis commands and copied results for weights, keypoints, outliers
-// and FPFH descriptors. These share one radius/neighborhood analysis mechanism:
-// a resolved feature scale, a capped radius support row per sample, and named
-// same-domain scalar outputs published in one undoable transaction.
+// Point-analysis commands and copied results for keypoints, outliers and FPFH
+// descriptors (density weights moved to their operation module, RUNTIME-353).
+// These share one radius/neighborhood analysis mechanism: a resolved feature
+// scale, a capped radius support row per sample, and named same-domain scalar
+// outputs published in one undoable transaction.
 module;
 #include <array>
 #include <cstddef>
@@ -17,11 +18,10 @@ export import Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.OutlierAnalysisConfig;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
-export import Extrinsic.Runtime.DensityWeightConfig;
+export import Extrinsic.Runtime.DensityWeightOperation;
 export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Geometry.PointCloud.Kernels.Types;
 import Extrinsic.Graphics.GpuPropertyResidency;
 export namespace Extrinsic::Runtime
 {
@@ -82,24 +82,6 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    struct EditorDensityWeightResult
-    {
-        EditorCommandStatus Status{EditorCommandStatus::NoChange};
-        DensityWeightBackend RequestedBackend{DensityWeightBackend::CpuKDTree};
-        GeometryPropertyRef Weights{};
-        std::string ActualBackend{}, Message{};
-        std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
-        Geometry::PointCloud::Kernels::DensityWeightDiagnostics Diagnostics{};
-        // Resolved compact-support radius in source-property units (configured, or derived when 0).
-        double SupportRadius{};
-        float QueryRadius{}, MinWeight{}, MaxWeight{};
-        std::size_t MaximumNeighbors{};
-        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
-        bool IndexReused{};
-        std::size_t GpuQueryBatches{};
-        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
-        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
-    };
     struct EditorDescriptorAnalysisResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -115,7 +97,7 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    enum class EditorPointAnalysisResultSlot : std::uint8_t { OutlierAnalysis, KeypointAnalysis, DensityWeight, DescriptorAnalysis };
+    enum class EditorPointAnalysisResultSlot : std::uint8_t { OutlierAnalysis, KeypointAnalysis, DescriptorAnalysis };
     // Private workspace bindings borrow incomplete containers so sibling features
     // need not import these method records.
     extern "C++"
@@ -125,14 +107,12 @@ export namespace Extrinsic::Runtime
             std::function<void(EditorPointAnalysisResultSlot)> DismissResult{};
             std::function<void(EditorOutlierAnalysisResult)> OutlierAnalysis{};
             std::function<void(EditorKeypointAnalysisResult)> KeypointAnalysis{};
-            std::function<void(EditorDensityWeightResult)> DensityWeight{};
             std::function<void(EditorDescriptorAnalysisResult)> DescriptorAnalysis{};
         };
         struct EditorPointAnalysisResultsSnapshot
         {
             std::optional<EditorOutlierAnalysisResult> LastOutlierAnalysisResult{};
             std::optional<EditorKeypointAnalysisResult> LastKeypointAnalysisResult{};
-            std::optional<EditorDensityWeightResult> LastDensityWeightResult{};
             std::optional<EditorDescriptorAnalysisResult> LastDescriptorAnalysisResult{};
         };
     }
@@ -162,19 +142,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(const EditorProcessingCommands&, const KeypointAnalysisConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorProcessingCommands&, std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
-
-    // Fold complete transaction diagnostics into the method result retained by the caller.
-    void UpdateEditorPointScalarResult(EditorDensityWeightResult&, const EditorPointScalarTransactionSnapshot&);
-    [[nodiscard]] EditorPointScalarTransactionHandle StartEditorDensityWeightTransaction(
-        const EditorProcessingCommands&,const DensityWeightConfig&,EditorDensityWeightResult&,
-        std::function<void(EditorDensityWeightResult)> onComplete={});
-    [[nodiscard]] EditorPointScalarTransactionHandle MakeEditorDensityWeightTransactionForTest(
-        const EditorProcessingCommands&,const DensityWeightConfig&,std::vector<float>,Graphics::GpuPropertyResidency&, const EditorPointScalarTransactionSnapshot& diagnostics = {});
-    [[nodiscard]] ActionReadiness PreviewEditorDensityWeightCommand(const EditorProcessingCommands&, const DensityWeightConfig&);
-    [[nodiscard]] EditorDensityWeightResult ApplyEditorDensityWeightCommand(const EditorProcessingCommands&, const DensityWeightConfig&, std::function<void(EditorDensityWeightResult)> onComplete = {});
-    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(const EditorProcessingCommands&, const DensityWeightConfig&, std::string sourceId = {});
-    [[nodiscard]] std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(const EditorProcessingCommands&);
-    [[nodiscard]] EditorDensityWeightResult ApplyEditorConfiguredDensityWeight(const EditorProcessingCommands&, std::function<void(EditorDensityWeightResult)> onComplete = {});
 
     [[nodiscard]] ActionReadiness PreviewEditorDescriptorAnalysisCommand(const EditorProcessingCommands&, const DescriptorAnalysisConfig&);
     [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(const EditorProcessingCommands&, const DescriptorAnalysisConfig&, std::function<void(EditorDescriptorAnalysisResult)> onComplete = {});

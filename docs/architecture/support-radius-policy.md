@@ -117,7 +117,7 @@ runs on the existing job worker rather than the frame thread. Exception:
 Vulkan compact density weights resolve on the frame thread after the
 radius-independent device admission, so the analysis is bounded by Vulkan's
 2^20-point and workspace limits (a `shortcut:` in
-`Runtime.PointAnalysisOperations.DensityWeights.cpp`). The CPU reference
+`Runtime.DensityWeightOperation.cpp`). The CPU reference
 and Vulkan backend consume the same resolved positive radius and workload
 decision. Backends may use different acceleration structures for their
 iterative queries, but they do not independently infer a different default

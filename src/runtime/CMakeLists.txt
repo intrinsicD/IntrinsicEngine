@@ -35,6 +35,7 @@ target_sources(${target_name}
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
         Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
+        Modules/DensityWeight/Runtime.DensityWeightOperation.cppm
         Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
@@ -165,6 +166,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.PointScalarTransaction.cpp
         Modules/KernelDensity/Runtime.KernelDensityOperation.cpp
         Modules/PointSpacing/Runtime.PointSpacingOperation.cpp
+        Modules/DensityWeight/Runtime.DensityWeightOperation.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
@@ -173,7 +175,6 @@ target_sources(${target_name}
         Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp
         Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
         Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp
-        Editor/Operations/Runtime.PointAnalysisOperations.DensityWeights.cpp
         Editor/Operations/Runtime.PointConstructionOperations.Processing.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         Editor/Operations/Runtime.NormalOperations.Processing.cpp

@@ -5217,10 +5217,10 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
                     kept = true;
                     EXPECT_EQ(frame.PointFields.Results.Last<R::PointSpacingOperation>()->MeanRadius, 3);
                 }
-                if (method == 2 && check(frame.PointAnalysis.Results.LastDensityWeightResult))
+                if (method == 2 && check(frame.PointFields.Results.Last<R::DensityWeightOperation>()))
                 {
                     kept = true;
-                    EXPECT_EQ(frame.PointAnalysis.Results.LastDensityWeightResult->MaxWeight, 4);
+                    EXPECT_EQ(frame.PointFields.Results.Last<R::DensityWeightOperation>()->MaxWeight, 4);
                 }
             });
         R::EditorProcessingCommands commands{};

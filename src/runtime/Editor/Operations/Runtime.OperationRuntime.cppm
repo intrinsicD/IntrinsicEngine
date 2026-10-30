@@ -1,7 +1,8 @@
 // The operation runtime (ADR 0031, RUNTIME-347): one driver runs a declared operation through the
 // stages 1 resolve, 2-3 readiness and capture, 4 acquire, 5 execute, 6 gate, 7 publish, 8 deliver.
-// This is its pilot specialization: point samples in, one float column out, from kNN rows (kernel
-// density, point spacing). A definition declares names, parameters, its output and a pure Compute.
+// This is its point scalar specialization: point samples in, one float column out (kernel density and
+// point spacing from kNN rows; density weights from radius rows, RUNTIME-353). A definition declares
+// names, parameters, its output and a pure Compute; optional members override the runtime's defaults.
 // RUNTIME-349: an exported module for operation modules (ADR 0031 Decision 7). The editor helpers
 // the templates call are included in its purview as global-module declarations: reachable where an
 // operation module instantiates the runtime, not exported.
@@ -53,18 +54,61 @@ export extern "C++"
 {
     namespace Extrinsic::Runtime::GeometryProcessingDetail
     {
-    // The live samples a definition computes on; for CPU LBVH also their kNN rows, self included.
+    // The live samples a definition computes on. CPU LBVH adds their kNN rows (self included) for a
+    // definition with MinimumK, otherwise the shared index for QueryPointRadiusRows.
         struct PointSamplesInput
         {
             std::span<const glm::vec3> Points{};
             const std::vector<std::uint32_t>* Neighbors{nullptr};
+            const SpatialIndexSnapshot* Index{nullptr};
         };
 
-    // Messages are built from the names: "<Noun> estimation" labels the job, "<Method> requires at
-    // least two live samples." refuses a small input. MinimumK floors the kNN row width. Output
-    // names the parameters' output reference; capture resolves its domain in place.
+    // CPU LBVH radius rows: every sample's complete support at `radius` (others only, ascending).
+        struct PointRadiusSupport
+        {
+            std::vector<std::uint32_t> Offsets{}, Indices{};
+            std::size_t MaximumNeighbors{};
+        };
+        inline bool QueryPointRadiusRows(
+            const PointSamplesInput& input, float radius, PointRadiusSupport& support, std::string& message)
+        {
+            PointRadiusRows rows;
+            std::vector<std::uint32_t> row;
+            const auto capacity = std::uint32_t(std::max<std::size_t>(1, input.Points.size() - 1));
+            for (std::uint32_t i = 0; i < input.Points.size(); ++i)
+            {
+                const auto found = input.Index->Index.Radius(input.Points[i], radius, capacity, i, true);
+                if (found.Neighbors.size() != found.TotalCount)
+                {
+                    message = "Incomplete CPU radius candidates.";
+                    return false;
+                }
+                row.clear();
+                for (const auto& n : found.Neighbors)
+                    row.push_back(n.Index);
+                if (!AppendPointRadiusRow(rows, row, message))
+                    return false;
+            }
+            support = {std::move(rows.Offsets), std::move(rows.Indices), rows.MaximumNeighbors};
+            return true;
+        }
+
+    // The texts a definition may declare whole (Def::Wording()); by default they are built from its
+    // names: "<Noun> estimation" labels the job, "<Method> requires at least two live samples."
+    // refuses a small input.
+        struct OperationWording
+        {
+            std::string StaleTarget, OutputLabel, TooFewSamples, LbvhLimits, IndexMismatch, ConfigUnavailable, JobLabel,
+                JobName, GpuHistory;
+        };
+
+    // Output names the parameters' output reference; capture resolves its domain in place. Optional:
+    // Method, Evaluation and Failure (default texts); MinimumK (kNN rows, floored at it); Wording();
+    // ReferenceBackend (CpuOctree) and MinimumLiveCount (2); Prepare (a capture step before the Vulkan
+    // admission); GpuParams(params, result); InlineDeliversToSink (true); FinalizeFromPending (false: a
+    // failed worker is delivered as it is); RefuseInPlace.
         template <class Def>
-        concept PointScalarKnnDefinition = requires(const typename Def::Params& params,
+        concept PointScalarDefinition = requires(const typename Def::Params& params,
             typename Def::Params& editable,
             typename Def::Result& result,
             const Graphics::PointScalarGpuStats& stats,
@@ -72,19 +116,14 @@ export extern "C++"
             typename Def::Backend;
             typename Def::Operation; // the exported tag its results are stored under
             requires std::same_as<typename Def::Operation::Result, typename Def::Result>;
-            Def::Backend::CpuOctree;
             Def::Backend::CpuLBVH;
             Def::Backend::VulkanLBVH;
             { Def::Noun } -> std::convertible_to<std::string_view>;
-            { Def::Method } -> std::convertible_to<std::string_view>;
             { Def::History } -> std::convertible_to<std::string_view>;
-            { Def::Evaluation } -> std::convertible_to<std::string_view>;
-            { Def::Failure } -> std::convertible_to<std::string_view>;
-            { Def::MinimumK } -> std::convertible_to<std::size_t>;
             { Def::Output(editable) } -> std::same_as<GeometryPropertyRef&>;
             { Def::Validate(params) } -> std::same_as<Core::Config::EngineConfigSectionValidationResult>;
             { Def::InitialResult(params) } -> std::same_as<typename Def::Result>;
-            { Def::GpuParams(params) } -> std::same_as<Graphics::PointScalarGpuParams>;
+            requires requires { Def::GpuParams(params); } || requires { Def::GpuParams(params, result); };
             Def::FoldGpuStats(result, stats);
             { Def::Compute(params, input, result) } -> std::same_as<std::optional<std::vector<float>>>;
         };
@@ -101,12 +140,71 @@ export extern "C++"
             return text;
         }
 
-        template <PointScalarKnnDefinition Def> struct OperationRuntime
+        template <PointScalarDefinition Def> struct OperationRuntime
         {
             using Params = typename Def::Params;
             using Result = typename Def::Result;
             using Backend = typename Def::Backend;
-            static constexpr std::uint32_t MinimumLiveCount = 2;
+            static constexpr Backend Reference = []
+            {
+                if constexpr (requires { Def::ReferenceBackend; })
+                    return Def::ReferenceBackend;
+                else
+                    return Backend::CpuOctree;
+            }();
+            static constexpr std::uint32_t MinimumLiveCount = []
+            {
+                if constexpr (requires { Def::MinimumLiveCount; })
+                    return std::uint32_t(Def::MinimumLiveCount);
+                else
+                    return 2u;
+            }();
+            static constexpr bool InlineDeliversToSink = []
+            {
+                if constexpr (requires { Def::InlineDeliversToSink; })
+                    return bool(Def::InlineDeliversToSink);
+                else
+                    return true;
+            }();
+            static constexpr bool FinalizeFromPending = []
+            {
+                if constexpr (requires { Def::FinalizeFromPending; })
+                    return bool(Def::FinalizeFromPending);
+                else
+                    return false;
+            }();
+            static const OperationWording& Words()
+            {
+                static const OperationWording words = []
+                {
+                    if constexpr (requires { Def::Wording(); })
+                        return Def::Wording();
+                    else
+                    {
+                        const auto job = JoinOperationText({Def::Noun, " estimation"});
+                        return OperationWording{
+                            .StaleTarget = JoinOperationText({Def::Noun, " target entity is stale or missing."}),
+                            .OutputLabel = std::string(Def::Noun),
+                            .TooFewSamples = JoinOperationText({Def::Method, " requires at least two live samples."}),
+                            .LbvhLimits =
+                                "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.",
+                            .IndexMismatch =
+                                JoinOperationText({Def::Noun, " index snapshot does not match the selected samples."}),
+                            .ConfigUnavailable = JoinOperationText({Def::Noun, " estimation config is unavailable."}),
+                            .JobLabel = job,
+                            .JobName = job,
+                            .GpuHistory = std::string(Def::History)};
+                    }
+                }();
+                return words;
+            }
+            static Graphics::PointScalarGpuParams GpuParams(const Params& c, const Result& r)
+            {
+                if constexpr (requires { Def::GpuParams(c, r); })
+                    return Def::GpuParams(c, r);
+                else
+                    return Def::GpuParams(c);
+            }
 
             struct Work : PointScalarCapture
             {
@@ -142,7 +240,7 @@ export extern "C++"
                     return fail("Scene is unavailable.");
                 const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
                 if (!entity)
-                    return fail(JoinOperationText({Def::Noun, " target entity is stale or missing."}));
+                    return fail(Words().StaleTarget);
                 const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
                 auto w = std::make_shared<Work>();
                 if (!CapturePointScalarField(context,
@@ -150,7 +248,7 @@ export extern "C++"
                         a,
                         c.Positions,
                         Def::Output(c),
-                        Def::Noun,
+                        Words().OutputLabel,
                         purpose == Purpose::Execute,
                         *w,
                         diagnostic))
@@ -161,18 +259,21 @@ export extern "C++"
                 w->Result.SlotCount = w->SlotCount;
                 w->Result.LiveCount = w->LiveCount;
                 if (w->Result.LiveCount < MinimumLiveCount)
-                    return fail(JoinOperationText({Def::Method, " requires at least two live samples."}));
-                if (c.Backend != Backend::CpuOctree)
+                    return fail(Words().TooFewSamples);
+                if (c.Backend != Reference &&
+                    (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24)))
+                    return fail(Words().LbvhLimits);
+                const auto admit = [&]
                 {
-                    if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24))
-                        return fail(
-                            "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.");
-                    if (c.Backend == Backend::VulkanLBVH)
-                    {
-                        if (!AdmitPointScalarGpu(context, *w, Def::GpuParams(c), diagnostic))
-                            return {};
-                    }
+                    return AdmitPointScalarGpu(context, *w, GpuParams(c, w->Result), diagnostic);
+                };
+                if constexpr (requires { &Def::Prepare; })
+                {
+                    if (!Def::Prepare(c, w->Points, w->Result, purpose == Purpose::Execute, admit, diagnostic))
+                        return {};
                 }
+                if (c.Backend == Backend::VulkanLBVH && !admit())
+                    return {};
                 return w;
             }
 
@@ -185,19 +286,26 @@ export extern "C++"
                 r.Status = EditorCommandStatus::GeometryProcessingFailed;
                 r.ActualBackend = ToString(c.Backend);
                 PointSamplesInput input{.Points = w.Points};
-                if (c.Backend != Backend::CpuOctree)
+                if (c.Backend != Reference)
                 {
-                    const auto width = std::uint32_t(
-                        std::min<std::size_t>(w.Points.size(), std::max<std::size_t>(c.KNeighbors, Def::MinimumK) + 1));
-                    if (c.Backend == Backend::CpuLBVH &&
-                        !AppendPointKnnRows(*w.Index, w.Points, width, w.Neighbors.Indices, r.Message))
-                        return;
-                    input.Neighbors = &w.Neighbors.Indices;
+                    if constexpr (requires { Def::MinimumK; })
+                    {
+                        const auto width = std::uint32_t(std::min<std::size_t>(
+                            w.Points.size(), std::max<std::size_t>(c.KNeighbors, Def::MinimumK) + 1));
+                        if (c.Backend == Backend::CpuLBVH &&
+                            !AppendPointKnnRows(*w.Index, w.Points, width, w.Neighbors.Indices, r.Message))
+                            return;
+                        input.Neighbors = &w.Neighbors.Indices;
+                    }
+                    else
+                        input.Index = w.Index.get();
                 }
+                // A definition without Failure and Evaluation writes its own messages in Compute.
                 const auto values = Def::Compute(c, input, r);
                 if (!values)
                 {
-                    r.Message = Def::Failure;
+                    if constexpr (requires { Def::Failure; })
+                        r.Message = Def::Failure;
                     return;
                 }
                 for (std::size_t i = 0; i < w.Slots.size(); ++i)
@@ -206,15 +314,16 @@ export extern "C++"
                 r.Status = EditorCommandStatus::Applied;
                 r.CpuComputeMilliseconds =
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
-                r.Message = JoinOperationText(
-                    {Def::Noun, " computed using ", r.ActualBackend, " neighborhoods and ", Def::Evaluation, "."});
+                if constexpr (requires { Def::Evaluation; })
+                    r.Message = JoinOperationText(
+                        {Def::Noun, " computed using ", r.ActualBackend, " neighborhoods and ", Def::Evaluation, "."});
             }
 
-        // Stage 7, behind its own currentness check.
+            // Stage 7, behind its own currentness check (an abandoned run never reaches it in the job service).
             static Result Publish(const EditorProcessingContext& context, const std::shared_ptr<Work>& w)
             {
                 auto& r = w->Result;
-                if (!PointScalarFieldCurrent(context, w->Entity, *w))
+                if (w->Abandoned || !PointScalarFieldCurrent(context, w->Entity, *w))
                 {
                     r.Status = EditorCommandStatus::StaleEntity;
                     r.Message = JoinOperationText({Def::Noun, " input or output changed before publication."});
@@ -281,9 +390,9 @@ export extern "C++"
                     w->Entity,
                     w->Config.StableEntityId,
                     w->Config.Positions,
-                    Def::GpuParams(w->Config),
-                    std::string(Def::History),
-                    JoinOperationText({Def::Noun, " estimation"}),
+                    GpuParams(w->Config, w->Result),
+                    Words().GpuHistory,
+                    Words().JobLabel,
                     state,
                     [w, sink = std::move(sink)](EditorPointScalarTransactionSnapshot s)
                     {
@@ -354,7 +463,7 @@ export extern "C++"
                     return result;
                 }
             // Stage 4: the shared index, acquired after capture.
-                if (w->Config.Backend != Backend::CpuOctree)
+                if (w->Config.Backend != Reference)
                 {
                     const auto indexState = AcquirePointIndex(*context.SpatialIndices,
                         context.World,
@@ -369,14 +478,13 @@ export extern "C++"
                     if (indexState == PointIndexState::Unavailable)
                         return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
                     if (indexState == PointIndexState::Mismatched)
-                        return report(EditorCommandStatus::StaleEntity,
-                            JoinOperationText({Def::Noun, " index snapshot does not match the selected samples."}));
+                        return report(EditorCommandStatus::StaleEntity, Words().IndexMismatch);
                 }
                 if (!context.JobCommands.Available())
                 {
                     Execute(*w);
                     const Result result = Keep(context, invocation, Publish(context, w));
-                    if (onComplete)
+                    if (InlineDeliversToSink && onComplete)
                         onComplete(result);
                     return result;
                 }
@@ -386,7 +494,7 @@ export extern "C++"
                     .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                     .OutputName = output.Name,
                     .RequestedDomain = EditorJobDomainOfBackend(ToString(w->Config.Backend))};
-                const std::string label = JoinOperationText({Def::Noun, " estimation"});
+                const std::string& label = Words().JobLabel;
                 if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
                     return answer(EditorCommandStatus::Pending, std::move(busy->Message));
                 auto queued = w->Result;
@@ -403,14 +511,14 @@ export extern "C++"
                     },
                     std::move(queued),
                     label};
-                JobDesc desc{.DebugName = label,
+                JobDesc desc{.DebugName = Words().JobName,
                     .Scope = context.World,
                     .Work = [w](const JobCancellation&) -> JobResultEnvelope
                     {
                         Execute(*w);
                         return JobResultEnvelope::Make(true);
                     },
-                // Stage 6: a cancelled, abandoned or stale run publishes nothing.
+                    // Stage 6: a cancelled, abandoned or stale run publishes nothing.
                     .ValidateBeforeApply =
                         [context, w]
                     {
@@ -426,7 +534,10 @@ export extern "C++"
                         [w, delivery]
                     {
                         w->Abandoned = true;
-                        delivery.FinalizeAfterWorker(w->Result);
+                        if constexpr (FinalizeFromPending)
+                            delivery.Finalize();
+                        else
+                            delivery.FinalizeAfterWorker(w->Result);
                     }};
                 if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
                 {
@@ -446,7 +557,7 @@ export extern "C++"
                     return Keep(context,
                         BeginRun(context),
                         {.Status = EditorCommandStatus::InvalidProcessingParameters,
-                            .Message = JoinOperationText({Def::Noun, " estimation config is unavailable."})});
+                            .Message = Words().ConfigUnavailable});
                 }
                 return Apply(commands, *config, std::move(onComplete));
             }
@@ -463,7 +574,10 @@ export extern "C++"
                 auto w = Capture(ctx, config, why);
                 if (!w || config.Backend != Backend::VulkanLBVH)
                 {
-                    result = Def::InitialResult(config);
+                    if constexpr (requires { Def::RefuseInPlace(result, config); })
+                        Def::RefuseInPlace(result, config); // the caller's other fields stay
+                    else
+                        result = Def::InitialResult(config);
                     result.Status = EditorCommandStatus::InvalidProcessingParameters;
                     result.Message = w ? "GPU transaction requires vulkan_lbvh." : why;
                     result = Keep(ctx, invocation, std::move(result));
@@ -481,7 +595,7 @@ export extern "C++"
             {
                 const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
                 auto cpu = config;
-                cpu.Backend = Backend::CpuOctree;
+                cpu.Backend = Reference;
                 std::string why;
                 auto w = Capture(ctx, cpu, why);
                 if (!w || values.size() != w->SlotCount)

@@ -228,3 +228,5 @@ python3 tools/repo/check_layering.py --root src --strict
   include boilerplate, the non-template entry points stay (ADR 0031's boundary), and the panel (about
   130 lines) is unchanged. The two pilot operations were the most factored ones before (one shared
   family template), so they could show the least saving.
+- 2026-10-30: CI green for `3a66c3efb` (block 1) and `f4e369d9b` (the gate result): ci-linux-clang and
+  ci-docs.

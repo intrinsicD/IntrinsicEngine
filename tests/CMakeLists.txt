@@ -137,7 +137,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.DensityWeights.cpp
+        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightOperation.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp
@@ -218,6 +218,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.DensityWeightCo
         --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cppm
         --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cpp
         --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
+        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightOperation.cppm
         --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
