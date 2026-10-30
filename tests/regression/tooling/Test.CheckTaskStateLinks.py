@@ -184,6 +184,7 @@ class CheckTaskStateLinksTests(unittest.TestCase):
             [
                 "tests/regression/tooling/Test.CheckTaskStateLinks.py",
                 "tests/regression/tooling/Test.CheckKernelConvergence.py",
+                "tests/regression/tooling/Test.CheckFeatureBoundaries.py",
                 "tests/regression/tooling/Test.CheckCompilerHazards.py",
                 "tests/regression/tooling/Test.CheckSourceRules.py",
                 "tests/regression/tooling/Test.McpBridge.py",
