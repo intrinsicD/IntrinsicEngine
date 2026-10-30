@@ -61,13 +61,16 @@ contract_review: tracker only; each slice declares its own contracts
     reset" geklickt wird oder per Konvergenz akzeptiert wird oder der buffer cache aus budget Gründen
     wieder Platz braucht. Dann sollten die am längsten ungenutzten gecacheten buffer wieder zerstört
     werden"
+43. "Ja bitte. Das soll aber für alle gpu Algorithmen gelten und neue sollen auch genau so direkt
+    implementiert werden." (yes to the first plan; the job form applies to every GPU algorithm, and
+    new ones are built that way from the start)
 
 ## Goal
 - Reach the target in
   [`docs/architecture/engine-and-feature-modules.md`](../../docs/architecture/engine-and-feature-modules.md):
   a foundation, a small set of module services, and self-registering feature plugins that are
-  rebuilt and reloaded while the Sandbox runs and are fully controllable over MCP. Measured by its
-  rules R1–R6. This note says where the work is and what comes next; each slice has its own task.
+  rebuilt and reloaded while the Sandbox runs and are fully controllable over MCP, with interactive
+  and observable algorithms. Measured by its rules R1–R7. This note says where the work is and what comes next; each slice has its own task.
 
 ## State
 - 2026-10-30: the target was written and accepted by the operator.
@@ -81,8 +84,177 @@ contract_review: tracker only; each slice declares its own contracts
   3. registries;
   4. moving the features out of the editor.
 
+## Plan (first plan, 2026-10-30; revised after Codex plan review `plan022`)
+
+Serves Q36 (the target's goals R1–R6: self-registering plugins, run-time compilation, full MCP
+control, short build and CI) and Q39–Q43 (jobs, observation, resident GPU state, all GPU
+algorithms; R7).
+
+**Why this order is the shortest path.**
+- Measuring first is cheap, and a ratchet locks in the direction from the first commit.
+- The riskiest assumption comes next, before any large rebuild: whether C++23 plugins can be built
+  as shared libraries and reloaded inside the running Sandbox. Its answer shapes the services, the
+  registries and every migration after it.
+- Today all engine libraries are static (`intrinsic_add_module_library` → `add_library` without a
+  type), the whole runtime is one library (`ExtrinsicRuntime`), and the undo history stores
+  `std::function` callbacks (`Runtime.EditorCommandHistory.cppm:76`).
+- After the spike, one real feature goes through every layer before anything is migrated broadly.
+
+Each slice runs plan → Codex plan review → implementation with red-before tests and mutations →
+Codex code review and ponytail → commit → CI. After each slice I stop and report (drift budget).
+Results-bearing measurements (timings) get the **full** experiment pre-flight of `AGENTS.md`
+"Experiments": two independent reviews of a frozen packet, generated HTML reports. Decisions rest on
+them: the operator's numeric targets and the choice of link variant. Deterministic checks are tests,
+not runs.
+
+**Slice 1: the boundary ratchet and the baselines.**
+- **The checker** `tools/repo/check_feature_boundaries.py`, with an executable counting contract:
+  - **Operation names:** the `enum` of `properties.operation` of the `run_operation` tool in
+    `tests/data/agent_declared_tool_schemas.json`. A missing, empty or malformed enum is an error,
+    never a pass. Each name matches as snake_case or as its PascalCase form, on whole-word
+    boundaries.
+  - **R1 scope:** files with suffix `.cpp`, `.cppm`, `.hpp`, `.h` and `CMakeLists.txt` under
+    `src/runtime` and `src/app`, excluding plugin folders (`src/runtime/Modules/<name>/`, later
+    `plugins/<name>/`). A file counts when it names two or more operations.
+  - **R2 scope:** per plugin folder, the distinct modules it imports, other than its own and its
+    partitions, from two classes:
+    - *editor internals:* modules whose interface unit lives under `src/runtime/Editor/`;
+    - *other plugins:* modules whose interface unit lives in another plugin folder.
+
+    Module names are resolved to folders by scanning `export module` declarations.
+  - **Baseline** `tools/repo/feature_boundaries_baseline.json`: the R1 count and each folder's R2
+    counts. Strict mode fails when:
+    - a value rises above its ceiling;
+    - a new folder appears without an entry (new plugins start at 0);
+    - an entry is stale (its folder is gone);
+    - a value falls below its ceiling while the ceiling is not lowered in the same change;
+    - a ceiling is higher than in the last accepted baseline. That is the baseline file at the
+      revision before the whole change:
+      - the push event's `before` SHA for a direct push, covering every pushed commit;
+      - the base SHA for a pull request or merge group;
+      - the merge base with `origin/main` for a local run.
+
+      These are the revisions `ci-docs` already passes to its docs-sync step. When the required
+      revision is unavailable, the check fails with a reason instead of passing. Raising a ceiling
+      together with a regression, in one commit or across several pushed together, is therefore
+      refused; the ratchet only turns down.
+  - Wired into `ci-docs` (static Python).
+  - Tests in `tests/regression/tooling/`, written before the checker, on a fixture tree: an added
+    hub file fails R1; an editor import and a cross-plugin import each fail R2; a new folder without
+    an entry fails; a stale entry fails; a fall without a lowered ceiling fails; a ceiling raised
+    above the previous baseline fails, even when the count rose with it, also when one commit of a
+    two-commit push raises it and the second leaves it unchanged; a missing comparison revision
+    fails; a malformed or empty enum
+    fails. Mutations, each red: each of these checks removed in turn, including the comparison with
+    the previous baseline.
+- **Inventories** (deterministic, read from the code; no run):
+  - **R5:** both categories, with the method stated. *Editor actions that are not commands:*
+    action-button sites, shortcuts and gestures that change state outside the command path.
+    *Commands without an MCP tool.*
+  - **R7:** one row per GPU or iterative algorithm and per backend, with:
+    - step form (yes or no);
+    - resident state;
+    - the bytes moved per iteration, as a formula in the input sizes;
+    - buffer lifetime;
+    - preview interval.
+
+    Unknowns are stated, not guessed. This is the migration list Q43 asks for.
+- **Timing baselines** (full pre-flight, frozen before any measurement):
+  - **R6, incremental rebuild:**
+    - preset `dev` (it builds the Sandbox; `ci` does not), the existing `build/dev` cache, `ccache`
+      as configured;
+    - the parallelism of the machine's default;
+    - three named files with one fixed, compile-relevant edit each (an operation unit, a config
+      interface, a geometry interface), plus a no-op rebuild as control;
+    - five repetitions each, alternating;
+    - built on the checks of `tools/analysis/benchmark_compile_iteration.py`.
+  - **R6, clean build:** one clean build of `dev` (wall time and peak memory).
+  - **R6, CI:** wall time from workflow start to end of the last 20 green `ci-linux-clang` runs on
+    `main` (not stage sums), as a stated cohort.
+- **Output:** a baseline report generated from the raw outputs; the target's "today" column; the
+  operator sets the numeric targets of R4, R6 and R7.
+
+**Slice 2: the plugin-host spike.**
+- **Containment:** behind the CMake option `INTRINSIC_PLUGIN_SPIKE` (off by default), code under
+  `plugins/spike/`. A test asserts that with the option off, no spike target or test is configured.
+  Not in CI until the operator decides.
+- **Pass checks:** each is written as an assertion before the spike runs.
+- **S1, the boundary.** A spike plugin is built as a separate target after the host, from the host's
+  existing module BMIs, with the same compiler and flags and **without rebuilding the host**. It is
+  loaded into the running Sandbox and registers a config section, a command and a window. Pass:
+  - every symbol resolves at load time;
+  - shared state has **one identity** across the boundary (the address of a host registry and of
+    a static seen from host and plugin are equal, so no duplicated engine state);
+  - static initialization and destruction run once, in a defined order;
+  - the ImGui context and allocator are the host's;
+  - the command is callable over MCP;
+  - the window draws.
+
+  Both link variants are tried **on this one fixture**, without converting the whole engine:
+  (a) the static engine with an exporting executable (`-rdynamic` or an export list), (b) the
+  libraries the fixture needs, built as shared. They are compared on build time, binary size and
+  symbol problems.
+- **S2, reload without a restart.** The plugin is edited and only its target rebuilt. The host is
+  triggered by an MCP tool or a file watcher.
+  - **The reload sequence:**
+    1. draining is bounded: queued jobs are cancelled; running jobs finish or are cancelled within a
+       timeout; pending completion callbacks and GPU fences complete;
+    2. the plugin is unregistered and unloaded;
+    3. the new build is loaded and registered.
+  - **Pass:**
+    - scene and config survive;
+    - an undo entry **and a redo entry** made through the plugin before the reload still work after
+      it (today's `std::function` history must not call unloaded code, so this is expected to fail
+      until history entries hold data or a registered command);
+    - a failed build, a failed load and a failed `Register` leave the old plugin running, or none,
+      with a reason and no partial registration;
+    - the registries hold no stale entry;
+    - 20 reload cycles run clean with the host and the plugin both ASan-instrumented;
+    - the time from saving to the reloaded plugin running is measured (the R4 baseline, under the
+      full pre-flight).
+- **S3, the job form on CPU and GPU.** Inputs and backend are fixed before bitwise comparisons.
+  - **CPU case:** CPD's CPU backend (it already has `Step()`) through
+    `Init`/`Step`/`Metrics`/`Preview`/`Finish`, driven by a minimal loop with a lock-free triple
+    buffer and a metric ring. Pause, single step and stop work from the UI and over MCP.
+  - **GPU case:** GPU k-means with its resident buffers. Steps move no full arrays; the run's
+    buffers live until Accept, Reset or accept on convergence; observation is fence-safe.
+  - **Assertions:**
+    - a run equals its step sequence, bit for bit;
+    - preview on equals preview off;
+    - pause and resume equals an uninterrupted run;
+    - latest wins: a newer preview supersedes an older one, and the older result is never shown
+      after the newer;
+    - cancel commits nothing;
+    - previews commit nothing, also when they complete;
+    - Accept or Apply commits exactly once;
+    - a converged run commits only when accept on convergence is enabled, and otherwise waits for
+      Accept or Reset;
+    - a stalled reader never sees a torn snapshot and never blocks the writer (a separate TSan
+      harness, with progress asserted, not only cleanliness);
+    - the GPU case moves zero full-array bytes per step after `Init`;
+    - the main-thread stall during a slider preview is measured against the proposed 4 ms.
+- **Done:** a spike report with yes or no per question, the numbers, and a recommended plugin
+  boundary, link variant and history-entry form, for the operator to decide. The spike code then
+  either becomes the start of slice 3 or is deleted.
+
+**Later slices** (each gets its own plan after the spike decision):
+3. **One vertical slice:** one real feature (proposal: k-means, closest to the job form)
+   end-to-end as a plugin. It has its own build target, registers config, commands, windows and its
+   MCP tools, runs through an extended **existing** job service (Step loop, preview and commit,
+   latest wins, triple buffer, metric ring, buffer cache with budget and LRU, MCP job controls), and
+   reloads in the running Sandbox. Generic registries are allowed (the target asks for them);
+   central dispatch shaped by operations is not.
+4. **The services generalized** from what the vertical slice needed; the hub files disappear
+   (R1, R3, R5).
+5. **Migrations, one algorithm per slice:** every GPU algorithm (Q43) and the CPU iterative ones
+   into the job form, each with R7's acceptance (step form, zero full-array bytes per step, buffer
+   lifetime, the five plugin tests).
+6. **Features out of the editor into plugins**, one at a time, with R1–R3 ratcheting down.
+7. **Build and CI:** one target per plugin, and dependency-aware CI selection (a change to a shared
+   service rebuilds and tests its dependents) (R6).
+
 ## Acceptance criteria
-- [ ] Rules R1–R6 of the target meet their targets, as measured by the checker and the baselines
+- [ ] Rules R1–R7 of the target meet their targets, as measured by the checker and the baselines
       (the operator decides; this replaces the target page only then).
 
 ## Verification
@@ -168,3 +340,26 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
   New rule R7 (interactive and observable) with today's values. GPU k-means already uploads once
   and previews at an interval; CPD has `Step()`.
+- 2026-10-30: Q43: the job form applies to every GPU algorithm, and new ones are built that way. It is
+  recorded in the target (scope), in AGENTS.md §6 and in `docs/agent/contract.md` (the method
+  protocol), with the skill mirrors synced. The first plan was written for review.
+- 2026-10-30: Codex plan review of the first plan (`plan022`, fresh session): revise, with eight
+  findings:
+  1. an executable counting contract for R1/R2;
+  2. the full pre-flight for timings, since decisions rest on them;
+  3. precise R5/R6/R7 measures (`ci` does not build the Sandbox);
+  4. S1 must prove one identity of shared state with a separately built plugin;
+  5. S2 must cover undo and redo across a reload (today's history holds `std::function`), bounded
+     draining and failed loads;
+  6. S3 needs a resident-GPU case and explicit commit semantics;
+  7. a vertical slice before broad migration;
+  8. the policy wording must keep the metrics and hybrid exceptions and the optional accept on
+     convergence.
+
+  Folded. Delta reviews:
+  - `plan022b`: revise (a ceiling could rise along with a regression; commit semantics; R7 in the
+    acceptance criterion);
+  - `plan022c`: revise (`HEAD~1` misses a two-commit push);
+  - `plan022d`: approve.
+
+  The measurement runs still need their frozen packets and pre-flight reviews.

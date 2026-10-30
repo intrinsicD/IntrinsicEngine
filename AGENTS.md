@@ -164,6 +164,14 @@ a scoped API decision approves otherwise. Applicable tasks declare element-domai
 and engine-integration contracts and name deferred integration owners. Spatial
 work also reads the [consumer inventory](docs/architecture/spatial-index-consumers.md).
 
+Every GPU algorithm and every iterative algorithm takes the job form of the architecture target
+([Jobs, preview and observation](docs/architecture/engine-and-feature-modules.md#jobs-preview-and-observation-operator-2026-10-30)):
+`Init`/`Step`/`Metrics`/`Preview`/`Finish`; resident state, with full CPU-GPU transfers only at
+start and end (a few bytes of metrics per step, and small data for a step marked hybrid, excepted);
+run buffers kept until Accept, Reset or, where the algorithm offers it, accept on convergence. New
+ones are built this way from the start; existing ones are migrated under `ARCH-022` (operator,
+2026-10-30).
+
 ## 7. Testing protocol
 
 Testing must be fast. Add/update tests for behavior changes; a test for new or

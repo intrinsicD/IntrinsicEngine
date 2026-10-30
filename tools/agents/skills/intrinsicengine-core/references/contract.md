@@ -268,7 +268,10 @@ Method/paper work must follow this order:
 3. Add correctness tests.
 4. Add benchmark harness/manifests.
 5. Add optimized CPU backend.
-6. Add GPU backend only after reference parity exists.
+6. Add GPU backend only after reference parity exists. A GPU backend, like any iterative backend,
+   takes the job form of the architecture target ([Jobs, preview and observation](../../../../../docs/architecture/engine-and-feature-modules.md#jobs-preview-and-observation-operator-2026-10-30)):
+   `Init`/`Step`/`Metrics`/`Preview`/`Finish`; resident state, with full CPU-GPU transfers only at
+   start and end (a few bytes of metrics per step, and small data for a step marked hybrid, excepted).
 7. Document numerical limitations and diagnostics.
 
 Geometry method binding follows the canonical property-domain substitutability

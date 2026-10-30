@@ -184,6 +184,12 @@ Off means no intermediate copies at all; the result is identical.
   - pause, n steps, resume, stop and accept, and cancel;
   - waiting until a condition holds (an iteration, a metric threshold).
 
+**Scope (operator, 2026-10-30):** this applies to **every GPU algorithm**, and to every iterative
+algorithm. Existing ones are brought into this form (inventoried in `ARCH-022`'s plan); new ones are
+built this way from the start ([AGENTS.md](../../AGENTS.md) §6). Until the job service offers the
+loop, a new algorithm is still written as `Init`/`Step`/`Finish` with resident state, and the
+existing job path drives it.
+
 **Tests every plugin gets cheaply:**
 - a run equals its step sequence;
 - preview on equals preview off;
