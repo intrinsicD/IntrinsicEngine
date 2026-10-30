@@ -519,3 +519,12 @@ python3 tools/docs/check_doc_links.py --root . --strict
     each new check mutation-checked.
   - Technical test of revision 3 (two samples through `r6_run.sh`, numbers not read): chain exit 0,
     both samples sealed, the new host and source fields present, report rendered.
+- 2026-10-30: R6 second delta on `54ec2561…d76f`: Claude PASS (optional: `AttributeError` not
+  caught), Codex REVISE (a malformed value such as a null `startedAt`, a zero wall time or a string
+  number could still crash the report outside its handler; the CPU residual was described as only
+  over-flagging, but its error can have either sign). Revision 4 changes only the report and the
+  packet text: the page is rendered completely before printing and any parse or render error makes it
+  UNEVALUATED; wall times must be positive and no CI run may end before it starts; the residual is
+  described as able to over- or underestimate. Self-check extended and each new check
+  mutation-checked; the report renders the revision-3 technical test's outputs (exit 0, numbers not
+  read). The runner is unchanged since revision 3, so its technical test stands.
