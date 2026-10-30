@@ -319,9 +319,11 @@ Revised after the Codex plan review (Log, 2026-10-30).
           schema and registration, all of which gain the field, so it is regenerated;
        5. `Sandbox.MeshProcessingPanels.cpp`: the polarity wording (not the control, which follows from
           the row);
-       6. `docs/architecture/outlier-analysis.md`.
+       6. `docs/architecture/outlier-analysis.md`;
+       7. (found before implementing, see the Log) `Runtime.DerivedConfigSections.cppm`: bool rows, a
+          one-time framework capability.
 
-       That is 6 files against the gate's 3. The codec, validation, schema, agent schema (its baseline
+       That is 6 files per option (7 for this first bool option) against the gate's 3. The codec, validation, schema, agent schema (its baseline
        test drops newly added fields, `Test.AgentOperations.cpp`), inventory and panel control follow
        from the row without edits. The extra three: the golden changes with every added field of a
        derived section; the wording and the documentation change because this option changes what the
@@ -602,3 +604,29 @@ python3 tools/agents/check_task_policy.py --root . --strict
     Vulkan device initialization and driver calls (`PushConstants`, dbus). They have the same size
     since 1a and also appear in the full Vulkan run before this task (`RUNTIME-353`), so they are not
     attributed to this change. The smokes are a functional pass (31/31), not a clean sanitizer pass.
+- 2026-10-30: Block 3 plan: Codex plan review (`plan354f`, fresh session): revise.
+  - The panel wording and the documentation also change for `negative`, so the prediction is 6.
+  - The refusal cannot precede capture.
+  - The 3a inventory of visible changes was incomplete.
+  - The visibility test must observe drawn controls.
+  - The Vulkan refusal is pinned by its exact text.
+
+  Folded. Delta (`plan354g`): approve.
+- 2026-10-30: Block 3a implemented: the outlier panel's six numbers drawn by `DrawBoundFields` over
+  `kOutlierAnalysisRows`, with the panel's method and backend predicate.
+  - New test `SandboxProcessingPanels.OutlierNumberControlsFollowTheirRowsPerMethodAndBackend` covers
+    every method × backend, observing drawn controls by activation; any further number or bool row is
+    expected everywhere.
+  - The radius edit in `OutlierActionsApplyTheirOwnRequestAndRetryRejectedConfig` addresses
+    `"Radius##Outliers"` (structural, question 28).
+  - Mutations, each red on the new test:
+    - the old hand-written controls;
+    - stddev shown for every method;
+    - the batch size shown for every backend;
+    - entity drawn as a number.
+- 2026-10-30: Deviation found before 3b: the derived codec has no bool rows. `IsDerivable` rejects
+  them, the serializer writes a number, the parser reads a number, and no check refuses a non-boolean.
+  `negative` therefore also needs bool support in `Runtime.DerivedConfigSections.cppm`, a one-time
+  framework capability (a second bool option would not need it). It goes into the trial commit and
+  is counted: the prediction becomes 7 files, 6 per option plus the one-time framework edit. It is
+  reported both ways.

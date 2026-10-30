@@ -2156,28 +2156,33 @@ namespace Extrinsic::Sandbox::Editor
             config.Backend = Runtime::OutlierAnalysisBackend(backend);
             changed = true;
         }
+        // RUNTIME-354: the number controls are the rows'; the panel keeps which method and backend show which.
+        changed |= DrawBoundFields<Runtime::OutlierAnalysisConfig>(Runtime::kOutlierAnalysisRows,
+            config,
+            "Outliers",
+            [&](const std::string_view name)
+            {
+                using M = Runtime::OutlierAnalysisMethod;
+                if (name == "k_neighbors")
+                    return config.Method != M::Radius;
+                if (name == "stddev_multiplier")
+                    return config.Method == M::Statistical;
+                if (name == "score_threshold")
+                    return config.Method == M::LocalDistanceRatio;
+                if (name == "radius" || name == "minimum_neighbors")
+                    return config.Method == M::Radius;
+                if (name == "gpu_query_batch_size")
+                    return config.Backend == Runtime::OutlierAnalysisBackend::VulkanLBVH;
+                return name != "entity"; // drawn by the entity picker
+            });
         if (config.Method == Runtime::OutlierAnalysisMethod::Statistical)
-        {
-            changed |= ImGui::InputScalar("Neighbors k", ImGuiDataType_U32, &config.KNeighbors);
-            changed |= ImGui::InputFloat("Standard deviation multiplier", &config.StdDevMultiplier);
             ImGui::TextWrapped(
                 "Mark mean neighbor distances above the global mean plus this multiple of the population standard deviation.");
-        }
         else if (config.Method == Runtime::OutlierAnalysisMethod::LocalDistanceRatio)
-        {
-            changed |= ImGui::InputScalar("Neighbors k", ImGuiDataType_U32, &config.KNeighbors);
-            changed |= ImGui::InputFloat("Score threshold", &config.ScoreThreshold);
             ImGui::TextWrapped(
                 "Compare each sample's mean neighbor distance to its neighbors' mean distances. Scores above the threshold are marked. This is a density-deviation heuristic, not a calibrated probability.");
-        }
         else
-        {
-            changed |= ImGui::InputFloat("Radius", &config.Radius);
-            changed |= ImGui::InputScalar("Minimum neighbors", ImGuiDataType_U32, &config.MinimumNeighbors);
             ImGui::TextWrapped("Mark samples with fewer than this many other samples inside the inclusive radius.");
-        }
-        if (config.Backend == Runtime::OutlierAnalysisBackend::VulkanLBVH)
-            changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
         if (changed)
         {
             config.Operation = Runtime::OutlierAnalysisOperation::Analyze;

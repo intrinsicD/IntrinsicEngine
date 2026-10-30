@@ -9,6 +9,7 @@
 #include <glm/vec4.hpp>
 #include <glm/vec2.hpp>
 #include <algorithm>
+#include <cctype>
 #include <array>
 #include <concepts>
 #include <functional>
@@ -2294,6 +2295,102 @@ TEST(SandboxProcessingPanels, ProgressivePoissonManualAndDebouncedRunsShareConfi
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
+// RUNTIME-354 block 3: the outlier numbers are drawn from their rows, each for its method and backend.
+// A control counts as drawn when activating its id makes it active; GetID alone exists for any label.
+TEST(SandboxProcessingPanels, OutlierNumberControlsFollowTheirRowsPerMethodAndBackend)
+{
+    using M = R::OutlierAnalysisMethod;
+    using B = R::OutlierAnalysisBackend;
+    // Today's rows per method and backend; any other number or bool row is expected everywhere.
+    const auto expected = [](const R::OutlierAnalysisConfig& c, const std::string_view name)
+    {
+        if (name == "k_neighbors")
+            return c.Method != M::Radius;
+        if (name == "stddev_multiplier")
+            return c.Method == M::Statistical;
+        if (name == "score_threshold")
+            return c.Method == M::LocalDistanceRatio;
+        if (name == "radius" || name == "minimum_neighbors")
+            return c.Method == M::Radius;
+        if (name == "gpu_query_batch_size")
+            return c.Backend == B::VulkanLBVH;
+        return name != "entity";
+    };
+    std::vector<std::string> rows;
+    for (const auto& row : R::kOutlierAnalysisRows)
+        if (row.Spec.Type == R::ConfigFieldType::UInt || row.Spec.Type == R::ConfigFieldType::Float ||
+            row.Spec.Type == R::ConfigFieldType::Bool)
+            rows.emplace_back(row.Spec.Name);
+    std::vector<R::OutlierAnalysisConfig> combos;
+    for (const auto method : {M::Statistical, M::Radius, M::LocalDistanceRatio})
+        for (const auto backend : {B::CpuOctree, B::CpuLBVH, B::VulkanLBVH})
+            combos.push_back({.Method = method, .Backend = backend});
+    const auto label = [](std::string name)
+    {
+        std::ranges::replace(name, '_', ' ');
+        name[0] = char(std::toupper(static_cast<unsigned char>(name[0])));
+        return name + "##Outliers";
+    };
+
+    PanelHarness h;
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
+    std::size_t combo = 0, row = 0, checked = 0;
+    int frame = 0, step = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine)
+    {
+        if (++frame > 4000)
+        {
+            ADD_FAILURE() << "the visibility walk did not finish";
+            engine.RequestExit();
+            return;
+        }
+        auto* window = ImGui::FindWindowByName("Outlier Analysis");
+        if (!window)
+            return;
+        if (row == 0 && step == 0)
+        {
+            auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto outliers = *R::GetDerivedSection<R::kOutlierAnalysisSection>(config);
+            outliers.Method = combos[combo].Method;
+            outliers.Backend = combos[combo].Backend;
+            R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
+            EXPECT_TRUE(h.Apply(config));
+        }
+        ++step;
+        if (step < 3)
+            return; // the panel's draft follows the applied config
+        const auto id = window->GetID(label(rows[row]).c_str());
+        if (step == 3)
+        {
+            ImGui::FocusWindow(window);
+            ImGui::ActivateItemByID(id);
+        }
+        if (step == 5)
+        {
+            EXPECT_EQ(ImGui::GetActiveID() == id, expected(combos[combo], rows[row]))
+                << rows[row] << " for method " << int(combos[combo].Method) << ", backend "
+                << int(combos[combo].Backend);
+            ImGui::ClearActiveID();
+            ++checked;
+            step = 2;
+            if (++row == rows.size())
+            {
+                row = step = 0;
+                if (++combo == combos.size())
+                {
+                    completed = true;
+                    engine.RequestExit();
+                }
+            }
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_EQ(checked, combos.size() * rows.size());
+    EXPECT_GE(rows.size(), 7u); // entity and the six numbers, and any option added since
+}
+
 TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejectedConfig)
 {
     bool reject = false;
@@ -2348,7 +2445,7 @@ TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejected
                 EXPECT_EQ(props.Size(), 9u);
                 rejections = 0; reject = true;
             }
-            EditScalarControl(window, "Radius", step - 6, "1.25");
+            EditScalarControl(window, "Radius##Outliers", step - 6, "1.25");
             if (step == 14) click("Detect outliers");
             if (step == 18)
             {
