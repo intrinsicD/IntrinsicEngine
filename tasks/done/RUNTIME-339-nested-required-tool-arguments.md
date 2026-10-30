@@ -14,6 +14,8 @@ contract_review: a field spec can mark a nested object's member as required in t
 ---
 # RUNTIME-339 — Required members of nested arguments (moonshot M2, slice 15)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `e53822a13`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

@@ -14,6 +14,8 @@ contract_review: the mesh denoise, remesh, subdivide and simplify panels draw th
 ---
 # RUNTIME-344 — Topology panels generated from the bound fields (moonshot M2, slice 20)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `278f2bb15`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

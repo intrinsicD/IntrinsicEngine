@@ -14,6 +14,8 @@ contract_review: agent argument validation at the runtime trust boundary; no cat
 ---
 # RUNTIME-326 — The advertised agent schema is enforced at dispatch (moonshot M2, slice 1)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `7d967065e`, `c452f339e`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator question (verbatim, 2026-10-27)
 3. "start improving the engine by implementing the Moonshot.md. Keep properly track of where you
    and your subagents are at so we can continue anytime properly."

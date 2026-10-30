@@ -13,9 +13,11 @@ contract_review: tracker only; each workstream task declares its own contracts
 ---
 # ARCH-020 — Moonshot program tracker
 
+> **Retired 2026-10-30** (a program tracker; implementation maturity does not apply). Commit reference: `2f8060be8`, `7619165c8`. Closed by the operator's decision of 2026-10-30 (ARCH-022, Q36): the moonshot is archived and ARCH-022 tracks the one current architecture target. Its two open criteria were not met and are dropped with it.
+
 > **Closed by the operator's decision of 2026-10-30.** The moonshot is archived; the only architecture
 > target is [`engine-and-feature-modules.md`](../../docs/architecture/engine-and-feature-modules.md),
-> tracked in [`ARCH-022`](ARCH-022-engine-and-feature-modules-target.md). This note is history until the
+> tracked in [`ARCH-022`](../active/ARCH-022-engine-and-feature-modules-target.md). This note is history until the
 > task cleanup moves it to `tasks/done/`.
 
 ## Operator questions (verbatim, 2026-10-27)
@@ -61,8 +63,10 @@ contract_review: tracker only; each workstream task declares its own contracts
 | subagent of `849ae7d0` ("M1 Slang feasibility spike") | 2 (`GRAPHICS-123`) | 2026-10-27 | finished | `tasks/evidence/GRAPHICS-123/spike/FINDINGS.md` + `run_all.sh` (git-ignored, local) |
 
 ## Acceptance criteria
-- [ ] Every row of the first-30-days list has an owning task or a recorded decision not to do it.
-- [ ] The scorecard (moonshot §6) has measured baselines for every row it can measure.
+- [x] The program is closed by the operator's decision of 2026-10-30 (ARCH-022, Q36: archive all old
+      targets; one current target). Its two original criteria below were not met and are dropped.
+- Dropped, not met (operator's decision of 2026-10-30): every row of the first-30-days list has an owning task or a recorded decision not to do it.
+- Dropped, not met (operator's decision of 2026-10-30): the scorecard (moonshot §6) has measured baselines for every row it can measure.
 
 ## Verification
 ```bash

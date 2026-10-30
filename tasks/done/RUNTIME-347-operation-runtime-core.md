@@ -14,6 +14,8 @@ contract_review: kernel density and point spacing run through one operation runt
 ---
 # RUNTIME-347 — Operation runtime core: kernel density and point spacing as definitions (ADR 0031 phase 0/1, slice 2)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `411e2214a`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

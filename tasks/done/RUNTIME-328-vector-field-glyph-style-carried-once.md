@@ -14,6 +14,8 @@ contract_review: refactor of how the vector-field draw style travels from extrac
 ---
 # RUNTIME-328 — The vector-field glyph style is carried once (moonshot M2, slice 3)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `eee3836dd`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim, 2026-10-28)
 3. "start improving the engine by implementing the Moonshot.md. Keep properly track of where you
    and your subagents are at so we can continue anytime properly."

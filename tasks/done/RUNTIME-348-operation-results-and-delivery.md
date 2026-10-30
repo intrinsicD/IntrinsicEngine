@@ -14,6 +14,8 @@ contract_review: the operation runtime stores the results of kernel density and 
 ---
 # RUNTIME-348 — Operation results and delivery (ADR 0031 phase 1, slice 3)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `55e924743`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

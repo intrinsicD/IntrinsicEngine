@@ -14,6 +14,8 @@ contract_review: refactor of how the lane visualization style is carried and dec
 ---
 # RUNTIME-329 — The lane visualization style is declared once (moonshot M2, slice 4)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `51d4dccf2`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim, 2026-10-28)
 3. "start improving the engine by implementing the Moonshot.md. Keep properly track of where you
    and your subagents are at so we can continue anytime properly."

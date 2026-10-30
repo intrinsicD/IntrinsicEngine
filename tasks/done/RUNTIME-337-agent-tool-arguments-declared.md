@@ -14,6 +14,8 @@ contract_review: agent tool input schemas generated from declared argument specs
 ---
 # RUNTIME-337 — Agent tool arguments declared once (moonshot M2, slice 13)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `d87a49012`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

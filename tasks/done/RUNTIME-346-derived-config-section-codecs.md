@@ -14,6 +14,8 @@ contract_review: the kernel density and point spacing config sections are read, 
 ---
 # RUNTIME-346 — Config section codecs derived from bound fields (ADR 0031 phase 0, slice 1)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `051b66011`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

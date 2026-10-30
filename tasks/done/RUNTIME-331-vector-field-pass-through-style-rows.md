@@ -14,6 +14,8 @@ contract_review: refactor of where a pass-through vector-field style field is de
 ---
 # RUNTIME-331 — A pass-through vector-field style field is one row (moonshot M2, slice 7)
 
+> **Retired 2026-10-30** at `Operational`. Commit reference: `d1d3d3ae6`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

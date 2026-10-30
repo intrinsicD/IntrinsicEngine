@@ -14,6 +14,8 @@ contract_review: the GPU-preview binding of a vector-field layer's per-arrow len
 ---
 # RUNTIME-334 — The GPU-preview binding shares the per-arrow style rule (moonshot M2, slice 10)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `01c266dfd`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

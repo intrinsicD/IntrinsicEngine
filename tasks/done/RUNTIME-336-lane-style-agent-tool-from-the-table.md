@@ -14,6 +14,8 @@ contract_review: a new agent tool whose style arguments, reader and checks come 
 ---
 # RUNTIME-336 — An agent tool generated from the lane style table (moonshot M2, slice 12)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `36dd1fc81`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

@@ -14,6 +14,8 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
 ---
 # ARCH-021 — Declared operations over one shared operation runtime (design)
 
+> **Retired 2026-10-30** (a design record; implementation maturity does not apply). Commit reference: `b0fa3a6da`, `f96a13e2d`, `ab3324ebf`. Designed and accepted as ADR 0031; superseded by the operator on 2026-10-30 after its phase 2 gate failed ([report](../../docs/reports/2026-10-30-phase-2-gate.md)).
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

@@ -14,6 +14,8 @@ contract_review: two pieces of math the editor wrote out itself move to the libr
 ---
 # RUNTIME-345 — Editor math to the modules that own it (moonshot M2, step 2a)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `7619165c8`. Completed. Codex code review: revise; its delta review resolved Blocking 1 and the optional point and Blocking 2 only partly (the limitation is stated in the code comment); no explicit approval is recorded.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

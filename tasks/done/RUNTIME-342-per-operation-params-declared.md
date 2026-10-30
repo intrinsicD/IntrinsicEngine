@@ -14,6 +14,8 @@ contract_review: a tool's declared arguments can carry per-value cases (when one
 ---
 # RUNTIME-342 — Per-operation params declared (moonshot M2, slice 18)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `198c20a45`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

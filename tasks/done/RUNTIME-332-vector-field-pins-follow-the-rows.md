@@ -14,6 +14,8 @@ contract_review: test-only change of two vector-field pins (record layout litera
 ---
 # RUNTIME-332 — The vector-field test pins follow the rows (moonshot M2, slice 8)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `8dfd6647f`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

@@ -14,6 +14,8 @@ contract_review: refactor of how the vector-field layer style is declared; scene
 ---
 # RUNTIME-327 — The vector-field style is declared once (moonshot M2, slice 2)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `d667f5d12`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim, 2026-10-27)
 3. "start improving the engine by implementing the Moonshot.md. Keep properly track of where you
    and your subagents are at so we can continue anytime properly."

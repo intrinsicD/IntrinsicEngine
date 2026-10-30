@@ -14,6 +14,8 @@ contract_review: the shared spatial index admission states why a snapshot does n
 ---
 # RUNTIME-350 — A mismatched index snapshot refuses with a reason on the GPU paths
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `2c0b04f05`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

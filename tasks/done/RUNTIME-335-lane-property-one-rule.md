@@ -14,6 +14,8 @@ contract_review: one rule decides which property a lane can show as a scalar fie
 ---
 # RUNTIME-335 — One rule for a lane's scalar and color properties (moonshot M2, slice 11)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `ed50d5ab2`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

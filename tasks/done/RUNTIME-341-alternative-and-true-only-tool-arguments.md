@@ -14,6 +14,8 @@ contract_review: a tool's declared arguments can name alternative required sets 
 ---
 # RUNTIME-341 — Alternative argument sets and true-only flags (moonshot M2, slice 17)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `a9cc0a6e1`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

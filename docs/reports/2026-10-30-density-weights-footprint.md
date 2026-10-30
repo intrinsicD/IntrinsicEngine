@@ -9,7 +9,7 @@ This is a static line count (no timing or memory run). Before is commit `f4e369d
 RUNTIME-353 change. Every message, status, delivery rule and computed value of density weights is
 kept. One measured quantity moved: `CpuComputeMilliseconds` now also covers formatting the success
 message and freeing the CPU LBVH radius rows. The tests and mutations are listed in
-`tasks/active/RUNTIME-353-density-weights-on-the-operation-runtime.md`.
+`tasks/done/RUNTIME-353-density-weights-on-the-operation-runtime.md`.
 
 ## Result
 
@@ -80,7 +80,7 @@ The new operation unit, by section:
 
 ## Method
 
-`tasks/evidence/RUNTIME-353/dw_footprint2.py` (local; its rules are reproduced here) is run as
+`tasks/evidence/RUNTIME-353/dw_footprint2.py` (local, retired with the task on 2026-10-30; its rules are reproduced here and in the [phase 2 report](2026-10-30-phase-2-gate.md)'s `footprint_lines.py`) is run as
 `python3 dw_footprint2.py f4e369d9b` for before and without arguments for after.
 
 **Files.** Every file under `src`, `docs/api/generated` and `tests/data/agent_declared_tool_schemas.json` with a line matching

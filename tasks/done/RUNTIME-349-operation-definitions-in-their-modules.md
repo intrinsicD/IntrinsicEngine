@@ -14,6 +14,8 @@ contract_review: the operation runtime becomes an exported framework module for 
 ---
 # RUNTIME-349 — Operation definitions in their modules (ADR 0031 phase 1, slice 4)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `eaebeab6e`, `a3dd0663a`. Completed. Codex code review: revise; both blocking findings were confirmed resolved in `a3dd0663a` by RUNTIME-351's plan review (Object B).
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

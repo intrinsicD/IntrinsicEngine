@@ -14,6 +14,8 @@ contract_review: test generation over the existing field tables plus an internal
 ---
 # RUNTIME-330 — Contract tests generated from the declared field tables (moonshot M2, slice 5)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `cdbb3b885`, `8be58c2ec`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim, 2026-10-28)
 3. "start improving the engine by implementing the Moonshot.md. Keep properly track of where you
    and your subagents are at so we can continue anytime properly."

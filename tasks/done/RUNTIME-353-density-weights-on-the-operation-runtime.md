@@ -14,6 +14,8 @@ contract_review: compact density weights run through the operation runtime as a 
 ---
 # RUNTIME-353 — Density weights on the operation runtime (the saving on an unfactored operation)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `11764850c`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

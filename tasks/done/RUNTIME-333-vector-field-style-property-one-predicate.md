@@ -14,6 +14,8 @@ contract_review: one predicate decides which properties can drive a vector-field
 ---
 # RUNTIME-333 — One predicate for per-arrow style properties (moonshot M2, slice 9)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `922c37b8d`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

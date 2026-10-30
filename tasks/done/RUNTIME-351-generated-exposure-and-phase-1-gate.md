@@ -14,6 +14,8 @@ contract_review: kernel density and point spacing get their agent row, section r
 ---
 # RUNTIME-351 — Generated exposure and the phase 1 gate (ADR 0031 phase 1, slice 5)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `3a66c3efb`, `f4e369d9b`. Block 1 built (generic section functions); its code review was revise for the note only, with no C++ defect. The operator stopped building after block 1 (question 30): generated exposure was not built, the phase 1 size criterion was missed ([report](../../docs/reports/2026-10-30-phase-1-gate-footprint.md)), and build time and memory were not measured.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

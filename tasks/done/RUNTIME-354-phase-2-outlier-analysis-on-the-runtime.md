@@ -14,6 +14,8 @@ contract_review: ADR 0031 phase 2, the architectural test, with outlier analysis
 ---
 # RUNTIME-354 — Phase 2: outlier analysis on the operation runtime (the architectural test)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `266137c3d`, `439fb09ee`, `2003c2d4f`, `69ced3262`, `b593c0d9e`, `de36d3a2b`, `0348dbbed`, `3c664527e`. Phase 2 built and measured; the gate failed (size missed, option trial 7 files, projection reached only in its most favourable scenario; [report](../../docs/reports/2026-10-30-phase-2-gate.md)). ADR 0031 superseded.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."
@@ -456,11 +458,11 @@ Revised after the Codex plan review (Log, 2026-10-30).
 
 ## Acceptance criteria
 Block 1:
-- [ ] Outlier analysis runs through the runtime's stages 1-4, 6 and 8 with its custom publication and
-      immediate mode; the editor file gone; results in the store.
-- [ ] Every behavioural test unchanged and green; kernel density, point spacing and density weights
-      unchanged.
-- [ ] Codex plan and code review.
+- [x] Outlier analysis runs through the runtime's stages 1-4, 6 and 8 with its custom publication and
+      immediate mode; the editor file gone; results in the store. — met: Codex code reviews `review354b` (1a, approve after `review354a`'s revise) and `review354c` (1b, approve); CI green.
+- [x] Every behavioural test unchanged and green; kernel density, point spacing and density weights
+      unchanged. — met: Codex code reviews `review354b` (1a, approve after `review354a`'s revise) and `review354c` (1b, approve); CI green.
+- [x] Codex plan and code review. — met. Plan reviews: `plan354`–`plan354e` (blocks 1a, 1b, 2) ended in revise and were folded as interactive review input without a further round; blocks 3 and 4 were approved in `plan354g` and `plan354j`. Code reviews approved each block: `review354b` (1a), `review354c` (1b), `review354d` (2), `review354e` (3), `review354g` (the block 4 report, after `review354f`'s revise).
 
 ## Verification
 ```bash
@@ -753,3 +755,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
     operator decides.
   - The scripts embedded in the report were extracted and rerun; they reproduce the numbers. The
     operation table points to the report for the measured rows.
+- 2026-10-30: Codex final review of the block 4 report (`review354f`, same thread): revise. The embedded
+  projection read `HEAD` and the working-tree table; both are now pinned to `0348dbbed`, and two
+  wording corrections were applied. Delta (`review354g`): approve. The CI statement in the report was
+  replaced by the observed per-commit statuses before the commit (`3c664527e`).

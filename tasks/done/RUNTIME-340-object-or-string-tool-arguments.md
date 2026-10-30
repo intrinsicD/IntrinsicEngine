@@ -14,6 +14,8 @@ contract_review: a field type for a JSON object or a string (a payload passed as
 ---
 # RUNTIME-340 — Object-or-string tool arguments (moonshot M2, slice 16)
 
+> **Retired 2026-10-30** at `CPUContracted`. Commit reference: `d3cdf663a`. Completed; the reviews and their verdicts are recorded in the Log.
+
 ## Operator questions (verbatim)
 3. (2026-10-27) "start improving the engine by implementing the Moonshot.md. Keep properly track of
    where you and your subagents are at so we can continue anytime properly."

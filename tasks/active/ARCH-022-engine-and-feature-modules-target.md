@@ -82,3 +82,18 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - The no-framework, no-golden and three-plugin rules are marked as proposals, not operator
     decisions.
   - The kernel stays under its convergence checker.
+- 2026-10-30: Operator (Q37): "Bitte räum erst auf." The 31 tasks of the moonshot M2 and ADR 0031
+  programs were retired to `tasks/done/`. Each has a retirement line with its commit reference and
+  maturity, and an entry in `RETIREMENT-LOG.md`.
+  - RUNTIME-354's three criteria were recorded as met, with their review sources.
+  - ARCH-020's two criteria were dropped, unmet, by the operator's decision.
+  - ARCH-021 and ADR 0031 are superseded.
+
+  The session brief was regenerated, and the links were retargeted (frozen records only in their
+  directory part). Evidence:
+  - RUNTIME-354's scripts move to `tasks/evidence/ARCH-022/` (this task still uses them);
+  - RUNTIME-326's logs and the RUNTIME-351 and RUNTIME-353 scripts are proposed for deletion, since
+    the reports reproduce them.
+
+  13 older active tasks with open points remain (September and October; three with stale `codex`
+  claims). Whether they move to the backlog is put to the operator.
