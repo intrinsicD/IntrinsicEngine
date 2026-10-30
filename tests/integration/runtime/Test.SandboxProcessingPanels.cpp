@@ -9,7 +9,6 @@
 #include <glm/vec4.hpp>
 #include <glm/vec2.hpp>
 #include <algorithm>
-#include <cctype>
 #include <array>
 #include <concepts>
 #include <functional>
@@ -2325,12 +2324,6 @@ TEST(SandboxProcessingPanels, OutlierNumberControlsFollowTheirRowsPerMethodAndBa
     for (const auto method : {M::Statistical, M::Radius, M::LocalDistanceRatio})
         for (const auto backend : {B::CpuOctree, B::CpuLBVH, B::VulkanLBVH})
             combos.push_back({.Method = method, .Backend = backend});
-    const auto label = [](std::string name)
-    {
-        std::ranges::replace(name, '_', ' ');
-        name[0] = char(std::toupper(static_cast<unsigned char>(name[0])));
-        return name + "##Outliers";
-    };
 
     PanelHarness h;
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
@@ -2360,7 +2353,7 @@ TEST(SandboxProcessingPanels, OutlierNumberControlsFollowTheirRowsPerMethodAndBa
         ++step;
         if (step < 3)
             return; // the panel's draft follows the applied config
-        const auto id = window->GetID(label(rows[row]).c_str());
+        const auto id = window->GetID((Editor::BoundFieldLabel(rows[row]) + "##Outliers").c_str());
         if (step == 3)
         {
             ImGui::FocusWindow(window);

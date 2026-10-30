@@ -1007,6 +1007,17 @@ TEST(OutlierAnalysisConfig, NegativeMarksTheInliersOnCpuBackendsAndVulkanRefuses
             EXPECT_EQ(preview.DisabledReason, "Negative masks need a CPU backend.");
             EXPECT_EQ(
                 R::ApplyEditorOutlierAnalysisCommand(commands, vulkan).Message, "Negative masks need a CPU backend.");
+            R::EditorOutlierAnalysisResult failure;
+            EXPECT_FALSE(R::StartEditorOutlierAnalysisTransaction(commands, vulkan, failure));
+            EXPECT_EQ(failure.Message, "Negative masks need a CPU backend.");
             EXPECT_FALSE(props.Exists("vulkan_mask"));
+
+            // A removal reads the published mask, so the Vulkan backend selected for it still removes.
+            auto vulkanRemove = remove;
+            vulkanRemove.Backend = R::OutlierAnalysisBackend::VulkanLBVH;
+            const auto vulkanRemoved = R::ApplyEditorOutlierAnalysisCommand(commands, vulkanRemove);
+            ASSERT_TRUE(vulkanRemoved.Succeeded()) << vulkanRemoved.Message;
+            EXPECT_EQ(vulkanRemoved.ActualBackend, "published_mask");
+            EXPECT_EQ(props.Size(), 2u);
         }
 }

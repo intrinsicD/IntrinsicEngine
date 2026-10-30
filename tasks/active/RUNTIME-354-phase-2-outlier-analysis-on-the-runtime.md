@@ -354,6 +354,59 @@ Revised after the Codex plan review (Log, 2026-10-30).
      takes over.
    - A tracked report and the gate verdict; the operator decides.
 
+   **Block 4 plan** (written after 3b; the inputs below are measured, the projection cases are fixed
+   here before the report is written).
+   - Inputs, whole-block counts with the existing scripts:
+     - outlier analysis: before 1,593 (`11764850c`). After, 1,475 at `69ced3262` (the functionality of
+       before) and 1,484 with the trial option (`b593c0d9e`). The size criterion uses 1,475; both are
+       reported.
+     - kernel density: about 391 (pre-pilot estimate) → 477; point spacing: about 395 → 486; density
+       weights: 883 → 700.
+     - Framework since phase 0 (`f96a13e2d`), counted once:
+       - `Runtime.OperationRuntime.cppm` 968, new;
+       - `Runtime.OperationResults.cppm` 122, new;
+       - `Runtime.DerivedConfigSections.cppm` 266, new;
+       - `Runtime.ConfigFieldSpec.cppm` +22;
+       - minus the family template it replaced (195).
+
+       Total 1,183. Checked with `git diff --numstat f96a13e2d HEAD` over `src/runtime/Editor`,
+       `src/runtime/Config` and `src/app/Sandbox/Editor/Sandbox.PanelSupport.*`; any other shared
+       file that grew for the framework is added.
+   - Criteria:
+     1. tests kept: every behavioural assertion of the outlier tests at `11764850c` is still present;
+        the structural rewrites are those listed in this Log;
+     2. Decision 5 fit: the runtime runs stages 1-4, 6 and 8 for outlier analysis, and its custom
+        publication runs inside the runtime's frame (block 1a). Open for the operator: Decision 3's
+        inline delivery, for outlier analysis and density weights;
+     3. size: 1,475 against at most 956;
+     4. option trial: 7 files (6 per option) against at most 3;
+     5. projection: net = the measured savings of the four migrated operations + the projected
+        savings of the other 26 table rows − the framework growth (once).
+   - The two crediting cases, fixed in advance:
+     - **A, credited by shape (the ADR's rule):**
+       - rows publishing custom output (`Cu` in the table) save at outlier analysis's measured rate,
+         the work the runtime actually took over (7.4 %);
+       - the other rows save at density weights' rate, the unfactored near-copy case (20.7 %).
+     - **B, pooled:** every other row saves at the pooled rate of the four migrated operations
+       (3.8 %).
+     - **Sensitivity:**
+       - the table's own error, about ±10 % per row;
+       - the framework growth for shapes the runtime does not have yet is not estimated (framed
+         queries, normals-like and smoothing-like GPU runs, topology edits and replacement, two
+         entities, a run-time column count). Both cases are therefore upper bounds in that respect.
+   - Preliminary computation, done while writing this plan: A about 5,045, B about 721, against
+     5,000. Case A's margin (about 45 lines) lies far inside the table's error (about ±4,700 over the 26
+     rows), so on case A the criterion is not decided by the data, and on case B it is missed.
+   - Report: `docs/reports/2026-10-30-phase-2-gate.md`. It holds:
+     - the method, inputs and per-criterion verdicts;
+     - both cases with the sensitivity;
+     - the computing script;
+     - what ADR 0031 says follows (a failed criterion 4 rejects the contract and takes the
+       glue-helper alternative; a missed size is an implementation failure).
+
+     The ADR's status is not changed here; the operator decides. The report gets a Codex review
+     (claims and evidence).
+
 ## Block 1 tests (predictions as assertions)
 - Every behavioural assertion stays:
   - `OutlierAnalysis.*`, `OutlierAnalysisConfig.*`, `OutlierAnalysisOperations.*`, `OutlierTransaction.*`;
@@ -654,3 +707,26 @@ python3 tools/agents/check_task_policy.py --root . --strict
   - the panel hiding the new row (the 3a visibility test);
   - bool serialized as a number (the golden);
   - the bool type check removed (the test aborts: the parser reads a number as bool).
+- 2026-10-30: Block 3 reviews (diff `2003c2d4f..de36d3a2b`, including block 2's follow-up witness):
+  - Codex (`review354e`): approve, no blocking findings. It confirmed:
+    - 3a preserves behaviour within the listed visible changes, and the visibility test observes
+      submitted controls;
+    - `negative` is consistent on every CPU path, removal, undo and the stamp;
+    - the Vulkan refusal comes before any output write on preview, apply and transaction start;
+    - bool rows are sound and unreachable for the other derived sections;
+    - the trial count is honest: 7 files, failing the three-file criterion, which code approval does
+      not change.
+  - Ponytail (separate agent): ship. One finding: the test re-implemented the label helper.
+  - Both optional points applied in a follow-up commit (tests only, outside the trial):
+    - the visibility test uses `Editor::BoundFieldLabel`;
+    - the option's test also asserts that a manual transaction start refuses with the exact text, and
+      that a Vulkan-selected removal still removes from the published inverted mask.
+
+    The affected tests pass; these fixes go to the final review with block 4.
+- 2026-10-30: Codex review of the block 4 plan (`plan354h`, fresh session): revise.
+  - The pilots' pre-pilot counts used other rules: recount both revisions with identical rules.
+  - The framework subtotal is incomplete: reconcile it per file, separating operation-owned changes.
+  - Case A is not "the ADR's rule": map the rows to shapes, use the measured operations within each
+    supported group, and name the unsupported groups as assumptions.
+  - Propagate the table's ±10 % through the rates (about ±610 for A, ±178 for B).
+  - Criterion 2 keeps the open inline-delivery nonconformance.
