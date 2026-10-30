@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "r1_files": 31,
+  "r2": {
+    "src/runtime/Modules/BilateralFilter": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/Clustering": {
+      "editor_internals": 5,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/Curvature": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/CurvatureSegmentation": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/DensityWeight": {
+      "editor_internals": 4,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/DescriptorAnalysis": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/Geodesics": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/KernelDensity": {
+      "editor_internals": 4,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/KeypointAnalysis": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/NormalEstimation": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/OutlierAnalysis": {
+      "editor_internals": 5,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/Parameterization": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/PhysicsIntegration": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/PointCloudConsolidation": {
+      "editor_internals": 4,
+      "other_plugins": 2
+    },
+    "src/runtime/Modules/PointConstruction": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/PointSampling": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/PointSpacing": {
+      "editor_internals": 4,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/ProgressivePoisson": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "src/runtime/Modules/Registration": {
+      "editor_internals": 0,
+      "other_plugins": 1
+    },
+    "src/runtime/Modules/TextureBake": {
+      "editor_internals": 1,
+      "other_plugins": 0
+    }
+  }
+}

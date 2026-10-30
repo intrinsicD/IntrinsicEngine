@@ -24,6 +24,9 @@ Repository structure and policy scripts.
   and fails on both new and stale policy entries so improvements ratchet in the
   same change. Synthetic regressions live in
   `tests/regression/tooling/Test.CheckKernelConvergence.py`.
+- `check_feature_boundaries.py`: the `ARCH-022` ratchet for rules R1 and R2 of
+  `docs/architecture/engine-and-feature-modules.md` (the contract is in its docstring); synthetic
+  cases in `tests/regression/tooling/Test.CheckFeatureBoundaries.py`.
 - `check_compiler_hazards.py`: rejects source patterns that a supported compiler miscompiles. Currently one hazard (BUG-223): a `const T&` parameter defaulting to a named constant, whose integral members Clang 20.1 folds to the default's values. Run in `ci-linux-clang.yml`; synthetic cases in `tests/regression/tooling/Test.CheckCompilerHazards.py`.
 - `check_ui_contract_guard.sh`: UI boundary guard script (canonical path).
 - `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, broad legacy wildcard bans, and open task-owner references).

@@ -109,6 +109,9 @@ jobs:
             --head-ref "$head_ref" \
             --strict
 
+      - name: Validate feature boundaries (ARCH-022 ratchet, strict mode)
+        run: python3 tools/repo/check_feature_boundaries.py --root . --strict
+
       - name: Validate agent skill mirrors
         run: python3 tools/agents/sync_skills.py --check
 
@@ -150,6 +153,7 @@ jobs:
         run: |
           python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
           python3 tests/regression/tooling/Test.CheckKernelConvergence.py
+          python3 tests/regression/tooling/Test.CheckFeatureBoundaries.py
           python3 tests/regression/tooling/Test.CheckCompilerHazards.py
           python3 tests/regression/tooling/Test.CheckSourceRules.py
           python3 tests/regression/tooling/Test.McpBridge.py

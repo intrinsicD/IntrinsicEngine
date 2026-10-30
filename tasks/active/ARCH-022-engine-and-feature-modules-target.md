@@ -128,16 +128,13 @@ not runs.
     - a new folder appears without an entry (new plugins start at 0);
     - an entry is stale (its folder is gone);
     - a value falls below its ceiling while the ceiling is not lowered in the same change;
-    - a ceiling is higher than in the last accepted baseline. That is the baseline file at the
-      revision before the whole change:
-      - the push event's `before` SHA for a direct push, covering every pushed commit;
-      - the base SHA for a pull request or merge group;
-      - the merge base with `origin/main` for a local run.
-
-      These are the revisions `ci-docs` already passes to its docs-sync step. When the required
-      revision is unavailable, the check fails with a reason instead of passing. Raising a ceiling
-      together with a regression, in one commit or across several pushed together, is therefore
-      refused; the ratchet only turns down.
+    - a ceiling is higher than in the last accepted baseline. As built (after the code review
+      `review022s1`), the last accepted baseline is the **lowest value of each ceiling in the
+      baseline file's Git history**. A key absent from a version counts as 0 there, so a new
+      plugin starts at 0. Because the ratchet only falls, that lowest value is the last legitimate
+      one. A raise in an earlier commit of the same push, or one that landed with a failed push,
+      therefore cannot become the new baseline. A missing or shallow history fails with a reason.
+      This replaces the comparison with one change-base revision of the first plan.
   - Wired into `ci-docs` (static Python).
   - Tests in `tests/regression/tooling/`, written before the checker, on a fixture tree: an added
     hub file fails R1; an editor import and a cross-plugin import each fail R2; a new folder without
@@ -363,3 +360,87 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - `plan022d`: approve.
 
   The measurement runs still need their frozen packets and pre-flight reviews.
+- 2026-10-30: Operator (Q44): "Ja bitte, slice 1". The ratchet was implemented:
+  - `tools/repo/check_feature_boundaries.py`, its baseline `feature_boundaries_baseline.json`
+    (R1 31 files; R2 27 editor imports and 3 cross-plugin imports, per folder) and its tests
+    `Test.CheckFeatureBoundaries.py` (14), written first. They were red without the checker.
+  - Wiring: in `ci-docs`, the docs-sync step passes its change base through `GITHUB_ENV` to a new
+    strict ratchet step. `Test.WorkflowRouting.py`'s harness now provides `GITHUB_ENV` and asserts
+    the base per event.
+  - Name matching uses token boundaries instead of the planned whole words. The snake_case form must
+    not touch letters or digits; the PascalCase form must not be preceded by an uppercase letter or
+    followed by a lowercase one. Whole words would have missed names inside identifiers such as
+    `ApplyEditorKernelDensityConfig`.
+  - Mutations, each red:
+    - M1 the R1 ceiling;
+    - M2 editor imports;
+    - M3 cross-plugin imports;
+    - M4 a new folder without an entry;
+    - M5 a stale entry;
+    - M6 a fall below the ceiling;
+    - M7 the comparison with the previous baseline;
+    - M8 a new entry above 0;
+    - M9 a missing revision;
+    - M10 an empty enum;
+    - M11 the name boundaries;
+    - M12 the plugin-folder exclusion;
+    - M13 the workflow step;
+    - M14 a hard-coded change base.
+- 2026-10-30: Ratchet code reviews (diff `0f015760…`):
+  - **Codex (`review022s1`, fresh session): revise.**
+    - P1: plugin folders under both roots shared one name.
+    - P1: declarations were read as lines, so comments, strings and one-line forms could fool R2.
+    - P2: a plugin folder without sources went unnoticed.
+    - P2: duplicate or blank names were accepted.
+    - At plan level: a failed push leaves its raise as the next push's base.
+  - **Ponytail: ship**, with three savings: a literal prefilter (R1 2.9 s → 0.1 s), a test that
+    duplicated the CI step, and a README copy of the contract.
+  - **All applied:**
+    - folders are keyed by path and discovered as directories;
+    - declarations are read with comments, strings and raw strings removed, without line anchors;
+    - the names must be unique snake_case;
+    - the comparison uses the lowest ceiling in the baseline's Git history instead of one change
+      base, which also removes the `GITHUB_ENV` hand-over and the routing-test change;
+    - the duplicate test and the README copy are gone.
+  - **Verification:** 16 tests pass, and the repository passes in 0.4 s. The baseline is unchanged
+    in value: R1 31, the R2 counts identical, now keyed by path.
+  - **Mutations, each red:** M1–M12 (M9 is now missing history, and the enum checks are split in
+    two), M13 the workflow step, and the new M15–M18 (comments and strings, basename identity,
+    folders only from sources, line-anchored imports).
+- 2026-10-30: Codex delta (`review022s1b`): revise.
+  - P1: the history was simplified at merges, so a lowering on a merged side branch could be lost.
+  - P1: C++ tokenization: spaces or comments between the dots of a module name, and line splicing
+    before comments.
+  - P2: an unreadable baseline version was skipped as if deleted.
+
+  Applied:
+  - the history is read with `--full-history`, and `ls-tree` tells a deleting commit from an
+    unreadable one, which now fails;
+  - names allow whitespace between tokens and are normalized;
+  - backslash-newline is spliced before comments are removed.
+
+  The test helper now looks for the expected text only in finding lines; before, a case could pass
+  on a report line. Tests: 20 pass, among them a merge with `-s ours` over a lowering side branch,
+  a removed blob, spaced and commented names, a continued line comment, and a spaced declaration.
+  Mutations, each red: M1–M22, plus M20b (import spacing). M20 (declaration spacing) first survived
+  and is red with the spaced-declaration test.
+- 2026-10-30: Codex second delta (`review022s1c`): revise. Splicing before raw-string recognition
+  turned a raw string's contents into declarations.
+  - Replaced by a one-pass lexer (`code_only`). It recognizes raw strings on the original text;
+    outside them it splices backslash-newline first, then blanks comments (a continued `//` comment
+    continues) and literals.
+  - Only module interface units and plugin files are lexed: 0.8 s on the repository.
+  - New tests: a raw string with a backslash-newline that hides a fake declaration, and a name split
+    by backslash-newline.
+  - 20 tests pass. Mutations M1–M24 are each red: M23 removes raw-string recognition, M24 skips
+    interface units outside plugins. M21 (splicing outside raw strings) first survived and is red
+    with the split-name test.
+- 2026-10-30: Codex third delta (`review022s1d`): revise.
+  - The lexical limits (trigraphs, digraphs, macro tricks) are accepted for this ratchet.
+  - P1: the `.cppm`-only filter lost editor modules declared in headers.
+
+  The checker now lexes every file under `src/runtime/Editor/` (for owners) and every plugin file
+  (for imports). New test: an editor module declared in a `.hpp`, red before the fix. Mutations
+  M24 and M24b, each red. 21 tests pass; 0.9 s on the repository.
+- 2026-10-30: Codex fourth delta (`review022s1e`, diff `5e2e9e13…`): approve, with no remaining
+  findings within the agreed scope and lexical limits.
