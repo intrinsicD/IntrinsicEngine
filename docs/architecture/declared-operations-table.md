@@ -5,7 +5,9 @@ table of named operations with their removable code, as the basis of the phase 2
 net saving at least 5,000 lines"). This table is that basis. It was made on 2026-10-29 at
 `f96a13e2d` by a read-only agent from function boundaries (`wc` lines, comments and blank lines
 included, tests left out), and the main session spot-checked four sizes against the code (`ARCH-021`).
-Phase 2 replaces the estimates of the migrated operations with measured numbers.
+Phase 2 replaces the estimates of the migrated operations with measured numbers: kernel density, point
+spacing, density weights and outlier analysis are measured in the
+[phase 2 gate report](../reports/2026-10-30-phase-2-gate.md), which also projects this table.
 
 **Path keys.**
 - O = `src/runtime/Editor/Operations/Runtime.`
