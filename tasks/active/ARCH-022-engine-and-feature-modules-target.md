@@ -444,3 +444,26 @@ python3 tools/docs/check_doc_links.py --root . --strict
   M24 and M24b, each red. 21 tests pass; 0.9 s on the repository.
 - 2026-10-30: Codex fourth delta (`review022s1e`, diff `5e2e9e13…`): approve, with no remaining
   findings within the agreed scope and lexical limits.
+- 2026-10-30: Inventories for R5 and R7 (two read-only agents; I spot-checked three R7 claims) in
+  `docs/reports/2026-10-30-arch-022-inventories.md`, with the target's R5/R7 cells updated.
+  - Codex claims review (`review022inv`, fresh session; 13 rows of Appendix A and samples of B
+    checked against the code): revise, on four points:
+    1. a false 128-byte readback ceiling (implicit smoothing reads 80 bytes per solve);
+    2. a step-form count inconsistent with its rule (11, not 10);
+    3. the counting rule for controls shared by windows;
+    4. the 53 are table rows, and R5 is static reachability.
+  - All corrected. The sampled source supports:
+    - CPU work in the main-thread `IsReadyToApply`;
+    - the six synchronous commands;
+    - progressive Poisson's hard-coded GPU availability of false;
+    - the workspace pool without a budget;
+    - the transfer formulas of G4–G7.
+- 2026-10-30: Codex delta on the inventories (`review022inv2`): findings 1, 2 and 4 resolved. My
+  "once per window" correction contradicted the single texture-bake row.
+  - The rule is now one row per **distinct action**, a control together with the state it changes.
+    Look-alike controls that act on different operations count separately (the four scalar
+    Accept/Discard pairs); one control that changes the same state from several windows counts once
+    (texture bake in the Inspector and in Appearance).
+  - The census already follows this rule, so the totals stand.
+- 2026-10-30: Codex second delta on the inventories (`review022inv3`): approve, within the sampled
+  static scope. Its editorial point is applied: the counting rule lives only in Appendix B, item 4.
