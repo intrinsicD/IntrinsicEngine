@@ -3,7 +3,7 @@
 The delivered slice is a CPU reference and standalone curve inspector. It does
 not change METHOD-040 partitions or Sandbox behavior. The
 [formulation](curvature_extrema.md) fixes the numerical choices;
-[UI-053](../../../tasks/active/UI-053-curvature-extremum-engine-overlay.md)
+[UI-053](../../../tasks/backlog/ui/UI-053-curvature-extremum-engine-overlay.md)
 owns engine/config/overlay integration. Part-boundary selection and merging
 remain a later experiment after inspecting these candidates.
 

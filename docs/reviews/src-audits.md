@@ -8,7 +8,7 @@ erst nach erneuter Prüfung als noch offen zu behandeln.
 Die [gemeinsame Auswertung mit priorisiertem Umsetzungsplan](2026-10-16-src-audit-implementation-plan.md)
 führt doppelte Befunde zusammen und ordnet die fachlichen Zuständigkeiten zu.
 Der aktuelle Umsetzungs- und Prüfstand wird in
-[HARDEN-090](../../tasks/active/HARDEN-090-src-audit-remediation.md) geführt.
+[HARDEN-090](../../tasks/backlog/workshop/HARDEN-090-src-audit-remediation.md) geführt.
 
 | Bereich | Bericht | Geprüfter Commit | Ergebnis |
 | --- | --- | --- | --- |

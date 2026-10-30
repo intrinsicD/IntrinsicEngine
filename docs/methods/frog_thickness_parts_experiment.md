@@ -158,7 +158,7 @@ using the same controls. This tests a different regional model, not just
 smoother boundaries. Inside-triangle curve alignment remains separately
 unimplemented: it may improve boundary placement but cannot by itself validate
 which regions should represent whole limbs. These are follow-ups owned by
-[METHOD-043](../../tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md),
+[METHOD-043](../../tasks/backlog/methods/METHOD-043-thickness-and-curve-parts-comparison.md),
 not work silently added after Round 4.
 
 ## Reproduction and verification

@@ -392,9 +392,9 @@ die passenden Build-/Strukturprüfungen sichern die Umbenennung ab.
 
 | Bestehender Task | Stand beim Audit und Abgrenzung |
 | --- | --- |
-| [RUNTIME-274](../../tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md) | Sampling existiert. Weitere Voxel-/Octree-Strategien, progressive Prefix-Anzeige und Integrationsabdeckung sind offen. Erklärt nicht die neuen Fehler 001/002. |
+| [RUNTIME-274](../../tasks/backlog/runtime/RUNTIME-274-point-cloud-subsampling-workflow.md) | Sampling existiert. Weitere Voxel-/Octree-Strategien, progressive Prefix-Anzeige und Integrationsabdeckung sind offen. Erklärt nicht die neuen Fehler 001/002. |
 | [RUNTIME-276](../../tasks/done/RUNTIME-276-declarative-config-field-specs.md) | Bestehender Owner der unvollständigen Feldtabellen-/Schemamigration, siehe 009. |
-| [RUNTIME-294](../../tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md) | Verbleibende GPU-Residency-Migrationen sind in Methoden-Slices 301–310 aufgeteilt. Nicht jede ursprüngliche Tabellenzeile ist weiterhin unimplementiert. |
+| [RUNTIME-294](../../tasks/backlog/runtime/RUNTIME-294-migrate-gpu-methods-to-property-residency.md) | Verbleibende GPU-Residency-Migrationen sind in Methoden-Slices 301–310 aufgeteilt. Nicht jede ursprüngliche Tabellenzeile ist weiterhin unimplementiert. |
 | [RUNTIME-311](../../tasks/backlog/runtime/RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md) und [RUNTIME-314](../../tasks/backlog/runtime/RUNTIME-314-reuse-existing-processing-helpers.md) | Bereits gelandete Konsolidierungen und noch offene GPU-Verifikation unterscheiden. Alte Copy-paste-Befunde nicht ungeprüft erneut anlegen. |
 
 ## Verifikation und Reproduktion

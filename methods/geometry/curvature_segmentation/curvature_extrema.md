@@ -2,7 +2,7 @@
 
 METHOD-041 extracts candidate curves on an unchanged triangle surface. It does
 not partition faces or change METHOD-040. The native CPU reference and offline
-viewer are the inspection surface; [UI-053](../../../tasks/active/UI-053-curvature-extremum-engine-overlay.md)
+viewer are the inspection surface; [UI-053](../../../tasks/backlog/ui/UI-053-curvature-extremum-engine-overlay.md)
 owns Sandbox integration. The selected engineering formulation is described
 below, not claimed to reproduce every stage of either cited paper.
 

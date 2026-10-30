@@ -153,7 +153,7 @@ execution record. “SDF” in the proposed follow-up means **shape diameter
 function**, not a signed-distance field.
 
 Do not promote or port v4 into an engine selector. The next comparison belongs
-to [METHOD-043](../../tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md):
+to [METHOD-043](../../tasks/backlog/methods/METHOD-043-thickness-and-curve-parts-comparison.md):
 test proposals aligned to explicit within-triangle curvature curves and an
 independent thickness/enclosure signal, with asymmetric necks and matched
 sampling controls. Neither is implemented here, and neither guarantees good

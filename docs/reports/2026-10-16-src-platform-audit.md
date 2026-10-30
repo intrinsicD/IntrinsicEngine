@@ -196,7 +196,7 @@ Der Grundstil ist konsistent: C++23-Module, m_-Member, explizite Backends und st
 
 - IME-Komposition, native Dateidialoge und Multiwindow sind laut Platform-README keine zugesagten Funktionen. Daraus keinen neuen Featureauftrag ableiten.
 - [PLATFORM-004](../../tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md) ist bewusst ein Planungsanker für weitere Plattformen. Windows/macOS-Unterstützung nicht im Zuge dieses Cleanups beginnen.
-- [UI-079](../../tasks/active/UI-079-imguizmo-hidpi-operational-run.md) enthält den noch offenen nativen HiDPI-Gizmo-Nachweis. CPU-Koordinatentests ersetzen ihn nicht.
+- [UI-079](../../tasks/backlog/ui/UI-079-imguizmo-hidpi-operational-run.md) enthält den noch offenen nativen HiDPI-Gizmo-Nachweis. CPU-Koordinatentests ersetzen ihn nicht.
 - GLFW erzeugt bei Fokusverlust synthetische Releases. Ein allgemeiner GLFW-Bug „Tasten bleiben nach Fokusverlust hängen“ wurde daher nicht bestätigt.
 - **Zusätzliche Socket-Prüfspur, nicht reproduziert:** ConnectLocalSocket verwendet blockierendes connect ohne Deadline (Platform.LocalSocket.cpp:195–203), auch für die Besitzprobe in Listen. Ein voller Accept-Backlog kann diesen Weg blockieren. Vor einem Fix mit einem isolierten Backlog-Test belegen; unklar/belegt darf niemals als verwaist gelten.
 - **Erst bei Nicht-Unix-Promotion relevant:** Test.LocalSocket.cpp bindet POSIX-Header unbedingt ein. Der Laufzeitstatus Unsupported allein macht diese Testquelle nicht auf Windows kompilierbar. Das ist derzeit keine Zusage einer unterstützten Windows-Testmatrix.

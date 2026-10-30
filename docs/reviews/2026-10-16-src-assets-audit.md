@@ -349,7 +349,7 @@ Folgende kleinere Punkte rechtfertigen keine breite Umbenennungsaktion:
 
 | Thema | Bestehender Besitzer und Einordnung |
 | --- | --- |
-| Vollständige authored Faktor-/Texturprojektion | [GRAPHICS-105](../../tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md), insbesondere um Zeile 335; kein neuer Assets-Task nötig |
+| Vollständige authored Faktor-/Texturprojektion | [GRAPHICS-105](../../tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md), insbesondere um Zeile 335; kein neuer Assets-Task nötig |
 | MaterialX-Teilmenge | [ASSETIO-009](../../tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md), abhängig von GRAPHICS-105 |
 | Asynchrone Prüfung externer Modelldateien | [ASSETIO-010](../../tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md) |
 | Tatsächlicher File/Import-Widget-Ablauf | [ASSETIO-011](../../tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md), abhängig von ASSETIO-010 |
