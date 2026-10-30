@@ -112,3 +112,12 @@ order does not decide. A mutation that breaks a draw's vertex offset can lose
 the device instead of failing a click. See
 [BUG-255](../../tasks/done/BUG-255-render-graph-depth-synchronization-hazards.md)
 and [BUG-254](../../tasks/done/BUG-254-gpu-pick-misses-points-and-lines.md).
+
+## A workflow edit needs its pinning test, and a push needs its CI result
+
+`Test.CheckTaskStateLinks.py` pins the exact command list of the ci-docs step "Validate structural CI policy
+regressions". ARCH-022 added a test to that step without updating the pin, and the check before pushing ran only a
+hand-picked subset of ci-docs. ci-docs was then red on `main` for seven commits (`b73d90b46` to `ef98e7370`) until
+`b6963920e`. Safeguard: before pushing a change under `.github/workflows/`, search the tests for the edited step name and
+run every `python3` command of that workflow on a clean worktree of the commit; after each push, read that commit's CI
+result before pushing the next.
