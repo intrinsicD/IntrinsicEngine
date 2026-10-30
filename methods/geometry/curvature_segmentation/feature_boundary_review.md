@@ -176,5 +176,5 @@ would need its own physical-scale and hard-feature preservation contract.
   on the comparison cohort. The current review makes no such acceptance claim.
 
 Implementation, benchmark manifests, and any later adoption remain owned by
-[METHOD-040](../../../tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md).
+[METHOD-040](../../../tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md).
 The present deliverable is this revised experiment and its bounded rationale.

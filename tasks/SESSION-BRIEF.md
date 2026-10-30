@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `ARCH-022` — Engine and feature modules: the architecture target (tasks/active/ARCH-022-engine-and-feature-modules-target.md)
+- `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 
 ## Theme B — Rendering modernization
@@ -155,7 +156,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- unblocked: `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md)
 - unblocked: `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/backlog/methods/METHOD-043-thickness-and-curve-parts-comparison.md)
 - unblocked: `METHOD-048` — Full HKTex mesh authoring, compiled rendering and measured default adoption (tasks/backlog/methods/METHOD-048-hktex-mesh-textures.md)
 - unblocked: `METHOD-052` — Anderson acceleration for Coherent Point Drift EM (tasks/backlog/methods/METHOD-052-coherent-point-drift-anderson-acceleration.md)

@@ -59,7 +59,6 @@ and any missing-input prerequisite; none states a result.
 - [METHOD-073 — Structure-from-motion measurement-matrix factorization (needs correspondences)](METHOD-073-robust-pca-structure-from-motion-factorization.md)
 - [METHOD-074 — Shape-collection map synchronization](METHOD-074-robust-pca-shape-collection-map-synchronization.md)
 - [METHOD-075 — BRDF and measurement-table cleanup (needs BRDF input and consumer)](METHOD-075-robust-pca-brdf-measurement-table-cleanup.md)
-- [METHOD-040 — Global multicut curvature-patch CPU reference](METHOD-040-global-multicut-curvature-patch-reference.md)
 - [METHOD-043 — Thickness and curve-aligned parts comparison](METHOD-043-thickness-and-curve-parts-comparison.md)
 - [METHOD-083 — Align Nyström mechanisms with the author implementation](METHOD-083-nystrom-upstream-alignment.md)
 

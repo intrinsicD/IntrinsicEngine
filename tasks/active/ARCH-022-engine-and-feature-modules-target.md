@@ -116,10 +116,15 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
      The no-shape-framework and no-golden rules stay proposals. The three-plugin rule for shared
      helpers is replaced by promotion at the second consumer.
-  2. 12 of the 13 older active tasks moved to the backlog (`ui`, `methods`, `rendering`, `runtime`,
+  2. 11 of the 13 older active tasks moved to the backlog (`ui`, `methods`, `rendering`, `runtime`,
      `workshop` for HARDEN-090). Their stale claim fields were cleared; the shared claim registry
-     held no claims. **UI-037 stays in `tasks/active/`**, because the frozen record RUNTIME-277 states
-     "UI-037 (active)" in text that may not be edited, and the strict task-state check enforces it.
+     held no claims. Two stay in `tasks/active/`, because records that may not be edited name them
+     as active:
+     - **UI-037:** the frozen record RUNTIME-277 says "UI-037 (active)", and the strict task-state
+       check enforces it;
+     - **METHOD-040:** ARA claim C45 cites its active path as proof, and `ara/` is not committed here
+       (operator rule). The first push moved it; `ci-docs` failed on `813fd16dc` and `579e8e8cf`, and
+       the move was undone.
   3. The reviewed evidence folders of RUNTIME-326, 351, 353 and 354 were deleted; the phase 2
      scripts remain in `tasks/evidence/ARCH-022/`.
 
