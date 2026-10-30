@@ -467,3 +467,16 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - The census already follows this rule, so the totals stand.
 - 2026-10-30: Codex second delta on the inventories (`review022inv3`): approve, within the sampled
   static scope. Its editorial point is applied: the counting rule lives only in Appendix B, item 4.
+- 2026-10-30: R6 timing baselines, preparation for the full pre-flight.
+  - The manifest `benchmarks/ci/manifests/arch022_r6_dev_loop_baseline.yaml` runs the existing
+    compile-iteration runner on the Sandbox target with preset `dev`, at `adf7e0b3c`. A sample is
+    configure, clean, no-op and three touches: an operation unit, a plugin config interface and a
+    geometry interface. There are five samples plus one warmup.
+  - The runner gains `params.dependency_set` (default `ci`, the previous constant), so it guards the
+    vcpkg tree the preset builds against.
+  - Technical test (one sample, numbers not read): the first attempt found that `dev` does not
+    export compile commands, so the frozen configuration adds `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`.
+    The second attempt passed every runner assertion; its snapshot hashed the `dev` tree (1,728
+    files, against 1,731 in `ci`), and the report script rendered.
+  - The packet (Layer A, Layer B, `r6_report.py`) is in `tasks/evidence/ARCH-022/preflight-r6/`, to
+    be frozen after this commit and reviewed by a fresh Claude and a fresh Codex session.

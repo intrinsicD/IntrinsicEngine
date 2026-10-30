@@ -1,0 +1,43 @@
+benchmark_id: build.engine_compile_iteration.arch022_r6_dev_loop_baseline.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.arch022_r6_2026_10_30
+params:
+  intent: performance
+  source_revisions:
+    warmup: adf7e0b3c566a2a07643eece1573ab9dfa022484
+    baseline: adf7e0b3c566a2a07643eece1573ab9dfa022484
+  sample_order: [warmup, baseline, baseline, baseline, baseline, baseline]
+  measured_iterations: 5
+  warmup_iterations: 1
+  warmup_scope: the first sample (arm warmup, same revision) is retained but excluded from every summary
+  preset: dev
+  dependency_set: dev
+  target: ExtrinsicSandbox
+  compiler: /bin/clang++-23
+  jobs: 32
+  minimum_interface_importers: 1
+  configure_options:
+    - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - -DINTRINSIC_BUILD_TESTS=OFF
+    - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+    - -DINTRINSIC_ENABLE_CCACHE=OFF
+    - -DCMAKE_CXX_COMPILER_LAUNCHER=
+    - -DCMAKE_C_COMPILER_LAUNCHER=
+  scenarios:
+    clean: null
+    noop: null
+    operation_impl: src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp
+    config_interface: src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+    geometry_interface: src/geometry/Geometry.Registration.cppm
+  invalidation: mtime only; source bytes remain at the exact clean commit; require observed importer fan-out
+  build_storage: one disposable tmpfs directory; fresh artifacts per sample
+  dependency_state: the preinstalled dev vcpkg tree, no package installation during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent memory
+  summary: per-scenario median, min and max over the five baseline samples; the warmup sample is retained and excluded
+metrics:
+  - build_time_ms
+  - configure_time_ms
+  - memory_peak_bytes
+  - sample_count
+thresholds: {}

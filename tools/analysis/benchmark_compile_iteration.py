@@ -224,7 +224,8 @@ def main() -> None:
         print(f"START {directory.name}", flush=True)
         # Pre-read the same input populations; this is not a cold-filesystem experiment.
         files = [source / f for f in command(["git", "ls-files"], source).splitlines()]
-        dependency_root = source / "external/vcpkg-installed/ci"
+        # The preinstalled vcpkg tree the preset builds against (VCPKG_INSTALLED_DIR); ci unless declared.
+        dependency_root = source / "external/vcpkg-installed" / params.get("dependency_set", "ci")
         for path in files:
             if path.is_file():
                 with path.open("rb") as stream:
