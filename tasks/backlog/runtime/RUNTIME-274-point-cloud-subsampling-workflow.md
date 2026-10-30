@@ -54,4 +54,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
   the GEOM-061 per-voxel strategies and octree levels (their kernels are not implemented yet),
   mesh/graph-domain contract rows, an ImGui panel test, and progressive prefix streaming (the
   Vulkan backend landed with RUNTIME-290).
-
+- 2026-10-30: Moved from `tasks/active/` to the backlog by the operator's decision (ARCH-022, question 38): nobody is working on it now. Its stale claim fields were cleared; its scope, state and open points are unchanged.

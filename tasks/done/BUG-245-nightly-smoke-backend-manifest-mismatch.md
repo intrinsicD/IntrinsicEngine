@@ -41,7 +41,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ```
 The downloaded `nightly-deep-reports` artifact contains only the passed halfedge smoke result: the workflow uploads `smoke_result.json`, while the two failing records were written as sibling files. They cannot be recovered from that artifact. Local synthetic records and an unknown-backend mutation verify the strict validator; a new owning nightly run must close criterion 3. No benchmark was rerun or performance result inferred.
 
-Local acceptance source: Claude session `cfef44b9-d354-480c-a64f-83338d51f2c0` accepts criteria 1 and 2 on the fixed CI patch (`0f7fc69d93e4d6688e291de705962ce1138b3d43f776fbf99eaf2ecec6a8c935`). Consolidated verification is in [HARDEN-090](../active/HARDEN-090-src-audit-remediation.md).
+Local acceptance source: Claude session `cfef44b9-d354-480c-a64f-83338d51f2c0` accepts criteria 1 and 2 on the fixed CI patch (`0f7fc69d93e4d6688e291de705962ce1138b3d43f776fbf99eaf2ecec6a8c935`). Consolidated verification is in [HARDEN-090](../backlog/workshop/HARDEN-090-src-audit-remediation.md).
 
 ## Completion
 Completed 2026-10-19. Fix commit: `c8d6354a8`. Owning

@@ -5,10 +5,10 @@ depends_on: [METHOD-039]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner: "codex-boundary"
-branch: "codex/method-040-boundary-partition"
-worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-09-05T23:57:08Z"
+owner:
+branch:
+worktree:
+claimed_at:
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.element-domain-sources, geometry.property-coherence, method.engine-integration]
 contract_review: "This task materially changes a triangle-surface method and its same-topology face/edge result contract, but deliberately stops before runtime/config/UI/property adoption. geometry.parameterization-optimization does not apply because no UV, chart, seam, cut materialization, or topology change is in scope. geometry.support-radius-policy does not apply because this remains a mesh method with a method-local dimensionless surface scale, not a compact-support point-set method."
@@ -52,7 +52,7 @@ maturity_target: CPUContracted
   frozen candidate definitions, retained negative evidence, and existing
   correctness gates remain required. No performance or quality adoption claim
   follows from completing the overnight engineering slice.
-- The [review](../../methods/geometry/curvature_segmentation/feature_boundary_review.md)
+- The [review](../../../methods/geometry/curvature_segmentation/feature_boundary_review.md)
   explains the clarified geometric target and earlier frog/sculpt observations.
 - METHOD-039's standalone feature detector and local patch reference are
   independently executable. The local solver passes the frozen supplied-
@@ -110,7 +110,7 @@ maturity_target: CPUContracted
 ## Overnight candidate freeze
 - The boundary-only candidate remains a comparator after varied mesh inspection
   exposed fragmentation and a large background region. The separately frozen
-  [regional experiment](../../methods/geometry/curvature_segmentation/boundary_partition_experiment.md)
+  [regional experiment](../../../methods/geometry/curvature_segmentation/boundary_partition_experiment.md)
   adds bounded curvature fitting, a scale-coupled region cost, and attenuation
   of redundant soft evidence near hard creases. It is explicitly a new
   non-pairwise objective; exact tiny-graph tests cover its complete energy.
@@ -312,7 +312,7 @@ python3 tools/agents/check_ara_claims.py --root . --strict
   No positive METHOD-040 CPU-contract or production-adoption verdict follows.
 - The separately frozen contrast/area/curve-coverage profiles investigate the
   operator's geometric-feature target. The
-  [experiment contract](../../methods/geometry/curvature_segmentation/boundary_partition_experiment.md)
+  [experiment contract](../../../methods/geometry/curvature_segmentation/boundary_partition_experiment.md)
   records every objective and parameter change explicitly. Twelve local inputs
   are retained in the comparison, including parser/topology rejections; meshes
   are never silently repaired, trimmed, or used as CI fixtures.
@@ -326,7 +326,7 @@ python3 tools/agents/check_ara_claims.py --root . --strict
   inspected source and exact input conditions. A separate automatic rejection
   prevented transferring private derived viewer screenshots; they remain local.
 - Formal completion-evidence generation is independently blocked by
-  [BUG-171](../done/BUG-171-required-command-receipt-supersession.md): two
+  [BUG-171](../../done/BUG-171-required-command-receipt-supersession.md): two
   failed development builds were mistakenly marked required, and the evidence
   tool cannot reconcile them with later passing checks. Both original receipts
   remain intact. Do not delete them, weaken the gate, or mark this task retired
@@ -337,7 +337,7 @@ python3 tools/agents/check_ara_claims.py --root . --strict
   rejected invalid/unsupported inputs. The cohort exited 1, as those failures
   remain part of the record. Thirty-six schema-v2 observations validate with
   claim eligibility false. The report is
-  [boundary_partition_report.md](../../methods/geometry/curvature_segmentation/boundary_partition_report.md).
+  [boundary_partition_report.md](../../../methods/geometry/curvature_segmentation/boundary_partition_report.md).
 - Final source review resolved stale regional gains, weighted-variance numeric
   extremes, positive hard-curve test coverage, unbound viewer sidecars, and
   float32 export restoration. Twenty-eight boundary tests and ten synthetic
@@ -346,7 +346,7 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 - The first full CPU run failed one existing authored-normal import test.
   One hundred isolated repetitions passed. Independent read-only review found
   plausible pre-existing completion races, recorded without proven attribution
-  in [BUG-172](../done/BUG-172-synchronous-cpu-load-completion-race.md).
+  in [BUG-172](../../done/BUG-172-synchronous-cpu-load-completion-race.md).
   The final CPU rerun passes; the original intermittent failure remains open.
 
 - Required-gate corrections are tracked separately: BUG-173 fixes two runtime
@@ -384,8 +384,11 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 
 ## Subsequent diagnostic access
 - The operator subsequently requested direct engine/UI testing with Claude
-  collaboration. [UI-052](../done/UI-052-method040-diagnostic-inspection.md) owns that
+  collaboration. [UI-052](../../done/UI-052-method040-diagnostic-inspection.md) owns that
   separately scoped explicit diagnostic access, analogous to BUG-163. This
   does not change the overnight negative oracle, production default, formal
   retirement blocker, or the positive-adoption conditions above. Its versioned
   method token selects the fixed curves profile, not an accepted v2 backend.
+
+## Log
+- 2026-10-30: Moved from `tasks/active/` to the backlog by the operator's decision (ARCH-022, question 38): nobody is working on it now. Its stale claim fields were cleared; its scope, state and open points are unchanged.

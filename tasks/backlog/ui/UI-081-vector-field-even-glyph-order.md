@@ -83,3 +83,4 @@ cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests
 ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SandboxDomainPanels|PointSamplingOperations|VisualizationRecipes|RuntimeVectorFieldExtraction|VisualizationOverlayPass)\.'
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+- 2026-10-30: Moved from `tasks/active/` to the backlog by the operator's decision (ARCH-022, question 38): nobody is working on it now. Its stale claim fields were cleared; its scope, state and open points are unchanged.

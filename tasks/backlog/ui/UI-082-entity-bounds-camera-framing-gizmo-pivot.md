@@ -72,3 +72,4 @@ ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(RuntimeCameraCo
 - 2026-10-23: the focused tests above pass on `main` (496/496). The full CPU suite and the
   sanitizer builds were not rerun. The operator has not yet confirmed the bounds-center reading of
   "center of gravity" or keeping imports at their authored size.
+- 2026-10-30: Moved from `tasks/active/` to the backlog by the operator's decision (ARCH-022, question 38): nobody is working on it now. Its stale claim fields were cleared; its scope, state and open points are unchanged.

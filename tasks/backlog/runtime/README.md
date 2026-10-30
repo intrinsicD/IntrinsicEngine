@@ -71,6 +71,8 @@ From the 2026-10-01 duplication/consistency audit; each task owns its own scope.
 - [RUNTIME-311 — Unify the two-phase GPU Run/Accept transaction lifecycle](RUNTIME-311-unify-gpu-scalar-outlier-transaction-lifecycle.md)
 - [RUNTIME-314 — Reuse existing runtime helpers instead of local copies](RUNTIME-314-reuse-existing-processing-helpers.md)
 - [RUNTIME-325 — Coroutine waits in JobService, or delete the coroutine path](RUNTIME-325-coroutine-waits-in-jobservice.md) (REVIEW-007 C02)
+- [RUNTIME-274 — Point-cloud subsampling editor workflow](RUNTIME-274-point-cloud-subsampling-workflow.md)
+- [RUNTIME-294 — Migrate every GPU method to the property residency](RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 
 ## Appearance attribute binding
 

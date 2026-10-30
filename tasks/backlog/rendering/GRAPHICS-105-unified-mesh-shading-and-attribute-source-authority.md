@@ -661,3 +661,6 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^Runti
 
 Local regression/build/test logs and bounded Claude packets:
 `/tmp/intrinsic-authored-material-reuse/`.
+
+## Log
+- 2026-10-30: Moved from `tasks/active/` to the backlog by the operator's decision (ARCH-022, question 38): nobody is working on it now. Its stale claim fields were cleared; its scope, state and open points are unchanged.

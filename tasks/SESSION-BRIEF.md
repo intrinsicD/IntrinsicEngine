@@ -9,25 +9,14 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `ARCH-022` — Engine and feature modules: the architecture target (tasks/active/ARCH-022-engine-and-feature-modules-target.md)
-- `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
-- `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
-- `HARDEN-090` — Consolidated src audit remediation (tasks/active/HARDEN-090-src-audit-remediation.md)
-- `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
-- `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
-- `METHOD-083` — Align Nyström mechanisms with the author implementation (tasks/active/METHOD-083-nystrom-upstream-alignment.md)
-- `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md)
-- `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/active/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
-- `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
-- `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/active/UI-079-imguizmo-hidpi-operational-run.md)
-- `UI-081` — Evenly spread vector-field glyphs from a progressive element order (tasks/active/UI-081-vector-field-even-glyph-order.md)
-- `UI-082` — Entity bounding boxes, large-model camera framing and bounds-center gizmo pivot (tasks/active/UI-082-entity-bounds-camera-framing-gizmo-pivot.md)
 
 ## Theme B — Rendering modernization
 
 - blocked by `GRAPHICS-105`: `ASSETIO-009` — Loss-aware MaterialX subset import (tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md)
 - blocked by `GRAPHICS-105`: `GEOM-066` — meshoptimizer v1.2 geometry oracle and adoption evidence (tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
 - unblocked: `GEOM-067` — Memory-aware BVH and merged-node evidence (tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md)
+- unblocked: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - blocked by `LEGACY-043`: `GRAPHICS-123` — Slang single-kernel gradient pilot (tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
 - unblocked: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `GEOM-066`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
@@ -77,6 +66,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
 - blocked by `RUNTIME-286`: `UI-066` — Mesh Health window (tasks/backlog/ui/UI-066-mesh-health-window.md)
 - unblocked: `UI-077` — Readiness field markers in every config panel (tasks/backlog/ui/UI-077-readiness-field-markers-in-all-panels.md)
+- unblocked: `UI-079` — Run the ImGuizmo smokes at a real HiDPI pixel ratio (tasks/backlog/ui/UI-079-imguizmo-hidpi-operational-run.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -139,6 +129,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-117` — Cheaper noise-level weight search for the variational fit (tasks/backlog/geometry/GEOM-117-cheaper-variational-fit-noise-level-search.md)
 - unblocked: `GRAPHICS-151` — Sorted segment heads and fixed-order segment reduction (tasks/backlog/rendering/GRAPHICS-151-sorted-segment-heads-and-reduction.md)
 - unblocked: `GRAPHICS-152` — Device round trips that do not lose small inputs to frame pacing (tasks/backlog/rendering/GRAPHICS-152-small-input-device-round-trip-pacing.md)
+- unblocked: `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/backlog/rendering/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)
@@ -164,6 +155,8 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
+- unblocked: `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md)
+- unblocked: `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/backlog/methods/METHOD-043-thickness-and-curve-parts-comparison.md)
 - unblocked: `METHOD-048` — Full HKTex mesh authoring, compiled rendering and measured default adoption (tasks/backlog/methods/METHOD-048-hktex-mesh-textures.md)
 - unblocked: `METHOD-052` — Anderson acceleration for Coherent Point Drift EM (tasks/backlog/methods/METHOD-052-coherent-point-drift-anderson-acceleration.md)
 - unblocked: `METHOD-054` — Geodesic Bayesian Coherent Point Drift (GBCPD) (tasks/backlog/methods/METHOD-054-geodesic-bayesian-coherent-point-drift.md)
@@ -186,10 +179,13 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `METHOD-073` — Robust factorization of a multi-view measurement matrix (structure from motion) (tasks/backlog/methods/METHOD-073-robust-pca-structure-from-motion-factorization.md)
 - unblocked: `METHOD-074` — RobustPCA synchronization of maps across a shape collection (tasks/backlog/methods/METHOD-074-robust-pca-shape-collection-map-synchronization.md)
 - unblocked: `METHOD-075` — RobustPCA cleanup of measured BRDF and measurement tables (tasks/backlog/methods/METHOD-075-robust-pca-brdf-measurement-table-cleanup.md)
+- unblocked: `METHOD-083` — Align Nyström mechanisms with the author implementation (tasks/backlog/methods/METHOD-083-nystrom-upstream-alignment.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
+- blocked by `GEOM-061`: `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/backlog/runtime/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - unblocked: `RUNTIME-275` — Gaussian noise editor operation (tasks/backlog/runtime/RUNTIME-275-gaussian-noise-editor-operation.md)
+- unblocked: `RUNTIME-294` — Migrate every GPU method to the property residency (tasks/backlog/runtime/RUNTIME-294-migrate-gpu-methods-to-property-residency.md)
 - unblocked: `RUNTIME-295` — Extraction fills render blocks from the residency (tasks/backlog/runtime/RUNTIME-295-extraction-fills-render-blocks-from-residency.md)
 - unblocked: `RUNTIME-301` — Bilateral point filter on the GPU property residency (tasks/backlog/runtime/RUNTIME-301-bilateral-on-the-residency.md)
 - unblocked: `RUNTIME-302` — FPFH descriptors on the GPU property residency (tasks/backlog/runtime/RUNTIME-302-fpfh-on-the-residency.md)
@@ -217,15 +213,19 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
+- unblocked: `UI-053` — Curvature-extremum engine overlay (tasks/backlog/ui/UI-053-curvature-extremum-engine-overlay.md)
 - unblocked: `UI-075` — One Appearance panel for all domains with per-attribute source selectors (tasks/backlog/ui/UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 - unblocked: `UI-076` — Camera preset and focus visual smoke (tasks/backlog/ui/UI-076-camera-preset-visual-smoke.md)
 - unblocked: `UI-080` — Editable local rotation in the Sandbox Inspector (tasks/backlog/ui/UI-080-editable-inspector-rotation.md)
+- unblocked: `UI-081` — Evenly spread vector-field glyphs from a progressive element order (tasks/backlog/ui/UI-081-vector-field-even-glyph-order.md)
+- unblocked: `UI-082` — Entity bounding boxes, large-model camera framing and bounds-center gizmo pivot (tasks/backlog/ui/UI-082-entity-bounds-camera-framing-gizmo-pivot.md)
 
 ## Unthemed
 
 - unblocked: `BUILD-012` — Evaluate replacing the ImGui vcpkg overlay port with the registry port (tasks/backlog/process/BUILD-012-imgui-registry-port-evaluation.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
+- unblocked: `HARDEN-090` — Consolidated src audit remediation (tasks/backlog/workshop/HARDEN-090-src-audit-remediation.md)
 
 ## Audits
 

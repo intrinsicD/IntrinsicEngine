@@ -18,7 +18,7 @@ contract_review: Reviewed the catalog. A coroutine job kind changes the JobServi
 The operator selected the METHOD-056 CPD E-step as the first coroutine consumer
 on 2026-10-16. JobService coroutine ownership, request-scoped broker events,
 cancellation wakeups, and the CPD Begin/Complete consumer are integrated under
-[HARDEN-090](../../active/HARDEN-090-src-audit-remediation.md). The productive
+[HARDEN-090](../workshop/HARDEN-090-src-audit-remediation.md). The productive
 consumer now suspends while waiting for the device result; timeout is enforced
 by the owner-thread broker pump. Refusal/failure/timeout retain CPU fallback,
 while cancellation exits before fallback or another solver step.

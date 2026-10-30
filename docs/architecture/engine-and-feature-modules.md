@@ -67,12 +67,54 @@ is allowed.
   therefore reaches agents without editing any central list. Today's MCP lane is described in
   [Agent control lane](agent-control-lane.md) (ADR 0029).
 
-**Proposed working rules, not yet decided by the operator:**
-- no central framework that knows the *shapes* of operations (scalar column, custom publication,
-  GPU transaction kinds), as ADR 0031 built;
-- no generator or golden that every new field must pass through;
-- a plugin may write its own glue against the services, and small duplication between plugins is
-  accepted. A helper moves into the services ring only when three plugins need it identically.
+## Plugins: what goes where (operator, 2026-10-30)
+
+**Three kinds of code, three places:**
+
+| kind | example | where it lives |
+|---|---|---|
+| **algorithm**: stateless, input to output | marching cubes: grid to mesh (`Geometry.MarchingCubes`) | the foundation: `src/geometry` or `src/graphics` |
+| **shared service with state** | the spatial index cache; a GPU pipeline with its buffers | the module services |
+| **feature**: workflow, UI, commands, config | "extract an isosurface" in the editor | a plugin |
+
+**Promotion instead of plugin dependencies.**
+- A plugin never depends on another plugin, only on the two rings below.
+- When a second plugin needs something from a plugin, exactly the part it needs moves down: an
+  algorithm into the foundation, a stateful service into the module services, each with its own
+  tests. The original plugin keeps its UI, commands and config.
+- A new algorithm may start inside a plugin, where hot reload makes iteration fast, and is promoted
+  when a second consumer appears. Promoted code no longer reloads while the Sandbox runs: the core
+  stays stable, the plugins stay fluid.
+
+**A plugin owns its UI, and its UI only calls commands.**
+- A plugin registers its windows and menu entries itself.
+- A button never changes the scene directly; it calls a registered command. The same command is an
+  MCP tool, so an agent can do whatever the UI can (R5) without anyone maintaining a central list.
+
+**The shape of a plugin** (to be settled by the hot-reload spike):
+
+```
+plugins/marching_cubes/
+  CMakeLists.txt               its own shared library
+  MarchingCubes.Plugin.cpp     entry point: Register(host)
+  MarchingCubes.Commands.cpp   "marching_cubes.extract" with its argument schema (also an MCP tool)
+  MarchingCubes.Panel.cpp      its window; buttons call the command
+  MarchingCubes.Config.cppm    config rows; the section is registered
+  tests/
+```
+
+- `Register(host)` adds the config section, the commands and the windows through the services.
+- On unload the host removes everything that plugin registered.
+- A reload works like this: the plugin's jobs finish or are cancelled; the host unregisters it,
+  unloads the old library, loads the new one and calls `Register`. The scene, the config and the
+  undo history stay with the host.
+- Open for the spike:
+  - C++23 modules across the shared-library boundary with clang;
+  - sharing the ImGui context;
+  - jobs that are still running on unload.
+
+**Still proposed, not decided:** no central framework that knows the *shapes* of operations (as ADR
+0031 built), and no generator or golden that every new field must pass through.
 
 ## Rules, measured
 

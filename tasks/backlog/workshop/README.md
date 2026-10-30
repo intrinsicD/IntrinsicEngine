@@ -6,7 +6,7 @@ its dependencies, conditional gates, scope and verification.
 
 ## Tasks
 
-No open tasks in this category.
+- [HARDEN-090 — Consolidated src audit remediation](HARDEN-090-src-audit-remediation.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

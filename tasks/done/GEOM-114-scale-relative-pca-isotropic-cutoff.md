@@ -16,7 +16,7 @@ contract_review: numerical correction inside the existing PCA kernel and its GLS
 ## Current status — 2026-10-16
 
 The CPU and GLSL PCA correction, scale regressions and native normal checks are
-implemented and verified under [HARDEN-090](../active/HARDEN-090-src-audit-remediation.md).
+implemented and verified under [HARDEN-090](../backlog/workshop/HARDEN-090-src-audit-remediation.md).
 That task owns the canonical verification and review record. The reproducer below
 describes the audited baseline; acceptance and retirement are recorded separately.
 

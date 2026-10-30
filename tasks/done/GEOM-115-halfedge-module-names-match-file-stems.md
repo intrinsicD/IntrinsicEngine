@@ -51,7 +51,7 @@ Original planning constraints (before implementation):
 On 2026-10-16, the operator selected **Option A — align module names with file names**
 (“Modulnamen an Dateien angleichen”). The thirteen exported names and their exact in-tree
 imports/references were changed to `Geometry.HalfedgeMesh.<X>` under
-[HARDEN-090](../active/HARDEN-090-src-audit-remediation.md). Source file paths remain unchanged;
+[HARDEN-090](../backlog/workshop/HARDEN-090-src-audit-remediation.md). Source file paths remain unchanged;
 this patch changes no behavior or test expectations. The inventory was refreshed with the
 combined mechanical integration.
 

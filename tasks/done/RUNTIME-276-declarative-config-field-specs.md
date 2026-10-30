@@ -16,7 +16,7 @@ contracts: [repo.source-documentation, repo.task-contract-discovery, geometry.el
 
 The operator selected preservation of existing string-enum payloads on 2026-10-16.
 Slices B and C, the 26-section registry schema coverage, and backend display-label
-reuse are integrated under [HARDEN-090](../active/HARDEN-090-src-audit-remediation.md).
+reuse are integrated under [HARDEN-090](../backlog/workshop/HARDEN-090-src-audit-remediation.md).
 Existing integer enums retain integer codes; existing string enums retain stable
 tokens. The shared schema supports both, with display labels in `x-enum-names`.
 Strict owners preserve diagnostic order; fallback owners retain their warning,

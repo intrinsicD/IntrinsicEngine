@@ -31,7 +31,7 @@ Raw job log was retrieved through the GitHub Actions API. No PR exists for this 
 - [x] Add a regression that rejects missing real producers while accepting intended source-rule tests.
 - [x] The owning main CI selection and CPU gate pass without suppressing coverage.
 
-Local acceptance source: Claude session `cfef44b9-d354-480c-a64f-83338d51f2c0` accepts criteria 1 and 2 on the fixed CI patch (`0f7fc69d93e4d6688e291de705962ce1138b3d43f776fbf99eaf2ecec6a8c935`). Criterion 3 is met by main CI; acceptance source: independent read-only reviewer `a71c0bff2810ec640` (2026-10-19), "C. BUG-244 criterion 3 — MET" (see Completion). Consolidated implementation verification is in [HARDEN-090](../active/HARDEN-090-src-audit-remediation.md).
+Local acceptance source: Claude session `cfef44b9-d354-480c-a64f-83338d51f2c0` accepts criteria 1 and 2 on the fixed CI patch (`0f7fc69d93e4d6688e291de705962ce1138b3d43f776fbf99eaf2ecec6a8c935`). Criterion 3 is met by main CI; acceptance source: independent read-only reviewer `a71c0bff2810ec640` (2026-10-19), "C. BUG-244 criterion 3 — MET" (see Completion). Consolidated implementation verification is in [HARDEN-090](../backlog/workshop/HARDEN-090-src-audit-remediation.md).
 
 ## Verification
 ```bash

@@ -478,7 +478,7 @@ Retired [METHOD-077](METHOD-077-cpd-nystrom-landmark-variant-experiment.md),
   `RenderWorldPoolEngineWiring.SourceRules` passes. Selection parity was not exercised by that push run.
 - GEOM-114 (`ffe7e8372`), GEOM-115 (`149172027`) and RUNTIME-276 (`f010ebf33`, `ffe7e8372`): all
   criteria were already accepted by the independent reviewers recorded in each note and in
-  [HARDEN-090](../active/HARDEN-090-src-audit-remediation.md); the same main run adds a full CPU suite
+  [HARDEN-090](../backlog/workshop/HARDEN-090-src-audit-remediation.md); the same main run adds a full CPU suite
   without failures. RUNTIME-276 is re-profiled from `standard` to micro (interactive finish, no report).
 - BUG-245 stays open: nightly run 39203553565 on `64d691ae5` seals all 41 results, but the strict
   validator step is not reached while BUG-222 fails the benchmark smoke. No test or benchmark was rerun for this retirement.
@@ -622,7 +622,7 @@ Retired [UI-078](UI-078-imguizmo-transform-editing.md).
 
 - The Sandbox edits entity transforms with an app-private ImGuizmo gizmo (menu-only enable, W/E/R, Escape, Shift snap with configurable steps, origin or bounds-center pivot, local/global incl. groups). Runtime owns the frozen matrix session, atomic non-TRS rejection, viewport claim, lifecycle cancels and one undo batch per drag; the old runtime ray adapter and gizmo packet builder are gone. ADR 0006 §§3–5 hold the consolidated decision.
 - Maturity: Operational on Vulkan for the executed path at pixel ratio 1 (ara C118: perspective and orthographic split smokes, native GLFW focus smoke; RTX 3050, X11).
-- Owned elsewhere: real HiDPI run [UI-079](../active/UI-079-imguizmo-hidpi-operational-run.md); accepted top-down orthographic X/Z scale-handle limitation [BUG-236](BUG-236-imguizmo-scale-axis-plane-picking.md).
+- Owned elsewhere: real HiDPI run [UI-079](../backlog/ui/UI-079-imguizmo-hidpi-operational-run.md); accepted top-down orthographic X/Z scale-handle limitation [BUG-236](BUG-236-imguizmo-scale-axis-plane-picking.md).
 
 Commits `5ba6f9b97`, `6441f256e`, `a6fc6f4fc`, `0ae5e4538`, `b513f2787`, `49a609334` and the slice 4b docs and retirement commits.
 

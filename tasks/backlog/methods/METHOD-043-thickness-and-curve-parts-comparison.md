@@ -7,10 +7,10 @@ workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
 evidence_skip_reason: "Operator-directed interactive experiment, capped at four method iteration rounds; source, controls, raw observations and Claude review are retained."
-owner: codex
-branch: main
-worktree: /home/alex/Documents/IntrinsicEngine
-claimed_at: "2026-09-07T12:01+02:00"
+owner:
+branch:
+worktree:
+claimed_at:
 contract_schema: 1
 contracts: [geometry.element-domain-sources, method.engine-integration]
 contract_review: "Surface topology and embedding are semantic requirements. Same-cardinality results preserve source properties and topology. Any accepted candidate needs shared runtime/config/UI publication; this note owns those deferred decisions."
@@ -21,7 +21,7 @@ contract_review: "Surface topology and embedding are semantic requirements. Same
 - Compare an interior-aware shape-diameter signal and curve-aligned separator proposals against the rejected METHOD-042 neck sweep before choosing a reusable CPU method.
 
 ## Context
-- The operator explicitly approved continuation with Claude on 2026-09-07, with **at most four iteration rounds**. This is directed method work outside the standing product-convergence focus, not production-design approval. METHOD-042's [record](../../docs/methods/frog_parts_experiment.md) retains the exact seam oracle and failed controls.
+- The operator explicitly approved continuation with Claude on 2026-09-07, with **at most four iteration rounds**. This is directed method work outside the standing product-convergence focus, not production-design approval. METHOD-042's [record](../../../docs/methods/frog_parts_experiment.md) retains the exact seam oracle and failed controls.
 
 ## Four-round budget
 - A round is a changed scientific signal or selection rule plus its declared controls/cohort; an unsuccessful formulation consumes its round. No fifth tuning pass is allowed. Numerical/unit-test repairs are disclosed separately and cannot hide a changed formulation.
@@ -39,7 +39,7 @@ contract_review: "Surface topology and embedding are semantic requirements. Same
 - [x] Only after a positive control verdict, select the smallest C++ CPU reference and integration slice; otherwise record another bounded rejection. **No adoption:** synthetic counts alone are insufficient and the native sculpt comparison regresses.
 
 ## Current stop-state
-- All four authorized rounds are complete; no further experiment is authorized by this budget. [Report](../../docs/methods/frog_thickness_parts_experiment.md), [record](../../ara/evidence/diagnostics/method043/record.json), and ARA C66–C68 retain the bounded CPU observations and failures.
+- All four authorized rounds are complete; no further experiment is authorized by this budget. [Report](../../../docs/methods/frog_thickness_parts_experiment.md), [record](../../../ara/evidence/diagnostics/method043/record.json), and ARA C66–C68 retain the bounded CPU observations and failures.
 - Offline Python reference and tests only, not a new engine backend. The thickness-only taper/bulge result does not establish whole-part segmentation. No sculpt guard or default change was implemented.
 - This note stays active as shared memory for the unimplemented comparison/integration decisions, pending operator review and a new work budget; it is not marked Operational or retired. The operator authorized publication of the outstanding research batch on 2026-09-07; the historical measurements retain their dirty-source classification after publication.
 
@@ -62,7 +62,7 @@ interior rules. Current point LBVH nearest/radius queries cannot measure shape
 diameter; curve distance would need segment traversal. This reminder does not
 reopen the completed four-round experiment or change its recorded verdicts.
 
-See the [shared spatial-index consumer inventory](../../docs/architecture/spatial-index-consumers.md).
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Verification
 - `python3 tests/regression/tooling/Test.ShapeDiameterParts.py`
@@ -74,3 +74,6 @@ See the [shared spatial-index consumer inventory](../../docs/architecture/spatia
 
 ## Limits
 - No novelty claim, anatomical guarantee, CGAL installation, backend token, runtime change or default adoption. No fifth method iteration.
+
+## Log
+- 2026-10-30: Moved from `tasks/active/` to the backlog by the operator's decision (ARCH-022, question 38): nobody is working on it now. Its stale claim fields were cleared; its scope, state and open points are unchanged.

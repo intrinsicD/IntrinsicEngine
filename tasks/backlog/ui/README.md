@@ -16,7 +16,7 @@ its dependencies, conditional gates, scope and verification.
 - [UI-075 — One Appearance panel for all domains with per-attribute source selectors](UI-075-unified-appearance-panel-with-attribute-source-selectors.md)
 - [UI-076 — Camera preset and focus visual smoke](UI-076-camera-preset-visual-smoke.md)
 - [UI-077 — Readiness field markers in every config panel](UI-077-readiness-field-markers-in-all-panels.md)
-- [UI-079 — Run the ImGuizmo smokes at a real HiDPI pixel ratio](../../active/UI-079-imguizmo-hidpi-operational-run.md)
+- [UI-079 — Run the ImGuizmo smokes at a real HiDPI pixel ratio](UI-079-imguizmo-hidpi-operational-run.md)
 - [UI-080 — Editable local rotation in the Sandbox Inspector](UI-080-editable-inspector-rotation.md)
 
 ## Agent lane and inspection windows
@@ -27,6 +27,9 @@ Each window uses the same runtime functions as agent operations.
 - [UI-063 — File > Properties import/export window](UI-063-properties-import-export-window.md)
 - [UI-064 — History window](UI-064-history-window.md)
 - [UI-066 — Mesh Health window](UI-066-mesh-health-window.md)
+- [UI-053 — Curvature-extremum engine overlay](UI-053-curvature-extremum-engine-overlay.md)
+- [UI-081 — Evenly spread vector-field glyphs from a progressive element order](UI-081-vector-field-even-glyph-order.md)
+- [UI-082 — Entity bounding boxes, large-model camera framing and bounds-center gizmo pivot](UI-082-entity-bounds-camera-framing-gizmo-pivot.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

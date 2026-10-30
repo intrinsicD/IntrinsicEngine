@@ -29,6 +29,15 @@ contract_review: tracker only; each slice declares its own contracts
     können. Wenn wir für dieses Ziel Dinge umbauen müssen dann ist das ok. Am Ende zählt das
     Änderungen günstig sind, die Engine modular und erweiterbar ist und dass der Build und ci nicht
     so lange dauert."
+37. "Bitte räum erst auf. Danach erklärst du mir wie die Plugins genau aussehen sollten und wir
+    müssen irgendwie regeln dass zb. Plugin Features Wiederverwendung werden. Sagen wir wir bauen
+    marching cubes als Plugin. Nach einer Weile brauchen aber vllt andere Plugins darauf Zugriff.
+    Dann sollte marching cubes ein Feature Modul werden welches zum Engine kern gehört damit es von
+    anderen Plugins verwendet werden kann. Plugins sollten auch für ihre eigene ui zuständig sein
+    und diese registrieren… oder?"
+38. "Passt 1-3. evidence gerne löschen" (1: the three kinds of code, promotion instead of plugin
+    dependencies, and "the UI only calls commands" go into the target; 2: the 13 older active tasks
+    move to the backlog; 3: the reviewed evidence folders are deleted)
 
 ## Goal
 - Reach the target in
@@ -97,3 +106,23 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
   13 older active tasks with open points remain (September and October; three with stale `codex`
   claims). Whether they move to the backlog is put to the operator.
+- 2026-10-30: Operator (Q38), decisions 1-3 carried out.
+  1. The target gained "Plugins: what goes where":
+     - three kinds of code (algorithm to the foundation, stateful shared service to the module
+       services, feature to a plugin);
+     - promotion of exactly the needed part instead of dependencies between plugins;
+     - a plugin owns its UI, and the UI only calls commands, which are MCP tools;
+     - the plugin layout sketch, with the spike's open points.
+
+     The no-shape-framework and no-golden rules stay proposals. The three-plugin rule for shared
+     helpers is replaced by promotion at the second consumer.
+  2. 12 of the 13 older active tasks moved to the backlog (`ui`, `methods`, `rendering`, `runtime`,
+     `workshop` for HARDEN-090). Their stale claim fields were cleared; the shared claim registry
+     held no claims. **UI-037 stays in `tasks/active/`**, because the frozen record RUNTIME-277 states
+     "UI-037 (active)" in text that may not be edited, and the strict task-state check enforces it.
+  3. The reviewed evidence folders of RUNTIME-326, 351, 353 and 354 were deleted; the phase 2
+     scripts remain in `tasks/evidence/ARCH-022/`.
+
+  The strict checks pass (links, task policy, task-state links). The one local link finding is in
+  the uncommitted `docs/research/geometry-methods-2026-10-23.md`, which links the old METHOD-083
+  path; it is the operator's file and stays untouched.

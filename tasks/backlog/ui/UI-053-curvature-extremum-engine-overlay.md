@@ -7,10 +7,10 @@ workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
 evidence_skip_reason: "Interactive follow-up for the agreed detector-first inspection sequence."
-owner: codex
-branch: codex/method-040-boundary-partition
-worktree: /home/alex/Documents/IntrinsicEngine
-claimed_at: "2026-09-06T23:26:45+02:00"
+owner:
+branch:
+worktree:
+claimed_at:
 contract_schema: 1
 contracts: [geometry.element-domain-sources, geometry.property-coherence, method.engine-integration]
 contract_review: "Publishes detached geometric feature curves through shared validated engine/config/UI operations."
@@ -45,3 +45,6 @@ ctest --test-dir build/ci --output-on-failure -R 'ScalarfieldExtrema|SandboxCurv
 cmake --build --preset dev --target ExtrinsicSandbox
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-10-30: Moved from `tasks/active/` to the backlog by the operator's decision (ARCH-022, question 38): nobody is working on it now. Its stale claim fields were cleared; its scope, state and open points are unchanged.
