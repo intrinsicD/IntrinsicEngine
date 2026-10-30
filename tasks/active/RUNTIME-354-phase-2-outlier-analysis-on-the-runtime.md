@@ -630,3 +630,27 @@ python3 tools/agents/check_task_policy.py --root . --strict
   framework capability (a second bool option would not need it). It goes into the trial commit and
   is counted: the prediction becomes 7 files, 6 per option plus the one-time framework edit. It is
   reported both ways.
+- 2026-10-30: Block 3b, the option trial `negative`, implemented as its own commit. **Measured: 7 files**
+  (148 insertions, 32 deletions), exactly the corrected prediction:
+  1. `Runtime.OutlierAnalysisConfig.cppm`: the member and row (+5);
+  2. `Runtime.OutlierAnalysisOperation.cpp`: the mask, the count and the Vulkan refusal (+5 −2);
+  3. `Test.OutlierAnalysis.cpp`: its test (+94);
+  4. `config_section_codec_golden.json`: the outlier entry regenerated (24 lines). It was checked
+     against the previous entry: every case, the defaults, non-default, invalid enum and registration
+     are equal once the `negative` key is removed. The only differences are the new schema property,
+     the canonical key, and the one serializer-generated payload that gains the field;
+  5. `Sandbox.MeshProcessingPanels.cpp`: polarity wording only (5 lines); the checkbox came from the
+     row;
+  6. `docs/architecture/outlier-analysis.md` (+6);
+  7. `Runtime.DerivedConfigSections.cppm`: bool rows (+8 −1), one-time.
+
+  The agent schema baseline, the inventory and the schema tests needed no edit. Against the gate's 3:
+  failed as defined (6 per option, 7 for this first bool option); the verdict is block 4's and the
+  operator's.
+
+  Mutations, each red:
+  - `negative` ignored in the mask, and in the count;
+  - the Vulkan refusal removed (exact text);
+  - the panel hiding the new row (the 3a visibility test);
+  - bool serialized as a number (the golden);
+  - the bool type check removed (the test aborts: the parser reads a number as bool).
