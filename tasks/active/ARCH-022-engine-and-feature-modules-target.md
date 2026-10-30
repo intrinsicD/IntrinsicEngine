@@ -528,3 +528,21 @@ python3 tools/docs/check_doc_links.py --root . --strict
   described as able to over- or underestimate. Self-check extended and each new check
   mutation-checked; the report renders the revision-3 technical test's outputs (exit 0, numbers not
   read). The runner is unchanged since revision 3, so its technical test stands.
+- 2026-10-30: R6 pre-flight third delta on `c77edd2e…3fcb`: Claude PASS, Codex PASS (records and
+  verbatim verdicts in `tasks/evidence/ARCH-022/preflight-r6/reviews/`). The start gate rebuilt the
+  manifest from the live state at `d6824e47f` (digest matched) and the run started 23:25 local; the
+  chain exited 0, all six samples sealed, the report rendered, and no measurement was flagged.
+  - Audit: every summary recomputed from the raw outputs, independently of the report, and agrees.
+  - Result ([R6 baseline](../../docs/reports/2026-10-30-arch-022-r6-baseline.md)): Sandbox rebuild
+    after one edit 19.1 s (operation unit), 48.6 s (plugin config interface, 20 units), 18.7 s
+    (geometry interface); each includes a 12.8 s Sandbox link (GNU ld); no-op 0.14 s; clean build
+    2.0 min plus 8.2 s configure; CI median 41.1 min (20 green runs, 21 to 71). The target's R4 and R6
+    cells are updated.
+  - Claims check of the report by a separate agent: changes required (link 12.9 → 12.8 s median,
+    geometry max 18.7, no-op spread 2.3 %, "fourth packet version", the 20 units are the interface
+    plus its 19 importers in the Sandbox target, R1 not R2, audit wording); all applied.
+  - Surprises against the written predictions: the clean build (predicted 10 to 45 min) and the
+    config interface (predicted 1 to 8 min) were faster; the coordinator's earlier exposure to a
+    technical-test clean build is recorded in the packet. The config edit's chain runs through the
+    runtime's `PointAnalysisOperations` interface into a Sandbox editor panel.
+  - Slice 1 output is complete; the numeric R4, R6 and R7 targets are the operator's.
