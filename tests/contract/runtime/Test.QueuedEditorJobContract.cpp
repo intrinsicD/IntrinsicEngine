@@ -644,9 +644,9 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
     // scalar snapshots and execute history themselves.
     constexpr std::array<std::string_view, 4> allowedScalarPublishers{
         "Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp", // the publisher
-        "Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp",        // RUNTIME-311 owns it
-        "Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp",   // double distances with infinity sentinels
-        "Editor/Operations/Runtime.ScalarRidgeOperations.cpp",           // vertex and edge outputs, two slot sets
+        "Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp", // two columns + stamp (RUNTIME-354)
+        "Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp", // double distances with infinity sentinels
+        "Editor/Operations/Runtime.ScalarRidgeOperations.cpp", // vertex and edge outputs, two slot sets
     };
     std::size_t scanned = 0;
     std::size_t finiteMatched = 0;
@@ -715,26 +715,31 @@ TEST(QueuedEditorJobDriftGuard, EveryEditorJobIdentityNamesItsRequestedDomain)
     // A constructed identity, or a GPU transaction's designated `Identity = {.EntityId = ...}`.
     const std::regex construction{R"(EditorJobIdentity(\s+\w+)?\s*\{|(\.|->)Identity\s*=\s*\{(?=\s*\.))"};
     std::size_t identities = 0;
-    for (const auto& entry : fs::directory_iterator(root))
-    {
-        const auto extension = entry.path().extension();
-        if (extension != ".cpp" && extension != ".hpp" && extension != ".cppm") continue; // the runtime's shared identity (RUNTIME-354)
-        std::ifstream file(entry.path());
-        const std::string text{std::istreambuf_iterator<char>(file), {}};
-        SCOPED_TRACE(entry.path().filename().string());
-        for (auto it = std::sregex_iterator(text.begin(), text.end(), construction); it != std::sregex_iterator(); ++it)
+    // RUNTIME-354: operations also live in their modules, and the runtime's shared identity is in a .cppm.
+    for (const auto& dir : {root, fs::path{INTRINSIC_SOURCE_DIR} / "src" / "runtime" / "Modules"})
+        for (const auto& entry : fs::recursive_directory_iterator(dir))
         {
-            // The initializer runs to the brace that closes the one the match opened.
-            std::size_t at = static_cast<std::size_t>(it->position() + it->length());
-            for (int depth = 1; depth > 0 && at < text.size(); ++at)
-                depth += text[at] == '{' ? 1 : text[at] == '}' ? -1 : 0;
-            const std::string initializer = text.substr(static_cast<std::size_t>(it->position()),
-                                                        at - static_cast<std::size_t>(it->position()));
-            if (initializer.ends_with("{}")) continue; // a default member, filled before submission
-            ++identities;
-            EXPECT_NE(initializer.find(".RequestedDomain"), std::string::npos)
-                << "an editor job identity names its config's requested backend domain: " << initializer;
+            const auto extension = entry.path().extension();
+            if (extension != ".cpp" && extension != ".hpp" && extension != ".cppm")
+                continue;
+            std::ifstream file(entry.path());
+            const std::string text{std::istreambuf_iterator<char>(file), {}};
+            SCOPED_TRACE(entry.path().filename().string());
+            for (auto it = std::sregex_iterator(text.begin(), text.end(), construction); it != std::sregex_iterator();
+                ++it)
+            {
+                // The initializer runs to the brace that closes the one the match opened.
+                std::size_t at = static_cast<std::size_t>(it->position() + it->length());
+                for (int depth = 1; depth > 0 && at < text.size(); ++at)
+                    depth += text[at] == '{' ? 1 : text[at] == '}' ? -1 : 0;
+                const std::string initializer = text.substr(
+                    static_cast<std::size_t>(it->position()), at - static_cast<std::size_t>(it->position()));
+                if (initializer.ends_with("{}"))
+                    continue; // a default member, filled before submission
+                ++identities;
+                EXPECT_NE(initializer.find(".RequestedDomain"), std::string::npos)
+                    << "an editor job identity names its config's requested backend domain: " << initializer;
+            }
         }
-    }
     EXPECT_GE(identities, 22u) << "the scan found the operations' identities";
 }

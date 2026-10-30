@@ -1,11 +1,13 @@
 // The operation runtime (ADR 0031, RUNTIME-347): one driver runs a declared operation through the
 // stages 1 resolve, 2-3 readiness and capture, 4 acquire, 5 execute, 6 gate, 7 publish, 8 deliver.
-// This is its point scalar specialization: point samples in, one float column out (kernel density and
-// point spacing from kNN rows; density weights from radius rows, RUNTIME-353). A definition declares
-// names, parameters, its output and a pure Compute; optional members override the runtime's defaults.
+// Two shapes share one base (OperationShape): point samples in and one float column out (kernel
+// density and point spacing from kNN rows, density weights from radius rows), and point columns a
+// definition publishes itself (outlier analysis, RUNTIME-354). A definition declares names,
+// parameters, its outputs and a pure Compute; optional members override the runtime's defaults.
 // RUNTIME-349: an exported module for operation modules (ADR 0031 Decision 7). The editor helpers
-// the templates call are included in its purview as global-module declarations: reachable where an
-// operation module instantiates the runtime, not exported.
+// the templates call are included in its purview as global-module declarations, reachable where an
+// operation module instantiates the runtime; those a custom definition calls itself are exported by
+// name in OperationSupport (RUNTIME-354), and no others.
 module;
 #include <algorithm>
 #include <array>
@@ -45,6 +47,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
@@ -52,6 +55,8 @@ import Geometry.Properties;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
+#include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
 export extern "C++"
 {
     namespace Extrinsic::Runtime::GeometryProcessingDetail
@@ -156,13 +161,15 @@ export extern "C++"
                     OperationWording w{
                         .StaleTarget = JoinOperationText({Def::Noun, " target entity is stale or missing."}),
                         .OutputLabel = std::string(Def::Noun),
+                        .TooFewSamples = {},
                         .LbvhLimits =
                             "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.",
                         .IndexMismatch =
                             JoinOperationText({Def::Noun, " index snapshot does not match the selected samples."}),
                         .ConfigUnavailable = JoinOperationText({Def::Noun, " estimation config is unavailable."}),
                         .JobLabel = job,
-                        .JobName = job};
+                        .JobName = job,
+                        .GpuHistory = {}};
                     if constexpr (requires { Def::Method; })
                         w.TooFewSamples = JoinOperationText({Def::Method, " requires at least two live samples."});
                     if constexpr (requires { Def::History; })
@@ -926,6 +933,36 @@ export extern "C++"
         {
             const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
             return context.EngineConfigControlState ? &context.EngineConfigControlState->ActiveConfig : nullptr;
+        }
+        // The helpers a custom definition (Decision 5, its own publication and GPU steps) calls itself.
+        namespace OperationSupport
+        {
+            using EditorFeatureDetail::ToEditorCommandStatus;
+            using GeometryProcessingDetail::AcquirePointIndex;
+            using GeometryProcessingDetail::AppendPointKnnRows;
+            using GeometryProcessingDetail::GeometryPropertiesCurrent;
+            using GeometryProcessingDetail::MutableGeometryProperties;
+            using GeometryProcessingDetail::ObserveGeometryProperty;
+            using GeometryProcessingDetail::PointIndexState;
+            using GeometryProcessingDetail::PointPropertyWatch;
+            using GeometryProcessingDetail::RebasePointPropertyHistory;
+            using GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage;
+            using Runtime::GuardEditorProcessingResult;
+            // The GPU lifecycle (Decision 6): the runtime-owned core and its steps.
+            using GeometryProcessingDetail::AcquireGpuTransactionBack;
+            using GeometryProcessingDetail::BeginGpuTransactionAccept;
+            using GeometryProcessingDetail::DiscardGpuTransaction;
+            using GeometryProcessingDetail::FailGpuTransaction;
+            using GeometryProcessingDetail::FinishGpuTransaction;
+            using GeometryProcessingDetail::GpuRingAcquisition;
+            using GeometryProcessingDetail::GpuTransactionAcceptRefusal;
+            using GeometryProcessingDetail::GpuTransactionCore;
+            using GeometryProcessingDetail::GpuTransactionCurrent;
+            using GeometryProcessingDetail::GpuTransactionDeferralsExhausted;
+            using GeometryProcessingDetail::GpuTransactionOf;
+            using GeometryProcessingDetail::GpuTransactionStartRefusal;
+            using GeometryProcessingDetail::ReadyGpuTransaction;
+            using GeometryProcessingDetail::SubmitGpuTransactionRun;
         }
     }
 }

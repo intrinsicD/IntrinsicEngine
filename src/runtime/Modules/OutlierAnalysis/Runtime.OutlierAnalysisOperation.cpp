@@ -1,14 +1,13 @@
+// It reaches the editor only through Extrinsic.Runtime.OperationRuntime (ADR 0031 Decision 7).
 module;
 #include <functional>
 #include <cstring>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -18,7 +17,7 @@ module;
 #include <utility>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
-module Extrinsic.Runtime.PointAnalysisOperations;
+module Extrinsic.Runtime.OutlierAnalysisOperation;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -26,30 +25,19 @@ import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
-import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Core.Error;
 import Geometry.PointCloud.Utils;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
-import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.OutlierAnalysis;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.Runtime.OperationRuntime;
-#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
-#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
-#include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
 
 #pragma clang fp contract(off)
 namespace Extrinsic::Runtime
@@ -59,10 +47,10 @@ namespace Extrinsic::Runtime
         namespace GS = ECS::Components::GeometrySources;
         namespace PC = Geometry::PointCloud;
         using D = GeometryElementDomain;
-        using GeometryProcessingDetail::PointPropertyWatch;
-        using GeometryProcessingDetail::ObserveGeometryProperty;
-        using GeometryProcessingDetail::MutableGeometryProperties;
-        using GeometryProcessingDetail::GeometryPropertiesCurrent;
+        using OperationSupport::PointPropertyWatch;
+        using OperationSupport::ObserveGeometryProperty;
+        using OperationSupport::MutableGeometryProperties;
+        using OperationSupport::GeometryPropertiesCurrent;
         // Transient provenance for the most recent detection on this entity. Persisted masks
         // remain visible after reload, but removal requires detection against the live source.
         struct AnalysisStamp
@@ -234,7 +222,7 @@ namespace Extrinsic::Runtime
                 else
                 {
                     const auto width = QueryWidth(c, w.Points.size());
-                    if (!GeometryProcessingDetail::AppendPointKnnRows(
+                    if (!OperationSupport::AppendPointKnnRows(
                             *w.Index, w.Points, width, w.Values.NeighborIds, r.Message))
                         return;
                     ratio = PC::EstimateOutlierProbabilityFromNeighbors(w.Points, w.Values.NeighborIds, params);
@@ -373,7 +361,7 @@ namespace Extrinsic::Runtime
                 const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
                 *revisions = {ObserveGeometryProperty(a, c.Mask.Domain, c.Mask.Name),
                     ObserveGeometryProperty(a, c.Score.Domain, c.Score.Name)};
-                GeometryProcessingDetail::RebasePointPropertyHistory(context, entity, historyBefore);
+                OperationSupport::RebasePointPropertyHistory(context, entity, historyBefore);
                 RestoreStamp(context, entity, target.Stamp, false, &c.Mask);
                 if (context.InvalidateWorkspaceSnapshotCache)
                     context.InvalidateWorkspaceSnapshotCache();
@@ -395,7 +383,7 @@ namespace Extrinsic::Runtime
                                                        : mutate(*after);
             r.Status = status == EditorCommandHistoryStatus::InvalidCommand
                 ? EditorCommandStatus::InvalidProcessingParameters
-                : EditorFeatureDetail::ToEditorCommandStatus(status);
+                : OperationSupport::ToEditorCommandStatus(status);
             if (!r.Succeeded())
                 r.Message = "Outlier publication rejected by history checks.";
             return r;
@@ -482,7 +470,7 @@ namespace Extrinsic::Runtime
                                                        : mutate(*after, {});
             r.Status = status == EditorCommandHistoryStatus::InvalidCommand
                 ? EditorCommandStatus::InvalidProcessingParameters
-                : EditorFeatureDetail::ToEditorCommandStatus(status);
+                : OperationSupport::ToEditorCommandStatus(status);
             r.WrittenCount = kept;
             r.Message = r.Succeeded()
                 ? "Marked points removed by the atomic CPU compaction stage; no GPU readback; all surviving properties retained in source order."
@@ -494,7 +482,7 @@ namespace Extrinsic::Runtime
     // read back on Accept) and the mask's float presentation ring.
     struct EditorOutlierTransaction : std::enable_shared_from_this<EditorOutlierTransaction>
     {
-        GeometryProcessingDetail::GpuTransactionCore Core{};
+        OperationSupport::GpuTransactionCore Core{};
         std::shared_ptr<OutlierWork> Work{}; // its Result is the transaction's result
         std::array<GeometryPropertyRef, 3> Refs{};
         std::optional<Graphics::GpuPropertyView> Input{};
@@ -507,7 +495,7 @@ namespace Extrinsic::Runtime
     };
     namespace OutlierTransactionDetail
     {
-        namespace GP = GeometryProcessingDetail;
+        namespace GP = OperationSupport;
         using Run = EditorOutlierTransactionHandle;
         bool Current(const Run& w)
         {
@@ -785,7 +773,7 @@ namespace Extrinsic::Runtime
                 return result;
             }
             if (sink)
-                w->Sink = GuardEditorProcessingResult(w->Core.Context, std::move(sink));
+                w->Sink = OperationSupport::GuardEditorProcessingResult(w->Core.Context, std::move(sink));
             (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
             return w->Work->Result;
         }
@@ -801,7 +789,7 @@ namespace Extrinsic::Runtime
             std::function<void(EditorOutlierAnalysisResult)> retain,
             bool& busy)
         {
-            namespace GP = GeometryProcessingDetail;
+            namespace GP = OperationSupport;
             auto w = OutlierTransactionDetail::Make(
                 ctx, work, ctx.SpatialIndices ? ctx.SpatialIndices->PropertyResidency() : nullptr);
             w->Core.AutoAccept = automatic;
@@ -832,13 +820,13 @@ namespace Extrinsic::Runtime
             work->Result.Status = EditorCommandStatus::Pending;
             work->Result.ActualBackend = "vulkan_lbvh";
             work->Result.Message = "Device outlier analysis queued.";
-            w->Sink = GuardEditorProcessingResult(ctx, std::move(sink));
+            w->Sink = OperationSupport::GuardEditorProcessingResult(ctx, std::move(sink));
             w->Retain = std::move(retain);
             if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Device outlier analysis").IsValid())
             {
                 result = work->Result;
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
-                result.Message = GP::MeshSupport::QueuedJobRejectedMessage(w->Core.JobLabel);
+                result.Message = GP::QueuedJobRejectedMessage(w->Core.JobLabel);
                 return {};
             }
             result = work->Result;
@@ -850,7 +838,7 @@ namespace Extrinsic::Runtime
             Graphics::GpuPropertyResidency& residency,
             std::function<void(Result)> retain)
         {
-            namespace GP = GeometryProcessingDetail;
+            namespace GP = OperationSupport;
             auto w = OutlierTransactionDetail::Make(ctx, work, &residency);
             auto& t = w->Core;
             const auto rollback = [&]
@@ -913,7 +901,7 @@ namespace Extrinsic::Runtime
                     }
         }
         // Running, accepting or finished: the lifecycle's own refusal says why Accept is not available now.
-        else if (const auto refused = GeometryProcessingDetail::GpuTransactionAcceptRefusal(w->Core))
+        else if (const auto refused = OperationSupport::GpuTransactionAcceptRefusal(w->Core))
             s.AcceptDisabledReason = refused->Message;
         return s;
     }
@@ -928,7 +916,7 @@ namespace Extrinsic::Runtime
     void DiscardEditorOutlierAnalysis(const EditorProcessingCommands&, const EditorOutlierTransactionHandle& w)
     {
         if (w)
-            GeometryProcessingDetail::DiscardGpuTransaction(
+            OperationSupport::DiscardGpuTransaction(
                 w->Core, EditorCommandStatus::NoChange, "Outlier result discarded; CPU fields retained.");
     }
 
@@ -961,6 +949,22 @@ namespace Extrinsic::Runtime
         std::function<void(EditorOutlierAnalysisResult)> onComplete)
     {
         return OutlierRuntime::Apply(commands, config, std::move(onComplete));
+    }
+    RuntimeEngineConfigApplyResult ApplyEditorOutlierAnalysisConfig(
+        const EditorProcessingCommands& commands, const OutlierAnalysisConfig& config, std::string sourceId)
+    {
+        return ApplyOperationConfig(commands,
+            OutlierDefinition::Validate(config),
+            sourceId.empty() ? std::string{kOutlierAnalysisConfigSectionName} : sourceId,
+            [&](Core::Config::EngineConfig& candidate)
+            {
+                SetOutlierAnalysisConfig(candidate, config);
+            });
+    }
+    std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorProcessingCommands& commands)
+    {
+        const Core::Config::EngineConfig* active = ActiveOperationConfig(commands);
+        return active ? GetOutlierAnalysisConfig(*active) : std::nullopt;
     }
     EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(
         const EditorProcessingCommands& commands, std::function<void(EditorOutlierAnalysisResult)> onComplete)

@@ -40,6 +40,9 @@ contract_review: a design ADR (0031) proposing a typed operation definition and 
     duplication is real; 2 phase 2 directly; 3 deeper cuts to the pilot; 4 revise the gate; 5 stop)
 32. (2026-10-30) "ja mach 1." (answer to: after `RUNTIME-353`, 1 phase 2 directly (outlier
     analysis); 2 revise the phase 1 size gate; 3 normalize density weights' kept divergences; 4 stop)
+33. (2026-10-30) "I think the full plan (1) is still the right approach. Please continue" (answer
+    to: after `RUNTIME-354` block 1a and its size projection, 1 the full plan (1b, 2, 3, 4); 2 blocks
+    2-4 first, 1b after the verdict; 3 stop)
 
 ## Goal
 - `docs/adr/0031-declared-operations.md`: an operation is one typed definition (parameters declared

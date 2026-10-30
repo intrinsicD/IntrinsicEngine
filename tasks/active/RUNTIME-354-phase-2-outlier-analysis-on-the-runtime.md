@@ -22,6 +22,8 @@ contract_review: ADR 0031 phase 2, the architectural test, with outlier analysis
     rewritten, keeping every behavioural assertion)
 32. (2026-10-30) "ja mach 1." (answer to: after `RUNTIME-353`, 1 phase 2 directly (outlier
     analysis); 2 revise the phase 1 size gate; 3 normalize density weights' kept divergences; 4 stop)
+33. (2026-10-30) "I think the full plan (1) is still the right approach. Please continue" (the full
+    plan: 1b, 2, 3, 4, in that order)
 
 ## Goal
 - ADR 0031 (`docs/adr/0031-declared-operations.md`, Validation, Gates, "After phase 2"):
@@ -146,6 +148,47 @@ Revised after the Codex plan review (Log, 2026-10-30).
        2232-2253). Direct callers (agent, tests) reach no slot.
      - With the store, every caller's run is kept (the intended change).
      - The panel's forwarding goes, as `RUNTIME-348` did for the pilot.
+   - **Block 1b plan (question 33):**
+     - **A module apart from the config:** `Extrinsic.Runtime.OutlierAnalysisOperation`, files
+       `Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm` and `.cpp`, as for density
+       weights. The config interface sits in the `ConfigPropertyTypes` boundary, and its hand-written
+       codec imports it.
+     - **The interface** takes from `Runtime.PointAnalysisOperations.cppm`: the result, the
+       `OutlierOperation` tag, the transaction handle and snapshot, and the entry-point declarations.
+       `Extrinsic.Runtime.PointAnalysisOperations` re-exports the module, so its importers are
+       unchanged.
+     - **The implementation unit** holds the outlier code moved from the editor file (bodies
+       unchanged; qualifiers become the exported names below) and the config wrappers moved from
+       `Runtime.PointAnalysisOperations.cpp`, over `ApplyOperationConfig`/`ActiveOperationConfig`. The
+       editor file goes.
+     - **The framework surface:**
+       - `Extrinsic.Runtime.OperationRuntime` includes the GPU lifecycle headers (`GpuFront.hpp`,
+         `GpuTransactionLifecycle.hpp`) in its purview and imports `GpuPropertyBinding`;
+       - it exports `Extrinsic::Runtime::OperationSupport`: using-declarations of the existing
+         helpers a custom definition uses, no copies;
+       - the list: the property watches (`PointPropertyWatch`, `ObserveGeometryProperty`,
+         `GeometryPropertiesCurrent`, `RebasePointPropertyHistory`), `MutableGeometryProperties`,
+         `AcquirePointIndex`/`PointIndexState`, `AppendPointKnnRows`, `MeshSupport::QueuedJobRejectedMessage`,
+         `ToEditorCommandStatus`, `GuardEditorProcessingResult`, and the GPU lifecycle
+         (`GpuTransactionCore`, `GpuRingAcquisition`, `GpuTransactionOf`, `GpuTransactionCurrent`,
+         `AcquireGpuTransactionBack`, `GpuTransactionDeferralsExhausted`, `ReadyGpuTransaction`,
+         `FinishGpuTransaction`, `FailGpuTransaction`, `GpuTransactionAcceptRefusal`,
+         `BeginGpuTransactionAccept`, `GpuTransactionStartRefusal`, `SubmitGpuTransactionRun`,
+         `DiscardGpuTransaction`).
+
+       A spike (reverted) compiled and linked exported using-declarations of a function, a function
+       template, a struct and an enum from an operation module.
+     - **The test of the architecture:** the source rule `OperationModuleBoundary` keeps its two
+       pinned exceptions and gains none. A mutation adding an editor-internal include to the new unit
+       makes it red.
+     - **Build lists and checks:** the point analysis boundary checks the new unit instead of the
+       editor file; the new interface joins `ProcessingCompilationLocality.PointAnalysisResults`
+       (no point cloud algorithm module behind it), as the config interface is; the module inventory is regenerated.
+     - **Also:** `DefinitionTraits`' designated initializer names every field (a
+       `-Wmissing-designated-field-initializers` warning from 1a).
+     - **Tests:** a placement-only change, so no behaviour moves: the selection, the Vulkan outlier
+       smokes, the boundary and source-rule tests, the docs checks. The footprint is counted
+       (informational).
 2. **Block 2: the derived config section for outlier analysis.** Rows bound to the record in the
    interface, replacing the hand-written codec's 201 lines; the golden payloads and every diagnostic
    unchanged (the derived codec generalized only where the outlier codec needs it). Its own plan.
@@ -315,3 +358,45 @@ python3 tools/agents/check_task_policy.py --root . --strict
   had become a broader mutation (the immediate branch disabled); rerun as the focused one (an index
   acquisition added inside the removal): red. Vulkan outlier and scalar smokes 31/31 on the revised
   tree. Interim size: the footprint 1,593 → 1,498, the runtime 632 → 931.
+- 2026-10-30: Committed `266137c3d` (block 1a); CI green (ci-linux-clang, ci-docs). Next is the
+  operator's choice: the full plan (1b, 2, 3, 4), blocks 2-4 first with 1b after the verdict, or stop.
+- 2026-10-30: Codex review of the 1b plan (`plan354d`): revise, one item: the scalar-publisher
+  allowance of `RuntimeReuseDriftGuard` (`Test.QueuedEditorJobContract.cpp`) moves to the new
+  file's path (it transfers an existing allowance, no new `OperationModuleBoundary` exception). The
+  export surface is "sound", consistent with Decisions 5-7, complete and with nothing unneeded; keep
+  the unit's `#pragma clang fp contract(off)`; update the runtime's synopsis comment. Folded.
+- 2026-10-30: Block 1b implemented (question 33).
+  - Outlier analysis lives in `Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm` and
+    `.cpp`; the editor file moved (`git mv`), and the config wrappers moved from the family's unit.
+  - The runtime includes the GPU lifecycle headers and exports `OperationSupport`: 25
+    using-declarations, no copies.
+  - Checks:
+    - the point analysis boundary checks the new unit, and `PointAnalysisResults` also checks the
+      new interface;
+    - `RuntimeReuseDriftGuard`'s scalar-publisher allowance moved to the new path;
+    - the identity drift guard also scans `src/runtime/Modules` (structural, question 28: the
+      outlier GPU identity moved there; the threshold of 22 is unchanged);
+    - `DefinitionTraits`' designated initializer names every field;
+    - the module inventory is regenerated.
+  - Verification (this session):
+    - the selection 861/861; source rules 9/9;
+    - `OperationModuleBoundary` fails when an editor-internal include is added to the new unit, and
+      passes once it is removed: no new exception was needed (the architecture check of 1b);
+    - inventory and doc links are clean.
+  - Size: the footprint 1,498 → 1,546 (module boilerplate, the interface counted whole); the runtime
+    931 → 973 (the exported surface).
+- 2026-10-30: Codex code review of 1b (`review354c`, diff `8b8610b2…`): approve, no blocking
+  findings ("placement-only in behavior"; all 25 exported names used; both guard edits keep their
+  guarantees; no new `OperationModuleBoundary` exception). Its optional comment fix applied: the
+  interface names both refusals that are not stored.
+- 2026-10-30: Ponytail review of 1b (separate agent): six findings, all deletions or smaller forms,
+  applied:
+  - the interface's unused `PointScalarTransaction` re-export removed;
+  - three dead lines in the point analysis interface removed;
+  - six unused includes and imports the moved unit carried over removed;
+  - `OperationSupport` placed in the existing export block;
+  - the identity guard's loop shortened;
+  - the repeated header comment removed.
+
+  Re-run on the final tree: the selection 861/861, source rules 9/9, the drift guards, the Vulkan
+  smokes 31/31; the inventory up to date. Size: the footprint 1,538, the runtime 968.

@@ -122,6 +122,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
         --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisResults
         --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm
         --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         --check-source src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
@@ -139,7 +140,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
         --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightOperation.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp
+        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp

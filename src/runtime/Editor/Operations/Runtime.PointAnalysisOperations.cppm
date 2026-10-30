@@ -1,5 +1,5 @@
-// Point-analysis commands and copied results for keypoints, outliers and FPFH
-// descriptors (density weights moved to their operation module, RUNTIME-353).
+// Point-analysis commands and copied results for keypoints and FPFH descriptors (density
+// weights and outlier analysis moved to their operation modules, RUNTIME-353 and RUNTIME-354).
 // These share one radius/neighborhood analysis mechanism: a resolved feature
 // scale, a capped radius support row per sample, and named same-domain scalar
 // outputs published in one undoable transaction.
@@ -8,71 +8,20 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <memory>
-#include <vector>
 #include <optional>
 #include <string>
 export module Extrinsic.Runtime.PointAnalysisOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorCommon;
-export import Extrinsic.Runtime.OutlierAnalysisConfig;
+export import Extrinsic.Runtime.OutlierAnalysisOperation;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
 export import Extrinsic.Runtime.DensityWeightOperation;
 export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Extrinsic.Graphics.GpuPropertyResidency;
 export namespace Extrinsic::Runtime
 {
-    struct EditorOutlierAnalysisResult
-    {
-        EditorCommandStatus Status{EditorCommandStatus::NoChange};
-        OutlierAnalysisMethod Method{OutlierAnalysisMethod::Statistical};
-        OutlierAnalysisBackend RequestedBackend{OutlierAnalysisBackend::CpuOctree};
-        OutlierAnalysisOperation Operation{OutlierAnalysisOperation::Analyze};
-        GeometryPropertyRef Mask{}, Score{};
-        std::string ActualBackend{}, Message{};
-        std::size_t SlotCount{}, LiveCount{}, RejectedCount{}, WrittenCount{};
-        float MeanDistance{}, StdDevDistance{}, DistanceThreshold{};
-        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
-        bool IndexReused{};
-        std::size_t GpuQueryBatches{};
-        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
-        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
-    };
-    // The operation's identity for its stored results (RUNTIME-354; the config's mode enum already
-    // holds the name OutlierAnalysisOperation).
-    struct OutlierOperation
-    {
-        using Params = OutlierAnalysisConfig;
-        using Result = EditorOutlierAnalysisResult;
-    };
-    struct EditorOutlierTransaction;
-    using EditorOutlierTransactionHandle = std::shared_ptr<EditorOutlierTransaction>;
-    struct EditorOutlierTransactionSnapshot
-    {
-        EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
-        bool CanAccept{};
-        std::string AcceptDisabledReason{};
-        EditorOutlierAnalysisResult Result{};
-    };
-    // Null with `failure` filled when refused; an active job on the same output answers Pending
-    // with the shared "already has an active" message (the same holds for the keypoint and
-    // density-weight Start*Transaction below).
-    [[nodiscard]] EditorOutlierTransactionHandle StartEditorOutlierAnalysisTransaction(
-        const EditorProcessingCommands&, const OutlierAnalysisConfig&, EditorOutlierAnalysisResult& failure);
-    [[nodiscard]] EditorOutlierTransactionSnapshot SnapshotEditorOutlierAnalysis(
-        const EditorProcessingCommands&, const EditorOutlierTransactionHandle&);
-    [[nodiscard]] EditorOutlierAnalysisResult AcceptEditorOutlierAnalysis(
-        const EditorProcessingCommands&, const EditorOutlierTransactionHandle&,
-        std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
-    void DiscardEditorOutlierAnalysis(const EditorProcessingCommands&, const EditorOutlierTransactionHandle&);
-    // Mock-device seam: captured inputs and an already completed pair of full-row fronts.
-    [[nodiscard]] EditorOutlierTransactionHandle MakeEditorOutlierTransactionForTest(
-        const EditorProcessingCommands&, const OutlierAnalysisConfig&, std::vector<float> scores,
-        std::vector<std::uint32_t> mask, Graphics::GpuPropertyResidency&);
-
     struct EditorKeypointAnalysisResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -133,12 +82,6 @@ export namespace Extrinsic::Runtime
     // terminal outcome of a newly queued job while its attachment remains active.
     // Pending for an already active output observes that job and registers no
     // additional callback. Configured Apply follows the same delivery contract.
-    [[nodiscard]] ActionReadiness PreviewEditorOutlierAnalysisCommand(const EditorProcessingCommands&, const OutlierAnalysisConfig&);
-    [[nodiscard]] EditorOutlierAnalysisResult ApplyEditorOutlierAnalysisCommand(const EditorProcessingCommands&, const OutlierAnalysisConfig&, std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
-    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorOutlierAnalysisConfig(const EditorProcessingCommands&, const OutlierAnalysisConfig&, std::string sourceId = {});
-    [[nodiscard]] std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorProcessingCommands&);
-    [[nodiscard]] EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(const EditorProcessingCommands&, std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
-
     [[nodiscard]] EditorPointScalarTransactionHandle StartEditorKeypointAnalysisTransaction(
         const EditorProcessingCommands&, const KeypointAnalysisConfig&, EditorKeypointAnalysisResult&,
         std::function<void(EditorKeypointAnalysisResult)> onComplete = {}, bool automatic = false);

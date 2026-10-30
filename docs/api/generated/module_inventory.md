@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 117 |
+| `runtime` | 118 |
 
 ## Modules
 
@@ -452,6 +452,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.KeypointAnalysisConfig` | `src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.NormalEstimationConfig` | `src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.OutlierAnalysisConfig` | `src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.OutlierAnalysisOperation` | `src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsModule` | `src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationConfig` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm` | `runtime` |
@@ -480,4 +481,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **453**
+Total modules: **454**

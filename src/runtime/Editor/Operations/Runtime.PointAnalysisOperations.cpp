@@ -10,20 +10,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 namespace Extrinsic::Runtime
 {
-    RuntimeEngineConfigApplyResult ApplyEditorOutlierAnalysisConfig(
-        const EditorProcessingCommands& commands, const OutlierAnalysisConfig& config, std::string sourceId)
-    {
-        return ApplyEditorProcessingConfig(commands,
-            ValidateOutlierAnalysisConfigSection(SerializeOutlierAnalysisConfig(config), {}, kOutlierAnalysisConfigSectionName),
-            sourceId.empty() ? std::string{kOutlierAnalysisConfigSectionName} : sourceId,
-            [&](Core::Config::EngineConfig& candidate) { SetOutlierAnalysisConfig(candidate, config); });
-    }
-    std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorProcessingCommands& commands)
-    {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (!context.EngineConfigControlState) return std::nullopt;
-        return GetOutlierAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
-    }
     RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(
         const EditorProcessingCommands& commands, const KeypointAnalysisConfig& config, std::string sourceId)
     {

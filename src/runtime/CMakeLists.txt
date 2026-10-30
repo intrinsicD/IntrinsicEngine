@@ -29,6 +29,7 @@ target_sources(${target_name}
         Modules/Curvature/Runtime.MeshCurvatureConfig.cppm
         Modules/Geodesics/Runtime.GeodesicsConfig.cppm
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+        Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm
         Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
         Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
         Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
@@ -162,11 +163,11 @@ target_sources(${target_name}
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
-        Editor/Operations/Runtime.PointAnalysisOperations.Outliers.cpp
         Editor/Operations/Runtime.PointScalarTransaction.cpp
         Modules/KernelDensity/Runtime.KernelDensityOperation.cpp
         Modules/PointSpacing/Runtime.PointSpacingOperation.cpp
         Modules/DensityWeight/Runtime.DensityWeightOperation.cpp
+        Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
