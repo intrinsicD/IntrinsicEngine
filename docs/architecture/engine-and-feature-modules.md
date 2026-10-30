@@ -113,6 +113,84 @@ plugins/marching_cubes/
   - sharing the ImGui context;
   - jobs that are still running on unload.
 
+## Jobs, preview and observation (operator, 2026-10-30)
+
+Every algorithm a plugin offers runs as a job; the main thread never waits for it.
+
+**One way to run.**
+- The inputs are snapshotted on the main thread and computed on a worker or the GPU. The result is
+  committed on the main thread only if the inputs are still current, as one undo step.
+- There is no second inline path with other semantics; the scheduler may run a tiny job within
+  the same frame.
+- **Preview and commit are separate.** While a slider moves, only previews run, into a display
+  buffer without undo entries; releasing it or Apply commits once.
+- **The latest wins.** A newer preview of the same command on the same output supersedes the older
+  one (cancelled, or its result dropped) instead of being refused.
+- **Coarse while dragging, full on release**, where an algorithm offers a coarse level.
+
+**Step functions, wherever possible.** An algorithm is a state machine:
+- `Init` (the state owns all buffers);
+- `Step` (one bounded iteration);
+- `Metrics` (a few numbers);
+- `Preview` (what the viewer shows);
+- `Finish`.
+
+The job service owns the loop and checks between steps for stop, pause and single step; then it
+takes metrics and preview on the same worker thread. Every algorithm therefore gets these, without
+code of its own:
+- pause;
+- single step (n steps);
+- stop and accept the current state;
+- cancel.
+
+A run without UI is the same loop. A non-iterative algorithm steps in chunks, or in one step. Where
+an external solver owns the inner loop, the step boundary is the outer loop.
+
+**Resident state.**
+- After `Init`, the state a `Step` needs already exists where the step runs. A GPU algorithm keeps
+  its inputs and working buffers resident; `Step` only records and dispatches work.
+- Between steps there is no full-array transfer between CPU and GPU. Only a few bytes of metrics are
+  read back, asynchronously, so convergence may be noticed one step late.
+- A step that cannot avoid a CPU stage moves only small data (for example a matrix) and is marked as
+  hybrid. The preview draws from the GPU buffers directly.
+- Data crosses between CPU and GPU only at the start and at the end (the backlog task GRAPHICS-153
+  has the same goal). GPU k-means already uploads once and previews at an interval.
+
+**Lifetime and the buffer cache.**
+- A run's buffers live until **Accept**, **Reset** or **accept on convergence** (an option per
+  algorithm).
+- Then they are parked in the host's buffer cache, keyed by size class and usage, instead of being
+  destroyed.
+- When the cache needs room for its memory budget, the least recently used parked buffers are
+  destroyed first. Buffers of an active run are pinned and never evicted; if the budget cannot be
+  met, a new run is refused with a reason.
+- A GPU buffer is reused only after its fence has signalled.
+- The cache holds raw buffers, never types from a plugin, so it survives a plugin reload.
+
+**Observation.** Each algorithm has a **live preview** checkbox, on by default for iterative ones.
+Off means no intermediate copies at all; the result is identical.
+- **The hand-over** from the computing thread to its readers is a lock-free **triple buffer**. The
+  writer never waits, and a reader can read at any time and always gets the newest complete state.
+  The worker copies only when the last state was taken, and at most about 30 times per second.
+- **Metrics** per step go to a ring that is kept in full, so the curves have no gaps.
+- **The UI:**
+  - the preview in the viewport, drawn from the buffers;
+  - metric curves in the panel;
+  - stop, pause and single-step buttons.
+
+  The services provide these; no panel rebuilds them.
+- **Agents get the same over MCP:**
+  - a status with the phase, the iteration, the latest metrics and their history;
+  - pause, n steps, resume, stop and accept, and cancel;
+  - waiting until a condition holds (an iteration, a metric threshold).
+
+**Tests every plugin gets cheaply:**
+- a run equals its step sequence;
+- preview on equals preview off;
+- pause and resume equals an uninterrupted run;
+- cancel leaves the scene unchanged;
+- no data transfer per step after `Init`, apart from the metrics.
+
 **Still proposed, not decided:** no central framework that knows the *shapes* of operations (as ADR
 0031 built), and no generator or golden that every new field must pass through.
 
@@ -126,6 +204,7 @@ plugins/marching_cubes/
 | **R4** A plugin change reaches the running Sandbox without a restart. | time from saving an edit to the reloaded plugin running, for a typical plugin | not possible; a restart is needed | proposal: under 10 s |
 | **R5** Everything the editor can do, an agent can do over MCP. | registered commands without an MCP tool, and editor actions that are not commands | 48 MCP tools from a hand-written list; coverage of editor actions not measured | 0 and 0 |
 | **R6** Build and CI are fast. | incremental rebuild after editing one plugin; CI wall time | CI `ci-linux-clang` median 40 min (36 runs, 22 to 71); incremental rebuild not measured | proposal: rebuild well under a minute, CI median under 15 min |
+| **R7** Algorithms stay interactive and observable. | longest main-thread stall caused by an algorithm run; CPU-GPU bytes per step after `Init` (metrics apart); algorithms with step functions | not measured; GPU k-means uploads once; CPD has `Step()` | proposal: under 4 ms; 0 bytes; every iterative algorithm |
 
 The proposed numbers for R4 and R6 are set by the operator once their baselines are measured.
 

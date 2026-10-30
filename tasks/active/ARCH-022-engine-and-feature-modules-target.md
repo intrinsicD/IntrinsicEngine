@@ -38,6 +38,29 @@ contract_review: tracker only; each slice declares its own contracts
 38. "Passt 1-3. evidence gerne löschen" (1: the three kinds of code, promotion instead of plugin
     dependencies, and "the UI only calls commands" go into the target; 2: the 13 older active tasks
     move to the backlog; 3: the reviewed evidence folders are deleted)
+39. "Macht es Sinn alle Algorithmen die über die ui ausgeführt werden (per Button Click) als
+    asynchrone tasks auszuführen? Ansonsten hätte ich lieber interaktivität falls sich das irgendwie
+    mit zb slidern beißt… Wie macht man das besonders gut?"
+40. "Ok das klingt ziemlich gut. Außerdem hätte ich bei bestimmten Algorithmen, zb Registrierung oder
+    iterative Optimierung/fitting gerne interaktive Updates, so dass man live verfolgen kann was
+    passiert (observability). Ich habe gemerkt dass ich so besonders schnell Fehler in den
+    Algorithmen finden kann und dass das auch die Wartezeit verkürzt. Wir könnten das als preview
+    checkbox bei den ui Algorithmen einbauen dass man das auch ausstellen kann?"
+41. "- eine step Funktion sollte es überall, wo möglich, geben - für die Beobachtung der Algorithmen
+    würde ich gerne eine Art „Double buffering" verwenden, sodass diese lockless funktionieren und
+    ich zu jeder Zeit lesen kann ohne die Berechnung zu stören. Oder ist das keine gute Idee und
+    wiederspricht dem „Briefkasten"? - wenn ein Algorithmus fertig ist können die temporären buffer
+    zerstört werden oder in einen reuse cache geparkt werden damit diese nicht neu instanziert werden
+    müssen und recycelt werden können. - ja Agenten sollten das ebenfalls bekommen. Wie macht man das
+    alles „gut"?"
+42. "Klingt gut, mir ist nur wichtig dass wenn step aufgerufen wird (außer bei der ersten iteration)
+    der „gpu-State" den der Algorithmus braucht bereits existiert. Also dass nicht zwischen drin immer
+    wieder teuer gpu io oder so passieren muss (außer es geht garnicht anders) damit step einfach nur
+    ausführt und sonst quasi nix leistet. Als Beispiel hier bei kmeans, sollen die gpu bidder on die
+    die Zwischenergebnisse und Ergebnisse geschrieben werden so lange existieren bis „accept oder
+    reset" geklickt wird oder per Konvergenz akzeptiert wird oder der buffer cache aus budget Gründen
+    wieder Platz braucht. Dann sollten die am längsten ungenutzten gecacheten buffer wieder zerstört
+    werden"
 
 ## Goal
 - Reach the target in
@@ -131,3 +154,17 @@ python3 tools/docs/check_doc_links.py --root . --strict
   The strict checks pass (links, task policy, task-state links). The one local link finding is in
   the uncommitted `docs/research/geometry-methods-2026-10-23.md`, which links the old METHOD-083
   path; it is the operator's file and stays untouched.
+- 2026-10-30: Q39-Q42 recorded in the target as "Jobs, preview and observation":
+  - one way to run, with preview and commit separate, the latest preview winning, and a coarse level
+    while dragging;
+  - step functions with the loop owned by the job service;
+  - resident state, with data transfer only at start and end;
+  - buffer lifetime until Accept, Reset or convergence, then a budgeted LRU cache (active runs
+    pinned);
+  - a live preview checkbox, with a lock-free triple buffer as the hand-over (the operator's double
+    buffering, with a third buffer so neither side waits), a full metric ring, and the same controls
+    for agents over MCP;
+  - five cheap tests per plugin.
+
+  New rule R7 (interactive and observable) with today's values. GPU k-means already uploads once
+  and previews at an interval; CPD has `Step()`.
