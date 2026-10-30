@@ -822,12 +822,15 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
     using Density = Runtime::KernelDensityOperation;
     using Spacing = Runtime::PointSpacingOperation;
     using Weights = Runtime::DensityWeightOperation;
+    using Outliers = Runtime::OutlierOperation;
     const Runtime::KernelDensityConfig missingDensity{.StableEntityId = 0xFFFFFFF0u};
     const Runtime::PointSpacingConfig missingSpacing{.StableEntityId = 0xFFFFFFF0u};
     const Runtime::KernelDensityConfig invalidDensity{.Backend = static_cast<Runtime::KernelDensityBackend>(7)};
     const Runtime::PointSpacingConfig invalidSpacing{.Backend = static_cast<Runtime::PointSpacingBackend>(7)};
     const Runtime::DensityWeightConfig missingWeights{.StableEntityId = 0xFFFFFFF0u};
     const Runtime::DensityWeightConfig invalidWeights{.Backend = static_cast<Runtime::DensityWeightBackend>(7)};
+    const Runtime::OutlierAnalysisConfig missingOutliers{.StableEntityId = 0xFFFFFFF0u};
+    const Runtime::OutlierAnalysisConfig invalidOutliers{.Backend = static_cast<Runtime::OutlierAnalysisBackend>(7)};
     Runtime::EditorPointFieldPreparedFrame expired{};
     {
         Runtime::EditorWorkspaceAttachment attachment;
@@ -840,6 +843,8 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         EXPECT_FALSE(empty.Results.Last<Density>());
         EXPECT_FALSE(empty.Results.Last<Spacing>());
         EXPECT_FALSE(empty.Results.Last<Weights>());
+        EXPECT_FALSE(empty.Results.Last<Outliers>());
+        (void)Runtime::ApplyEditorOutlierAnalysisCommand(empty.Commands, missingOutliers, {});
         (void)Runtime::ApplyEditorKernelDensityCommand(empty.Commands, missingDensity, {});
         (void)Runtime::ApplyEditorPointSpacingCommand(empty.Commands, missingSpacing, {});
         (void)Runtime::ApplyEditorDensityWeightCommand(empty.Commands, missingWeights, {});
@@ -848,6 +853,13 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         ASSERT_TRUE(first.Results.Last<Spacing>());
         EXPECT_EQ(first.Results.Last<Density>()->Message, "Density target entity is stale or missing.");
         EXPECT_EQ(first.Results.Last<Spacing>()->Message, "Radii target entity is stale or missing.");
+        ASSERT_TRUE(first.Results.Last<Outliers>());
+        EXPECT_EQ(first.Results.Last<Outliers>()->Message, "Outlier target entity is stale or missing.");
+        const auto invalidOutlier = Runtime::ApplyEditorOutlierAnalysisCommand(empty.Commands, invalidOutliers, {});
+        EXPECT_NE(invalidOutlier.Message, "Outlier target entity is stale or missing.");
+        EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>()->Message,
+            invalidOutlier.Message);
+        EXPECT_EQ(first.Results.Last<Outliers>()->Message, "Outlier target entity is stale or missing.");
         ASSERT_TRUE(first.Results.Last<Weights>());
         EXPECT_EQ(first.Results.Last<Weights>()->Message, "Density-weight target is stale or missing.");
         EXPECT_FALSE(empty.Results.Last<Density>());
@@ -865,6 +877,11 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         EXPECT_FALSE(dismissed.Results.Last<Density>());
         ASSERT_TRUE(dismissed.Results.Last<Spacing>());
         ASSERT_TRUE(dismissed.Results.Last<Weights>()) << "another operation's dismissal leaves it";
+        ASSERT_TRUE(dismissed.Results.Last<Outliers>()) << "another operation's dismissal leaves it";
+        Runtime::DismissOperationResult<Outliers>(empty.DismissResult);
+        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>());
+        (void)Runtime::ApplyEditorOutlierAnalysisCommand(empty.Commands, missingOutliers, {});
+        ASSERT_TRUE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>());
         Runtime::DismissOperationResult<Weights>(empty.DismissResult);
         EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>());
         EXPECT_EQ(first.Results.Last<Weights>()->Message, "Density-weight target is stale or missing.");
@@ -877,6 +894,7 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         EXPECT_FALSE(Runtime::PreviewEditorKernelDensityCommand(expired.Commands, {}).Enabled);
         EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Spacing>());
         EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>());
+        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>());
         EXPECT_FALSE(Runtime::GetEditorDensityWeightConfig(expired.Commands));
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
@@ -892,6 +910,12 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         (void)Runtime::ApplyEditorDensityWeightCommand(current.Commands, missingWeights, {});
         (void)Runtime::ApplyEditorDensityWeightCommand(expired.Commands, invalidWeights, {});
         Runtime::DismissOperationResult<Weights>(expired.DismissResult);
+        (void)Runtime::ApplyEditorOutlierAnalysisCommand(current.Commands, missingOutliers, {});
+        (void)Runtime::ApplyEditorOutlierAnalysisCommand(expired.Commands, invalidOutliers, {});
+        Runtime::DismissOperationResult<Outliers>(expired.DismissResult);
+        ASSERT_TRUE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>());
+        EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>()->Message,
+            "Outlier target entity is stale or missing.");
         ASSERT_TRUE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>());
         EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>()->Message,
             "Density-weight target is stale or missing.");
@@ -901,6 +925,8 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
     Runtime::DismissOperationResult<Density>(expired.DismissResult);
     (void)Runtime::ApplyEditorDensityWeightCommand(expired.Commands, missingWeights, {});
     Runtime::DismissOperationResult<Weights>(expired.DismissResult);
+    (void)Runtime::ApplyEditorOutlierAnalysisCommand(expired.Commands, missingOutliers, {});
+    Runtime::DismissOperationResult<Outliers>(expired.DismissResult);
     EXPECT_FALSE(Runtime::PreviewEditorPointSpacingCommand(expired.Commands, {}).Enabled);
     engine.Shutdown();
 }
@@ -947,7 +973,8 @@ TEST(SandboxEditorSessionLifecycle, PointAnalysisFramesRetainAllSlotsAndRejectEx
         using S = Runtime::EditorPointAnalysisResultSinks;
         using R = Runtime::EditorPointAnalysisResultsSnapshot;
         using Slot = Runtime::EditorPointAnalysisResultSlot;
-        check(&S::OutlierAnalysis, &R::LastOutlierAnalysisResult, Slot::OutlierAnalysis);
+        // RUNTIME-354: outlier analysis left the family for the operation result store (its checks are in
+        // PointFieldFramesRetainIndependentResultsAndRejectExpiredDelivery).
         check(&S::KeypointAnalysis, &R::LastKeypointAnalysisResult, Slot::KeypointAnalysis);
         // RUNTIME-353: density weights left the family for the operation result store; descriptors keep
         // the per-slot and cross-slot checks.
@@ -965,17 +992,16 @@ TEST(SandboxEditorSessionLifecycle, PointAnalysisFramesRetainAllSlotsAndRejectEx
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
         const auto current = Runtime::PrepareEditorPointAnalysisFrame(attachment);
-        current.ResultSinks.OutlierAnalysis({.Message="new attachment"});
-        expired.ResultSinks.OutlierAnalysis({.Message="old attachment"});
-        expired.ResultSinks.DismissResult(Slot::OutlierAnalysis);
-        ASSERT_TRUE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastOutlierAnalysisResult);
-        EXPECT_EQ(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastOutlierAnalysisResult->Message,"new attachment");
+        current.ResultSinks.KeypointAnalysis({.Message="new attachment"});
+        expired.ResultSinks.KeypointAnalysis({.Message="old attachment"});
+        expired.ResultSinks.DismissResult(Slot::KeypointAnalysis);
+        ASSERT_TRUE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastKeypointAnalysisResult);
+        EXPECT_EQ(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastKeypointAnalysisResult->Message,"new attachment");
         expired = current;
     }
-    expired.ResultSinks.OutlierAnalysis({.Message="after destruction"});
     expired.ResultSinks.KeypointAnalysis({.Message="after destruction"});
     expired.ResultSinks.DescriptorAnalysis({.Message="after destruction"});
-    expired.ResultSinks.DismissResult(Runtime::EditorPointAnalysisResultSlot::OutlierAnalysis);
+    expired.ResultSinks.DismissResult(Runtime::EditorPointAnalysisResultSlot::KeypointAnalysis);
     EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(expired.Commands, {}).Enabled);
     engine.Shutdown();
 }

@@ -51,7 +51,7 @@ namespace Extrinsic::Runtime
             static constexpr std::uint32_t MinimumLiveCount = 1;
             static constexpr bool InlineDeliversToSink = false, FinalizeFromPending = true;
             static constexpr std::string_view Noun{"Density"}, History{"Compute compact density weights"};
-            static OperationWording Wording()
+            static OperationWording Wording(OperationWording)
             {
                 return {.StaleTarget = "Density-weight target is stale or missing.",
                     .OutputLabel = "Weight",

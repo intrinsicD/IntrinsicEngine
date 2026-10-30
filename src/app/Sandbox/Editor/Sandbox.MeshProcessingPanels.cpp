@@ -2109,8 +2109,10 @@ namespace Extrinsic::Sandbox::Editor
 
     void MeshProcessingPanels::Impl::DrawOutliersWindow(bool& open, const SandboxEditorContext& context)
     {
-        if (context.PointAnalysis.Results.LastOutlierAnalysisResult)
-            Outliers.LastResult = context.PointAnalysis.Results.LastOutlierAnalysisResult;
+        // RUNTIME-354: the operation runtime stores every run's result; the panel only reads it.
+        if (const auto stored = context.PointFields.Results.Last<Runtime::OutlierOperation>())
+            Outliers.LastResult = *stored;
+        const std::function<void(Runtime::EditorOutlierAnalysisResult)> noSessionSink{};
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Outlier Analysis", &open))
         {
@@ -2203,10 +2205,9 @@ namespace Extrinsic::Sandbox::Editor
                 },
                 [&]
                 {
-                    return Runtime::ApplyEditorConfiguredOutlierAnalysis(
-                        context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.OutlierAnalysis);
+                    return Runtime::ApplyEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, noSessionSink);
                 },
-                context.PointAnalysis.ResultSinks.OutlierAnalysis,
+                noSessionSink,
                 "Outlier config was rejected.",
                 request.StableEntityId,
                 request.Mask.Name);
@@ -2218,12 +2219,7 @@ namespace Extrinsic::Sandbox::Editor
                 transaction.Phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept ||
                 transaction.Phase == Runtime::EditorGpuTransactionPhase::Accepting);
         if (OutlierTransaction && !outlierActive)
-        {
-            Outliers.LastResult = transaction.Result;
-            if (context.PointAnalysis.ResultSinks.OutlierAnalysis)
-                context.PointAnalysis.ResultSinks.OutlierAnalysis(transaction.Result);
             OutlierTransaction.reset();
-        }
         if (DrawProcessingActionButton("Detect outliers", ReadinessWhileGpuRunPending(readiness, outlierActive)))
         {
             Outliers.Run.ClearNote(); // an own submission replaces an earlier duplicate refusal
@@ -2238,9 +2234,6 @@ namespace Extrinsic::Sandbox::Editor
                 else
                 {
                     Outliers.LastResult = result;
-                    // A refused start leaves no handle; the sink keeps its result on screen.
-                    if (!OutlierTransaction && context.PointAnalysis.ResultSinks.OutlierAnalysis)
-                        context.PointAnalysis.ResultSinks.OutlierAnalysis(result);
                     Outliers.Run.WatchOutputIfQueued(Outliers.LastResult, config.StableEntityId, config.Mask.Name);
                 }
             }
@@ -2262,9 +2255,8 @@ namespace Extrinsic::Sandbox::Editor
             switch (DrawGpuTransactionControls(row, "Outliers"))
             {
             case GpuTransactionRowAction::Accept:
-                Outliers.LastResult = Runtime::AcceptEditorOutlierAnalysis(context.PointAnalysis.Commands,
-                    OutlierTransaction,
-                    context.PointAnalysis.ResultSinks.OutlierAnalysis);
+                Outliers.LastResult =
+                    Runtime::AcceptEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction);
                 break;
             case GpuTransactionRowAction::Discard:
                 Runtime::DiscardEditorOutlierAnalysis(context.PointAnalysis.Commands, OutlierTransaction);
@@ -2310,8 +2302,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Outliers",
                 Outliers.LastResult,
-                Runtime::EditorPointAnalysisResultSlot::OutlierAnalysis,
-                context.PointAnalysis.ResultSinks.DismissResult);
+                &Runtime::OperationResultKey<Runtime::OutlierOperation>::Tag,
+                context.PointFields.DismissResult);
         }
         ImGui::End();
     }

@@ -997,7 +997,8 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
       "ApplyEditorConfiguredRegistrationCommand",
     }};
     // RUNTIME-348 (operator decision 28): kernel density and point spacing publish through the operation
-    // runtime's result store, which their panels read instead of naming a session sink.
+    // runtime's result store, which their panels read instead of naming a session sink; outlier analysis
+    // too (RUNTIME-354).
     constexpr std::array<std::string_view, 10> sinks{{
         "context.MeshTopology.ResultSinks.MeshDenoise",
         "context.MeshFields.ResultSinks.MeshCurvature",
@@ -1005,7 +1006,7 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
         "context.MeshTopology.ResultSinks.MeshSubdivide",
         "context.MeshTopology.ResultSinks.MeshSimplify",
         "context.Normals.ResultSinks.NormalEstimation",
-        "context.PointAnalysis.ResultSinks.OutlierAnalysis",
+        "context.PointFields.Results.Last<Runtime::OutlierOperation>()",
         "context.PointFields.Results.Last<Runtime::KernelDensityOperation>()",
         "context.PointFields.Results.Last<Runtime::PointSpacingOperation>()",
         "context.Registration.ResultSinks.Registration",

@@ -196,3 +196,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - 2026-10-30: Codex delta (`review353b`, diff `8afa940cdba6…`): approve, no findings ("This preserves
   the base lifecycle guarantees through the new storage mechanism"; timing boundary "resolved by
   disclosure"; the cleanups preserve behaviour; numbers reconcile).
+- 2026-10-30: Committed `11764850c`; CI green (ci-linux-clang, ci-docs).

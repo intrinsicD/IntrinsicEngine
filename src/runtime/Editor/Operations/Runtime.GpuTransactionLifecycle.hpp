@@ -124,6 +124,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     {
         EditorCommandStatus Status{};
         std::string Message{};
+        bool OutputBusy{}; // another run owns the output (its job or its unaccepted ring)
     };
     [[nodiscard]] std::optional<GpuTransactionRefusal> GpuTransactionStartRefusal(const GpuTransactionCore&);
     // Queues the Run job. Its readiness polls `Hooks.Poll`; publication runs `CompleteRun` and,

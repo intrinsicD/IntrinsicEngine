@@ -2316,7 +2316,8 @@ TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejected
         .Id = "test.outlier_execution", .MenuPath = {"View"}, .Title = "Outlier execution observer",
         .OpenByDefault = true,
         .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
-            result = context.PointAnalysis.Results.LastOutlierAnalysisResult;
+            const auto stored = context.PointFields.Results.Last<R::OutlierOperation>();
+            result = stored ? std::optional{*stored} : std::nullopt;
         }});
     int frame = 0, step = 0, phase = 0;
     std::uint64_t jobsBefore = 0;
@@ -5101,15 +5102,18 @@ TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResu
         context.JobCommands.Submit=[&](R::JobDesc job,const auto&)->R::JobToken {
             return stale ? h.Engine->Jobs().Submit(std::move(job)) : R::JobToken{};
         };
-        const auto commands=R::BindEditorProcessingCommands(context);
-        auto outlierRun=R::MakeEditorOutlierTransactionForTest(commands,outliers,
-            std::vector<float>(rows.Size(),1),std::vector<std::uint32_t>(rows.Size(),0),residency);
+        auto commands=R::BindEditorProcessingCommands(context);
+        R::EditorOutlierTransactionHandle outlierRun{};
         auto normalRun=R::MakeEditorNormalTransactionForTest(commands,normals,std::vector<glm::vec3>(rows.Size(),{0,0,1}));
         auto smoothingRun=R::MakeEditorPropertySmoothingTransactionForTest(commands,id,smoothing,std::vector<double>(rows.Size(),1));
-        ASSERT_TRUE(outlierRun); ASSERT_TRUE(normalRun); ASSERT_TRUE(smoothingRun);
-        if(method==0)h.Panels.InjectOutlierTransactionForTest(outlierRun);
-        else if(method==1)h.Panels.InjectNormalTransactionForTest(normalRun);
-        else h.Panels.InjectPropertySmoothingTransactionForTest(smoothingRun);
+        ASSERT_TRUE(normalRun); ASSERT_TRUE(smoothingRun);
+        if(method==1)h.Panels.InjectNormalTransactionForTest(normalRun);
+        else if(method==2)h.Panels.InjectPropertySmoothingTransactionForTest(smoothingRun);
+        // RUNTIME-354: the outlier run is bound to the session's result store (the panel's own runs are)
+        // once the first frame shows the session; the panel reads its terminal result there.
+        R::EditorProcessingCommands sessionCommands{};
+        const auto sessionObserver=h.Shell.AddFrameObserver([&](const Editor::SandboxEditorContext& frame){
+            if(!sessionCommands.IsBound())sessionCommands=frame.PointFields.Commands;});
         const auto terminal=[&]()->std::pair<Phase,std::string> {
             if(method==0){const auto s=R::SnapshotEditorOutlierAnalysis(commands,outlierRun);return {s.Phase,s.Result.Message};}
             if(method==1){const auto s=R::SnapshotEditorNormalEstimation(commands,normalRun);return {s.Phase,s.Result.Message};}
@@ -5118,6 +5122,18 @@ TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResu
         int frames=0,terminalFrame=0; bool checked=false;
         h.Driver->OnFrame=[&](R::Engine& engine) {
             if(++frames>100){ADD_FAILURE()<<"terminal result was not displayed";engine.RequestExit();return;}
+            if(method==0&&!outlierRun){
+                if(!sessionCommands.IsBound())return;
+                const auto& session=R::EditorProcessingCommandsAccess::Resolve(sessionCommands);
+                context.OperationResults=session.OperationResults;context.AttachmentActive=session.AttachmentActive;
+                commands=R::BindEditorProcessingCommands(context);
+                outlierRun=R::MakeEditorOutlierTransactionForTest(commands,outliers,
+                    std::vector<float>(rows.Size(),1),std::vector<std::uint32_t>(rows.Size(),0),residency);
+                if(!outlierRun){ADD_FAILURE()<<"no outlier transaction";engine.RequestExit();return;}
+                h.Panels.InjectOutlierTransactionForTest(outlierRun);
+                frames=1;
+                return;
+            }
             auto* window=ImGui::FindWindowByName(titles[method]); if(!window)return;
             ImGui::SetWindowSize(window,{800,1800}); ImGui::SetWindowPos(window,{0,0});
             if(frames==5){
@@ -5142,6 +5158,7 @@ TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResu
             }
         };
         h.Engine->Run(); EXPECT_TRUE(checked);
+        h.Shell.RemoveFrameObserver(sessionObserver);
         R::DiscardEditorOutlierAnalysis({},outlierRun);
         R::DiscardEditorNormalEstimation({},normalRun);
         R::DiscardEditorPropertySmoothing({},smoothingRun);
@@ -6394,9 +6411,10 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
         .PanelResult = [](const Editor::SandboxEditorContext& context)
             -> std::optional<std::pair<R::EditorCommandStatus, std::string>>
         {
-            const auto& r = context.PointAnalysis.Results.LastOutlierAnalysisResult;
+            const auto r = context.PointFields.Results.Last<R::OutlierOperation>();
             return r ? std::optional{std::pair{r->Status, r->Message}} : std::nullopt;
-        }});
+        },
+        .ElsewherePending = "Outlier estimation queued."});
 }
 
 // UI-073: the texture bake controls show the run of the bake they submitted, through the shared

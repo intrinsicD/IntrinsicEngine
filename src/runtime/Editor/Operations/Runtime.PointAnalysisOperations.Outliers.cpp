@@ -24,7 +24,6 @@ import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 import Extrinsic.ECS.Scene.Handle;
@@ -43,6 +42,7 @@ import Extrinsic.Graphics.OutlierAnalysis;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.Runtime.OperationRuntime;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -71,25 +71,6 @@ namespace Extrinsic::Runtime
             std::vector<PointPropertyWatch> Inputs{};
             PointPropertyWatch MaskWatch{};
         };
-        struct OutlierWork : GeometryProcessingDetail::PointInputCapture
-        {
-            OutlierAnalysisConfig Config{};
-            entt::entity Entity{};
-            PointPropertyWatch MaskWatch{}, ScoreWatch{};
-            GeometryScalarPropertySnapshot BeforeMask{}, BeforeScore{};
-            std::vector<std::uint32_t> AfterMask{}, Counts{}, NeighborIds{};
-            std::vector<float> AfterScore{};
-            std::shared_ptr<const SpatialIndexSnapshot> Index{};
-            SpatialIndexHandle GpuIndex{};
-            bool Abandoned{};
-            EditorOutlierAnalysisResult Result{};
-        };
-        bool CurrentInput(const EditorProcessingContext& context, const OutlierWork& w)
-        {
-            const std::array outputs{w.MaskWatch, w.ScoreWatch};
-            return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) &&
-                GeometryPropertiesCurrent(context, w.Entity, outputs);
-        }
         bool CurrentStamp(const EditorProcessingContext& context, entt::entity entity, const OutlierAnalysisConfig& c)
         {
             const auto* stamp = context.Scene->Raw().try_get<AnalysisStamp>(entity);
@@ -97,76 +78,106 @@ namespace Extrinsic::Runtime
                 GeometryPropertiesCurrent(context, entity, stamp->Inputs) &&
                 GeometryPropertiesCurrent(context, entity, std::span(&stamp->MaskWatch, 1));
         }
-        enum class CapturePurpose
+        // What a run computes: the mask and score by source slot, and the CPU LBVH scratch rows.
+        struct OutlierColumns
         {
-            Execute,
-            Readiness
-        };
-        std::shared_ptr<OutlierWork> Capture(const EditorProcessingContext& context,
-            OutlierAnalysisConfig c,
-            std::string& diagnostic,
-            CapturePurpose purpose = CapturePurpose::Execute)
-        {
-            auto fail = [&](std::string why) -> std::shared_ptr<OutlierWork>
+            std::vector<std::uint32_t> Mask{}, Counts{}, NeighborIds{};
+            std::vector<float> Score{};
+            void Resize(std::size_t slots)
             {
-                diagnostic = std::move(why);
-                return {};
+                Mask.resize(slots);
+                Score.resize(slots);
+            }
+        };
+        using OutlierWork = GeometryProcessingDetail::
+            PointColumnsWork<OutlierAnalysisConfig, EditorOutlierAnalysisResult, OutlierColumns, 2>;
+        // Outlier analysis on the operation runtime (RUNTIME-354): its capture checks, compute, custom
+        // publication, removal mode and GPU transaction; the runtime runs the stages around them.
+        struct OutlierDefinition
+        {
+            using Operation = OutlierOperation;
+            using Params = OutlierAnalysisConfig;
+            using Result = EditorOutlierAnalysisResult;
+            using Backend = OutlierAnalysisBackend;
+            using Work = OutlierWork;
+            static constexpr std::string_view Noun{"Outlier"};
+            static constexpr std::uint32_t MinimumLiveCount = 1;
+            static constexpr bool InlineDeliversToSink = false;
+            static GeometryProcessingDetail::OperationWording Wording(GeometryProcessingDetail::OperationWording w)
+            {
+                w.TooFewSamples = "Outlier analysis requires live input samples.";
+                return w;
+            }
+            static std::array<GeometryPropertyRef*, 2> Outputs(Params& c)
+            {
+                return {&c.Mask, &c.Score};
+            }
+            static Result InitialResult(const Params& c)
+            {
+                return {.Method = c.Method,
+                    .RequestedBackend = c.Backend,
+                    .Operation = c.Operation,
+                    .Mask = c.Mask,
+                    .Score = c.Score};
+            }
+            static Core::Config::EngineConfigSectionValidationResult Validate(const Params& c)
+            {
+                return ValidateOutlierAnalysisConfigSection(
+                    SerializeOutlierAnalysisConfig(c), {}, kOutlierAnalysisConfigSectionName);
+            }
+            static bool Prepare(
+                const EditorProcessingContext&, const GeometryEntityAvailability&, const Work&, std::string&);
+            static void Compute(Work&);
+            static Result Publish(const EditorProcessingContext&, Work&);
+            static bool Immediate(const Params& c)
+            {
+                return c.Operation == OutlierAnalysisOperation::RemoveMarked;
+            }
+            static Result PublishImmediate(const EditorProcessingContext&, const std::shared_ptr<Work>&);
+            static EditorOutlierTransactionHandle StartGpu(const EditorProcessingContext&,
+                const std::shared_ptr<Work>&,
+                Result&,
+                std::function<void(Result)> sink,
+                bool automatic,
+                std::function<void(Result)> retain,
+                bool& busy);
+            static EditorOutlierTransactionHandle MakeTestGpu(const EditorProcessingContext&,
+                const std::shared_ptr<Work>&,
+                Graphics::GpuPropertyResidency&,
+                std::function<void(Result)> retain);
+        };
+        using OutlierRuntime = GeometryProcessingDetail::PointColumnsRuntime<OutlierDefinition>;
+        // The method, LBVH and Vulkan checks after the runtime's shared capture (RUNTIME-354): a removal
+        // checks its source and stamp and needs nothing else.
+        bool OutlierDefinition::Prepare(const EditorProcessingContext& context,
+            const GeometryEntityAvailability& a,
+            const OutlierWork& w,
+            std::string& why)
+        {
+            const auto fail = [&](std::string reason)
+            {
+                why = std::move(reason);
+                return false;
             };
-            const auto validation = ValidateOutlierAnalysisConfigSection(
-                SerializeOutlierAnalysisConfig(c), {}, kOutlierAnalysisConfigSectionName);
-            if (!validation.Usable())
-                return fail(validation.Diagnostics.front().Message);
-            if ((context.AttachmentActive && !context.AttachmentActive()) || !context.Scene)
-                return fail("Scene is unavailable.");
-            const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
-            if (!entity)
-                return fail("Outlier target entity is stale or missing.");
-            const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
-            auto w = std::make_shared<OutlierWork>();
-            const bool captured = purpose == CapturePurpose::Execute
-                ? GeometryProcessingDetail::CapturePointInput(a, c.Positions, true, *w, diagnostic)
-                : GeometryProcessingDetail::PreparePointInput(context, *entity, a, c.Positions, *w, diagnostic);
-            if (!captured)
-                return {};
-            if (c.Mask.Domain == D::Unknown)
-                c.Mask.Domain = c.Positions.Domain;
-            if (c.Score.Domain == D::Unknown)
-                c.Score.Domain = c.Positions.Domain;
-            const std::array outputs{c.Mask, c.Score};
-            if (!GeometryProcessingDetail::ValidatePointOutputs(a, c.Positions, outputs, "Outlier", diagnostic))
-                return {};
-            const auto* props = ResolveGeometryPropertySet(a, c.Positions.Domain);
-            w->Config = c;
-            w->Entity = *entity;
-            w->Result.RequestedBackend = c.Backend;
-            w->Result.Method = c.Method;
-            w->Result.Operation = c.Operation;
-            w->Result.Mask = c.Mask;
-            w->Result.Score = c.Score;
-            w->Result.SlotCount = w->SlotCount;
-            w->Result.LiveCount = w->LiveCount;
-            w->MaskWatch = ObserveGeometryProperty(a, c.Mask.Domain, c.Mask.Name);
-            w->ScoreWatch = ObserveGeometryProperty(a, c.Score.Domain, c.Score.Name);
-            if (!w->Result.LiveCount)
-                return fail("Outlier analysis requires live input samples.");
+            const auto& c = w.Config;
             if (c.Operation == OutlierAnalysisOperation::RemoveMarked)
             {
                 if (c.Positions.Domain != D::PointCloudPoint || a.SourceView.EdgeSource ||
                     a.SourceView.HalfedgeSource || a.SourceView.FaceSource)
                     return fail(
                         "Remove Marked Points requires a topology-free point cloud. Mesh/graph detection preserves topology.");
-                if (!CurrentStamp(context, *entity, c))
+                if (!CurrentStamp(context, w.Entity, c))
                     return fail(
                         "Detect outliers again: the source or published mask changed, or this mask has no current analysis.");
-                return w;
+                return true;
             }
-            if (c.Method == OutlierAnalysisMethod::LocalDistanceRatio && w->Result.LiveCount < 2)
+            if (c.Method == OutlierAnalysisMethod::LocalDistanceRatio && w.Result.LiveCount < 2)
                 return fail("Local distance ratio requires at least two live samples.");
-            if (c.Method == OutlierAnalysisMethod::Statistical && c.KNeighbors >= w->Result.LiveCount)
+            if (c.Method == OutlierAnalysisMethod::Statistical && c.KNeighbors >= w.Result.LiveCount)
                 return fail("Statistical outlier analysis requires more live samples than k.");
             if (c.Backend != OutlierAnalysisBackend::CpuOctree)
             {
-                if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24) ||
+                if (!context.SpatialIndices || !w.ValidLbvh || w.Result.LiveCount > (1u << 24) ||
                     (c.Method == OutlierAnalysisMethod::Radius && c.Radius > Geometry::PointLBVH::CoordinateLimit))
                     return fail(
                         "LBVH requires the spatial cache, at most 2^24 samples and coordinates/radius within 1e18.");
@@ -178,33 +189,26 @@ namespace Extrinsic::Runtime
                         c.Mask.ValueKind != Geometry::PropertyValueKind::UInt32)
                         return fail("Vulkan outliers require a float score and uint32 mask.");
                     const auto width = Graphics::OutlierNeighborWidth(
-                        std::uint32_t(c.Method), c.KNeighbors, std::uint32_t(w->LiveCount));
-                    if (w->SlotCount > (1u << 20) || std::uint64_t(w->LiveCount) * width > (1u << 24))
+                        std::uint32_t(c.Method), c.KNeighbors, std::uint32_t(w.LiveCount));
+                    if (w.SlotCount > (1u << 20) || std::uint64_t(w.LiveCount) * width > (1u << 24))
                         return fail("Vulkan outlier storage exceeds the bounded device workspace.");
                     if (c.Method == OutlierAnalysisMethod::Radius && std::fpclassify(c.Radius) == FP_SUBNORMAL)
                         return fail("Vulkan radius outliers refuse subnormal radius parameters.");
                     if (std::fpclassify(c.ScoreThreshold) == FP_SUBNORMAL ||
                         std::fpclassify(c.StdDevMultiplier) == FP_SUBNORMAL)
                         return fail("Vulkan outliers refuse subnormal float threshold parameters.");
-                    if (w->HasSubnormalCoordinates)
+                    if (w.HasSubnormalCoordinates)
                         return fail("Vulkan outliers do not admit subnormal positions.");
                     if (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable())
                         return fail("Vulkan outlier neighborhoods require the framed spatial cache and job service.");
-                    if (w->Result.LiveCount > (1u << 20) ||
+                    if (w.Result.LiveCount > (1u << 20) ||
                         (c.Method == OutlierAnalysisMethod::Statistical && c.KNeighbors > 64) ||
                         (c.Method == OutlierAnalysisMethod::LocalDistanceRatio && c.KNeighbors > 63))
                         return fail(
                             "Vulkan outlier queries support at most 2^20 live samples and statistical k=1..64 or distance-ratio k<=63 (64 candidates).");
                 }
             }
-            if (purpose == CapturePurpose::Execute)
-            {
-                w->BeforeMask = CaptureGeometryScalarProperty(*props, c.Mask);
-                w->BeforeScore = CaptureGeometryScalarProperty(*props, c.Score);
-                w->AfterMask.resize(props->Size());
-                w->AfterScore.resize(props->Size());
-            }
-            return w;
+            return true;
         }
         std::uint32_t QueryWidth(const OutlierAnalysisConfig& c, std::size_t count)
         {
@@ -212,7 +216,7 @@ namespace Extrinsic::Runtime
                 return std::uint32_t(std::min(count - 1, std::max<std::size_t>(c.KNeighbors, 2)) + 1);
             return std::uint32_t(std::min<std::size_t>(c.KNeighbors, count - 1));
         }
-        void Compute(OutlierWork& w)
+        void OutlierDefinition::Compute(OutlierWork& w)
         {
             const auto started = std::chrono::steady_clock::now();
             const auto& c = w.Config;
@@ -231,9 +235,9 @@ namespace Extrinsic::Runtime
                 {
                     const auto width = QueryWidth(c, w.Points.size());
                     if (!GeometryProcessingDetail::AppendPointKnnRows(
-                            *w.Index, w.Points, width, w.NeighborIds, r.Message))
+                            *w.Index, w.Points, width, w.Values.NeighborIds, r.Message))
                         return;
-                    ratio = PC::EstimateOutlierProbabilityFromNeighbors(w.Points, w.NeighborIds, params);
+                    ratio = PC::EstimateOutlierProbabilityFromNeighbors(w.Points, w.Values.NeighborIds, params);
                 }
                 if (!ratio)
                 {
@@ -257,8 +261,8 @@ namespace Extrinsic::Runtime
             {
                 if (w.Index && c.Backend == OutlierAnalysisBackend::CpuLBVH)
                     for (std::uint32_t i = 0; i < w.Points.size(); ++i)
-                        w.Counts.push_back(w.Index->Index.Radius(w.Points[i], c.Radius, 1, i, true).TotalCount);
-                analysis = PC::ClassifyRadiusOutliers(w.Counts, c.MinimumNeighbors);
+                        w.Values.Counts.push_back(w.Index->Index.Radius(w.Points[i], c.Radius, 1, i, true).TotalCount);
+                analysis = PC::ClassifyRadiusOutliers(w.Values.Counts, c.MinimumNeighbors);
             }
             else
             {
@@ -298,8 +302,8 @@ namespace Extrinsic::Runtime
             r.DistanceThreshold = analysis.DistanceThreshold;
             for (std::size_t i = 0; i < w.Slots.size(); ++i)
             {
-                w.AfterMask[w.Slots[i]] = analysis.Mask[i];
-                w.AfterScore[w.Slots[i]] = analysis.Scores[i];
+                w.Values.Mask[w.Slots[i]] = analysis.Mask[i];
+                w.Values.Score[w.Slots[i]] = analysis.Scores[i];
             }
             r.WrittenCount = w.Slots.size();
             r.Status = EditorCommandStatus::Applied;
@@ -328,41 +332,32 @@ namespace Extrinsic::Runtime
                     watch = ObserveGeometryProperty(a, watch.Domain, watch.Name);
             raw.emplace_or_replace<AnalysisStamp>(entity, std::move(*stamp));
         }
-        EditorOutlierAnalysisResult Publish(
-            const EditorProcessingContext& context, const std::shared_ptr<OutlierWork>& w)
+        // Stage 7's custom publication (Decision 5): both columns and the stamp in one history entry.
+        EditorOutlierAnalysisResult OutlierDefinition::Publish(const EditorProcessingContext& context, OutlierWork& w)
         {
-            auto& r = w->Result;
-            if (!CurrentInput(context, *w))
-            {
-                r.Status = EditorCommandStatus::StaleEntity;
-                r.Message = "Outlier input or output changed before publication.";
-                return r;
-            }
-            if (r.Status != EditorCommandStatus::Applied)
-                return r;
+            auto& r = w.Result;
             struct State
             {
                 GeometryScalarPropertySnapshot Mask{}, Score{};
                 std::optional<AnalysisStamp> Stamp{};
             };
             std::optional<AnalysisStamp> oldStamp;
-            if (auto* stamp = context.Scene->Raw().try_get<AnalysisStamp>(w->Entity))
+            if (auto* stamp = context.Scene->Raw().try_get<AnalysisStamp>(w.Entity))
                 oldStamp = *stamp;
-            auto before = std::make_shared<State>(State{w->BeforeMask, w->BeforeScore, oldStamp});
+            auto before = std::make_shared<State>(State{w.Before[0], w.Before[1], oldStamp});
             auto after = std::make_shared<State>(*before);
-            after->Stamp = AnalysisStamp{w->Config.Positions, w->Config.Mask, w->Inputs, w->MaskWatch};
+            after->Stamp = AnalysisStamp{w.Config.Positions, w.Config.Mask, w.Inputs, w.OutputWatches[0]};
             if (!PrepareGeometryScalarProperty(
-                    after->Mask, w->Config.Mask.ValueKind, w->SlotCount, w->Slots, w->AfterMask) ||
+                    after->Mask, w.Config.Mask.ValueKind, w.SlotCount, w.Slots, w.Values.Mask) ||
                 !PrepareGeometryScalarProperty(
-                    after->Score, w->Config.Score.ValueKind, w->SlotCount, w->Slots, w->AfterScore))
+                    after->Score, w.Config.Score.ValueKind, w.SlotCount, w.Slots, w.Values.Score))
             {
                 r.Status = EditorCommandStatus::InvalidProcessingParameters;
                 r.Message = "Output values are not exactly representable in the selected scalar storage.";
                 return r;
             }
-            auto revisions =
-                std::make_shared<std::array<PointPropertyWatch, 2>>(std::array{w->MaskWatch, w->ScoreWatch});
-            const auto mutate = [context, entity = w->Entity, inputs = w->Inputs, c = w->Config, revisions](
+            auto revisions = std::make_shared<std::array<PointPropertyWatch, 2>>(w.OutputWatches);
+            const auto mutate = [context, entity = w.Entity, inputs = w.Inputs, c = w.Config, revisions](
                                     const State& target)
             {
                 if (!GeometryPropertiesCurrent(context, entity, inputs) ||
@@ -405,7 +400,8 @@ namespace Extrinsic::Runtime
                 r.Message = "Outlier publication rejected by history checks.";
             return r;
         }
-        EditorOutlierAnalysisResult RemoveMarked(
+        // The immediate mode's publication: the marked points compacted out in one history entry.
+        EditorOutlierAnalysisResult OutlierDefinition::PublishImmediate(
             const EditorProcessingContext& context, const std::shared_ptr<OutlierWork>& w)
         {
             auto& r = w->Result;
@@ -506,6 +502,8 @@ namespace Extrinsic::Runtime
         // Leased from the spatial cache; the recorder closure keeps it while its work may run.
         std::shared_ptr<Graphics::OutlierWorkspace> Workspace{};
         std::function<void(EditorOutlierAnalysisResult)> Sink{};
+        // The session store's retention (RUNTIME-354), before the sink; Accept's sink cannot replace it.
+        std::function<void(EditorOutlierAnalysisResult)> Retain{};
     };
     namespace OutlierTransactionDetail
     {
@@ -539,7 +537,7 @@ namespace Extrinsic::Runtime
                 w->Input = resolve(work.Config.Positions);
             if (!w->Input)
                 return false;
-            const std::array watches{work.ScoreWatch, work.MaskWatch};
+            const std::array watches{work.OutputWatches[1], work.OutputWatches[0]};
             for (std::size_t i = 0; i < 2; ++i)
                 if (watches[i].Revision && !w->Base[i])
                 {
@@ -669,14 +667,14 @@ namespace Extrinsic::Runtime
                     }
                     publications[i] = r->Lease ? r->Lease->Publication : 0;
                 }
-                std::memcpy(work.AfterScore.data(), t.Rings[0].Readback->Bytes.data(), work.SlotCount * 4);
-                std::memcpy(work.AfterMask.data(), t.Rings[1].Readback->Bytes.data(), work.SlotCount * 4);
+                std::memcpy(work.Values.Score.data(), t.Rings[0].Readback->Bytes.data(), work.SlotCount * 4);
+                std::memcpy(work.Values.Mask.data(), t.Rings[1].Readback->Bytes.data(), work.SlotCount * 4);
             }
             for (std::size_t i = 0; i < 2; ++i)
                 if (const auto& r = t.Rings[i].Readback)
                     r->Lease.reset();
             for (const auto row : work.Slots)
-                if (!std::isfinite(work.AfterScore[row]) || work.AfterMask[row] > 1)
+                if (!std::isfinite(work.Values.Score[row]) || work.Values.Mask[row] > 1)
                 {
                     Fail(w, "Invalid outlier device result.");
                     return;
@@ -684,7 +682,7 @@ namespace Extrinsic::Runtime
             work.Result.Status = EditorCommandStatus::Applied;
             work.Result.WrittenCount = work.Slots.size();
             work.Result.ActualBackend = "vulkan_lbvh";
-            const auto published = Publish(t.Context, w->Work);
+            const auto published = OutlierRuntime::Publish(t.Context, w->Work);
             if (!published.Succeeded())
             {
                 GP::FinishGpuTransaction(t, EditorGpuTransactionPhase::Failed, published.Status, published.Message);
@@ -739,7 +737,7 @@ namespace Extrinsic::Runtime
             t.Hooks = {.Current =
                            [raw]
                 {
-                    return CurrentInput(raw->Core.Context, *raw->Work);
+                    return OutlierRuntime::Current(raw->Core.Context, *raw->Work);
                 },
                 .Poll =
                     [self]
@@ -770,6 +768,8 @@ namespace Extrinsic::Runtime
                     auto& r = raw->Work->Result;
                     r.Status = status;
                     r.Message = std::move(message);
+                    if (auto retain = std::move(raw->Retain))
+                        retain(r);
                     if (auto sink = std::move(raw->Sink))
                         sink(r);
                 }};
@@ -789,18 +789,27 @@ namespace Extrinsic::Runtime
             (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
             return w->Work->Result;
         }
-        Run Start(const EditorProcessingContext& ctx,
+
+    }
+    namespace
+    {
+        EditorOutlierTransactionHandle OutlierDefinition::StartGpu(const EditorProcessingContext& ctx,
             const std::shared_ptr<OutlierWork>& work,
             EditorOutlierAnalysisResult& result,
             std::function<void(EditorOutlierAnalysisResult)> sink,
-            bool automatic)
+            bool automatic,
+            std::function<void(EditorOutlierAnalysisResult)> retain,
+            bool& busy)
         {
-            auto w = Make(ctx, work, ctx.SpatialIndices ? ctx.SpatialIndices->PropertyResidency() : nullptr);
+            namespace GP = GeometryProcessingDetail;
+            auto w = OutlierTransactionDetail::Make(
+                ctx, work, ctx.SpatialIndices ? ctx.SpatialIndices->PropertyResidency() : nullptr);
             w->Core.AutoAccept = automatic;
             if (auto refused = GP::GpuTransactionStartRefusal(w->Core))
             {
                 result.Status = refused->Status;
                 result.Message = std::move(refused->Message);
+                busy = refused->OutputBusy;
                 return {};
             }
             std::string why;
@@ -824,6 +833,7 @@ namespace Extrinsic::Runtime
             work->Result.ActualBackend = "vulkan_lbvh";
             work->Result.Message = "Device outlier analysis queued.";
             w->Sink = GuardEditorProcessingResult(ctx, std::move(sink));
+            w->Retain = std::move(retain);
             if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Device outlier analysis").IsValid())
             {
                 result = work->Result;
@@ -832,6 +842,36 @@ namespace Extrinsic::Runtime
                 return {};
             }
             result = work->Result;
+            return w;
+        }
+        // A completed pair of full-row fronts on a test residency.
+        EditorOutlierTransactionHandle OutlierDefinition::MakeTestGpu(const EditorProcessingContext& ctx,
+            const std::shared_ptr<Work>& work,
+            Graphics::GpuPropertyResidency& residency,
+            std::function<void(Result)> retain)
+        {
+            namespace GP = GeometryProcessingDetail;
+            auto w = OutlierTransactionDetail::Make(ctx, work, &residency);
+            auto& t = w->Core;
+            const auto rollback = [&]
+            {
+                t.Delivered = true;
+                GP::FailGpuTransaction(t, {});
+                return EditorOutlierTransactionHandle{};
+            };
+            for (std::size_t i = 0; i < 3; ++i)
+            {
+                if (GP::AcquireGpuTransactionBack(t, i, work->Entity, w->Refs[i], std::uint32_t(work->SlotCount), 3) !=
+                    GP::GpuRingAcquisition::Ready)
+                    return rollback();
+                t.Rings[i].Back.reset();
+                if (!residency.Publish(t.Rings[i].Key))
+                    return rollback();
+            }
+            t.TestFront = true;
+            w->Retain = std::move(retain);
+            GP::ReadyGpuTransaction(t);
+            work->Result.Status = EditorCommandStatus::Pending;
             return w;
         }
     }
@@ -846,17 +886,10 @@ namespace Extrinsic::Runtime
             config.Operation != OutlierAnalysisOperation::Analyze)
         {
             failure.Message = "Only Vulkan analysis creates an outlier transaction.";
+            OutlierRuntime::Refuse(commands, failure);
             return {};
         }
-        const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string why;
-        auto work = Capture(ctx, config, why);
-        if (!work)
-        {
-            failure.Message = why;
-            return {};
-        }
-        return OutlierTransactionDetail::Start(ctx, work, failure, {}, false);
+        return OutlierRuntime::StartTransaction(commands, config, failure);
     }
     EditorOutlierTransactionSnapshot SnapshotEditorOutlierAnalysis(
         const EditorProcessingCommands&, const EditorOutlierTransactionHandle& w)
@@ -905,151 +938,34 @@ namespace Extrinsic::Runtime
         std::vector<std::uint32_t> mask,
         Graphics::GpuPropertyResidency& residency)
     {
-        namespace GP = GeometryProcessingDetail;
-        const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
-        auto cpu = config;
-        cpu.Backend = OutlierAnalysisBackend::CpuOctree;
-        std::string why;
-        auto work = Capture(ctx, cpu, why);
-        if (!work || scores.size() != work->SlotCount || mask.size() != work->SlotCount)
-            return {};
-        work->Config.Backend = config.Backend;
-        work->Result.RequestedBackend = config.Backend;
-        work->AfterScore = std::move(scores);
-        work->AfterMask = std::move(mask);
-        auto w = OutlierTransactionDetail::Make(ctx, work, &residency);
-        auto& t = w->Core;
-        const auto rollback = [&]
-        {
-            t.Delivered = true;
-            GP::FailGpuTransaction(t, {});
-            return EditorOutlierTransactionHandle{};
-        };
-        for (std::size_t i = 0; i < 3; ++i)
-        {
-            if (GP::AcquireGpuTransactionBack(t, i, work->Entity, w->Refs[i], std::uint32_t(work->SlotCount), 3) !=
-                GP::GpuRingAcquisition::Ready)
-                return rollback();
-            t.Rings[i].Back.reset();
-            if (!residency.Publish(t.Rings[i].Key))
-                return rollback();
-        }
-        t.TestFront = true;
-        GP::ReadyGpuTransaction(t);
-        work->Result.Status = EditorCommandStatus::Pending;
-        return w;
+        return OutlierRuntime::MakeTransactionForTest(
+            commands,
+            config,
+            [&](OutlierWork& w)
+            {
+                if (scores.size() != w.SlotCount || mask.size() != w.SlotCount)
+                    return false;
+                w.Values.Score = std::move(scores);
+                w.Values.Mask = std::move(mask);
+                return true;
+            },
+            residency);
     }
-
     ActionReadiness PreviewEditorOutlierAnalysisCommand(
         const EditorProcessingCommands& commands, const OutlierAnalysisConfig& config)
     {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string diagnostic;
-        const auto work = Capture(context, config, diagnostic, CapturePurpose::Readiness);
-        return {bool(work), std::move(diagnostic)};
+        return OutlierRuntime::Preview(commands, config);
     }
     EditorOutlierAnalysisResult ApplyEditorOutlierAnalysisCommand(const EditorProcessingCommands& commands,
         const OutlierAnalysisConfig& config,
         std::function<void(EditorOutlierAnalysisResult)> onComplete)
     {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string diagnostic;
-        auto w = Capture(context, config, diagnostic);
-        const auto report = [&config, &w](EditorCommandStatus status, std::string message)
-        {
-            auto result = w ? w->Result
-                            : EditorOutlierAnalysisResult{.Method = config.Method,
-                                  .RequestedBackend = config.Backend,
-                                  .Operation = config.Operation,
-                                  .Mask = config.Mask,
-                                  .Score = config.Score};
-            result.Status = status;
-            result.Message = std::move(message);
-            return result;
-        };
-        if (!w)
-            return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
-        if (w->Config.Operation == OutlierAnalysisOperation::RemoveMarked)
-            return RemoveMarked(context, w);
-        if (w->Config.Backend == OutlierAnalysisBackend::VulkanLBVH)
-        {
-            auto result = w->Result;
-            (void)OutlierTransactionDetail::Start(context, w, result, std::move(onComplete), true);
-            return result;
-        }
-
-        if (w->Config.Backend != OutlierAnalysisBackend::CpuOctree)
-        {
-            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(*context.SpatialIndices,
-                context.World,
-                w->Entity,
-                w->Config.Positions,
-                w->Slots,
-                w->Points,
-                w->GpuIndex,
-                w->Index,
-                w->Result.IndexReused,
-                diagnostic);
-            if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
-                return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
-            if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
-                return report(
-                    EditorCommandStatus::StaleEntity, "Outlier index snapshot does not match the selected samples.");
-        }
-        if (!context.JobCommands.Available())
-        {
-            Compute(*w);
-            return Publish(context, w);
-        }
-        const EditorJobIdentity identity{.EntityId = config.StableEntityId,
-            .Scope = ToEditorJobScope(w->Config.Mask.Domain),
-            .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
-            .OutputName = w->Config.Mask.Name,
-            .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
-        namespace MS = GeometryProcessingDetail::MeshSupport;
-        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Outlier estimation"))
-            return report(EditorCommandStatus::Pending, std::move(busy->Message));
-        auto queued = w->Result;
-        queued.Message = "Outlier estimation queued.";
-        const MS::QueuedJobDelivery<EditorOutlierAnalysisResult> delivery{
-            context, std::move(onComplete), std::move(queued), "Outlier estimation"};
-        JobDesc desc{.DebugName = "Outlier estimation",
-            .Scope = context.World,
-            .Work = [w](const JobCancellation&) -> JobResultEnvelope
-            {
-                Compute(*w);
-                return JobResultEnvelope::Make(true);
-            },
-            .ValidateBeforeApply =
-                [context, w]
-            {
-                return MS::ValidateQueuedJob(w->Abandoned, CurrentInput(context, *w));
-            },
-            .PublishCompletion =
-                [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
-            {
-                return delivery.Publish(Publish(context, w));
-            },
-            .FinalizeUnpublishedOnMainThread =
-                [w, delivery]
-            {
-                w->Abandoned = true;
-                delivery.FinalizeAfterWorker(w->Result);
-            }};
-        if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
-        {
-            w->Abandoned = true;
-            return delivery.Rejected();
-        }
-        return delivery.Pending();
+        return OutlierRuntime::Apply(commands, config, std::move(onComplete));
     }
     EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(
         const EditorProcessingCommands& commands, std::function<void(EditorOutlierAnalysisResult)> onComplete)
     {
-        const auto config = GetEditorOutlierAnalysisConfig(commands);
-        if (!config)
-            return {.Status = EditorCommandStatus::InvalidProcessingParameters,
-                .Message = "Outlier estimation config is unavailable."};
-        return ApplyEditorOutlierAnalysisCommand(commands, *config, std::move(onComplete));
+        return OutlierRuntime::ApplyConfigured(
+            commands, GetEditorOutlierAnalysisConfig(commands), std::move(onComplete));
     }
 } // namespace Extrinsic::Runtime

@@ -41,6 +41,13 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
+    // The operation's identity for its stored results (RUNTIME-354; the config's mode enum already
+    // holds the name OutlierAnalysisOperation).
+    struct OutlierOperation
+    {
+        using Params = OutlierAnalysisConfig;
+        using Result = EditorOutlierAnalysisResult;
+    };
     struct EditorOutlierTransaction;
     using EditorOutlierTransactionHandle = std::shared_ptr<EditorOutlierTransaction>;
     struct EditorOutlierTransactionSnapshot
@@ -97,7 +104,7 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    enum class EditorPointAnalysisResultSlot : std::uint8_t { OutlierAnalysis, KeypointAnalysis, DescriptorAnalysis };
+    enum class EditorPointAnalysisResultSlot : std::uint8_t { KeypointAnalysis, DescriptorAnalysis };
     // Private workspace bindings borrow incomplete containers so sibling features
     // need not import these method records.
     extern "C++"
@@ -105,13 +112,11 @@ export namespace Extrinsic::Runtime
         struct EditorPointAnalysisResultSinks
         {
             std::function<void(EditorPointAnalysisResultSlot)> DismissResult{};
-            std::function<void(EditorOutlierAnalysisResult)> OutlierAnalysis{};
             std::function<void(EditorKeypointAnalysisResult)> KeypointAnalysis{};
             std::function<void(EditorDescriptorAnalysisResult)> DescriptorAnalysis{};
         };
         struct EditorPointAnalysisResultsSnapshot
         {
-            std::optional<EditorOutlierAnalysisResult> LastOutlierAnalysisResult{};
             std::optional<EditorKeypointAnalysisResult> LastKeypointAnalysisResult{};
             std::optional<EditorDescriptorAnalysisResult> LastDescriptorAnalysisResult{};
         };

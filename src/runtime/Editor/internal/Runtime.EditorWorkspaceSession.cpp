@@ -769,7 +769,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             if (!AttachmentEpochIsActive(epoch)) return;
             switch (slot)
             {
-            case EditorPointAnalysisResultSlot::OutlierAnalysis: m_PointAnalysisResults.LastOutlierAnalysisResult.reset(); break;
             case EditorPointAnalysisResultSlot::KeypointAnalysis: m_PointAnalysisResults.LastKeypointAnalysisResult.reset(); break;
             case EditorPointAnalysisResultSlot::DescriptorAnalysis: m_PointAnalysisResults.LastDescriptorAnalysisResult.reset(); break;
             }
@@ -873,8 +872,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         {
             if (epoch && epoch->load()) m_NormalResults.LastNormalEstimationResult.reset();
         };
-        m_PointAnalysisResultSinks.OutlierAnalysis =
-            retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastOutlierAnalysisResult);
         m_PointSetResultSinks.BilateralFilter =
             retain(m_PointSetResults, &EditorPointSetResultsSnapshot::LastBilateralFilterResult);
         m_PointAnalysisResultSinks.KeypointAnalysis =

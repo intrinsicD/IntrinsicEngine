@@ -194,6 +194,7 @@ TEST(OutlierTransaction, InitialSubmissionRejectsWithoutCallback)
     Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
     const auto result=R::ApplyEditorOutlierAnalysisCommand(h.Commands(),h.Config,[&](auto){++callbacks;});
     EXPECT_EQ(result.Status,R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(result.ActualBackend,"vulkan_lbvh")<<"the device run was submitted, not a CPU job (RUNTIME-354)";
     EXPECT_EQ(submissions,1u);EXPECT_EQ(callbacks,0u); // One terminal outcome, returned directly.
     R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
 }
@@ -230,10 +231,17 @@ TEST(OutlierTransaction, DuplicateStartIsPendingWithTheSharedMessage)
     h.Context.JobCommands.FindActive = [](const R::EditorJobIdentity& identity) {
         return std::optional{R::EditorJobRecord{.Token = R::JobToken{5, 1}, .Identity = identity, .State = R::JobState::Running}};
     };
+    R::OperationResultStore store;
+    h.Context.OperationResults = &store;
+    h.Context.AttachmentActive = []
+    {
+        return true;
+    };
     R::EditorOutlierAnalysisResult failure;
     EXPECT_FALSE(R::StartEditorOutlierAnalysisTransaction(h.Commands(), h.Config, failure));
     EXPECT_EQ(failure.Status, R::EditorCommandStatus::Pending) << failure.Message;
     EXPECT_EQ(failure.Message, "Outlier estimation already has an active running job (job 5:1).");
+    EXPECT_FALSE(store.Copy().Last<R::OutlierOperation>()) << "it answers for the active run: not stored (RUNTIME-354)";
     R::RuntimeModuleShutdownContext shutdown{commands, events, h.Jobs.Jobs(), worlds, services};
     cache.OnShutdown(shutdown);
 }
@@ -256,4 +264,134 @@ TEST(OutlierTransaction, ReentrantDiscardDuringAcceptStillDeliversAppliedOnce)
     EXPECT_TRUE(h.Rows().Exists(h.Config.Mask.Name));EXPECT_TRUE(h.Rows().Exists(h.Config.Score.Name));
     R::DiscardEditorOutlierAnalysis(h.Commands(),run);
     EXPECT_EQ(results.size(),1u);
+}
+
+// RUNTIME-354: the operation runtime keeps a device outlier run's results in the session's store
+// without the panel: its started answer, then its terminal result, also when Accept brings its own
+// sink (which replaces the run's sink, not the retention), a Discard, a failure and a cancellation.
+TEST(OutlierTransaction, GpuResultsAreRetainedWithoutThePanel)
+{
+    Harness h;
+    R::OperationResultStore store;
+    bool active = true;
+    h.Context.OperationResults = &store;
+    h.Context.AttachmentActive = [&]
+    {
+        return active;
+    };
+    const auto stored = [&]
+    {
+        return store.Copy().Last<R::OutlierOperation>();
+    };
+    auto run = h.Ready();
+    ASSERT_TRUE(run);
+    ASSERT_TRUE(stored()) << "the started answer is stored";
+    EXPECT_EQ(stored()->Status, R::EditorCommandStatus::Pending);
+    unsigned calls = 0;
+    ASSERT_EQ(R::AcceptEditorOutlierAnalysis(h.Commands(),
+                  run,
+                  [&](const R::EditorOutlierAnalysisResult& r)
+                  {
+                      ++calls;
+                      ASSERT_TRUE(stored());
+                      EXPECT_EQ(stored()->Status, r.Status) << "the store is written before the sink runs";
+                  })
+                  .Status,
+        R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    EXPECT_EQ(calls, 1u);
+    ASSERT_TRUE(stored());
+    EXPECT_EQ(stored()->Status, R::EditorCommandStatus::Applied) << "Accept's sink does not replace the retention";
+    EXPECT_EQ(stored()->RejectedCount, R::SnapshotEditorOutlierAnalysis(h.Commands(), run).Result.RejectedCount);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    // Accept without a sink: the run's terminal result is retained as well.
+    auto plain = h.Ready();
+    ASSERT_TRUE(plain);
+    ASSERT_EQ(R::AcceptEditorOutlierAnalysis(h.Commands(), plain).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    EXPECT_EQ(stored()->Status, R::EditorCommandStatus::Applied);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    auto discarded = h.Ready();
+    ASSERT_TRUE(discarded);
+    R::DiscardEditorOutlierAnalysis(h.Commands(), discarded);
+    EXPECT_EQ(stored()->Status, R::EditorCommandStatus::NoChange) << "a discard is stored";
+    EXPECT_EQ(stored()->Message, "Outlier result discarded; CPU fields retained.");
+    // An Accept that cannot be submitted fails; the failure is stored. The transaction keeps the
+    // context it was made with, so the refusing submission is installed first.
+    const auto submit = h.Context.JobCommands.Submit;
+    h.Context.JobCommands.Submit = [](R::JobDesc, R::EditorJobIdentity)
+    {
+        return R::JobToken{};
+    };
+    auto failing = h.Ready();
+    ASSERT_TRUE(failing);
+    (void)R::AcceptEditorOutlierAnalysis(h.Commands(), failing);
+    EXPECT_EQ(R::SnapshotEditorOutlierAnalysis(h.Commands(), failing).Phase, R::EditorGpuTransactionPhase::Failed);
+    EXPECT_EQ(stored()->Status, R::SnapshotEditorOutlierAnalysis(h.Commands(), failing).Result.Status)
+        << "a failure is stored";
+    h.Context.JobCommands.Submit = submit;
+    // A cancelled Accept ends the run; its terminal result is stored.
+    auto cancelled = h.Ready();
+    ASSERT_TRUE(cancelled);
+    ASSERT_EQ(R::AcceptEditorOutlierAnalysis(h.Commands(), cancelled).Status, R::EditorCommandStatus::Pending);
+    ASSERT_FALSE(h.Jobs.Snapshot().Entries.empty());
+    (void)h.Jobs.Jobs().Cancel(h.Jobs.Snapshot().Entries.back().Token);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    const auto phase = R::SnapshotEditorOutlierAnalysis(h.Commands(), cancelled).Phase;
+    EXPECT_NE(phase, R::EditorGpuTransactionPhase::ReadyToAccept);
+    EXPECT_EQ(stored()->Status, R::SnapshotEditorOutlierAnalysis(h.Commands(), cancelled).Result.Status);
+    // A run that ends after its session detached stores nothing.
+    auto detached = h.Ready();
+    ASSERT_TRUE(detached);
+    store.Clear();
+    active = false;
+    R::DiscardEditorOutlierAnalysis(h.Commands(), detached);
+    EXPECT_EQ(R::SnapshotEditorOutlierAnalysis(h.Commands(), detached).Phase, R::EditorGpuTransactionPhase::Discarded);
+    EXPECT_FALSE(stored());
+}
+
+// The production start (not the test seam) gives its transaction the store's retention: its queued
+// answer is stored, then its terminal result without any panel.
+TEST(OutlierTransaction, ProductionStartRetainsItsTerminalResult)
+{
+    Harness h;
+    R::SpatialIndexCache cache;
+    h.Context.SpatialIndices = &cache;
+    h.Device.ShaderFloat64 = true;
+    R::CommandBus commands;
+    R::KernelEventBus events;
+    R::WorldRegistry worlds;
+    R::ServiceRegistry services;
+    h.Context.World = worlds.CreateWorld("production-start");
+    h.Context.Scene = worlds.Get(h.Context.World);
+    const auto entity =
+        Intrinsic::Tests::MakePointDomainSource(*h.Context.Scene, R::GeometryElementDomain::PointCloudPoint);
+    (void)Intrinsic::Tests::PointDomainProperties(*h.Context.Scene, entity, R::GeometryElementDomain::PointCloudPoint)
+        .GetOrAdd<glm::vec3>("v:position", glm::vec3{0});
+    h.Config.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    services.BeginRegistration();
+    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(h.Device, "test").has_value());
+    R::EngineSetup setup{commands, events, h.Jobs.Jobs(), worlds, services, [](R::FramePhase, R::RuntimeFrameHook) {}};
+    ASSERT_TRUE(cache.OnRegister(setup).has_value());
+    R::OperationResultStore store;
+    h.Context.OperationResults = &store;
+    h.Context.AttachmentActive = []
+    {
+        return true;
+    };
+    const auto stored = [&]
+    {
+        return store.Copy().Last<R::OutlierOperation>();
+    };
+    R::EditorOutlierAnalysisResult result;
+    const auto run = R::StartEditorOutlierAnalysisTransaction(h.Commands(), h.Config, result);
+    ASSERT_TRUE(run) << result.Message;
+    ASSERT_TRUE(stored());
+    EXPECT_EQ(stored()->Status, R::EditorCommandStatus::Pending);
+    EXPECT_EQ(stored()->Message, "Device outlier analysis queued.");
+    R::DiscardEditorOutlierAnalysis(h.Commands(), run);
+    EXPECT_EQ(stored()->Status, R::EditorCommandStatus::NoChange) << "the terminal result is retained";
+    EXPECT_EQ(stored()->Message, "Outlier result discarded; CPU fields retained.");
+    R::RuntimeModuleShutdownContext shutdown{commands, events, h.Jobs.Jobs(), worlds, services};
+    cache.OnShutdown(shutdown);
 }

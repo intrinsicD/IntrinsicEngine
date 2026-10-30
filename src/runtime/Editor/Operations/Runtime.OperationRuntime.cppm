@@ -8,6 +8,7 @@
 // operation module instantiates the runtime, not exported.
 module;
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <concepts>
 #include <cstddef>
@@ -19,6 +20,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -93,39 +95,13 @@ export extern "C++"
             return true;
         }
 
-    // The texts a definition may declare whole (Def::Wording()); by default they are built from its
-    // names: "<Noun> estimation" labels the job, "<Method> requires at least two live samples."
-    // refuses a small input.
+    // The texts a definition may adjust (Def::Wording(defaults) returns them changed); by default they
+    // are built from its names: "<Noun> estimation" labels the job, "<Method> requires at least two
+    // live samples." refuses a small input.
         struct OperationWording
         {
             std::string StaleTarget, OutputLabel, TooFewSamples, LbvhLimits, IndexMismatch, ConfigUnavailable, JobLabel,
                 JobName, GpuHistory;
-        };
-
-    // Output names the parameters' output reference; capture resolves its domain in place. Optional:
-    // Method, Evaluation and Failure (default texts); MinimumK (kNN rows, floored at it); Wording();
-    // ReferenceBackend (CpuOctree) and MinimumLiveCount (2); Prepare (a capture step before the Vulkan
-    // admission); GpuParams(params, result); InlineDeliversToSink (true); FinalizeFromPending (false: a
-    // failed worker is delivered as it is); RefuseInPlace.
-        template <class Def>
-        concept PointScalarDefinition = requires(const typename Def::Params& params,
-            typename Def::Params& editable,
-            typename Def::Result& result,
-            const Graphics::PointScalarGpuStats& stats,
-            PointSamplesInput input) {
-            typename Def::Backend;
-            typename Def::Operation; // the exported tag its results are stored under
-            requires std::same_as<typename Def::Operation::Result, typename Def::Result>;
-            Def::Backend::CpuLBVH;
-            Def::Backend::VulkanLBVH;
-            { Def::Noun } -> std::convertible_to<std::string_view>;
-            { Def::History } -> std::convertible_to<std::string_view>;
-            { Def::Output(editable) } -> std::same_as<GeometryPropertyRef&>;
-            { Def::Validate(params) } -> std::same_as<Core::Config::EngineConfigSectionValidationResult>;
-            { Def::InitialResult(params) } -> std::same_as<typename Def::Result>;
-            requires requires { Def::GpuParams(params); } || requires { Def::GpuParams(params, result); };
-            Def::FoldGpuStats(result, stats);
-            { Def::Compute(params, input, result) } -> std::same_as<std::optional<std::vector<float>>>;
         };
 
         inline std::string JoinOperationText(std::initializer_list<std::string_view> parts)
@@ -140,10 +116,9 @@ export extern "C++"
             return text;
         }
 
-        template <PointScalarDefinition Def> struct OperationRuntime
+    // What every shape reads from a definition: its optional members, or the runtime's defaults.
+        template <class Def> struct DefinitionTraits
         {
-            using Params = typename Def::Params;
-            using Result = typename Def::Result;
             using Backend = typename Def::Backend;
             static constexpr Backend Reference = []
             {
@@ -177,27 +152,272 @@ export extern "C++"
             {
                 static const OperationWording words = []
                 {
-                    if constexpr (requires { Def::Wording(); })
-                        return Def::Wording();
-                    else
-                    {
-                        const auto job = JoinOperationText({Def::Noun, " estimation"});
-                        return OperationWording{
-                            .StaleTarget = JoinOperationText({Def::Noun, " target entity is stale or missing."}),
-                            .OutputLabel = std::string(Def::Noun),
-                            .TooFewSamples = JoinOperationText({Def::Method, " requires at least two live samples."}),
-                            .LbvhLimits =
-                                "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.",
-                            .IndexMismatch =
-                                JoinOperationText({Def::Noun, " index snapshot does not match the selected samples."}),
-                            .ConfigUnavailable = JoinOperationText({Def::Noun, " estimation config is unavailable."}),
-                            .JobLabel = job,
-                            .JobName = job,
-                            .GpuHistory = std::string(Def::History)};
-                    }
+                    const auto job = JoinOperationText({Def::Noun, " estimation"});
+                    OperationWording w{
+                        .StaleTarget = JoinOperationText({Def::Noun, " target entity is stale or missing."}),
+                        .OutputLabel = std::string(Def::Noun),
+                        .LbvhLimits =
+                            "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.",
+                        .IndexMismatch =
+                            JoinOperationText({Def::Noun, " index snapshot does not match the selected samples."}),
+                        .ConfigUnavailable = JoinOperationText({Def::Noun, " estimation config is unavailable."}),
+                        .JobLabel = job,
+                        .JobName = job};
+                    if constexpr (requires { Def::Method; })
+                        w.TooFewSamples = JoinOperationText({Def::Method, " requires at least two live samples."});
+                    if constexpr (requires { Def::History; })
+                        w.GpuHistory = std::string(Def::History);
+                    if constexpr (requires { Def::Wording(w); })
+                        w = Def::Wording(std::move(w));
+                    return w;
                 }();
                 return words;
             }
+        };
+
+    // Stage 8's slot (RUNTIME-348): the session's store, written before any sink runs and only while
+    // the attachment is active. A duplicate refusal never writes it (it answers for another run).
+        inline std::uint64_t BeginOperationRun(const EditorProcessingContext& context)
+        {
+            return context.OperationResults ? context.OperationResults->BeginRun() : 0u;
+        }
+        template <class Op>
+        typename Op::Result KeepOperationResult(
+            const EditorProcessingContext& context, std::uint64_t invocation, typename Op::Result result)
+        {
+            RetainOperationResult<Op>(context.OperationResults, context.AttachmentActive, invocation, result);
+            return result;
+        }
+
+        enum class CapturePurpose
+        {
+            Execute,
+            Readiness
+        };
+
+    // What both shapes share (RUNTIME-354), over the shape's Capture, Execute, Current, Publication and
+    // Apply: readiness, configured Apply, the store's retention, a stored refusal, stage 7's frame, and
+    // stages 4-8 of a CPU run.
+        template <class Shape, class Def> struct OperationShape : DefinitionTraits<Def>
+        {
+            using Traits = DefinitionTraits<Def>;
+            using Op = typename Def::Operation;
+            using Params = typename Def::Params;
+            using Result = typename Def::Result;
+
+        // Stages 1-2 only: ready, refused, or pending (the input kind's deferred verdict).
+            static ActionReadiness Preview(const EditorProcessingCommands& commands, const Params& config)
+            {
+                const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+                std::string diagnostic;
+                const auto work = Shape::Capture(context, config, diagnostic, CapturePurpose::Readiness);
+                return {bool(work), std::move(diagnostic)};
+            }
+
+        // Configured Apply: the active config's run, or a stored refusal without one.
+            static Result ApplyConfigured(const EditorProcessingCommands& commands,
+                const std::optional<Params>& config,
+                std::function<void(Result)> onComplete)
+            {
+                if (config)
+                    return Shape::Apply(commands, *config, std::move(onComplete));
+                const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+                return KeepOperationResult<Op>(context,
+                    BeginOperationRun(context),
+                    {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                        .Message = Traits::Words().ConfigUnavailable});
+            }
+
+        // The store's retention of a run's later result (a queued or GPU run), before its sink.
+            static std::function<void(Result)> Retainer(
+                const EditorProcessingContext& context, std::uint64_t invocation)
+            {
+                return [store = context.OperationResults, active = context.AttachmentActive, invocation](Result r)
+                {
+                    RetainOperationResult<Op>(store, active, invocation, r);
+                };
+            }
+
+        // A refusal: the captured run's result (or the request's) with the reason, stored.
+            template <class Work>
+            static Result Report(const EditorProcessingContext& context,
+                std::uint64_t invocation,
+                const std::shared_ptr<Work>& w,
+                const Params& config,
+                EditorCommandStatus status,
+                std::string message)
+            {
+                auto result = w ? w->Result : Def::InitialResult(config);
+                result.Status = status;
+                result.Message = std::move(message);
+                return KeepOperationResult<Op>(context, invocation, std::move(result));
+            }
+
+            static std::string StalePublication()
+            {
+                return JoinOperationText({Def::Noun, " input or output changed before publication."});
+            }
+
+            // Stage 7, behind its own currentness check (an abandoned run never reaches it in the job service).
+            template <class Work>
+            static Result Publish(const EditorProcessingContext& context, const std::shared_ptr<Work>& w)
+            {
+                auto& r = w->Result;
+                if (w->Abandoned || !Shape::Current(context, *w))
+                {
+                    r.Status = EditorCommandStatus::StaleEntity;
+                    r.Message = StalePublication();
+                    return r;
+                }
+                if (r.Status != EditorCommandStatus::Applied)
+                    return r;
+                return Shape::Publication(context, *w);
+            }
+
+            // Stages 4-8 on the CPU for a captured run: the shared index of a non-reference backend; then,
+            // without a job lane, execution and publication inline (stored, returned, and given to the sink
+            // unless the definition says otherwise); otherwise one queued run per output (a duplicate answers
+            // Pending for the active run and is not stored): its Pending answer is stored, stage 6 refuses a
+            // cancelled, abandoned or stale run, and the terminal result is stored before the sink receives it.
+            template <class Work>
+            static Result RunOnCpu(const EditorProcessingContext& context,
+                std::uint64_t invocation,
+                const std::shared_ptr<Work>& w,
+                const GeometryPropertyRef& output,
+                std::function<void(Result)> onComplete)
+            {
+                if (w->Config.Backend != Traits::Reference)
+                {
+                    std::string diagnostic;
+                    const auto state = AcquirePointIndex(*context.SpatialIndices,
+                        context.World,
+                        w->Entity,
+                        w->Config.Positions,
+                        w->Slots,
+                        w->Points,
+                        w->GpuIndex,
+                        w->Index,
+                        w->Result.IndexReused,
+                        diagnostic);
+                    if (state == PointIndexState::Unavailable)
+                        return Report(context,
+                            invocation,
+                            w,
+                            w->Config,
+                            EditorCommandStatus::InvalidProcessingParameters,
+                            std::move(diagnostic));
+                    if (state == PointIndexState::Mismatched)
+                        return Report(context,
+                            invocation,
+                            w,
+                            w->Config,
+                            EditorCommandStatus::StaleEntity,
+                            Traits::Words().IndexMismatch);
+                }
+                if (!context.JobCommands.Available())
+                {
+                    Shape::Execute(*w);
+                    const Result result = KeepOperationResult<Op>(context, invocation, Publish(context, w));
+                    if (Traits::InlineDeliversToSink && onComplete)
+                        onComplete(result);
+                    return result;
+                }
+                const EditorJobIdentity identity{.EntityId = w->Config.StableEntityId,
+                    .Scope = ToEditorJobScope(output.Domain),
+                    .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+                    .OutputName = output.Name,
+                    .RequestedDomain = EditorJobDomainOfBackend(ToString(w->Config.Backend))};
+                const std::string& label = Traits::Words().JobLabel;
+                if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
+                {
+                    auto result = w->Result;
+                    result.Status = EditorCommandStatus::Pending;
+                    result.Message = std::move(busy->Message);
+                    return result;
+                }
+                auto queued = w->Result;
+                queued.Message = label + " queued.";
+                const MeshSupport::QueuedJobDelivery<Result> delivery{context,
+                    [retain = Retainer(context, invocation), sink = std::move(onComplete)](Result result)
+                    {
+                        retain(result);
+                        if (sink)
+                            sink(std::move(result));
+                    },
+                    std::move(queued),
+                    label};
+                JobDesc desc{.DebugName = Traits::Words().JobName,
+                    .Scope = context.World,
+                    .Work = [w](const JobCancellation&) -> JobResultEnvelope
+                    {
+                        Shape::Execute(*w);
+                        return JobResultEnvelope::Make(true);
+                    },
+                    // Stage 6: a cancelled, abandoned or stale run publishes nothing.
+                    .ValidateBeforeApply =
+                        [context, w]
+                    {
+                        return MeshSupport::ValidateQueuedJob(w->Abandoned, Shape::Current(context, *w));
+                    },
+                    .PublishCompletion =
+                        [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
+                    {
+                        return delivery.Publish(Publish(context, w));
+                    },
+                    .FinalizeUnpublishedOnMainThread =
+                        [w, delivery]
+                    {
+                        w->Abandoned = true;
+                        if constexpr (Traits::FinalizeFromPending)
+                            delivery.Finalize();
+                        else
+                            delivery.FinalizeAfterWorker(w->Result);
+                    }};
+                if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
+                {
+                    w->Abandoned = true;
+                    return KeepOperationResult<Op>(context, invocation, delivery.Rejected());
+                }
+                return KeepOperationResult<Op>(context, invocation, delivery.Pending());
+            }
+        };
+
+        // Output names the parameters' output reference; capture resolves its domain in place. Optional:
+        // Method, Evaluation and Failure (default texts); MinimumK (kNN rows, floored at it); Wording(defaults);
+        // ReferenceBackend (CpuOctree) and MinimumLiveCount (2); Prepare (a capture step before the Vulkan
+        // admission); GpuParams(params, result); InlineDeliversToSink (true); FinalizeFromPending (false: a
+        // failed worker is delivered as it is); RefuseInPlace.
+        template <class Def>
+        concept PointScalarDefinition = requires(const typename Def::Params& params,
+            typename Def::Params& editable,
+            typename Def::Result& result,
+            const Graphics::PointScalarGpuStats& stats,
+            PointSamplesInput input) {
+            typename Def::Backend;
+            typename Def::Operation; // the exported tag its results are stored under
+            requires std::same_as<typename Def::Operation::Result, typename Def::Result>;
+            Def::Backend::CpuLBVH;
+            Def::Backend::VulkanLBVH;
+            { Def::Noun } -> std::convertible_to<std::string_view>;
+            { Def::History } -> std::convertible_to<std::string_view>;
+            { Def::Output(editable) } -> std::same_as<GeometryPropertyRef&>;
+            { Def::Validate(params) } -> std::same_as<Core::Config::EngineConfigSectionValidationResult>;
+            { Def::InitialResult(params) } -> std::same_as<typename Def::Result>;
+            requires requires { Def::GpuParams(params); } || requires { Def::GpuParams(params, result); };
+            Def::FoldGpuStats(result, stats);
+            { Def::Compute(params, input, result) } -> std::same_as<std::optional<std::vector<float>>>;
+        };
+
+        template <PointScalarDefinition Def> struct OperationRuntime : OperationShape<OperationRuntime<Def>, Def>
+        {
+            using Base = OperationShape<OperationRuntime<Def>, Def>;
+            using Params = typename Def::Params;
+            using Result = typename Def::Result;
+            using Backend = typename Def::Backend;
+            using Op = typename Def::Operation;
+            using Base::MinimumLiveCount;
+            using Base::Reference;
+            using Base::Words;
             static Graphics::PointScalarGpuParams GpuParams(const Params& c, const Result& r)
             {
                 if constexpr (requires { Def::GpuParams(c, r); })
@@ -216,17 +436,12 @@ export extern "C++"
                 bool Abandoned{};
                 typename Def::Result Result{};
             };
-            enum class Purpose
-            {
-                Execute,
-                Readiness
-            };
 
         // Stages 1-3 (and the GPU admission); null with the reason in `diagnostic` when refused.
             static std::shared_ptr<Work> Capture(const EditorProcessingContext& context,
                 Params c,
                 std::string& diagnostic,
-                Purpose purpose = Purpose::Execute)
+                CapturePurpose purpose = CapturePurpose::Execute)
             {
                 auto fail = [&](std::string why) -> std::shared_ptr<Work>
                 {
@@ -249,7 +464,7 @@ export extern "C++"
                         c.Positions,
                         Def::Output(c),
                         Words().OutputLabel,
-                        purpose == Purpose::Execute,
+                        purpose == CapturePurpose::Execute,
                         *w,
                         diagnostic))
                     return {};
@@ -269,7 +484,7 @@ export extern "C++"
                 };
                 if constexpr (requires { &Def::Prepare; })
                 {
-                    if (!Def::Prepare(c, w->Points, w->Result, purpose == Purpose::Execute, admit, diagnostic))
+                    if (!Def::Prepare(c, w->Points, w->Result, purpose == CapturePurpose::Execute, admit, diagnostic))
                         return {};
                 }
                 if (c.Backend == Backend::VulkanLBVH && !admit())
@@ -319,19 +534,16 @@ export extern "C++"
                         {Def::Noun, " computed using ", r.ActualBackend, " neighborhoods and ", Def::Evaluation, "."});
             }
 
-            // Stage 7, behind its own currentness check (an abandoned run never reaches it in the job service).
-            static Result Publish(const EditorProcessingContext& context, const std::shared_ptr<Work>& w)
+            static bool Current(const EditorProcessingContext& context, const Work& w)
             {
-                auto& r = w->Result;
-                if (w->Abandoned || !PointScalarFieldCurrent(context, w->Entity, *w))
-                {
-                    r.Status = EditorCommandStatus::StaleEntity;
-                    r.Message = JoinOperationText({Def::Noun, " input or output changed before publication."});
-                    return r;
-                }
-                if (r.Status != EditorCommandStatus::Applied)
-                    return r;
-                const auto status = PublishPointScalarField(context, w->Entity, *w, std::string(Def::History));
+                return PointScalarFieldCurrent(context, w.Entity, w);
+            }
+
+            // Stage 7's publication: the column through the property-write transaction.
+            static Result Publication(const EditorProcessingContext& context, Work& w)
+            {
+                auto& r = w.Result;
+                const auto status = PublishPointScalarField(context, w.Entity, w, std::string(Def::History));
                 r.Status = status == EditorCommandHistoryStatus::InvalidCommand
                     ? EditorCommandStatus::InvalidProcessingParameters
                     : EditorFeatureDetail::ToEditorCommandStatus(status);
@@ -357,19 +569,6 @@ export extern "C++"
                 Def::FoldGpuStats(r, s.Statistics);
                 if (s.Phase == EditorGpuTransactionPhase::Applied)
                     r.WrittenCount = r.LiveCount;
-            }
-
-        // Stage 8's slot (RUNTIME-348): the session's store, written before any sink runs and only while
-        // the attachment is active. A duplicate refusal never writes it (it answers for another run).
-            static std::uint64_t BeginRun(const EditorProcessingContext& context)
-            {
-                return context.OperationResults ? context.OperationResults->BeginRun() : 0u;
-            }
-            static Result Keep(const EditorProcessingContext& context, std::uint64_t invocation, Result result)
-            {
-                RetainOperationResult<typename Def::Operation>(
-                    context.OperationResults, context.AttachmentActive, invocation, result);
-                return result;
             }
 
         // The GPU shape: today's scalar transaction (stages 4-8 run inside it). The store keeps its
@@ -403,28 +602,18 @@ export extern "C++"
                     automatic,
                     test,
                     diagnostics,
-                    [w, store = ctx.OperationResults, active = ctx.AttachmentActive, invocation](
-                        EditorPointScalarTransactionSnapshot s)
+                    [w, retain = Base::Retainer(ctx, invocation)](EditorPointScalarTransactionSnapshot s)
                     {
                         auto terminal = w->Result;
                         FoldTransaction(terminal, s);
-                        RetainOperationResult<typename Def::Operation>(store, active, invocation, terminal);
+                        retain(terminal);
                     });
                 FoldTransaction(w->Result, state);
                 result = w->Result;
                 // A start refused because another run owns the output answers for that run.
                 if (!state.OutputBusy)
-                    (void)Keep(ctx, invocation, result);
+                    (void)KeepOperationResult<Op>(ctx, invocation, result);
                 return run;
-            }
-
-        // Stages 1-2 only: ready, refused, or pending (the input kind's deferred verdict).
-            static ActionReadiness Preview(const EditorProcessingCommands& commands, const Params& config)
-            {
-                const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-                std::string diagnostic;
-                const auto work = Capture(context, config, diagnostic, Purpose::Readiness);
-                return {bool(work), std::move(diagnostic)};
             }
 
             static GeometryPropertyCatalogSnapshot InputCatalog(
@@ -433,133 +622,29 @@ export extern "C++"
                 return BuildPointInputCatalog(EditorProcessingCommandsAccess::Resolve(commands), id, MinimumLiveCount);
             }
 
-        // Stages 1-8. Immediate failures are stored and returned; without a job lane 5-8 run inline and
-        // the result is stored, delivered to the sink once and returned; a queued run stores its Pending
-        // and later its terminal result, which the sink receives once.
+            // Stages 1-8: an immediate failure is stored and returned; then the GPU transaction, or the
+            // CPU run (stages 4-8, Base::RunOnCpu).
             static Result Apply(
                 const EditorProcessingCommands& commands, const Params& config, std::function<void(Result)> onComplete)
             {
                 const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-                const std::uint64_t invocation = BeginRun(context);
+                const std::uint64_t invocation = BeginOperationRun(context);
                 std::string diagnostic;
                 auto w = Capture(context, config, diagnostic);
-                const auto answer = [&config, &w](EditorCommandStatus status, std::string message)
-                {
-                    auto result = w ? w->Result : Def::InitialResult(config);
-                    result.Status = status;
-                    result.Message = std::move(message);
-                    return result;
-                };
-                const auto report = [&](EditorCommandStatus status, std::string message)
-                {
-                    return Keep(context, invocation, answer(status, std::move(message)));
-                };
                 if (!w)
-                    return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
+                    return Base::Report(context,
+                        invocation,
+                        w,
+                        config,
+                        EditorCommandStatus::InvalidProcessingParameters,
+                        std::move(diagnostic));
                 if (w->Config.Backend == Backend::VulkanLBVH)
                 {
                     Result result;
                     (void)StartGpu(context, w, invocation, result, std::move(onComplete), true);
                     return result;
                 }
-            // Stage 4: the shared index, acquired after capture.
-                if (w->Config.Backend != Reference)
-                {
-                    const auto indexState = AcquirePointIndex(*context.SpatialIndices,
-                        context.World,
-                        w->Entity,
-                        w->Config.Positions,
-                        w->Slots,
-                        w->Points,
-                        w->GpuIndex,
-                        w->Index,
-                        w->Result.IndexReused,
-                        diagnostic);
-                    if (indexState == PointIndexState::Unavailable)
-                        return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
-                    if (indexState == PointIndexState::Mismatched)
-                        return report(EditorCommandStatus::StaleEntity, Words().IndexMismatch);
-                }
-                if (!context.JobCommands.Available())
-                {
-                    Execute(*w);
-                    const Result result = Keep(context, invocation, Publish(context, w));
-                    if (InlineDeliversToSink && onComplete)
-                        onComplete(result);
-                    return result;
-                }
-                const auto& output = Def::Output(w->Config);
-                const EditorJobIdentity identity{.EntityId = config.StableEntityId,
-                    .Scope = ToEditorJobScope(output.Domain),
-                    .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
-                    .OutputName = output.Name,
-                    .RequestedDomain = EditorJobDomainOfBackend(ToString(w->Config.Backend))};
-                const std::string& label = Words().JobLabel;
-                if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
-                    return answer(EditorCommandStatus::Pending, std::move(busy->Message));
-                auto queued = w->Result;
-                queued.Message = label + " queued.";
-                const MeshSupport::QueuedJobDelivery<Result> delivery{context,
-                    [store = context.OperationResults,
-                        active = context.AttachmentActive,
-                        invocation,
-                        sink = std::move(onComplete)](Result result)
-                    {
-                        RetainOperationResult<typename Def::Operation>(store, active, invocation, result);
-                        if (sink)
-                            sink(std::move(result));
-                    },
-                    std::move(queued),
-                    label};
-                JobDesc desc{.DebugName = Words().JobName,
-                    .Scope = context.World,
-                    .Work = [w](const JobCancellation&) -> JobResultEnvelope
-                    {
-                        Execute(*w);
-                        return JobResultEnvelope::Make(true);
-                    },
-                    // Stage 6: a cancelled, abandoned or stale run publishes nothing.
-                    .ValidateBeforeApply =
-                        [context, w]
-                    {
-                        return MeshSupport::ValidateQueuedJob(
-                            w->Abandoned, PointScalarFieldCurrent(context, w->Entity, *w));
-                    },
-                    .PublishCompletion =
-                        [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
-                    {
-                        return delivery.Publish(Publish(context, w));
-                    },
-                    .FinalizeUnpublishedOnMainThread =
-                        [w, delivery]
-                    {
-                        w->Abandoned = true;
-                        if constexpr (FinalizeFromPending)
-                            delivery.Finalize();
-                        else
-                            delivery.FinalizeAfterWorker(w->Result);
-                    }};
-                if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
-                {
-                    w->Abandoned = true;
-                    return Keep(context, invocation, delivery.Rejected());
-                }
-                return Keep(context, invocation, delivery.Pending());
-            }
-
-            static Result ApplyConfigured(const EditorProcessingCommands& commands,
-                const std::optional<Params>& config,
-                std::function<void(Result)> onComplete)
-            {
-                if (!config)
-                {
-                    const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-                    return Keep(context,
-                        BeginRun(context),
-                        {.Status = EditorCommandStatus::InvalidProcessingParameters,
-                            .Message = Words().ConfigUnavailable});
-                }
-                return Apply(commands, *config, std::move(onComplete));
+                return Base::RunOnCpu(context, invocation, w, Def::Output(w->Config), std::move(onComplete));
             }
 
         // A GPU transaction the caller drives (preview, Accept, Discard); refused unless VulkanLBVH.
@@ -569,7 +654,7 @@ export extern "C++"
                 std::function<void(Result)> sink)
             {
                 const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
-                const std::uint64_t invocation = BeginRun(ctx);
+                const std::uint64_t invocation = BeginOperationRun(ctx);
                 std::string why;
                 auto w = Capture(ctx, config, why);
                 if (!w || config.Backend != Backend::VulkanLBVH)
@@ -580,7 +665,7 @@ export extern "C++"
                         result = Def::InitialResult(config);
                     result.Status = EditorCommandStatus::InvalidProcessingParameters;
                     result.Message = w ? "GPU transaction requires vulkan_lbvh." : why;
-                    result = Keep(ctx, invocation, std::move(result));
+                    result = KeepOperationResult<Op>(ctx, invocation, std::move(result));
                     return {};
                 }
                 return StartGpu(ctx, w, invocation, result, std::move(sink), false);
@@ -604,7 +689,221 @@ export extern "C++"
                 w->Result.RequestedBackend = config.Backend;
                 w->AfterValues = std::move(values);
                 Result result;
-                return StartGpu(ctx, w, BeginRun(ctx), result, {}, false, &residency, diagnostics);
+                return StartGpu(ctx, w, BeginOperationRun(ctx), result, {}, false, &residency, diagnostics);
+            }
+        };
+
+        // A point columns run (RUNTIME-354): the capture, the watches and before-state of its N outputs,
+        // the values its definition computes, the shared index.
+        template <class P, class R, class C, std::size_t N> struct PointColumnsWork : PointInputCapture
+        {
+            P Config{};
+            entt::entity Entity{};
+            std::array<PointPropertyWatch, N> OutputWatches{};
+            std::array<GeometryScalarPropertySnapshot, N> Before{};
+            C Values{};
+            std::shared_ptr<const SpatialIndexSnapshot> Index{};
+            SpatialIndexHandle GpuIndex{};
+            bool Abandoned{};
+            R Result{};
+        };
+
+        // A definition that publishes its own columns (ADR 0031 Decision 5, custom): Work names its
+        // PointColumnsWork; Outputs lists pointers to its output references (domains resolved in place, the
+        // first names the job); Prepare adds its checks to the shared capture, before the before-state;
+        // Compute is stage 5 on the run; Publish writes stage 7's history entry after the runtime's check;
+        // Immediate selects a synchronous mode published by PublishImmediate (no index, no compute);
+        // StartGpu and MakeTestGpu run its own transaction, given the store's retention.
+        template <class Def>
+        concept PointColumnsDefinition = requires(typename Def::Params& editable,
+            const typename Def::Params& params,
+            typename Def::Work& work,
+            const EditorProcessingContext& context) {
+            typename Def::Operation;
+            requires std::same_as<typename Def::Operation::Result, typename Def::Result>;
+            requires std::derived_from<typename Def::Work, PointInputCapture>;
+            { Def::Noun } -> std::convertible_to<std::string_view>;
+            Def::Outputs(editable);
+            { Def::Validate(params) } -> std::same_as<Core::Config::EngineConfigSectionValidationResult>;
+            { Def::InitialResult(params) } -> std::same_as<typename Def::Result>;
+            { Def::Immediate(params) } -> std::same_as<bool>;
+            Def::Compute(work);
+            { Def::Publish(context, work) } -> std::same_as<typename Def::Result>;
+        };
+
+        template <PointColumnsDefinition Def> struct PointColumnsRuntime : OperationShape<PointColumnsRuntime<Def>, Def>
+        {
+            using Base = OperationShape<PointColumnsRuntime<Def>, Def>;
+            using Params = typename Def::Params;
+            using Result = typename Def::Result;
+            using Backend = typename Def::Backend;
+            using Work = typename Def::Work;
+            using Op = typename Def::Operation;
+            using Base::MinimumLiveCount;
+            using Base::Reference;
+            using Base::Words;
+            static constexpr std::size_t N = std::tuple_size_v<decltype(Def::Outputs(std::declval<Params&>()))>;
+
+            // Stages 1-3: section, scene, entity, the point input (copied for execution, prepared for
+            // readiness), the outputs' domains and checks, their watches, the live count, the definition's
+            // checks, and for an execution the outputs' before-state.
+            static std::shared_ptr<Work> Capture(const EditorProcessingContext& context,
+                Params c,
+                std::string& diagnostic,
+                CapturePurpose purpose = CapturePurpose::Execute)
+            {
+                auto fail = [&](std::string why) -> std::shared_ptr<Work>
+                {
+                    diagnostic = std::move(why);
+                    return {};
+                };
+                const auto validation = Def::Validate(c);
+                if (!validation.Usable())
+                    return fail(validation.Diagnostics.front().Message);
+                if (!context.Scene)
+                    return fail("Scene is unavailable.");
+                const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
+                if (!entity)
+                    return fail(Words().StaleTarget);
+                const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
+                auto w = std::make_shared<Work>();
+                const bool execute = purpose == CapturePurpose::Execute;
+                if (!(execute ? CapturePointInput(a, c.Positions, true, *w, diagnostic)
+                              : PreparePointInput(context, *entity, a, c.Positions, *w, diagnostic)))
+                    return {};
+                const auto outputs = Def::Outputs(c);
+                std::array<GeometryPropertyRef, N> refs{};
+                for (std::size_t i = 0; i < N; ++i)
+                {
+                    if (outputs[i]->Domain == GeometryElementDomain::Unknown)
+                        outputs[i]->Domain = c.Positions.Domain;
+                    refs[i] = *outputs[i];
+                }
+                if (!ValidatePointOutputs(a, c.Positions, refs, Words().OutputLabel, diagnostic))
+                    return {};
+                w->Config = c;
+                w->Entity = *entity;
+                w->Result = Def::InitialResult(c);
+                w->Result.SlotCount = w->SlotCount;
+                w->Result.LiveCount = w->LiveCount;
+                for (std::size_t i = 0; i < N; ++i)
+                    w->OutputWatches[i] = ObserveGeometryProperty(a, refs[i].Domain, refs[i].Name);
+                if (w->Result.LiveCount < MinimumLiveCount)
+                    return fail(Words().TooFewSamples);
+                if (!Def::Prepare(context, a, *w, diagnostic))
+                    return {};
+                if (execute && !Def::Immediate(c))
+                {
+                    const auto* props = ResolveGeometryPropertySet(a, c.Positions.Domain);
+                    for (std::size_t i = 0; i < N; ++i)
+                        w->Before[i] = CaptureGeometryScalarProperty(*props, refs[i]);
+                    w->Values.Resize(props->Size());
+                }
+                return w;
+            }
+
+            static void Execute(Work& w)
+            {
+                Def::Compute(w);
+            }
+            static bool Current(const EditorProcessingContext& context, const Work& w)
+            {
+                return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) &&
+                    GeometryPropertiesCurrent(context, w.Entity, w.OutputWatches);
+            }
+
+            static Result Publication(const EditorProcessingContext& context, Work& w)
+            {
+                return Def::Publish(context, w);
+            }
+
+            // Stages 1-8, as the scalar shape. The immediate mode: stage 4 needs nothing, the runtime's gate,
+            // the definition's publication, stored and returned. A GPU start (the definition's transaction)
+            // stores its answer unless another run owns the output.
+            static Result Apply(
+                const EditorProcessingCommands& commands, const Params& config, std::function<void(Result)> onComplete)
+            {
+                const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+                const std::uint64_t invocation = BeginOperationRun(context);
+                std::string diagnostic;
+                auto w = Capture(context, config, diagnostic);
+                if (!w)
+                    return Base::Report(context,
+                        invocation,
+                        w,
+                        config,
+                        EditorCommandStatus::InvalidProcessingParameters,
+                        std::move(diagnostic));
+                if (Def::Immediate(w->Config))
+                {
+                    if (!Current(context, *w))
+                        return Base::Report(
+                            context, invocation, w, config, EditorCommandStatus::StaleEntity, Base::StalePublication());
+                    return KeepOperationResult<Op>(context, invocation, Def::PublishImmediate(context, w));
+                }
+                if (w->Config.Backend == Backend::VulkanLBVH)
+                {
+                    auto result = w->Result;
+                    bool busy = false;
+                    (void)Def::StartGpu(
+                        context, w, result, std::move(onComplete), true, Base::Retainer(context, invocation), busy);
+                    if (!busy)
+                        (void)KeepOperationResult<Op>(context, invocation, result);
+                    return result;
+                }
+                return Base::RunOnCpu(context, invocation, w, *Def::Outputs(w->Config)[0], std::move(onComplete));
+            }
+
+            // A GPU transaction the caller drives: `result` holds the request; a refusal keeps it with the
+            // reason and is stored, as is a start no other run answers for.
+            static auto StartTransaction(const EditorProcessingCommands& commands, const Params& config, Result& result)
+            {
+                const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
+                const std::uint64_t invocation = BeginOperationRun(ctx);
+                std::string why;
+                auto w = Capture(ctx, config, why);
+                if (!w)
+                {
+                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                    result.Message = std::move(why);
+                    (void)KeepOperationResult<Op>(ctx, invocation, result);
+                    return decltype(Def::StartGpu(ctx, w, result, {}, false, {}, std::declval<bool&>())){};
+                }
+                bool busy = false;
+                auto run = Def::StartGpu(ctx, w, result, {}, false, Base::Retainer(ctx, invocation), busy);
+                if (!busy)
+                    (void)KeepOperationResult<Op>(ctx, invocation, result);
+                return run;
+            }
+            static void Refuse(const EditorProcessingCommands& commands, const Result& result)
+            {
+                const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
+                (void)KeepOperationResult<Op>(ctx, BeginOperationRun(ctx), result);
+            }
+
+            // A transaction over given values (`fill` writes them into the run), captured as the CPU
+            // reference would be; its Pending answer is stored, and its terminal result.
+            template <class Fill>
+            static auto MakeTransactionForTest(const EditorProcessingCommands& commands,
+                const Params& config,
+                Fill fill,
+                Graphics::GpuPropertyResidency& residency)
+            {
+                const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
+                auto cpu = config;
+                cpu.Backend = Reference;
+                std::string why;
+                auto w = Capture(ctx, cpu, why);
+                using Run = decltype(Def::MakeTestGpu(ctx, w, residency, {}));
+                if (!w || !fill(*w))
+                    return Run{};
+                w->Config.Backend = config.Backend;
+                w->Result.RequestedBackend = config.Backend;
+                const std::uint64_t invocation = BeginOperationRun(ctx);
+                auto run = Def::MakeTestGpu(ctx, w, residency, Base::Retainer(ctx, invocation));
+                if (run)
+                    (void)KeepOperationResult<Op>(ctx, invocation, w->Result);
+                return run;
             }
         };
     }

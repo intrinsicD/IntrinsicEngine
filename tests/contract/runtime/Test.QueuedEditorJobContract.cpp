@@ -718,7 +718,7 @@ TEST(QueuedEditorJobDriftGuard, EveryEditorJobIdentityNamesItsRequestedDomain)
     for (const auto& entry : fs::directory_iterator(root))
     {
         const auto extension = entry.path().extension();
-        if (extension != ".cpp" && extension != ".hpp") continue;
+        if (extension != ".cpp" && extension != ".hpp" && extension != ".cppm") continue; // the runtime's shared identity (RUNTIME-354)
         std::ifstream file(entry.path());
         const std::string text{std::istreambuf_iterator<char>(file), {}};
         SCOPED_TRACE(entry.path().filename().string());

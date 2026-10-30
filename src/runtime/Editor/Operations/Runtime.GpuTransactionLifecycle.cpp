@@ -210,13 +210,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     std::optional<GpuTransactionRefusal> GpuTransactionStartRefusal(const GpuTransactionCore& t)
     {
         if (auto busy = MeshSupport::ActiveOutputJobRefusal(t.Context, t.Identity, t.JobLabel))
-            return GpuTransactionRefusal{EditorCommandStatus::Pending, std::move(busy->Message)};
+            return GpuTransactionRefusal{EditorCommandStatus::Pending, std::move(busy->Message), true};
         if (!t.Residency)
             return GpuTransactionRefusal{EditorCommandStatus::InvalidProcessingParameters, t.Label + " needs the GPU property residency."};
         for (std::size_t i = 0; i < t.RingCount; ++i)
             if (t.Residency->HasRing(t.Rings[i].Key))
                 return GpuTransactionRefusal{EditorCommandStatus::InvalidProcessingParameters,
-                                             "A GPU result for this output awaits Accept or Discard."};
+                                             "A GPU result for this output awaits Accept or Discard.", true};
         return std::nullopt;
     }
 

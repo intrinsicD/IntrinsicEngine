@@ -679,3 +679,224 @@ TEST(OutlierAnalysis, UnrepresentableScoreDoesNotPartiallyPublishMask)
     EXPECT_FALSE(props.Exists(config.Score.Name));
     EXPECT_FALSE(history.CanUndo());
 }
+
+// RUNTIME-354: outlier analysis on the operation runtime. Every run's result reaches the session's
+// store, whoever started it (the panel forwarded only its own runs before); the delivery rules stay.
+TEST(OutlierAnalysis, EveryRunReachesTheOperationResultStore)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = MakeRemovalCloud(scene, 16u, false);
+    auto config = RemovalConfig(entity);
+    R::EditorCommandHistory history;
+    R::SelectionController selection;
+    R::OperationResultStore store;
+    bool active = true;
+    R::EditorProcessingContext context{.Scene = &scene, .Selection = &selection, .CommandHistory = &history};
+    context.OperationResults = &store;
+    context.AttachmentActive = [&]
+    {
+        return active;
+    };
+    const auto last = [&]
+    {
+        return store.Copy().Last<R::OutlierOperation>();
+    };
+    // Inline: stored and returned, without a sink call (as before).
+    unsigned deliveries = 0;
+    const auto detected = R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),
+        config,
+        [&](R::EditorOutlierAnalysisResult)
+        {
+            ++deliveries;
+        });
+    ASSERT_TRUE(detected.Succeeded()) << detected.Message;
+    EXPECT_EQ(deliveries, 0u);
+    ASSERT_TRUE(last());
+    EXPECT_EQ(last()->Message, detected.Message);
+    // An immediate refusal.
+    auto missing = config;
+    missing.StableEntityId = std::numeric_limits<std::uint32_t>::max();
+    (void)R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), missing);
+    EXPECT_EQ(last()->Message, "Outlier target entity is stale or missing.");
+    // RemoveMarked called directly (no panel).
+    auto remove = config;
+    remove.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    const auto removed = R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), remove);
+    ASSERT_TRUE(removed.Succeeded()) << removed.Message;
+    EXPECT_EQ(last()->Message, removed.Message);
+    EXPECT_EQ(last()->RejectedCount, removed.RejectedCount);
+    // Queued: the pending answer, a duplicate refusal leaving the active run's slot, the terminal
+    // result, and an older completion never replacing a newer immediate result.
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    const auto queued = R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), config);
+    ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
+    EXPECT_EQ(last()->Message, "Outlier estimation queued.");
+    const auto duplicate = R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), config);
+    ASSERT_EQ(duplicate.Status, R::EditorCommandStatus::Pending);
+    EXPECT_NE(duplicate.Message.find("already has an active"), std::string::npos) << duplicate.Message;
+    EXPECT_EQ(last()->Message, "Outlier estimation queued.") << "the duplicate refusal never occupies the slot";
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(last());
+    EXPECT_EQ(last()->Status, R::EditorCommandStatus::Applied) << last()->Message;
+    const auto newer = R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), config);
+    ASSERT_EQ(newer.Status, R::EditorCommandStatus::Pending);
+    (void)R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), missing);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    EXPECT_EQ(last()->Message, "Outlier target entity is stale or missing.")
+        << "an older completion never replaces a newer result";
+    // A detached session stores nothing (and refuses, as before).
+    store.Clear();
+    active = false;
+    EXPECT_EQ(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), config).Message,
+        "Scene is unavailable.");
+    EXPECT_FALSE(last());
+}
+
+// The store is written before a queued run's sink runs.
+TEST(OutlierAnalysis, QueuedResultIsStoredBeforeTheSinkRuns)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = MakeRemovalCloud(scene, 16u, false);
+    const auto config = RemovalConfig(entity);
+    R::EditorCommandHistory history;
+    R::OperationResultStore store;
+    R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+    context.OperationResults = &store;
+    context.AttachmentActive = []
+    {
+        return true;
+    };
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    bool seen = false;
+    ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),
+                  config,
+                  [&](const R::EditorOutlierAnalysisResult& r)
+                  {
+                      const auto stored = store.Copy().Last<R::OutlierOperation>();
+                      ASSERT_TRUE(stored);
+                      EXPECT_EQ(stored->Status, r.Status);
+                      EXPECT_EQ(stored->Message, r.Message);
+                      seen = true;
+                  })
+                  .Status,
+        R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    EXPECT_TRUE(seen);
+}
+
+// Pins of today's behaviour that the runtime must keep (green before and after).
+TEST(OutlierAnalysis, CompetingFailuresKeepTheirOrder)
+{
+    // A removal on a mesh refuses for its topology before any backend or Vulkan check.
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto mesh = Make(scene, D::MeshVertex);
+    auto remove = Config(mesh, D::MeshVertex);
+    remove.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    remove.Backend = R::OutlierAnalysisBackend::VulkanLBVH;
+    const auto commands = R::BindEditorProcessingCommands({.Scene = &scene});
+    EXPECT_EQ(R::ApplyEditorOutlierAnalysisCommand(commands, remove).Message,
+        "Remove Marked Points requires a topology-free point cloud. Mesh/graph detection preserves topology.");
+    // A method's parameter refusal wins over the LBVH limits (no spatial cache here).
+    auto statistical = Config(mesh, D::MeshVertex);
+    statistical.Backend = R::OutlierAnalysisBackend::CpuLBVH;
+    statistical.KNeighbors = 1000;
+    EXPECT_EQ(R::ApplyEditorOutlierAnalysisCommand(commands, statistical).Message,
+        "Statistical outlier analysis requires more live samples than k.");
+    // A removal needs no spatial index: with an LBVH backend and no cache it still runs.
+    Extrinsic::ECS::Scene::Registry cloudScene;
+    const auto cloud = MakeRemovalCloud(cloudScene, 16u, false);
+    R::EditorCommandHistory history;
+    const auto cloudCommands = R::BindEditorProcessingCommands({.Scene = &cloudScene, .CommandHistory = &history});
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(cloudCommands, RemovalConfig(cloud)).Succeeded());
+    // A valid removal skips the method, backend and Vulkan checks: no device, k above the live count.
+    auto vulkanRemove = RemovalConfig(cloud);
+    vulkanRemove.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    vulkanRemove.Method = R::OutlierAnalysisMethod::Statistical;
+    vulkanRemove.Backend = R::OutlierAnalysisBackend::VulkanLBVH;
+    vulkanRemove.KNeighbors = 1000;
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(cloudCommands, vulkanRemove).Enabled);
+    const auto vulkanRemoved = R::ApplyEditorOutlierAnalysisCommand(cloudCommands, vulkanRemove);
+    EXPECT_TRUE(vulkanRemoved.Succeeded()) << vulkanRemoved.Message;
+    EXPECT_EQ(vulkanRemoved.ActualBackend, "published_mask") << "the removal, not a device run";
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(cloudCommands, RemovalConfig(cloud)).Succeeded());
+    auto lbvhRemove = RemovalConfig(cloud);
+    lbvhRemove.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    lbvhRemove.Backend = R::OutlierAnalysisBackend::CpuLBVH;
+    const auto removed = R::ApplyEditorOutlierAnalysisCommand(cloudCommands, lbvhRemove);
+    EXPECT_TRUE(removed.Succeeded()) << removed.Message;
+}
+
+TEST(OutlierAnalysis, StaleQueuedRunEndsWithTheSharedWordingAndWritesNothing)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = MakeRemovalCloud(scene, 16u, false);
+    const auto config = RemovalConfig(entity);
+    auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
+    R::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = &scene;
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    std::vector<R::EditorOutlierAnalysisResult> delivered;
+    ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),
+                  config,
+                  [&](R::EditorOutlierAnalysisResult r)
+                  {
+                      delivered.push_back(std::move(r));
+                  })
+                  .Status,
+        R::EditorCommandStatus::Pending);
+    props.Get<glm::vec3>("samples")[0].x += 1;
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_EQ(delivered.size(), 1u);
+    EXPECT_EQ(delivered[0].Status, R::EditorCommandStatus::StaleEntity);
+    EXPECT_EQ(
+        delivered[0].Message, "Outlier estimation was cancelled or its source became stale; nothing was applied.");
+    EXPECT_FALSE(props.Exists("outliers"));
+    EXPECT_FALSE(props.Exists("scores"));
+    EXPECT_FALSE(history.CanUndo());
+    auto remove = config;
+    remove.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), remove).Enabled)
+        << "no stamp was written";
+}
+
+TEST(OutlierAnalysis, PublicationWritesBothColumnsAndTheStampAndUndoRestoresAll)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = MakeRemovalCloud(scene, 16u, false);
+    const auto config = RemovalConfig(entity);
+    auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
+    R::EditorCommandHistory history;
+    const auto commands = R::BindEditorProcessingCommands({.Scene = &scene, .CommandHistory = &history});
+    auto remove = config;
+    remove.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(commands, config).Succeeded());
+    EXPECT_TRUE(props.Exists("outliers"));
+    EXPECT_TRUE(props.Exists("scores"));
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, remove).Enabled) << "the stamp is current";
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(props.Exists("outliers"));
+    EXPECT_FALSE(props.Exists("scores"));
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(commands, remove).Enabled) << "the stamp is restored";
+    ASSERT_TRUE(history.Redo().Succeeded());
+    EXPECT_TRUE(props.Exists("outliers"));
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, remove).Enabled);
+}
+
+TEST(OutlierAnalysis, NoLiveSampleRefusesWithItsOwnWording)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = MakeRemovalCloud(scene, 16u, false);
+    auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
+    auto deleted = props.GetOrAdd<bool>("v:deleted", false);
+    for (std::size_t i = 0; i < props.Size(); ++i)
+        deleted[i] = true;
+    const auto commands = R::BindEditorProcessingCommands({.Scene = &scene});
+    const auto result = R::ApplyEditorOutlierAnalysisCommand(commands, RemovalConfig(entity));
+    EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(result.Message, "Outlier analysis requires live input samples.");
+}
