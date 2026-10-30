@@ -2177,12 +2177,12 @@ namespace Extrinsic::Sandbox::Editor
             });
         if (config.Method == Runtime::OutlierAnalysisMethod::Statistical)
             ImGui::TextWrapped(
-                "Mark mean neighbor distances above the global mean plus this multiple of the population standard deviation.");
+                "Outliers have mean neighbor distances above the global mean plus this multiple of the population standard deviation.");
         else if (config.Method == Runtime::OutlierAnalysisMethod::LocalDistanceRatio)
             ImGui::TextWrapped(
-                "Compare each sample's mean neighbor distance to its neighbors' mean distances. Scores above the threshold are marked. This is a density-deviation heuristic, not a calibrated probability.");
+                "Compare each sample's mean neighbor distance to its neighbors' mean distances. Scores above the threshold are outliers. This is a density-deviation heuristic, not a calibrated probability.");
         else
-            ImGui::TextWrapped("Mark samples with fewer than this many other samples inside the inclusive radius.");
+            ImGui::TextWrapped("Outliers have fewer than this many other samples inside the inclusive radius.");
         if (changed)
         {
             config.Operation = Runtime::OutlierAnalysisOperation::Analyze;
@@ -2274,7 +2274,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("The score ring is available to the colormap; CPU fields change only on Accept.");
         }
 
-        ImGui::TextWrapped("Detection writes a mask (1 = outlier) and a score. Geometry stays in source order.");
+        ImGui::TextWrapped(
+            "Detection writes a mask (1 = marked: the outliers, or the inliers with Negative) and a score. Geometry stays in source order.");
         auto remove = config;
         remove.Operation = Runtime::OutlierAnalysisOperation::RemoveMarked;
         const auto removal = Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands, remove);
@@ -2298,7 +2299,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text(
                 "Requested: %s; ran: %s", Runtime::ToString(result.RequestedBackend), result.ActualBackend.c_str());
             ImGui::Text(
-                "Live / total: %zu / %zu; outliers: %zu", result.LiveCount, result.SlotCount, result.RejectedCount);
+                "Live / total: %zu / %zu; marked: %zu", result.LiveCount, result.SlotCount, result.RejectedCount);
             if (result.Method == Runtime::OutlierAnalysisMethod::Statistical)
                 ImGui::Text("Mean %.5g; standard deviation %.5g; threshold %.5g",
                     double(result.MeanDistance),

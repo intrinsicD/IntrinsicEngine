@@ -58,7 +58,7 @@ export extern "C++"
                 if (row.Spec.Name != section.Fields[i].Name || type != section.Fields[i].Type)
                     return false;
                 const bool number = type == ConfigFieldType::UInt || type == ConfigFieldType::Float ||
-                    type == ConfigFieldType::StringEnum;
+                    type == ConfigFieldType::StringEnum || type == ConfigFieldType::Bool;
                 if (number ? row.Get == nullptr || row.Set == nullptr
                            : type != ConfigFieldType::PropertyRef || row.Ref == nullptr)
                     return false;
@@ -90,6 +90,8 @@ extern "C++"
                 }
                 else if (row.Spec.Type == ConfigFieldType::UInt)
                     out[name] = static_cast<std::uint64_t>(row.Get(config));
+                else if (row.Spec.Type == ConfigFieldType::Bool)
+                    out[name] = row.Get(config) != 0.0;
                 else
                     out[name] = row.Get(config);
             }
@@ -117,6 +119,8 @@ extern "C++"
                         if (value.get_ref<const std::string&>() == row.Spec.EnumValues[i])
                             row.Set(config, static_cast<double>(i));
                 }
+                else if (row.Spec.Type == ConfigFieldType::Bool)
+                    row.Set(config, value.get<bool>() ? 1.0 : 0.0);
                 else
                     row.Set(config, row.Narrow ? double(value.get<float>()) : value.get<double>());
             }
@@ -142,6 +146,9 @@ extern "C++"
                     !AcceptsConfigFieldNumber(row.Spec, data[std::string(row.Spec.Name)].template get<double>()))
                     return refuse(
                         row, std::string(row.Spec.Name) + " must be " + DescribeConfigFieldRange(row.Spec) + ".");
+            for (const BoundField<Cfg>& row : section.Rows)
+                if (row.Spec.Type == ConfigFieldType::Bool && !data[std::string(row.Spec.Name)].is_boolean())
+                    return refuse(row, std::string(row.Spec.Name) + " must be boolean.");
             for (const BoundField<Cfg>& row : section.Rows)
                 if (row.Spec.Type == ConfigFieldType::StringEnum &&
                     !IsConfigFieldToken(section.Fields, row.Spec.Name, data[std::string(row.Spec.Name)]))

@@ -31,6 +31,7 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Score{.Domain=GeometryElementDomain::Unknown,.Name="outlier_score",.ValueKind=Geometry::PropertyValueKind::Float};
         std::uint32_t KNeighbors{16}, MinimumNeighbors{4}, GpuQueryBatchSize{4096};
         float StdDevMultiplier{1}, Radius{1}, ScoreThreshold{2};
+        bool Negative{};
     };
     // RUNTIME-354: the section declared once (rows bound to the record, the codec derived from them),
     // keeping the hand-written codec's messages, stage order and conversions (its golden pins them);
@@ -107,6 +108,10 @@ export namespace Extrinsic::Runtime
                                                          .Min = 0,
                                                          .Max = kOutlierAnalysisFloatMax},
             OutlierAnalysisMayStoreZero),
+        Bind<&OutlierAnalysisConfig::Negative>({.Name = "negative",
+            .Type = ConfigFieldType::Bool,
+            .Description = "Mark the inliers instead of the outliers (PCL's negative), so a removal keeps only the "
+                           "outliers. CPU backends only."}),
         Bind<&OutlierAnalysisConfig::Positions>({.Name = "positions",
             .Type = ConfigFieldType::PropertyRef,
             .Description = "Positions, mask and score must have distinct names on the same element domain.",

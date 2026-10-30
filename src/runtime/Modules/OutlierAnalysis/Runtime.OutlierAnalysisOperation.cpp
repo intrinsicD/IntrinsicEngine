@@ -183,6 +183,9 @@ namespace Extrinsic::Runtime
                         "Detect outliers again: the source or published mask changed, or this mask has no current analysis.");
                 return true;
             }
+            // The shader writes the device mask, so only the CPU backends invert it.
+            if (c.Negative && c.Backend == OutlierAnalysisBackend::VulkanLBVH)
+                return fail("Negative masks need a CPU backend.");
             if (c.Method == OutlierAnalysisMethod::LocalDistanceRatio && w.Result.LiveCount < 2)
                 return fail("Local distance ratio requires at least two live samples.");
             if (c.Method == OutlierAnalysisMethod::Statistical && c.KNeighbors >= w.Result.LiveCount)
@@ -308,13 +311,13 @@ namespace Extrinsic::Runtime
                 r.Message = "Outlier classification failed.";
                 return;
             }
-            r.RejectedCount = analysis.RejectedCount;
+            r.RejectedCount = c.Negative ? w.Slots.size() - analysis.RejectedCount : analysis.RejectedCount;
             r.MeanDistance = analysis.MeanDistance;
             r.StdDevDistance = analysis.StdDevDistance;
             r.DistanceThreshold = analysis.DistanceThreshold;
             for (std::size_t i = 0; i < w.Slots.size(); ++i)
             {
-                w.Values.Mask[w.Slots[i]] = analysis.Mask[i];
+                w.Values.Mask[w.Slots[i]] = analysis.Mask[i] != c.Negative;
                 w.Values.Score[w.Slots[i]] = analysis.Scores[i];
             }
             r.WrittenCount = w.Slots.size();

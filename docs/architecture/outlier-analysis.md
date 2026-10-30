@@ -7,6 +7,12 @@ properties on the selected element domain: `outlier_mask` (`uint32`, 1 rejects,
 0 keeps) and `outlier_score` (`float`). **Show mask** and **Show score** use the
 shared label/scalar visualization recipes.
 
+`negative` (default false, PCL's `setNegative`) inverts the mask of live samples:
+1 marks the inliers, so **Remove marked points** keeps only the outliers. Scores
+and deleted rows are unchanged, and the reported count is the marked samples.
+The CPU backends honour it; `vulkan_lbvh` refuses it before any output is
+written, because the device kernel writes the mask.
+
 All eight mesh/graph/point-cloud element domains are accepted. Positions are
 samples in the property's coordinate system: face centroids and edge samples
 are valid inputs. Distances do not apply entity transforms. Detection preserves

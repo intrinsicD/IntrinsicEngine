@@ -916,3 +916,97 @@ TEST(OutlierAnalysisConfig, BackendNamesAreTheTokensAndInvalidValuesSayInvalid)
     EXPECT_STREQ(R::ToString(R::OutlierAnalysisBackend::VulkanLBVH), "vulkan_lbvh");
     EXPECT_STREQ(R::ToString(static_cast<R::OutlierAnalysisBackend>(7)), "invalid");
 }
+
+// RUNTIME-354 block 3 (the option trial): `negative` marks the live inliers instead of the outliers
+// (PCL's setNegative) on every method and CPU backend, so a removal keeps only the outliers; the
+// Vulkan kernel writes the mask itself, so that backend refuses it before any output is written.
+TEST(OutlierAnalysisConfig, NegativeMarksTheInliersOnCpuBackendsAndVulkanRefusesIt)
+{
+    namespace C = Extrinsic::Core::Config;
+    EXPECT_FALSE(R::OutlierAnalysisConfig{}.Negative);
+    R::OutlierAnalysisConfig flipped;
+    flipped.Negative = true;
+    const auto parsed = R::ValidateDerivedSection<R::kOutlierAnalysisSection>(
+        R::SerializeDerivedSection<R::kOutlierAnalysisSection>(flipped), {}, "test");
+    ASSERT_TRUE(parsed.Usable());
+    EXPECT_NE(parsed.CanonicalPayloadJson.find(R"("negative":true)"), std::string::npos);
+    EXPECT_EQ(R::ValidateDerivedSection<R::kOutlierAnalysisSection>(R"({"negative":1})", {}, "test")
+                  .Diagnostics.front()
+                  .Message,
+        "negative must be boolean.");
+
+    for (const auto method : {R::OutlierAnalysisMethod::Statistical,
+             R::OutlierAnalysisMethod::Radius,
+             R::OutlierAnalysisMethod::LocalDistanceRatio})
+        for (const auto backend : {R::OutlierAnalysisBackend::CpuOctree, R::OutlierAnalysisBackend::CpuLBVH})
+        {
+            SCOPED_TRACE(
+                std::string(R::kOutlierAnalysisMethod[std::to_underlying(method)]) + " " + R::ToString(backend));
+            R::WorldRegistry worlds;
+            const auto world = worlds.CreateWorld("negative");
+            auto& scene = *worlds.Get(world);
+            R::SpatialIndexCache cache(worlds);
+            const auto entity = Make(scene, D::PointCloudPoint);
+            auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
+            C::EngineConfigSectionRegistry registry;
+            ASSERT_TRUE(registry.Register(R::MakeDerivedSectionRegistration<R::kOutlierAnalysisSection>()));
+            R::RuntimeEngineConfigControlState state;
+            C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
+            R::EditorCommandHistory history;
+            R::EditorProcessingContext context{
+                .Scene = &scene, .World = world, .CommandHistory = &history, .SpatialIndices = &cache};
+            context.EngineConfigControlState = &state;
+            context.EngineConfigCommandsAvailable = true;
+            context.PreviewEngineConfigDocument = [&](const auto& document, const auto& origin)
+            {
+                return C::PreviewEngineConfig(document, state.ActiveConfig, {origin, &registry});
+            };
+            context.ApplyEngineConfigHotSubset = [&](const auto& preview)
+            {
+                state.ActiveConfig = preview.Preview.Config;
+                return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
+            };
+            const auto commands = R::BindEditorProcessingCommands(context);
+            auto config = Config(entity, D::PointCloudPoint);
+            config.Method = method;
+            config.Backend = backend;
+            ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(commands, config).Succeeded());
+            // Sample 3 is the outlier; sample 4 is deleted.
+            ASSERT_EQ(std::as_const(props).Get<std::uint32_t>("outliers").Vector(),
+                (std::vector<std::uint32_t>{0, 0, 0, 1, 0}));
+            const auto scores = std::as_const(props).Get<float>("scores").Vector();
+
+            config.Negative = true;
+            ASSERT_TRUE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
+            ASSERT_TRUE(R::GetEditorOutlierAnalysisConfig(commands)->Negative);
+            const auto inverted = R::ApplyEditorConfiguredOutlierAnalysis(commands);
+            ASSERT_TRUE(inverted.Succeeded()) << inverted.Message;
+            EXPECT_EQ(inverted.RejectedCount, 3u);
+            EXPECT_EQ(std::as_const(props).Get<std::uint32_t>("outliers").Vector(),
+                (std::vector<std::uint32_t>{1, 1, 1, 0, 0}));
+            EXPECT_EQ(std::as_const(props).Get<float>("scores").Vector(), scores);
+
+            auto remove = config;
+            remove.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+            const auto removed = R::ApplyEditorOutlierAnalysisCommand(commands, remove);
+            ASSERT_TRUE(removed.Succeeded()) << removed.Message;
+            EXPECT_EQ(removed.RejectedCount, 3u);
+            ASSERT_EQ(props.Size(), 2u); // the outlier and the deleted row
+            EXPECT_EQ(std::as_const(props).Get<glm::vec3>("samples")[0], glm::vec3(10, 0, 0));
+            ASSERT_TRUE(history.Undo().Succeeded());
+            EXPECT_EQ(props.Size(), 5u);
+            EXPECT_EQ(std::as_const(props).Get<std::uint32_t>("outliers").Vector(),
+                (std::vector<std::uint32_t>{1, 1, 1, 0, 0}));
+
+            // Other Vulkan checks refuse too (no device here), so only the exact text discriminates.
+            auto vulkan = config;
+            vulkan.Backend = R::OutlierAnalysisBackend::VulkanLBVH;
+            vulkan.Mask.Name = "vulkan_mask";
+            const auto preview = R::PreviewEditorOutlierAnalysisCommand(commands, vulkan);
+            EXPECT_FALSE(preview.Enabled);
+            EXPECT_EQ(preview.DisabledReason, "Negative masks need a CPU backend.");
+            EXPECT_EQ(
+                R::ApplyEditorOutlierAnalysisCommand(commands, vulkan).Message, "Negative masks need a CPU backend.");
+            EXPECT_FALSE(props.Exists("vulkan_mask"));
+        }
+}
