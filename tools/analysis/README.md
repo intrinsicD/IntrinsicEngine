@@ -21,9 +21,10 @@ Static analysis and performance analysis tooling.
   For a developer-loop measurement, `params.build_once` configures and clean-builds only
   in the first sample, `params.edit` appends a unique probe line instead of touching
   (the source check then allows exactly the commit plus the probe lines), and omitting
-  `params.jobs` keeps Ninja's default parallelism. No-op and settle builds after every
-  scenario must produce no output except CMake's glob re-check; every command records
-  the CPU other processes used and swap activity during it
+  `params.jobs` keeps Ninja's default parallelism. The no-op build and a settle build after
+  every other scenario must produce no output except CMake's glob re-check; every command records
+  an estimated CPU residual (machine busy CPU minus its own), swap activity and the
+  PSI memory stall during it
   (`benchmarks/ci/manifests/arch022_r6_dev_loop_baseline.yaml`).
 
 - `tools/analysis/compile_hotspots.py`: normalizes the latest Ninja records

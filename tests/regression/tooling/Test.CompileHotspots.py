@@ -914,10 +914,13 @@ class CompileIterationMeasurementTests(unittest.TestCase):
             (proc / "stat").write_text("cpu  100 20 30 5000 700 4 6 0 50 0\ncpu0 1 2 3 4 5 6 7 8 9 10\n")
             (proc / "vmstat").write_text("pswpin 3\npswpout 5\npgmajfault 11\n")
             (proc / "meminfo").write_text("MemTotal: 64 kB\nMemAvailable: 32 kB\n")
+            (proc / "pressure").mkdir()
+            (proc / "pressure/memory").write_text("some avg10=0.00 avg60=0.00 avg300=0.00 total=1234\n"
+                                                  "full avg10=0.00 avg60=0.00 avg300=0.00 total=99\n")
             ticks = bench.os.sysconf("SC_CLK_TCK")
             self.assertEqual(bench.host_counters(proc), {
                 "busy_cpu_s": 160 / ticks, "swap_in_pages": 3, "swap_out_pages": 5,
-                "major_faults": 11, "mem_available_kib": 32})
+                "major_faults": 11, "memory_stall_us": 1234, "mem_available_kib": 32})
 
     def test_window_outputs_ignore_only_the_glob_recheck(self):
         window = (b"# ninja log v5\n0\t5\t0\t/b/CMakeFiles/cmake.verify_globs\ta\n"

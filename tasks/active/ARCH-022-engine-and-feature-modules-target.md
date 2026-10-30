@@ -505,3 +505,17 @@ python3 tools/docs/check_doc_links.py --root . --strict
     reused the build tree without `clean`, the probe files held exactly their probe lines, every
     settle build was empty, host counters were recorded, the CI cohort had 20 runs with all fields,
     and the report rendered. The packet goes to delta reviews.
+- 2026-10-30: R6 delta reviews on `c41e77dd…bd9da`: Claude REVISE, Codex REVISE.
+  - Codex: the report could crash instead of printing UNEVALUATED on early failures or malformed
+    inputs; `source_clean_before_after` stayed true despite probe edits; the CPU residual was presented
+    as exact attribution; flags were missing per measurement; the settle wording said "every scenario".
+  - Claude: with the 2 GiB swap full, the swap flag cannot see memory pressure (page-cache reclaim
+    shows only as faults).
+  - Revision 3: the report turns every missing or malformed input into UNEVALUATED, flags each
+    measurement row, adds a "memory stall" flag (PSI `some` above 1 % of wall time; idle host 0 µs in
+    5 s), labels the CPU residual an estimate, and shows the CI median over single-attempt runs. The
+    runner records the PSI stall, removes `CMAKE_BUILD_PARALLEL_LEVEL` when `jobs` is absent, and
+    records the probe hashes with honest source diagnostics. Self-check and runner tests extended,
+    each new check mutation-checked.
+  - Technical test of revision 3 (two samples through `r6_run.sh`, numbers not read): chain exit 0,
+    both samples sealed, the new host and source fields present, report rendered.

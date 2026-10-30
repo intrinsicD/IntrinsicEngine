@@ -34,15 +34,15 @@ params:
       - src/geometry/Geometry.Registration.cppm
       - src/geometry/Geometry.Registration.cpp
       - src/runtime/Editor/Operations/Runtime.RegistrationOperations.Processing.cpp
-  parallelism: Ninja's default (no --parallel), as a developer's build
+  parallelism: Ninja's default (no --parallel; CMAKE_BUILD_PARALLEL_LEVEL removed from the environment), as a developer's build
   compiler_cache: as the dev preset configures it; ccache is not installed on the measuring host, and the runner asserts no ccache in any compile command
   invalidation: one unique compile-relevant line appended per edit scenario and sample; edits accumulate in the disposable worktree; the touched source and the declared importers must compile
   build_storage: one build directory on disk inside the disposable worktree (build/dev), configured and clean-built once, then rebuilt incrementally
-  settledness: an unmeasured build after every scenario must produce no output except CMake's glob re-check
+  settledness: the noop build and an unmeasured build after every other scenario must produce no output except CMake's glob re-check
   dependency_state: the preinstalled dev vcpkg tree, no package installation during sampling
   operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
   memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent memory
-  host_interference: per measured window, system busy CPU from /proc/stat minus the build's own user+system CPU, and swap and major-fault deltas from /proc/vmstat
+  host_interference: per measured window, an estimated CPU residual (system busy CPU from /proc/stat minus the build's own user+system CPU), swap and major-fault deltas from /proc/vmstat, and the PSI memory stall (some) delta
   summary: per incremental scenario median, min and max over the five baseline samples; the clean build is one measurement; the warmup's incremental scenarios are retained and excluded
 metrics:
   - build_time_ms

@@ -62,9 +62,12 @@ def host_counters(proc: Path = Path("/proc")) -> dict:
     ticks = [int(v) for v in (proc / "stat").read_text().split("\n", 1)[0].split()[1:9]]
     vm = dict(line.split() for line in (proc / "vmstat").read_text().splitlines())
     memory = dict(line.split()[:2] for line in (proc / "meminfo").read_text().splitlines())
+    # PSI "some": microseconds in which at least one task stalled on memory (reclaim, refaults).
+    stall = (proc / "pressure/memory").read_text().split("\n", 1)[0].rsplit("total=", 1)[1]
     return {"busy_cpu_s": (sum(ticks) - ticks[3] - ticks[4]) / os.sysconf("SC_CLK_TCK"),
             "swap_in_pages": int(vm["pswpin"]), "swap_out_pages": int(vm["pswpout"]),
-            "major_faults": int(vm["pgmajfault"]), "mem_available_kib": int(memory["MemAvailable:"])}
+            "major_faults": int(vm["pgmajfault"]), "memory_stall_us": int(stall),
+            "mem_available_kib": int(memory["MemAvailable:"])}
 
 
 def check_source(source: Path, probes: dict[str, bytes], revision: str | None = None) -> None:
@@ -189,6 +192,8 @@ def main() -> None:
     assert not params.get("edit") or (build_once and len(set(params["source_revisions"].values())) == 1)
     output.mkdir(parents=True)
     env = dict(os.environ, CCACHE_DISABLE="1", VCPKG_FORCE_SYSTEM_BINARIES="1")
+    if not params.get("jobs"):
+        env.pop("CMAKE_BUILD_PARALLEL_LEVEL", None)  # Ninja's own default, not an inherited override
     # This runner borrows preinstalled packages; configure must never reinstall
     # them when a disposable worktree changes vcpkg's toolchain/overlay identity.
     configure = (["cmake", "--preset", params["preset"], "-B", str(build)] +
@@ -230,7 +235,7 @@ def main() -> None:
         time_lines = (directory / f"{label}.time.json").read_text().splitlines()
         record = json.loads(time_lines[-1])
         host = {key: host_after[key] - host_before[key] for key in host_before if key != "mem_available_kib"}
-        # CPU the whole machine spent in the window minus what the build's process tree spent.
+        # Estimated residual: machine busy CPU minus the build's process tree (also interrupts, kernel threads).
         host["other_cpu_s"] = host.pop("busy_cpu_s") - record["cpu_user_s"] - record["cpu_system_s"]
         host["mem_available_kib_before"] = host_before["mem_available_kib"]
         record.update(wall_ms=wall, started_at=stamp, exit_code=result.returncode, command=argv,
@@ -347,8 +352,10 @@ def main() -> None:
                if name in manifest["metrics"]},  # a reused build tree has no configure of its own
                "diagnostics": {"arm": arm, "position": position, "sample": counters[arm],
                                "toolchain_backend": params["compiler"], "configure_time_ms": configure_times,
-                               "scenarios": details, "source_clean_before_after": True,
-                               "probe_edits": sorted(probes)}}
+                               "scenarios": details, "source_clean_before_after": not probes,
+                               "source_matches_expected_state": True,
+                               "probe_edits": {path: hashlib.sha256(content).hexdigest()
+                                               for path, content in sorted(probes.items())}}}
         write_json(directory / "raw-result.json", raw)
         sealed = canonicalize(raw, manifest_path=manifest_path, manifest=manifest,
                               manifests_root=REPO / "benchmarks", run_id=output.name,
