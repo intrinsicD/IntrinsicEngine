@@ -14,6 +14,13 @@ IntrinsicEngine uses a layered architecture optimized for modularity, testabilit
 - `app`: top-level application/sandbox entrypoints that depend on `runtime`.
 - `legacy`: temporary migration area with tracked exceptions only.
 
+## Target
+
+The only current architecture target is [Engine and feature modules](engine-and-feature-modules.md):
+a foundation, a small set of module services, and self-registering feature modules that can be
+rebuilt and reloaded while the Sandbox runs and are fully controllable by agents over MCP. The layer
+rules below describe today and stay enforced; the target adds the feature ring above them.
+
 ## Contract references
 
 - Dependency and ownership rules: [layering.md](layering.md).

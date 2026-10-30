@@ -25,7 +25,7 @@ When a section refers to a retired legacy MVP, read it as "historically shipped 
 All feature tracks below target the reorganized `src/` layer layout. The current cross-cutting focus is hardening: enforce modularity, explicit dependencies, and one-way layering while preserving build/test reliability. The legacy tree is retired; missing promoted behavior belongs in the parity matrix and structured backlog tasks.
 
 - Contract and layering rules: `AGENTS.md` and `docs/agent/contract.md`.
-- Rendering target architecture: `docs/architecture/rendering-target-architecture.md`.
+- Rendering target architecture: `docs/archive/architecture/rendering-target-architecture.md`.
 - Archived hardening tracker: `tasks/archive/0001-post-reorganization-hardening-tracker.md`.
 
 ---
@@ -51,25 +51,11 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 Runtime/frame-pipeline execution work is tracked through the structured task system: see the runtime backlog index at [tasks/backlog/runtime/README.md](../tasks/backlog/runtime/README.md) and the completed runtime extraction gate [GRAPHICS-016 — Runtime extraction and graphics handoff](../tasks/archive/GRAPHICS-016-runtime-extraction-handoff.md). The default migration intent preserves the current subsystem split while introducing explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages; concrete sequencing lives in the structured GRAPHICS/runtime tasks rather than this roadmap.
 
-### Near-term architecture sequencing
+### Architecture target
 
-1. **Baseline + checkpoints**
-   - Lock current telemetry, pass ordering, and render-contract snapshots before each migration phase.
-   - Keep rollback shims and feature-flagged cutovers until each phase clears its pass/fail gates.
-   - Use `FrameLoop.StagedPhases` / `FrameLoop.LegacyCompatibility` as the explicit cutover toggle pair documented in `docs/architecture/frame-loop-rollback-strategy.md`.
-2. **Frame-stage extraction**
-   - Introduce typed `RenderFrameInput`, `WorldSnapshot`, `RenderWorld`, and `FrameContext` seams.
-   - Ensure render preparation consumes immutable extracted state instead of late live ECS traversal.
-3. **Fixed-step runtime evolution**
-   - Move toward a fixed-step simulation lane with variable-rate rendering and bounded frames in flight.
-   - Make GPU completion, deferred retirement, and per-frame ownership explicit runtime concepts.
-4. **Renderer-owned preparation**
-   - Keep three-pass/deferred/post/overlay behavior expressed as renderer-owned render-graph composition rather than top-level loop branching.
-   - Preserve headless/testable paths by isolating platform and swapchain specifics from simulation, extraction, and maintenance logic.
-
-This architecture track is intentionally cross-cutting: it enables later rendering, streaming, and interaction work without reordering the feature roadmap below.
-
-**GPU-driven pipeline plan:** [docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md](architecture/gpu-driven-modular-rendering-pipeline-plan.md) provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It is consumed by the structured rendering backlog (see [tasks/backlog/rendering/README.md](../tasks/backlog/rendering/README.md)); the original parity seed is retired as [GRAPHICS-001 — Rendering parity inventory and task index](../tasks/archive/GRAPHICS-001-rendering-parity-inventory.md).
+The architecture target is [Engine and feature modules](architecture/engine-and-feature-modules.md),
+the only current one (operator, 2026-10-30). The earlier near-term sequencing and the GPU-driven
+pipeline plan are archived ([sequencing](archive/architecture/roadmap-architecture-sequencing.md)).
 
 ### Architecture constraints (preserve during all refactor work)
 

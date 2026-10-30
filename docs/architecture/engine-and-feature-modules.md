@@ -1,0 +1,174 @@
+# Engine and feature modules: the architecture target
+
+- **Status:** The **only** current architecture target (operator, 2026-10-30). It is replaced only
+  when its goals are met. Earlier target, vision and plan documents are archived in
+  [`docs/archive/`](../archive/README.md); [ADR 0031](../adr/0031-declared-operations.md) is
+  superseded.
+- **Tracking:** [`ARCH-022`](../../tasks/active/ARCH-022-engine-and-feature-modules-target.md).
+- **Origin:** after ADR 0031's phase 2 gate failed
+  ([report](../reports/2026-10-30-phase-2-gate.md)), the operator stated the intent and decided
+  the goals below.
+
+## Goals (operator, 2026-10-30)
+
+In the operator's words: *"Am Ende zählt das Änderungen günstig sind, die Engine modular und
+erweiterbar ist und dass der Build und ci nicht so lange dauert."* Rebuilding things for these goals
+is allowed.
+
+1. **Changes are cheap.**
+2. **The engine is the foundation; modules (plugins) add features and methods.** Each module
+   registers itself.
+3. **Run-time compilation:** an agent changes a module's code, and the Sandbox keeps running and picks
+   up the change.
+4. **Agents can control the engine completely over MCP.**
+5. **Build and CI are fast.**
+
+## The target in three rings
+
+```
+ ┌───────────────────────────────────────────────────────────────────┐
+ │ Feature modules (plugins): one folder and one library each        │
+ │ (outliers, normals, remesh, ICP, k-means, texture bake, …)        │
+ │ Each one: its algorithm glue, config rows, panel and commands.    │
+ │ It registers itself, can be rebuilt and reloaded while the        │
+ │ Sandbox runs, and knows only the ring below.                      │
+ ├───────────────────────────────────────────────────────────────────┤
+ │ Module services: the small, stable surface plugins build against  │
+ │ 1. scene and property access, with one undo transaction           │
+ │ 2. jobs (snapshot in, commit on the main thread)                  │
+ │ 3. GPU resources (property residency, spatial index cache)        │
+ │ 4. config sections (declared once as rows)                        │
+ │ 5. UI host (register a window and a menu entry)                   │
+ │ 6. command registry: every action, for the UI and for MCP alike   │
+ │ 7. plugin host: load, register, unload, reload                    │
+ ├───────────────────────────────────────────────────────────────────┤
+ │ Foundation: core, ecs, geometry and graphics libraries, rhi,      │
+ │ assets, platform, the runtime kernel (frame loop, jobs, commands, │
+ │ events, worlds)                                                   │
+ └───────────────────────────────────────────────────────────────────┘
+   Dependencies point down only. The two lower rings name no feature.
+```
+
+**What this implies:**
+- **Plugins are separate libraries loaded by the running Sandbox.** A change to one rebuilds only
+  that library, which serves goal 3 and goal 5 alike. The foundation and the services are the host
+  and stay loaded.
+- **Everything a plugin adds goes through the services' registries** (config sections, windows,
+  commands), and the registries take it out again on unload. Nothing else may keep a pointer into a
+  plugin's code across a reload; this includes undo entries, which therefore hold data or a
+  registered command, not plugin closures.
+- **The kernel stays as ADR 0024/0027 decided.** `tools/repo/check_kernel_convergence.py` keeps
+  enforcing its closed surface. The archived `kernel-target-state.md` is history; its knob table no
+  longer guides placement, this page does.
+- **State that must survive a reload lives in the host:** the scene, the config and the undo
+  history. A plugin rebuilds its own state on load.
+- **Commands are the one way to act.** The UI and the MCP lane both call registered commands, and
+  the MCP tool list is generated from the command registry at run time. A plugin's command
+  therefore reaches agents without editing any central list. Today's MCP lane is described in
+  [Agent control lane](agent-control-lane.md) (ADR 0029).
+
+**Proposed working rules, not yet decided by the operator:**
+- no central framework that knows the *shapes* of operations (scalar column, custom publication,
+  GPU transaction kinds), as ADR 0031 built;
+- no generator or golden that every new field must pass through;
+- a plugin may write its own glue against the services, and small duplication between plugins is
+  accepted. A helper moves into the services ring only when three plugins need it identically.
+
+## Rules, measured
+
+| rule | measure | today (2026-10-30) | target |
+|---|---|---|---|
+| **R1** The foundation and the services name no feature. | files under `src/runtime` and `src/app`, outside plugin folders, that name two or more of the 22 agent-visible operations (snake_case or PascalCase). The algorithm libraries `src/geometry` and `src/graphics` hold the methods' kernels and are counted apart. | 31 files: 18 in the editor, 9 in the app, 2 in config, the agent operations and the runtime build list. 13 of them name five or more (below). Apart: 4 in `src/geometry` | 0 |
+| **R2** A plugin imports only the services and the foundation. | per plugin: imports of editor internals and of other plugins | outlier analysis imports 13 runtime modules, editor internals among them | 0 |
+| **R3** Adding a method is a new plugin folder; removing it is deleting the folder. | files outside the folder touched to add an operation, tests included | 9 to 13 files | 0 |
+| **R4** A plugin change reaches the running Sandbox without a restart. | time from saving an edit to the reloaded plugin running, for a typical plugin | not possible; a restart is needed | proposal: under 10 s |
+| **R5** Everything the editor can do, an agent can do over MCP. | registered commands without an MCP tool, and editor actions that are not commands | 48 MCP tools from a hand-written list; coverage of editor actions not measured | 0 and 0 |
+| **R6** Build and CI are fast. | incremental rebuild after editing one plugin; CI wall time | CI `ci-linux-clang` median 40 min (36 runs, 22 to 71); incremental rebuild not measured | proposal: rebuild well under a minute, CI median under 15 min |
+
+The proposed numbers for R4 and R6 are set by the operator once their baselines are measured.
+
+## Inventory (measured 2026-10-30)
+
+**Where the code is** (lines of C++, tests apart):
+
+| area | lines | note |
+|---|---:|---|
+| `src/geometry` | 88,566 | algorithm library: this is where the methods are |
+| `src/graphics` | 75,050 | renderer, GPU kernels |
+| `src/runtime/Editor` | 51,014 | 39,635 of it in `Editor/Operations`: the operations' glue |
+| `src/runtime/Modules` | 21,314 | 20 folders. Four hold an operation (the ADR 0031 migrations); 9 hold only a config interface; the rest are services (clustering, consolidation, texture bake, physics, GPU backends). All are built into one runtime library listed in `src/runtime/CMakeLists.txt` |
+| `src/app` (Sandbox) | 19,816 | all processing panels in two files: `Sandbox.MeshProcessingPanels.cpp` 5,478 and `Sandbox.MethodPanels.cpp` 3,987 |
+| `src/runtime/Kernel` | 5,582 | the slim kernel (ADR 0024/0027, enforced by its convergence checker) |
+
+A survey on 2026-10-28 found about 520 lines of real algorithm code in the editor. The rest is glue:
+- execution 24 %;
+- undo and commit 19 %;
+- validation and config 18 %;
+- kernel adaptation 14 %;
+- view models 13 %.
+
+**Hub files that name five or more features** (the 13 largest of R1's 31). Every method is entered
+in each of these:
+
+| file | features named | lines |
+|---|---:|---:|
+| `Agent/Runtime.AgentOperations.Operations.cpp` | 22 | 1,176 |
+| `app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp` | 21 | 5,478 |
+| `app/Sandbox/Sandbox.ConfigSections.cpp` | 16 | 73 |
+| `runtime/CMakeLists.txt` | 15 | 363 |
+| `Editor/internal/Runtime.EditorWorkspaceSession.cpp` | 11 | 1,113 |
+| `Editor/Operations/Runtime.GeometryProcessingOperations.{Mesh.cpp,cppm}` | 8 | 727 |
+| `Editor/internal/Runtime.EditorFeatureContextAdapters.cpp`, `Runtime.EditorFeatures.Internal.hpp` | 7 | 2,410 |
+| `Editor/Runtime.EditorProcessing.cppm`, `Editor/Operations/Runtime.MeshFieldOperations.cppm` | 6 | 631 |
+| `Editor/Operations/Runtime.MeshTopologyOperations.{Topology.cpp,cppm}` | 5 | 3,604 |
+
+**What a module imports** (R2): distinct named modules imported from outside the folder (its own
+partitions not counted).
+
+| module | lines | imports | of them runtime |
+|---|---:|---:|---:|
+| PointCloudConsolidation | 5,750 | 50 | 19 |
+| TextureBake | 4,489 | 42 | 14 |
+| Clustering | 2,774 | 38 | 17 |
+| OutlierAnalysis | 1,246 | 25 | 13 |
+| PhysicsIntegration | 1,442 | 21 | 8 |
+| DensityWeight, KernelDensity, PointSpacing | 333-355 | 14-15 | 7-8 |
+| ProgressivePoisson | 2,186 | 12 | 1 |
+
+## How we got here (short)
+
+- The kernel work (ADR 0024/0027) succeeded and is enforced.
+- The methods never got a boundary: each was added as editor operations and panels and entered
+  itself in the hub files.
+- Later programs measured *files per added field* and *duplicated glue*, and answered with central
+  machinery: tables, generators, then ADR 0031's operation runtime. That made the centre larger
+  instead of making the features independent.
+- Keeping every message and quirk byte-identical meant the machinery had to absorb every special
+  case.
+
+## Decisions and open points
+
+**Decided by the operator (2026-10-30):**
+- This page is the only architecture target, and the old targets are archived.
+- ADR 0031 is superseded.
+- Every module registers itself.
+- Plugins are compiled and reloaded at run time, so agents can change code while the Sandbox keeps
+  running.
+- Agents control the engine completely over MCP.
+- Rebuilding things for these goals is allowed.
+
+**Open, for the first plan** (`ARCH-022`):
+1. **Numeric targets for R4 and R6**, once the baselines are measured.
+2. **Order of steps.** The proposal starts with the riskiest assumption:
+   1. **Baselines and a checker:** the incremental rebuild per module, CI time by stage, and MCP
+      coverage; a CI checker for R1 and R2, with today's numbers as a ceiling that may only fall.
+   2. **A spike:** one small feature module, built as a shared library, is loaded into the running
+      Sandbox, edited, rebuilt and reloaded without a restart, with a command reachable over MCP.
+      It answers three questions:
+      - whether C++23 modules work across that boundary with clang;
+      - what registration and unregistration need;
+      - which state survives a reload.
+   3. **Registries for self-registration** (config sections, windows, commands and their MCP
+      tools), removing the hub files.
+   4. **Features move out of the editor into plugins**, one at a time.
+3. **Which process hosts the plugins:** the Sandbox app or the engine runtime.

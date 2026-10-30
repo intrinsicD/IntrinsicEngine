@@ -4,7 +4,7 @@
 - **Date:** 2026-03-19
 - **Owners:** Runtime / Rendering Architecture
 - **Related backlog:** `tasks/backlog/legacy-todo.md` → `B3. Engine Architecture Review Follow-Up`
-- **Related specs:** `docs/architecture/runtime-subsystem-boundaries.md`, `docs/architecture/rendering-three-pass.md`
+- **Related specs:** `docs/archive/architecture/runtime-subsystem-boundaries.md`, `docs/architecture/rendering-three-pass.md`
 
 ## Context
 

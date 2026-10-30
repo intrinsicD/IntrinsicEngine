@@ -348,7 +348,7 @@ Revised after the Codex plan review (Log, 2026-10-30).
      unchanged, the Vulkan smokes; the trial's `git show --stat`.
 4. **Block 4: measurement and the gate.**
    - The outlier footprint after, with the same script, against the 956-line target.
-   - The projection over `docs/architecture/declared-operations-table.md`, recomputed from the measured
+   - The projection over `docs/archive/architecture/declared-operations-table.md`, recomputed from the measured
      savings of the migrated operations. The cumulative framework growth since phase 0 is counted once
      and subtracted. A custom-publication operation is credited only with the work the runtime actually
      takes over.

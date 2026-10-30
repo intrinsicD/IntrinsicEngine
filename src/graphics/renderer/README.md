@@ -70,7 +70,7 @@ tests must assert the intended SPV path or be paired with a corresponding
   cover surfaces, lines, points, lighting, postprocess, selection, debug and UI.
 - [Picking and primitive selection](../../../docs/architecture/primitive-selection.md)
   cover GPU hit identity and Runtime selection ownership.
-- [Renderer target architecture](../../../docs/architecture/rendering-target-architecture.md)
+- [Renderer target architecture](../../../docs/archive/architecture/rendering-target-architecture.md)
   covers service boundaries and the typed pipeline-query API.
 - [Shared compute primitives](../../../docs/architecture/compute-parallel-primitives.md)
   and [spatial indices](../../../docs/architecture/spatial-indices.md) cover reusable

@@ -1,5 +1,9 @@
 # IntrinsicEngine: Ground-Up Redesign Vision and Priority Stack
 
+> **Archived 2026-10-30** (operator decision). Not a current target and not design guidance.
+> The only current architecture target is [Engine and feature modules](../../architecture/engine-and-feature-modules.md).
+> Kept for history; statements about the code reflect the time of writing.
+
 - **Status:** Proposed vision document
 - **Date:** 2026-04-02
 - **Audience:** Runtime, Rendering, Geometry, Tools

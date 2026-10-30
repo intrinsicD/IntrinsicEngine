@@ -12,9 +12,9 @@
   `RUNTIME-179`..`RUNTIME-187` (right-sized convergence closure)
 - **Related docs:** [ADR-0003](0003-ideal-runtime-architecture.md) (staged
   frame products; this ADR refines it),
-  [`docs/architecture/ground-up-redesign-vision.md`](../architecture/ground-up-redesign-vision.md),
-  [`docs/architecture/feature-module-playbook.md`](../architecture/feature-module-playbook.md),
-  [`docs/architecture/runtime-subsystem-boundaries.md`](../architecture/runtime-subsystem-boundaries.md)
+  [`docs/archive/architecture/ground-up-redesign-vision.md`](../archive/architecture/ground-up-redesign-vision.md),
+  [`docs/archive/architecture/feature-module-playbook.md`](../archive/architecture/feature-module-playbook.md),
+  [`docs/archive/architecture/runtime-subsystem-boundaries.md`](../archive/architecture/runtime-subsystem-boundaries.md)
 
 ## Context
 
@@ -349,9 +349,10 @@ placement.
 - The layering gate (`tools/repo/check_layering.py --root src --strict`) and
   module inventory regeneration verify the import-surface shrinkage claim as
   extractions land.
-- Ongoing convergence toward this contract is tracked by the living
-  [`docs/architecture/kernel-target-state.md`](../architecture/kernel-target-state.md)
-  scorecard (greppable kernel-slimness invariants + per-domain module rows),
+- Convergence toward this contract was tracked by the
+  [`kernel-target-state.md`](../archive/architecture/kernel-target-state.md) scorecard (archived
+  2026-10-30; `tools/repo/check_kernel_convergence.py` still enforces the closed surface, and the
+  current architecture target is [Engine and feature modules](../architecture/engine-and-feature-modules.md)),
   closed by the umbrella task
   [`ARCH-014`](../../tasks/done/ARCH-014-kernel-convergence-tracking.md).
   `ARCH-007` retired 2026-07-08 (first seam; CommandBus).

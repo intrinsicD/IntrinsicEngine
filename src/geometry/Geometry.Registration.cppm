@@ -96,7 +96,7 @@ export namespace Geometry::Registration
     // Optional iteration observability
     // -------------------------------------------------------------------------
     //
-    // See docs/architecture/geometry-pipeline-modularity.md §3.4.
+    // See docs/archive/architecture/geometry-pipeline-modularity.md §3.4.
     //
     // Read-only snapshot emitted at the end of each ICP iteration. Observing
     // never mutates solver state, so an observed run and an unobserved run

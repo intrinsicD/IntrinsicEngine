@@ -12,14 +12,17 @@ Status labels:
 - `roadmap`: planning document for scoped future work; not a claim that the
   listed capability is implemented.
 
+## The architecture target
+
+- [Engine and feature modules](engine-and-feature-modules.md) (`target`) — the **only** current
+  architecture target (operator, 2026-10-30). It is replaced only when its goals are met. Earlier
+  target, vision and plan documents are archived in [`docs/archive/`](../archive/README.md) and are
+  not design guidance.
+
 ## Canonical architecture set
 
 - [Overview](overview.md) (`canonical`)
 - [Layering rules](layering.md) (`canonical`)
-- [Kernel target state](kernel-target-state.md) (`canonical`) — north-star +
-  closed convergence scorecard for ADR-0024 as right-sized by ADR-0027;
-  closure recorded by
-  [`ARCH-014`](../../tasks/done/ARCH-014-kernel-convergence-tracking.md).
 - [Runtime](runtime.md) (`canonical`)
 - [Sandbox editor feature boundaries](sandbox-editor-feature-boundaries.md) (`canonical`)
 - [Runtime config control](runtime-config-control.md) (`canonical`)
@@ -84,25 +87,23 @@ Status labels:
 | Document | Status | Notes |
 |---|---|---|
 | `backend_integration_slicing_policy.md` | legacy-background | Useful guidance, not canonical policy. |
-| `feature-module-playbook.md` | legacy-background | Candidate content for future module handbook consolidation. |
 | `frame-loop-rollback-strategy.md` | legacy-background | Runtime policy background; may be merged into runtime docs later. |
-| `geometry-pipeline-modularity.md` | roadmap | Registration-first swappable-stage pipeline design; slice roadmap owned by `GEOM-054` and follow-ups. |
-| `gpu-driven-modular-rendering-pipeline-plan.md` | migration | Planning doc for rendering migration; not canonical architecture. |
-| `ground-up-redesign-blueprint-2026.md` | archival | Vision/blueprint context. |
-| `ground-up-redesign-vision.md` | archival | Vision narrative; non-normative. |
-| `moonshot.md` | roadmap | Twelve-month moonshot (pillars M1–M11); a proposal, not a claim. |
-| `declared-operations-table.md` | roadmap | ADR 0031's named operations with lines now and estimated kept (the phase 2 projection basis); an estimate, not a measurement. |
 | `htex-halfedge-patch-system.md` | legacy-background | Geometry method background; its test-only `Geometry.HtexPatch` prototype was removed. |
 | `parameterization-mapping-roadmap.md` | roadmap | GEOM-011 planning note for parameterization, atlas, distortion, and surface-map packs. |
 | `post-merge-audit-checklist.md` | migration | Temporary migration review artifact. |
 | `point-cloud-algorithm-roadmap.md` | roadmap | GEOM-010 planning note for point-cloud algorithm packs and method boundaries. |
 | `rendering-three-pass.md` | legacy-background | Rendering strategy context. |
-| `retained-geometry-lifecycle-consolidation-plan.md` | migration | Migration planning note. |
-| `runtime-subsystem-boundaries.md` | legacy-background | Detailed runtime background. |
 | `legacy-rendering-architecture-migration.md` | migration | Specific to the source-tree migration phase. |
 | `legacy-task-graphs-migration.md` | migration | Specific to the source-tree migration phase. |
 | `vectorfield-overlay-lifecycle-invariants.md` | legacy-background | Subsystem-specific historical notes. |
-| [`verification-evidence-architecture.md`](verification-evidence-architecture.md) | roadmap | Planned unified test/CI/agent evidence graph, verifier profiles, quality admission, migration gates, and bound `CI-012..020` / `BUILD-005..006` / `PROC-031` task DAG. |
+
+Archived on 2026-10-30 (operator: "alle alten Zieldokumente archiviert"), listed in
+[`docs/archive/README.md`](../archive/README.md): `moonshot.md`, `ground-up-redesign-vision.md`,
+`ground-up-redesign-blueprint-2026.md`, `kernel-target-state.md`, `feature-module-playbook.md`,
+`runtime-subsystem-boundaries.md`, `rendering-target-architecture.md`,
+`gpu-driven-modular-rendering-pipeline-plan.md`, `retained-geometry-lifecycle-consolidation-plan.md`,
+`geometry-pipeline-modularity.md`, `verification-evidence-architecture.md`,
+`declared-operations-table.md`.
 
 ## Notes
 

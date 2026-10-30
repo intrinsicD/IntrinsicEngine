@@ -1,5 +1,9 @@
 # Retained Geometry Lifecycle Consolidation Audit
 
+> **Archived 2026-10-30** (operator decision). Not a current target and not design guidance.
+> The only current architecture target is [Engine and feature modules](../../architecture/engine-and-feature-modules.md).
+> Kept for history; statements about the code reflect the time of writing.
+
 This document records the current audit of duplicate retained-geometry upload and lifecycle code paths across:
 
 - `GraphLifecycle`

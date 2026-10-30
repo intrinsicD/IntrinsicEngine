@@ -11,7 +11,7 @@ This file is the archival index for the completed three-pass rendering refactor 
 ## Canonical Documents (legacy `src/` tree)
 
 - `docs/architecture/rendering-three-pass.md` — canonical technical architecture spec for the legacy renderer (pass contracts, data contracts, invariants).
-- `docs/architecture/runtime-subsystem-boundaries.md` — legacy runtime ownership map, dependency directions, and lifecycle order.
+- `docs/archive/architecture/runtime-subsystem-boundaries.md` — legacy runtime ownership map, dependency directions, and lifecycle order.
 - `tasks/backlog/legacy-todo.md` — active near-term execution queue.
 - `docs/roadmap.md` — medium/long-horizon sequencing.
 

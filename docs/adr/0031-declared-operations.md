@@ -1,6 +1,10 @@
 # ADR 0031: Declared operations over one shared operation runtime
 
-- **Status:** Accepted (operator, 2026-10-29: "Do 1. - 3.": accept, lift the property-write limit for operations, start phase 0 and the pilot)
+- **Status:** Superseded (operator, 2026-10-30) by the architecture target
+  [Engine and feature modules](../architecture/engine-and-feature-modules.md). Its own phase 2 gate
+  failed ([report](../reports/2026-10-30-phase-2-gate.md)). Nothing further is migrated onto the
+  operation runtime; the four migrated operations stay as they are until the target replaces them.
+  Accepted earlier (operator, 2026-10-29: "Do 1. - 3.").
 - **Date:** 2026-10-29
 - **Owners:** runtime (editor operations), with geometry and Sandbox app owners for their seams
 - **Related tasks:** `ARCH-021` (this design), `ARCH-020` (moonshot tracker, M2), `RUNTIME-343`,
@@ -382,7 +386,7 @@ method-specific steps:
   transaction for scalar columns; the operation runtime with stages 1-8, the `PointSamples` kind,
   the scalar GPU shape, result slots; the framework module and the layering rule; a table of named
   operations with their measured removable code (the projection basis:
-  `docs/architecture/declared-operations-table.md`, an estimate until phase 2 measures).
+  `docs/archive/architecture/declared-operations-table.md`, an estimate until phase 2 measures).
 - Phase 1: kernel density and point spacing (implementation shakedown).
 - Phase 2: outlier analysis (two outputs, GPU, custom publication): the architectural test.
 - Phase 3: mesh remesh (topology replacement, explicit parameters, argument entity).

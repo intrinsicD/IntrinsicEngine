@@ -1,5 +1,9 @@
 # Feature Module Playbook (Refactor + New Development)
 
+> **Archived 2026-10-30** (operator decision). Not a current target and not design guidance.
+> The only current architecture target is [Engine and feature modules](../../architecture/engine-and-feature-modules.md).
+> Kept for history; statements about the code reflect the time of writing.
+
 This playbook defines the **default way** to add and refactor runtime features without growing accidental coupling.
 
 Use it when introducing anything like `Runtime.SomethingModule.cppm`, geometry tooling, streaming jobs, or render integrations.
@@ -8,8 +12,8 @@ Use it when introducing anything like `Runtime.SomethingModule.cppm`, geometry t
 > `Runtime.*Module`, read [`kernel-target-state.md`](kernel-target-state.md)
 > and use its knob-decision table to place the responsibility. The kernel is
 > converging to a slim seam-only core
-> ([ADR-0024](../adr/0024-kernel-module-architecture.md), as amended by
-> [ADR-0027](../adr/0027-right-sized-runtime-composition.md),
+> ([ADR-0024](../../adr/0024-kernel-module-architecture.md), as amended by
+> [ADR-0027](../../adr/0027-right-sized-runtime-composition.md),
 > completed by `ARCH-014` and protected by the exact convergence checker):
 > if your feature wants a new `Engine` method, that is the signal it is a
 > command, event, service, or app-composed responsibility — not kernel
@@ -42,7 +46,7 @@ behavior inside ad-hoc runtime or ImGui code.
 When a feature grows past the floor, it is a small contract-driven slice:
 
 1. **App-composed runtime responsibility** — first apply
-   [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) to
+   [ADR-0026](../../adr/0026-runtime-module-scope-by-consumer-contract.md) to
    lifecycle, state scope, commit ownership, and consumers. Use the current
    `IRuntimeModule`/`EngineSetup` boundary when the responsibility genuinely
    needs Engine-owned optional lifecycle or frame-loop registration; never

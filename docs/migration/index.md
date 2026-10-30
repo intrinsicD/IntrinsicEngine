@@ -10,7 +10,7 @@ This section tracks **temporary** repository transition work toward the target c
 
 ## Migration documents
 
-- [Target repository layout](target-repo-layout.md) — agreed final-state directory contract.
+- [Target repository layout](../archive/migration/target-repo-layout.md) — agreed final-state directory contract.
 - [Legacy retirement plan](legacy-retirement.md) — historical retirement evidence for the deleted `src/legacy/` tree.
 - [Non-legacy parity matrix](nonlegacy-parity-matrix.md) — promoted `src/` subsystem parity state after legacy retirement.
 - [Source-tree reorganization](source-tree-reorganization.md) — phased move strategy and safeguards.

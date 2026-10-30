@@ -1,11 +1,15 @@
 # Runtime Subsystem Boundaries & Lifecycle Map
 
+> **Archived 2026-10-30** (operator decision). Not a current target and not design guidance.
+> The only current architecture target is [Engine and feature modules](../../architecture/engine-and-feature-modules.md).
+> Kept for history; statements about the code reflect the time of writing.
+
 > **Legacy baseline (pre-ADR-0024).** This is a historical snapshot of the
 > subsystem split and its `GetGraphicsBackend()`/`GetAssetPipeline()`/… getter
-> access policy. Under [ADR-0024](../adr/0024-kernel-module-architecture.md)
+> access policy. Under [ADR-0024](../../adr/0024-kernel-module-architecture.md)
 > these `Engine::GetX()` getters are driven to zero (kernel-target-state
 > scorecard), as right-sized by
-> [ADR-0027](../adr/0027-right-sized-runtime-composition.md): durable domains
+> [ADR-0027](../../adr/0027-right-sized-runtime-composition.md): durable domains
 > become app-composed responsibilities without a mandatory wrapper, callers
 > use narrow capability contexts (D13), and the frame loop uses one command
 > drain + two event pumps (D5/D7) rather than a single dispatcher drain +

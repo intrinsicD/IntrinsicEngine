@@ -1,5 +1,9 @@
 # Modular GPU-Driven Rendering Pipeline Plan (Code-Aware Reuse + Gap Audit)
 
+> **Archived 2026-10-30** (operator decision). Not a current target and not design guidance.
+> The only current architecture target is [Engine and feature modules](../../architecture/engine-and-feature-modules.md).
+> Kept for history; statements about the code reflect the time of writing.
+
 > **Historical document.** This plan describes the pre-promotion renderer. Several
 > shaders and loaders it names as current (`instance_cull_multigeo.comp`,
 > `scene_update.comp`, `pick_mesh`/`pick_line`/`pick_point`) were never loaded by

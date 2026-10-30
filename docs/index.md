@@ -17,7 +17,7 @@ This page is the canonical entry point for repository documentation.
 - [Engine config file schema](architecture/engine-config.md)
 - [Rendering three-pass architecture](architecture/rendering-three-pass.md)
 - [Primitive selection and method inputs](architecture/primitive-selection.md)
-- [Runtime subsystem boundaries](architecture/runtime-subsystem-boundaries.md)
+- [Runtime subsystem boundaries](archive/architecture/runtime-subsystem-boundaries.md)
 - [Task graph architecture](architecture/task-graph-domains.md)
 
 ## ADRs
@@ -66,7 +66,7 @@ This page is the canonical entry point for repository documentation.
 ## Migration
 
 - [Migration docs index](migration/index.md)
-- [Target repository layout](migration/target-repo-layout.md)
+- [Target repository layout](archive/migration/target-repo-layout.md)
 - [Legacy retirement plan](migration/legacy-retirement.md)
 - [Non-legacy parity matrix](migration/nonlegacy-parity-matrix.md)
 - [Source-tree reorganization](migration/source-tree-reorganization.md)

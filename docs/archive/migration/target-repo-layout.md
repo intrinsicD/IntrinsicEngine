@@ -1,5 +1,9 @@
 # Target Repository Layout (Migration Contract)
 
+> **Archived 2026-10-30** (operator decision). Not a current target and not design guidance.
+> The only current architecture target is [Engine and feature modules](../../architecture/engine-and-feature-modules.md).
+> Kept for history; statements about the code reflect the time of writing.
+
 This document defines the explicit target directory layout for the IntrinsicEngine reorganization effort.
 
 > Migration note: this file is a planning/migration contract and not a permanent architecture deep dive.

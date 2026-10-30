@@ -1,5 +1,9 @@
 # MOONSHOT — IntrinsicEngine as a living geometry laboratory
 
+> **Archived 2026-10-30** (operator decision). Not a current target and not design guidance.
+> The only current architecture target is [Engine and feature modules](../../architecture/engine-and-feature-modules.md).
+> Kept for history; statements about the code reflect the time of writing.
+
 > **Status:** vision proposal, 2026-10-27. Not a task, an authorization or a result.
 > Numbers under *Today* come from the repository at `83e42148a` and name their source.
 > Every *Target* is a hypothesis to test, not a claim. Any part of this plan enters
@@ -696,7 +700,7 @@ Unlimited resources move the bottleneck from people to coordination.
 | M2 | `UI-037`, `UI-077` (readiness); typed editor operations; the agent operation registry; `RUNTIME-314` |
 | M3 | `BUILD-005`, `BUILD-006`, `BUILD-013`, `BUILD-014`; `CI-012`–`CI-020`; `tools/ci/touched_scope.py`; `GRAPHICS-137` (shader objects) |
 | M4 | `EditorCommandHistory`; the job service; `docs/architecture/property-coherence.md`; `RUNTIME-284` (history checkpoints) |
-| M5 | `GRAPHICS-125`, `GEOM-066`, `GEOM-067`, `GRAPHICS-160`; `Graphics.HZB`, `Graphics.CullingSystem`, `Graphics.PointLBVH`; `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` |
+| M5 | `GRAPHICS-125`, `GEOM-066`, `GEOM-067`, `GRAPHICS-160`; `Graphics.HZB`, `Graphics.CullingSystem`, `Graphics.PointLBVH`; `docs/archive/architecture/gpu-driven-modular-rendering-pipeline-plan.md` |
 | M6 | The `gpu;vulkan` smoke pattern; the `intrinsicengine-vulkan-frame-triage` recipe; `RUNTIME-281` |
 | M7 | `Geometry.RobustPredicates`, `Geometry.Validation`; the IO fail-closed contract (`intrinsicengine-geometry-io-format`) |
 | M8 | ADR 0029 (agent control lane); `RUNTIME-280`; `view_screenshot` and `view_capture` |
