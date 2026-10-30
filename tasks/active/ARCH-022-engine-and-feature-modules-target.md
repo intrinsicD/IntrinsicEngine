@@ -64,6 +64,9 @@ contract_review: tracker only; each slice declares its own contracts
 43. "Ja bitte. Das soll aber für alle gpu Algorithmen gelten und neue sollen auch genau so direkt
     implementiert werden." (yes to the first plan; the job form applies to every GPU algorithm, and
     new ones are built that way from the start)
+44. "Ja bitte, slice 1"
+45. "ok then Option 1" (the R6 timing baselines measure the workload the plan names: build tree on
+    disk, one clean build, real edits, default parallelism, ccache as configured)
 
 ## Goal
 - Reach the target in
@@ -480,3 +483,25 @@ python3 tools/docs/check_doc_links.py --root . --strict
     files, against 1,731 in `ci`), and the report script rendered.
   - The packet (Layer A, Layer B, `r6_report.py`) is in `tasks/evidence/ARCH-022/preflight-r6/`, to
     be frozen after this commit and reviewed by a fresh Claude and a fresh Codex session.
+- 2026-10-30: R6 pre-flight, round 1 and 2 on packet `7b0c1426…361b9`: Claude REVISE, Codex BLOCK.
+  - Both: the command chain was not fail-fast; the report summarized partial populations; outputs
+    could be overwritten; the load average cannot separate the runner's own load from other load.
+  - Both: the packet measured a controlled proxy (fresh tmpfs per sample, ccache off, 32 jobs, mtime
+    touches, six clean builds), not the plan's workload, and recorded no deviation. Further: CI
+    re-runs inflate created-to-updated; the 3 h timeout did not fit the predictions; noop could
+    relink unseen; the 10 % resolution claim was unsupported.
+  - Operator (Q45): "ok then Option 1", the plan's workload.
+  - Revision 2: the runner gains `build_once`, unique appended probe edits with an exact source check,
+    optional `jobs`, per-command host counters (other-process CPU, swap, major faults), empty-window
+    checks for noop and a settle build after every scenario; three new tests, each failing with its
+    mechanism removed. The manifest (`.v2`) names the importers each interface edit must rebuild
+    (static count: 2 direct importers for the config interface, closure 19; 1 for the geometry
+    interface). `r6_run.sh` holds the fail-fast chain; `r6_report.py` refuses incomplete populations
+    (self-check with mutations). The installed gh 2.4.0 lacks `run list --branch/--status`; the CI
+    query uses the REST API (found by the first technical-test attempt, which the fail-fast chain
+    stopped).
+  - Technical test of revision 2 (two samples, `warmup` and `baseline`, through `r6_run.sh` with a
+    temporary test manifest; numbers not read): chain exit 0, both samples sealed, the second sample
+    reused the build tree without `clean`, the probe files held exactly their probe lines, every
+    settle build was empty, host counters were recorded, the CI cohort had 20 runs with all fields,
+    and the report rendered. The packet goes to delta reviews.

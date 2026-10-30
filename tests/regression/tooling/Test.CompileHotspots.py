@@ -907,6 +907,52 @@ class CompileIterationMeasurementTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Unsupported dependency directory symlink"):
                 bench.dependency_snapshot(root)
 
+    def test_host_counters_count_busy_cpu_without_idle_iowait_or_guest(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            proc = Path(temporary)
+            # user nice system idle iowait irq softirq steal guest guest_nice
+            (proc / "stat").write_text("cpu  100 20 30 5000 700 4 6 0 50 0\ncpu0 1 2 3 4 5 6 7 8 9 10\n")
+            (proc / "vmstat").write_text("pswpin 3\npswpout 5\npgmajfault 11\n")
+            (proc / "meminfo").write_text("MemTotal: 64 kB\nMemAvailable: 32 kB\n")
+            ticks = bench.os.sysconf("SC_CLK_TCK")
+            self.assertEqual(bench.host_counters(proc), {
+                "busy_cpu_s": 160 / ticks, "swap_in_pages": 3, "swap_out_pages": 5,
+                "major_faults": 11, "mem_available_kib": 32})
+
+    def test_window_outputs_ignore_only_the_glob_recheck(self):
+        window = (b"# ninja log v5\n0\t5\t0\t/b/CMakeFiles/cmake.verify_globs\ta\n"
+                  b"5\t9\t0\tbin/ExtrinsicSandbox\tb\n")
+        self.assertEqual(bench.window_outputs(window), ["bin/ExtrinsicSandbox"])
+        self.assertEqual(bench.window_outputs(window.splitlines(keepends=True)[0]), [])
+
+    def test_source_check_accepts_only_the_expected_probe_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run = lambda *args: bench.subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+            run("init", "-q")
+            (root / "a.cpp").write_text("int a;\n")
+            (root / "b.cpp").write_text("int b;\n")
+            run("add", ".")
+            run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "c")
+            head = bench.command(["git", "rev-parse", "HEAD"], root).strip()
+            bench.check_source(root, {}, head)
+            probes = {"a.cpp": b"int a;\nint probe_1;\n"}
+            (root / "a.cpp").write_bytes(probes["a.cpp"])
+            bench.check_source(root, probes, head)
+            with self.assertRaisesRegex(AssertionError, "beyond the probe edits"):
+                bench.check_source(root, {}, head)
+            (root / "a.cpp").write_bytes(b"int a;\nint probe_2;\n")
+            with self.assertRaisesRegex(AssertionError, "plus its probe lines"):
+                bench.check_source(root, probes, head)
+            (root / "a.cpp").write_bytes(probes["a.cpp"])
+            (root / "b.cpp").write_text("int b2;\n")
+            with self.assertRaisesRegex(AssertionError, "beyond the probe edits"):
+                bench.check_source(root, probes, head)
+            (root / "b.cpp").write_text("int b;\n")
+            bench.check_source(root, probes, head)
+            with self.assertRaises(AssertionError):
+                bench.check_source(root, probes, "0" * 40)
+
     def test_log_window_excludes_old_commands_and_rejects_compaction(self):
         old = b"# ninja log v5\n0\t20\t0\told.o\ta\n"
         new = b"20\t30\t0\tnew.o\tb\n"

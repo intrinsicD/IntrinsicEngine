@@ -18,6 +18,13 @@ Static analysis and performance analysis tooling.
   arm entries fail closed. See
   `benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml` and the
   [matched overnight measurements](../../docs/results/build007_overnight_compile_measurement.md).
+  For a developer-loop measurement, `params.build_once` configures and clean-builds only
+  in the first sample, `params.edit` appends a unique probe line instead of touching
+  (the source check then allows exactly the commit plus the probe lines), and omitting
+  `params.jobs` keeps Ninja's default parallelism. No-op and settle builds after every
+  scenario must produce no output except CMake's glob re-check; every command records
+  the CPU other processes used and swap activity during it
+  (`benchmarks/ci/manifests/arch022_r6_dev_loop_baseline.yaml`).
 
 - `tools/analysis/compile_hotspots.py`: normalizes the latest Ninja records
   into physical compiler invocations, resolves their sources through the
