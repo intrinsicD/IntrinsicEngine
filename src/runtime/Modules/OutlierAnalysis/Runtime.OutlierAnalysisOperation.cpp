@@ -39,6 +39,30 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.Runtime.OperationRuntime;
 
+namespace Extrinsic::Runtime
+{
+    template std::string SerializeDerivedSection<kOutlierAnalysisSection>(const OutlierAnalysisConfig&);
+    template Core::Config::EngineConfigSectionValidationResult ValidateDerivedSection<kOutlierAnalysisSection>(
+        std::string_view, std::string_view, std::string_view);
+    template std::optional<OutlierAnalysisConfig> GetDerivedSection<kOutlierAnalysisSection>(
+        const Core::Config::EngineConfig&);
+    template void SetDerivedSection<kOutlierAnalysisSection>(Core::Config::EngineConfig&, const OutlierAnalysisConfig&);
+    template Core::Config::EngineConfigSectionRegistration MakeDerivedSectionRegistration<kOutlierAnalysisSection>();
+}
+
+// The name is the row's token, so the codec and the owner's name cannot drift apart.
+extern "C++"
+{
+    namespace Extrinsic::Runtime
+    {
+        const char* ToString(OutlierAnalysisBackend b) noexcept
+        {
+            const auto i = std::to_underlying(b);
+            return i < std::size(kOutlierAnalysisBackend) ? kOutlierAnalysisBackend[i].data() : "invalid";
+        }
+    }
+}
+
 #pragma clang fp contract(off)
 namespace Extrinsic::Runtime
 {
@@ -110,8 +134,8 @@ namespace Extrinsic::Runtime
             }
             static Core::Config::EngineConfigSectionValidationResult Validate(const Params& c)
             {
-                return ValidateOutlierAnalysisConfigSection(
-                    SerializeOutlierAnalysisConfig(c), {}, kOutlierAnalysisConfigSectionName);
+                return ValidateDerivedSection<kOutlierAnalysisSection>(
+                    SerializeDerivedSection<kOutlierAnalysisSection>(c), {}, kOutlierAnalysisConfigSectionName);
             }
             static bool Prepare(
                 const EditorProcessingContext&, const GeometryEntityAvailability&, const Work&, std::string&);
@@ -958,13 +982,13 @@ namespace Extrinsic::Runtime
             sourceId.empty() ? std::string{kOutlierAnalysisConfigSectionName} : sourceId,
             [&](Core::Config::EngineConfig& candidate)
             {
-                SetOutlierAnalysisConfig(candidate, config);
+                SetDerivedSection<kOutlierAnalysisSection>(candidate, config);
             });
     }
     std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorProcessingCommands& commands)
     {
         const Core::Config::EngineConfig* active = ActiveOperationConfig(commands);
-        return active ? GetOutlierAnalysisConfig(*active) : std::nullopt;
+        return active ? GetDerivedSection<kOutlierAnalysisSection>(*active) : std::nullopt;
     }
     EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(
         const EditorProcessingCommands& commands, std::function<void(EditorOutlierAnalysisResult)> onComplete)

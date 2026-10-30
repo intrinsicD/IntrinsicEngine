@@ -1206,7 +1206,7 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
             Runtime::kOutlierAnalysisConfigSectionSchemaId,
             [](const CoreConfig::EngineConfig& c)
             {
-                return Runtime::GetOutlierAnalysisConfig(c).has_value();
+                return Runtime::GetDerivedSection<Runtime::kOutlierAnalysisSection>(c).has_value();
             }},
         {Runtime::kDescriptorAnalysisConfigSectionName,
             Runtime::kDescriptorAnalysisConfigSectionSchemaId,
@@ -1338,8 +1338,12 @@ TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContrac
         MakePointConstructionConfigSectionRegistration, SetPointConstructionConfig, GetPointConstructionConfig,
         ZeroGpuQueryBatch<PointConstructionConfig>);
     ExpectPointConfigSectionContract<OutlierAnalysisConfig>(kOutlierAnalysisConfigSectionName,
-        kOutlierAnalysisConfigSectionSchemaId, SerializeOutlierAnalysisConfig, ValidateOutlierAnalysisConfigSection,
-        MakeOutlierAnalysisConfigSectionRegistration, SetOutlierAnalysisConfig, GetOutlierAnalysisConfig,
+        kOutlierAnalysisConfigSectionSchemaId,
+        SerializeDerivedSection<kOutlierAnalysisSection>,
+        ValidateDerivedSection<kOutlierAnalysisSection>,
+        MakeDerivedSectionRegistration<kOutlierAnalysisSection>,
+        SetDerivedSection<kOutlierAnalysisSection>,
+        GetDerivedSection<kOutlierAnalysisSection>,
         ZeroGpuQueryBatch<OutlierAnalysisConfig>);
     ExpectPointConfigSectionContract<KernelDensityConfig>(kKernelDensityConfigSectionName,
         kKernelDensityConfigSectionSchemaId,
@@ -1414,9 +1418,9 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
             {
                 Runtime::OutlierAnalysisConfig config;
                 config.Positions = ref;
-                return Runtime::SerializeOutlierAnalysisConfig(config);
+                return Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>(config);
             },
-            Runtime::ValidateOutlierAnalysisConfigSection},
+            Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>},
         {"KeypointAnalysis",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
@@ -1548,8 +1552,9 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
     check(Runtime::PointSpacingConfig{},
         &Runtime::PointSpacingConfig::Positions,
         Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>);
-    check(Runtime::OutlierAnalysisConfig{}, &Runtime::OutlierAnalysisConfig::Positions,
-          Runtime::SerializeOutlierAnalysisConfig);
+    check(Runtime::OutlierAnalysisConfig{},
+        &Runtime::OutlierAnalysisConfig::Positions,
+        Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>);
     check(Runtime::KeypointAnalysisConfig{}, &Runtime::KeypointAnalysisConfig::Positions,
           Runtime::SerializeKeypointAnalysisConfig);
     check(Runtime::DescriptorAnalysisConfig{}, &Runtime::DescriptorAnalysisConfig::Positions,
@@ -1620,7 +1625,7 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
                 return Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>(c);
             }},
         Family{"OutlierAnalysis",
-            Runtime::ValidateOutlierAnalysisConfigSection,
+            Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>,
             "Outlier analysis config must be an object.",
             "Unknown outlier field: ",
             {"entity", "k_neighbors", "minimum_neighbors", "gpu_query_batch_size"},
@@ -1628,7 +1633,7 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
             {
                 Runtime::OutlierAnalysisConfig c;
                 c.StableEntityId = id;
-                return Runtime::SerializeOutlierAnalysisConfig(c);
+                return Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>(c);
             }},
         Family{"KeypointAnalysis",
             Runtime::ValidateKeypointAnalysisConfigSection,
@@ -1791,7 +1796,7 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
             {"bandwidth"},
             "Unknown density backend."},
         Family{"OutlierAnalysis",
-            Runtime::ValidateOutlierAnalysisConfigSection,
+            Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>,
             {"radius", "stddev_multiplier", "score_threshold"},
             "Unknown outlier backend."},
         Family{"PointConstruction",
@@ -1865,18 +1870,22 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
         "Kernel sigma scale must be positive.");
     EXPECT_TRUE(Runtime::ValidatePointConstructionConfigSection(
         R"({"bounding_box_padding":1e-50})", {}, "float-test").Usable());
-    reject(Runtime::ValidateOutlierAnalysisConfigSection, R"({"method":"radius","radius":0})",
+    reject(Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>,
+        R"({"method":"radius","radius":0})",
         "Radius must be positive.");
     for (const auto radius : {"9223372036854775807", "9223372036854775808", "18446744073709551615"})
     {
-        const auto result = Runtime::ValidateOutlierAnalysisConfigSection(
+        const auto result = Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>(
             std::string(R"({"method":"radius","radius":)") + radius + '}', {}, "float-test");
         ASSERT_TRUE(result.Usable());
-        EXPECT_EQ(Runtime::ValidateOutlierAnalysisConfigSection(
-            result.CanonicalPayloadJson, {}, "float-test").CanonicalPayloadJson, result.CanonicalPayloadJson);
+        EXPECT_EQ(Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>(
+                      result.CanonicalPayloadJson, {}, "float-test")
+                      .CanonicalPayloadJson,
+            result.CanonicalPayloadJson);
     }
-    EXPECT_TRUE(Runtime::ValidateOutlierAnalysisConfigSection(
-        R"({"radius":1e-50,"stddev_multiplier":1e-50,"score_threshold":1e-50})", {}, "float-test").Usable());
+    EXPECT_TRUE(Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>(
+        R"({"radius":1e-50,"stddev_multiplier":1e-50,"score_threshold":1e-50})", {}, "float-test")
+            .Usable());
 }
 
 TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories)
@@ -1900,7 +1909,7 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
         Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection, typed, domain},
         Family{"KernelDensity", Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>, typed, domain},
         Family{"PointSpacing", Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>, typed, domain},
-        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection, typed, domain},
+        Family{"OutlierAnalysis", Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>, typed, domain},
         Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
         Family{"DescriptorAnalysis", Runtime::ValidateDescriptorAnalysisConfigSection, descriptor, descriptor},
         Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection, density, density},
@@ -1979,7 +1988,7 @@ TEST(SandboxConfigSections, PointPropertyFieldsPreserveKindsAndFirstErrorOrder)
             Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
             {{"positions", "vec3"}, {"radii", "float"}}},
         Family{"OutlierAnalysis",
-            Runtime::ValidateOutlierAnalysisConfigSection,
+            Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>,
             {{"positions", "vec3"}, {"mask", "uint32"}, {"score", "float"}}},
         Family{"KeypointAnalysis",
             Runtime::ValidateKeypointAnalysisConfigSection,
@@ -2078,8 +2087,11 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
     {
         SCOPED_TRACE("OutlierAnalysis");
         using C = Runtime::OutlierAnalysisConfig;
-        check(C{}, {&C::Positions, &C::Mask, &C::Score}, Runtime::SetOutlierAnalysisConfig,
-            Runtime::GetOutlierAnalysisConfig, Runtime::SerializeOutlierAnalysisConfig);
+        check(C{},
+            {&C::Positions, &C::Mask, &C::Score},
+            Runtime::SetDerivedSection<Runtime::kOutlierAnalysisSection>,
+            Runtime::GetDerivedSection<Runtime::kOutlierAnalysisSection>,
+            Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>);
     }
     {
         SCOPED_TRACE("KeypointAnalysis");

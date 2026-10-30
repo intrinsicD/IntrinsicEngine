@@ -2121,7 +2121,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         const auto active = Runtime::GetEditorOutlierAnalysisConfig(context.PointAnalysis.Commands)
                                 .value_or(Runtime::OutlierAnalysisConfig{});
-        const auto serialized = Runtime::SerializeOutlierAnalysisConfig(active);
+        const auto serialized = Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>(active);
         Outliers.Synchronize(active, serialized);
         auto& config = Outliers.Draft;
         bool changed = false;
@@ -2149,7 +2149,7 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::Combo("Backend",
                 &backend,
                 OwnerConfigEnumLabels<Runtime::OutlierAnalysisBackend, 3>(
-                    Runtime::OutlierAnalysisConfigFieldSpecs(), "backend")
+                    std::span<const Runtime::ConfigFieldSpec>(Runtime::kOutlierAnalysisFields), "backend")
                     .data(),
                 3))
         {

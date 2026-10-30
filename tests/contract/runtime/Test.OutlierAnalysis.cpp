@@ -67,7 +67,7 @@ TEST(OutlierAnalysis, EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
     for(unsigned d=1;d<=8;++d)
         for(auto method : {R::OutlierAnalysisMethod::Statistical,R::OutlierAnalysisMethod::Radius,R::OutlierAnalysisMethod::LocalDistanceRatio})
         {
-            SCOPED_TRACE(std::to_string(d)+R::ToString(method));
+            SCOPED_TRACE(std::to_string(d) + std::string(R::kOutlierAnalysisMethod[std::to_underlying(method)]));
             R::WorldRegistry worlds;auto world=worlds.CreateWorld("outliers");auto& scene=*worlds.Get(world);
             R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto config=Config(entity,D(d));config.Method=method;
             auto& props=PointDomainProperties(scene,entity,D(d));const auto size=props.Size();
@@ -223,7 +223,7 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
         config.ScoreThreshold = 1.25f;
         config.Radius = 5;
         C::EngineConfigSectionRegistry registry;
-        ASSERT_TRUE(registry.Register(R::MakeOutlierAnalysisConfigSectionRegistration()));
+        ASSERT_TRUE(registry.Register(R::MakeDerivedSectionRegistration<R::kOutlierAnalysisSection>()));
         R::RuntimeEngineConfigControlState state;
         C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
         R::EditorProcessingContext context{.Scene = &scene};
@@ -244,8 +244,8 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
         EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshFace).Exists("outliers"));
         ASSERT_TRUE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
         ASSERT_TRUE(R::GetEditorOutlierAnalysisConfig(commands));
-        EXPECT_EQ(R::SerializeOutlierAnalysisConfig(*R::GetEditorOutlierAnalysisConfig(commands)),
-                  R::SerializeOutlierAnalysisConfig(config));
+        EXPECT_EQ(R::SerializeDerivedSection<R::kOutlierAnalysisSection>(*R::GetEditorOutlierAnalysisConfig(commands)),
+            R::SerializeDerivedSection<R::kOutlierAnalysisSection>(config));
         ASSERT_TRUE(R::ApplyEditorConfiguredOutlierAnalysis(commands).Succeeded());
         EXPECT_EQ(previews, 1);
         EXPECT_EQ(applies, 1);
@@ -253,7 +253,8 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
                              R"({"minimum_neighbors":-1})", R"({"operation":"delete"})", R"({"gpu_query_batch_size":0})",
                              R"({"method":"radius","radius":0})", R"({"radius":1e100})", R"({"unknown":1})", R"({"score_threshold":-1})", R"({"score_threshold":1e100})",
                              R"({"mask":{"domain":"unknown","name":"outliers","kind":"float"}})"})
-            EXPECT_FALSE(R::ValidateOutlierAnalysisConfigSection(payload, {}, "test").Usable()) << payload;
+            EXPECT_FALSE(R::ValidateDerivedSection<R::kOutlierAnalysisSection>(payload, {}, "test").Usable())
+                << payload;
         config.KNeighbors = 0;
         EXPECT_FALSE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
         EXPECT_EQ(applies, 1);
@@ -262,16 +263,18 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
 
 TEST(OutlierAnalysisConfig, RadiusMustRemainPositiveInFloatStorage)
 {
-    EXPECT_FALSE(R::ValidateOutlierAnalysisConfigSection(
-        R"({"method":"radius","radius":1e-100})", {}, "test").Usable());
+    EXPECT_FALSE(
+        R::ValidateDerivedSection<R::kOutlierAnalysisSection>(R"({"method":"radius","radius":1e-100})", {}, "test")
+            .Usable());
     for (const auto payload : {R"({"method":"radius","radius":1.401298464324817e-45})",
                                R"({"method":"radius","radius":1.1754943508222875e-38})",
                                R"({"method":"radius","radius":3.4028234663852886e38})"})
     {
-        const auto accepted = R::ValidateOutlierAnalysisConfigSection(payload, {}, "test");
+        const auto accepted = R::ValidateDerivedSection<R::kOutlierAnalysisSection>(payload, {}, "test");
         ASSERT_TRUE(accepted.Usable()) << payload;
-        EXPECT_TRUE(R::ValidateOutlierAnalysisConfigSection(
-            accepted.CanonicalPayloadJson, {}, "test").Usable()) << accepted.CanonicalPayloadJson;
+        EXPECT_TRUE(
+            R::ValidateDerivedSection<R::kOutlierAnalysisSection>(accepted.CanonicalPayloadJson, {}, "test").Usable())
+            << accepted.CanonicalPayloadJson;
     }
 }
 
@@ -365,10 +368,12 @@ TEST(OutlierAnalysisConfig, DistanceRatioRoundTripsDefaultsAndClampsKToSmallInpu
     R::OutlierAnalysisConfig config;
     config.Method=R::OutlierAnalysisMethod::LocalDistanceRatio;
     config.ScoreThreshold=1.25f;config.KNeighbors=63;
-    R::SetOutlierAnalysisConfig(engine,config);
-    const auto restored=R::GetOutlierAnalysisConfig(engine);ASSERT_TRUE(restored);
+    R::SetDerivedSection<R::kOutlierAnalysisSection>(engine, config);
+    const auto restored = R::GetDerivedSection<R::kOutlierAnalysisSection>(engine);
+    ASSERT_TRUE(restored);
     EXPECT_EQ(restored->Method,config.Method);EXPECT_EQ(restored->ScoreThreshold,1.25f);
-    const auto defaults=R::ValidateOutlierAnalysisConfigSection(R"({"method":"local_distance_ratio"})",{},"test");
+    const auto defaults =
+        R::ValidateDerivedSection<R::kOutlierAnalysisSection>(R"({"method":"local_distance_ratio"})", {}, "test");
     EXPECT_TRUE(defaults.Usable());
     for (const auto sampleCount : {5u, 70u})
     {
@@ -616,9 +621,11 @@ TEST(OutlierAnalysis, RadiusParametersAndMissingSceneFailBeforeAnyMutation)
         if (radius <= 0.0f)
         {
             // The serialized config lane rejects the same parameter up front.
-            EXPECT_FALSE(R::ValidateOutlierAnalysisConfigSection(
-                R::SerializeOutlierAnalysisConfig(config), {},
-                R::kOutlierAnalysisConfigSectionName).Usable());
+            EXPECT_FALSE(R::ValidateDerivedSection<R::kOutlierAnalysisSection>(
+                R::SerializeDerivedSection<R::kOutlierAnalysisSection>(config),
+                {},
+                R::kOutlierAnalysisConfigSectionName)
+                    .Usable());
         }
     }
 
@@ -899,4 +906,13 @@ TEST(OutlierAnalysis, NoLiveSampleRefusesWithItsOwnWording)
     const auto result = R::ApplyEditorOutlierAnalysisCommand(commands, RemovalConfig(entity));
     EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_EQ(result.Message, "Outlier analysis requires live input samples.");
+}
+
+// RUNTIME-354 block 2: the backend's name stays the codec's token, and an out-of-range value names "invalid".
+TEST(OutlierAnalysisConfig, BackendNamesAreTheTokensAndInvalidValuesSayInvalid)
+{
+    EXPECT_STREQ(R::ToString(R::OutlierAnalysisBackend::CpuOctree), "cpu_octree");
+    EXPECT_STREQ(R::ToString(R::OutlierAnalysisBackend::CpuLBVH), "cpu_lbvh");
+    EXPECT_STREQ(R::ToString(R::OutlierAnalysisBackend::VulkanLBVH), "vulkan_lbvh");
+    EXPECT_STREQ(R::ToString(static_cast<R::OutlierAnalysisBackend>(7)), "invalid");
 }

@@ -3,10 +3,10 @@
 // the generic functions below (serialize, validate, get, set, registration). Rows are UInt and Float
 // rows bound to number members, StringEnum rows bound to an enum (enumerator i is token
 // EnumValues[i]) and PropertyRef rows bound to a GeometryPropertyRef. The payload is checked before
-// conversion, in the stage order of the hand-written point codecs. Every Float row refuses a positive
-// value that stores as zero, and the cross-field Check runs after the references: a section whose
-// rules differ (outlier analysis' mode-dependent radius, density weights' order) needs that stated
-// before it moves here. The config helper headers are in the purview with their own linkage:
+// conversion, in the stage order of the hand-written point codecs. A Float row refuses a positive
+// value that stores as zero, unless its Positivity rule says when (outlier analysis' mode-dependent
+// radius, RUNTIME-354); the cross-field Check runs after the references. A section whose rules
+// differ otherwise (density weights' order) needs that stated before it moves here. The config helper headers are in the purview with their own linkage:
 // reachable where a generic function is instantiated, not exported.
 module;
 #include <cstddef>
@@ -96,17 +96,21 @@ extern "C++"
             return SerializeConfigJson(out);
         }
 
-        // Reads a validated payload. A Float row reads the number as double first, so an integer
-        // literal of more than 53 significant bits rounds twice on its way to a float member.
+        // Reads a validated payload; without `references`, its numbers and tokens only. A number goes
+        // straight into a float member, as the hand-written codecs converted it.
         template <class Cfg>
-        [[nodiscard]] Cfg ParseDerivedConfig(const DerivedConfigSection<Cfg>& section, const nlohmann::json& data)
+        [[nodiscard]] Cfg ParseDerivedConfig(
+            const DerivedConfigSection<Cfg>& section, const nlohmann::json& data, const bool references = true)
         {
             Cfg config{};
             for (const BoundField<Cfg>& row : section.Rows)
             {
                 const nlohmann::json& value = data.at(std::string(row.Spec.Name));
                 if (row.Ref != nullptr)
-                    DecodePointPropertyRef(value, config.*row.Ref);
+                {
+                    if (references)
+                        DecodePointPropertyRef(value, config.*row.Ref);
+                }
                 else if (row.Spec.Type == ConfigFieldType::StringEnum)
                 {
                     for (std::size_t i = 0; i < row.Spec.EnumValues.size(); ++i)
@@ -114,7 +118,7 @@ extern "C++"
                             row.Set(config, static_cast<double>(i));
                 }
                 else
-                    row.Set(config, value.get<double>());
+                    row.Set(config, row.Narrow ? double(value.get<float>()) : value.get<double>());
             }
             return config;
         }
@@ -146,11 +150,19 @@ extern "C++"
                             ".");
             if (auto error = ValidatePointConfigNonnegativeFloats(data, section.Fields))
                 return RejectConfigSection(subject, std::move(*error));
+            const Cfg numbers = ParseDerivedConfig(section, data, false);
             for (const BoundField<Cfg>& row : section.Rows)
             {
                 if (row.Spec.Type != ConfigFieldType::Float)
                     continue;
                 const double value = data[std::string(row.Spec.Name)].template get<double>();
+                if (row.Positivity != nullptr)
+                {
+                    if (!row.Positivity(numbers))
+                        continue;
+                    if (!(value > 0.0))
+                        return RejectConfigSection(subject, std::string(row.PositiveRefusal));
+                }
                 Cfg stored{};
                 row.Set(stored, value);
                 if (value > 0.0 && row.Get(stored) == 0.0)

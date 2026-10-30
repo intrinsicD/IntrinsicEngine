@@ -112,9 +112,11 @@ TEST(OutlierTransaction, InputOrDeletionChangeRefusesAccept)
 TEST(OutlierTransaction, ConfigRoundTripRetainsVulkanAndTypedOutputs)
 {
     Harness h;Extrinsic::Core::Config::EngineConfig engine;
-    R::SetOutlierAnalysisConfig(engine,h.Config);
-    const auto restored=R::GetOutlierAnalysisConfig(engine);ASSERT_TRUE(restored);
-    EXPECT_EQ(R::SerializeOutlierAnalysisConfig(*restored),R::SerializeOutlierAnalysisConfig(h.Config));
+    R::SetDerivedSection<R::kOutlierAnalysisSection>(engine, h.Config);
+    const auto restored = R::GetDerivedSection<R::kOutlierAnalysisSection>(engine);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(R::SerializeDerivedSection<R::kOutlierAnalysisSection>(*restored),
+        R::SerializeDerivedSection<R::kOutlierAnalysisSection>(h.Config));
 }
 TEST(OutlierTransaction, UnsupportedStorageAndSubnormalInputsRefuseAdmission)
 {

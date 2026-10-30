@@ -1,5 +1,5 @@
-// Compiles OutlierAnalysis and DensityWeight config codecs together to share JSON work (kernel density and
-// point spacing moved to their operation modules, RUNTIME-349).
+// The density weight config codec (kernel density, point spacing and outlier analysis derive theirs
+// from their declared rows: RUNTIME-349, RUNTIME-354).
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -15,7 +15,6 @@ import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
-import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
@@ -26,65 +25,7 @@ namespace Extrinsic::Runtime
     namespace
     {
         constexpr Geometry::PropertyValueKind kFloatKind[]{Geometry::PropertyValueKind::Float};
-        constexpr Geometry::PropertyValueKind kUInt32Kind[]{Geometry::PropertyValueKind::UInt32};
         constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
-        constexpr std::string_view kOutlierAnalysisMethod[]{"statistical", "radius", "local_distance_ratio"};
-        constexpr std::string_view kOutlierAnalysisOperation[]{"analyze", "remove_marked"};
-        constexpr std::string_view kOutlierAnalysisBackend[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
-        constexpr std::string_view kOutlierAnalysisBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
-        constexpr ConfigFieldSpec kOutlierAnalysisFields[]{
-            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
-            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors.", .Min = 1},
-            {.Name = "minimum_neighbors", .Type = ConfigFieldType::UInt, .Description = "Minimum neighbors."},
-            {.Name = "gpu_query_batch_size",
-                .Type = ConfigFieldType::UInt,
-                .Description = "Gpu query batch size.",
-                .Min = 1,
-                .Max = 16384},
-            {.Name = "method",
-                .Type = ConfigFieldType::StringEnum,
-                .Description = "Method.",
-                .EnumValues = kOutlierAnalysisMethod},
-            {.Name = "operation",
-                .Type = ConfigFieldType::StringEnum,
-                .Description = "Operation.",
-                .EnumValues = kOutlierAnalysisOperation},
-            {.Name = "backend",
-                .Type = ConfigFieldType::StringEnum,
-                .Description = "Backend.",
-                .EnumNames = kOutlierAnalysisBackendNames,
-                .EnumValues = kOutlierAnalysisBackend},
-            {.Name = "radius",
-                .Type = ConfigFieldType::Float,
-                .Description =
-                    "With method radius, the value must be strictly positive after conversion to float; otherwise zero is allowed.",
-                .Min = 0,
-                .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "stddev_multiplier",
-                .Type = ConfigFieldType::Float,
-                .Description = "Stddev multiplier.",
-                .Min = 0,
-                .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "score_threshold",
-                .Type = ConfigFieldType::Float,
-                .Description = "Score threshold.",
-                .Min = 0,
-                .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "positions",
-                .Type = ConfigFieldType::PropertyRef,
-                .Description = "Positions, mask and score must have distinct names on the same element domain.",
-                .RefKinds = kVec3Kind},
-            {.Name = "mask",
-                .Type = ConfigFieldType::PropertyRef,
-                .Description = "Mask.",
-                .RefKinds = kUInt32Kind,
-                .AnyScalar = true},
-            {.Name = "score",
-                .Type = ConfigFieldType::PropertyRef,
-                .Description = "Score.",
-                .RefKinds = kFloatKind,
-                .AnyScalar = true},
-        };
         constexpr std::string_view kDensityWeightBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"};
         constexpr std::string_view kDensityWeightKernel[]{"gaussian", "theta_lop", "wendland_c2"};
         constexpr std::string_view kDensityWeightMode[]{"direct", "reciprocal"};
@@ -130,150 +71,6 @@ namespace Extrinsic::Runtime
                 .RefKinds = kFloatKind,
                 .AnyScalar = true},
         };
-
-        using Json = nlohmann::json;
-        OutlierAnalysisConfig ParseOutlierAnalysisConfig(const Json& data)
-        {
-            OutlierAnalysisConfig c;
-            c.StableEntityId = data.at("entity");
-            for (unsigned i = 0; i < 3; ++i)
-                if (data.at("method") == ToString(OutlierAnalysisMethod(i)))
-                    c.Method = OutlierAnalysisMethod(i);
-            c.Operation = data.at("operation") == "remove_marked" ? OutlierAnalysisOperation::RemoveMarked
-                                                                  : OutlierAnalysisOperation::Analyze;
-            for (unsigned i = 0; i < 3; ++i)
-                if (data.at("backend") == ToString(OutlierAnalysisBackend(i)))
-                    c.Backend = OutlierAnalysisBackend(i);
-            ConfigDetail::DecodePointPropertyRef(data.at("positions"), c.Positions);
-            ConfigDetail::DecodePointPropertyRef(data.at("mask"), c.Mask);
-            ConfigDetail::DecodePointPropertyRef(data.at("score"), c.Score);
-            c.KNeighbors = data.at("k_neighbors");
-            c.MinimumNeighbors = data.at("minimum_neighbors");
-            c.GpuQueryBatchSize = data.at("gpu_query_batch_size");
-            c.Radius = data.at("radius");
-            c.StdDevMultiplier = data.at("stddev_multiplier");
-            c.ScoreThreshold = data.at("score_threshold");
-            return c;
-        }
-    }
-    const char* ToString(OutlierAnalysisMethod m) noexcept
-    {
-        switch (m)
-        {
-        case OutlierAnalysisMethod::Statistical:        return "statistical";
-        case OutlierAnalysisMethod::Radius:             return "radius";
-        case OutlierAnalysisMethod::LocalDistanceRatio: return "local_distance_ratio";
-        }
-        return "invalid";
-    }
-    const char* ToString(OutlierAnalysisBackend b) noexcept
-    {
-        switch (b)
-        {
-        case OutlierAnalysisBackend::CpuOctree:  return "cpu_octree";
-        case OutlierAnalysisBackend::CpuLBVH:    return "cpu_lbvh";
-        case OutlierAnalysisBackend::VulkanLBVH: return "vulkan_lbvh";
-        }
-        return "invalid";
-    }
-    const char* ToString(OutlierAnalysisOperation o) noexcept
-    {
-        switch (o)
-        {
-        case OutlierAnalysisOperation::Analyze:      return "analyze";
-        case OutlierAnalysisOperation::RemoveMarked: return "remove_marked";
-        }
-        return "invalid";
-    }
-    std::string SerializeOutlierAnalysisConfig(const OutlierAnalysisConfig& c)
-    {
-        return ConfigDetail::SerializeConfigJson(Json{{"entity", c.StableEntityId},
-            {"method", ToString(c.Method)},
-            {"backend", ToString(c.Backend)},
-            {"operation", ToString(c.Operation)},
-            {"positions", ConfigDetail::EncodePointPropertyRef(c.Positions)},
-            {"mask", ConfigDetail::EncodePointPropertyRef(c.Mask)},
-            {"score", ConfigDetail::EncodePointPropertyRef(c.Score)},
-            {"k_neighbors", c.KNeighbors},
-            {"minimum_neighbors", c.MinimumNeighbors},
-            {"gpu_query_batch_size", c.GpuQueryBatchSize},
-            {"radius", c.Radius},
-            {"stddev_multiplier", c.StdDevMultiplier},
-            {"score_threshold", c.ScoreThreshold}});
-    }
-    Core::Config::EngineConfigSectionValidationResult ValidateOutlierAnalysisConfigSection(
-        std::string_view payload, std::string_view, std::string_view subject)
-    {
-        using namespace Core::Config;
-        using ConfigDetail::RejectConfigSection;
-        auto input = ConfigDetail::ParseConfigJson(payload, false),
-             data = ConfigDetail::ParseConfigJson(SerializeOutlierAnalysisConfig({}), true);
-        if (auto error = ConfigDetail::ValidatePointConfigFields(input,
-                data,
-                "Outlier analysis config must be an object.",
-                "Unknown outlier field: ",
-                kOutlierAnalysisFields))
-            return RejectConfigSection(subject, std::move(*error));
-        if (!ConfigDetail::InConfigFieldRange(
-                kOutlierAnalysisFields, "k_neighbors", data["k_neighbors"].get<double>()) ||
-            !ConfigDetail::InConfigFieldRange(
-                kOutlierAnalysisFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()))
-            return RejectConfigSection(subject, "k must be positive and GPU query batch size must be 1..16384.");
-        if (!ConfigDetail::IsConfigFieldToken(kOutlierAnalysisFields, "method", data["method"]))
-            return RejectConfigSection(subject, "Unknown outlier method.");
-        if (!ConfigDetail::IsConfigFieldToken(kOutlierAnalysisFields, "operation", data["operation"]))
-            return RejectConfigSection(subject, "Unknown outlier operation.");
-        if (!ConfigDetail::IsConfigFieldToken(kOutlierAnalysisFields, "backend", data["backend"]))
-            return RejectConfigSection(subject, "Unknown outlier backend.");
-        if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(data, kOutlierAnalysisFields))
-            return RejectConfigSection(subject, std::move(*error));
-        if (data["method"] == "radius" && data["radius"].get<float>() <= 0)
-            return RejectConfigSection(subject,
-                data["radius"].get<double>() <= 0.0 ? "Radius must be positive."
-                                                    : "Radius must remain positive in float storage.");
-        if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(data, kOutlierAnalysisFields))
-            return RejectConfigSection(subject, std::move(*error));
-        if (data["positions"]["domain"] != data["mask"]["domain"] ||
-            data["mask"]["domain"] != data["score"]["domain"] || data["positions"]["name"] == data["mask"]["name"] ||
-            data["positions"]["name"] == data["score"]["name"] || data["mask"]["name"] == data["score"]["name"])
-            return RejectConfigSection(
-                subject, "Position, mask and score must be distinct properties on the same domain.");
-        return ConfigDetail::AcceptConfigSection(
-            SerializeOutlierAnalysisConfig(ParseOutlierAnalysisConfig(data)), input.size());
-    }
-    std::optional<OutlierAnalysisConfig> GetOutlierAnalysisConfig(const Core::Config::EngineConfig& c)
-    {
-        return ConfigDetail::GetPointConfig(c,
-            kOutlierAnalysisConfigSectionName,
-            kOutlierAnalysisConfigSectionSchemaId,
-            1u,
-            ValidateOutlierAnalysisConfigSection,
-            ParseOutlierAnalysisConfig);
-    }
-    void SetOutlierAnalysisConfig(Core::Config::EngineConfig& c, const OutlierAnalysisConfig& value)
-    {
-        Core::Config::UpsertEngineConfigSection(c.AppSections,
-            ConfigDetail::MakeConfigSection(kOutlierAnalysisConfigSectionName,
-                kOutlierAnalysisConfigSectionSchemaId,
-                1,
-                SerializeOutlierAnalysisConfig(value)));
-    }
-    std::span<const ConfigFieldSpec> OutlierAnalysisConfigFieldSpecs() noexcept
-    {
-        return kOutlierAnalysisFields;
-    }
-    Core::Config::EngineConfigSectionRegistration MakeOutlierAnalysisConfigSectionRegistration()
-    {
-        return ConfigDetail::MakeSectionRegistration(kOutlierAnalysisConfigSectionName,
-            kOutlierAnalysisConfigSectionSchemaId,
-            1,
-            SerializeOutlierAnalysisConfig({}),
-            ValidateOutlierAnalysisConfigSection,
-            ConfigDetail::BuildSectionSchemaJson(kOutlierAnalysisConfigSectionSchemaId,
-                "OutlierAnalysis",
-                "Validated OutlierAnalysis configuration.",
-                kOutlierAnalysisFields,
-                ConfigDetail::ParseConfigJson(SerializeOutlierAnalysisConfig({}), true)));
     }
 }
 

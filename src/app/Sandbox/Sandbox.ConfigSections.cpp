@@ -47,7 +47,7 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakeCoherentPointDriftConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakePointSamplingConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||
-            !registry.Register(Runtime::MakeOutlierAnalysisConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kOutlierAnalysisSection>()) ||
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kKernelDensitySection>()) ||
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kPointSpacingSection>()) ||
             !registry.Register(Runtime::MakeBilateralFilterConfigSectionRegistration()) ||

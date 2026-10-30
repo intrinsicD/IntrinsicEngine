@@ -227,7 +227,7 @@ namespace
                              std::uint32_t target = 0u)
     {
         EXPECT_EQ(R::GetNormalEstimationConfig(config)->StableEntityId, expected);
-        EXPECT_EQ(R::GetOutlierAnalysisConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetDerivedSection<R::kOutlierAnalysisSection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetKeypointAnalysisConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDescriptorAnalysisConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDerivedSection<R::kKernelDensitySection>(config)->StableEntityId, expected);
@@ -721,7 +721,7 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
             {
                 if (action == 1 || action == 2)
                 {
-                    const auto input = *R::GetOutlierAnalysisConfig(
+                    const auto input = *R::GetDerivedSection<R::kOutlierAnalysisSection>(
                         harness.Control().GetEngineConfigControlState().ActiveConfig);
                     const auto readiness = R::PreviewEditorOutlierAnalysisCommand(
                         R::BindEditorProcessingCommands({.Scene = &scene}), input);
@@ -854,16 +854,18 @@ TEST(SandboxProcessingPanels, FaceOutputsDisplayWithTheirCanonicalDomain)
         (void)faces.GetOrAdd<float>("f:score", 0.5f);
         ASSERT_TRUE(harness.Selection().SetSelectedEntity(scene, entity));
         auto config = harness.Control().GetEngineConfigControlState().ActiveConfig;
-        auto outliers = *R::GetOutlierAnalysisConfig(config);
+        auto outliers = *R::GetDerivedSection<R::kOutlierAnalysisSection>(config);
         outliers.Positions.Domain = outliers.Mask.Domain = outliers.Score.Domain =
             R::GeometryElementDomain::MeshFace;
         outliers.Positions.Name = "f:centroid";
         outliers.Score.Name = "f:score";
         // Already-published face scores remain displayable when k is too large to run.
-        R::SetOutlierAnalysisConfig(config, outliers);
+        R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
         ASSERT_TRUE(harness.Apply(config));
-        ASSERT_EQ(R::GetOutlierAnalysisConfig(harness.Control().GetEngineConfigControlState().ActiveConfig)->Score.Name,
-                  "f:score");
+        ASSERT_EQ(R::GetDerivedSection<R::kOutlierAnalysisSection>(
+                      harness.Control().GetEngineConfigControlState().ActiveConfig)
+                      ->Score.Name,
+            "f:score");
         ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(
             normals ? "mesh.processing.faces.normals" : "view.outlier_analysis", true));
         int frame = 0;
@@ -1345,7 +1347,7 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
             "CPU LBVH (cached)",
             [](const auto& c)
             {
-                return int(R::GetOutlierAnalysisConfig(c)->Backend);
+                return int(R::GetDerivedSection<R::kOutlierAnalysisSection>(c)->Backend);
             },
             1,
             1},
@@ -1355,7 +1357,7 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
             "CPU octree",
             [](const auto& c)
             {
-                return int(R::GetOutlierAnalysisConfig(c)->Backend);
+                return int(R::GetDerivedSection<R::kOutlierAnalysisSection>(c)->Backend);
             },
             0,
             0},
@@ -1365,7 +1367,7 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
             "Vulkan LBVH",
             [](const auto& c)
             {
-                return int(R::GetOutlierAnalysisConfig(c)->Backend);
+                return int(R::GetDerivedSection<R::kOutlierAnalysisSection>(c)->Backend);
             }},
         Control{"view.keypoint_analysis",
             "ISS Keypoint Analysis",
@@ -2304,11 +2306,11 @@ TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejected
     auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
     props.Get<glm::vec3>("v:position")[8] = {100, 100, 100};
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-    auto outliers = *R::GetOutlierAnalysisConfig(config);
+    auto outliers = *R::GetDerivedSection<R::kOutlierAnalysisSection>(config);
     outliers.StableEntityId = R::SelectionController::ToStableEntityId(entity);
     outliers.Method = R::OutlierAnalysisMethod::Radius;
     outliers.Radius = 1.1f; outliers.MinimumNeighbors = 1;
-    R::SetOutlierAnalysisConfig(config, outliers);
+    R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
     std::optional<R::EditorOutlierAnalysisResult> result;
@@ -2330,7 +2332,11 @@ TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejected
         ImGui::SetWindowPos(window, {0, 0});
         ++step;
         const auto click = [&](const char* label) { ImGui::ActivateItemByID(window->GetID(label)); };
-        const auto active = [&] { return *R::GetOutlierAnalysisConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        const auto active = [&]
+        {
+            return *R::GetDerivedSection<R::kOutlierAnalysisSection>(
+                h.Control().GetEngineConfigControlState().ActiveConfig);
+        };
         if (phase == 0)
         {
             if (step == 2) jobsBefore = engine.Jobs().Stats().SubmittedJobs;
@@ -5090,7 +5096,8 @@ TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResu
         outliers.Backend=R::OutlierAnalysisBackend::VulkanLBVH; outliers.Positions=normals.Positions;
         outliers.Score.Domain=outliers.Mask.Domain=R::GeometryElementDomain::MeshVertex;
         auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
-        R::SetNormalEstimationConfig(config,normals); R::SetOutlierAnalysisConfig(config,outliers);
+        R::SetNormalEstimationConfig(config, normals);
+        R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
         auto section=R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
         section.PayloadJson=R::SerializePropertySmoothingConfig(smoothing);
         Config::UpsertEngineConfigSection(config.AppSections, section);
@@ -5986,12 +5993,12 @@ TEST(SandboxProcessingPanels, OutlierPanelShowsItsFinishedRunOnlyForItsEntity)
     auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
     props.Get<glm::vec3>("v:position")[8] = {100, 100, 100};
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-    auto outliers = *R::GetOutlierAnalysisConfig(config);
+    auto outliers = *R::GetDerivedSection<R::kOutlierAnalysisSection>(config);
     outliers.StableEntityId = R::SelectionController::ToStableEntityId(entity);
     outliers.Method = R::OutlierAnalysisMethod::Radius;
     outliers.Radius = 1.1f;
     outliers.MinimumNeighbors = 1;
-    R::SetOutlierAnalysisConfig(config, outliers);
+    R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
     ExpectRunShownOnlyForItsEntity(h, "Outlier Analysis", "Detect outliers", entity, other,
@@ -6390,13 +6397,13 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
             [](PanelHarness& h, const std::uint32_t id)
         {
             auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-            auto outliers = *R::GetOutlierAnalysisConfig(config);
+            auto outliers = *R::GetDerivedSection<R::kOutlierAnalysisSection>(config);
             outliers.StableEntityId = id;
             outliers.Method = R::OutlierAnalysisMethod::Radius;
             outliers.Radius = 1.1f;
             outliers.MinimumNeighbors = 1;
             outliers.Mask.Name = "duplicate_outliers";
-            R::SetOutlierAnalysisConfig(config, outliers);
+            R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
             EXPECT_TRUE(h.Apply(config));
             return std::function<R::EditorCommandStatus(const R::EditorProcessingCommands&, std::function<void()>)>(
                 [outliers](const R::EditorProcessingCommands& commands, std::function<void()> done) {

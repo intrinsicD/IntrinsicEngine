@@ -104,6 +104,12 @@ export namespace Extrinsic::Runtime
         double (*Get)(const Cmd&){nullptr};
         void (*Set)(Cmd&, double){nullptr};
         GeometryPropertyRef Cmd::* Ref{nullptr};
+        bool Narrow{}; // a float member: a config number converts straight into it, not through double
+    // A Float row's positivity rule (RUNTIME-354): while it holds on the record converted so far, a
+    // value that is not positive is refused with PositiveRefusal and one that stores as zero with
+    // Spec.Refusal; while it does not, neither. Without it, a positive value must not store as zero.
+        bool (*Positivity)(const Cmd&){nullptr};
+        std::string_view PositiveRefusal{};
     };
 
     template <class> struct BoundMember;
@@ -115,7 +121,10 @@ export namespace Extrinsic::Runtime
 
     // The row of `spec` bound to `Member` (a pointer to a numeric, bool, enum or property
     // reference member).
-    template <auto Member> [[nodiscard]] constexpr auto Bind(const ConfigFieldSpec& spec)
+    template <auto Member>
+    [[nodiscard]] constexpr auto Bind(const ConfigFieldSpec& spec,
+        bool (*positivity)(const typename BoundMember<decltype(Member)>::Command&) = nullptr,
+        std::string_view positiveRefusal = {})
     {
         using Cmd = typename BoundMember<decltype(Member)>::Command;
         using T = typename BoundMember<decltype(Member)>::Type;
@@ -139,7 +148,10 @@ export namespace Extrinsic::Runtime
                         command.*Member = static_cast<T>(static_cast<std::underlying_type_t<T>>(value));
                     else
                         command.*Member = static_cast<T>(value);
-                }};
+                },
+                .Narrow = std::is_same_v<T, float>,
+                .Positivity = positivity,
+                .PositiveRefusal = positiveRefusal};
     }
 
     // The specs of `rows`, in order: the plain table schemas, checks and hints read.

@@ -192,11 +192,158 @@ Revised after the Codex plan review (Log, 2026-10-30).
 2. **Block 2: the derived config section for outlier analysis.** Rows bound to the record in the
    interface, replacing the hand-written codec's 201 lines; the golden payloads and every diagnostic
    unchanged (the derived codec generalized only where the outlier codec needs it). Its own plan.
+   - **Block 2 plan:**
+     - **Golden first.** `tests/data/config_section_codec_golden.json` gains `outlier_analysis`,
+       captured from today's hand-written codec through the existing golden test
+       (`DeclaredFieldContracts.ConfigSectionCodecsMatchTheirGolden`): the shared payloads plus
+       outlier-specific ones:
+       - the radius method with radius 0, 1e-50 and 1e-100;
+       - another method with radius 1e-50 (accepted, stored 0);
+       - `stddev_multiplier` and `score_threshold` at 1e-50 (accepted);
+       - unknown method and operation tokens;
+       - radius 0 under the radius method together with an empty positions name (the radius rule
+         reports first);
+       - mismatched mask and score domains, and equal names.
+
+       It is captured with a one-off dump, recorded in the Log, and committed with the block. Green
+       before the switch, it pins the switch.
+     - **The derived codec, generalized only where the outlier codec differs:**
+       - A Float row of `BoundField` may declare `Positivity`, a predicate on the record converted so
+         far (numbers and tokens, references not yet). While it holds, a value that is not positive is
+         refused with the row's `PositiveRefusal`, and a positive one that stores as zero with its
+         `Refusal`. While it does not hold, there is no positivity or storage rule.
+       - Rows without `Positivity` keep today's rule (kernel density and point spacing unchanged).
+       - Outlier analysis: the radius row's predicate is the radius method ("Radius must be positive."
+         / "Radius must remain positive in float storage."); `stddev_multiplier` and `score_threshold`
+         declare a predicate that never holds (the outlier codec never refused them for storage).
+     - **The other outlier rules, with existing features:**
+       - the k and batch-size rows carry the combined refusal "k must be positive and GPU query batch
+         size must be 1..16384.";
+       - the method, operation and backend rows carry their "Unknown outlier …" texts;
+       - the domain and distinct-name rule is the section's `Check`.
+
+       The row order is the old table's, so validation stages and the schema's field order hold.
+     - **Placement and callers:**
+       - The rows and section go in `Runtime.OutlierAnalysisConfig.cppm`, which stays config-only and
+         in `ConfigPropertyTypes`, with `extern template` declarations.
+       - The explicit instantiations and `ToString` (from the row tokens) go in the outlier operation
+         unit, as for kernel density.
+       - The outlier part of `Runtime.PointNeighborhoodConfigCodecs.cpp` (201 lines) goes.
+       - Callers use the generic functions and `kOutlierAnalysisFields`: the outlier unit, the panel,
+         the section registration list, and the tests that name the old functions (structural,
+         question 28).
+     - **Conversion (Codex plan review):**
+       - `BoundField` records `Narrow` (the member is a `float`), and the derived parser converts a
+         number straight into such a member, as the hand-written codecs did.
+       - Before, an integer literal above 2^53 rounded twice through `double`. The derived module
+         documented that as a deviation since `RUNTIME-346`.
+       - So kernel density and point spacing get their pre-pilot conversion back in that corner,
+         which their golden does not contain.
+     - **Tests:**
+       - the golden unchanged across the switch; captured cases (61) include, from the review, an
+         invalid operation with an invalid backend, positions and score sharing a name on one domain,
+         mask and score on another domain than positions, and an integer literal above 2^53 for
+         each float;
+       - `ToString`'s tokens and "invalid" pinned directly
+         (`OutlierAnalysisConfig.BackendNamesAreTheTokensAndInvalidValuesSayInvalid`; the method and
+         operation overloads lost their last caller and were deleted, see the Log);
+       - mutations: each comparison of the `Check` dropped, and the operation and backend rows
+         swapped;
+       - `IsDerivable` holds for the outlier section;
+       - mutations, each red: `Positivity` ignored, the radius row's refusal texts removed, and the
+         `Check` dropped (the golden's domain cases);
+       - the selection with `DeclaredFieldContracts.*`, `SandboxConfigSections.*`,
+         `EngineConfigSectionSchemas.*` and the agent schema baseline.
 3. **Block 3: the panel from the rows, and the option trial.** Within question 32 (Codex plan review):
    only the field-table controls the option trial needs, not `RUNTIME-351`'s whole generated-panel
    block. Before the block, its plan names the operation and a real option consumed by `Compute`, whose
    codec, validation, schema and panel control derive from its row, and bounds the panel changes. The
    trial counts every edit: generated files and tests included.
+
+   **Block 3 plan.** Two commits, so the second one's diff is the measurement.
+   - **3a, the outlier panel's numbers from the rows.**
+     - The six hand-written number controls (k, stddev multiplier, score threshold, radius, minimum
+       neighbors, GPU query batch size) become one `DrawBoundFields` call over `kOutlierAnalysisRows`.
+       `DrawBoundFields` and `DrawFieldControl` are the existing `RUNTIME-344` helpers in
+       `Sandbox.PanelSupport`; nothing new in the framework.
+     - Its keep predicate is the panel's visibility, unchanged:
+       - `entity` is drawn by the entity picker;
+       - k for the statistical and distance ratio methods;
+       - the stddev multiplier for the statistical method, the score threshold for the distance ratio;
+       - radius and minimum neighbors for the radius method;
+       - the batch size for the Vulkan backend.
+
+       Any other number row is shown, so a new option applying to every method needs no panel edit.
+       Enums, references and the entity keep their controls (`DrawFieldControl` draws none for them).
+     - Changes a user sees (completed after the Codex plan review):
+       - the labels become the row names: "Neighbors k" → "K neighbors", "Standard deviation
+         multiplier" → "Stddev multiplier", "GPU query batch size" → "Gpu query batch size";
+       - k and minimum neighbors stay unsigned inputs (their range passes `int`) and clamp to the
+         accepted range after an edit, so k = 0 becomes 1;
+       - the batch size becomes a drag over 1..16384, and the three floats drags over their range
+         with `%.6g`; radius 0 under the radius method is still refused by validation;
+       - the order is the rows': under the radius method minimum neighbors comes before radius, and
+         the Vulkan batch size comes before the radius, stddev and threshold controls;
+       - each control gains the row's hover hint (no readiness markers: the window has no
+         `ReadinessMarkerScope`).
+
+       The method help texts stay.
+     - Tests:
+       - `Test.SandboxProcessingPanels` addresses the radius control by its new id
+         (`"Radius##Outliers"`, the existing edit helper drives a drag's input mode). A structural
+         rewrite under question 28; the assertions stay.
+       - New: for every method and backend, the controls actually drawn (activated by id and observed
+         active on the next frame, not `GetID`, which computes an id whether drawn or not) are
+         exactly the expected ones. The expected set is a literal per method and backend for today's
+         rows; every other number or bool row is expected in every combination, so a new option is
+         covered without editing the test, and hiding it fails.
+   - **3b, the option trial.**
+     - Operation: outlier analysis. Option: `negative` (bool, default false), PCL's `setNegative`. It
+       marks the inliers instead of the outliers, so "Remove marked points" keeps only the outliers.
+     - `Compute` writes `mask = analysis.Mask[i] != negative` and counts the marked samples; it covers
+       all three methods on both CPU backends. Scores are unchanged.
+     - The Vulkan backend refuses it in `Prepare`, right after the removal's early return (removal
+       reads the published mask and stays independent of the backend), so after capture but before
+       any output snapshot, dispatch or publication: "Negative masks need a CPU backend." The mask ring
+       is GPU-resident and the shader writes it, so honouring it there would touch the shader and its
+       parameter block, outside the declared structure. The row's description says so.
+     - The words that state the mask's polarity become neutral (Codex plan review): the panel's "mask
+       (1 = outlier)" and "outliers: N", and its method help texts that say which samples are marked;
+       `docs/architecture/outlier-analysis.md` documents the option and its CPU-only restriction.
+     - Expected edits (prediction, written before the trial; the trial commit holds every edit the
+       option needs, and the count is what it actually touches):
+       1. `Runtime.OutlierAnalysisConfig.cppm` (the member and row);
+       2. `Runtime.OutlierAnalysisOperation.cpp` (its use and the Vulkan refusal);
+       3. `Test.OutlierAnalysis.cpp` (its test);
+       4. `tests/data/config_section_codec_golden.json`: the outlier entry pins the canonical payload,
+          schema and registration, all of which gain the field, so it is regenerated;
+       5. `Sandbox.MeshProcessingPanels.cpp`: the polarity wording (not the control, which follows from
+          the row);
+       6. `docs/architecture/outlier-analysis.md`.
+
+       That is 6 files against the gate's 3. The codec, validation, schema, agent schema (its baseline
+       test drops newly added fields, `Test.AgentOperations.cpp`), inventory and panel control follow
+       from the row without edits. The extra three: the golden changes with every added field of a
+       derived section; the wording and the documentation change because this option changes what the
+       mask means. Whether they count is not reframed here; the count goes to block 4's verdict and
+       the operator, and under the ADR as written more than 3 fails criterion 4.
+     - An algorithmic option (for example PCL's sample standard deviation) was considered and not
+       chosen: it changes the geometry kernel (`ClassifyStatisticalOutliers`) and the shader, which no
+       operation structure removes.
+     - Tests in `Test.OutlierAnalysis.cpp`, red without the change:
+       - the default is false, and `negative = true` round-trips through the section;
+       - on a fixture with known outliers, each method on both CPU backends, run through the configured
+         execution, gives the complement mask and the complementary marked count, with the scores and
+         deleted rows unchanged;
+       - a removal after it keeps exactly the outliers, and Undo restores the cloud;
+       - Vulkan with `negative` refuses with exactly the new message through preview and through
+         application (other Vulkan checks also refuse, so only the exact text discriminates), with
+         nothing published.
+
+       Mutations, each red: `negative` ignored in `Compute`; the refusal removed; the row hidden in the
+       panel (the visibility test).
+   - Verification: the selection, `SandboxProcessingPanels.*`, the golden, the agent schema baseline
+     unchanged, the Vulkan smokes; the trial's `git show --stat`.
 4. **Block 4: measurement and the gate.**
    - The outlier footprint after, with the same script, against the 956-line target.
    - The projection over `docs/architecture/declared-operations-table.md`, recomputed from the measured
@@ -400,3 +547,58 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
   Re-run on the final tree: the selection 861/861, source rules 9/9, the drift guards, the Vulkan
   smokes 31/31; the inventory up to date. Size: the footprint 1,538, the runtime 968.
+- 2026-10-30: Codex review of the block 2 plan (`plan354e`): revise.
+  - B1: the derived parser converts through `double`, the hand-written one straight into the float
+    (a different canonical for integer literals above 2^53); fixed by `Narrow`.
+  - B2: three discriminating golden cases, and mutations of the single comparisons and of the stage
+    order.
+  - B3: pin `ToString` directly.
+
+  `Positivity` was judged the smallest exact generalization ("no cheaper exact solution using only
+  the existing hooks"). Folded.
+
+  The golden was captured from the hand-written codec, with a one-off dump test that was then
+  removed: `outlier_analysis`, 61 cases, plus defaults, non-default, invalid enum and registration.
+  The stored kernel density and point spacing entries came out byte-identical.
+- 2026-10-30: Block 2 implemented.
+  - The outlier section is rows bound to `OutlierAnalysisConfig`, plus the section with its `Check`.
+    The generic codec is instantiated once in the operation unit, and the hand-written codec is
+    deleted. `BoundField` gains `Narrow` and `Positivity`/`PositiveRefusal`; callers use the
+    generic functions.
+  - Verified in this session:
+    - the golden is unchanged across the switch;
+    - the selection 904/904 and source rules 9/9;
+    - the Vulkan smokes 31/31;
+    - the inventory up to date, and doc links clean.
+  - Mutations, each red against `DeclaredFieldContracts.ConfigSectionCodecsMatchTheirGolden`:
+    - the radius predicate never holding;
+    - the codec ignoring `Positivity`;
+    - the radius storage refusal text removed;
+    - `Narrow` ignored (the 2^53 witnesses);
+    - each of the five `Check` comparisons dropped;
+    - stddev without the may-store-zero predicate;
+    - the operation and backend rows swapped (red on the registration and on a case).
+
+    A first "Positivity ignored" mutation (the refusal text as `nullptr`) did not compile, and was
+    replaced by the two above.
+- 2026-10-30: Ponytail review of block 2 (separate agent): ship, two findings, both applied.
+  - The method and operation `ToString` overloads had lost their last production caller (`rg` over
+    `src/`), so they and their pins were deleted. Only the backend's overload remains, pinned by
+    `BackendNamesAreTheTokensAndInvalidValuesSayInvalid`. This supersedes the plan review's B3 for
+    the deleted overloads.
+  - The never-positive lambda is named once (`OutlierAnalysisMayStoreZero`).
+
+  Rebuilt; the selection 904/904 and source rules 9/9. Size: the footprint 1,470 (from 1,538); the
+  runtime 968.
+- 2026-10-30: Codex code review of block 2 (`review354d`, diff `99d2471c…`, same thread as 1a and
+  1b): approve, no blocking findings. It found the observable behaviour preserved (defaults, canonical
+  serialization, messages, precedence, conversions, references, schema, registration), and
+  `Positivity` and `Narrow` narrowly scoped.
+  - Its optional point, applied: a direct witness that kernel density and point spacing convert an
+    integer literal above 2^53 straight to float
+    (`DeclaredFieldContracts.FloatFieldsConvertNumbersStraightToFloat`; red on both with `Narrow`
+    ignored).
+  - Its note on the Vulkan smoke log: LeakSanitizer reports leaks at exit. The allocations are in
+    Vulkan device initialization and driver calls (`PushConstants`, dbus). They have the same size
+    since 1a and also appear in the full Vulkan run before this task (`RUNTIME-353`), so they are not
+    attributed to this change. The smokes are a functional pass (31/31), not a clean sanitizer pass.

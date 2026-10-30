@@ -30,6 +30,7 @@ import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.KernelDensityConfig;
+import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
@@ -912,6 +913,7 @@ namespace
         std::string Name, Output, FloatField, Defaults, NonDefault, InvalidEnum;
         std::function<SectionValidation(std::string_view)> Validate;
         Extrinsic::Core::Config::EngineConfigSectionRegistration Registration;
+        std::vector<std::string> Extra{}; // the section's own rules (RUNTIME-354: outlier analysis)
     };
     std::vector<SectionCodec> GoldenSections()
     {
@@ -931,6 +933,21 @@ namespace
             .KNeighbors = 3,
             .GpuQueryBatchSize = 64,
             .ScaleFactor = 1.5f};
+        const R::OutlierAnalysisConfig outliers{.StableEntityId = 7,
+            .Method = R::OutlierAnalysisMethod::LocalDistanceRatio,
+            .Backend = R::OutlierAnalysisBackend::CpuLBVH,
+            .Operation = R::OutlierAnalysisOperation::RemoveMarked,
+            .Positions = {.Domain = D::PointCloudPoint, .Name = "p", .ValueKind = K::Vec3},
+            .Mask = {.Domain = D::PointCloudPoint, .Name = "m", .ValueKind = K::Bool},
+            .Score = {.Domain = D::PointCloudPoint, .Name = "s", .ValueKind = K::Double},
+            .KNeighbors = 9,
+            .MinimumNeighbors = 2,
+            .GpuQueryBatchSize = 128,
+            .StdDevMultiplier = 1.5f,
+            .Radius = 0.25f,
+            .ScoreThreshold = 2.5f};
+        const std::string p = R"("positions":{"domain":"MeshVertex","name":"p","kind":"vec3"})";
+        const std::string m = R"("mask":{"domain":"MeshVertex","name":"m","kind":"uint32"})";
         return {
             {"kernel_density",
                 "density",
@@ -956,6 +973,51 @@ namespace
                     return R::ValidateDerivedSection<R::kPointSpacingSection>(payload, {}, "golden");
                 },
                 R::MakeDerivedSectionRegistration<R::kPointSpacingSection>()},
+            {"outlier_analysis",
+                "score",
+                "radius",
+                R::SerializeDerivedSection<R::kOutlierAnalysisSection>({}),
+                R::SerializeDerivedSection<R::kOutlierAnalysisSection>(outliers),
+                R::SerializeDerivedSection<R::kOutlierAnalysisSection>(
+                    {.Backend = static_cast<R::OutlierAnalysisBackend>(7)}),
+                [](const std::string_view payload)
+                {
+                    return R::ValidateDerivedSection<R::kOutlierAnalysisSection>(payload, {}, "golden");
+                },
+                R::MakeDerivedSectionRegistration<R::kOutlierAnalysisSection>(),
+                {R"({"method":"radius","radius":0})",
+                    R"({"method":"radius","radius":-1})",
+                    R"({"method":"radius","radius":1e-50})",
+                    R"({"method":"radius","radius":1e-100})",
+                    R"({"method":"radius","radius":0.5})",
+                    R"({"method":"statistical","radius":1e-50})",
+                    R"({"method":"local_distance_ratio","score_threshold":2.5})",
+                    R"({"stddev_multiplier":1e-50})",
+                    R"({"score_threshold":1e-50})",
+                    R"({"method":"bogus"})",
+                    R"({"method":1})",
+                    R"({"operation":"bogus"})",
+                    R"({"operation":"remove_marked"})",
+                    R"({"k_neighbors":0})",
+                    R"({"minimum_neighbors":4294967296})",
+                    R"({"method":"bogus","backend":"gpu"})",
+                    R"({"operation":"bogus","method":"bogus"})",
+                    R"({"method":"radius","radius":0,"positions":{"domain":"MeshVertex","name":"","kind":"vec3"}})",
+                    R"({"method":"radius","radius":1e-50,"stddev_multiplier":-1})",
+                    "{" + p + "," + m + R"(,"score":{"domain":"MeshFace","name":"s","kind":"float"}})",
+                    "{" + p + "," + m + R"(,"score":{"domain":"MeshVertex","name":"m","kind":"float"}})",
+                    "{" + p +
+                        R"(,"mask":{"domain":"MeshVertex","name":"p","kind":"uint32"},"score":{"domain":"MeshVertex","name":"s","kind":"float"}})",
+                    "{" + p +
+                        R"(,"mask":{"domain":"MeshVertex","name":"m","kind":"float"},"score":{"domain":"MeshVertex","name":"s","kind":"double"}})",
+                    "{" + p + "," + m + R"(,"score":{"domain":"MeshVertex","name":"s","kind":"vec3"}})",
+                    R"({"operation":"bogus","backend":"gpu"})",
+                    "{" + p + "," + m + R"(,"score":{"domain":"MeshVertex","name":"p","kind":"float"}})",
+                    "{" + p +
+                        R"(,"mask":{"domain":"MeshFace","name":"m","kind":"uint32"},"score":{"domain":"MeshFace","name":"s","kind":"float"}})",
+                    R"({"radius":18014399583223809})",
+                    R"({"stddev_multiplier":18014399583223809})",
+                    R"({"score_threshold":18014399583223809})"}},
         };
     }
     // One payload per refusal path, then valid ones; $O is the section's output field, $F its float field.
@@ -996,6 +1058,7 @@ namespace
             R"({"$F":1e-50,"positions":{"domain":"MeshVertex","name":"","kind":"vec3"}})",
             R"({"k_neighbors":-1,"bogus":1})",
             R"({"positions":{"domain":"MeshVertex","name":"","kind":"vec3"},"gpu_query_batch_size":0})"};
+        payloads.insert(payloads.end(), section.Extra.begin(), section.Extra.end());
         for (std::string& payload : payloads)
             for (const auto& [key, value] :
                 {std::pair{std::string("$O"), section.Output}, {std::string("$F"), section.FloatField}})
@@ -1037,6 +1100,24 @@ namespace
     }
 }
 
+// RUNTIME-354 block 2: a float field converts a JSON number straight into float, as the hand-written codecs
+// did. Through double, this integer literal above 2^53 would round twice, to 18014398509481984.
+TEST(DeclaredFieldContracts, FloatFieldsConvertNumbersStraightToFloat)
+{
+    const std::string literal = "18014399583223809";
+    const auto stored = [](const auto& validation, const char* field)
+    {
+        EXPECT_TRUE(validation.Usable()) << validation.CanonicalPayloadJson;
+        return Json::parse(validation.CanonicalPayloadJson)[field].template get<float>();
+    };
+    EXPECT_EQ(stored(R::ValidateDerivedSection<R::kKernelDensitySection>(R"({"bandwidth":)" + literal + "}", {}, "t"),
+                  "bandwidth"),
+        18014400656965632.0f);
+    EXPECT_EQ(stored(R::ValidateDerivedSection<R::kPointSpacingSection>(R"({"scale_factor":)" + literal + "}", {}, "t"),
+                  "scale_factor"),
+        18014400656965632.0f);
+}
+
 TEST(DeclaredFieldContracts, ConfigSectionCodecsMatchTheirGolden)
 {
     std::ifstream file(GoldenPath());
@@ -1076,6 +1157,7 @@ namespace
     }();
     static_assert(R::IsDerivable(R::kKernelDensitySection));
     static_assert(R::IsDerivable(R::kPointSpacingSection));
+    static_assert(R::IsDerivable(R::kOutlierAnalysisSection));
     static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
         .Rows = R::kKernelDensityRows, .Fields = kKernelDensityRenamed}));
     static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
