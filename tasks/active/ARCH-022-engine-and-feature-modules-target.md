@@ -930,3 +930,13 @@ python3 tools/docs/check_doc_links.py --root . --strict
   (regenerated: 455 modules). The local replay now runs every `run:` block of ci-docs with
   `bash -e` on a clean copy (23 run, 2 skipped for the GitHub context or package installation, 0
   failed), plus `check_layering` and `check_compiler_hazards`. The lesson says so.
+- 2026-10-31: Codex review of `01095d834..30881f958` (variant (b) and the CI fixes, thread
+  `01a19286`): APPROVE, no findings.
+  - In (b), host and plugin use the same engine `.so` files, and the (a) branch is unchanged.
+  - The ratchet exclusion is exact and tested, and the exit callback keeps the shutdown order.
+  - S1 is complete: both variants pass 54 of 60. Three findings for the plugin design:
+    1. a config section registered after boot is not active, and its first change does not
+       reach the plugin;
+    2. registering a window needs an editor-internal module (R2);
+    3. the Sandbox's exit is not LSan-clean on this host because of the NVIDIA driver, plugin or
+       not.
