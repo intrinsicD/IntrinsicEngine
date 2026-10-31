@@ -181,6 +181,43 @@ namespace Extrinsic::Runtime
         return m_SectionRegistry;
     }
 
+    bool EngineConfigControl::RegisterSection(
+        RuntimeEngineConfigSectionRegistration registration)
+    {
+        Core::Config::EngineConfig* config = MutableConfig();
+        const std::string name = registration.DefaultSection.Name;
+        if (config == nullptr || m_DispatchingSectionChanges ||
+            Core::Config::FindEngineConfigSection(config->AppSections, name) !=
+                nullptr ||
+            !m_SectionRegistry.Register(std::move(registration)))
+        {
+            return false;
+        }
+        Core::Config::UpsertEngineConfigSection(
+            config->AppSections,
+            m_SectionRegistry.Find(name)->DefaultSection);
+        m_ConfigControlState.ActiveConfig = *config;
+        return true;
+    }
+
+    bool EngineConfigControl::UnregisterSection(const std::string_view name)
+    {
+        Core::Config::EngineConfig* config = MutableConfig();
+        if (config == nullptr || m_DispatchingSectionChanges ||
+            !m_SectionRegistry.Unregister(name))
+        {
+            return false;
+        }
+        std::erase_if(
+            config->AppSections,
+            [name](const Core::Config::EngineConfigSection& section)
+            {
+                return section.Name == name;
+            });
+        m_ConfigControlState.ActiveConfig = *config;
+        return true;
+    }
+
     std::string_view EngineConfigControl::Name() const noexcept
     {
         return "Runtime.EngineConfigControl";
@@ -471,6 +508,10 @@ namespace Extrinsic::Runtime
         result.EngineConfigApplied = true;
         RecordConfigApply(result);
 
+        // The loop holds pointers into the registry and the config, so callbacks may not
+        // register or unregister sections.
+        const bool wasDispatching =
+            std::exchange(m_DispatchingSectionChanges, true);
         for (const std::string& name : result.ChangedSectionNames)
         {
             const Core::Config::EngineConfigSectionRegistration* registration =
@@ -487,6 +528,7 @@ namespace Extrinsic::Runtime
                 registration->OnChanged(*previous, *current);
             }
         }
+        m_DispatchingSectionChanges = wasDispatching;
         return result;
     }
 

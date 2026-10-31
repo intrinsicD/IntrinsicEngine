@@ -162,6 +162,14 @@ class SanitizerPresetTests(unittest.TestCase):
         self.assertEqual(len(build_dirs), len(expected))
         self.assertEqual(len(install_dirs), len(expected))
 
+    def test_only_the_dev_presets_link_with_lld(self) -> None:
+        # CI keeps GNU ld until the operator adopts lld there (ARCH-022 Q49).
+        opted = {
+            name for name in self.configure_presets
+            if self._resolved_configure_preset(name)["cacheVariables"].get("INTRINSIC_USE_LLD") == "ON"
+        }
+        self.assertEqual(opted, {"dev", "dev-cuda"})
+
     def test_cmake_resolves_exact_capabilities_and_fail_hard_flags(self) -> None:
         root_cmake = ROOT_CMAKE.read_text(encoding="utf-8")
         test_cmake = TEST_CMAKE.read_text(encoding="utf-8")

@@ -102,6 +102,7 @@ namespace Extrinsic::Core::Config
         EngineConfigSectionRegistry() = default;
 
         [[nodiscard]] bool Register(EngineConfigSectionRegistration registration);
+        [[nodiscard]] bool Unregister(std::string_view name);
         [[nodiscard]] const EngineConfigSectionRegistration*
         Find(std::string_view name) const noexcept;
         [[nodiscard]] std::span<const EngineConfigSectionRegistration>

@@ -54,6 +54,15 @@ toolchain at major version 20 or newer. A complete toolchain means matching
 `clang`, `clang++`, and `clang-scan-deps` binaries, such as
 `clang-22`/`clang++-22`/`clang-scan-deps-22`.
 
+The `dev` and `dev-cuda` presets link with lld when it is installed
+(`INTRINSIC_USE_LLD`; it looks for `ld.lld-<clang major>`, `ld.lld-24` and
+`ld.lld`). The configure prints `Linker: lld (...)`, or says GNU ld stays. lld
+cuts the Sandbox link from about 13 s to under 1 s
+([comparison](reports/2026-10-31-arch-022-linker-comparison.md)). Install it with
+`sudo apt install lld-24`, then run `cmake --preset dev` once: an automatic
+reconfigure keeps the old cache and does not pick up the preset. CI presets keep
+the default linker.
+
 ### Option B: override the compiler explicitly for one configure
 
 ```bash

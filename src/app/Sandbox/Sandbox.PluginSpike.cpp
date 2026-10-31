@@ -68,25 +68,27 @@ namespace Extrinsic::Sandbox::Spike
         template <typename T>
         std::uintptr_t Address(T* pointer) { return reinterpret_cast<std::uintptr_t>(pointer); }
 
-        // All or nothing: the original config sections are kept until both registries are replaced; any
-        // failure restores them and unregisters every window this commit added. The operation registry is
-        // replaced last, so a failure never has to restore it.
+        // All or nothing: any failure unregisters every config section and window this commit added (their
+        // registration runs no callback, so nothing else needs undoing). The operation registry is replaced
+        // last, so a failure never has to restore it.
         std::optional<std::string> Commit(StagedRegistrations staged, Runtime::EngineConfigControl& config,
                                           Runtime::EditorUiHost& ui, std::string_view failAt)
         {
-            Core::Config::EngineConfigSectionRegistry& sections = config.SectionRegistry();
-            const Core::Config::EngineConfigSectionRegistry originalSections = sections;
+            std::vector<std::string> sections{};
             std::vector<Runtime::EditorWindowHandle> added{};
             const auto rollback = [&](std::string reason) -> std::optional<std::string>
             {
-                sections = originalSections;
+                for (const auto& name : sections) (void)config.UnregisterSection(name);
                 for (const auto handle : added) (void)ui.UnregisterWindow(handle);
                 return reason;
             };
 
-            Core::Config::EngineConfigSectionRegistry sectionsCopy = sections;
             for (auto& section : staged.ConfigSections)
-                if (!sectionsCopy.Register(std::move(section))) return rollback("config: section rejected");
+            {
+                std::string name = section.DefaultSection.Name;
+                if (!config.RegisterSection(std::move(section))) return rollback("config: section rejected");
+                sections.push_back(std::move(name));
+            }
             if (failAt == "config") return rollback("config: injected failure after the config sections");
 
             Runtime::AgentOperationRegistry operationsCopy = *g_Operations;
@@ -102,8 +104,7 @@ namespace Extrinsic::Sandbox::Spike
             }
             if (failAt == "windows") return rollback("windows: injected failure after the windows");
 
-            sections = std::move(sectionsCopy);
-            if (failAt == "replace") return rollback("replace: injected failure between the two replacements");
+            if (failAt == "replace") return rollback("replace: injected failure before the operation registry is replaced");
             *g_Operations = std::move(operationsCopy);
             return std::nullopt;
         }

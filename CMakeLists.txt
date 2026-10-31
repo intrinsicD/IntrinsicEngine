@@ -401,6 +401,21 @@ set(INTRINSIC_LINK_FLAGS
         # Link-time optimization (LTO) could go here in the future
 )
 
+# lld links the Sandbox in under a second instead of ~13 s with GNU ld (ARCH-022, Q49); the dev presets opt in.
+option(INTRINSIC_USE_LLD "Link with lld when it is installed; otherwise the default linker stays" OFF)
+if(INTRINSIC_USE_LLD)
+    string(REGEX MATCH "^[0-9]+" _intrinsic_clang_major "${CMAKE_CXX_COMPILER_VERSION}")
+    # ld.lld-24: the apt sources offer no lld-23 for the clang 23 toolchain.
+    find_program(INTRINSIC_LLD NAMES ld.lld-${_intrinsic_clang_major} ld.lld-24 ld.lld
+                 HINTS /usr/lib/llvm-${_intrinsic_clang_major}/bin)
+    if(INTRINSIC_LLD)
+        list(APPEND INTRINSIC_LINK_FLAGS --ld-path=${INTRINSIC_LLD})
+        message(STATUS "Linker: lld (${INTRINSIC_LLD})")
+    else()
+        message(STATUS "Linker: lld not found (sudo apt install lld-24); GNU ld stays")
+    endif()
+endif()
+
 # glm vector types are consumed both textually (#include in .cpp/.cppm global
 # module fragments) and through imported module BMIs. Clang 20 and 21 fail to
 # merge anonymous-union members of class template specializations that reach a

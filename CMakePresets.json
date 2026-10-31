@@ -29,7 +29,8 @@
       "inherits": "base",
       "description": "Default developer configuration. Keeps the CUDA backend disabled unless explicitly requested.",
       "cacheVariables": {
-        "INTRINSIC_ENABLE_CUDA": "OFF"
+        "INTRINSIC_ENABLE_CUDA": "OFF",
+        "INTRINSIC_USE_LLD": "ON"
       }
     },
     {
@@ -38,7 +39,8 @@
       "inherits": "base",
       "description": "Developer configuration with the optional CUDA backend enabled. Requires a working CUDA toolkit/driver install.",
       "cacheVariables": {
-        "INTRINSIC_ENABLE_CUDA": "ON"
+        "INTRINSIC_ENABLE_CUDA": "ON",
+        "INTRINSIC_USE_LLD": "ON"
       }
     },
     {

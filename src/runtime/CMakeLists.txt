@@ -78,6 +78,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorUiHost.cppm
         Editor/Runtime.EditorUiModule.cppm
         Editor/Runtime.EditorWindowRegistry.cppm
+        Services/Runtime.UiHostTypes.cppm
         Kernel/Runtime.Engine.cppm
         Config/Runtime.EngineConfigBoot.cppm
         Config/Runtime.EngineConfigControl.cppm

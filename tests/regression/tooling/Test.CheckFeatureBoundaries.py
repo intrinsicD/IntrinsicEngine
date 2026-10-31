@@ -102,13 +102,14 @@ class FeatureBoundaryRatchet(unittest.TestCase):
         write(self.root, "src/runtime/Modules/Gamma/Runtime.Gamma.cppm", "export module Extrinsic.Runtime.Gamma;\n")
         self.assert_fails("Gamma")
 
-    def test_spike_folder_is_not_a_plugin_but_other_plugin_folders_are(self) -> None:
-        editor_import = "import Extrinsic.Runtime.EditorThing;\n"
-        write(self.root, "plugins/spike/SpikePlugin.cpp", editor_import)
+    def test_plugins_folder_is_ratcheted_like_any_plugin_folder(self) -> None:
+        write(self.root, "plugins/spike/SpikePlugin.cpp", "import Extrinsic.Runtime.UiHostTypes;\n")
+        self.assert_fails("plugins/spike")
+        self.save_baseline(r1=1, alpha=(1, 0), beta=(0, 0), **{"plugins/spike": (0, 0)})
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        write(self.root, "plugins/other/Other.cpp", editor_import)
-        self.assert_fails("plugins/other")
+        write(self.root, "plugins/spike/SpikePlugin.cpp", "import Extrinsic.Runtime.EditorThing;\n")
+        self.assert_fails("plugins/spike")
 
     def test_stale_entry_fails(self) -> None:
         import shutil

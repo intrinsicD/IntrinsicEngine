@@ -12,7 +12,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
-import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.UiHostTypes;
 import Extrinsic.Sandbox.PluginSpike;
 
 namespace
@@ -92,7 +92,8 @@ namespace
 
     void DrawWindow(bool& open)
     {
-        if (ImGui::Begin("Spike plugin###view.spike", &open))
+        // Auto-resize: the window follows marker_size changes instead of clipping the marker.
+        if (ImGui::Begin("Spike plugin###view.spike", &open, ImGuiWindowFlags_AlwaysAutoResize))
         {
             if (!g_FirstDrawSeen)
             {

@@ -82,6 +82,13 @@ namespace Extrinsic::Runtime
         SectionRegistry() noexcept;
         [[nodiscard]] const RuntimeEngineConfigSectionRegistry&
         SectionRegistry() const noexcept;
+        // Registration after boot: the section's canonical default joins both config views
+        // (the engine's and GetEngineConfigControlState's); no callback runs. Unregister
+        // removes registration and value. Both fail without change when the control is
+        // unbound, during OnChanged dispatch, or for a duplicate, present or unknown name.
+        [[nodiscard]] bool RegisterSection(
+            RuntimeEngineConfigSectionRegistration registration);
+        [[nodiscard]] bool UnregisterSection(std::string_view name);
 
         [[nodiscard]] std::string_view Name() const noexcept override;
         [[nodiscard]] Core::Result OnRegister(EngineSetup& setup) override;
@@ -141,5 +148,6 @@ namespace Extrinsic::Runtime
         RuntimeRenderRecipeState m_RenderRecipeState{};
         RuntimeEngineConfigControlState m_ConfigControlState{};
         bool m_Published{false};
+        bool m_DispatchingSectionChanges{false};
     };
 }

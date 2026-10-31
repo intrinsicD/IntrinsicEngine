@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 118 |
+| `runtime` | 119 |
 
 ## Modules
 
@@ -479,7 +479,8 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Scene/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Scene/Runtime.SelectionController.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
+| `Extrinsic.Runtime.UiHostTypes` | `src/runtime/Services/Runtime.UiHostTypes.cppm` | `runtime` |
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **455**
+Total modules: **456**

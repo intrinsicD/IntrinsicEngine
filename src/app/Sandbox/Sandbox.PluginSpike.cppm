@@ -10,7 +10,7 @@ export module Extrinsic.Sandbox.PluginSpike;
 
 import Extrinsic.Runtime.DerivedConfigSections; // re-exports Extrinsic.Core.Config.EngineLoad (app does not import core)
 import Extrinsic.Runtime.AgentOperations;
-import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.UiHostTypes;
 import Extrinsic.Runtime.ServiceRegistry;
 
 // Exported by the executable and usable before dlopen and through teardown (it holds no host state):

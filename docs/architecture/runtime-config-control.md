@@ -194,6 +194,17 @@ exactly once. Callbacks are
 non-failing post-commit notifications and must not re-enter config control.
 Preview, rejected, and no-change operations invoke none.
 
+A section can also join after boot (a plugin, ARCH-022): `RegisterSection`
+validates the registration like the boot registry, then puts its canonical
+default into both the engine's config and the control's snapshot, so the
+section is active at once and the first apply reaches its callback with the
+default as previous. It invokes no callback. `UnregisterSection` removes the
+registration and the section from both. Both run on the main thread and fail
+without change when the control is unbound, for a duplicate, an already present
+or an unknown name, and when called from a callback during apply. A section in
+the boot document whose registration arrives later is discarded at boot and
+starts from its default.
+
 Every other engine-config difference is boot-only and is reported in
 `RuntimeEngineConfigApplyResult::RejectedBootOnlyFields`; the live config remains
 unchanged.

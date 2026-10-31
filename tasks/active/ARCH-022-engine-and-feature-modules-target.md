@@ -958,3 +958,108 @@ python3 tools/docs/check_doc_links.py --root . --strict
     lifecycle order as before; the 4 failures are finding 1.
   - The repository's `lsan.supp` is unchanged; whether it gets the line is the operator's call (CI
     uses lavapipe).
+- 2026-10-31: Plan for Q50 steps 2 to 4, revision 2 (Codex plan review 1: REVISE, thread
+  `01a19341-7b01-7742-8e3e-5a9765793450`; three blocking findings on step 3, answered below).
+  Serves Q49/Q50 and through them Q36 (cheap changes, short builds, plugins that register
+  themselves): R2 (a plugin uses no editor internals), R3, R4, R6, and the S1 findings 1 and 2.
+  - **Step 2, lld as the dev linker.**
+    - `option(INTRINSIC_USE_LLD OFF)`; the `dev` and `dev-cuda` presets set it ON. `ci` inherits
+      `base`, not `dev`, so CI is unchanged until the operator decides.
+    - With it on: `find_program(INTRINSIC_LLD NAMES ld.lld-<clang major> ld.lld-24 ld.lld
+      HINTS /usr/lib/llvm-<clang major>/bin)`. The compiler is clang 23, but the apt sources
+      offer no `lld-23` (the `lld` metapackage depends on it), so the operator installs
+      `lld-24` (`/usr/bin/ld.lld-24`), the version the comparison measured. If found, `--ld-path=` is appended to the existing
+      `INTRINSIC_LINK_FLAGS`, which modules, tests, the Sandbox and the spike plugin already
+      use, and a status line names it. If not found, a status line says GNU ld stays. A
+      NOTFOUND result is searched again at the next configure, so the operator's install on
+      Monday is picked up by `cmake --preset dev`.
+    - Test: `Test.SanitizerPresets.py` pins `INTRINSIC_USE_LLD` ON in `dev` and `dev-cuda`
+      and not ON in any preset that a `ci*` preset resolves to (mutation: remove it from
+      `dev`).
+    - Real path, in a separate build directory configured with the `dev` preset and its
+      sanitizers, with the extracted lld wrapper on `PATH` only as `ld.lld-24`, the name the
+      package installs (so discovery itself is tested): the CPU contract tests and the Sandbox link with lld
+      (`.comment`), the tests pass, and the spike driver passes in both variants. Fallback:
+      a configure without lld prints the status line and the link commands carry no
+      `--ld-path`.
+  - **Step 3, finding 1: config sections registered after boot.**
+    - `EngineConfigControl` gains `[[nodiscard]] bool RegisterSection(registration)` and
+      `[[nodiscard]] bool UnregisterSection(std::string_view name)`.
+    - Both views change together: the engine's config that hot apply and previews read, and
+      the control's `ActiveConfig` copy that `config_get` reads.
+    - Register: `EngineConfigSectionRegistry::Register` validates the default and rejects a
+      duplicate. The canonical default then goes into both views. A section of that name
+      already in the config is rejected without change. Register calls no callback: the plugin starts from its own default,
+      so nothing differs.
+    - Unregister: the registration (new `EngineConfigSectionRegistry::Unregister`) and the
+      section leave both views. No value is retained here: the target requires config to survive
+      a reload, and S2 implements that.
+    - Both return false and change nothing when the control is unbound, and when called
+      from an `OnChanged` callback during hot apply (a flag set for the dispatch loop and
+      restored to its previous value after it; the loop holds pointers into the registry and
+      the config). Callers are on the main thread,
+      as `config_apply` is today.
+    - Spike: the commit registers its section first and unregisters it when a later stage
+      fails. No callback runs in between, so the rollback is complete.
+    - Tests in `tests/contract/runtime/Test.RuntimeConfigControl.cpp`, each failing without
+      the change:
+      - a late registration is in both views with its default;
+      - the first hot apply after it calls `OnChanged` once, with the default as previous (the
+        S1 failure);
+      - an unregister removes the registration and the section from both views; a later apply
+        naming the section changes nothing and calls nothing;
+      - a duplicate, an already present name, an unknown unregister, an unbound control, and a
+        call from inside `OnChanged` return false and change nothing.
+    - The four S1 checks of finding 1 are expected to pass in the spike driver.
+    - Limitation, recorded and not changed here: a section in `engine.json` for a plugin that
+      is not loaded at boot is discarded at boot (`ParseAppSections` warns "not registered").
+      The late registration starts from the default. Keeping such sections for a later
+      registration is a separate decision for the operator.
+  - **Step 4, finding 2: windows without editor internals.**
+    - The target names "UI host (register a window and a menu entry)" as a module service.
+    - A new module `Extrinsic.Runtime.UiHostTypes` in `src/runtime/Services/` is the first
+      module of that ring. It holds `EditorWindowHandle`, `EditorWindowDescriptor` and
+      `EditorWindowMenuEntry`, unchanged. `Extrinsic.Runtime.EditorWindowRegistry` re-exports
+      it (`export import`), so its 21 importers compile unchanged.
+    - The spike plugin imports `UiHostTypes` instead of the registry; it only fills
+      descriptors, and the host commits them. Its R2 count is then 0/0.
+    - `NOT_PLUGINS` is deleted. `plugins/spike` gets an ordinary baseline entry `0/0`, which
+      the ratchet allows because an absent entry counts as zero.
+    - Its exclusion test is replaced by two tests: the spike folder is an ordinary plugin
+      folder, and an editor import in it is rejected.
+    - Checks:
+      - both builds and both spike variants, with consumers of the registry rebuilt;
+      - the ratchet, layering, module inventory, source rules and the whole ci-docs replay;
+      - the window-registry tests unchanged.
+  - Codex plan review 2 (delta, same thread): findings 1-3 resolved; new blocker: the named
+    package `lld-24` does not match clang 23's search name. Answered with its two wording corrections.
+    Review 3 (delta): `lld` depends on `lld-23`, which has no candidate here; the reviewer's
+    smallest fix applied (install `lld-24`, search `ld.lld-24`, test that name through `PATH`).
+  - Not in these steps: CI adoption of lld; a repository `lsan.supp`; moving other editor
+    types; keeping config values across a reload (S2 implements it); boot-document values for sections
+    registered later.
+  - Codex plan review 4 (delta): APPROVE, task-diff SHA-256
+    `a70174160ec3105a7b67d941c428af420c3e5fcce8c22affcb0426be2d13cf53`.
+- 2026-10-31: Q50 steps 2 to 4 implemented.
+  - Step 3 tests, mutation-checked (each mutation fails its own test):
+    - no copy sync on register fails the late-registration and rejection tests;
+    - a value kept on unregister fails the unregister test;
+    - a guard never set gives an ASan heap-use-after-free in the dispatch test (the guard is
+      needed, not only tidy);
+    - a guard not restored, a present name not checked, and an unbound control not checked
+      (UBSan null access) each fail their test.
+  - Step 2: the presets test fails with lld removed from `dev`. The configure of `build/dev`
+    without lld prints `Linker: lld not found (sudo apt install lld-24); GNU ld stays`, and
+    no link carries `--ld-path`. `build/spike` with only `ld.lld-24` on `PATH` finds it, and
+    58 link commands carry it.
+  - Step 4: `Extrinsic.Runtime.UiHostTypes` (`src/runtime/Services/`), re-exported by the
+    window registry. `plugins/spike` counts 0/0, `NOT_PLUGINS` is gone, and the replacement
+    ratchet test fails with the exclusion restored.
+  - Real path with lld (`build/spike`, `build/spike-shared`; dev preset with sanitizers; only
+    `ld.lld-24` on `PATH`): the Sandbox, the runtime contract tests, the engine libraries and the
+    plugin carry `Linker: Ubuntu LLD 24.0.0`. All 1870 runtime contract tests pass.
+  - Spike driver: the finding-1 checks now pass. One new failure in run12 was a fixture defect:
+    the plugin's window kept its first auto-fit size and clipped the 96 px marker after the
+    change to 12 (the image shows a scrollbar). The window now auto-resizes. Runs 13 (variant
+    a) and b4 (variant b), both linked with lld: 60 of 60 checks each. S1 has no open finding
+    left.

@@ -9,32 +9,9 @@ module;
 
 export module Extrinsic.Runtime.EditorWindowRegistry;
 
+export import Extrinsic.Runtime.UiHostTypes;
+
 namespace Extrinsic::Runtime {
-export struct EditorWindowHandle {
-  std::uint64_t Value{0};
-
-  [[nodiscard]] bool IsValid() const noexcept { return Value != 0u; }
-  [[nodiscard]] friend bool operator==(EditorWindowHandle,
-                                       EditorWindowHandle) noexcept = default;
-};
-
-export struct EditorWindowDescriptor {
-  std::string Id{};
-  std::vector<std::string> MenuPath{};
-  std::string Title{};
-  bool OpenByDefault{false};
-  std::function<void(bool &)> Draw{};
-  std::function<void(bool)> OpenStateChanged{};
-};
-
-export struct EditorWindowMenuEntry {
-  EditorWindowHandle Handle{};
-  std::string Id{};
-  std::vector<std::string> MenuPath{};
-  std::string Title{};
-  bool Open{false};
-};
-
 export enum class EditorUiVisibilityCommandKind : std::uint8_t {
   Toggle,
   Show,
