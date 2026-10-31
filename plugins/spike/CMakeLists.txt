@@ -14,9 +14,12 @@ set_target_properties(IntrinsicSpikePlugin PROPERTIES
         POSITION_INDEPENDENT_CODE ON
         CXX_SCAN_FOR_MODULES OFF
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)
-target_compile_features(IntrinsicSpikePlugin PRIVATE cxx_std_23)
 target_compile_options(IntrinsicSpikePlugin PRIVATE ${INTRINSIC_COMPILE_FLAGS} @${SPIKE_HOST_MODULES})
 target_link_options(IntrinsicSpikePlugin PRIVATE ${INTRINSIC_LINK_FLAGS})
 # Usage requirements only; no engine archive is linked, so engine symbols bind to the executable at load.
 target_link_libraries(IntrinsicSpikePlugin PRIVATE $<COMPILE_ONLY:ExtrinsicSandboxEditor>)
 add_dependencies(IntrinsicSpikePlugin IntrinsicSpikeHostModules)
+# With module scanning off, Ninja does not see the imported BMIs; rebuild whenever the host relinks or its
+# module list changes, so the plugin never keeps an object compiled against an older host.
+set_source_files_properties(SpikePlugin.cpp PROPERTIES OBJECT_DEPENDS
+        "${SPIKE_HOST_MODULES};${CMAKE_BINARY_DIR}/bin/ExtrinsicSandbox")

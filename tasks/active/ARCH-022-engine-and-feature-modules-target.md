@@ -829,3 +829,33 @@ python3 tools/docs/check_doc_links.py --root . --strict
       vague-linkage symbols, so the allowlist is by kind (only entry points and ASan bounds strong),
       not by name;
     - with the option off, the Sandbox builds and exports 3,217 dynamic symbols (173,917 with it).
+- 2026-10-31: S1 block review.
+  - Codex (thread `01a19286`): CHANGES REQUIRED.
+    - Must fix: concurrent loads bypass the single-plugin limit; the config validator accepts -12,
+      "12" and 1.5; the plugin is not rebuilt when the host changes.
+    - Should fix: stage-specific failure checks with registry contents; marker dimensions with an
+      absent-marker baseline; schema, default and active state checked separately; the leak
+      comparison with frames; isolated config and a Vulkan check; quit racing the socket.
+  - Ponytail review: the repository's LSan recipe for a Vulkan exit (BUG-083: one ICD through
+    `VK_DRIVER_FILES`, `fast_unwind_on_malloc=0`); Pillow instead of a hand-written PNG decoder; and
+    smaller simplifications (-75 lines).
+  - Fixed:
+    - a load reservation released when the continuation is destroyed;
+    - a JSON validator: one integer field in [1, 64], nothing else;
+    - `OBJECT_DEPENDS` of the plugin on the host executable and the module list (verified: touching
+      the host makes the plugin object dirty);
+    - the driver as above, plus pipelined double-load and invalid-payload tests;
+    - no `PluginHostContext`, integer addresses, no no-op registry copy, no redundant import or CMake
+      line.
+  - The BUG-083 recipe was tried before adopting it:
+    - without a plugin the Sandbox still leaked 240 bytes (NVIDIA, pipeline creation) or 368 bytes
+      (lavapipe, one-time driver initialization);
+    - the NVIDIA leak appears in some runs only (run 3: in the plugin session but not the no-plugin
+      one).
+  - So finding 2 is narrowed: with the repository's settings the Sandbox's exit is not LSan-clean on
+    this host because of driver allocations. The driver now attributes records by their frames: no
+    record touches the plugin or the spike host code.
+  - Driver run 4 (`tasks/evidence/ARCH-022/spike-s1/run4/summary.json`): 52 of 58 passed. The 6
+    failures are finding 1 (4: the section is not active after a late registration, so no change
+    callback, no redrawn marker, no `config_changed` event) and finding 2 (2: exit status 1 and the
+    driver's leak records).

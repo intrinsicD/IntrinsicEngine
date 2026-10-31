@@ -26,13 +26,8 @@ export namespace Extrinsic::Sandbox::Spike
         std::vector<Runtime::EditorWindowDescriptor> Windows{};
     };
 
-    struct PluginHostContext
-    {
-        void* ImGuiContext{nullptr};
-    };
-
     // extern "C" entry points of a plugin; nothing throws across them (-fno-exceptions).
-    using RegisterFn = bool (*)(const PluginHostContext& host, StagedRegistrations& staged, std::string& error) noexcept;
+    using RegisterFn = bool (*)(StagedRegistrations& staged, std::string& error) noexcept;
     using ShutdownFn = void (*)() noexcept;
     inline constexpr const char* kRegisterSymbol = "intrinsic_plugin_register_v0";
     inline constexpr const char* kShutdownSymbol = "intrinsic_plugin_shutdown_v0";

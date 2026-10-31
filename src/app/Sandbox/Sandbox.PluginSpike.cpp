@@ -5,7 +5,7 @@ module;
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <format>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -55,66 +55,54 @@ namespace Extrinsic::Sandbox::Spike
     {
         using Json = nlohmann::json;
 
-        struct LoadedPlugin
-        {
-            void* Handle{nullptr};
-            ShutdownFn Shutdown{nullptr};
-            bool Committed{false};
-        };
-
         Runtime::AgentOperationRegistry* g_Operations{nullptr};
-        LoadedPlugin g_Plugin{};
+        ShutdownFn g_Shutdown{nullptr}; // set once a plugin is committed; S1 never unloads it
+        bool g_LoadPending{false};      // a load whose commit has not finished (or been dropped) yet
 
         Runtime::AgentOperationOutcome Fail(std::string code, std::string message)
         {
             return {.IsError = true, .Text = std::move(message), .ErrorCode = std::move(code)};
         }
 
-        std::string Address(const void* pointer) { return std::format("{}", pointer); }
+        template <typename T>
+        std::uintptr_t Address(T* pointer) { return reinterpret_cast<std::uintptr_t>(pointer); }
 
-        template <typename Fn>
-        std::string FunctionAddress(Fn function)
-        {
-            return Address(reinterpret_cast<const void*>(reinterpret_cast<std::uintptr_t>(function)));
-        }
-
-        // All or nothing: the originals are kept until every step succeeded; any failure restores both
-        // registries and unregisters every window this commit added.
+        // All or nothing: the original config sections are kept until both registries are replaced; any
+        // failure restores them and unregisters every window this commit added. The operation registry is
+        // replaced last, so a failure never has to restore it.
         std::optional<std::string> Commit(StagedRegistrations staged, Runtime::EngineConfigControl& config,
                                           Runtime::EditorUiHost& ui, std::string_view failAt)
         {
             Core::Config::EngineConfigSectionRegistry& sections = config.SectionRegistry();
             const Core::Config::EngineConfigSectionRegistry originalSections = sections;
-            const Runtime::AgentOperationRegistry originalOperations = *g_Operations;
             std::vector<Runtime::EditorWindowHandle> added{};
             const auto rollback = [&](std::string reason) -> std::optional<std::string>
             {
                 sections = originalSections;
-                *g_Operations = originalOperations;
                 for (const auto handle : added) (void)ui.UnregisterWindow(handle);
                 return reason;
             };
 
             Core::Config::EngineConfigSectionRegistry sectionsCopy = sections;
             for (auto& section : staged.ConfigSections)
-                if (!sectionsCopy.Register(std::move(section))) return rollback("config section rejected");
-            if (failAt == "config") return rollback("injected failure after the config sections");
+                if (!sectionsCopy.Register(std::move(section))) return rollback("config: section rejected");
+            if (failAt == "config") return rollback("config: injected failure after the config sections");
 
             Runtime::AgentOperationRegistry operationsCopy = *g_Operations;
             for (auto& operation : staged.Operations)
-                if (!operationsCopy.Register(std::move(operation))) return rollback("operation rejected");
-            if (failAt == "operations") return rollback("injected failure after the operations");
+                if (!operationsCopy.Register(std::move(operation))) return rollback("operations: operation rejected");
+            if (failAt == "operations") return rollback("operations: injected failure after the operations");
 
             for (auto& window : staged.Windows)
             {
                 const auto handle = ui.RegisterWindow(std::move(window));
-                if (!handle.IsValid()) return rollback("window rejected");
+                if (!handle.IsValid()) return rollback("windows: window rejected");
                 added.push_back(handle);
             }
-            if (failAt == "windows") return rollback("injected failure after the windows");
+            if (failAt == "windows") return rollback("windows: injected failure after the windows");
 
             sections = std::move(sectionsCopy);
-            if (failAt == "replace") return rollback("injected failure between the two replacements");
+            if (failAt == "replace") return rollback("replace: injected failure between the two replacements");
             *g_Operations = std::move(operationsCopy);
             return std::nullopt;
         }
@@ -126,7 +114,8 @@ namespace Extrinsic::Sandbox::Spike
                 return Fail("invalid_params", "path is required");
             const std::string path = arguments["path"].get<std::string>();
             const std::string failAt = arguments.value("fail_at", std::string{});
-            if (g_Plugin.Committed) return Fail("already_loaded", "a plugin is already loaded");
+            if (g_Shutdown != nullptr) return Fail("already_loaded", "a plugin is already loaded");
+            if (g_LoadPending) return Fail("load_pending", "another load has not committed yet");
 
             void* handle = failAt == "dlopen" ? nullptr : dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
             if (handle == nullptr)
@@ -141,13 +130,15 @@ namespace Extrinsic::Sandbox::Spike
 
             StagedRegistrations staged{};
             std::string error{};
-            const PluginHostContext host{.ImGuiContext = ImGui::GetCurrentContext()};
-            if (failAt == "register" || !registerFn(host, staged, error))
+            if (failAt == "register" || !registerFn(staged, error))
                 return Fail("register_failed", failAt == "register" ? "injected Register failure" : error);
 
-            // The commit runs on a later frame, after this call's dispatch through the registry returned.
+            // The commit runs on a later frame, after this call's dispatch through the registry returned. The
+            // reservation ends when the continuation is destroyed: after it completed, or when the call is dropped.
+            g_LoadPending = true;
+            const std::shared_ptr<void> reservation(nullptr, [](void*) { g_LoadPending = false; });
             Runtime::AgentOperationOutcome outcome{.Text = "{}"};
-            outcome.Continuation = [&engine, staged = std::move(staged), failAt, handle, shutdownFn](
+            outcome.Continuation = [&engine, staged = std::move(staged), failAt, shutdownFn, reservation](
                 const Runtime::AgentOperationContext& context, Runtime::AgentOperationOutcome& result) mutable
             {
                 auto* ui = engine.Services().Find<Runtime::EditorUiHost>();
@@ -161,7 +152,7 @@ namespace Extrinsic::Sandbox::Spike
                     result = Fail("commit_failed", *failure);
                     return true;
                 }
-                g_Plugin = {.Handle = handle, .Shutdown = shutdownFn, .Committed = true};
+                g_Shutdown = shutdownFn;
                 spike_lifecycle_event("commit");
                 result = {.Text = R"({"loaded":true})"};
                 return true;
@@ -173,7 +164,8 @@ namespace Extrinsic::Sandbox::Spike
         {
             Json windows = Json::array();
             if (const auto* ui = engine.Services().Find<Runtime::EditorUiHost>())
-                for (const auto& entry : ui->BuildWindowMenuModel()) windows.push_back(entry.Id);
+                for (const auto& entry : ui->BuildWindowMenuModel())
+                    windows.push_back({{"id", entry.Id}, {"open", entry.Open}});
             ImGuiMemAllocFunc alloc = nullptr;
             ImGuiMemFreeFunc free = nullptr;
             void* userData = nullptr;
@@ -183,8 +175,8 @@ namespace Extrinsic::Sandbox::Spike
                 {"inline_static", {{"address", Address(&HostInlineStatic())}, {"value", HostInlineStatic()}}},
                 {"thread_local", {{"address", Address(&HostThreadLocal())}, {"value", HostThreadLocal()}}},
                 {"imgui_context", Address(ImGui::GetCurrentContext())},
-                {"imgui_alloc", FunctionAddress(alloc)},
-                {"imgui_free", FunctionAddress(free)},
+                {"imgui_alloc", reinterpret_cast<std::uintptr_t>(alloc)},
+                {"imgui_free", reinterpret_cast<std::uintptr_t>(free)},
                 {"imgui_alloc_user_data", Address(userData)},
                 {"implot_context", Address(ImPlot::GetCurrentContext())},
                 {"windows", windows},
@@ -210,7 +202,7 @@ namespace Extrinsic::Sandbox::Spike
             .Name = "plugin_host_identity",
             .Title = "Host identity probes (ARCH-022 spike)",
             .Description = "Addresses and values of the host's probes, ImGui context and allocator, ImPlot context, "
-                           "registered window ids.",
+                           "registered windows with their open state.",
             .Invoke = [&engine](const Runtime::AgentOperationContext&, std::string_view) { return HostIdentity(engine); },
         });
         (void)registry.Register({
@@ -220,7 +212,7 @@ namespace Extrinsic::Sandbox::Spike
             .ReadOnly = false,
             .Invoke = [&engine](const Runtime::AgentOperationContext&, std::string_view)
             {
-                if (g_Plugin.Committed && g_Plugin.Shutdown != nullptr) g_Plugin.Shutdown();
+                if (g_Shutdown != nullptr) g_Shutdown();
                 engine.RequestExit();
                 return Runtime::AgentOperationOutcome{.Text = R"({"quitting":true})"};
             },

@@ -1,37 +1,49 @@
 #!/usr/bin/env python3
 """ARCH-022 slice 2, S1: drives the spike plugin through the running Sandbox and asserts the S1 pass checks.
 
-Starts <build>/bin/ExtrinsicSandbox with an isolated agent socket and event log, then over the agent socket
-(newline-delimited JSON-RPC, as tools/agents/mcp_bridge.py speaks it):
-  1. injects a load failure at every stage and asserts the registries (tools, config sections, windows) unchanged;
-  2. loads the plugin and asserts its tool, config section and window are registered;
-  3. asserts one identity of shared state: the plugin mutates the host's counter, inline static and thread-local
+Runs <build>/bin/ExtrinsicSandbox twice with an isolated agent socket, the built-in config (no --engine-config, no
+INTRINSIC_ENGINE_CONFIG, no config/engine.json) and the repository's LSan settings for a Vulkan exit (BUG-083: one
+ICD through VK_DRIVER_FILES, fast_unwind_on_malloc=0, lsan.supp). The first session only quits: it records what the
+Sandbox's own exit reports: on this host the NVIDIA driver leaks a few hundred bytes in pipeline creation in some runs,
+with or without a plugin, so the plugin session's sanitizer records are attributed by their frames. The second session, over the agent socket (newline-delimited JSON-RPC, as tools/agents/mcp_bridge.py speaks it):
+  1. checks the Vulkan device through diagnostics_read and captures the window without a marker;
+  2. injects a load failure at every stage: the error names that stage, and tools, config sections and windows are
+     unchanged in content;
+  3. loads the plugin and asserts its tool, config section and window are registered;
+  4. asserts one identity of shared state: the plugin mutates the host's counter, inline static and thread-local
      through imported code, and both sides see the same addresses, ImGui context and allocator, ImPlot context;
-  4. calls spike_echo; checks the config section's default (8) and a change to 12 (one callback, marker redrawn);
-  5. finds the magenta marker in window captures before and after the change;
-  6. quits through app_quit and asserts a clean exit, clean sanitizers and the lifecycle event order.
-A first session without the plugin records what the Sandbox's own exit reports; the plugin session is also
-compared with it. Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
-Usage: python3 plugins/spike/spike_driver.py --build build/spike --out <new dir>
+  5. calls spike_echo; checks the config section's schema, default 8 and active state, and a change to 12;
+  6. finds a solid magenta square of the expected side in window captures before and after the change;
+  7. quits through app_quit; asserts the exit against the first session and the lifecycle event order.
+Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
+Usage: python3 plugins/spike/spike_driver.py --build build/spike --out <new dir> [--icd <VK_DRIVER_FILES json>]
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import io
 import json
 import os
+import re
 import socket
-import struct
 import subprocess
 import sys
 import time
-import zlib
+from collections import Counter
 from pathlib import Path
 
+from PIL import Image
+
 REPO = Path(__file__).resolve().parents[2]
-FAIL_STAGES = ["dlopen", "dlsym", "register", "config", "operations", "windows", "replace"]
+# Expected error code and, for commit stages, the stage the message must name.
+FAIL_STAGES = {"dlopen": "dlopen_failed", "dlsym": "dlsym_failed", "register": "register_failed",
+               "config": "commit_failed", "operations": "commit_failed", "windows": "commit_failed",
+               "replace": "commit_failed"}
 MAGENTA = (255, 0, 255)
+# A sanitizer frame in any of these is the spike's own code.
+SPIKE_FRAMES = ("libIntrinsicSpikePlugin", "Sandbox.PluginSpike", "SpikePlugin.cpp", "Extrinsic::Sandbox::Spike")
 
 
 class Checks:
@@ -81,8 +93,8 @@ class Agent:
             if message.get("id") == wanted:
                 return message
 
-    def call(self, name: str, arguments: dict | None = None) -> tuple[bool, dict | str, list[dict]]:
-        """(ok, parsed text or raw text, content items) of one tool call."""
+    def call(self, name: str, arguments: dict | None = None) -> tuple[bool, dict | str, list[dict], str]:
+        """(ok, parsed text or raw text, content items, error code) of one tool call."""
         reply = self.request("tools/call", {"name": name, "arguments": arguments or {}})
         result = reply.get("result", {})
         content = result.get("content", [])
@@ -91,70 +103,90 @@ class Agent:
             parsed: dict | str = json.loads(text)
         except (json.JSONDecodeError, TypeError):
             parsed = text
-        return not result.get("isError", "error" in reply), parsed, content
+        code = ((result.get("structuredContent") or {}).get("error") or {}).get("code", "")
+        return not result.get("isError", "error" in reply), parsed, content, code
 
-    def tools(self) -> list[str]:
-        return [tool["name"] for tool in self.request("tools/list", {}).get("result", {}).get("tools", [])]
+    def call_pipelined(self, calls: list[tuple[str, dict]]) -> list[tuple[bool, str]]:
+        """Sends every call before reading any reply, so the server dispatches them in one frame."""
+        first = self.next_id + 1
+        for name, arguments in calls:
+            self.next_id += 1
+            self.sock.sendall(json.dumps({"jsonrpc": "2.0", "id": self.next_id, "method": "tools/call",
+                                          "params": {"name": name, "arguments": arguments}}).encode() + b"\n")
+        replies: dict[int, dict] = {}
+        self.sock.settimeout(60.0)
+        while len(replies) < len(calls):
+            while b"\n" not in self.buffer:
+                chunk = self.sock.recv(1 << 20)
+                if not chunk:
+                    raise ConnectionError("the Sandbox closed the agent socket")
+                self.buffer += chunk
+            line, self.buffer = self.buffer.split(b"\n", 1)
+            message = json.loads(line)
+            if first <= message.get("id", 0) <= self.next_id:
+                replies[message["id"]] = message
+        out = []
+        for i in range(first, self.next_id + 1):
+            result = replies[i].get("result", {})
+            code = ((result.get("structuredContent") or {}).get("error") or {}).get("code", "")
+            out.append((not result.get("isError", "error" in replies[i]), code))
+        return out
 
-
-def magenta_pixels(png: bytes) -> int:
-    """Counts pure magenta pixels of an 8-bit RGB or RGBA PNG (standard library only)."""
-    assert png[:8] == b"\x89PNG\r\n\x1a\n"
-    position, data, width = 8, b"", 0
-    while position < len(png):
-        length, kind = struct.unpack(">I4s", png[position:position + 8])
-        body = png[position + 8:position + 8 + length]
-        if kind == b"IHDR":
-            width, height, depth, colour, _, _, interlace = struct.unpack(">IIBBBBB", body)
-            assert depth == 8 and colour in (2, 6) and interlace == 0, (depth, colour, interlace)
-            channels = 4 if colour == 6 else 3
-        elif kind == b"IDAT":
-            data += body
-        position += 12 + length
-    raw, stride, count = zlib.decompress(data), width * channels, 0
-    previous = bytearray(stride)
-    for row in range(height):
-        kind, line = raw[row * (stride + 1)], bytearray(raw[row * (stride + 1) + 1:(row + 1) * (stride + 1)])
-        for i in range(stride):
-            left = line[i - channels] if i >= channels else 0
-            up, corner = previous[i], previous[i - channels] if i >= channels else 0
-            if kind == 1:
-                line[i] = (line[i] + left) & 0xFF
-            elif kind == 2:
-                line[i] = (line[i] + up) & 0xFF
-            elif kind == 3:
-                line[i] = (line[i] + ((left + up) >> 1)) & 0xFF
-            elif kind == 4:
-                p = left + up - corner
-                pa, pb, pc = abs(p - left), abs(p - up), abs(p - corner)
-                line[i] = (line[i] + (left if pa <= pb and pa <= pc else up if pb <= pc else corner)) & 0xFF
-        count += sum(1 for x in range(0, stride, channels) if tuple(line[x:x + 3]) == MAGENTA)
-        previous = line
-    return count
+    def quit(self) -> bool:
+        """app_quit; the shutdown may close the socket before the reply is sent, which also counts as accepted."""
+        try:
+            return self.call("app_quit")[0]
+        except ConnectionError:
+            return True
 
 
-def capture_marker(agent: Agent, checks: Checks, out: Path, name: str, side: int) -> None:
-    ok, _, content = agent.call("view_capture", {"region": "window", "path": f"{name}.png", "overwrite": True})
+def magenta_square(png: bytes) -> dict:
+    """The magenta pixels' count and bounding box; a solid square has count == width * height."""
+    image = Image.open(io.BytesIO(png)).convert("RGB")
+    width = image.width
+    points = [(i % width, i // width) for i, pixel in enumerate(image.getdata()) if pixel == MAGENTA]
+    if not points:
+        return {"count": 0, "width": 0, "height": 0}
+    xs, ys = [x for x, _ in points], [y for _, y in points]
+    return {"count": len(points), "width": max(xs) - min(xs) + 1, "height": max(ys) - min(ys) + 1}
+
+
+def capture(agent: Agent, checks: Checks, name: str) -> dict | None:
+    ok, _, content, _ = agent.call("view_capture", {"region": "window", "path": f"{name}.png", "overwrite": True})
     image = next((item for item in content if item.get("type") == "image"), None)
     if not checks.check(f"{name}: window capture returned an image", ok and image is not None, content[:1]):
-        return
-    png = base64.b64decode(image["data"])
-    (out / f"{name}.png").write_bytes(png)
-    count = magenta_pixels(png)
-    checks.check(f"{name}: marker of {side}x{side} pixels drawn", (side - 1) ** 2 <= count <= (side + 1) ** 2, count)
+        return None
+    return magenta_square(base64.b64decode(image["data"]))
 
 
-def registries(agent: Agent) -> tuple[list[str], list[str], list[str]]:
-    _, sections, _ = agent.call("config_sections")
-    _, identity, _ = agent.call("plugin_host_identity")
-    names = [entry["section"] for entry in sections.get("sections", [])] if isinstance(sections, dict) else []
-    return sorted(agent.tools()), sorted(names), sorted(identity.get("windows", []))
+def expect_square(checks: Checks, name: str, found: dict | None, side: int) -> None:
+    if found is not None:
+        checks.check(f"{name}: one solid {side}x{side} magenta square",
+                     found["width"] == found["height"] == side and found["count"] == side * side, found)
 
 
-def sanitizer_report(log: str) -> list[str]:
-    """The leak and error headlines of a sanitizer report, without addresses or process ids."""
-    keep = ("Direct leak", "Indirect leak", "SUMMARY:", "ERROR:", "runtime error:")
-    return sorted(line.split("==")[-1].strip() for line in log.splitlines() if any(k in line for k in keep))
+def registries(agent: Agent) -> dict:
+    """What a load may change, by content: tool specs, config sections, windows with their open state."""
+    _, sections, _, _ = agent.call("config_sections")
+    _, identity, _, _ = agent.call("plugin_host_identity")
+    tools = sorted(agent.request("tools/list", {}).get("result", {}).get("tools", []), key=lambda t: t["name"])
+    return {"tools": tools, "sections": sections.get("sections", []) if isinstance(sections, dict) else sections,
+            "windows": identity.get("windows", []) if isinstance(identity, dict) else identity}
+
+
+def leak_records(log: str) -> list[str]:
+    """Each sanitizer record (headline and frames) without addresses, process ids or build ids, sorted."""
+    records, current = [], None
+    for line in log.splitlines():
+        if re.match(r"(Direct|Indirect) leak of|.*runtime error:|.*ERROR: AddressSanitizer", line):
+            current = [re.sub(r"==\d+==", "", line).strip()]
+            records.append(current)
+        elif current is not None and re.match(r"\s+#\d+ ", line):
+            frame = re.sub(r"0x[0-9a-f]+|\(BuildId: [0-9a-f]+\)|\+0x[0-9a-f]+", "", line)
+            current.append(re.sub(r"\s+", " ", re.sub(r"#\d+", "", frame)).strip())
+        elif not line.strip():
+            current = None
+    return sorted("\n".join(record) for record in records)
 
 
 def session(build: Path, out: Path, env: dict, deadline: float, body) -> tuple[object, str]:
@@ -178,32 +210,43 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--build", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--icd", type=Path, default=Path(os.environ.get(
+        "VK_DRIVER_FILES", "/usr/share/vulkan/icd.d/nvidia_icd.json")), help="the one Vulkan ICD (VK_DRIVER_FILES)")
     parser.add_argument("--deadline", type=float, default=120.0, help="seconds for startup and for exit")
     args = parser.parse_args()
     out, build = args.out.resolve(), args.build.resolve()
     out.mkdir(parents=True)  # never reuse an earlier attempt's directory
     checks = Checks()
-    if not checks.check("environment: DISPLAY is set", bool(os.environ.get("DISPLAY")), os.environ.get("DISPLAY")):
+    ready = [checks.check("environment: DISPLAY is set", bool(os.environ.get("DISPLAY")), os.environ.get("DISPLAY")),
+             checks.check("environment: the Vulkan ICD exists", args.icd.is_file(), str(args.icd)),
+             checks.check("environment: built-in config (no config/engine.json)",
+                          not (REPO / "config/engine.json").exists())]
+    if not all(ready):
         return finish(checks, out)
     events = out / "plugin" / "events.log"
-    env = dict(os.environ, INTRINSIC_SPIKE_EVENT_LOG=str(events), ASAN_OPTIONS="detect_leaks=1",
-               LSAN_OPTIONS=f"suppressions={REPO / 'lsan.supp'}", UBSAN_OPTIONS="print_stacktrace=1")
-    # The same Sandbox without the plugin: what its exit reports on its own.
-    base_code, base_log = session(build, out / "no-plugin", env, args.deadline, lambda agent: agent.call("app_quit"))
+    env = {k: v for k, v in os.environ.items() if k != "INTRINSIC_ENGINE_CONFIG"}
+    env.update(INTRINSIC_SPIKE_EVENT_LOG=str(events), VK_DRIVER_FILES=str(args.icd),
+               ASAN_OPTIONS="detect_leaks=1:fast_unwind_on_malloc=0",
+               LSAN_OPTIONS=f"detect_leaks=1:fast_unwind_on_malloc=0:suppressions={REPO / 'lsan.supp'}",
+               UBSAN_OPTIONS="print_stacktrace=1")
+    base_code, base_log = session(build, out / "no-plugin", env, args.deadline, lambda agent: agent.quit())
 
     def body(agent: Agent) -> None:
         try:
-            run(agent, checks, out / "plugin", build / "plugins/libIntrinsicSpikePlugin.so")
+            run(agent, checks, build / "plugins/libIntrinsicSpikePlugin.so")
         except Exception as error:  # a crash or a protocol failure is a failed check, not a driver traceback
             checks.check("driver: the session completed", False, f"{type(error).__name__}: {error}")
 
     code, log = session(build, out / "plugin", env, args.deadline, body)
     checks.check("exit: the Sandbox exited with status 0", code == 0, code)
-    checks.check("exit: ASan and LSan clean", "Sanitizer" not in log, [l for l in log.splitlines() if "Sanitizer" in l][:3])
-    checks.check("exit: UBSan clean", "runtime error:" not in log, [l for l in log.splitlines() if "runtime error:" in l][:3])
-    checks.check("exit: same status as without the plugin", code == base_code, [code, base_code])
-    checks.check("exit: no sanitizer report beyond the no-plugin run", sanitizer_report(log) == sanitizer_report(base_log),
-                 sorted(set(sanitizer_report(log)) ^ set(sanitizer_report(base_log))))
+    checks.check("exit: ASan, LSan and UBSan clean", not leak_records(log), leak_records(log)[:3])
+    # The NVIDIA driver's pipeline leaks come and go between runs, so records are attributed by their frames.
+    spike = [r for r in leak_records(log) if any(m in r for m in SPIKE_FRAMES)]
+    checks.check("exit: no sanitizer record has a frame in the plugin or the spike host code", not spike, spike[:2])
+    only_here = sorted(((Counter(leak_records(log)) - Counter(leak_records(base_log))) +
+                        (Counter(leak_records(base_log)) - Counter(leak_records(log)))).elements())
+    checks.results.append({"check": "info: exit status and records against the no-plugin session", "pass": True,
+                           "detail": {"status": [code, base_code], "records_in_one_session_only": len(only_here)}})
     lines = events.read_text().splitlines() if events.exists() else []
     expected = ["static_construct"] + ["register"] * 5 + ["commit", "first_draw", "config_changed", "shutdown",
                                                             "static_destruct"]
@@ -211,48 +254,72 @@ def main() -> int:
     return finish(checks, out)
 
 
-def run(agent: Agent, checks: Checks, out: Path, plugin: Path) -> None:
+def run(agent: Agent, checks: Checks, plugin: Path) -> None:
+    _, diagnostics, _, _ = agent.call("diagnostics_read")
+    text = json.dumps(diagnostics)
+    checks.check("environment: Vulkan device operational", '"is_operational": true' in text and "Vulkan" in text,
+                 text[:300])
+    expect_square(checks, "no marker before the load", capture(agent, checks, "before_load"), 0)
     baseline = registries(agent)
-    checks.check("host: plugin tools present", {"plugin_load", "plugin_host_identity", "app_quit"} <= set(baseline[0]))
-    for stage in FAIL_STAGES:
-        ok, reply, _ = agent.call("plugin_load", {"path": str(plugin), "fail_at": stage})
-        checks.check(f"failure at {stage}: the load fails with a reason", not ok and bool(reply), reply)
-        checks.check(f"failure at {stage}: registries unchanged", registries(agent) == baseline,
-                     {"tools": sorted(set(registries(agent)[0]) ^ set(baseline[0]))})
-    ok, reply, _ = agent.call("plugin_load", {"path": str(plugin)})
-    checks.check("load: committed", ok and isinstance(reply, dict) and reply.get("loaded") is True, reply)
-    tools, sections, windows = registries(agent)
-    checks.check("load: tools spike_echo and spike_identity registered", {"spike_echo", "spike_identity"} <= set(tools))
-    checks.check("load: config section spike registered", "spike" in sections, sections)
-    checks.check("load: window view.spike registered", "view.spike" in windows, windows)
+    names = {tool["name"] for tool in baseline["tools"]}
+    checks.check("host: spike host tools present", {"plugin_load", "plugin_host_identity", "app_quit"} <= names)
+    for stage, code in FAIL_STAGES.items():
+        ok, reply, _, error = agent.call("plugin_load", {"path": str(plugin), "fail_at": stage})
+        named = code != "commit_failed" or str(reply).startswith(f"{stage}:")
+        checks.check(f"failure at {stage}: fails at that stage ({code})", not ok and error == code and named,
+                     [error, reply])
+        now = registries(agent)
+        checks.check(f"failure at {stage}: tools, config sections and windows unchanged", now == baseline,
+                     {key: "changed" for key in now if now[key] != baseline[key]})
+    # Two loads in one frame: exactly one commits, the other is refused while the first is pending.
+    results = agent.call_pipelined([("plugin_load", {"path": str(plugin)}), ("plugin_load", {"path": str(plugin)})])
+    checks.check("load: of two loads in one frame, one commits and one is refused as load_pending",
+                 sorted(results) == [(False, "load_pending"), (True, "")], results)
+    after = registries(agent)
+    checks.check("load: tools spike_echo and spike_identity registered",
+                 {"spike_echo", "spike_identity"} <= {tool["name"] for tool in after["tools"]})
+    checks.check("load: config section spike registered", any(s.get("section") == "spike" for s in after["sections"]))
+    checks.check("load: window view.spike registered and open", {"id": "view.spike", "open": True} in after["windows"],
+                 after["windows"])
 
-    _, before, _ = agent.call("plugin_host_identity")
-    _, plugin_view, _ = agent.call("spike_identity")
-    _, after, _ = agent.call("plugin_host_identity")
+    _, before, _, _ = agent.call("plugin_host_identity")
+    _, seen, _, _ = agent.call("spike_identity")
+    _, host, _, _ = agent.call("plugin_host_identity")
     for probe in ("counter", "inline_static", "thread_local"):
-        checks.check(f"identity: {probe} has one address", plugin_view[probe]["address"] == after[probe]["address"],
-                     [plugin_view[probe]["address"], after[probe]["address"]])
+        checks.check(f"identity: {probe} has one address", seen[probe]["address"] == host[probe]["address"],
+                     [seen[probe]["address"], host[probe]["address"]])
         checks.check(f"identity: {probe} mutated by the plugin is seen by the host",
-                     after[probe]["value"] == before[probe]["value"] + 1 == plugin_view[probe]["value"],
-                     [before[probe]["value"], plugin_view[probe]["value"], after[probe]["value"]])
+                     host[probe]["value"] == before[probe]["value"] + 1 == seen[probe]["value"],
+                     [before[probe]["value"], seen[probe]["value"], host[probe]["value"]])
     for key in ("imgui_context", "imgui_alloc", "imgui_free", "imgui_alloc_user_data", "implot_context"):
-        checks.check(f"identity: {key} is the host's", plugin_view[key] == after[key], [plugin_view[key], after[key]])
+        set_by_host = key == "imgui_alloc_user_data" or host[key] != 0  # ImGui's default allocator has no user data
+        checks.check(f"identity: {key} is the host's", seen[key] == host[key] and set_by_host, [seen[key], host[key]])
 
-    ok, echo, _ = agent.call("spike_echo", {"text": "hello"})
+    ok, echo, _, _ = agent.call("spike_echo", {"text": "hello"})
     checks.check("mcp: spike_echo answers", ok and echo == {"echo": {"text": "hello"}}, echo)
 
-    ok, section, _ = agent.call("config_get", {"section": "spike"})
-    checks.check("config: section, schema and default 8 visible after the load",
-                 ok and '"marker_size":8' in json.dumps(section, separators=(",", ":")), section)
-    capture_marker(agent, checks, out, "marker_default", 8 * 8)
-    ok, applied, _ = agent.call("config_apply", {"section": "spike", "payload": {"marker_size": 12}})
+    ok, section, _, _ = agent.call("config_get", {"section": "spike"})
+    schema = section.get("schema", {}) if isinstance(section, dict) else {}
+    checks.check("config: schema declares marker_size as an integer in [1, 64]",
+                 schema.get("properties", {}).get("marker_size") == {"type": "integer", "minimum": 1, "maximum": 64},
+                 schema)
+    checks.check("config: default is marker_size 8", ok and section.get("defaults") == {"marker_size": 8}, section)
+    checks.check("config: the section is active after the load", ok and section.get("active") is True, section)
+    expect_square(checks, "marker at the default", capture(agent, checks, "marker_default"), 8 * 8)
+    for bad in ({"marker_size": -12}, {"marker_size": "12"}, {"marker_size": 1.5}, {"marker_size": 65},
+                {"marker_size": 12, "extra": 1}):
+        ok, reply, _, _ = agent.call("config_apply", {"section": "spike", "payload": bad})
+        checks.check(f"config: invalid payload {json.dumps(bad)} rejected", not ok, reply)
+    ok, applied, _, _ = agent.call("config_apply", {"section": "spike", "payload": {"marker_size": 12}})
     checks.check("config: change to 12 applied", ok, applied)
-    _, plugin_view, _ = agent.call("spike_identity")
-    checks.check("config: active value 12 and exactly one change callback",
-                 plugin_view.get("marker_size") == 12 and plugin_view.get("config_changes") == 1, plugin_view)
-    capture_marker(agent, checks, out, "marker_changed", 12 * 8)
-    ok, _, _ = agent.call("app_quit")
-    checks.check("exit: app_quit accepted", ok)
+    ok, section, _, _ = agent.call("config_get", {"section": "spike"})
+    checks.check("config: active payload 12 after the change",
+                 ok and section.get("active") is True and section.get("payload") == {"marker_size": 12}, section)
+    _, seen, _, _ = agent.call("spike_identity")
+    checks.check("config: the plugin got exactly one change callback with 12",
+                 seen.get("marker_size") == 12 and seen.get("config_changes") == 1, seen)
+    expect_square(checks, "marker after the change", capture(agent, checks, "marker_changed"), 12 * 8)
+    checks.check("exit: app_quit accepted", agent.quit())
 
 
 def finish(checks: Checks, out: Path) -> int:

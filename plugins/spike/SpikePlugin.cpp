@@ -1,15 +1,13 @@
 // ARCH-022 slice 2, S1: the spike plugin. Built against the host's module BMIs, linked to nothing of the
 // engine: every engine, ImGui and ImPlot symbol binds to the running Sandbox at dlopen.
-#include <charconv>
 #include <cstdint>
-#include <format>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
-#include <utility>
 
 #include <imgui.h>
 #include <implot.h>
+#include <nlohmann/json.hpp>
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -23,6 +21,7 @@ namespace
     namespace Config = Extrinsic::Core::Config;
     using Extrinsic::Runtime::AgentOperationContext;
     using Extrinsic::Runtime::AgentOperationOutcome;
+    using Json = nlohmann::json;
 
     struct Lifecycle
     {
@@ -35,38 +34,33 @@ namespace
     int g_ChangeCount = 0;
     bool g_FirstDrawSeen = false;
 
-    std::string Address(const void* pointer) { return std::format("\"{}\"", pointer); }
+    template <typename T>
+    std::uintptr_t Address(T* pointer) { return reinterpret_cast<std::uintptr_t>(pointer); }
 
-    template <typename Fn>
-    std::string FunctionAddress(Fn function)
+    // The section's only field: {"marker_size": N}, N an integer in [1, 64]; anything else is invalid.
+    std::optional<int> MarkerSize(std::string_view payload)
     {
-        return Address(reinterpret_cast<const void*>(reinterpret_cast<std::uintptr_t>(function)));
-    }
-
-    // Reads {"marker_size": N} with N in [1, 64]; the only field of the section.
-    bool ParseMarkerSize(std::string_view payload, int& size)
-    {
-        const auto key = payload.find("\"marker_size\"");
-        if (key == std::string_view::npos) return false;
-        auto start = payload.find_first_of("0123456789", key + 13);
-        if (start == std::string_view::npos) return false;
-        const auto [end, error] = std::from_chars(payload.data() + start, payload.data() + payload.size(), size);
-        return error == std::errc{} && size >= 1 && size <= 64;
+        const Json value = Json::parse(payload, nullptr, false);
+        if (!value.is_object() || value.size() != 1 || !value.contains("marker_size")) return std::nullopt;
+        const Json& size = value["marker_size"];
+        if (!size.is_number_integer()) return std::nullopt;
+        const auto n = size.get<std::int64_t>();
+        if (n < 1 || n > 64) return std::nullopt;
+        return static_cast<int>(n);
     }
 
     Config::EngineConfigSectionValidationResult Validate(std::string_view document, std::string_view, std::string_view)
     {
-        int size = 0;
-        if (!ParseMarkerSize(document, size)) return {.State = Config::EngineConfigState::Invalid};
+        const auto size = MarkerSize(document);
+        if (!size) return {.State = Config::EngineConfigState::Invalid};
         return {.State = Config::EngineConfigState::Valid,
-                .CanonicalPayloadJson = std::format(R"({{"marker_size":{}}})", size),
+                .CanonicalPayloadJson = Json{{"marker_size", *size}}.dump(),
                 .ParsedFieldCount = 1u};
     }
 
     void OnChanged(const Config::EngineConfigSection&, const Config::EngineConfigSection& current)
     {
-        int size = 0;
-        if (ParseMarkerSize(current.PayloadJson, size)) g_MarkerSize = size;
+        if (const auto size = MarkerSize(current.PayloadJson)) g_MarkerSize = *size;
         ++g_ChangeCount;
         spike_lifecycle_event("config_changed");
     }
@@ -81,14 +75,19 @@ namespace
         ImGuiMemFreeFunc free = nullptr;
         void* userData = nullptr;
         ImGui::GetAllocatorFunctions(&alloc, &free, &userData);
-        return {.Text = std::format(
-            R"({{"counter":{{"address":{},"value":{}}},"inline_static":{{"address":{},"value":{}}},)"
-            R"("thread_local":{{"address":{},"value":{}}},"imgui_context":{},"imgui_alloc":{},"imgui_free":{},)"
-            R"("imgui_alloc_user_data":{},"implot_context":{},"marker_size":{},"config_changes":{}}})",
-            Address(&Spike::HostCounter()), Spike::HostCounter(), Address(&Spike::HostInlineStatic()),
-            Spike::HostInlineStatic(), Address(&Spike::HostThreadLocal()), Spike::HostThreadLocal(),
-            Address(ImGui::GetCurrentContext()), FunctionAddress(alloc), FunctionAddress(free), Address(userData),
-            Address(ImPlot::GetCurrentContext()), g_MarkerSize, g_ChangeCount)};
+        const Json value = {
+            {"counter", {{"address", Address(&Spike::HostCounter())}, {"value", Spike::HostCounter()}}},
+            {"inline_static", {{"address", Address(&Spike::HostInlineStatic())}, {"value", Spike::HostInlineStatic()}}},
+            {"thread_local", {{"address", Address(&Spike::HostThreadLocal())}, {"value", Spike::HostThreadLocal()}}},
+            {"imgui_context", Address(ImGui::GetCurrentContext())},
+            {"imgui_alloc", reinterpret_cast<std::uintptr_t>(alloc)},
+            {"imgui_free", reinterpret_cast<std::uintptr_t>(free)},
+            {"imgui_alloc_user_data", Address(userData)},
+            {"implot_context", Address(ImPlot::GetCurrentContext())},
+            {"marker_size", g_MarkerSize},
+            {"config_changes", g_ChangeCount},
+        };
+        return {.Text = value.dump()};
     }
 
     void DrawWindow(bool& open)
@@ -111,15 +110,9 @@ namespace
     }
 }
 
-extern "C" bool intrinsic_plugin_register_v0(const Spike::PluginHostContext& host, Spike::StagedRegistrations& staged,
-                                             std::string& error) noexcept
+extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged, std::string&) noexcept
 {
     spike_lifecycle_event("register");
-    if (host.ImGuiContext != ImGui::GetCurrentContext())
-    {
-        error = "the plugin sees another ImGui context than the host";
-        return false;
-    }
     staged.ConfigSections.push_back({
         .DefaultSection = {.Name = "spike", .SchemaId = "intrinsic.spike", .SchemaVersion = 1u,
                            .PayloadJson = R"({"marker_size":8})"},
@@ -133,7 +126,7 @@ extern "C" bool intrinsic_plugin_register_v0(const Spike::PluginHostContext& hos
         .Description = "Returns its arguments; proves a plugin tool is callable over MCP.",
         .InputSchemaJson = R"({"type":"object","properties":{"text":{"type":"string"}},"additionalProperties":false})",
         .Invoke = [](const AgentOperationContext&, std::string_view arguments)
-        { return AgentOperationOutcome{.Text = std::format(R"({{"echo":{}}})", arguments)}; },
+        { return AgentOperationOutcome{.Text = Json{{"echo", Json::parse(arguments, nullptr, false)}}.dump()}; },
     });
     staged.Operations.push_back({
         .Name = "spike_identity",

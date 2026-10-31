@@ -39,7 +39,6 @@ import Extrinsic.Runtime.ViewCapture;
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
 #if defined(INTRINSIC_PLUGIN_SPIKE)
-import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Sandbox.PluginSpike;
 #endif
 
