@@ -1,4 +1,4 @@
-// ARCH-022 slice 2, S1: the spike plugin. Built against the host's module BMIs, linked to nothing of the
+// ARCH-022 slice 2, S1 and S2: the spike plugin. Built against the host's module BMIs, linked to nothing of the
 // engine: every engine, ImGui and ImPlot symbol binds to the running Sandbox at dlopen.
 #include <cstdint>
 #include <optional>
@@ -8,6 +8,11 @@
 #include <imgui.h>
 #include <implot.h>
 #include <nlohmann/json.hpp>
+
+// Generated in the build directory (CMake writes the default; the S2 driver rewrites it to make a new build):
+// SPIKE_GENERATION, the build's version; SPIKE_FAIL_REGISTER, a build whose Register stages and then fails;
+// SPIKE_MISSING_SYMBOL (optional), a build that needs a symbol the host does not export, so dlopen fails.
+#include "SpikeVersion.inc"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -30,6 +35,21 @@ namespace
     };
     const Lifecycle g_Lifecycle{};
 
+    // Captured by every callable handed to the host: reports each copy and destruction, and each call, so the
+    // host can refuse to close this image while any of them is alive.
+    class Tracked
+    {
+    public:
+        explicit Tracked(const char* kind) noexcept : m_Kind(kind) { spike_callable(SPIKE_GENERATION, m_Kind, +1); }
+        Tracked(const Tracked& other) noexcept : m_Kind(other.m_Kind) { spike_callable(SPIKE_GENERATION, m_Kind, +1); }
+        Tracked& operator=(const Tracked&) = delete;
+        ~Tracked() { spike_callable(SPIKE_GENERATION, m_Kind, -1); }
+        void Invoked() const noexcept { spike_invoked(SPIKE_GENERATION, m_Kind); }
+
+    private:
+        const char* m_Kind;
+    };
+
     int g_MarkerSize = 8;
     int g_ChangeCount = 0;
     bool g_FirstDrawSeen = false;
@@ -49,7 +69,7 @@ namespace
         return static_cast<int>(n);
     }
 
-    Config::EngineConfigSectionValidationResult Validate(std::string_view document, std::string_view, std::string_view)
+    Config::EngineConfigSectionValidationResult Validate(std::string_view document)
     {
         const auto size = MarkerSize(document);
         if (!size) return {.State = Config::EngineConfigState::Invalid};
@@ -58,7 +78,7 @@ namespace
                 .ParsedFieldCount = 1u};
     }
 
-    void OnChanged(const Config::EngineConfigSection&, const Config::EngineConfigSection& current)
+    void OnChanged(const Config::EngineConfigSection& current)
     {
         if (const auto size = MarkerSize(current.PayloadJson)) g_MarkerSize = *size;
         ++g_ChangeCount;
@@ -66,7 +86,7 @@ namespace
     }
 
     // Mutates the host's probes through imported code and reports what the plugin sees.
-    AgentOperationOutcome Identity(const AgentOperationContext&, std::string_view)
+    AgentOperationOutcome Identity()
     {
         ++Spike::HostCounter();
         ++Spike::HostInlineStatic();
@@ -111,14 +131,31 @@ namespace
     }
 }
 
-extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged, std::string&) noexcept
+#if defined(SPIKE_MISSING_SYMBOL) && SPIKE_MISSING_SYMBOL
+extern "C" void spike_symbol_the_host_does_not_export() noexcept;
+#endif
+
+extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged, std::string& error) noexcept
 {
+#if defined(SPIKE_MISSING_SYMBOL) && SPIKE_MISSING_SYMBOL
+    spike_symbol_the_host_does_not_export(); // never reached: RTLD_NOW refuses the image first
+#endif
     spike_lifecycle_event("register");
+    staged.Generation = SPIKE_GENERATION;
     staged.ConfigSections.push_back({
         .DefaultSection = {.Name = "spike", .SchemaId = "intrinsic.spike", .SchemaVersion = 1u,
                            .PayloadJson = R"({"marker_size":8})"},
-        .Validate = Validate,
-        .OnChanged = OnChanged,
+        .Validate = [t = Tracked{"validator"}](std::string_view document, std::string_view, std::string_view)
+        {
+            t.Invoked();
+            return Validate(document);
+        },
+        .OnChanged = [t = Tracked{"change_callback"}](const Config::EngineConfigSection&,
+                                                       const Config::EngineConfigSection& current)
+        {
+            t.Invoked();
+            OnChanged(current);
+        },
         .SchemaJson = R"({"type":"object","properties":{"marker_size":{"type":"integer","minimum":1,"maximum":64}},"additionalProperties":false})",
     });
     staged.Operations.push_back({
@@ -126,23 +163,51 @@ extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged,
         .Title = "Echo (spike plugin)",
         .Description = "Returns its arguments; proves a plugin tool is callable over MCP.",
         .InputSchemaJson = R"({"type":"object","properties":{"text":{"type":"string"}},"additionalProperties":false})",
-        .Invoke = [](const AgentOperationContext&, std::string_view arguments)
-        { return AgentOperationOutcome{.Text = Json{{"echo", Json::parse(arguments, nullptr, false)}}.dump()}; },
+        .Invoke = [t = Tracked{"operation"}](const AgentOperationContext&, std::string_view arguments)
+        {
+            t.Invoked();
+            return AgentOperationOutcome{.Text = Json{{"echo", Json::parse(arguments, nullptr, false)}}.dump()};
+        },
     });
     staged.Operations.push_back({
         .Name = "spike_identity",
         .Title = "Identity probes (spike plugin)",
         .Description = "Mutates the host's probes through imported code and reports what the plugin sees.",
-        .Invoke = Identity,
+        .Invoke = [t = Tracked{"operation"}](const AgentOperationContext&, std::string_view)
+        {
+            t.Invoked();
+            return Identity();
+        },
+    });
+    staged.Operations.push_back({
+        .Name = "spike_version",
+        .Title = "Version (spike plugin)",
+        .Description = "The plugin build's generation (SpikeVersion.inc).",
+        .Invoke = [t = Tracked{"operation"}](const AgentOperationContext&, std::string_view)
+        {
+            t.Invoked();
+            return AgentOperationOutcome{.Text = Json{{"generation", SPIKE_GENERATION}}.dump()};
+        },
     });
     staged.Windows.push_back({
         .Id = "view.spike",
         .MenuPath = {"View"},
         .Title = "Spike plugin",
         .OpenByDefault = true,
-        .Draw = DrawWindow,
+        .Draw = [t = Tracked{"window_draw"}](bool& open)
+        {
+            t.Invoked();
+            DrawWindow(open);
+        },
+        .OpenStateChanged = [t = Tracked{"window_state"}](bool) { t.Invoked(); },
     });
+#if SPIKE_FAIL_REGISTER
+    error = "this build's Register stages everything and then fails";
+    return false;
+#else
+    (void)error;
     return true;
+#endif
 }
 
 extern "C" void intrinsic_plugin_shutdown_v0() noexcept { spike_lifecycle_event("shutdown"); }

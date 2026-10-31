@@ -103,6 +103,8 @@ export namespace Extrinsic::Runtime
     public:
         // Fails for empty or duplicate names, missing invokers and unsupported input schemas.
         [[nodiscard]] bool Register(AgentOperationSpec spec);
+        // False when no operation has that name.
+        [[nodiscard]] bool Unregister(std::string_view name);
         [[nodiscard]] const AgentOperationSpec* Find(std::string_view name) const noexcept;
         [[nodiscard]] std::span<const AgentOperationSpec> Entries() const noexcept { return m_Entries; }
 

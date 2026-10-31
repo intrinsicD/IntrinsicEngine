@@ -8,8 +8,8 @@ until LSan runs: its leaks are then named and suppressed by plugins/spike/lsan-d
 Over the agent socket (newline-delimited JSON-RPC,
 as tools/agents/mcp_bridge.py speaks it) it:
   1. checks the Vulkan device through diagnostics_read and captures the window without a marker;
-  2. injects a load failure at every stage: the error names that stage, and tools, config sections (with their
-     schema, defaults and payload) and windows are unchanged;
+  2. injects a load failure at every host stage: the error names that stage, and tools, config sections (with
+     their schema, defaults and payload) and windows are unchanged; each opened image is closed again;
   3. loads the plugin (a second load in the same dispatch must be refused as load_pending) and asserts its tool,
      config section and window are registered;
   4. asserts one identity of shared state: the plugin mutates the host's counter, inline static and thread-local
@@ -40,7 +40,8 @@ from PIL import Image
 
 REPO = Path(__file__).resolve().parents[2]
 # Expected error code per injected stage; commit stages must also name the stage in their message.
-FAIL_STAGES = {"dlopen": "dlopen_failed", "dlsym": "dlsym_failed", "register": "register_failed",
+# A failing Register is a plugin build of its own (S2, reload_driver.py), not a host-side injection.
+FAIL_STAGES = {"dlopen": "dlopen_failed", "dlsym": "dlsym_failed",
                "config": "commit_failed", "operations": "commit_failed", "windows": "commit_failed"}
 MAGENTA = (255, 0, 255)
 # A sanitizer frame in any of these is the spike's own code.
@@ -202,23 +203,32 @@ def leak_records(log: str) -> list[str]:
     return sorted("\n".join(record) for record in records)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+def arguments(description: str) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--build", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--icd", type=Path, default=Path(os.environ.get(
         "VK_DRIVER_FILES", "/usr/share/vulkan/icd.d/nvidia_icd.json")), help="the one Vulkan ICD (VK_DRIVER_FILES)")
     parser.add_argument("--deadline", type=float, default=120.0, help="seconds for startup and for exit")
     args = parser.parse_args()
-    out, build = args.out.resolve(), args.build.resolve()
-    out.mkdir(parents=True)  # never reuse an earlier attempt's directory
-    checks = Checks()
+    args.out, args.build = args.out.resolve(), args.build.resolve()
+    args.out.mkdir(parents=True)  # never reuse an earlier attempt's directory
+    return args
+
+
+def launch(args: argparse.Namespace, checks: Checks, scenario) -> tuple[object, str, list[str]] | None:
+    """Runs scenario(agent) against a Sandbox started with the driver's environment and waits for its exit.
+    Returns (exit code, stderr, lifecycle events), or None when the environment is not ready."""
+    out, build = args.out, args.build
     ready = [checks.check("environment: DISPLAY is set", bool(os.environ.get("DISPLAY")), os.environ.get("DISPLAY")),
              checks.check("environment: the Vulkan ICD exists", args.icd.is_file(), str(args.icd)),
              checks.check("environment: built-in config (no config/engine.json)",
-                          not (REPO / "config/engine.json").exists())]
+                          not (REPO / "config/engine.json").exists()),
+             # A longer socket path makes the Sandbox refuse to listen (InvalidPath), which looks like a hang.
+             checks.check("environment: the agent socket path fits AF_UNIX (at most 107 bytes)",
+                          len(str(out / "agent.sock").encode()) <= 107, str(out / "agent.sock"))]
     if not all(ready):
-        return finish(checks, out)
+        return None
     events, suppressions = out / "events.log", out / "lsan.supp"
     suppressions.write_text((REPO / "lsan.supp").read_text() + (Path(__file__).parent / "lsan-driver.supp").read_text())
     env = {k: v for k, v in os.environ.items() if k != "INTRINSIC_ENGINE_CONFIG"}
@@ -231,7 +241,7 @@ def main() -> int:
         sandbox = subprocess.Popen([str(build / "bin/ExtrinsicSandbox"), "--agent-socket", str(out / "agent.sock"),
                                     "--agent-root", str(out)], cwd=REPO, env=env, stdout=stdout, stderr=stderr)
         try:
-            run(Agent(out / "agent.sock", args.deadline), checks, build / "plugins/libIntrinsicSpikePlugin.so")
+            scenario(Agent(out / "agent.sock", args.deadline))
         except Exception as error:  # a crash or a protocol failure is a failed check, not a driver traceback
             checks.check("driver: the session completed", False, f"{type(error).__name__}: {error}")
         try:
@@ -240,23 +250,41 @@ def main() -> int:
             sandbox.kill()
             code = "killed after the deadline"
     log = (out / "sandbox.stderr").read_bytes().decode(errors="replace")
-    sanitizer, records = sanitizer_lines(log), leak_records(log)
+    sanitizer = sanitizer_lines(log)
     checks.check("exit: the Sandbox exited with status 0", code == 0, code)
     checks.check("exit: ASan, LSan and UBSan clean", not sanitizer, sanitizer[:3])
     checks.check("exit: no sanitizer error other than a leak report", all(LEAK_REPORT.search(l) for l in sanitizer),
                  [l for l in sanitizer if not LEAK_REPORT.search(l)][:3])
-    spike = [r for r in records if any(m in r for m in SPIKE_FRAMES)]
+    return code, log, events.read_text().splitlines() if events.exists() else []
+
+
+def main() -> int:
+    args = arguments(__doc__)
+    checks = Checks()
+    closes: list[dict] = []
+    result = launch(args, checks, lambda agent: closes.extend(run(agent, checks, args.build / "plugins/libIntrinsicSpikePlugin.so")))
+    if result is None:
+        return finish(checks, args.out)
+    _, log, lines = result
+    spike = [r for r in leak_records(log) if any(m in r for m in SPIKE_FRAMES)]
     checks.check("exit: no leak record has a frame in the plugin or the spike host code", not spike, spike[:2])
-    lines = events.read_text().splitlines() if events.exists() else []
-    # Register runs once per load that reaches the commit: each commit-stage failure, then the successful load.
-    registers = sum(code == "commit_failed" for code in FAIL_STAGES.values()) + 1
-    expected = ["static_construct"] + ["register"] * registers + ["commit", "first_draw", "config_changed", "shutdown",
-                                                                   "static_destruct"]
-    checks.check("lifecycle: events once each in order (Register once per staged attempt)", lines == expected, lines)
-    return finish(checks, out)
+    # Each failed attempt that opened an image is closed with no live callable and leaves the process: static
+    # construction, Register when it reached the commit, static destruction at the close.
+    opened = [stage for stage in FAIL_STAGES if stage != "dlopen"]
+    clean = [c for c in closes if c.get("closed") is True and c.get("unmapped") is True
+             and all(count == 0 for count in c.get("live", {}).values())]
+    checks.check("lifecycle: every failed image closed with no live callable and unmapped",
+                 len(closes) == len(clean) == len(opened), closes)
+    expected = []
+    for stage in opened:
+        expected += ["static_construct"] + (["register"] if FAIL_STAGES[stage] == "commit_failed" else []) + ["static_destruct"]
+    expected += ["static_construct", "register", "commit", "first_draw", "config_changed", "shutdown", "static_destruct"]
+    checks.check("lifecycle: events in order (Register once per staged attempt)", lines == expected, lines)
+    return finish(checks, args.out)
 
 
-def run(agent: Agent, checks: Checks, plugin: Path) -> None:
+def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
+    """The S1 session; returns the host's close records of the failed attempts."""
     ok, diagnostics, _, _ = agent.call("diagnostics_read")
     status = find(diagnostics, "device_status")
     checks.check("environment: Vulkan device operational",
@@ -326,7 +354,9 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> None:
     checks.check("config: the plugin got exactly one change callback with 12",
                  seen.get("marker_size") == 12 and seen.get("config_changes") == 1, seen)
     expect_square(agent, checks, "marker_changed", 12 * 8)
+    _, host, _, _ = agent.call("plugin_host_identity")
     checks.check("exit: app_quit accepted", agent.quit())
+    return host.get("closes", []) if isinstance(host, dict) else []
 
 
 def finish(checks: Checks, out: Path) -> int:

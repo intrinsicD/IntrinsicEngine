@@ -203,7 +203,9 @@ registration and the section from both. Both run on the main thread and fail
 without change when the control is unbound, for a duplicate, an already present
 or an unknown name, and when called from a callback during apply. Apply rejects
 a preview made before a registration change, since it would drop or bring back
-a section; preview again. A section in
+a section; preview again. A late section's change is also validated again with
+its current registration, so a preview held across a re-registration (a plugin
+reload with the same schema id and version) cannot bypass the new validator. A section in
 the boot document whose registration arrives later is discarded at boot and
 starts from its default.
 

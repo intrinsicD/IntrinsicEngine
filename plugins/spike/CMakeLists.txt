@@ -1,4 +1,4 @@
-# ARCH-022 slice 2, S1: a plugin built after the host, loaded with dlopen, in one of two link variants.
+# ARCH-022 slice 2, S1 and S2: a plugin built after the host, loaded with dlopen, in one of two link variants.
 add_library(IntrinsicSpikePlugin MODULE SpikePlugin.cpp)
 set_target_properties(IntrinsicSpikePlugin PROPERTIES
         POSITION_INDEPENDENT_CODE ON
@@ -6,6 +6,13 @@ set_target_properties(IntrinsicSpikePlugin PROPERTIES
 target_compile_options(IntrinsicSpikePlugin PRIVATE ${INTRINSIC_COMPILE_FLAGS})
 target_link_options(IntrinsicSpikePlugin PRIVATE ${INTRINSIC_LINK_FLAGS})
 add_dependencies(IntrinsicSpikePlugin ExtrinsicSandbox)
+# S2: the build's generation lives in the build directory, so the reload driver can make a new build without
+# touching repository sources. Written once; the driver rewrites it.
+set(SPIKE_GENERATED ${CMAKE_CURRENT_BINARY_DIR}/generated)
+if(NOT EXISTS ${SPIKE_GENERATED}/SpikeVersion.inc)
+    file(WRITE ${SPIKE_GENERATED}/SpikeVersion.inc "#define SPIKE_GENERATION 1\n#define SPIKE_FAIL_REGISTER 0\n")
+endif()
+target_include_directories(IntrinsicSpikePlugin PRIVATE ${SPIKE_GENERATED})
 
 if(BUILD_SHARED_LIBS)
     # Variant (b): the engine libraries are shared, so the plugin links them like any target and CMake

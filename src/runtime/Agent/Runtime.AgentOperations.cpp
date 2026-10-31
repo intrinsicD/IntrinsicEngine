@@ -73,6 +73,13 @@ namespace Extrinsic::Runtime
         return true;
     }
 
+    bool AgentOperationRegistry::Unregister(const std::string_view name)
+    {
+        // Owned: `name` may view an entry that the compaction overwrites.
+        return std::erase_if(m_Entries, [owned = std::string{name}](const AgentOperationSpec& entry)
+                             { return entry.Name == owned; }) != 0u;
+    }
+
     const AgentOperationSpec* AgentOperationRegistry::Find(const std::string_view name) const noexcept
     {
         for (const auto& entry : m_Entries)

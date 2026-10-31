@@ -1254,3 +1254,59 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - Not in S2: a file watcher (the MCP tool is the trigger); a general plugin host outside the
     spike; CI; moving editor operations to registered commands; agent continuations created by
     plugin operations (the spike's operations create none; a general host must drain them).
+- 2026-10-31: S2a implemented (unload and reload, spike host only).
+  - Runtime:
+    - `AgentOperationRegistry::Unregister`, with its name owned (the registry-compaction lesson of
+      `3ba77576a`).
+    - Apply validates a late section's change again with its current registration
+      (stricter-validator regression test).
+  - Host:
+    - callable accounting per generation and kind (`spike_callable`, `spike_invoked`);
+    - private copies;
+    - a close only at zero live callables;
+    - `plugin_unload` and `plugin_reload`;
+    - saved section payloads reapplied through preview and apply;
+    - the `fail_at register` short-circuit removed;
+    - test hook `retain_callable`.
+  - Plugin:
+    - a token in every callable;
+    - `spike_version`;
+    - builds from a generated `SpikeVersion.inc` (generation, a failing Register, an unresolved
+      symbol).
+  - Driver `reload_driver.py`, written before the first run, results:
+    - run 1: 34 of 40, two findings:
+      - The planned failed-load fixture, a truncated `.so`, crashes glibc's `dlopen` with SIGBUS
+        while it maps the segments, instead of failing. A partially written plugin file would
+        therefore kill the host. lld writes its output to a temporary file and renames it, so a
+        reload never sees a partial file from lld; the host's private copy is taken from the
+        finished file.
+      - The failed load now uses a realistic fixture: a build that needs a symbol the host does
+        not export (`undefined symbol`, `dlopen_failed`).
+      - Unknown tools answer with a JSON-RPC error ("Unknown tool"), not a tool result; the
+        check reads that.
+    - runs 2 and b1: 57 of 57 in both variants;
+    - run 3 adds the guard check: 60 of 60.
+
+    Every closed image left the process (no GNU-unique pinning with clang): 28 static
+    constructions, 28 destructions.
+  - The S1 driver's lifecycle check is now strict: every failed attempt's image is closed with no
+    live callable and unmapped. S1 regression: 57 of 57.
+  - Plan deviation: the scene is seeded with an imported test mesh (`import_file`), since no
+    rename or translate tool exists. The comparison is `save_scene` byte equality, with a control
+    of two saves.
+  - S2a mutations (host source mutated, rebuilt, the driver run; each caught by its intended check):
+    - close guard disabled: the guard checks;
+    - windows kept on unload: the unload checks;
+    - restore skipped: the reapplied-payload checks;
+    - windows kept on a rollback: the failed-commit checks;
+    - staging kept after a failed commit: the S1 strict lifecycle check;
+    - staging kept after a failed Register: the failed-Register close check.
+
+    The first batch had four invalid runs. Their output paths made the agent socket path longer
+    than AF_UNIX allows (111 to 113 bytes), and the Sandbox logged `InvalidPath` and never
+    listened. A timeout looked like a catch. The driver now checks the socket path length as an
+    environment condition, and those four mutations were rerun with short paths.
+  - Final S2a state (`build/spike` and `build/spike-shared`, lld, dev sanitizers):
+    - 280 core, 292 Sandbox editor integration and 1875 runtime contract tests pass;
+    - S1 driver: 58 of 58 in both variants;
+    - S2a driver: 61 of 61 in both variants.

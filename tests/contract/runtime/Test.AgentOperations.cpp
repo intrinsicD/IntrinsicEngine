@@ -69,6 +69,24 @@ TEST(AgentOperations, RegistryRejectsDuplicatesAndMissingInvokers)
     EXPECT_FALSE(registry.Find("mutate")->ReadOnly);
 }
 
+TEST(AgentOperations, UnregisterRemovesOnlyTheNamedOperation)
+{
+    const auto noop = [](const R::AgentOperationContext&, std::string_view) { return R::AgentOperationOutcome{}; };
+    R::AgentOperationRegistry registry;
+    const std::string longName(122, 'b');
+    ASSERT_TRUE(registry.Register({.Name = "a", .Invoke = noop}));
+    ASSERT_TRUE(registry.Register({.Name = longName, .Invoke = noop}));
+    ASSERT_TRUE(registry.Register({.Name = "z", .Invoke = noop}));
+
+    // A name owned by the registry: erasing compacts the entries over it.
+    EXPECT_TRUE(registry.Unregister(registry.Find("a")->Name));
+    ASSERT_EQ(registry.Entries().size(), 2u);
+    EXPECT_NE(registry.Find(longName), nullptr);
+    EXPECT_NE(registry.Find("z"), nullptr);
+    EXPECT_FALSE(registry.Unregister("a"));
+    EXPECT_TRUE(registry.Register({.Name = "a", .Invoke = noop}));
+}
+
 TEST(AgentOperations, ProtocolRejectsNonObjectArgumentsBeforeMutation)
 {
     int mutations = 0;

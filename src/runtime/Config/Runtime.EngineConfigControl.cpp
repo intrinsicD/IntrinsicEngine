@@ -222,6 +222,7 @@ namespace Extrinsic::Runtime
             config->AppSections,
             m_SectionRegistry.Find(name)->DefaultSection);
         m_ConfigControlState.ActiveConfig = *config;
+        m_LateSections.push_back(name);
         return true;
     }
 
@@ -241,6 +242,7 @@ namespace Extrinsic::Runtime
             {
                 return section.Name == owned;
             });
+        std::erase(m_LateSections, owned);
         m_ConfigControlState.ActiveConfig = *config;
         return true;
     }
@@ -489,6 +491,36 @@ namespace Extrinsic::Runtime
         result.GpuProfilingChanged = gpuProfilingChanged;
         result.ChangedSectionNames =
             FindChangedSectionNames(config->AppSections, candidate.AppSections);
+        for (const std::string& name : result.ChangedSectionNames)
+        {
+            const Core::Config::EngineConfigSectionRegistration* registration =
+                m_SectionRegistry.Find(name);
+            const Core::Config::EngineConfigSection* section =
+                Core::Config::FindEngineConfigSection(candidate.AppSections, name);
+            if (std::ranges::find(m_LateSections, name) == m_LateSections.end() ||
+                registration == nullptr || section == nullptr)
+            {
+                continue;
+            }
+            const Core::Config::EngineConfigSection* live =
+                Core::Config::FindEngineConfigSection(config->AppSections, name);
+            if (registration->Validate(
+                    section->PayloadJson,
+                    live != nullptr ? live->PayloadJson
+                                    : registration->DefaultSection.PayloadJson,
+                    "app.sections." + name + ".payload")
+                    .State != Core::Config::EngineConfigState::Valid)
+            {
+                result.LoadResult.Diagnostics.push_back(Core::Config::EngineConfigDiagnostic{
+                    .Code = Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                    .Subject = "app.sections." + name,
+                    .Message = "The section's current registration rejects the previewed payload; preview again.",
+                });
+                result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+                RecordConfigApply(result);
+                return result;
+            }
+        }
         if (!recipePathChanged && !gpuProfilingChanged &&
             result.ChangedSectionNames.empty())
         {

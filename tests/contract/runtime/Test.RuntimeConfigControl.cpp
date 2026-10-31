@@ -992,6 +992,66 @@ TEST(RuntimeConfigControl, PreviewFromBeforeARegistrationChangeIsRejected)
     engine.Shutdown();
 }
 
+TEST(RuntimeConfigControl, PreviewHeldAcrossAStricterReregistrationIsRejected)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
+    engine.Initialize();
+    Runtime::EngineConfigControl* configControl =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControl, nullptr);
+    ASSERT_TRUE(configControl->RegisterSection(
+        MakeTestSectionRegistration("late", R"json({"value":0})json")));
+
+    CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
+    CoreConfig::UpsertEngineConfigSection(
+        candidate.AppSections,
+        CoreConfig::EngineConfigSection{.Name = "late",
+                                        .SchemaId = "test.late",
+                                        .SchemaVersion = 1u,
+                                        .PayloadJson = R"json({"value":50})json"});
+    const CoreConfig::EngineConfigLoadResult held =
+        configControl->PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate), "held-preview.json");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(held));
+
+    // A plugin reload: same name, schema id and version, but a validator that rejects 50.
+    ASSERT_TRUE(configControl->UnregisterSection("late"));
+    std::uint32_t callbackCount = 0u;
+    CoreConfig::EngineConfigSectionRegistration stricter = MakeTestSectionRegistration(
+        "late",
+        R"json({"value":0})json",
+        [&](const CoreConfig::EngineConfigSection&, const CoreConfig::EngineConfigSection&)
+        {
+            ++callbackCount;
+        });
+    stricter.Validate = [](const std::string_view document, std::string_view, std::string_view)
+    {
+        return CoreConfig::EngineConfigSectionValidationResult{
+            .State = document == R"json({"value":50})json"
+                ? CoreConfig::EngineConfigState::Invalid
+                : CoreConfig::EngineConfigState::Valid,
+            .CanonicalPayloadJson = std::string{document},
+        };
+    };
+    ASSERT_TRUE(configControl->RegisterSection(std::move(stricter)));
+
+    EXPECT_EQ(configControl->ApplyEngineConfigHotSubset(held).Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Rejected);
+    EXPECT_EQ(callbackCount, 0u);
+    for (const CoreConfig::EngineConfig* view :
+         {&engine.GetEngineConfig(),
+          &configControl->GetEngineConfigControlState().ActiveConfig})
+    {
+        const std::string* payload = SectionPayload(*view, "late");
+        ASSERT_NE(payload, nullptr);
+        EXPECT_EQ(*payload, R"json({"value":0})json");
+    }
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeConfigControl, InvalidHotRecipeConfigPreservesActiveOverride)
 {
     const std::filesystem::path invalidPath =
