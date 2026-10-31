@@ -2,6 +2,7 @@
 // Built only with INTRINSIC_PLUGIN_SPIKE; the plugin imports this module from the host's BMIs.
 module;
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -57,8 +58,10 @@ export namespace Extrinsic::Sandbox::Spike
         return value;
     }
 
-    // Host state a plugin's undoable edits change (S2b); it survives a reload, as scene data does.
-    [[nodiscard]] int& HostUndoValue() noexcept;
+    // Host state a plugin's undoable edits change (S2b); it survives a reload, as scene data does. Edits move it by
+    // at most kMaxUndoDelta, so it cannot overflow.
+    inline constexpr std::int64_t kMaxUndoDelta = 1'000'000;
+    [[nodiscard]] std::int64_t& HostUndoValue() noexcept;
 
     // Records an undo entry through the editor history without the plugin naming editor types. The command form
     // holds data and calls the registered command; the closure form holds the plugin's closures, as today's

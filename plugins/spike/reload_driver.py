@@ -4,8 +4,8 @@
 Starts the Sandbox like spike_driver.py (isolated socket, built-in config, the driver's LSan settings). Builds of
 the plugin come from rewriting <build>/plugins/spike/generated/SpikeVersion.inc (its generation, or a Register that
 stages and then fails) and building IntrinsicSpikePlugin; repository sources are never touched. Before the session
-it prebuilds generation 2 (A), 3 (B), 4 (Register fails), 6 (unresolved symbol) and 7 (clamping validator); during
-it, it builds generation 5 and a broken header.
+it prebuilds generation 2 (A), 3 (B), 4 (Register fails), 6 (unresolved symbol), 7 (clamping validator) and 8 (an
+empty history handler); during it, it builds generation 5 and a broken header.
 It checks, in order:
   1. a seeded scene (an imported mesh, renamed, moved and scaled through a loaded scene file) saves to identical
      files twice (the comparison's own control);
@@ -17,8 +17,8 @@ It checks, in order:
      answers, only it is invoked, registries equal the loaded state, 12 and the 96 px marker survive, the scene file
      is unchanged, the identity probes still share one address;
   5. a failed build leaves the plugin file and the running version unchanged;
-  6. a failed load (generation 6 needs a symbol the host does not export), a failed Register (generation 4) and a
-     failed commit (fail_at windows) each leave
+  6. a failed load (generation 6 needs a symbol the host does not export), a failed Register (generation 4), a
+     failed commit (fail_at windows) and a staged history command without a handler (generation 8) each leave
      no plugin, with the reason, registries equal to the baseline and no live callable at the close;
   7. 20 reloads alternating A and B: version, registries and close records each cycle; then a build whose validator
      clamps 12 to 10 with a fallback: the saved 12 is reported rejected and not applied (the default 8 stays);
@@ -28,11 +28,12 @@ It checks, in order:
      image mapped, with callables_alive;
   10. a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
-With --closure-control it runs the S2b control instead: today's closure entry, recorded by the plugin, is undone
-after the plugin's image left the process. The control counts only if the entry was listed, the image was unmapped,
+With --closure-control it runs the S2b control instead: closure entries 5 and 3 (today's form) are recorded, 3 is
+undone, the plugin is reloaded to a 16 MiB larger build (so the freed range stays free), and the remaining entry is
+undone after the old image left the process. The control counts only if the entry was listed, the image was unmapped,
 the host logged `closure_undo` as its last event, and the Sandbox then died with a sanitizer SEGV whose address lies
 in the closed image's former range, with EditorCommandHistory::Undo on the stack. A still-mapped image makes it
-inconclusive.
+inconclusive, and so does a new image mapped over the old range.
 Usage: python3 plugins/spike/reload_driver.py --build build/spike --out <new dir> [--icd <VK_DRIVER_FILES json>]
        [--closure-control]
 """
@@ -69,17 +70,18 @@ class Builds:
         self.header = build / "plugins/spike/generated/SpikeVersion.inc"
         self.plugin = build / "plugins/libIntrinsicSpikePlugin.so"
 
-    def write_header(self, generation: int, fail_register: bool = False, missing: bool = False,
-                     clamp: bool = False) -> None:
-        self.header.write_text(f"#define SPIKE_GENERATION {generation}\n#define SPIKE_FAIL_REGISTER {int(fail_register)}\n"
-                               f"#define SPIKE_MISSING_SYMBOL {int(missing)}\n#define SPIKE_CLAMP_MARKER {int(clamp)}\n")
+    def write_header(self, generation: int, **options: bool) -> None:
+        """SPIKE_GENERATION plus one define per build option (fail_register, missing, clamp, empty_command)."""
+        names = {"fail_register": "SPIKE_FAIL_REGISTER", "missing": "SPIKE_MISSING_SYMBOL", "clamp": "SPIKE_CLAMP_MARKER",
+                 "empty_command": "SPIKE_EMPTY_HISTORY_COMMAND", "pad": "SPIKE_PAD"}
+        self.header.write_text(f"#define SPIKE_GENERATION {generation}\n" +
+                               "".join(f"#define {macro} {int(options.get(key, False))}\n" for key, macro in names.items()))
 
-    def make(self, generation: int, fail_register: bool = False, broken: bool = False, missing: bool = False,
-             clamp: bool = False) -> bool:
+    def make(self, generation: int, broken: bool = False, **options: bool) -> bool:
         if broken:
             self.header.write_text("#error a broken plugin build\n")
         else:
-            self.write_header(generation, fail_register, missing, clamp)
+            self.write_header(generation, **options)
         result = subprocess.run(["cmake", "--build", str(self.build), "--target", "IntrinsicSpikePlugin"],
                                 capture_output=True, text=True, timeout=1800)
         (self.dir / f"build-{generation}{'-broken' if broken else ''}.log").write_text(result.stdout + result.stderr)
@@ -233,7 +235,8 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     for name, arguments, code, generation in (
             ("failed load", {"path": str(kept["missing"])}, "dlopen_failed", None),
             ("failed Register", {"path": str(kept["F"])}, "register_failed", 4),
-            ("failed commit", {"path": str(kept["A"]), "fail_at": "windows"}, "commit_failed", 2)):
+            ("failed commit", {"path": str(kept["A"]), "fail_at": "windows"}, "commit_failed", 2),
+            ("empty history handler", {"path": str(kept["empty"])}, "commit_failed", 8)):
         ok, reply, _, error = agent.call("plugin_reload", arguments)
         state = host(agent)
         checks.check(f"{name}: fails with {code} and a reason", not ok and error == code and bool(reply), [error, reply])
@@ -273,6 +276,13 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
 
     # 8. Undo and redo through the plugin across a reload (S2b): both stacks hold an entry when it reloads.
     start = host(agent)["undo_value"]
+    _, before, _, _ = agent.call("history")
+    for delta in (2147483648, -1000001):
+        ok, reply, _, error = agent.call("spike_counter_add", {"delta": delta})
+        _, after, _, _ = agent.call("history")
+        checks.check(f"history: delta {delta} out of range is rejected, value and history unchanged",
+                     not ok and error == "invalid_params" and host(agent)["undo_value"] == start and after == before,
+                     [reply, error, after])
     for delta in (5, 3):
         ok, reply, _, error = agent.call("spike_counter_add", {"delta": delta})
         checks.check(f"history: add {delta} recorded", ok, [reply, error])
@@ -311,19 +321,28 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
 def control(agent: s1.Agent, checks: s1.Checks, kept: dict[str, Path], state: dict) -> None:
     ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
     checks.check("control: loaded", ok and generation_of(reply) == 2, [reply, error])
-    ok, reply, _, error = agent.call("spike_counter_add", {"delta": 5, "form": "closure"})
+    replies = [agent.call("spike_counter_add", {"delta": delta, "form": "closure"}) for delta in (5, 3)]
+    undone = agent.call("undo")[0]
     _, history, _, _ = agent.call("history")
-    checks.check("control: the closure entry is recorded and listed",
-                 ok and host(agent)["undo_value"] == 5 and str(history.get("undo_label", "")).endswith("Spike add 5 (closure)"),
-                 [reply, error, history])
-    ok, reply, _, error = agent.call("plugin_unload")
-    close = host(agent)["closes"][-1]
-    state["unmapped"] = ok and close.get("unmapped") is True
+    checks.check("control: closure entries 5 and 3 recorded, 3 undone: undo holds 5, redo holds 3, value 5",
+                 all(r[0] for r in replies) and undone and host(agent)["undo_value"] == 5
+                 and str(history.get("undo_label", "")).endswith("Spike add 5 (closure)")
+                 and str(history.get("redo_label", "")).endswith("Spike add 3 (closure)"), [replies, history])
+    # The padded build cannot be mapped into the freed range: a same-size build was, and the stale closure then
+    # silently ran the new image's code (run s2b-ctl3).
+    ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["pad"])})
+    now = host(agent)
+    close = next((c for c in reversed(now["closes"]) if c.get("generation") == 2), {})
+    old, new = ([int(x, 16) for x in r] if len(r) == 2 else [0, 0] for r in (close.get("range", []), now["loaded_range"]))
+    state["unmapped"] = ok and generation_of(reply) == 9 and close.get("unmapped") is True \
+        and (new[1] <= old[0] or old[1] <= new[0])
     state["range"] = close.get("range", [])
-    checks.check("control: the plugin unloaded and its image left the process", state["unmapped"], [reply, error, close])
+    checks.check("control: reloaded to generation 9, generation 2's image left the process and its range is free",
+                 state["unmapped"], [reply, error, close, now["loaded_range"]])
     try:
         state["undo"] = agent.call("undo")
-    except (ConnectionError, OSError) as error:
+        agent.quit()  # no crash: end the session instead of waiting for the deadline
+    except OSError as error:
         state["undo"] = f"{type(error).__name__}: {error}"
 
 
@@ -340,7 +359,7 @@ def run_control(args, checks: s1.Checks, kept: dict[str, Path]) -> int:
     low, high = (int(x, 16) for x in state["range"]) if len(state.get("range", [])) == 2 else (0, 0)
     in_image = fault is not None and low <= int(fault[1], 16) < high
     if not state.get("unmapped"):
-        checks.check("control: inconclusive, the image stayed mapped", False, state)
+        checks.check("control: inconclusive, the image stayed mapped or its range was reused", False, state)
     else:
         checks.check("control: undo of today's closure entry touched the unloaded image (after closure_undo, a SEGV "
                      "inside the closed image's range, EditorCommandHistory::Undo on the stack, the process died)",
@@ -359,7 +378,9 @@ def main() -> int:
     kept: dict[str, Path] = {}
     # A normal generation last, so an interrupted session leaves the build directory loadable.
     for name, generation, options in (("F", 4, {"fail_register": True}), ("missing", 6, {"missing": True}),
-                                      ("clamp", 7, {"clamp": True}), ("B", 3, {}), ("A", 2, {})):
+                                      ("clamp", 7, {"clamp": True}), ("empty", 8, {"empty_command": True}),
+                                      ("pad", 9, {"pad": True}),
+                                      ("B", 3, {}), ("A", 2, {})):
         if not checks.check(f"prebuild: generation {generation} ({name}) built", builds.make(generation, **options)):
             return s1.finish(checks, args.out)
         kept[name] = builds.keep(name)

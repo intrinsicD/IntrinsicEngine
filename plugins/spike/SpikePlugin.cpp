@@ -12,7 +12,9 @@
 // Generated in the build directory (CMake writes the default; the S2 driver rewrites it to make a new build):
 // SPIKE_GENERATION, the build's version; SPIKE_FAIL_REGISTER, a build whose Register stages and then fails;
 // SPIKE_MISSING_SYMBOL (optional), a build that needs a symbol the host does not export, so dlopen fails;
-// SPIKE_CLAMP_MARKER (optional), a build whose validator clamps marker_size above 10 with a fallback.
+// SPIKE_CLAMP_MARKER (optional), a build whose validator clamps marker_size above 10 with a fallback;
+// SPIKE_EMPTY_HISTORY_COMMAND (optional), a build that stages a second history command without a handler;
+// SPIKE_PAD (optional), a build 16 MiB larger, so it cannot be mapped into a smaller build's freed range.
 #include "SpikeVersion.inc"
 
 import Extrinsic.Core.Config.Engine;
@@ -28,6 +30,10 @@ namespace
     using Extrinsic::Runtime::AgentOperationContext;
     using Extrinsic::Runtime::AgentOperationOutcome;
     using Json = nlohmann::json;
+
+#if defined(SPIKE_PAD) && SPIKE_PAD
+    [[gnu::used]] const char g_Pad[16u << 20u] = {1};
+#endif
 
     struct Lifecycle
     {
@@ -119,12 +125,24 @@ namespace
 
     // spike_counter_add {delta, form}: an undoable edit of host state. The command form records data for the
     // registered history command; the closure form records this image's closures, as today's entries do.
+    // A delta within [-kMaxUndoDelta, kMaxUndoDelta]; anything else (including integers too large to read) is not.
+    std::optional<std::int64_t> Delta(const Json& value)
+    {
+        if (!value.is_number_integer()) return std::nullopt;
+        if (value.is_number_unsigned() && value.get<std::uint64_t>() > static_cast<std::uint64_t>(Spike::kMaxUndoDelta))
+            return std::nullopt;
+        const auto delta = value.get<std::int64_t>();
+        if (delta < -Spike::kMaxUndoDelta || delta > Spike::kMaxUndoDelta) return std::nullopt;
+        return delta;
+    }
+
     AgentOperationOutcome CounterAdd(const AgentOperationContext& context, std::string_view argumentsJson)
     {
         const Json arguments = Json::parse(argumentsJson, nullptr, false);
-        if (!arguments.is_object() || !arguments.contains("delta") || !arguments["delta"].is_number_integer())
-            return {.IsError = true, .Text = "delta (integer) is required", .ErrorCode = "invalid_params"};
-        const int delta = arguments["delta"].get<int>();
+        const auto parsed = arguments.is_object() && arguments.contains("delta") ? Delta(arguments["delta"]) : std::nullopt;
+        if (!parsed)
+            return {.IsError = true, .Text = "delta must be an integer within +-1000000", .ErrorCode = "invalid_params"};
+        const std::int64_t delta = *parsed;
         const bool closure = arguments.value("form", std::string{"command"}) == "closure";
         const std::string label = "Spike add " + std::to_string(delta) + (closure ? " (closure)" : "");
         const bool recorded = closure
@@ -233,11 +251,15 @@ extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged,
         {
             t.Invoked();
             const Json delta = Json::parse(payload, nullptr, false);
-            if (!delta.is_number_integer()) return false;
-            Spike::HostUndoValue() += undo ? -delta.get<int>() : delta.get<int>();
+            const auto bounded = Delta(delta);
+            if (!bounded) return false;
+            Spike::HostUndoValue() += undo ? -*bounded : *bounded;
             return true;
         },
     });
+#if defined(SPIKE_EMPTY_HISTORY_COMMAND) && SPIKE_EMPTY_HISTORY_COMMAND
+    staged.HistoryCommands.push_back({.Name = "spike.empty"});
+#endif
     staged.Windows.push_back({
         .Id = "view.spike",
         .MenuPath = {"View"},

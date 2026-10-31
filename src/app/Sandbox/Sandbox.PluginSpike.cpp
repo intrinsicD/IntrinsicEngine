@@ -3,7 +3,6 @@
 // over is counted per generation, and an image is closed only when none of its callables is alive.
 module;
 
-#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -95,9 +94,9 @@ namespace Extrinsic::Sandbox::Spike
         return value;
     }
 
-    int& HostUndoValue() noexcept
+    std::int64_t& HostUndoValue() noexcept
     {
-        static int value = 0;
+        static std::int64_t value = 0;
         return value;
     }
 
@@ -210,23 +209,20 @@ namespace Extrinsic::Sandbox::Spike
             return copy;
         }
 
-        // The lowest start and highest end of the file's mappings, as hex strings; empty when it is not mapped.
+        // The first start and last end of the file's mappings (the kernel lists them in ascending order), as hex
+        // strings; empty when it is not mapped.
         Json MappedRange(const std::filesystem::path& file)
         {
             std::ifstream maps("/proc/self/maps");
-            std::uintptr_t low = UINTPTR_MAX, high = 0;
+            std::string low{}, high{};
             for (std::string line; std::getline(maps, line);)
             {
                 if (line.find(file.string()) == std::string::npos) continue;
                 const auto dash = line.find('-');
-                low = std::min(low, static_cast<std::uintptr_t>(std::stoull(line.substr(0, dash), nullptr, 16)));
-                high = std::max(high, static_cast<std::uintptr_t>(std::stoull(line.substr(dash + 1), nullptr, 16)));
+                if (low.empty()) low = "0x" + line.substr(0, dash);
+                high = "0x" + line.substr(dash + 1, line.find(' ') - dash - 1);
             }
-            if (high == 0) return Json::array();
-            char text[2][32];
-            std::snprintf(text[0], sizeof text[0], "0x%lx", static_cast<unsigned long>(low));
-            std::snprintf(text[1], sizeof text[1], "0x%lx", static_cast<unsigned long>(high));
-            return Json::array({text[0], text[1]});
+            return low.empty() ? Json::array() : Json::array({low, high});
         }
 
         // Closes an image only when no callable of its generation is alive (otherwise it stays mapped, so no
@@ -345,7 +341,8 @@ namespace Extrinsic::Sandbox::Spike
             using Status = Runtime::EditorCommandHistoryStatus;
             for (auto& command : staged.HistoryCommands)
             {
-                const bool registered = history->RegisterCommand(command.Name,
+                // An empty Apply would pass RegisterCommand inside the host's wrapper and only fail when called.
+                const bool registered = command.Apply && history->RegisterCommand(command.Name,
                     [apply = std::move(command.Apply)](const std::string_view payload, const bool undo)
                     {
                         if (apply(payload, undo)) return undo ? Status::Undone : Status::Applied;
@@ -557,6 +554,7 @@ namespace Extrinsic::Sandbox::Spike
                 {"undo_value", HostUndoValue()},
                 {"live", CountsJson(Live())},
                 {"loaded", g_Plugin ? Json(g_Plugin->Generation) : Json(nullptr)},
+                {"loaded_range", g_Plugin ? MappedRange(g_Plugin->Copy) : Json::array()},
                 {"invoked", CountsJson(Invoked())},
                 {"closes", g_Closes},
             };

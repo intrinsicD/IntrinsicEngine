@@ -1373,3 +1373,32 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
     The dropped-load mutation first went unnoticed: the check read the last close record, which
     was an earlier clean one. It now requires a new record, and the mutation is caught.
+- 2026-10-31: S2b review of `6bca0539a`.
+  - Codex (delta in thread `01a193d9-…`, diff SHA-256 prefix `b32354b0d15cb4d6`): all five earlier
+    findings resolved. The generation stamp, the `callables_alive` deviation (for this spike) and
+    the revised control criterion are accepted. REVISE, with three Musts:
+    1. the counter accepted deltas whose undo overflows (`-INT_MIN`);
+    2. a staged history command with an empty handler passed registration and would terminate
+       when called;
+    3. the closure control skipped the approved sequence (both stacks, then a reload).
+  - Fresh Claude ponytail review: Ship, with lean findings (a comment said three times, a test
+    repeating another, `MappedRange` parsing and printing again, a redundant exception type). All
+    applied.
+  - Fixes:
+    1. deltas are bounded to ±1,000,000 and the host value is 64-bit; out-of-range deltas
+       (2147483648, -1000001) are rejected with value and history unchanged;
+    2. an empty `Apply` fails the commit ("history: command rejected"); build 8 stages a valid
+       and an empty command, and the rollback leaves the baseline with nothing alive;
+    3. the control now runs the approved sequence.
+  - Finding from the full control (run ctl3): reloaded to the same-size build B, the loader mapped B
+    into the range A had just left. Undo of today's closure entry then ran B's code in A's place
+    and produced the expected values without any error. Only the per-generation accounting showed
+    that no handler had run. Value checks alone cannot detect a stale closure; on a reload, today's
+    closure entries silently execute whatever code now sits at their address.
+  - To make the crash case deterministic, the control reloads to a 16 MiB larger build (generation
+    9), which cannot fit the freed range. It asserts that the ranges do not overlap, then undoes:
+    a SEGV inside A's former range with `Undo` on the stack (run ctl4: 15 of 15).
+  - After the fixes, run in both variants: 82 of 82 driver checks; control 15 of 15 (variant b
+    too); S1 58 of 58; 1877 runtime contract tests.
+  - Mutations: the delta bound removed fails the range check and the undo/redo values; the
+    empty-handler guard removed fails every empty-handler check.

@@ -431,8 +431,6 @@ namespace Extrinsic::Runtime
         }
 
         const Core::Config::EngineConfig& candidate = loadResult.Preview.Config;
-        // A preview made before RegisterSection/UnregisterSection would drop, bring back or bypass the current
-        // validator of a section (a plugin reload); unstamped previews count as made at generation 0.
         if (loadResult.SectionRegistryGeneration != m_SectionRegistryGeneration)
         {
             result.LoadResult.Diagnostics.push_back(Core::Config::EngineConfigDiagnostic{
