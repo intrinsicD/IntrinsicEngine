@@ -102,6 +102,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t MaxCallsPerFrame{4};
         std::size_t MaxMessageBytes{8u << 20u};
         std::chrono::milliseconds ProgressInterval{250}; // between progress notifications of one call
+        // Called once after the built-in operations are registered; the registry outlives the module's
+        // users. Only the ARCH-022 plugin-host spike sets it.
+        std::function<void(AgentOperationRegistry&)> RegisterExtraOperations{};
     };
 
     struct AgentServerStatus

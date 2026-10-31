@@ -439,6 +439,7 @@ namespace Extrinsic::Runtime
         m_Impl->Options = std::move(options);
         RegisterEditorAgentOperations(m_Impl->Registry);
         RegisterViewCaptureAgentOperations(m_Impl->Registry);
+        if (m_Impl->Options.RegisterExtraOperations) m_Impl->Options.RegisterExtraOperations(m_Impl->Registry);
         m_Impl->Protocol = std::make_unique<AgentProtocol>(m_Impl->Registry, m_Impl->Options.ReadOnly);
         m_Impl->Protocol->SetProgressInterval(m_Impl->Options.ProgressInterval);
         m_Impl->Status.ReadOnly = m_Impl->Options.ReadOnly;

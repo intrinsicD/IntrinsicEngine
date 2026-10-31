@@ -793,3 +793,39 @@ python3 tools/docs/check_doc_links.py --root . --strict
     not compared.
   - `plugins/` is added to the repository root allowlist (`tools/repo/root_allowlist.yaml`), the
     plugin location the target names (`plugins/<name>/`).
+- 2026-10-31: S1 steps 3 to 5, variant (a): host loader, plugin and driver.
+  - Code:
+    - `AgentServerOptions::RegisterExtraOperations`, a plain optional hook; only the spike sets it.
+    - `Extrinsic.Sandbox.PluginSpike`, in the editor library only with the option: the plugin
+      contract, the identity probes, the lifecycle recorder, the deferred atomic commit with failure
+      injection, and the tools `plugin_load`, `plugin_host_identity` and `app_quit`.
+    - The plugin: config section `spike`, tools `spike_echo` and `spike_identity`, window
+      `view.spike` with a magenta marker.
+    - `plugins/spike/spike_driver.py`.
+  - The tool names follow the repository's snake_case convention, not the plan's dotted names.
+  - Driver run 2 (`tasks/evidence/ARCH-022/spike-s1/run2/summary.json`): 41 of 46 checks passed.
+    - Yes:
+      - the plugin loads into the running Sandbox;
+      - an injected failure at each of the 7 stages leaves tools, config sections and windows
+        unchanged;
+      - the counter, inline static and thread-local have one address, and the plugin's mutations
+        are seen by the host;
+      - the ImGui context, allocator and user data and the ImPlot context are the host's;
+      - `spike_echo` answers over MCP;
+      - the config section is visible with schema and default 8;
+      - the window draws its 64×64 marker exactly;
+      - the lifecycle events come in order, with no repeated static init or destruction.
+    - No, finding 1 (late config registration): `config_apply` accepts 12, but `OnChanged` runs only
+      when the active config holds the section before and after the change
+      (`Runtime.EngineConfigControl.cpp`). A section registered after boot is not in the active
+      config, so the first change never reaches the plugin. That is 3 of the failed checks: the
+      callback, the redrawn marker, and the `config_changed` event. Recorded, not fixed (plan).
+    - No, finding 2 (host exit): the Sandbox ends with status 1 and a LeakSanitizer report (116,642
+      bytes in 24 allocations, from the graphics driver, X11 and dbus), identically without the
+      plugin. The plan's "ASan clean at exit" cannot hold for this host. The driver adds a session
+      without the plugin and asserts the same status and no report beyond it; both pass.
+  - Symbols:
+    - the plugin defines 2 strong symbols (its entry points), the ASan section bounds and 813 weak
+      vague-linkage symbols, so the allowlist is by kind (only entry points and ASan bounds strong),
+      not by name;
+    - with the option off, the Sandbox builds and exports 3,217 dynamic symbols (173,917 with it).

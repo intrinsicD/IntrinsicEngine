@@ -34,6 +34,13 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             imguizmo_lib
             implot::implot
     )
+    if(INTRINSIC_PLUGIN_SPIKE)
+        # ARCH-022 spike: the plugin contract and loader (Sandbox.PluginSpike).
+        target_sources(ExtrinsicSandboxEditor
+                PUBLIC FILE_SET CXX_MODULES FILES Sandbox.PluginSpike.cppm
+                PRIVATE Sandbox.PluginSpike.cpp)
+        target_link_libraries(ExtrinsicSandboxEditor PRIVATE nlohmann_json::nlohmann_json ${CMAKE_DL_LIBS})
+    endif()
 endif()
 
 if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
@@ -63,5 +70,6 @@ if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     if(INTRINSIC_PLUGIN_SPIKE)
         # ARCH-022 spike, variant (a): the static engine's symbols are exported for dlopen'ed plugins.
         set_target_properties(ExtrinsicSandbox PROPERTIES ENABLE_EXPORTS ON)
+        target_compile_definitions(ExtrinsicSandbox PRIVATE INTRINSIC_PLUGIN_SPIKE=1)
     endif()
 endif()

@@ -38,6 +38,10 @@ import Extrinsic.Runtime.ViewCapture;
 
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
+#if defined(INTRINSIC_PLUGIN_SPIKE)
+import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Sandbox.PluginSpike;
+#endif
 
 namespace
 {
@@ -454,7 +458,14 @@ int main(int argc, char** argv)
     }
 
     if (cli.Agent)
-        engine.AddModule(std::make_unique<Extrinsic::Runtime::AgentServerModule>(*cli.Agent));
+    {
+        auto agentOptions = *cli.Agent;
+#if defined(INTRINSIC_PLUGIN_SPIKE)
+        agentOptions.RegisterExtraOperations = [&engine](Extrinsic::Runtime::AgentOperationRegistry& registry)
+        { Extrinsic::Sandbox::Spike::RegisterHostOperations(registry, engine); };
+#endif
+        engine.AddModule(std::make_unique<Extrinsic::Runtime::AgentServerModule>(std::move(agentOptions)));
+    }
     engine.AddModule(std::move(configControl));
     engine.AddModule(std::move(physicsModule));
     engine.EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
