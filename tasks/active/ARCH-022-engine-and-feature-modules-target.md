@@ -72,6 +72,9 @@ contract_review: tracker only; each slice declares its own contracts
     R7 under 4 ms; next a CI time breakdown (1), then a measured linker comparison (2), then slice 2
     (3))
 47. (2026-10-31) "Du darfst lld installieren. Ich bin gerade nicht an dem Rechner."
+48. (2026-10-31) "Für 2. würde ich auch die Konzert nehmen" (read as "Jobzeit", agreeing with the
+    recommendation: the CI target means the `full-cpu` job time; this reading was stated back to
+    the operator)
 
 ## Goal
 - Reach the target in
@@ -583,3 +586,23 @@ python3 tools/docs/check_doc_links.py --root . --strict
     compares them and refuses inconsistent arms (self-check with mutations).
   - Technical test (all four runs with two samples each, numbers not read): every run exited 0,
     every sample had its arm's linker, and the report rendered, so its consistency gates held.
+- 2026-10-31: Operator (Q48): the 15-minute CI target means the job time (as read back to the
+  operator); the target table says so.
+- 2026-10-31: Linker pre-flight rounds 1 and 2 on `96d8dc7b…dc60f`: Claude REVISE, Codex REVISE.
+  - Both: arm equivalence was not enforced where the arms could differ: link commands, CMake
+    cache, dependencies, executed compile edges, and binding of each run to the reviewed manifest
+    and runner. Codex also: sealed contents unchecked, and the R6 Layer A was outside the manifest.
+    Claude also: the rule looked at wall time only.
+  - Layer B overstated the report's link-command check and misstated the baseline spread (0.6 s on
+    the config interface, not 0.3 s).
+  - Revision 2:
+    - the report gates all of the above;
+    - the decision also needs a link-step saving of at least 2 s, a non-link difference under 1 s,
+      and no flagged edit measurement;
+    - the run order is balanced (bfd, lld, lld, bfd);
+    - the chain records both linkers' identities, and the runner records the binary size;
+    - the dead gold filter is removed;
+    - every new gate is mutation-checked.
+  - Technical test of revision 2 (all four runs with two samples each, numbers not read): every run
+    exited 0, every sample had its arm's linker and a recorded binary size, `linkers.txt` names
+    `ld.bfd` 2.38 and LLD 24.0.0, and the report rendered, so every arm-equivalence gate held.

@@ -81,9 +81,9 @@ def check_source(source: Path, probes: dict[str, bytes], revision: str | None = 
 
 
 def linker_lines(comment: str) -> list[str]:
-    """The `.comment` lines a linker leaves in an ELF binary (lld and mold write one; GNU ld writes none)."""
+    """The `.comment` lines a linker leaves in an ELF binary (lld and mold write one; GNU ld and gold write none)."""
     return [line.split("]", 1)[1].strip() for line in comment.splitlines()
-            if "]" in line and any(name in line for name in ("Linker:", "LLD", "mold", "GNU gold"))]
+            if "]" in line and any(name in line for name in ("Linker:", "LLD", "mold"))]
 
 
 def check_linker(link_command: str, comment: str, params: dict) -> list[str]:
@@ -373,7 +373,8 @@ def main() -> None:
             comment = subprocess.run(["readelf", "-p", ".comment", str(build / params["target_binary"])], cwd=source,
                                      check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
             linker = {"comment_lines": check_linker(link_command, comment, params),
-                      "link_command_sha256": hashlib.sha256(link_command.encode()).hexdigest()}
+                      "link_command_sha256": hashlib.sha256(link_command.encode()).hexdigest(),
+                      "binary_bytes": (build / params["target_binary"]).stat().st_size}
         raw = {"benchmark_id": manifest["benchmark_id"], "method": manifest["method"],
                "dataset": manifest["dataset"], "backend": "external_baseline", "commit": revision,
                "status": "passed", "metrics": {name: value for name, value in {"build_time_ms": timings,
