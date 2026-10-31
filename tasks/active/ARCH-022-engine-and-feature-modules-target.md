@@ -618,3 +618,23 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - Each new check is mutation-checked.
   - Technical test of revision 3 (four runs, two samples each, numbers not read): every run exited
     0, `linkers.txt` complete, and the report rendered.
+- 2026-10-31: Linker comparison: both reviewers PASS on `e758d333…48156`.
+  - The start gate matched the live digest, after green CI on the measured runner. Records are in
+    `tasks/evidence/ARCH-022/preflight-ld/reviews/`.
+  - The four runs (bfd, lld, lld, bfd) all exited 0, and every report gate held.
+  - Audit: the coordinator recomputed every summary from the raw outputs; it agrees.
+  - Result ([report](../../docs/reports/2026-10-31-arch-022-linker-comparison.md)): lld links the
+    Sandbox in 0.84 s instead of 12.7 s. The rebuilds after one edit fall from 18.9 to 7.1 s
+    (operation unit), from 18.6 to 6.7 s (geometry interface) and from 48.8 to 36.7 s (plugin
+    config interface). The non-link time is unchanged (at most 0.19 s apart), and no measurement
+    was flagged.
+  - The frozen rule says lld is a candidate default for dev builds. Adoption is a separate change
+    with its own tests (the CPU suite linked with lld, the Sandbox started, packaged lld).
+  - Surprise: the lld link (predicted 1–4 s) and the lld geometry rebuild (predicted 7–11 s) were
+    faster than predicted.
+  - Against the R6 target (plugin edits):
+    - With lld, the plugin's operation-unit edit meets it.
+    - The plugin config interface does not; its serial module chain is R1's problem.
+    - The geometry edit is a core-library edit; it is also under 10 s.
+  - Claims check of the report by a separate agent: changes required (clean-build drift 0.41 s, the
+    geometry edit is not a plugin edit, a held prediction missing, where the records are); applied.
