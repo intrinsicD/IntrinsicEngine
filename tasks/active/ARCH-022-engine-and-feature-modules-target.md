@@ -879,3 +879,10 @@ python3 tools/docs/check_doc_links.py --root . --strict
       was not told of that change.
     - Finding 2 (2 failures): status 1 and the NVIDIA driver's 240 bytes. No other sanitizer line, and
       no leak frame in the spike code.
+- 2026-10-31: S1 review, second delta (Codex): CHANGES REQUIRED.
+  - A failed registry read could pass as unchanged, and the section listing's `schema_id` and
+    `schema_version` had dropped out of the comparison.
+  - Fixed: every registry read must succeed or the session fails, and each section keeps its
+    listing entry next to its `config_get`.
+  - Driver run 8 (`tasks/evidence/ARCH-022/spike-s1/run8/summary.json`): 54 of 60 passed. The same
+    two findings remain.

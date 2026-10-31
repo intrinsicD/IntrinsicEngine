@@ -156,17 +156,18 @@ def expect_square(agent: Agent, checks: Checks, name: str, side: int) -> None:
 
 
 def registries(agent: Agent) -> dict:
-    """What a load may change, by content: tool specs, each config section's config_get, windows and their state."""
-    _, listing, _, _ = agent.call("config_sections")
-    names = [entry["section"] for entry in listing.get("sections", [])] if isinstance(listing, dict) else []
-    sections = {}
-    for name in names:
-        ok, section, _, _ = agent.call("config_get", {"section": name})
-        sections[name] = section if ok else {"error": section}
-    _, identity, _, _ = agent.call("plugin_host_identity")
+    """What a load may change, by content: tool specs, each config section (its listing entry and its config_get),
+    windows and their state. A failed read raises, so a comparison never rests on error replies."""
+    def read(name: str, arguments: dict | None = None) -> dict:
+        ok, value, _, _ = agent.call(name, arguments)
+        if not ok or not isinstance(value, dict):
+            raise RuntimeError(f"registry read {name} {arguments or ''} failed: {value}")
+        return value
+
+    sections = {entry["section"]: {"listing": entry, "get": read("config_get", {"section": entry["section"]})}
+                for entry in read("config_sections").get("sections", [])}
     tools = sorted(agent.request("tools/list", {}).get("result", {}).get("tools", []), key=lambda t: t["name"])
-    return {"tools": tools, "sections": sections,
-            "windows": identity.get("windows", []) if isinstance(identity, dict) else identity}
+    return {"tools": tools, "sections": sections, "windows": read("plugin_host_identity").get("windows", [])}
 
 
 def find(value: object, key: str) -> object:
@@ -301,7 +302,7 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> None:
     ok, echo, _, _ = agent.call("spike_echo", {"text": "hello"})
     checks.check("mcp: spike_echo answers", ok and echo == {"echo": {"text": "hello"}}, echo)
 
-    section = after["sections"].get("spike", {})
+    section = after["sections"].get("spike", {}).get("get", {})
     checks.check("config: schema declares marker_size as an integer in [1, 64]",
                  section.get("schema", {}).get("properties", {}).get("marker_size")
                  == {"type": "integer", "minimum": 1, "maximum": 64}, section)
