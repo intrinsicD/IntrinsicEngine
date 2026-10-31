@@ -201,7 +201,9 @@ section is active at once and the first apply reaches its callback with the
 default as previous. It invokes no callback. `UnregisterSection` removes the
 registration and the section from both. Both run on the main thread and fail
 without change when the control is unbound, for a duplicate, an already present
-or an unknown name, and when called from a callback during apply. A section in
+or an unknown name, and when called from a callback during apply. Apply rejects
+a preview made before a registration change, since it would drop or bring back
+a section; preview again. A section in
 the boot document whose registration arrives later is discarded at boot and
 starts from its default.
 

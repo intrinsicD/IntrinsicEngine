@@ -1008,19 +1008,12 @@ namespace Extrinsic::Core::Config
 
     bool EngineConfigSectionRegistry::Unregister(const std::string_view name)
     {
-        const auto it = std::find_if(
-            m_Entries.begin(),
-            m_Entries.end(),
-            [name](const EngineConfigSectionRegistration& entry)
-            {
-                return entry.DefaultSection.Name == name;
-            });
-        if (it == m_Entries.end())
-        {
-            return false;
-        }
-        m_Entries.erase(it);
-        return true;
+        return std::erase_if(
+                   m_Entries,
+                   [name](const EngineConfigSectionRegistration& entry)
+                   {
+                       return entry.DefaultSection.Name == name;
+                   }) != 0u;
     }
 
     const EngineConfigSectionRegistration* EngineConfigSectionRegistry::Find(

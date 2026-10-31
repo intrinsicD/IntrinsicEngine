@@ -78,8 +78,6 @@ namespace Extrinsic::Runtime
         explicit EngineConfigControl(
             RuntimeEngineConfigSectionRegistry sectionRegistry);
 
-        [[nodiscard]] RuntimeEngineConfigSectionRegistry&
-        SectionRegistry() noexcept;
         [[nodiscard]] const RuntimeEngineConfigSectionRegistry&
         SectionRegistry() const noexcept;
         // Registration after boot: the section's canonical default joins both config views

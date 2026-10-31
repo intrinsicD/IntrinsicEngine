@@ -1063,3 +1063,28 @@ python3 tools/docs/check_doc_links.py --root . --strict
     change to 12 (the image shows a scrollbar). The window now auto-resizes. Runs 13 (variant
     a) and b4 (variant b), both linked with lld: 60 of 60 checks each. S1 has no open finding
     left.
+  - Code review of `dec3be1b5`:
+    - Codex (fresh session `01a19362-8a98-7ec3-a804-68ff22d5899d`, diff SHA-256 prefix
+      `ff2c012fbeb4c892`): REVISE with two Musts and one Should:
+      1. `UnregisterSection` given a name owned by the registry erased the next section from the
+         config;
+      2. a preview held across a registration change dropped or brought back a section on apply;
+      3. nested dispatch lacked a test.
+    - Fresh Claude ponytail review: Ship, with lean findings:
+      - the non-const `SectionRegistry()` still let callers register without either view or the
+        guard;
+      - the spike's `replace` stage now equals `windows`;
+      - a 16-line `Unregister`;
+      - a `HINTS` line that never changes the result;
+      - two unused includes.
+  - Fixes, each with a regression test that failed before it and a mutation that fails it after:
+    - the name is copied before the registry erases its storage;
+    - apply rejects a preview whose sections no longer match the registry (diagnostic: preview
+      again);
+    - the nested apply keeps the outer guard;
+    - the non-const `SectionRegistry()` is deleted (every other caller only reads);
+    - the `replace` stage is gone, and the driver has 58 checks;
+    - the lean findings are applied.
+  - After the fixes (`build/spike`, lld): 1873 runtime contract and 292 Sandbox editor integration
+    tests pass. The spike driver passes 58 of 58 in both variants (runs 15 and b6); its lifecycle
+    check now derives the expected `register` count from the failure stages.

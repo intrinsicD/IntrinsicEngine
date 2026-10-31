@@ -104,7 +104,6 @@ namespace Extrinsic::Sandbox::Spike
             }
             if (failAt == "windows") return rollback("windows: injected failure after the windows");
 
-            if (failAt == "replace") return rollback("replace: injected failure before the operation registry is replaced");
             *g_Operations = std::move(operationsCopy);
             return std::nullopt;
         }

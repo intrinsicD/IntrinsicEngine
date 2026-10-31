@@ -794,12 +794,13 @@ TEST(RuntimeConfigControl,
 
 TEST(RuntimeConfigControl, RejectedSectionRegistrationChangesNothing)
 {
-    Runtime::EngineConfigControl unbound{};
+    CoreConfig::EngineConfigSectionRegistry bootSections{};
+    ASSERT_TRUE(bootSections.Register(
+        MakeTestSectionRegistration("boot", R"json({"value":0})json")));
+    Runtime::EngineConfigControl unbound{std::move(bootSections)};
     EXPECT_FALSE(unbound.RegisterSection(
         MakeTestSectionRegistration("late", R"json({"value":0})json")));
     EXPECT_EQ(unbound.SectionRegistry().Find("late"), nullptr);
-    ASSERT_TRUE(unbound.SectionRegistry().Register(
-        MakeTestSectionRegistration("boot", R"json({"value":0})json")));
     EXPECT_FALSE(unbound.UnregisterSection("boot"));
     EXPECT_NE(unbound.SectionRegistry().Find("boot"), nullptr);
 
@@ -875,6 +876,118 @@ TEST(RuntimeConfigControl, SectionRegistrationIsRejectedDuringChangeDispatch)
     EXPECT_NE(configControl->SectionRegistry().Find("late"), nullptr);
     EXPECT_TRUE(configControl->RegisterSection(
         MakeTestSectionRegistration("other", R"json({"value":0})json")));
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeConfigControl, NestedApplyKeepsTheOuterDispatchGuard)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
+    engine.Initialize();
+    Runtime::EngineConfigControl* configControl =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControl, nullptr);
+
+    ASSERT_TRUE(configControl->RegisterSection(
+        MakeTestSectionRegistration("inner", R"json({"value":0})json")));
+    std::vector<bool> attempts{};
+    ASSERT_TRUE(configControl->RegisterSection(MakeTestSectionRegistration(
+        "outer",
+        R"json({"value":0})json",
+        [&](const CoreConfig::EngineConfigSection&,
+            const CoreConfig::EngineConfigSection&)
+        {
+            attempts.push_back(ApplySectionPayload(
+                                   *configControl,
+                                   engine.GetEngineConfig(),
+                                   "inner",
+                                   R"json({"value":1})json")
+                                   .Succeeded());
+            attempts.push_back(configControl->RegisterSection(
+                MakeTestSectionRegistration("other", R"json({"value":0})json")));
+            attempts.push_back(configControl->UnregisterSection("outer"));
+        })));
+    ASSERT_EQ(ApplySectionPayload(*configControl,
+                                  engine.GetEngineConfig(),
+                                  "outer",
+                                  R"json({"value":1})json")
+                  .Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Applied);
+    EXPECT_EQ(attempts, (std::vector<bool>{true, false, false}));
+    EXPECT_EQ(configControl->SectionRegistry().Find("other"), nullptr);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeConfigControl, UnregisterSectionAcceptsANameOwnedByTheRegistry)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
+    engine.Initialize();
+    Runtime::EngineConfigControl* configControl =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControl, nullptr);
+    ASSERT_TRUE(configControl->RegisterSection(
+        MakeTestSectionRegistration("alpha", R"json({"value":0})json")));
+    ASSERT_TRUE(configControl->RegisterSection(
+        MakeTestSectionRegistration("bravo", R"json({"value":0})json")));
+
+    ASSERT_TRUE(configControl->UnregisterSection(
+        configControl->SectionRegistry().Find("alpha")->DefaultSection.Name));
+    EXPECT_EQ(configControl->SectionRegistry().Find("alpha"), nullptr);
+    EXPECT_NE(configControl->SectionRegistry().Find("bravo"), nullptr);
+    for (const CoreConfig::EngineConfig* view :
+         {&engine.GetEngineConfig(),
+          &configControl->GetEngineConfigControlState().ActiveConfig})
+    {
+        EXPECT_EQ(SectionPayload(*view, "alpha"), nullptr);
+        EXPECT_NE(SectionPayload(*view, "bravo"), nullptr);
+    }
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeConfigControl, PreviewFromBeforeARegistrationChangeIsRejected)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
+    engine.Initialize();
+    Runtime::EngineConfigControl* configControl =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControl, nullptr);
+    const auto previewProfilingToggle = [&]
+    {
+        CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
+        candidate.Render.EnableGpuProfiling = !candidate.Render.EnableGpuProfiling;
+        return configControl->PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate), "held-preview.json");
+    };
+
+    // Held across a registration: applying it would drop the new section.
+    const CoreConfig::EngineConfigLoadResult beforeRegister = previewProfilingToggle();
+    ASSERT_TRUE(configControl->RegisterSection(
+        MakeTestSectionRegistration("late", R"json({"value":0})json")));
+    EXPECT_EQ(configControl->ApplyEngineConfigHotSubset(beforeRegister).Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Rejected);
+
+    // Held across an unregistration: applying it would bring the section back.
+    const CoreConfig::EngineConfigLoadResult beforeUnregister = previewProfilingToggle();
+    ASSERT_TRUE(configControl->UnregisterSection("late"));
+    EXPECT_EQ(configControl->ApplyEngineConfigHotSubset(beforeUnregister).Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Rejected);
+
+    for (const CoreConfig::EngineConfig* view :
+         {&engine.GetEngineConfig(),
+          &configControl->GetEngineConfigControlState().ActiveConfig})
+    {
+        EXPECT_EQ(SectionPayload(*view, "late"), nullptr);
+    }
+    EXPECT_EQ(configControl->ApplyEngineConfigHotSubset(previewProfilingToggle()).Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Applied);
 
     engine.Shutdown();
 }

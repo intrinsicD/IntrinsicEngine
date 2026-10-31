@@ -406,8 +406,7 @@ option(INTRINSIC_USE_LLD "Link with lld when it is installed; otherwise the defa
 if(INTRINSIC_USE_LLD)
     string(REGEX MATCH "^[0-9]+" _intrinsic_clang_major "${CMAKE_CXX_COMPILER_VERSION}")
     # ld.lld-24: the apt sources offer no lld-23 for the clang 23 toolchain.
-    find_program(INTRINSIC_LLD NAMES ld.lld-${_intrinsic_clang_major} ld.lld-24 ld.lld
-                 HINTS /usr/lib/llvm-${_intrinsic_clang_major}/bin)
+    find_program(INTRINSIC_LLD NAMES ld.lld-${_intrinsic_clang_major} ld.lld-24 ld.lld)
     if(INTRINSIC_LLD)
         list(APPEND INTRINSIC_LINK_FLAGS --ld-path=${INTRINSIC_LLD})
         message(STATUS "Linker: lld (${INTRINSIC_LLD})")

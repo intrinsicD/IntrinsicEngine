@@ -41,8 +41,7 @@ from PIL import Image
 REPO = Path(__file__).resolve().parents[2]
 # Expected error code per injected stage; commit stages must also name the stage in their message.
 FAIL_STAGES = {"dlopen": "dlopen_failed", "dlsym": "dlsym_failed", "register": "register_failed",
-               "config": "commit_failed", "operations": "commit_failed", "windows": "commit_failed",
-               "replace": "commit_failed"}
+               "config": "commit_failed", "operations": "commit_failed", "windows": "commit_failed"}
 MAGENTA = (255, 0, 255)
 # A sanitizer frame in any of these is the spike's own code.
 SPIKE_FRAMES = ("libIntrinsicSpikePlugin", "Sandbox.PluginSpike", "SpikePlugin.cpp", "Extrinsic::Sandbox::Spike")
@@ -249,8 +248,10 @@ def main() -> int:
     spike = [r for r in records if any(m in r for m in SPIKE_FRAMES)]
     checks.check("exit: no leak record has a frame in the plugin or the spike host code", not spike, spike[:2])
     lines = events.read_text().splitlines() if events.exists() else []
-    expected = ["static_construct"] + ["register"] * 5 + ["commit", "first_draw", "config_changed", "shutdown",
-                                                            "static_destruct"]
+    # Register runs once per load that reaches the commit: each commit-stage failure, then the successful load.
+    registers = sum(code == "commit_failed" for code in FAIL_STAGES.values()) + 1
+    expected = ["static_construct"] + ["register"] * registers + ["commit", "first_draw", "config_changed", "shutdown",
+                                                                   "static_destruct"]
     checks.check("lifecycle: events once each in order (Register once per staged attempt)", lines == expected, lines)
     return finish(checks, out)
 

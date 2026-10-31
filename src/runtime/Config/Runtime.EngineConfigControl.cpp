@@ -152,6 +152,37 @@ namespace Extrinsic::Runtime
                                       "camera.controller");
             return fields;
         }
+
+        // False for a preview made before RegisterSection/UnregisterSection: it lacks a registered
+        // section (or holds it under another schema), or holds one unregistered since.
+        [[nodiscard]] bool SectionsMatchRegistry(
+            const std::vector<Core::Config::EngineConfigSection>& candidate,
+            const std::vector<Core::Config::EngineConfigSection>& live,
+            const RuntimeEngineConfigSectionRegistry& registry)
+        {
+            for (const RuntimeEngineConfigSectionRegistration& registration :
+                 registry.Entries())
+            {
+                const Core::Config::EngineConfigSection& expected =
+                    registration.DefaultSection;
+                const Core::Config::EngineConfigSection* section =
+                    Core::Config::FindEngineConfigSection(candidate, expected.Name);
+                if (section == nullptr || section->SchemaId != expected.SchemaId ||
+                    section->SchemaVersion != expected.SchemaVersion)
+                {
+                    return false;
+                }
+            }
+            return std::all_of(
+                candidate.begin(),
+                candidate.end(),
+                [&](const Core::Config::EngineConfigSection& section)
+                {
+                    return registry.Find(section.Name) != nullptr ||
+                        Core::Config::FindEngineConfigSection(live, section.Name) !=
+                            nullptr;
+                });
+        }
     }
 
     bool RuntimeEngineConfigApplyResult::SectionChanged(
@@ -167,12 +198,6 @@ namespace Extrinsic::Runtime
         RuntimeEngineConfigSectionRegistry sectionRegistry)
         : m_SectionRegistry(std::move(sectionRegistry))
     {
-    }
-
-    RuntimeEngineConfigSectionRegistry&
-    EngineConfigControl::SectionRegistry() noexcept
-    {
-        return m_SectionRegistry;
     }
 
     const RuntimeEngineConfigSectionRegistry&
@@ -202,17 +227,19 @@ namespace Extrinsic::Runtime
 
     bool EngineConfigControl::UnregisterSection(const std::string_view name)
     {
+        // Owned: `name` may view the registration that Unregister destroys.
+        const std::string owned{name};
         Core::Config::EngineConfig* config = MutableConfig();
         if (config == nullptr || m_DispatchingSectionChanges ||
-            !m_SectionRegistry.Unregister(name))
+            !m_SectionRegistry.Unregister(owned))
         {
             return false;
         }
         std::erase_if(
             config->AppSections,
-            [name](const Core::Config::EngineConfigSection& section)
+            [&owned](const Core::Config::EngineConfigSection& section)
             {
-                return section.Name == name;
+                return section.Name == owned;
             });
         m_ConfigControlState.ActiveConfig = *config;
         return true;
@@ -429,6 +456,20 @@ namespace Extrinsic::Runtime
         }
 
         const Core::Config::EngineConfig& candidate = loadResult.Preview.Config;
+        if (!SectionsMatchRegistry(
+                candidate.AppSections,
+                config->AppSections,
+                m_SectionRegistry))
+        {
+            result.LoadResult.Diagnostics.push_back(Core::Config::EngineConfigDiagnostic{
+                .Code = Core::Config::EngineConfigDiagnosticCode::InvalidSchema,
+                .Subject = "app.sections",
+                .Message = "The preview predates a config section registration change; preview again.",
+            });
+            result.Status = RuntimeEngineConfigApplyStatus::Rejected;
+            RecordConfigApply(result);
+            return result;
+        }
         result.RejectedBootOnlyFields =
             FindBootOnlyEngineConfigDifferences(*config, candidate);
         if (!result.RejectedBootOnlyFields.empty())
