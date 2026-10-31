@@ -67,6 +67,10 @@ contract_review: tracker only; each slice declares its own contracts
 44. "Ja bitte, slice 1"
 45. "ok then Option 1" (the R6 timing baselines measure the workload the plan names: build tree on
     disk, one clean build, real edits, default parallelism, ccache as configured)
+46. (2026-10-31) "Ja bitte dann mach 1 und 2. danach gehen wir 3. an" (yes to the proposed targets:
+    R4 under 10 s, R6 Sandbox rebuilt after one plugin edit in under 10 s and CI median under 15 min,
+    R7 under 4 ms; next a CI time breakdown (1), then a measured linker comparison (2), then slice 2
+    (3))
 
 ## Goal
 - Reach the target in
@@ -546,3 +550,22 @@ python3 tools/docs/check_doc_links.py --root . --strict
     technical-test clean build is recorded in the packet. The config edit's chain runs through the
     runtime's `PointAnalysisOperations` interface into a Sandbox editor panel.
   - Slice 1 output is complete; the numeric R4, R6 and R7 targets are the operator's.
+- 2026-10-31: Operator (Q46) set the R4, R6 and R7 targets as proposed (target table updated) and
+  chose the order: a CI time breakdown, then a measured linker comparison, then slice 2. The linker
+  comparison needs lld: the agent cannot install packages (sudo needs a password); apt.llvm.org now
+  offers `lld-24` (the `clang-23` in use is an older snapshot); `ld.gold` is already installed.
+- 2026-10-31: Step 1 of Q46, the CI time breakdown
+  ([report](../../docs/reports/2026-10-31-arch-022-ci-breakdown.md)), over the R6 baseline's 20 green
+  push runs, from GitHub's step timings (an analysis of logged data, no run).
+  - On a push, `ci-linux-clang` runs only `full-cpu` (`ci-docs` runs in parallel, median 4.2 min).
+  - Job median 38.2 min: the cold build is 32.1 min (84 %), the tests 4.4 min (12 %).
+  - Every push builds without a compiler cache. The measured CI-007 ccache policy exists, but only
+    in `pr-fast.yml`, which never runs on a push.
+  - 8 of 20 runs first waited 6.5 to 34.2 min for the previous run (the concurrency group); there
+    was no runner queueing.
+  - Build times fall into two groups (17.6–27.1 and 30.4–35.2 min); the cause is unknown.
+  - Claims check by a separate agent: changes required (ci-docs also runs on push; image and step
+    count only from two logs; the no-cache claim rests on the workflow; script scope; lever wording),
+    applied, then approved. The target's R6 cell links the breakdown.
+  - Open for the operator: whether the 15-minute target means job time or run time including the
+    wait.
