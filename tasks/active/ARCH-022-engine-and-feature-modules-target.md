@@ -245,6 +245,129 @@ not runs.
   boundary, link variant and history-entry form, for the operator to decide. The spike code then
   either becomes the start of slice 3 or is deleted.
 
+**Slice 2, S1 implementation plan (revision 4, 2026-10-31, after Codex plan review `plan022s1`).**
+Serves Q36 (plugins that register themselves, run-time compilation, full MCP) through R3, R4 and R5.
+Smallest end-to-end slice: one plugin loaded once into the running Sandbox. Reload (S2) and the job form
+(S3) come after.
+- **Facts it rests on** (read 2026-10-31):
+  - Everything links statically; there is no shared library, `-fPIC`, `-rdynamic` or dlopen code.
+  - Registration is by hand-written lists. `EditorUiHost::RegisterWindow` / `UnregisterWindow`
+    can unregister; the config-section registry and `AgentOperationRegistry` cannot. The
+    agent registry is exposed read-only, and `Register` grows the vector whose `std::function`s
+    dispatch runs.
+  - ImGui and ImPlot are static archives inside the executable.
+  - A toy check (clang 23, ASan and UBSan) showed: a `-fPIC` shared object built against non-PIC module
+    BMIs loads into a `-rdynamic` host, and a host function-local static and an inline-function
+    static have one address on both sides. This does not show that CMake can do the same.
+- **Toolchain and ABI, fixed for the spike.**
+  - CMake 4.3.2, Ninja, `/bin/clang++-23` with libstdc++, preset `dev`. The plugin gets the host's
+    effective compile and link flags: `-fno-rtti`, `-fno-exceptions`, `-fsanitize=address,undefined`.
+  - The entry point is `extern "C"` and `noexcept`; nothing throws across it.
+  - The host executable supplies the sanitizer runtimes; the plugin links none.
+  - UBSan's vptr check is off with `-fno-rtti`, so UBSan cleanliness says nothing about vptr
+    correctness.
+- **Step 1, containment.**
+  - `option(INTRINSIC_PLUGIN_SPIKE OFF)`; with it on, `plugins/spike/` is added and `ExtrinsicSandbox`
+    gets `ENABLE_EXPORTS` (variant (a)).
+  - Check: in a configured build with the option off (`build/dev`), `ninja -t targets all` lists no
+    spike target and `ctest -N` no spike test. This runs in the spike driver; it is not in CI.
+- **Step 2, the plugin target, the build recipe first.**
+  - `IntrinsicSpikePlugin` is a `MODULE` library with `POSITION_INDEPENDENT_CODE`, linking no engine
+    archive and no ImGui.
+  - Its first question is whether `$<COMPILE_ONLY:ExtrinsicSandboxEditor>` carries the module sets
+    (`CXX_MODULE_SETS`) so the plugin compiles against the host's BMIs. `COMPILE_ONLY` promises
+    compile requirements, not BMI reuse, so this is tested, not assumed.
+  - Named fallback: module scanning off for the plugin, with explicit `-fmodule-file=` flags taken
+    from the host's `.modmap` files.
+  - Checks:
+    - building only the plugin after the host runs only plugin build actions (Ninja's log window);
+    - host outputs and BMIs are byte-identical before and after;
+    - `nm` of the `.so` defines only names on a narrow allowlist: the plugin's own names plus the
+      vague-linkage instantiations listed by name.
+- **Step 3, the host side.** Spike-only, compiled only with the option.
+  - `Sandbox.PluginSpike.cpp` loads with `dlopen(RTLD_NOW | RTLD_LOCAL)` and resolves
+    `intrinsic_plugin_register_v0`.
+  - It passes a plain `PluginHostContext`: `EditorUiHost` (`RegisterWindow`) for windows, the config-section registry,
+    mutable access to the `AgentOperationRegistry` (added under the option), and the ImGui context.
+  - Registration is staged. The plugin fills a staging list; the host commits it after the MCP
+    dispatch that asked for the load has returned (on the next frame). The vector holding the
+    running callback therefore never grows during that call.
+  - The commit is atomic by construction:
+    1. the original config-section and agent-operation registries are kept;
+    2. the staged entries are added to copies of both, and the copies are validated;
+    3. the staged windows are registered, and each window that registered is remembered;
+    4. the two copies replace their registries.
+
+    Any failure in steps 2 to 4, including an injected one between the two replacements, restores
+    both registries from the kept originals and unregisters every window remembered in step 3. A
+    window whose registration failed has no handle and needs none. The originals are dropped only
+    after step 4 succeeded.
+  - Every failure (`dlopen`, `dlsym`, `Register`, a commit stage) returns a reason, with the
+    registries unchanged. A spike-only switch injects a failure after each stage, and each case is
+    asserted.
+  - The library stays loaded until the process exits. In S1 nothing calls `dlclose`, so no stored
+    callback can outlive its code.
+  - MCP tools: `plugin.load` (deferred as above), `plugin.host_identity`, and `app.quit` (for a
+    graceful exit), if none exists.
+- **Step 4, the plugin.** It registers:
+  - a config section `spike`, after boot;
+  - MCP tools `spike.echo` and `spike.identity`;
+  - a window `view.spike` that draws a fixed-colour rectangle as a pixel marker.
+
+  Identity is shown by state, not only by pointers. Through imported host code the plugin mutates:
+  - a host counter;
+  - a host inline static;
+  - a host `thread_local`, on the main thread.
+
+  The host then reads the values back. The plugin also reports, and the driver compares with the
+  host:
+  - its ImGui context;
+  - its ImGui allocator functions and user data;
+  - its ImPlot context.
+
+  Lifecycle: an `extern "C"` recorder exported by the executable, `spike_lifecycle_event(const char*)`,
+  is usable before `dlopen` and through process teardown, because it holds no host state. Each call
+  opens the driver-owned log file (path from an environment variable), appends one line and closes it.
+  The plugin records, in order:
+  1. its static construction (during `dlopen`);
+  2. `Register`;
+  3. the commit;
+  4. the first draw;
+  5. the shutdown hook `intrinsic_plugin_shutdown_v0`, which the host calls on `app.quit` before
+     the engine's teardown;
+  6. its static destruction (at process exit).
+- **Step 5, the driver and the pass assertions**, written before the first run.
+  - Environment: an X display (`DISPLAY`, checked first), the promoted Vulkan path with a working
+    device (checked through the existing diagnostics tool), and an isolated agent socket and config
+    directory. A readiness deadline applies to every wait, and the driver ends with `app.quit`.
+  - Assertions:
+    - the plugin loads;
+    - every identity and state check matches;
+    - `spike.echo` answers over MCP;
+    - the config section `spike` (one field, `marker_size`, default 8) is visible after the load,
+      with schema and default. A change to 12 through the existing config-apply path results in an
+      active value of 12, the plugin's change callback is called exactly once, and the marker is
+      drawn at 12;
+    - the explicitly opened window shows its marker in a `region="window"` view capture (the
+      default capture excludes panels);
+    - the lifecycle events come once each, in the expected order;
+    - ASan and UBSan are clean at exit.
+
+  Late config registration may fail, because defaults bind at boot and the change callback needs a
+  previous section. That is recorded as a spike finding, not fixed by a config redesign.
+  - None of these is a timing result, so no pre-flight is needed for S1's assertions.
+- **Step 6, variant (b), attempted whatever (a) shows.**
+  - The fixture's dependency closure (the libraries the plugin imports, and theirs) is built `SHARED`
+    with position-independent code, under the option, plus the runtime search path. No engine-wide
+    conversion.
+  - The same assertions run against it.
+  - The build-time and binary-size comparison of (a) and (b) is a measurement and gets its own
+    experiment pre-flight.
+- **Done for S1:** each S1 pass check answered yes or no in the spike report for (a) and (b), with the
+  evidence, including negative results.
+- **Not in S1:** unregister and reload (S2), the job form (S3), CI (the operator decides), and
+  converting any real module.
+
 **Later slices** (each gets its own plan after the spike decision):
 3. **One vertical slice:** one real feature (proposal: k-means, closest to the job form)
    end-to-end as a plugin. It has its own build target, registers config, commands, windows and its
@@ -638,3 +761,19 @@ python3 tools/docs/check_doc_links.py --root . --strict
     - The geometry edit is a core-library edit; it is also under 10 s.
   - Claims check of the report by a separate agent: changes required (clean-build drift 0.41 s, the
     geometry edit is not a plugin edit, a held prediction missing, where the records are); applied.
+- 2026-10-31: Slice 2 started (Q46: "danach gehen wir 3. an").
+  - An exploration of the code confirmed: static linking only; hand-written registration lists; no
+    unregister for config sections and MCP tools; ImGui statically inside the executable.
+  - A toy check (clang 23) showed one identity of host statics across a `-rdynamic` boundary.
+  - The S1 implementation plan was reviewed by a fresh Codex session (`plan022s1`, thread
+    `01a19266`): REVISE (7 blocking), REVISE (3), REVISE (1), then APPROVE on revision 4.
+  - What the revisions changed:
+    - both link variants are always attempted;
+    - the CMake module recipe is tested, with a named fallback;
+    - the load is deferred past the MCP dispatch, and the commit is atomic, with the originals
+      kept;
+    - identity is shown by state, with ImGui, ImPlot and thread-local probes and an exported
+      lifecycle recorder;
+    - an expected first config change is specified;
+    - the GUI checks are deterministic;
+    - the ABI and sanitizer limits are stated.
