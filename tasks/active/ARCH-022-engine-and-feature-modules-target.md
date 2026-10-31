@@ -917,3 +917,11 @@ python3 tools/docs/check_doc_links.py --root . --strict
     `src/app`. The spike now takes the `ServiceRegistry` and an exit callback instead. After the
     change, driver runs 9 (variant a) and b2 (variant b) passed 54 of 60 each, with the same two
     findings. All 56 ci-docs commands, single-line `run:` steps included, pass on a clean copy.
+- 2026-10-31: ci-linux-clang also failed on `01095d834`, at "Validate layering (strict mode)".
+  - The spike host module imported `Extrinsic.Core.Config.EngineLoad`, and app code may not import
+    core directly. It now imports `Extrinsic.Runtime.DerivedConfigSections`, which re-exports it, as
+    other app code does.
+  - `check_layering` and `check_compiler_hazards` pass; both variants build; driver run 10: 54 of
+    60.
+  - The failed "Aggregate gate timing result" step followed from the first failure.
+  - The lesson now names ci-linux-clang's repository checks too.

@@ -121,4 +121,6 @@ hand-picked subset of ci-docs. ci-docs was then red on `main` for seven commits 
 `b6963920e`. Safeguard: before pushing a change under `.github/workflows/`, search the tests for the edited step name and
 run every `python3` command of that workflow on a clean worktree of the commit; after each push, read that commit's CI
 result before pushing the next. A replay that collects the commands from the workflow file must also take single-line
-`run: python3 ...` steps; ARCH-022 missed 14 of them once and broke `main` again (`01095d834`).
+`run: python3 ...` steps; ARCH-022 missed 14 of them once and broke `main` again (`01095d834`). `ci-linux-clang`
+runs repository checks before its build (`check_layering.py --root src --strict`, `check_compiler_hazards.py`);
+replay those too for a change under `src/`.

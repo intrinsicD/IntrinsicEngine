@@ -8,7 +8,7 @@ module;
 
 export module Extrinsic.Sandbox.PluginSpike;
 
-import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.DerivedConfigSections; // re-exports Extrinsic.Core.Config.EngineLoad (app does not import core)
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.ServiceRegistry;
