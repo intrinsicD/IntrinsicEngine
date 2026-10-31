@@ -8,7 +8,7 @@ Root scanned: `src`
 
 | Layer | Module Count |
 |---|---:|
-| `app` | 7 |
+| `app` | 8 |
 | `assets` | 11 |
 | `core` | 38 |
 | `ecs` | 25 |
@@ -32,6 +32,7 @@ Root scanned: `src`
 | `Extrinsic.Sandbox.Editor.MeshProcessingPanels` | `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm` | `app` |
 | `Extrinsic.Sandbox.Editor.MethodPanels` | `src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm` | `app` |
 | `Extrinsic.Sandbox.ConfigSections` | `src/app/Sandbox/Sandbox.ConfigSections.cppm` | `app` |
+| `Extrinsic.Sandbox.PluginSpike` | `src/app/Sandbox/Sandbox.PluginSpike.cppm` | `app` |
 | `Extrinsic.Sandbox` | `src/app/Sandbox/Sandbox.cppm` | `app` |
 | `Extrinsic.Asset.EventBus` | `src/assets/Asset.EventBus.cppm` | `assets` |
 | `Extrinsic.Asset.GeometryPayload` | `src/assets/Asset.GeometryPayload.cppm` | `assets` |
@@ -481,4 +482,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **454**
+Total modules: **455**

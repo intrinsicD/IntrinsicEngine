@@ -925,3 +925,8 @@ python3 tools/docs/check_doc_links.py --root . --strict
     60.
   - The failed "Aggregate gate timing result" step followed from the first failure.
   - The lesson now names ci-linux-clang's repository checks too.
+- 2026-10-31: ci-docs also failed on `ff93e28a6`, at the module inventory freshness check: the new
+  module `Extrinsic.Sandbox.PluginSpike` was missing from `docs/api/generated/module_inventory.md`
+  (regenerated: 455 modules). The local replay now runs every `run:` block of ci-docs with
+  `bash -e` on a clean copy (23 run, 2 skipped for the GitHub context or package installation, 0
+  failed), plus `check_layering` and `check_compiler_hazards`. The lesson says so.
