@@ -1,0 +1,4 @@
+# Third-party Vulkan driver leaks at exit, appended to the repository's lsan.supp by spike_driver.py.
+# NVIDIA 580.159.04: allocations in pipeline creation, visible by name only while the driver stays loaded (LD_PRELOAD
+# of the ICD library); evidence in tasks/evidence/ARCH-022/spike-s1/baseline-nvidia-*.
+leak:libnvidia-glcore.so

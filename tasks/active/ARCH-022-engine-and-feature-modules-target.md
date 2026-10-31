@@ -75,6 +75,13 @@ contract_review: tracker only; each slice declares its own contracts
 48. (2026-10-31) "Für 2. würde ich auch die Konzert nehmen" (read as "Jobzeit", agreeing with the
     recommendation: the CI target means the `full-cpu` job time; this reading was stated back to
     the operator)
+49. (2026-10-31) "Lld übernehmen ja, installieren kann ich das erst am Montag oder so. Was machen
+    wir mit den 3 Befunden? Können wir den 1. und 2. Punkt irgendwie korrigieren? 3. lässt sich nix
+    machen oder?"
+50. (2026-10-31) "Ja bitte, mach 1. - 5." (1: the NVIDIA leak in the spike driver, by preload and a
+    narrow suppression; 2: prepare lld as the dev linker; 3: late config registration through
+    `RegisterSection`/`UnregisterSection`; 4: the window types in a contract module outside the
+    editor; 5: S2)
 
 ## Goal
 - Reach the target in
@@ -940,3 +947,14 @@ python3 tools/docs/check_doc_links.py --root . --strict
     2. registering a window needs an editor-internal module (R2);
     3. the Sandbox's exit is not LSan-clean on this host because of the NVIDIA driver, plugin or
        not.
+- 2026-10-31: Q50 step 1, finding 3 (the NVIDIA leak at exit).
+  - With the ICD library preloaded (`libGLX_nvidia.so.0`, from `nvidia_icd.json`), the driver stays
+    mapped until LSan runs. Its leaks are then named: `libnvidia-glcore.so` of driver 580.159.04,
+    114,000 bytes in 21 allocations.
+  - One suppression, `leak:libnvidia-glcore.so` (`plugins/spike/lsan-driver.supp`, appended to
+    `lsan.supp` by the driver), makes the exit clean: status 0, two of two no-plugin runs
+    (`baseline-nvidia-*`).
+  - Driver runs 11 (variant a) and b3 (variant b): 56 of 60 each. Exit status 0, sanitizers clean,
+    lifecycle order as before; the 4 failures are finding 1.
+  - The repository's `lsan.supp` is unchanged; whether it gets the line is the operator's call (CI
+    uses lavapipe).

@@ -3,7 +3,9 @@
 
 Runs <build>/bin/ExtrinsicSandbox with an isolated agent socket, the built-in config (no --engine-config, no
 INTRINSIC_ENGINE_CONFIG, no config/engine.json) and the repository's LSan settings for a Vulkan exit (BUG-083: one
-ICD through VK_DRIVER_FILES, fast_unwind_on_malloc=0, lsan.supp). Over the agent socket (newline-delimited JSON-RPC,
+ICD through VK_DRIVER_FILES, fast_unwind_on_malloc=0, lsan.supp). The ICD's library is preloaded so it stays mapped
+until LSan runs: its leaks are then named and suppressed by plugins/spike/lsan-driver.supp, appended to lsan.supp.
+Over the agent socket (newline-delimited JSON-RPC,
 as tools/agents/mcp_bridge.py speaks it) it:
   1. checks the Vulkan device through diagnostics_read and captures the window without a marker;
   2. injects a load failure at every stage: the error names that stage, and tools, config sections (with their
@@ -14,9 +16,8 @@ as tools/agents/mcp_bridge.py speaks it) it:
      through imported code, and both sides see the same addresses, ImGui context and allocator, ImPlot context;
   5. calls spike_echo; checks the config section's schema, default 8, active state, invalid payloads and a change to 12;
   6. finds a solid magenta square of the expected side in window captures before and after the change;
-  7. quits through app_quit; checks the exit, sanitizer errors, the attribution of leak records by their frames (on
-     this host the NVIDIA driver leaks a few hundred bytes in pipeline creation in some runs, with or without a plugin;
-     see tasks/evidence/ARCH-022/spike-s1/baseline-bug083*) and the lifecycle event order.
+  7. quits through app_quit; checks a clean exit, sanitizer errors, the attribution of any leak record by its frames
+     and the lifecycle event order.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
 Usage: python3 plugins/spike/spike_driver.py --build build/spike --out <new dir> [--icd <VK_DRIVER_FILES json>]
 """
@@ -219,11 +220,13 @@ def main() -> int:
                           not (REPO / "config/engine.json").exists())]
     if not all(ready):
         return finish(checks, out)
-    events = out / "events.log"
+    events, suppressions = out / "events.log", out / "lsan.supp"
+    suppressions.write_text((REPO / "lsan.supp").read_text() + (Path(__file__).parent / "lsan-driver.supp").read_text())
     env = {k: v for k, v in os.environ.items() if k != "INTRINSIC_ENGINE_CONFIG"}
     env.update(INTRINSIC_SPIKE_EVENT_LOG=str(events), VK_DRIVER_FILES=str(args.icd),
+               LD_PRELOAD=json.loads(args.icd.read_text())["ICD"]["library_path"],
                ASAN_OPTIONS="detect_leaks=1:fast_unwind_on_malloc=0",
-               LSAN_OPTIONS=f"detect_leaks=1:fast_unwind_on_malloc=0:suppressions={REPO / 'lsan.supp'}",
+               LSAN_OPTIONS=f"detect_leaks=1:fast_unwind_on_malloc=0:suppressions={suppressions}",
                UBSAN_OPTIONS="print_stacktrace=1")
     with (out / "sandbox.stdout").open("wb") as stdout, (out / "sandbox.stderr").open("wb") as stderr:
         sandbox = subprocess.Popen([str(build / "bin/ExtrinsicSandbox"), "--agent-socket", str(out / "agent.sock"),
