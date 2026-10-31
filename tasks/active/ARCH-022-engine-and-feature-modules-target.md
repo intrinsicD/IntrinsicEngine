@@ -777,3 +777,19 @@ python3 tools/docs/check_doc_links.py --root . --strict
     - an expected first config change is specified;
     - the GUI checks are deterministic;
     - the ABI and sanitizer limits are stated.
+- 2026-10-31: S1 steps 1 and 2 (containment, build recipe), in `build/spike` (preset `dev`,
+  `-DINTRINSIC_PLUGIN_SPIKE=ON`).
+  - Containment: with the option off, a fresh configure has no `IntrinsicSpike*` or
+    `plugins/spike` target, no spike test and no `--export-dynamic`.
+  - CMake 4.3.2's `$<COMPILE_ONLY:ExtrinsicSandboxEditor>` passes include paths and definitions but
+    no module sets. The plugin failed with "module 'Extrinsic.Core.Logging' not found".
+  - The named fallback works: `CollectHostModules.cmake` gathers the `-fmodule-file=` entries of
+    the host's `.modmap` files (466) into a response file, and the plugin compiles with module
+    scanning off against the host's BMIs.
+  - The host's 460 artifacts and BMIs were byte-identical before and after both plugin builds.
+  - The plugin `.so` defines only `intrinsic_plugin_probe_v0`. Its engine references (a function
+    and a module initializer) are undefined and exported by the executable.
+  - With `ENABLE_EXPORTS` the executable exports 173,917 dynamic symbols. Its size (738 MB) is noted,
+    not compared.
+  - `plugins/` is added to the repository root allowlist (`tools/repo/root_allowlist.yaml`), the
+    plugin location the target names (`plugins/<name>/`).

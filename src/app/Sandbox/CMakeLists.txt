@@ -59,4 +59,9 @@ if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
 
     # Sandbox resolves promoted runtime shaders beside its executable.
     intrinsic_add_glsl_shaders(ExtrinsicSandbox)
+
+    if(INTRINSIC_PLUGIN_SPIKE)
+        # ARCH-022 spike, variant (a): the static engine's symbols are exported for dlopen'ed plugins.
+        set_target_properties(ExtrinsicSandbox PROPERTIES ENABLE_EXPORTS ON)
+    endif()
 endif()

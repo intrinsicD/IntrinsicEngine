@@ -75,6 +75,8 @@ endif()
 # dependencies come from their own manifest feature instead of `windowing`.
 option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
 option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
+# ARCH-022 slice 2: the plugin-host spike (plugins/spike), off by default and not in CI.
+option(INTRINSIC_PLUGIN_SPIKE "Build the ARCH-022 plugin-host spike" OFF)
 if((INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
     AND NOT "sandbox-editor" IN_LIST VCPKG_MANIFEST_FEATURES)
     list(APPEND VCPKG_MANIFEST_FEATURES "sandbox-editor")
@@ -489,6 +491,10 @@ add_subdirectory(${INTRINSIC_PLATFORM_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_RUNTIME_SOURCE_ROOT})
 if(NOT INTRINSIC_HEADLESS_NO_GLFW OR INTRINSIC_BUILD_TESTS)
     add_subdirectory(${INTRINSIC_APP_SOURCE_ROOT})
+endif()
+
+if(INTRINSIC_PLUGIN_SPIKE AND TARGET ExtrinsicSandbox)
+    add_subdirectory(plugins/spike)
 endif()
 
 if(INTRINSIC_BUILD_BENCHMARKS)
