@@ -1008,11 +1008,12 @@ namespace Extrinsic::Core::Config
 
     bool EngineConfigSectionRegistry::Unregister(const std::string_view name)
     {
+        // Owned: `name` may view an entry that the compaction overwrites.
         return std::erase_if(
                    m_Entries,
-                   [name](const EngineConfigSectionRegistration& entry)
+                   [owned = std::string{name}](const EngineConfigSectionRegistration& entry)
                    {
-                       return entry.DefaultSection.Name == name;
+                       return entry.DefaultSection.Name == owned;
                    }) != 0u;
     }
 

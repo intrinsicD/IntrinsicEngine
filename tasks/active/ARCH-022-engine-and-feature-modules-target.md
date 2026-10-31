@@ -1088,3 +1088,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - After the fixes (`build/spike`, lld): 1873 runtime contract and 292 Sandbox editor integration
     tests pass. The spike driver passes 58 of 58 in both variants (runs 15 and b6); its lifecycle
     check now derives the expected `register` count from the failure stages.
+  - Codex delta review of `5cc90698e` (same thread): the three findings resolved; REVISE for one
+    new Must from the lean cleanup. The one-statement core `Unregister` compared against a
+    borrowed name while compaction overwrote it: with "a", a 122-character name and "z", it also
+    erased "z". A core regression test reproduced this (one entry left instead of two). The
+    predicate now owns the name, and 280 core, 17 config-control and 58 of 58 driver checks pass
+    (run 16).

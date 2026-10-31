@@ -184,6 +184,24 @@ TEST(CoreEngineConfigSections, RegistryValidatesDefaultsAndKeepsNameOrder)
     EXPECT_EQ(registry.Find("missing"), nullptr);
 }
 
+TEST(CoreEngineConfigSections, UnregisterAcceptsANameOwnedByTheRegistry)
+{
+    // Erasing compacts the entries: libstdc++ moves the long name over "a" and leaves its
+    // capacity in the short-string buffer the borrowed view points at, which then reads "z".
+    EngineConfigSectionRegistry registry{};
+    const std::string longName(122, 'b');
+    ASSERT_TRUE(registry.Register(FakeRegistration("a", "a.schema")));
+    ASSERT_TRUE(registry.Register(FakeRegistration(longName, "b.schema")));
+    ASSERT_TRUE(registry.Register(FakeRegistration("z", "z.schema")));
+
+    EXPECT_TRUE(registry.Unregister(registry.Find("a")->DefaultSection.Name));
+    const auto entries = registry.Entries();
+    ASSERT_EQ(entries.size(), 2u);
+    EXPECT_EQ(entries[0].DefaultSection.Name, longName);
+    EXPECT_EQ(entries[1].DefaultSection.Name, "z");
+    EXPECT_FALSE(registry.Unregister("missing"));
+}
+
 TEST(CoreEngineConfigSections, PopulateDefaultsPreservesExplicitValues)
 {
     EngineConfigSectionRegistry registry = FakeRegistry();
