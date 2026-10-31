@@ -125,3 +125,12 @@ result before pushing the next. A replay that collects the commands from the wor
 runs repository checks before its build (`check_layering.py --root src --strict`, `check_compiler_hazards.py`);
 replay those too for a change under `src/`. Replay whole `run:` blocks with `bash -e`, not extracted `python3`
 lines: a generator followed by `git diff --exit-code` (the module inventory) only fails as a block.
+
+## Do not wrap a push in `git stash push`/`pop`
+
+`git push` sends commits, never the working tree, so nothing has to be stashed around it. ARCH-022 ran
+`git stash push -- tasks/active/` before a push when that path had no changes: the push saved nothing, and the
+following `git stash pop` applied an older, unrelated stash (`BUG-137 slice C WIP`) onto the tree and stopped on a
+conflict. No work was lost (a conflicted pop keeps the entry), but the tree had to be restored by hand. Safeguard:
+push without stashing; when a stash is really needed, check `git diff --quiet -- <path>` first and pop the exact
+entry it created (`git stash pop stash@{n}` after reading `git stash list`).

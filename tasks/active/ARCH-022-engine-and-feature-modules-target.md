@@ -1094,3 +1094,163 @@ python3 tools/docs/check_doc_links.py --root . --strict
     erased "z". A core regression test reproduced this (one entry left instead of two). The
     predicate now owns the name, and 280 core, 17 config-control and 58 of 58 driver checks pass
     (run 16).
+  - Codex delta review of `3ba77576a` (same thread): "APPROVE — reviewed `3ba77576a`." Pushed;
+    the CI result is pending.
+- 2026-10-31: Plan for Q50 step 5, S2, revision 2. Codex plan review 1 (fresh session
+  `01a19388-e743-7a00-9786-5498ee09b6e6`) returned REVISE with six blocking findings, all folded
+  in below:
+  1. draining must release callables;
+  2. a redo entry must cross the reload;
+  3. the Register failure bypassed Register;
+  4. registry equality cannot see stale callbacks;
+  5. the closure control needs attribution;
+  6. scene contents, host identity and GPU fences.
+  - Questions served:
+    - Q36: "Ich will auch Laufzeit Kompilierung damit Agenten etwas ändern kannst du die
+      sandbox/engine weiterlaufen kann."
+    - Q50: "Ja bitte, mach 1. - 5." (5: S2)
+  - Goal item: the target's plugin host ("load, register, unload, reload"), and its rule that the
+    registries take out on unload whatever a plugin added, with undo entries holding data or a
+    registered command, not plugin closures. S2 is the slice the approved plan names for this. It
+    is the shortest path because S1 already loads the spike once; S2 adds the reverse direction
+    and the failure paths on the same fixture, without a general plugin host.
+  - Pass criteria: the approved S2 list (section "Slices"), unchanged, including the GPU fences.
+    Four blocks, each with its own code review; this plan review covers all four.
+  - **Callable accounting, used by every block.** Each plugin build has a generation (the version
+    from `SpikeVersion.inc`, a generated header in the build directory, so the driver's edits never
+    touch repository sources). Every callable the plugin hands to the host captures a token whose
+    constructors and destructor report to the host. The kinds are operation, validator, change
+    callback, window draw, window state, history handler, job work, job completion, and GPU
+    participant.
+    - The host keeps live counts per generation and kind.
+    - The host refuses to `dlclose` a generation whose counts are not all 0. The unload fails
+      with `callables_alive`, and the plugin stays loaded. The counts are recorded at every
+      close.
+    - Every invocation logs `<kind>:<generation>`, so the driver can assert that after a reload
+      only the new generation is called.
+  - **S2a, unload and reload (spike host only).**
+    - Order: reload = unload, then load. The approved criteria allow "the old plugin running, or
+      none", so the candidate is never opened beside the old image.
+    - Every load opens a private copy (`<tmp>/spike-<n>.so`), so a rebuilt file loads even if an
+      old image stays mapped; the copy is deleted after `dlclose`.
+    - `plugin_unload`:
+      1. drain (S2c);
+      2. the shutdown hook;
+      3. the config sections' active payloads are saved in the host, then the operations, sections,
+         windows and history handlers are unregistered;
+      4. the callable counts are recorded, then `dlclose`.
+
+      Whether the image left `/proc/self/maps` is reported.
+    - `plugin_load` restores the saved payloads after its commit through preview and apply, so the
+      new registration validates them; a rejected payload keeps the default and is reported.
+    - Apply also validates every changed section with its current registration, so a preview held
+      across a reload cannot carry a payload the new validator rejects. Its regression test keeps
+      the schema id and version and swaps in a stricter validator; the held preview is rejected
+      before anything changes.
+    - Driver checks, asserted before the first run, in both link variants:
+      - Unload: tools, sections and windows equal the pre-load baseline; the plugin's tools
+        answer as unknown; the closing generation's live counts are all 0.
+      - Reload after an edit:
+        - the version is the new one, the registries equal the post-load content, and only the
+          new generation is invoked;
+        - the marker size 12 set before the reload is active, the new plugin got one
+          `OnChanged` with 12, and the marker is 96 px;
+        - the scene is seeded with a translated, renamed copy of the reference geometry before
+          the first load, and `save_scene` files written before and after are byte-identical
+          (values and transforms, not only property metadata);
+        - the Sandbox PID and the sha256 of its binary are unchanged across the plugin rebuild;
+        - the identity probes still have one address.
+      - Failed build (a syntax error in the version header): the build fails, the `.so` is
+        unchanged (sha256), and the old version answers.
+      - Failed load (a truncated `.so`): `dlopen_failed`, no plugin, a reason, the registries
+        equal the baseline.
+      - Failed `Register`: a build whose `Register` stages everything and then returns false.
+        Result: `register_failed`, no plugin, the staging's live counts reach 0 before its
+        `dlclose`, and the registries equal the baseline. The host's `fail_at register`
+        short-circuit is removed.
+      - Failed commit (`fail_at windows`): no plugin, a reason, the registries equal the
+        baseline, and the counts are 0.
+      - 20 reload cycles alternating two prebuilt versions, under ASan, UBSan and LSan: each
+        cycle checks the version, the registries and the counts. At exit, no sanitizer report
+        and no unsuppressed leak (the leak-frame-name check is dropped: unloaded images lose
+        attribution).
+  - **S2b, undo and redo through the plugin across a reload.**
+    - Change: `EditorCommandHistory::RegisterCommand(name, handler)` and
+      `UnregisterCommand(name)`, plus `MakeRegisteredCommandRecord(label, name, payload)`.
+      - It is defined in the history's implementation unit, so the record's closures and their
+        payload strings are host code and host data.
+      - Undo and redo look the handler up when called. With no handler they return
+        `UnsupportedOperation`, and the entry stays (today's failure path).
+      - The plugin's handlers are staged and committed or unregistered like its other
+        registrations.
+    - Contract tests:
+      - a data entry calls the registered handler with its payload;
+      - with no handler, `UnsupportedOperation`, and the stacks are unchanged;
+      - a handler registered again makes it work;
+      - closure entries behave as before.
+    - Driver (command form): `spike_counter_add` 5, then 3, then `undo`, so the undo stack holds
+      5 and the redo stack holds 3. Reload. Then `undo`, `redo`, `redo`. The host counter takes
+      the expected values (5 → after the reload 0, 5, 8), the new generation's handler is the
+      one invoked, and no sanitizer report.
+    - Control (closure form, a separate driver mode): the same sequence with today's closure
+      entries. They carry no token, as today's closures don't, so they neither block the close nor
+      enter the zero-count assertion; the control asserts instead that the history still holds
+      them. It counts only if:
+      - the setup succeeded;
+      - the undo entry is listed by `history`;
+      - the old image left `/proc/self/maps`;
+      - the process then dies with a sanitizer report whose stack contains
+        `EditorCommandHistory::Undo`.
+
+      A still-mapped image makes the control inconclusive, and any other failure fails it.
+  - **S2c, bounded draining (CPU and GPU).**
+    - CPU: `spike_start_job {seconds, ignore_cancel}` submits through a host function that
+      records the token and refuses new submissions while draining.
+      - Plugin callables stay owned on the main thread: the job's work is a host lambda holding a
+        raw pointer to a host-owned entry with the plugin's work and completion. The worker sets
+        the entry's `returned` flag in host code after the plugin call has returned. The main
+        thread destroys the entry (and with it the plugin callables) only when the job is
+        terminal and either it never ran or `returned` is set. Reaping is not relied on: a
+        worker may still own the job record, which then holds only host code.
+      - Draining cancels the recorded tokens, then waits frame by frame until each entry is
+        destroyed that way, its completion or unpublished finalizer having run on the main
+        thread; their live counts reach 0.
+      - The deadline is 5 s, enforced in code. On timeout, the unload fails with
+        `drain_timeout`, submissions are admitted again, and the plugin stays loaded and
+        registered.
+    - GPU: `spike_gpu_work {frames}` registers a GPU queue participant that records a small
+      buffer fill each frame and reports in-flight work until its frames have completed.
+      In-flight is computed as the cache does: the last recorded frame has not retired
+      (`GlobalFrameNumber < SubmittedFrame + FramesInFlight + 1`). Draining stops the recording
+      and polls `HasInFlightWork` frame by frame. Only once it is false is the participant
+      unregistered. Its buffer is freed in `ShutdownAfterDeviceIdle`.
+    - Wording agreed in the review exchange: CPU draining enforces its deadline while the host
+      frame loop progresses. GPU resources and plugin code remain alive until their submissions
+      retire. GPU retirement has no plugin-level deadline: a hung GPU can stall the engine through
+      its existing frame-fence wait. Bounding that wait or changing device-loss handling is
+      outside S2.
+    - Driver:
+      - a reload with one running job and one queued behind it (more jobs than workers), the
+        states asserted before: both end cancelled, their completion events come before
+        `shutdown`, the counts are 0, and the reload succeeds;
+      - a job that ignores cancellation for 10 s: `drain_timeout`, the old version answers, and a
+        submission works again; after the job ends, a reload succeeds;
+      - a reload while GPU work is in flight (asserted before): the participant's shutdown event
+        comes before `dlclose`, the counts are 0, and the Sandbox log has no Vulkan validation
+        error.
+  - **S2d, the R4 baseline (full pre-flight, its own packet).**
+    - Measured: from writing `SpikeVersion.inc` through
+      `cmake --build --target IntrinsicSpikePlugin` and `plugin_reload` to the plugin answering
+      the new version.
+    - Reported per phase, both variants, repeated runs. Target: under 10 s.
+    - The packet fixes the exact commands, repetitions and stop rules: Layer A and B, a manifest,
+      a fresh Claude and a fresh Codex review, a start gate, and an HTML report.
+  - Codex plan review (thread `01a19388-e743-7a00-9786-5498ee09b6e6`):
+    - round 2: findings 2 to 4 resolved, 1 and 6 partly;
+    - round 3: one blocker, the GPU deadline (`BeginFrame` waits on frame fences without a
+      timeout);
+    - one exchange: the reviewer withdrew it. Verbatim: "Yes. I withdraw the blocker. APPROVE the
+      plan with the proposed clarification." The clarification is the wording above.
+  - Not in S2: a file watcher (the MCP tool is the trigger); a general plugin host outside the
+    spike; CI; moving editor operations to registered commands; agent continuations created by
+    plugin operations (the spike's operations create none; a general host must drain them).
