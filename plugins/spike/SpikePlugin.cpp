@@ -1,7 +1,10 @@
 // ARCH-022 slice 2, S1 and S2: the spike plugin. Built against the host's module BMIs, linked to nothing of the
 // engine: every engine, ImGui and ImPlot symbol binds to the running Sandbox at dlopen.
+#include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <thread>
 #include <string>
 #include <string_view>
 
@@ -19,7 +22,11 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.UiHostTypes;
 import Extrinsic.Sandbox.PluginSpike;
 
@@ -154,6 +161,77 @@ namespace
         return {.Text = Json{{"value", Spike::HostUndoValue()}}.dump()};
     }
 
+    // spike_start_job {seconds, ignore_cancel}: a CPU job of the plugin that runs for `seconds` (or until cancelled,
+    // unless it ignores cancellation); its completion logs whether it was published.
+    AgentOperationOutcome StartJob(const AgentOperationContext& context, std::string_view argumentsJson)
+    {
+        const Json arguments = Json::parse(argumentsJson, nullptr, false);
+        const double seconds = arguments.is_object() ? arguments.value("seconds", 1.0) : 1.0;
+        const bool ignoreCancel = arguments.is_object() && arguments.value("ignore_cancel", false);
+        const bool submitted = Spike::SubmitPluginJob(context, {
+            .Work = [t = Tracked{"job_work"}, seconds, ignoreCancel](const std::function<bool()>& cancelled)
+            {
+                t.Invoked();
+                const auto end = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);
+                while (std::chrono::steady_clock::now() < end && (ignoreCancel || !cancelled()))
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                return !cancelled();
+            },
+            .Completion = [t = Tracked{"job_completion"}](bool published)
+            {
+                t.Invoked();
+                spike_lifecycle_event(published ? "job_published" : "job_finalized");
+            },
+        });
+        if (!submitted) return {.IsError = true, .Text = "the job was not submitted", .ErrorCode = "not_submitted"};
+        return {.Text = R"({"submitted":true})"};
+    }
+
+    // spike_gpu_work: fills a slice of the plugin's own buffer in every recorded frame, one slice per frame in
+    // flight, so no two unretired frames write the same bytes.
+    AgentOperationOutcome GpuWork(const AgentOperationContext& context, std::string_view)
+    {
+        constexpr std::uint64_t kSlice = 64u << 10u;
+        auto* device = Spike::Services().Find<Extrinsic::RHI::IDevice>();
+        if (device == nullptr)
+            return {.IsError = true, .Text = "no RHI device", .ErrorCode = "no_device"};
+        const auto slots = device->GetFramesInFlight();
+        const auto buffer = device->CreateBuffer({.SizeBytes = kSlice * slots,
+                                                  .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+                                                  .DebugName = "spike plugin buffer"});
+        auto lastRecorded = std::make_shared<std::uint64_t>(0);
+        auto recorded = std::make_shared<bool>(false);
+        const bool started = Spike::StartPluginGpuWork(context, {
+            .Record = [t = Tracked{"gpu_record"}, device, buffer, slots, lastRecorded, recorded](
+                          Extrinsic::RHI::ICommandContext& commands)
+            {
+                t.Invoked();
+                const std::uint64_t frame = device->GetGlobalFrameNumber();
+                commands.FillBuffer(buffer, (frame % slots) * kSlice, kSlice, 0x5eedu);
+                *lastRecorded = frame;
+                *recorded = true;
+            },
+            .InFlight = [t = Tracked{"gpu_in_flight"}, device, lastRecorded, recorded]
+            {
+                t.Invoked();
+                // The cache's rule: a frame has retired once FramesInFlight + 1 newer frames began.
+                return *recorded && device->GetGlobalFrameNumber() < *lastRecorded + device->GetFramesInFlight() + 1u;
+            },
+            .Shutdown = [t = Tracked{"gpu_shutdown"}, device, buffer]
+            {
+                t.Invoked();
+                device->DestroyBuffer(buffer);
+                spike_lifecycle_event("gpu_shutdown");
+            },
+        });
+        if (!started)
+        {
+            device->DestroyBuffer(buffer);
+            return {.IsError = true, .Text = "the GPU work was not started", .ErrorCode = "not_started"};
+        }
+        return {.Text = R"({"started":true})"};
+    }
+
     void DrawWindow(bool& open)
     {
         // Auto-resize: the window follows marker_size changes instead of clipping the marker.
@@ -243,6 +321,29 @@ extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged,
         {
             t.Invoked();
             return CounterAdd(context, arguments);
+        },
+    });
+    staged.Operations.push_back({
+        .Name = "spike_start_job",
+        .Title = "CPU job (spike plugin)",
+        .Description = "Submits a plugin job that runs for seconds, or until cancelled unless ignore_cancel.",
+        .InputSchemaJson = R"({"type":"object","properties":{"seconds":{"type":"number"},"ignore_cancel":{"type":"boolean"}},"additionalProperties":false})",
+        .ReadOnly = false,
+        .Invoke = [t = Tracked{"operation"}](const AgentOperationContext& context, std::string_view arguments)
+        {
+            t.Invoked();
+            return StartJob(context, arguments);
+        },
+    });
+    staged.Operations.push_back({
+        .Name = "spike_gpu_work",
+        .Title = "GPU work (spike plugin)",
+        .Description = "Fills the plugin's own buffer in every recorded frame until the plugin unloads.",
+        .ReadOnly = false,
+        .Invoke = [t = Tracked{"operation"}](const AgentOperationContext& context, std::string_view arguments)
+        {
+            t.Invoked();
+            return GpuWork(context, arguments);
         },
     });
     staged.HistoryCommands.push_back({

@@ -24,9 +24,15 @@ It checks, in order:
      clamps 12 to 10 with a fallback: the saved 12 is reported rejected and not applied (the default 8 stays);
   8. undo and redo across a reload (S2b): add 5 and 3, undo, reload, then undo, redo, redo give 0, 5, 8, served
      only by the new generation's registered history command;
-  9. the close guard: an unload with one plugin callable kept alive (test hook) unregisters everything but leaves the
+  9. draining (S2c): more plugin jobs than workers (some running, some queued) are cancelled and reaped by a reload,
+     each completion before the shutdown hook, nothing alive at the close;
+  10. a job that ignores cancellation makes the reload fail with drain_timeout after 5 s; the old version answers,
+     submissions are admitted again, and once the job ended a reload succeeds;
+  11. GPU work in flight during a reload stops recording and retires before its shutdown and the plugin's; nothing
+     alive at the close, no Vulkan validation error;
+  12. the close guard: an unload with one plugin callable kept alive (test hook) unregisters everything but leaves the
      image mapped, with callables_alive;
-  10. a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
+  13. a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
 With --closure-control it runs the S2b control instead: closure entries 5 and 3 (today's form) are recorded, 3 is
 undone, the plugin is reloaded to a 16 MiB larger build (so the freed range stays free), and the remaining entry is
@@ -40,9 +46,12 @@ Usage: python3 plugins/spike/reload_driver.py --build build/spike --out <new dir
 
 from __future__ import annotations
 
+import collections
 import hashlib
 import json
+import os
 import shutil
+import time
 import subprocess
 import sys
 from pathlib import Path
@@ -107,7 +116,7 @@ def generation_of(reply: object) -> object:
 def last_close_clean(state: dict, generation: int) -> bool:
     """The last close: this generation, closed with every kind counted and none alive, unmapped, its copy gone."""
     close = state["closes"][-1] if state["closes"] else {}
-    return close.get("generation") == generation and s1.clean_close(close) and set(close.get("live", {})) == KINDS \
+    return close.get("generation") == generation and s1.clean_close(close) and KINDS <= set(close.get("live", {})) \
         and not Path(close.get("copy", "/")).exists()
 
 
@@ -115,6 +124,16 @@ def counted_while_loaded(state: dict) -> bool:
     """Every kind of the loaded generation has live callables, so a missing token cannot pass as zero."""
     live = state["live"].get(str(state["loaded"]), {})
     return all(live.get(kind, 0) > 0 for kind in KINDS)
+
+
+def wait_for(read, done, timeout_s: float = 10.0, poll_s: float = 0.1):
+    """Polls read() until done(value) or the timeout; returns the last value."""
+    end = time.monotonic() + timeout_s
+    value = read()
+    while not done(value) and time.monotonic() < end:
+        time.sleep(poll_s)
+        value = read()
+    return value
 
 
 def save_scene(agent: s1.Agent, out: Path, name: str) -> str:
@@ -306,7 +325,72 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     checks.check("history: only generation 3's handler ran after the reload, three times",
                  {gen: n for gen, n in handlers.items() if n} == {"3": 3}, handlers)
 
-    # 9. The close guard: with a plugin callable kept alive, the unload unregisters everything but must not close.
+    # 9. Draining (S2c), CPU: more jobs than workers, so some run and some wait; the reload cancels and reaps them.
+    events = out / "events.log"
+    count = 2 * (os.cpu_count() or 8) + 2
+    submitted = sum(agent.call("spike_start_job", {"seconds": 60})[0] for _ in range(count))
+    states = wait_for(lambda: collections.Counter(j["state"] for j in host(agent)["jobs"]),
+                      lambda s: s.get("running", 0) >= 1 and s.get("queued", 0) >= 1)
+    checks.check("drain: jobs running and queued before the reload", submitted == count and states.get("running", 0) >= 1
+                 and states.get("queued", 0) >= 1, [submitted, states])
+    seen_events = len(events.read_text().splitlines())
+    ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["A"])})
+    state = host(agent)
+    new_events = events.read_text().splitlines()[seen_events:]
+    finalized = [i for i, e in enumerate(new_events) if e == "job_finalized"]
+    shutdown = new_events.index("shutdown") if "shutdown" in new_events else -1
+    checks.check("drain: the reload succeeds with no plugin job left", ok and generation_of(reply) == 2 and not state["jobs"],
+                 [reply, error, state["jobs"][:3]])
+    checks.check("drain: every job ended cancelled, its completion before the shutdown hook",
+                 len(finalized) == count and 0 <= max(finalized, default=-1) < shutdown, [len(finalized), count, shutdown])
+    checks.check("drain: no live callable of generation 3 at the close, job callables included",
+                 last_close_clean(state, 3) and {"job_work", "job_completion"} <= set(state["closes"][-1]["live"]),
+                 state["closes"][-1:])
+
+    # 10. A job that ignores cancellation: the drain gives up on its 5 s deadline and the plugin stays.
+    ok = agent.call("spike_start_job", {"seconds": 12, "ignore_cancel": True})[0]
+    wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
+    before_timeout = s1.registries(agent)
+    started = time.monotonic()
+    ok_reload, reply, _, error = agent.call("plugin_reload", {"path": str(kept["B"])})
+    elapsed = time.monotonic() - started
+    checks.check("timeout: the reload fails with drain_timeout after the 5 s deadline",
+                 ok and not ok_reload and error == "drain_timeout" and 5.0 <= elapsed < 8.0, [error, reply, round(elapsed, 2)])
+    _, version, _, _ = agent.call("spike_version")
+    checks.check("timeout: the old version still answers, registries unchanged, no longer draining",
+                 version == {"generation": 2} and s1.registries(agent) == before_timeout and not host(agent)["draining"],
+                 version)
+    checks.check("timeout: a new submission is admitted again", agent.call("spike_start_job", {"seconds": 0.05})[0])
+    finished = wait_for(lambda: [j["finalized"] for j in host(agent)["jobs"]], lambda f: all(f), 20.0)
+    ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["A"])})
+    checks.check("timeout: after the job ended, a reload succeeds", all(finished) and ok and generation_of(reply) == 2,
+                 [finished, reply, error])
+
+    # 11. GPU work in flight during a reload: it stops recording, retires, then the plugin shuts down.
+    ok, reply, _, error = agent.call("spike_gpu_work")
+    gpu = wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
+    checks.check("gpu: the plugin's work is in flight before the reload", ok and bool(gpu) and gpu.get("in_flight") is True,
+                 [reply, error, gpu])
+    seen_events = len(events.read_text().splitlines())
+    ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["B"])})
+    state = host(agent)
+    new_events = events.read_text().splitlines()[seen_events:]
+    checks.check("gpu: the reload succeeds, the GPU work retired and its shutdown ran before the shutdown hook",
+                 ok and generation_of(reply) == 3 and state["gpu"] is None and "gpu_shutdown" in new_events
+                 and "shutdown" in new_events and new_events.index("gpu_shutdown") < new_events.index("shutdown"),
+                 [reply, error, new_events[:6]])
+    checks.check("gpu: the participant was unregistered only after its last frame retired",
+                 "gpu_unregistered_retired" in new_events and "gpu_unregistered_in_flight" not in new_events,
+                 new_events[:6])
+    checks.check("gpu: no live callable of generation 2 at the close, GPU callables included",
+                 last_close_clean(state, 2) and {"gpu_record", "gpu_in_flight", "gpu_shutdown"} <= set(state["closes"][-1]["live"]),
+                 state["closes"][-1:])
+    ok, diagnostics, _, _ = agent.call("diagnostics_read")
+    status = s1.find(diagnostics, "device_status")
+    checks.check("gpu: no Vulkan validation error", ok and isinstance(status, dict) and status.get("validation_enabled") is True
+                 and status.get("validation_error_count") == 0, status)
+
+    # 12. The close guard: with a plugin callable kept alive, the unload unregisters everything but must not close.
     ok, reply, _, error = agent.call("plugin_unload", {"retain_callable": True})
     state = host(agent)
     close = state["closes"][-1] if state["closes"] else {}

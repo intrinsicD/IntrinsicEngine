@@ -15,6 +15,9 @@ import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.UiHostTypes;
 import Extrinsic.Runtime.ServiceRegistry;
 
+// Named only in callable signatures, so the app layer does not import the RHI (as Runtime.JobService does).
+extern "C++" { namespace Extrinsic::RHI { class ICommandContext; } }
+
 // Exported by the executable and usable before dlopen and through teardown (it holds no host state):
 // appends one line to the file named by INTRINSIC_SPIKE_EVENT_LOG.
 export extern "C" void spike_lifecycle_event(const char* event) noexcept;
@@ -59,7 +62,7 @@ export namespace Extrinsic::Sandbox::Spike
     }
 
     // Host state a plugin's undoable edits change (S2b); it survives a reload, as scene data does. Edits move it by
-    // at most kMaxUndoDelta, so it cannot overflow.
+    // at most kMaxUndoDelta, which makes an overflow impractical.
     inline constexpr std::int64_t kMaxUndoDelta = 1'000'000;
     [[nodiscard]] std::int64_t& HostUndoValue() noexcept;
 
@@ -70,6 +73,31 @@ export namespace Extrinsic::Sandbox::Spike
                                      std::string command, std::string payload);
     [[nodiscard]] bool RecordClosureCommand(const Runtime::AgentOperationContext& context, std::string label,
                                             std::function<bool()> redo, std::function<bool()> undo);
+
+    // A plugin's CPU job (S2c): Work runs on a worker and polls `cancelled`; Completion runs on the main thread,
+    // with false when the job ended without publishing (cancelled or dropped).
+    struct PluginJob
+    {
+        std::function<bool(const std::function<bool()>& cancelled)> Work{};
+        std::function<void(bool published)> Completion{};
+    };
+
+    // A plugin's GPU work (S2c): Record runs while the host records frames, InFlight says whether the last
+    // recorded frame has not retired yet, Shutdown runs after it retired (it frees the plugin's resources).
+    struct PluginGpuWork
+    {
+        std::function<void(RHI::ICommandContext&)> Record{};
+        std::function<bool()> InFlight{};
+        std::function<void()> Shutdown{};
+    };
+
+    // The host keeps both on the main thread and drains them before an unload: jobs are cancelled and reaped,
+    // GPU work stops recording and is unregistered once retired. False while draining, without a job service,
+    // for incomplete callables, or when the service rejects the work.
+    [[nodiscard]] bool SubmitPluginJob(const Runtime::AgentOperationContext& context, PluginJob job);
+    [[nodiscard]] bool StartPluginGpuWork(const Runtime::AgentOperationContext& context, PluginGpuWork work);
+    // The engine's services, for a plugin to find what it needs (the RHI device).
+    [[nodiscard]] Runtime::ServiceRegistry& Services() noexcept;
 
     // Adds plugin_load, plugin_unload, plugin_reload, plugin_host_identity and app_quit; keeps the registry to
     // commit and remove plugin tools later.

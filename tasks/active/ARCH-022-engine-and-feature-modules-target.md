@@ -1402,3 +1402,41 @@ python3 tools/docs/check_doc_links.py --root . --strict
     too); S1 58 of 58; 1877 runtime contract tests.
   - Mutations: the delta bound removed fails the range check and the undo/redo values; the
     empty-handler guard removed fails every empty-handler check.
+  - Codex delta of `dd49e901a`: "APPROVE — commit `dd49e901a`." One wording note: "cannot
+    overflow" overstated; it now says an overflow is impractical. S2a and S2b are pushed.
+- 2026-11-01: S2c implemented (bounded draining, CPU and GPU).
+  - Host:
+    - `SubmitPluginJob` keeps each job's plugin callables in a host entry on the main thread;
+    - the worker reaches them through a host lambda and a raw pointer, and sets `Returned` after
+      the plugin call;
+    - completion and the unpublished finalizer run the plugin's completion on the main thread;
+    - `StartPluginGpuWork` registers a GPU queue participant whose callbacks forward to the
+      plugin's;
+    - unload and reload drain first, frame by frame: submissions refused, jobs cancelled,
+      entries destroyed once finalized and no longer on a worker, GPU work stopped and
+      unregistered only once its last frame retired (no device wait).
+
+    The 5 s deadline applies in code; on timeout the plugin stays and admission is restored.
+  - The app layer may import only runtime, so the contract names `RHI::ICommandContext` by a
+    forward declaration (as `Runtime.JobService` does). The plugin finds the device through
+    `Services()` and reports its own in-flight state (the cache's retirement rule); it imports
+    RHI directly, and R2 stays 0/0.
+  - Driver, variant (a), run 2: 94 of 94.
+    - 66 jobs (31 running, 35 queued) are all cancelled, each completion before the shutdown hook.
+    - A job that ignores cancellation: `drain_timeout` after 5.04 s; the old version answers and
+      admission is restored; after the job ended, a reload succeeds.
+    - GPU work in flight: its shutdown ran before the plugin's; Vulkan validation enabled, 0 errors.
+    - Run 1 failed one check on a stale reference (the snapshot predated the clamp step's 8),
+      not on the code.
+  - Variant (b): 94 of 94; control 15 of 15 in both variants; S1 58 of 58 in both.
+  - Mutations, each caught by its intended check:
+    - no cancellation: the drain checks;
+    - no deadline: the timeout checks;
+    - admission not restored: the admission check;
+    - entries reaped before their completion: a use-after-free kills the Sandbox.
+  - Finding, from the mutation "unregister the GPU work without waiting for retirement": it first
+    went unnoticed. `VulkanDevice::DestroyBuffer` already defers the release (`DeferDelete`)
+    until the frame retires, so an early free is harmless here. The wait guards callbacks that
+    fire at retirement (readbacks into plugin code), which the spike's GPU work does not have.
+    The host now logs whether the work was still in flight when it unregistered, and the driver
+    requires "retired". With that check the mutation is caught; run 3: 95 of 95.
