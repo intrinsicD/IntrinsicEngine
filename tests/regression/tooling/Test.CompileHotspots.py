@@ -956,6 +956,25 @@ class CompileIterationMeasurementTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 bench.check_source(root, probes, "0" * 40)
 
+    def test_linker_check_tells_lld_from_gnu_ld(self):
+        lld = "String dump of section '.comment':\n  [     0]  Linker: Ubuntu LLD 24.0.0\n  [    1a]  Ubuntu clang 23\n"
+        gnu = "String dump of section '.comment':\n  [     0]  GCC: (Ubuntu 11.4.0) 11.4.0\n  [    2b]  Ubuntu clang 23\n"
+        self.assertEqual(bench.linker_lines(lld), ["Linker: Ubuntu LLD 24.0.0"])
+        self.assertEqual(bench.linker_lines(gnu), [])
+        lld_arm = {"linker_comment": "Linker: Ubuntu LLD 24", "link_command_contains": ["--ld-path=/x/ld.lld"]}
+        bfd_arm = {"linker_comment": None, "link_command_excludes": ["--ld-path", "-fuse-ld"]}
+        self.assertEqual(bench.check_linker("clang++ a.o --ld-path=/x/ld.lld -o bin/S", lld, lld_arm),
+                         ["Linker: Ubuntu LLD 24.0.0"])
+        self.assertEqual(bench.check_linker("clang++ a.o -o bin/S", gnu, bfd_arm), [])
+        with self.assertRaisesRegex(AssertionError, "not linked by the declared linker"):
+            bench.check_linker("clang++ a.o --ld-path=/x/ld.lld -o bin/S", gnu, lld_arm)
+        with self.assertRaisesRegex(AssertionError, "not linked by the declared linker"):
+            bench.check_linker("clang++ a.o -o bin/S", lld, bfd_arm)
+        with self.assertRaisesRegex(AssertionError, "lacks a declared part"):
+            bench.check_linker("clang++ a.o -o bin/S", lld, lld_arm)
+        with self.assertRaisesRegex(AssertionError, "contains an excluded part"):
+            bench.check_linker("clang++ a.o -fuse-ld=lld -o bin/S", gnu, bfd_arm)
+
     def test_log_window_excludes_old_commands_and_rejects_compaction(self):
         old = b"# ninja log v5\n0\t20\t0\told.o\ta\n"
         new = b"20\t30\t0\tnew.o\tb\n"

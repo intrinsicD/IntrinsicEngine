@@ -1,0 +1,59 @@
+benchmark_id: build.engine_compile_iteration.arch022_linker_lld.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.arch022_r6_2026_10_30
+params:
+  intent: performance
+  source_revisions:
+    warmup: adf7e0b3c566a2a07643eece1573ab9dfa022484
+    baseline: adf7e0b3c566a2a07643eece1573ab9dfa022484
+  sample_order: [warmup, baseline, baseline, baseline, baseline, baseline]
+  measured_iterations: 5
+  warmup_iterations: 1
+  warmup_scope: the first sample (arm warmup, same revision) holds the one clean build; its incremental scenarios are retained and excluded from every summary
+  preset: dev
+  dependency_set: dev
+  target: ExtrinsicSandbox
+  compiler: /bin/clang++-23
+  build_once: true
+  target_binary: bin/ExtrinsicSandbox
+  linker_comment: "Linker: Ubuntu LLD 24"
+  link_command_contains:
+    - --ld-path=/home/alex/.local/opt/lld-24/ld.lld
+  linker: lld 24.0.0 (apt.llvm.org lld-24 snapshot, extracted without root; wrapper /home/alex/.local/opt/lld-24/ld.lld)
+  minimum_interface_importers: 1
+  configure_options:
+    - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - -DCMAKE_EXE_LINKER_FLAGS=--ld-path=/home/alex/.local/opt/lld-24/ld.lld
+    - -DCMAKE_SHARED_LINKER_FLAGS=--ld-path=/home/alex/.local/opt/lld-24/ld.lld
+    - -DCMAKE_MODULE_LINKER_FLAGS=--ld-path=/home/alex/.local/opt/lld-24/ld.lld
+  edit: "namespace {{ [[maybe_unused]] constexpr int arch022_r6_probe_{n} = 0; }}\n"
+  scenarios:
+    clean: null
+    noop: null
+    operation_impl: src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp
+    config_interface: src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+    geometry_interface: src/geometry/Geometry.Registration.cppm
+  probe_sources:
+    config_interface:
+      - src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+      - src/app/Sandbox/Sandbox.ConfigSections.cpp
+      - src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm
+    geometry_interface:
+      - src/geometry/Geometry.Registration.cppm
+      - src/geometry/Geometry.Registration.cpp
+      - src/runtime/Editor/Operations/Runtime.RegistrationOperations.Processing.cpp
+  parallelism: Ninja's default (no --parallel; CMAKE_BUILD_PARALLEL_LEVEL removed from the environment), as a developer's build
+  compiler_cache: as the dev preset configures it; ccache is not installed on the measuring host, and the runner asserts no ccache in any compile command
+  invalidation: one unique compile-relevant line appended per edit scenario and sample; edits accumulate in the disposable worktree; the touched source and the declared importers must compile
+  build_storage: one build directory on disk inside the disposable worktree (build/dev), configured and clean-built once, then rebuilt incrementally
+  settledness: the noop build and an unmeasured build after every other scenario must produce no output except CMake's glob re-check
+  dependency_state: the preinstalled dev vcpkg tree, no package installation during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent memory
+  host_interference: per measured window, an estimated CPU residual (system busy CPU from /proc/stat minus the build's own user+system CPU), swap and major-fault deltas from /proc/vmstat, and the PSI memory stall (some) delta
+  summary: per incremental scenario median, min and max over the five baseline samples; the clean build is one measurement; the warmup's incremental scenarios are retained and excluded
+metrics:
+  - build_time_ms
+  - memory_peak_bytes
+  - sample_count
+thresholds: {}

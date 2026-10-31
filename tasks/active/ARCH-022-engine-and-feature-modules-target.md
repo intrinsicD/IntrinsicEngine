@@ -71,6 +71,7 @@ contract_review: tracker only; each slice declares its own contracts
     R4 under 10 s, R6 Sandbox rebuilt after one plugin edit in under 10 s and CI median under 15 min,
     R7 under 4 ms; next a CI time breakdown (1), then a measured linker comparison (2), then slice 2
     (3))
+47. (2026-10-31) "Du darfst lld installieren. Ich bin gerade nicht an dem Rechner."
 
 ## Goal
 - Reach the target in
@@ -569,3 +570,16 @@ python3 tools/docs/check_doc_links.py --root . --strict
     applied, then approved. The target's R6 cell links the breakdown.
   - Open for the operator: whether the 15-minute target means job time or run time including the
     wait.
+- 2026-10-31: Step 2 of Q46, the linker comparison, prepared for a full pre-flight.
+  - lld (Q47): sudo needs a password, so `lld-24` and `libllvm24` were fetched from apt.llvm.org
+    with `apt-get download`, checked against the apt index's sha256, and extracted to
+    `~/.local/opt/lld-24`. A wrapper provides `libLLVM.so.24.0` to lld only; the system is
+    unchanged.
+  - The runner gains a linker identity check: the final link command (`ninja -t commands -s`) and
+    the binary's `.comment` must match the arm's declared linker in every sample. Test included,
+    each check mutation-checked.
+  - Manifests `arch022_linker_bfd.yaml` and `arch022_linker_lld.yaml` are the R6 workload with only
+    the linker changed. `ld_run.sh` runs bfd, lld, bfd, lld in one worktree path; `ld_report.py`
+    compares them and refuses inconsistent arms (self-check with mutations).
+  - Technical test (all four runs with two samples each, numbers not read): every run exited 0,
+    every sample had its arm's linker, and the report rendered, so its consistency gates held.

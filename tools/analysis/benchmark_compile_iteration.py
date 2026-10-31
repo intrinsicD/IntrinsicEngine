@@ -80,6 +80,24 @@ def check_source(source: Path, probes: dict[str, bytes], revision: str | None = 
         "Probe file differs from the commit plus its probe lines"
 
 
+def linker_lines(comment: str) -> list[str]:
+    """The `.comment` lines a linker leaves in an ELF binary (lld and mold write one; GNU ld writes none)."""
+    return [line.split("]", 1)[1].strip() for line in comment.splitlines()
+            if "]" in line and any(name in line for name in ("Linker:", "LLD", "mold", "GNU gold"))]
+
+
+def check_linker(link_command: str, comment: str, params: dict) -> list[str]:
+    """Assert the declared linker linked the target; params.linker_comment None means GNU ld (no linker line)."""
+    assert all(part in link_command for part in params.get("link_command_contains", [])), \
+        "Link command lacks a declared part"
+    assert not any(part in link_command for part in params.get("link_command_excludes", [])), \
+        "Link command contains an excluded part"
+    lines, expected = linker_lines(comment), params.get("linker_comment")
+    assert any(expected in line for line in lines) if expected else not lines, \
+        f"Binary was not linked by the declared linker: {lines}"
+    return lines
+
+
 def window_outputs(window: bytes) -> list[str]:
     """Every output a build produced, except CMake's glob re-check that runs on every build."""
     outputs = [line.split("\t")[3] for line in window.decode().splitlines()[1:] if line]
@@ -345,6 +363,17 @@ def main() -> None:
                     f"{scenario} left work for the next build"
                 clean_source(revision)
             print(f"  PASS {scenario}: {record['wall_ms'] / 1000:.3f}s, {len(rows)} compiler invocations", flush=True)
+        linker = None
+        if params.get("target_binary"):
+            # The last scenario relinked the binary in every sample; check what produced it.
+            link_command = command(["ninja", "-C", str(build), "-t", "commands", "-s", params["target_binary"]],
+                                   source).strip()
+            (directory / "link_command.txt").write_text(link_command + "\n")
+            # binutils 2.38 readelf warns on DWARF 5 on stderr; .comment on stdout is unaffected.
+            comment = subprocess.run(["readelf", "-p", ".comment", str(build / params["target_binary"])], cwd=source,
+                                     check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
+            linker = {"comment_lines": check_linker(link_command, comment, params),
+                      "link_command_sha256": hashlib.sha256(link_command.encode()).hexdigest()}
         raw = {"benchmark_id": manifest["benchmark_id"], "method": manifest["method"],
                "dataset": manifest["dataset"], "backend": "external_baseline", "commit": revision,
                "status": "passed", "metrics": {name: value for name, value in {"build_time_ms": timings,
@@ -355,7 +384,8 @@ def main() -> None:
                                "scenarios": details, "source_clean_before_after": not probes,
                                "source_matches_expected_state": True,
                                "probe_edits": {path: hashlib.sha256(content).hexdigest()
-                                               for path, content in sorted(probes.items())}}}
+                                               for path, content in sorted(probes.items())},
+                               "linker": linker}}
         write_json(directory / "raw-result.json", raw)
         sealed = canonicalize(raw, manifest_path=manifest_path, manifest=manifest,
                               manifests_root=REPO / "benchmarks", run_id=output.name,
