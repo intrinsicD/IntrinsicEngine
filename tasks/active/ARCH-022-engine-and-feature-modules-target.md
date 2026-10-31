@@ -886,3 +886,18 @@ python3 tools/docs/check_doc_links.py --root . --strict
     listing entry next to its `config_get`.
   - Driver run 8 (`tasks/evidence/ARCH-022/spike-s1/run8/summary.json`): 54 of 60 passed. The same
     two findings remain.
+- 2026-10-31: S1 step 6, variant (b): `build/spike-shared` (preset `dev`,
+  `-DINTRINSIC_PLUGIN_SPIKE=ON -DBUILD_SHARED_LIBS=ON`).
+  - The module libraries are added without a type, so the configure switch alone makes the engine
+    shared (13 `.so`); there is no source or CMake conversion. The plugin links
+    `ExtrinsicSandboxEditor` like any target, and CMake carries its module sets: no response file,
+    no `COMPILE_ONLY`.
+  - The first build failed: the project's static `libtinygltf.a` was not position-independent and
+    cannot go into the shared runtime. With `-DCMAKE_POSITION_INDEPENDENT_CODE=ON` it builds.
+  - Driver run b1 (`tasks/evidence/ARCH-022/spike-s1/run-b1/summary.json`): 54 of 60 passed, the
+    same checks and the same two findings as variant (a). Identity holds with shared libraries too:
+    one ImGui context and allocator, one ImPlot context, one counter, inline static and
+    thread-local.
+  - Observed, not compared (the comparison of build time and size needs its own pre-flight):
+    - variant (a): executable 738 MB, plugin 43 KB;
+    - variant (b): executable 7.4 MB plus 13 shared engine libraries, plugin 4.8 MB.
