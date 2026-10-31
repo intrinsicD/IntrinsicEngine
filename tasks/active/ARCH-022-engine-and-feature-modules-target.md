@@ -606,3 +606,15 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - Technical test of revision 2 (all four runs with two samples each, numbers not read): every run
     exited 0, every sample had its arm's linker and a recorded binary size, `linkers.txt` names
     `ld.bfd` 2.38 and LLD 24.0.0, and the report rendered, so every arm-equivalence gate held.
+- 2026-10-31: Linker pre-flight delta on `87df2ae5…14deb7`: Claude PASS, Codex REVISE.
+  - Codex's blocker: summaries selected samples by the raw `arm` label, which was never checked
+    against the frozen order, so a relabelled baseline sample could leave the decision.
+  - Revision 3:
+    - the report gates every sample's label against its position;
+    - it requires a complete `linkers.txt`, which the chain now writes from separate assignments,
+      also recording clang's ld (`/usr/bin/ld`);
+    - it shows the manifest prefix and hashes, and counts binary sizes over measured samples only;
+    - any repeat after "no decision" is outside the frozen plan.
+  - Each new check is mutation-checked.
+  - Technical test of revision 3 (four runs, two samples each, numbers not read): every run exited
+    0, `linkers.txt` complete, and the report rendered.
