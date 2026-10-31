@@ -901,3 +901,19 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - Observed, not compared (the comparison of build time and size needs its own pre-flight):
     - variant (a): executable 738 MB, plugin 43 KB;
     - variant (b): executable 7.4 MB plus 13 shared engine libraries, plugin 4.8 MB.
+- 2026-10-31: ci-docs failed on `01095d834`: the R2 ratchet treated `plugins/spike` as a new plugin
+  above 0.
+  - The spike imports `Extrinsic.Runtime.EditorWindowRegistry` for `EditorWindowDescriptor`, an
+    editor-internal module under the ratchet's definition. That is a spike finding: today a plugin
+    cannot register a window without an editor-internal import; R2 needs the descriptor in a service
+    module.
+  - Fix: `check_feature_boundaries.py` excludes exactly `plugins/spike` (`NOT_PLUGINS`), with a test
+    that every other folder under `plugins/` still counts; real plugins are unaffected.
+  - Why it slipped through locally: the local replay of ci-docs took only lines starting with
+    `python3` and missed 14 single-line `run: python3 ...` steps, among them this check. The lesson
+    in `docs/lessons/engineering.md` now names that trap.
+  - The next ci-docs step would also have failed: the source rule
+    `ProductionSourceHasNoApplicationCallbackLifecycle/app` forbids `Runtime::Engine&` under
+    `src/app`. The spike now takes the `ServiceRegistry` and an exit callback instead. After the
+    change, driver runs 9 (variant a) and b2 (variant b) passed 54 of 60 each, with the same two
+    findings. All 56 ci-docs commands, single-line `run:` steps included, pass on a clean copy.

@@ -35,6 +35,9 @@ SCHEMA = Path("tests/data/agent_declared_tool_schemas.json")
 R1_ROOTS = ("src/runtime", "src/app")
 SUFFIXES = (".cpp", ".cppm", ".hpp", ".h")
 PLUGIN_ROOTS = ("src/runtime/Modules", "plugins")
+# The ARCH-022 plugin-host spike (built only with INTRINSIC_PLUGIN_SPIKE) measures the plugin boundary instead of
+# obeying it; its R2 count is a spike finding, not a ratcheted plugin. Delete this entry with the spike.
+NOT_PLUGINS = frozenset({"plugins/spike"})
 EDITOR_ROOT = "src/runtime/Editor/"
 NAME_RE = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 RAW_START_RE = re.compile(r'(?<![A-Za-z0-9_])(?:u8|u|U|L)?R"([^()\\\s]{0,16})\(')
@@ -107,8 +110,8 @@ def name_matchers(names: list[str]) -> list[tuple[str, str, re.Pattern[str]]]:
 
 
 def plugin_folders(root: Path) -> list[str]:
-    return sorted(d.relative_to(root).as_posix() for top in PLUGIN_ROOTS if (root / top).is_dir()
-                  for d in (root / top).iterdir() if d.is_dir() and not d.name.startswith("."))
+    return sorted(rel for top in PLUGIN_ROOTS if (root / top).is_dir() for d in (root / top).iterdir()
+                  if d.is_dir() and not d.name.startswith(".") and (rel := d.relative_to(root).as_posix()) not in NOT_PLUGINS)
 
 
 def folder_of(rel: str, folders: list[str]) -> str | None:

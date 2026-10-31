@@ -120,4 +120,5 @@ regressions". ARCH-022 added a test to that step without updating the pin, and t
 hand-picked subset of ci-docs. ci-docs was then red on `main` for seven commits (`b73d90b46` to `ef98e7370`) until
 `b6963920e`. Safeguard: before pushing a change under `.github/workflows/`, search the tests for the edited step name and
 run every `python3` command of that workflow on a clean worktree of the commit; after each push, read that commit's CI
-result before pushing the next.
+result before pushing the next. A replay that collects the commands from the workflow file must also take single-line
+`run: python3 ...` steps; ARCH-022 missed 14 of them once and broke `main` again (`01095d834`).

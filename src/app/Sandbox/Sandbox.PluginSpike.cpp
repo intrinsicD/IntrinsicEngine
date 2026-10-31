@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -24,7 +25,7 @@ import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.ServiceRegistry;
 
 extern "C" void spike_lifecycle_event(const char* event) noexcept
 {
@@ -107,7 +108,7 @@ namespace Extrinsic::Sandbox::Spike
             return std::nullopt;
         }
 
-        Runtime::AgentOperationOutcome Load(Runtime::Engine& engine, std::string_view argumentsJson)
+        Runtime::AgentOperationOutcome Load(Runtime::ServiceRegistry& services, std::string_view argumentsJson)
         {
             const Json arguments = Json::parse(argumentsJson, nullptr, false);
             if (!arguments.is_object() || !arguments.contains("path") || !arguments["path"].is_string())
@@ -139,12 +140,12 @@ namespace Extrinsic::Sandbox::Spike
             const std::shared_ptr<void> reservation(nullptr, [](void*) { g_LoadPending = false; });
             // Spike test hook: a second load in the same dispatch must be refused while this one is pending.
             const std::string second = arguments.value("probe_pending", false)
-                ? Load(engine, Json{{"path", path}}.dump()).ErrorCode : std::string{};
+                ? Load(services, Json{{"path", path}}.dump()).ErrorCode : std::string{};
             Runtime::AgentOperationOutcome outcome{.Text = "{}"};
-            outcome.Continuation = [&engine, staged = std::move(staged), failAt, shutdownFn, reservation, second](
+            outcome.Continuation = [&services, staged = std::move(staged), failAt, shutdownFn, reservation, second](
                 const Runtime::AgentOperationContext& context, Runtime::AgentOperationOutcome& result) mutable
             {
-                auto* ui = engine.Services().Find<Runtime::EditorUiHost>();
+                auto* ui = services.Find<Runtime::EditorUiHost>();
                 if (ui == nullptr || context.ConfigControl == nullptr)
                 {
                     result = Fail("host_unavailable", "editor UI host or config control missing");
@@ -163,10 +164,10 @@ namespace Extrinsic::Sandbox::Spike
             return outcome;
         }
 
-        Runtime::AgentOperationOutcome HostIdentity(Runtime::Engine& engine)
+        Runtime::AgentOperationOutcome HostIdentity(Runtime::ServiceRegistry& services)
         {
             Json windows = Json::array();
-            if (const auto* ui = engine.Services().Find<Runtime::EditorUiHost>())
+            if (const auto* ui = services.Find<Runtime::EditorUiHost>())
                 for (const auto& entry : ui->BuildWindowMenuModel())
                     windows.push_back({{"id", entry.Id}, {"open", entry.Open}});
             ImGuiMemAllocFunc alloc = nullptr;
@@ -188,7 +189,8 @@ namespace Extrinsic::Sandbox::Spike
         }
     }
 
-    void RegisterHostOperations(Runtime::AgentOperationRegistry& registry, Runtime::Engine& engine)
+    void RegisterHostOperations(Runtime::AgentOperationRegistry& registry, Runtime::ServiceRegistry& services,
+                                std::function<void()> requestExit)
     {
         g_Operations = &registry;
         (void)registry.Register({
@@ -199,25 +201,25 @@ namespace Extrinsic::Sandbox::Spike
                            "probe_pending tries a second load in the same dispatch and reports its error code.",
             .InputSchemaJson = R"({"type":"object","properties":{"path":{"type":"string"},"fail_at":{"type":"string"},"probe_pending":{"type":"boolean"}},"required":["path"],"additionalProperties":false})",
             .ReadOnly = false,
-            .Invoke = [&engine](const Runtime::AgentOperationContext&, std::string_view arguments)
-            { return Load(engine, arguments); },
+            .Invoke = [&services](const Runtime::AgentOperationContext&, std::string_view arguments)
+            { return Load(services, arguments); },
         });
         (void)registry.Register({
             .Name = "plugin_host_identity",
             .Title = "Host identity probes (ARCH-022 spike)",
             .Description = "Addresses and values of the host's probes, ImGui context and allocator, ImPlot context, "
                            "registered windows with their open state.",
-            .Invoke = [&engine](const Runtime::AgentOperationContext&, std::string_view) { return HostIdentity(engine); },
+            .Invoke = [&services](const Runtime::AgentOperationContext&, std::string_view) { return HostIdentity(services); },
         });
         (void)registry.Register({
             .Name = "app_quit",
             .Title = "Quit the Sandbox (ARCH-022 spike)",
             .Description = "Calls the loaded plugin's shutdown hook, then requests the engine's exit.",
             .ReadOnly = false,
-            .Invoke = [&engine](const Runtime::AgentOperationContext&, std::string_view)
+            .Invoke = [requestExit = std::move(requestExit)](const Runtime::AgentOperationContext&, std::string_view)
             {
                 if (g_Shutdown != nullptr) g_Shutdown();
-                engine.RequestExit();
+                requestExit();
                 return Runtime::AgentOperationOutcome{.Text = R"({"quitting":true})"};
             },
         });

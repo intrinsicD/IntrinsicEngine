@@ -2,6 +2,7 @@
 // Built only with INTRINSIC_PLUGIN_SPIKE; the plugin imports this module from the host's BMIs.
 module;
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -10,7 +11,7 @@ export module Extrinsic.Sandbox.PluginSpike;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorWindowRegistry;
-import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.ServiceRegistry;
 
 // Exported by the executable and usable before dlopen and through teardown (it holds no host state):
 // appends one line to the file named by INTRINSIC_SPIKE_EVENT_LOG.
@@ -42,5 +43,6 @@ export namespace Extrinsic::Sandbox::Spike
     }
 
     // Adds plugin_load, plugin_host_identity and app_quit; keeps the registry to commit plugin tools later.
-    void RegisterHostOperations(Runtime::AgentOperationRegistry& registry, Runtime::Engine& engine);
+    void RegisterHostOperations(Runtime::AgentOperationRegistry& registry, Runtime::ServiceRegistry& services,
+                                std::function<void()> requestExit);
 }

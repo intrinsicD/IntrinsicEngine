@@ -461,7 +461,7 @@ int main(int argc, char** argv)
         auto agentOptions = *cli.Agent;
 #if defined(INTRINSIC_PLUGIN_SPIKE)
         agentOptions.RegisterExtraOperations = [&engine](Extrinsic::Runtime::AgentOperationRegistry& registry)
-        { Extrinsic::Sandbox::Spike::RegisterHostOperations(registry, engine); };
+        { Extrinsic::Sandbox::Spike::RegisterHostOperations(registry, engine.Services(), [&engine] { engine.RequestExit(); }); };
 #endif
         engine.AddModule(std::make_unique<Extrinsic::Runtime::AgentServerModule>(std::move(agentOptions)));
     }
