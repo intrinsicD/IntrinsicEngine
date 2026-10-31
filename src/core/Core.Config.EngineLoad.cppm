@@ -125,6 +125,8 @@ namespace Extrinsic::Core::Config
         std::uint32_t SchemaVersion{0u};
         EngineConfigPreview Preview{};
         std::vector<EngineConfigDiagnostic> Diagnostics{};
+        // Stamped by the runtime config control: its section registry's generation when the preview was made.
+        std::uint64_t SectionRegistryGeneration{0u};
     };
 
     export [[nodiscard]] std::string_view ToString(EngineConfigState value) noexcept;

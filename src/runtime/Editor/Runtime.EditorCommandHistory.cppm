@@ -5,8 +5,10 @@ module;
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -78,6 +80,11 @@ export namespace Extrinsic::Runtime
         bool Dirtying{true};
     };
 
+    // A command registered by name (a plugin's): the history calls it with an entry's payload, `undo` selecting
+    // the direction.
+    using EditorCommandHandler =
+        std::function<EditorCommandHistoryStatus(std::string_view payload, bool undo)>;
+
     class EditorCommandHistory
     {
     public:
@@ -89,6 +96,14 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] EditorCommandHistoryResult Redo();
         [[nodiscard]] EditorCommandHistoryResult MarkDirty(std::string label = {});
 
+        // Fail for an empty name or handler, a name already registered, or an unknown name.
+        [[nodiscard]] bool RegisterCommand(std::string name, EditorCommandHandler handler);
+        [[nodiscard]] bool UnregisterCommand(std::string_view name);
+        // An entry whose undo and redo look up the handler registered under `name` when they run, so it outlives
+        // the code that recorded it (a plugin reload). With no handler they return UnsupportedOperation, and the
+        // entry stays where it is.
+        [[nodiscard]] EditorCommandRecord MakeRegisteredCommandRecord(
+            std::string label, std::string name, std::string payload);
         void ClearHistory();
         void ResetDocument(std::string path = {});
         void MarkSaved(std::string path = {}, std::optional<std::uint64_t> savedRevision = std::nullopt);
@@ -124,6 +139,7 @@ export namespace Extrinsic::Runtime
         std::string m_ActivePath{};
         // Main-thread state: the agent scope, job completions and panels all run there.
         std::string m_LabelPrefix{};
+        std::map<std::string, EditorCommandHandler, std::less<>> m_Commands{};
     };
 
     // Sets a history label prefix for the lifetime of the scope and restores

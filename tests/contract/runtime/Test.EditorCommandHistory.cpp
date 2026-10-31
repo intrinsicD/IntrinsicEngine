@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -596,4 +597,71 @@ TEST(EditorCommandHistory, LabelPrefixScopesNestAndRestore)
     }
     EXPECT_EQ(record("Panel"), "Panel");
     const Extrinsic::Runtime::ScopedEditorCommandLabelPrefix none{nullptr, "ignored"};
+}
+
+namespace
+{
+    // Adds the payload's integer to `value` on redo and subtracts it on undo; counts its calls.
+    [[nodiscard]] Runtime::EditorCommandHandler MakeAddHandler(int& value, int& calls)
+    {
+        return [&value, &calls](const std::string_view payload, const bool undo)
+        {
+            ++calls;
+            const int delta = std::stoi(std::string{payload});
+            value += undo ? -delta : delta;
+            return undo ? Runtime::EditorCommandHistoryStatus::Undone : Runtime::EditorCommandHistoryStatus::Applied;
+        };
+    }
+}
+
+TEST(EditorCommandHistory, RegisteredCommandEntryCallsTheHandlerWithItsPayload)
+{
+    Runtime::EditorCommandHistory history{};
+    int value = 0;
+    int calls = 0;
+    ASSERT_TRUE(history.RegisterCommand("add", MakeAddHandler(value, calls)));
+    EXPECT_FALSE(history.RegisterCommand("add", MakeAddHandler(value, calls)));
+    EXPECT_FALSE(history.RegisterCommand("", MakeAddHandler(value, calls)));
+    EXPECT_FALSE(history.RegisterCommand("empty", {}));
+
+    ASSERT_TRUE(history.Execute(history.MakeRegisteredCommandRecord("Add 5", "add", "5")).Succeeded());
+    EXPECT_EQ(value, 5);
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Add 5");
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_EQ(value, 0);
+    ASSERT_TRUE(history.Redo().Succeeded());
+    EXPECT_EQ(value, 5);
+    EXPECT_EQ(calls, 3);
+    EXPECT_FALSE(history.UnregisterCommand("missing"));
+}
+
+TEST(EditorCommandHistory, RegisteredCommandEntriesWaitForTheirHandler)
+{
+    Runtime::EditorCommandHistory history{};
+    int value = 0;
+    int oldCalls = 0;
+    ASSERT_TRUE(history.RegisterCommand("add", MakeAddHandler(value, oldCalls)));
+    ASSERT_TRUE(history.Execute(history.MakeRegisteredCommandRecord("Add 5", "add", "5")).Succeeded());
+    ASSERT_TRUE(history.Execute(history.MakeRegisteredCommandRecord("Add 3", "add", "3")).Succeeded());
+    ASSERT_TRUE(history.Undo().Succeeded());
+    ASSERT_EQ(value, 5);
+
+    // The handler's code goes away (a plugin unload): both entries stay where they are.
+    ASSERT_TRUE(history.UnregisterCommand("add"));
+    EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::UnsupportedOperation);
+    EXPECT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::UnsupportedOperation);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 1u);
+    EXPECT_EQ(value, 5);
+
+    // A new handler under the same name (the reloaded plugin) serves both entries.
+    int newCalls = 0;
+    ASSERT_TRUE(history.RegisterCommand("add", MakeAddHandler(value, newCalls)));
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_EQ(value, 0);
+    ASSERT_TRUE(history.Redo().Succeeded());
+    ASSERT_TRUE(history.Redo().Succeeded());
+    EXPECT_EQ(value, 8);
+    EXPECT_EQ(oldCalls, 3);
+    EXPECT_EQ(newCalls, 3);
 }

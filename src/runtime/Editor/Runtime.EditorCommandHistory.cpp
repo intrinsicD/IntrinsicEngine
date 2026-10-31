@@ -4,8 +4,10 @@ module;
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -111,6 +113,41 @@ namespace Extrinsic::Runtime
     EditorCommandHistory::EditorCommandHistory(const std::size_t capacity)
         : m_Capacity(capacity)
     {
+    }
+
+    bool EditorCommandHistory::RegisterCommand(std::string name, EditorCommandHandler handler)
+    {
+        if (name.empty() || !handler)
+            return false;
+        return m_Commands.try_emplace(std::move(name), std::move(handler)).second;
+    }
+
+    bool EditorCommandHistory::UnregisterCommand(const std::string_view name)
+    {
+        const auto it = m_Commands.find(name);
+        if (it == m_Commands.end())
+            return false;
+        m_Commands.erase(it);
+        return true;
+    }
+
+    EditorCommandRecord EditorCommandHistory::MakeRegisteredCommandRecord(
+        std::string label, std::string name, std::string payload)
+    {
+        // Host code and host data only: the entry may outlive the handler's code.
+        const auto call = [this, name = std::move(name), payload = std::move(payload)](const bool undo)
+        {
+            const auto it = m_Commands.find(name);
+            if (it == m_Commands.end())
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            const EditorCommandHandler handler = it->second; // a handler may unregister itself
+            return handler(payload, undo);
+        };
+        return EditorCommandRecord{
+            .Label = std::move(label),
+            .Redo = [call] { return call(false); },
+            .Undo = [call] { return call(true); },
+        };
     }
 
     EditorCommandHistoryResult EditorCommandHistory::Execute(

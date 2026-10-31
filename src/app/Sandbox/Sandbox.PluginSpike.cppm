@@ -4,6 +4,7 @@ module;
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 export module Extrinsic.Sandbox.PluginSpike;
@@ -23,6 +24,14 @@ export extern "C" void spike_invoked(int generation, const char* kind) noexcept;
 
 export namespace Extrinsic::Sandbox::Spike
 {
+    // A history command (S2b): the host registers it by name with the editor history, so undo and redo entries
+    // hold data and find the current plugin's code when they run. Returns false when it cannot apply.
+    struct HistoryCommand
+    {
+        std::string Name{};
+        std::function<bool(std::string_view payload, bool undo)> Apply{};
+    };
+
     // What a plugin's Register adds; the host commits it atomically after the MCP call returned.
     struct StagedRegistrations
     {
@@ -30,6 +39,7 @@ export namespace Extrinsic::Sandbox::Spike
         std::vector<Core::Config::EngineConfigSectionRegistration> ConfigSections{};
         std::vector<Runtime::AgentOperationSpec> Operations{};
         std::vector<Runtime::EditorWindowDescriptor> Windows{};
+        std::vector<HistoryCommand> HistoryCommands{};
     };
 
     // extern "C" entry points of a plugin; nothing throws across them (-fno-exceptions).
@@ -46,6 +56,17 @@ export namespace Extrinsic::Sandbox::Spike
         static int value = 0;
         return value;
     }
+
+    // Host state a plugin's undoable edits change (S2b); it survives a reload, as scene data does.
+    [[nodiscard]] int& HostUndoValue() noexcept;
+
+    // Records an undo entry through the editor history without the plugin naming editor types. The command form
+    // holds data and calls the registered command; the closure form holds the plugin's closures, as today's
+    // entries do (the S2b control). Both execute the redo first; false when it fails or no history is available.
+    [[nodiscard]] bool RecordCommand(const Runtime::AgentOperationContext& context, std::string label,
+                                     std::string command, std::string payload);
+    [[nodiscard]] bool RecordClosureCommand(const Runtime::AgentOperationContext& context, std::string label,
+                                            std::function<bool()> redo, std::function<bool()> undo);
 
     // Adds plugin_load, plugin_unload, plugin_reload, plugin_host_identity and app_quit; keeps the registry to
     // commit and remove plugin tools later.

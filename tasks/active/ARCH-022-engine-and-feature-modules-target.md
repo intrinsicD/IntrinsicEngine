@@ -1310,3 +1310,66 @@ python3 tools/docs/check_doc_links.py --root . --strict
     - 280 core, 292 Sandbox editor integration and 1875 runtime contract tests pass;
     - S1 driver: 58 of 58 in both variants;
     - S2a driver: 61 of 61 in both variants.
+- 2026-10-31: S2a code review of `43042ab82`.
+  - Codex (fresh session `01a193d9-abc1-7782-8896-3a11de669a01`, diff SHA-256 prefix
+    `5cd0461b25eaa51e`): REVISE.
+    - Musts:
+      1. a dropped load continuation left its image open;
+      2. apply's re-validation checked only the state, not the canonical payload;
+      3. Restore could apply a fallback-changed payload that it reported as rejected.
+    - Shoulds:
+      4. the scene fixture did not protect transforms;
+      5. a missing token passed as zero.
+  - Fresh Claude ponytail review: Ship.
+    - Lean findings: `Usable()` like preview; the late-section list; a docstring claim; an unused
+      field; two driver near-copies; the prebuild order.
+    - Noted for the correctness review: on `callables_alive` the host unregisters everything and
+      forgets the plugin, while the plan said "the plugin stays loaded".
+  - Fixes (they go into the S2b review, per the review rule):
+    1. A pending candidate owns its image (`Own`): a dropped or unrunnable continuation closes it.
+       Test hook `simulate_drop`: closed, nothing alive, unmapped, copy removed.
+    2. Design change for review instead of re-validation: every preview the control makes carries
+       its section registry's generation, which `RegisterSection`/`UnregisterSection` advance.
+       Apply rejects any other generation. This replaces `SectionsMatchRegistry` and the
+       re-validation; unstamped previews count as generation 0. All production previews for
+       apply come from the control.
+    3. Restore applies only when the preview keeps the saved section unchanged. Fixture: a
+       build whose validator clamps 12 to 10 with a fallback; the saved 12 is reported rejected,
+       8 stays, and no change callback runs.
+    4. The scene is seeded with the imported mesh renamed, moved and scaled through `load_scene`.
+       The check asserts the seeded transform, then compares byte-equal saves.
+    5. Every callable kind must be counted while loaded and appear at every close (and the copy
+       must be gone).
+
+    Ponytail's lean findings are applied; the top-level `live` field stays, because 5 now reads
+    it.
+  - Deviation, recorded: on `callables_alive` the plugin is unregistered and forgotten, but its
+    image stays mapped (leaked), so no callable outlives its code. The plan's "stays loaded" is
+    met for the image, not for its registrations.
+- 2026-10-31: S2b implemented (undo and redo across a reload).
+  - `EditorCommandHistory::RegisterCommand`/`UnregisterCommand`/`MakeRegisteredCommandRecord`
+    (contract tests: a data entry calls its handler; without a handler `UnsupportedOperation` and
+    unchanged stacks; a handler registered again serves both entries).
+  - Spike: history commands staged and committed like other registrations; `RecordCommand` and
+    `RecordClosureCommand` let the plugin record entries without naming editor types (R2 stays
+    0/0); host state `HostUndoValue`.
+  - Driver: add 5, add 3, undo, reload to generation 3, then undo, redo, redo give 0, 5, 8; only
+    generation 3's handler ran (three times).
+  - Closure control (`--closure-control`): the entry is listed and the image unmapped; then undo
+    kills the Sandbox. The control's criterion as first written (pc equal to the fault address)
+    did not hold: with UBSan's function check, the caller reads the callee's type hash before the
+    jump, so the fault is a READ in the host frame. The criterion is now the plan's (Undo on the
+    stack), plus the fault address inside the closed image's former range, recorded by the host
+    before `dlclose`. Run ctl2: 12 of 12.
+  - Variant (a), run 2: 73 of 73.
+  - Variant (b): 73 of 73, control 13 of 13. S1 regression: 58 of 58 in both variants. Suites:
+    280 core, 292 integration, 1877 runtime contract tests.
+  - Mutations (each caught by its intended check):
+    - the history handler cached at record time: the reload fails `callables_alive`, and the
+      history checks fail;
+    - the validator's token removed: the counted-kind and close checks;
+    - Restore without its preview guard: the clamp check;
+    - the generation check removed: both held-preview contract tests.
+
+    The dropped-load mutation first went unnoticed: the check read the last close record, which
+    was an earlier clean one. It now requires a new record, and the mutation is caught.

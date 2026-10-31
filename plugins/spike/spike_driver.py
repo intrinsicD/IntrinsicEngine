@@ -203,6 +203,12 @@ def leak_records(log: str) -> list[str]:
     return sorted("\n".join(record) for record in records)
 
 
+def clean_close(close: dict) -> bool:
+    """A close attempt that closed the image with no live callable and saw it leave the process."""
+    return close.get("closed") is True and close.get("unmapped") is True and \
+        all(count == 0 for count in close.get("live", {}).values())
+
+
 def arguments(description: str) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--build", type=Path, required=True)
@@ -216,9 +222,11 @@ def arguments(description: str) -> argparse.Namespace:
     return args
 
 
-def launch(args: argparse.Namespace, checks: Checks, scenario) -> tuple[object, str, list[str]] | None:
+def launch(args: argparse.Namespace, checks: Checks, scenario, expect_crash: bool = False
+           ) -> tuple[object, str, list[str]] | None:
     """Runs scenario(agent) against a Sandbox started with the driver's environment and waits for its exit.
-    Returns (exit code, stderr, lifecycle events), or None when the environment is not ready."""
+    Returns (exit code, stderr, lifecycle events), or None when the environment is not ready. With expect_crash
+    the caller judges the exit; the clean-exit checks are skipped."""
     out, build = args.out, args.build
     ready = [checks.check("environment: DISPLAY is set", bool(os.environ.get("DISPLAY")), os.environ.get("DISPLAY")),
              checks.check("environment: the Vulkan ICD exists", args.icd.is_file(), str(args.icd)),
@@ -250,12 +258,15 @@ def launch(args: argparse.Namespace, checks: Checks, scenario) -> tuple[object, 
             sandbox.kill()
             code = "killed after the deadline"
     log = (out / "sandbox.stderr").read_bytes().decode(errors="replace")
+    lines = events.read_text().splitlines() if events.exists() else []
+    if expect_crash:
+        return code, log, lines
     sanitizer = sanitizer_lines(log)
     checks.check("exit: the Sandbox exited with status 0", code == 0, code)
     checks.check("exit: ASan, LSan and UBSan clean", not sanitizer, sanitizer[:3])
     checks.check("exit: no sanitizer error other than a leak report", all(LEAK_REPORT.search(l) for l in sanitizer),
                  [l for l in sanitizer if not LEAK_REPORT.search(l)][:3])
-    return code, log, events.read_text().splitlines() if events.exists() else []
+    return code, log, lines
 
 
 def main() -> int:
@@ -271,8 +282,7 @@ def main() -> int:
     # Each failed attempt that opened an image is closed with no live callable and leaves the process: static
     # construction, Register when it reached the commit, static destruction at the close.
     opened = [stage for stage in FAIL_STAGES if stage != "dlopen"]
-    clean = [c for c in closes if c.get("closed") is True and c.get("unmapped") is True
-             and all(count == 0 for count in c.get("live", {}).values())]
+    clean = [c for c in closes if clean_close(c)]
     checks.check("lifecycle: every failed image closed with no live callable and unmapped",
                  len(closes) == len(clean) == len(opened), closes)
     expected = []

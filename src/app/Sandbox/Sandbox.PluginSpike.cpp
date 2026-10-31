@@ -3,6 +3,7 @@
 // over is counted per generation, and an image is closed only when none of its callables is alive.
 module;
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -29,6 +30,7 @@ module Extrinsic.Sandbox.PluginSpike;
 
 import Extrinsic.Runtime.DerivedConfigSections; // re-exports Extrinsic.Core.Config.EngineLoad (app does not import core)
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -93,6 +95,36 @@ namespace Extrinsic::Sandbox::Spike
         return value;
     }
 
+    int& HostUndoValue() noexcept
+    {
+        static int value = 0;
+        return value;
+    }
+
+    bool RecordCommand(const Runtime::AgentOperationContext& context, std::string label, std::string command,
+                       std::string payload)
+    {
+        if (context.History == nullptr) return false;
+        return context.History->Execute(context.History->MakeRegisteredCommandRecord(
+            std::move(label), std::move(command), std::move(payload))).Succeeded();
+    }
+
+    bool RecordClosureCommand(const Runtime::AgentOperationContext& context, std::string label,
+                              std::function<bool()> redo, std::function<bool()> undo)
+    {
+        if (context.History == nullptr) return false;
+        using Status = Runtime::EditorCommandHistoryStatus;
+        return context.History->Execute({
+            .Label = std::move(label),
+            .Redo = [redo = std::move(redo)] { return redo() ? Status::Applied : Status::CommandFailed; },
+            .Undo = [undo = std::move(undo)]
+            {
+                spike_lifecycle_event("closure_undo"); // attributes the S2b control's crash to this call
+                return undo() ? Status::Undone : Status::UndoFailed;
+            },
+        }).Succeeded();
+    }
+
     namespace
     {
         using Json = nlohmann::json;
@@ -107,6 +139,7 @@ namespace Extrinsic::Sandbox::Spike
             std::vector<std::string> Operations{};
             std::vector<std::string> Sections{};
             std::vector<Runtime::EditorWindowHandle> Windows{};
+            std::vector<std::string> HistoryCommands{};
         };
 
         // An opened image whose Register succeeded; committed on a later frame.
@@ -117,6 +150,24 @@ namespace Extrinsic::Sandbox::Spike
             ShutdownFn Shutdown{nullptr};
             StagedRegistrations Staged{};
         };
+
+        bool Close(void* handle, const std::filesystem::path& copy, std::optional<int> generation);
+
+        // Owns a pending candidate's image: a load whose continuation is dropped (the caller disconnected) or
+        // cannot run closes the image here. Finish takes the candidate out, and with it the ownership.
+        std::shared_ptr<Candidate> Own(Candidate candidate)
+        {
+            return {new Candidate(std::move(candidate)), [](Candidate* pending)
+                    {
+                        if (pending->Handle != nullptr)
+                        {
+                            const int generation = pending->Staged.Generation;
+                            pending->Staged = {};
+                            (void)Close(pending->Handle, pending->Copy, generation);
+                        }
+                        delete pending;
+                    }};
+        }
 
         Runtime::AgentOperationRegistry* g_Operations{nullptr};
         std::optional<LoadedPlugin> g_Plugin{};
@@ -159,12 +210,23 @@ namespace Extrinsic::Sandbox::Spike
             return copy;
         }
 
-        bool Mapped(const std::filesystem::path& file)
+        // The lowest start and highest end of the file's mappings, as hex strings; empty when it is not mapped.
+        Json MappedRange(const std::filesystem::path& file)
         {
             std::ifstream maps("/proc/self/maps");
+            std::uintptr_t low = UINTPTR_MAX, high = 0;
             for (std::string line; std::getline(maps, line);)
-                if (line.find(file.string()) != std::string::npos) return true;
-            return false;
+            {
+                if (line.find(file.string()) == std::string::npos) continue;
+                const auto dash = line.find('-');
+                low = std::min(low, static_cast<std::uintptr_t>(std::stoull(line.substr(0, dash), nullptr, 16)));
+                high = std::max(high, static_cast<std::uintptr_t>(std::stoull(line.substr(dash + 1), nullptr, 16)));
+            }
+            if (high == 0) return Json::array();
+            char text[2][32];
+            std::snprintf(text[0], sizeof text[0], "0x%lx", static_cast<unsigned long>(low));
+            std::snprintf(text[1], sizeof text[1], "0x%lx", static_cast<unsigned long>(high));
+            return Json::array({text[0], text[1]});
         }
 
         // Closes an image only when no callable of its generation is alive (otherwise it stays mapped, so no
@@ -183,11 +245,12 @@ namespace Extrinsic::Sandbox::Spike
                 }
             }
             Json record{{"generation", generation ? Json(*generation) : Json(nullptr)}, {"live", live},
-                        {"closed", !alive}};
+                        {"closed", !alive}, {"copy", copy.string()}};
             if (!alive)
             {
+                record["range"] = MappedRange(copy); // where the image was, to attribute a later fault
                 dlclose(handle);
-                record["unmapped"] = !Mapped(copy);
+                record["unmapped"] = MappedRange(copy).empty();
                 std::error_code ec{};
                 std::filesystem::remove(copy, ec);
             }
@@ -240,15 +303,17 @@ namespace Extrinsic::Sandbox::Spike
         // last, so a failure never has to restore it.
         std::optional<std::string> Commit(StagedRegistrations& staged, LoadedPlugin& plugin,
                                           Runtime::EngineConfigControl& config, Runtime::EditorUiHost& ui,
-                                          const std::string_view failAt)
+                                          Runtime::EditorCommandHistory* history, const std::string_view failAt)
         {
             const auto rollback = [&](std::string reason) -> std::optional<std::string>
             {
                 for (const auto& name : plugin.Sections) (void)config.UnregisterSection(name);
                 for (const auto handle : plugin.Windows) (void)ui.UnregisterWindow(handle);
+                for (const auto& name : plugin.HistoryCommands) (void)history->UnregisterCommand(name);
                 plugin.Sections.clear();
                 plugin.Windows.clear();
                 plugin.Operations.clear();
+                plugin.HistoryCommands.clear();
                 return reason;
             };
 
@@ -277,12 +342,26 @@ namespace Extrinsic::Sandbox::Spike
             }
             if (failAt == "windows") return rollback("windows: injected failure after the windows");
 
+            using Status = Runtime::EditorCommandHistoryStatus;
+            for (auto& command : staged.HistoryCommands)
+            {
+                const bool registered = history->RegisterCommand(command.Name,
+                    [apply = std::move(command.Apply)](const std::string_view payload, const bool undo)
+                    {
+                        if (apply(payload, undo)) return undo ? Status::Undone : Status::Applied;
+                        return undo ? Status::UndoFailed : Status::CommandFailed;
+                    });
+                if (!registered) return rollback("history: command rejected");
+                plugin.HistoryCommands.push_back(command.Name);
+            }
+
             *g_Operations = std::move(operationsCopy);
             return std::nullopt;
         }
 
         // Reapplies the saved payloads of the plugin's sections through preview and apply, so the new
-        // registration validates them and its OnChanged receives them.
+        // registration validates them and its OnChanged receives them. A payload the preview does not keep as
+        // saved (rejected, or changed by a fallback) is not applied: the section keeps its default.
         Json Restore(const LoadedPlugin& plugin, Runtime::EngineConfigControl& config)
         {
             Json report{{"restored", Json::array()}, {"rejected", Json::array()}};
@@ -292,11 +371,11 @@ namespace Extrinsic::Sandbox::Spike
                 if (saved == g_SavedSections.end()) continue;
                 auto candidate = config.GetEngineConfigControlState().ActiveConfig;
                 Core::Config::UpsertEngineConfigSection(candidate.AppSections, saved->second);
-                const auto applied = config.ApplyEngineConfigHotSubset(config.PreviewEngineConfigControlDocument(
-                    Core::Config::SerializeEngineConfig(candidate), "plugin-reload:" + name));
-                const auto* active = Core::Config::FindEngineConfigSection(
-                    config.GetEngineConfigControlState().ActiveConfig.AppSections, name);
-                const bool restored = applied.Succeeded() && active != nullptr && *active == saved->second;
+                const auto preview = config.PreviewEngineConfigControlDocument(
+                    Core::Config::SerializeEngineConfig(candidate), "plugin-reload:" + name);
+                const auto* previewed = Core::Config::FindEngineConfigSection(preview.Preview.Config.AppSections, name);
+                const bool restored = Core::Config::IsConfigUsable(preview) && previewed != nullptr &&
+                    *previewed == saved->second && config.ApplyEngineConfigHotSubset(preview).Succeeded();
                 report[restored ? "restored" : "rejected"].push_back(name);
                 g_SavedSections.erase(saved);
             }
@@ -304,11 +383,12 @@ namespace Extrinsic::Sandbox::Spike
         }
 
         Runtime::AgentOperationOutcome Finish(Candidate candidate, Runtime::EngineConfigControl& config,
-                                              Runtime::EditorUiHost& ui, const std::string_view failAt)
+                                              Runtime::EditorUiHost& ui, Runtime::EditorCommandHistory* history,
+                                              const std::string_view failAt)
         {
             LoadedPlugin plugin{.Handle = candidate.Handle, .Copy = candidate.Copy,
                                 .Generation = candidate.Staged.Generation, .Shutdown = candidate.Shutdown};
-            const auto failure = Commit(candidate.Staged, plugin, config, ui, failAt);
+            const auto failure = Commit(candidate.Staged, plugin, config, ui, history, failAt);
             candidate.Staged = {}; // leftover staged callables die before any close
             if (failure)
             {
@@ -323,7 +403,8 @@ namespace Extrinsic::Sandbox::Spike
 
         // Shutdown hook, then every registration out (section payloads saved first), then the close. On
         // callables_alive the plugin is unregistered but stays mapped.
-        std::optional<std::string> Unload(Runtime::EngineConfigControl& config, Runtime::EditorUiHost& ui)
+        std::optional<std::string> Unload(Runtime::EngineConfigControl& config, Runtime::EditorUiHost& ui,
+                                          Runtime::EditorCommandHistory* history)
         {
             LoadedPlugin plugin = std::move(*g_Plugin);
             g_Plugin.reset();
@@ -337,6 +418,9 @@ namespace Extrinsic::Sandbox::Spike
             }
             for (const auto& name : plugin.Operations) (void)g_Operations->Unregister(name);
             for (const auto handle : plugin.Windows) (void)ui.UnregisterWindow(handle);
+            // Entries recorded through these commands stay in the history; they wait for a plugin that registers
+            // the same names again.
+            for (const auto& name : plugin.HistoryCommands) (void)history->UnregisterCommand(name);
             spike_lifecycle_event("unload");
             if (!Close(plugin.Handle, plugin.Copy, plugin.Generation)) return std::string{"callables_alive"};
             return std::nullopt;
@@ -352,7 +436,8 @@ namespace Extrinsic::Sandbox::Spike
 
         Runtime::EditorUiHost* Ui(Runtime::ServiceRegistry& services, const Runtime::AgentOperationContext& context)
         {
-            return context.ConfigControl != nullptr ? services.Find<Runtime::EditorUiHost>() : nullptr;
+            return context.ConfigControl != nullptr && context.History != nullptr
+                ? services.Find<Runtime::EditorUiHost>() : nullptr;
         }
 
         Runtime::AgentOperationOutcome Load(Runtime::ServiceRegistry& services, std::string_view argumentsJson)
@@ -368,22 +453,28 @@ namespace Extrinsic::Sandbox::Spike
             Runtime::AgentOperationOutcome failure{};
             auto candidate = Open(path, failAt, failure);
             if (!candidate) return failure;
+            auto opened = Own(std::move(*candidate));
+            // Spike test hook: drop the pending load as a disconnect would; the owner closes the image.
+            if (arguments.value("simulate_drop", false))
+            {
+                opened.reset();
+                return {.Text = Json{{"dropped", true}, {"close", g_Closes.back()}}.dump()};
+            }
             const auto reservation = Reserve();
             // Spike test hook: a second load in the same dispatch must be refused while this one is pending.
             const std::string second = arguments.value("probe_pending", false)
                 ? Load(services, Json{{"path", path}}.dump()).ErrorCode : std::string{};
             Runtime::AgentOperationOutcome outcome{.Text = "{}"};
-            outcome.Continuation = [&services, opened = std::make_shared<Candidate>(std::move(*candidate)), failAt,
-                                    reservation, second](const Runtime::AgentOperationContext& context,
+            outcome.Continuation = [&services, opened = std::move(opened), failAt, reservation, second](const Runtime::AgentOperationContext& context,
                                                          Runtime::AgentOperationOutcome& result)
             {
                 auto* ui = Ui(services, context);
                 if (ui == nullptr)
                 {
-                    result = Fail("host_unavailable", "editor UI host or config control missing");
+                    result = Fail("host_unavailable", "editor UI host, config control or history missing");
                     return true;
                 }
-                result = Finish(std::move(*opened), *context.ConfigControl, *ui, failAt);
+                result = Finish(std::exchange(*opened, Candidate{}), *context.ConfigControl, *ui, context.History, failAt);
                 if (!result.IsError)
                 {
                     Json reply = Json::parse(result.Text);
@@ -420,10 +511,10 @@ namespace Extrinsic::Sandbox::Spike
                 auto* ui = Ui(services, context);
                 if (ui == nullptr)
                 {
-                    result = Fail("host_unavailable", "editor UI host or config control missing");
+                    result = Fail("host_unavailable", "editor UI host, config control or history missing");
                     return true;
                 }
-                if (const auto error = Unload(*context.ConfigControl, *ui))
+                if (const auto error = Unload(*context.ConfigControl, *ui, context.History))
                 {
                     result = Fail(*error, "a callable of the closing generation is still alive; the image stays mapped");
                     return true;
@@ -435,7 +526,8 @@ namespace Extrinsic::Sandbox::Spike
                 }
                 Runtime::AgentOperationOutcome failure{};
                 auto candidate = Open(path, failAt, failure);
-                result = candidate ? Finish(std::move(*candidate), *context.ConfigControl, *ui, failAt) : failure;
+                result = candidate ? Finish(std::move(*candidate), *context.ConfigControl, *ui, context.History, failAt)
+                                   : failure;
                 return true;
             };
             return outcome;
@@ -462,8 +554,9 @@ namespace Extrinsic::Sandbox::Spike
                 {"implot_context", Address(ImPlot::GetCurrentContext())},
                 {"windows", windows},
                 {"pid", getpid()},
-                {"loaded", g_Plugin ? Json(g_Plugin->Generation) : Json(nullptr)},
+                {"undo_value", HostUndoValue()},
                 {"live", CountsJson(Live())},
+                {"loaded", g_Plugin ? Json(g_Plugin->Generation) : Json(nullptr)},
                 {"invoked", CountsJson(Invoked())},
                 {"closes", g_Closes},
             };
@@ -481,8 +574,9 @@ namespace Extrinsic::Sandbox::Spike
             .Title = "Load a plugin (ARCH-022 spike)",
             .Description = std::string{"dlopen a private copy of a plugin and commit its registrations on the next "
                                        "frame. "} + kFailAt + "probe_pending tries a second load in the same "
-                                       "dispatch and reports its error code.",
-            .InputSchemaJson = R"({"type":"object","properties":{"path":{"type":"string"},"fail_at":{"type":"string"},"probe_pending":{"type":"boolean"}},"required":["path"],"additionalProperties":false})",
+                                       "dispatch and reports its error code; simulate_drop drops the pending "
+                                       "load as a disconnect would.",
+            .InputSchemaJson = R"({"type":"object","properties":{"path":{"type":"string"},"fail_at":{"type":"string"},"probe_pending":{"type":"boolean"},"simulate_drop":{"type":"boolean"}},"required":["path"],"additionalProperties":false})",
             .ReadOnly = false,
             .Invoke = [&services](const Runtime::AgentOperationContext&, std::string_view arguments)
             { return Load(services, arguments); },
@@ -512,8 +606,9 @@ namespace Extrinsic::Sandbox::Spike
             .Name = "plugin_host_identity",
             .Title = "Host identity probes (ARCH-022 spike)",
             .Description = "Addresses and values of the host's probes, ImGui context and allocator, ImPlot context, "
-                           "registered windows with their open state, the process id, the loaded generation, live "
-                           "and invoked plugin callables per generation and kind, and every close attempt.",
+                           "registered windows with their open state, the process id, the host undo value, the loaded "
+                           "generation, live and invoked plugin callables per generation and kind, and every close "
+                           "attempt.",
             .Invoke = [&services](const Runtime::AgentOperationContext&, std::string_view) { return HostIdentity(services); },
         });
         (void)registry.Register({

@@ -152,37 +152,6 @@ namespace Extrinsic::Runtime
                                       "camera.controller");
             return fields;
         }
-
-        // False for a preview made before RegisterSection/UnregisterSection: it lacks a registered
-        // section (or holds it under another schema), or holds one unregistered since.
-        [[nodiscard]] bool SectionsMatchRegistry(
-            const std::vector<Core::Config::EngineConfigSection>& candidate,
-            const std::vector<Core::Config::EngineConfigSection>& live,
-            const RuntimeEngineConfigSectionRegistry& registry)
-        {
-            for (const RuntimeEngineConfigSectionRegistration& registration :
-                 registry.Entries())
-            {
-                const Core::Config::EngineConfigSection& expected =
-                    registration.DefaultSection;
-                const Core::Config::EngineConfigSection* section =
-                    Core::Config::FindEngineConfigSection(candidate, expected.Name);
-                if (section == nullptr || section->SchemaId != expected.SchemaId ||
-                    section->SchemaVersion != expected.SchemaVersion)
-                {
-                    return false;
-                }
-            }
-            return std::all_of(
-                candidate.begin(),
-                candidate.end(),
-                [&](const Core::Config::EngineConfigSection& section)
-                {
-                    return registry.Find(section.Name) != nullptr ||
-                        Core::Config::FindEngineConfigSection(live, section.Name) !=
-                            nullptr;
-                });
-        }
     }
 
     bool RuntimeEngineConfigApplyResult::SectionChanged(
@@ -222,7 +191,7 @@ namespace Extrinsic::Runtime
             config->AppSections,
             m_SectionRegistry.Find(name)->DefaultSection);
         m_ConfigControlState.ActiveConfig = *config;
-        m_LateSections.push_back(name);
+        ++m_SectionRegistryGeneration;
         return true;
     }
 
@@ -242,8 +211,8 @@ namespace Extrinsic::Runtime
             {
                 return section.Name == owned;
             });
-        std::erase(m_LateSections, owned);
         m_ConfigControlState.ActiveConfig = *config;
+        ++m_SectionRegistryGeneration;
         return true;
     }
 
@@ -417,26 +386,30 @@ namespace Extrinsic::Runtime
         const std::string_view document,
         std::string sourceId) const
     {
-        return Core::Config::PreviewEngineConfig(
+        Core::Config::EngineConfigLoadResult result = Core::Config::PreviewEngineConfig(
             document,
             CurrentConfig(),
             Core::Config::EngineConfigParseOptions{
                 .SourceId = std::move(sourceId),
                 .SectionRegistry = &m_SectionRegistry,
             });
+        result.SectionRegistryGeneration = m_SectionRegistryGeneration;
+        return result;
     }
 
     Core::Config::EngineConfigLoadResult
     EngineConfigControl::LoadEngineConfigControlFile(std::string path) const
     {
         const std::string sourceId = path;
-        return Core::Config::LoadEngineConfigFile(
+        Core::Config::EngineConfigLoadResult result = Core::Config::LoadEngineConfigFile(
             path,
             CurrentConfig(),
             Core::Config::EngineConfigParseOptions{
                 .SourceId = sourceId,
                 .SectionRegistry = &m_SectionRegistry,
             });
+        result.SectionRegistryGeneration = m_SectionRegistryGeneration;
+        return result;
     }
 
     RuntimeEngineConfigApplyResult
@@ -458,10 +431,9 @@ namespace Extrinsic::Runtime
         }
 
         const Core::Config::EngineConfig& candidate = loadResult.Preview.Config;
-        if (!SectionsMatchRegistry(
-                candidate.AppSections,
-                config->AppSections,
-                m_SectionRegistry))
+        // A preview made before RegisterSection/UnregisterSection would drop, bring back or bypass the current
+        // validator of a section (a plugin reload); unstamped previews count as made at generation 0.
+        if (loadResult.SectionRegistryGeneration != m_SectionRegistryGeneration)
         {
             result.LoadResult.Diagnostics.push_back(Core::Config::EngineConfigDiagnostic{
                 .Code = Core::Config::EngineConfigDiagnosticCode::InvalidSchema,
@@ -491,36 +463,6 @@ namespace Extrinsic::Runtime
         result.GpuProfilingChanged = gpuProfilingChanged;
         result.ChangedSectionNames =
             FindChangedSectionNames(config->AppSections, candidate.AppSections);
-        for (const std::string& name : result.ChangedSectionNames)
-        {
-            const Core::Config::EngineConfigSectionRegistration* registration =
-                m_SectionRegistry.Find(name);
-            const Core::Config::EngineConfigSection* section =
-                Core::Config::FindEngineConfigSection(candidate.AppSections, name);
-            if (std::ranges::find(m_LateSections, name) == m_LateSections.end() ||
-                registration == nullptr || section == nullptr)
-            {
-                continue;
-            }
-            const Core::Config::EngineConfigSection* live =
-                Core::Config::FindEngineConfigSection(config->AppSections, name);
-            if (registration->Validate(
-                    section->PayloadJson,
-                    live != nullptr ? live->PayloadJson
-                                    : registration->DefaultSection.PayloadJson,
-                    "app.sections." + name + ".payload")
-                    .State != Core::Config::EngineConfigState::Valid)
-            {
-                result.LoadResult.Diagnostics.push_back(Core::Config::EngineConfigDiagnostic{
-                    .Code = Core::Config::EngineConfigDiagnosticCode::InvalidValue,
-                    .Subject = "app.sections." + name,
-                    .Message = "The section's current registration rejects the previewed payload; preview again.",
-                });
-                result.Status = RuntimeEngineConfigApplyStatus::Rejected;
-                RecordConfigApply(result);
-                return result;
-            }
-        }
         if (!recipePathChanged && !gpuProfilingChanged &&
             result.ChangedSectionNames.empty())
         {

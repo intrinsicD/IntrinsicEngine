@@ -412,6 +412,13 @@ unfinished, including one targeting a different path. It neither waits nor write
 or changes document/history state on this rejection; synchronous saving is available
 again after the queued tail's completion/finalizer settles.
 
+A history entry can also hold data instead of closures: `RegisterCommand(name,
+handler)` registers a handler, and `MakeRegisteredCommandRecord(label, name,
+payload)` makes an entry whose undo and redo look the handler up when they run.
+With no handler registered they return `UnsupportedOperation` and the entry
+stays, so entries outlive the code that recorded them; a plugin reload
+(ARCH-022 S2) registers the same name again and serves them.
+
 Undoable entity edits keep their typed capture, validation, atomic application,
 and dirty-stamp policy with the owning runtime feature. The runtime-internal
 `ExecuteUndoableEntityMutation(...)` template turns those callbacks plus stable

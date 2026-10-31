@@ -11,7 +11,8 @@
 
 // Generated in the build directory (CMake writes the default; the S2 driver rewrites it to make a new build):
 // SPIKE_GENERATION, the build's version; SPIKE_FAIL_REGISTER, a build whose Register stages and then fails;
-// SPIKE_MISSING_SYMBOL (optional), a build that needs a symbol the host does not export, so dlopen fails.
+// SPIKE_MISSING_SYMBOL (optional), a build that needs a symbol the host does not export, so dlopen fails;
+// SPIKE_CLAMP_MARKER (optional), a build whose validator clamps marker_size above 10 with a fallback.
 #include "SpikeVersion.inc"
 
 import Extrinsic.Core.Config.Engine;
@@ -73,6 +74,12 @@ namespace
     {
         const auto size = MarkerSize(document);
         if (!size) return {.State = Config::EngineConfigState::Invalid};
+#if defined(SPIKE_CLAMP_MARKER) && SPIKE_CLAMP_MARKER
+        if (*size > 10)
+            return {.State = Config::EngineConfigState::FallbackApplied,
+                    .CanonicalPayloadJson = Json{{"marker_size", 10}}.dump(),
+                    .ParsedFieldCount = 1u};
+#endif
         return {.State = Config::EngineConfigState::Valid,
                 .CanonicalPayloadJson = Json{{"marker_size", *size}}.dump(),
                 .ParsedFieldCount = 1u};
@@ -108,6 +115,25 @@ namespace
             {"config_changes", g_ChangeCount},
         };
         return {.Text = value.dump()};
+    }
+
+    // spike_counter_add {delta, form}: an undoable edit of host state. The command form records data for the
+    // registered history command; the closure form records this image's closures, as today's entries do.
+    AgentOperationOutcome CounterAdd(const AgentOperationContext& context, std::string_view argumentsJson)
+    {
+        const Json arguments = Json::parse(argumentsJson, nullptr, false);
+        if (!arguments.is_object() || !arguments.contains("delta") || !arguments["delta"].is_number_integer())
+            return {.IsError = true, .Text = "delta (integer) is required", .ErrorCode = "invalid_params"};
+        const int delta = arguments["delta"].get<int>();
+        const bool closure = arguments.value("form", std::string{"command"}) == "closure";
+        const std::string label = "Spike add " + std::to_string(delta) + (closure ? " (closure)" : "");
+        const bool recorded = closure
+            ? Spike::RecordClosureCommand(context, label,
+                  [delta] { Spike::HostUndoValue() += delta; return true; },
+                  [delta] { Spike::HostUndoValue() -= delta; return true; })
+            : Spike::RecordCommand(context, label, "spike.add", std::to_string(delta));
+        if (!recorded) return {.IsError = true, .Text = "the edit was not recorded", .ErrorCode = "not_recorded"};
+        return {.Text = Json{{"value", Spike::HostUndoValue()}}.dump()};
     }
 
     void DrawWindow(bool& open)
@@ -187,6 +213,29 @@ extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged,
         {
             t.Invoked();
             return AgentOperationOutcome{.Text = Json{{"generation", SPIKE_GENERATION}}.dump()};
+        },
+    });
+    staged.Operations.push_back({
+        .Name = "spike_counter_add",
+        .Title = "Undoable add (spike plugin)",
+        .Description = "Adds delta to the host's undo value as an undoable edit; form command (default) or closure.",
+        .InputSchemaJson = R"({"type":"object","properties":{"delta":{"type":"integer"},"form":{"type":"string","enum":["command","closure"]}},"required":["delta"],"additionalProperties":false})",
+        .ReadOnly = false,
+        .Invoke = [t = Tracked{"operation"}](const AgentOperationContext& context, std::string_view arguments)
+        {
+            t.Invoked();
+            return CounterAdd(context, arguments);
+        },
+    });
+    staged.HistoryCommands.push_back({
+        .Name = "spike.add",
+        .Apply = [t = Tracked{"history_handler"}](std::string_view payload, bool undo)
+        {
+            t.Invoked();
+            const Json delta = Json::parse(payload, nullptr, false);
+            if (!delta.is_number_integer()) return false;
+            Spike::HostUndoValue() += undo ? -delta.get<int>() : delta.get<int>();
+            return true;
         },
     });
     staged.Windows.push_back({

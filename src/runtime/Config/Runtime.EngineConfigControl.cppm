@@ -84,8 +84,8 @@ namespace Extrinsic::Runtime
         // (the engine's and GetEngineConfigControlState's); no callback runs. Unregister
         // removes registration and value. Both fail without change when the control is
         // unbound, during OnChanged dispatch, or for a duplicate, present or unknown name.
-        // Apply validates a late section's change again with its current registration, so a
-        // preview held across a re-registration cannot bypass the new validator.
+        // Apply rejects a preview made before either call (a held preview would drop, bring back
+        // or bypass the current validator of a section).
         [[nodiscard]] bool RegisterSection(
             RuntimeEngineConfigSectionRegistration registration);
         [[nodiscard]] bool UnregisterSection(std::string_view name);
@@ -149,7 +149,7 @@ namespace Extrinsic::Runtime
         RuntimeEngineConfigControlState m_ConfigControlState{};
         bool m_Published{false};
         bool m_DispatchingSectionChanges{false};
-        // Registered through RegisterSection; apply validates their changes again (a reload replaces them).
-        std::vector<std::string> m_LateSections{};
+        // Counts RegisterSection/UnregisterSection; previews carry it, apply requires it unchanged.
+        std::uint64_t m_SectionRegistryGeneration{0u};
     };
 }
