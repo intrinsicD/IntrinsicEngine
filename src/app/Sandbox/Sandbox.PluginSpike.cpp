@@ -137,8 +137,11 @@ namespace Extrinsic::Sandbox::Spike
             // reservation ends when the continuation is destroyed: after it completed, or when the call is dropped.
             g_LoadPending = true;
             const std::shared_ptr<void> reservation(nullptr, [](void*) { g_LoadPending = false; });
+            // Spike test hook: a second load in the same dispatch must be refused while this one is pending.
+            const std::string second = arguments.value("probe_pending", false)
+                ? Load(engine, Json{{"path", path}}.dump()).ErrorCode : std::string{};
             Runtime::AgentOperationOutcome outcome{.Text = "{}"};
-            outcome.Continuation = [&engine, staged = std::move(staged), failAt, shutdownFn, reservation](
+            outcome.Continuation = [&engine, staged = std::move(staged), failAt, shutdownFn, reservation, second](
                 const Runtime::AgentOperationContext& context, Runtime::AgentOperationOutcome& result) mutable
             {
                 auto* ui = engine.Services().Find<Runtime::EditorUiHost>();
@@ -154,7 +157,7 @@ namespace Extrinsic::Sandbox::Spike
                 }
                 g_Shutdown = shutdownFn;
                 spike_lifecycle_event("commit");
-                result = {.Text = R"({"loaded":true})"};
+                result = {.Text = Json{{"loaded", true}, {"second_attempt", second}}.dump()};
                 return true;
             };
             return outcome;
@@ -192,8 +195,9 @@ namespace Extrinsic::Sandbox::Spike
             .Name = "plugin_load",
             .Title = "Load a plugin (ARCH-022 spike)",
             .Description = "dlopen a plugin and commit its registrations on the next frame. fail_at injects a "
-                           "failure at dlopen, dlsym, register, config, operations, windows or replace.",
-            .InputSchemaJson = R"({"type":"object","properties":{"path":{"type":"string"},"fail_at":{"type":"string"}},"required":["path"],"additionalProperties":false})",
+                           "failure at dlopen, dlsym, register, config, operations, windows or replace; "
+                           "probe_pending tries a second load in the same dispatch and reports its error code.",
+            .InputSchemaJson = R"({"type":"object","properties":{"path":{"type":"string"},"fail_at":{"type":"string"},"probe_pending":{"type":"boolean"}},"required":["path"],"additionalProperties":false})",
             .ReadOnly = false,
             .Invoke = [&engine](const Runtime::AgentOperationContext&, std::string_view arguments)
             { return Load(engine, arguments); },

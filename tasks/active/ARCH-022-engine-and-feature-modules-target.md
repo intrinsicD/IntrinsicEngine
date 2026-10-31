@@ -859,3 +859,23 @@ python3 tools/docs/check_doc_links.py --root . --strict
     failures are finding 1 (4: the section is not active after a late registration, so no change
     callback, no redrawn marker, no `config_changed` event) and finding 2 (2: exit status 1 and the
     driver's leak records).
+- 2026-10-31: S1 review delta. Ponytail: Ship (optional cuts applied). Codex: CHANGES REQUIRED.
+  - Codex's remaining points:
+    - section contents in the rollback comparison;
+    - the Vulkan check read the wrong case;
+    - the socket double-load is not guaranteed to land in one frame;
+    - non-leak sanitizer errors could pass.
+  - Fixed:
+    - the comparison holds each section's `config_get`;
+    - `device_status.actual_backend == "vulkan"` and `is_operational` are checked directly;
+    - a spike hook (`probe_pending`) makes a second load in the same dispatch, which must be refused
+      as `load_pending`, while a socket load right behind it may be refused as pending or already
+      loaded;
+    - any sanitizer line other than the leak report fails;
+    - the no-plugin session is dropped, since `baseline-bug083*` already shows the driver's own leaks.
+  - Driver run 7 (`tasks/evidence/ARCH-022/spike-s1/run7/summary.json`): 54 of 60 passed.
+  - The 6 failures:
+    - Finding 1 (4 failures): after the first change the section is active with 12, but the plugin
+      was not told of that change.
+    - Finding 2 (2 failures): status 1 and the NVIDIA driver's 240 bytes. No other sanitizer line, and
+      no leak frame in the spike code.
