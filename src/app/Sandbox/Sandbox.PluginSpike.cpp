@@ -780,6 +780,8 @@ namespace Extrinsic::Sandbox::Spike
             .Invoke = [&services, requestExit = std::move(requestExit)](const Runtime::AgentOperationContext&,
                                                                         std::string_view)
             {
+                // Like the other lifecycle operations: one at a time, so a quit's unload never overlaps a reload's.
+                if (g_LoadPending) return Fail("load_pending", "a load, unload or reload has not finished yet");
                 Runtime::AgentOperationOutcome outcome{.Text = "{}"};
                 outcome.Continuation = [&services, requestExit, reservation = Reserve(),
                                         deadline = std::optional<std::chrono::steady_clock::time_point>{}](

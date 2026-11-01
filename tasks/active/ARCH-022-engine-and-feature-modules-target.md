@@ -1486,3 +1486,8 @@ python3 tools/docs/check_doc_links.py --root . --strict
     58 in both variants.
   - Mutations: quitting on timeout is caught by the quit checks; quitting without the unload is
     caught by the quit-order check (and by S1).
+  - Codex delta of `afec3a26e`: the quit fix holds; REVISE on one new Must. `app_quit` reserved
+    without checking `g_LoadPending`, so a quit overlapping a reload could unload twice. Fix:
+    `app_quit` refuses with `load_pending` like the other lifecycle operations. Check: a quit sent
+    while a reload drains is refused, and the reload completes. Run 9: 105 of 105 (variant b:
+    105 of 105); S1 58 of 58 in both. The mutation without the check fails the overlap check.

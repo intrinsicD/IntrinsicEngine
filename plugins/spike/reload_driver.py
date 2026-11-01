@@ -35,7 +35,8 @@ It checks, in order:
      records again; frames 3 records exactly three frames. The retirement check uses the plugin's own frame numbers.
   12. the close guard: an unload with one plugin callable kept alive (test hook) unregisters everything but leaves the
      image mapped, with callables_alive;
-  13. a quit whose drain times out (a job that ignores cancellation) fails with drain_timeout and does not quit;
+  13. a quit while a reload drains is refused with load_pending; a quit whose drain times out (a job that ignores
+     cancellation) fails with drain_timeout and does not quit;
   14. a quit with a job and GPU work outstanding settles both before the shutdown hook, unloads the plugin, and a job
      request sent right behind it is not admitted; a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
@@ -473,8 +474,17 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
                  close)
     checks.check("guard: no plugin is registered", state["loaded"] is None and s1.registries(agent) == baseline, "changed")
 
-    # 13. A quit whose drain times out does not quit: the shutdown hook must not run before the work settled.
+    # 13. A quit while a reload is draining is refused; the reload then completes.
     ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
+    agent.call("spike_start_job", {"seconds": 2, "ignore_cancel": True})
+    wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
+    reload_reply, quit_reply = (agent.outcome(r) if "result" in r else (False, r.get("error"), [], "") for r in
+                                send_both(agent, ("plugin_reload", {"path": str(kept["A"])}), ("app_quit", {})))
+    checks.check("overlap: a quit during a reload's drain is refused with load_pending, and the reload completes",
+                 not quit_reply[0] and quit_reply[3] == "load_pending" and reload_reply[0]
+                 and generation_of(reload_reply[1]) == 2, [quit_reply[3], reload_reply[1]])
+
+    # 13b. A quit whose drain times out does not quit: the shutdown hook must not run before the work settled.
     agent.call("spike_start_job", {"seconds": 7, "ignore_cancel": True})
     wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
     ok, reply, _, error = agent.call("app_quit")
