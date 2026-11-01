@@ -19,7 +19,7 @@ as tools/agents/mcp_bridge.py speaks it) it:
   7. quits through app_quit; checks a clean exit, sanitizer errors, the attribution of any leak record by its frames
      and the lifecycle event order.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
-Usage: python3 plugins/spike/spike_driver.py --build build/spike --out <new dir> [--icd <VK_DRIVER_FILES json>]
+Usage: python3 plugins/spike/spike_driver.py --build build/dev --out <new dir> [--icd <VK_DRIVER_FILES json>]
 """
 
 from __future__ import annotations
@@ -45,7 +45,8 @@ FAIL_STAGES = {"dlopen": "dlopen_failed", "dlsym": "dlsym_failed",
                "config": "commit_failed", "operations": "commit_failed", "windows": "commit_failed"}
 MAGENTA = (255, 0, 255)
 # A sanitizer frame in any of these is the spike's own code.
-SPIKE_FRAMES = ("libIntrinsicSpikePlugin", "Sandbox.PluginSpike", "SpikePlugin.cpp", "Extrinsic::Sandbox::Spike")
+SPIKE_FRAMES = ("libIntrinsicSpikePlugin", "SpikePlugin.cpp", "Runtime.PluginHost", "Runtime.PluginContract",
+               "PluginHostModule", "PluginProbes")
 # The only sanitizer lines a driver leak report may contain; anything else (a crash, a fatal LSan error, UBSan) fails.
 LEAK_REPORT = re.compile(r"ERROR: LeakSanitizer: detected memory leaks|SUMMARY: AddressSanitizer: \d+ byte\(s\) leaked")
 
@@ -240,14 +241,15 @@ def launch(args: argparse.Namespace, checks: Checks, scenario, expect_crash: boo
     events, suppressions = out / "events.log", out / "lsan.supp"
     suppressions.write_text((REPO / "lsan.supp").read_text() + (Path(__file__).parent / "lsan-driver.supp").read_text())
     env = {k: v for k, v in os.environ.items() if k != "INTRINSIC_ENGINE_CONFIG"}
-    env.update(INTRINSIC_SPIKE_EVENT_LOG=str(events), VK_DRIVER_FILES=str(args.icd),
+    env.update(INTRINSIC_PLUGIN_EVENT_LOG=str(events), VK_DRIVER_FILES=str(args.icd),
                LD_PRELOAD=json.loads(args.icd.read_text())["ICD"]["library_path"],
                ASAN_OPTIONS="detect_leaks=1:fast_unwind_on_malloc=0",
                LSAN_OPTIONS=f"detect_leaks=1:fast_unwind_on_malloc=0:suppressions={suppressions}",
                UBSAN_OPTIONS="print_stacktrace=1")
     with (out / "sandbox.stdout").open("wb") as stdout, (out / "sandbox.stderr").open("wb") as stderr:
         sandbox = subprocess.Popen([str(build / "bin/ExtrinsicSandbox"), "--agent-socket", str(out / "agent.sock"),
-                                    "--agent-root", str(out)], cwd=REPO, env=env, stdout=stdout, stderr=stderr)
+                                    "--agent-root", str(out), "--plugin-test-hooks"],
+                                   cwd=REPO, env=env, stdout=stdout, stderr=stderr)
         try:
             scenario(Agent(out / "agent.sock", args.deadline))
         except Exception as error:  # a crash or a protocol failure is a failed check, not a driver traceback
@@ -278,7 +280,7 @@ def main() -> int:
         return finish(checks, args.out)
     _, log, lines = result
     spike = [r for r in leak_records(log) if any(m in r for m in SPIKE_FRAMES)]
-    checks.check("exit: no leak record has a frame in the plugin or the spike host code", not spike, spike[:2])
+    checks.check("exit: no leak record has a frame in the plugin or the plugin host code", not spike, spike[:2])
     # Each failed attempt that opened an image is closed with no live callable and leaves the process: static
     # construction, Register when it reached the commit, static destruction at the close.
     opened = [stage for stage in FAIL_STAGES if stage != "dlopen"]
@@ -288,8 +290,9 @@ def main() -> int:
     expected = []
     for stage in opened:
         expected += ["static_construct"] + (["register"] if FAIL_STAGES[stage] == "commit_failed" else []) + ["static_destruct"]
-    # app_quit unloads the plugin like plugin_unload, so its image closes before the exit.
-    expected += ["static_construct", "register", "commit", "first_draw", "config_changed", "shutdown", "unload",
+    # app_quit requests the exit; the plugin host runs the plugin's shutdown hook during the engine's shutdown and
+    # leaves the image mapped, whose static destruction runs as the process ends.
+    expected += ["static_construct", "register", "commit", "first_draw", "config_changed", "shutdown", "host_shutdown",
                  "static_destruct"]
     checks.check("lifecycle: events in order (Register once per staged attempt)", lines == expected, lines)
     return finish(checks, args.out)
@@ -305,7 +308,10 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
     expect_square(agent, checks, "before_load", 0)
     baseline = registries(agent)
     names = {tool["name"] for tool in baseline["tools"]}
-    checks.check("host: spike host tools present", {"plugin_load", "plugin_host_identity", "app_quit"} <= names)
+    checks.check("host: plugin host tools present",
+                 {"plugin_load", "plugin_unload", "plugin_reload", "plugin_list", "plugin_host_identity", "app_quit"} <= names)
+    ok, listed, _, _ = agent.call("plugin_list")
+    checks.check("host: plugin_list reports no plugin", ok and listed == {"loaded": None}, listed)
     for stage, code in FAIL_STAGES.items():
         ok, reply, _, error = agent.call("plugin_load", {"path": str(plugin), "fail_at": stage})
         named = code != "commit_failed" or str(reply).startswith(f"{stage}:")
@@ -319,6 +325,7 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
     (ok, reply, _, _), (ok2, _, _, error2) = agent.call_both(
         ("plugin_load", {"path": str(plugin), "probe_pending": True}), ("plugin_load", {"path": str(plugin)}))
     checks.check("load: committed", ok and isinstance(reply, dict) and reply.get("loaded") is True, reply)
+    generation = reply.get("generation") if isinstance(reply, dict) else None
     checks.check("load: a second load in the same dispatch is refused as load_pending",
                  isinstance(reply, dict) and reply.get("second_attempt") == "load_pending", reply)
     checks.check("load: a second load right behind it is refused", not ok2 and error2 in ("load_pending", "already_loaded"),
@@ -345,6 +352,12 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
 
     ok, echo, _, _ = agent.call("spike_echo", {"text": "hello"})
     checks.check("mcp: spike_echo answers", ok and echo == {"echo": {"text": "hello"}}, echo)
+    ok, listed, _, _ = agent.call("plugin_list")
+    loaded = listed.get("loaded") if isinstance(listed, dict) else None
+    checks.check("host: plugin_list reports the loaded generation and its registrations",
+                 ok and isinstance(loaded, dict) and loaded.get("generation") == generation
+                 and "spike_echo" in loaded["operations"]
+                 and loaded.get("config_sections") == ["spike"] and loaded.get("history_commands") == ["spike.add"], listed)
 
     section = after["sections"].get("spike", {}).get("get", {})
     checks.check("config: schema declares marker_size as an integer in [1, 64]",

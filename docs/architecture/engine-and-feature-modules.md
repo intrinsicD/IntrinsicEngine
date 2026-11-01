@@ -91,27 +91,56 @@ is allowed.
 - A button never changes the scene directly; it calls a registered command. The same command is an
   MCP tool, so an agent can do whatever the UI can (R5) without anyone maintaining a central list.
 
-**The shape of a plugin** (to be settled by the hot-reload spike):
+**The shape of a plugin** (settled by the hot-reload spike and slice 3 step 1, `ARCH-022`):
 
 ```
 plugins/marching_cubes/
-  CMakeLists.txt               its own shared library
-  MarchingCubes.Plugin.cpp     entry point: Register(host)
+  CMakeLists.txt               add_library(... MODULE ...), links ExtrinsicRuntime (shared engine builds only)
+  MarchingCubes.Plugin.cpp     the v1 entry points; Register adds everything through PluginRegistrations
   MarchingCubes.Commands.cpp   "marching_cubes.extract" with its argument schema (also an MCP tool)
   MarchingCubes.Panel.cpp      its window; buttons call the command
   MarchingCubes.Config.cppm    config rows; the section is registered
   tests/
 ```
 
-- `Register(host)` adds the config section, the commands and the windows through the services.
-- On unload the host removes everything that plugin registered.
-- A reload works like this: the plugin's jobs finish or are cancelled; the host unregisters it,
-  unloads the old library, loads the new one and calls `Register`. The scene, the config and the
-  undo history stay with the host.
-- Open for the spike:
-  - C++23 modules across the shared-library boundary with clang;
-  - sharing the ImGui context;
-  - jobs that are still running on unload.
+- **The contract** is `Extrinsic.Runtime.PluginContract` (`src/runtime/Services/`), the only module a plugin needs
+  to reach the host:
+  - three `extern "C"` entry points: `intrinsic_plugin_register_v1` fills `PluginRegistrations` (config sections,
+    MCP operations, windows, history commands); `intrinsic_plugin_shutdown_v1`; `intrinsic_plugin_build_id_v1`
+    returns `INTRINSIC_PLUGIN_BUILD_ID` from the generated `PluginBuildId.h`;
+  - host functions for CPU jobs, GPU work (a queue participant), undo entries (`RecordPluginCommand`) and the
+    engine's services;
+  - a plugin hands callables to the host through these APIs only, so the host holds every one of them and
+    removes them all before it closes the image;
+  - operations answer at once: a deferred result (a continuation, progress or cancel) is refused with
+    `deferred_unsupported`, because the agent server keeps those beyond the reach of an unload.
+- **v1 means the same build:** the build id is a sha256 over the toolchain, standard library, compile flags and
+  definitions, build type, sanitizers, shared-engine setting and every engine module interface (`src/**/*.cppm`). The host refuses another
+  id (`abi_mismatch`) and a missing entry point (`dlsym_failed`). There is no compatibility layer beyond that; a
+  plugin is rebuilt with the engine.
+- **The host** is `Extrinsic.Runtime.PluginHost`, a runtime module the Sandbox composes. Its MCP tools are
+  `plugin_load`, `plugin_unload`, `plugin_reload`, `plugin_list` and `app_quit`.
+  - A load opens a private copy, calls Register and commits everything atomically on the next frame.
+  - An unload drains first: the plugin's jobs are cancelled and reaped and its GPU work retired, within 5 s
+    (else `drain_timeout`, and the plugin stays). Then the shutdown hook runs and every registration goes, with
+    the config payloads saved. The image is closed only when none of its callables is alive.
+  - A reload is an unload and a load; the saved payloads are validated again and reapplied.
+  - At the ordinary exit the engine settles GPU work and jobs; the host, which shuts down first, runs the
+    shutdown hook and removes the registrations, and leaves the image mapped.
+  - Fault injection and probes, for the fixture plugin's drivers, need `--plugin-test-hooks`.
+  - Plugins need the shared engine libraries (the `dev` presets). In a static build `plugin_load` answers
+    `plugins_unsupported`.
+- **The spike's three questions, answered** ([spike report](../reports/2026-11-01-arch-022-plugin-host-spike.md)):
+  - C++23 modules across the boundary with clang work with the shared engine. The plugin links the engine
+    libraries like any target, CMake carries their module sets, and every symbol (ImGui and ImPlot included)
+    binds to the one copy the Sandbox loaded. The static engine needed a 5.4 s collection of the host's
+    module files per build; that arrangement is removed.
+  - Registration needs four registries with unregistration (config sections, operations, windows, history
+    commands), an atomic commit, and a host that holds every plugin callable. The ImGui context is the host's.
+  - State that survives a reload: the scene, the config (saved payloads, validated again), the undo history
+    and host state. Undo entries hold data and call a registered command, so they find the new plugin's code;
+    an entry that holds the plugin's closures crashes after the unload (the S2b control). Jobs still running
+    at an unload are cancelled and reaped, and GPU work retired, before the old image goes.
 
 ## Jobs, preview and observation (operator, 2026-10-30)
 
@@ -309,4 +338,5 @@ partitions not counted).
    3. **Registries for self-registration** (config sections, windows, commands and their MCP
       tools), removing the hub files.
    4. **Features move out of the editor into plugins**, one at a time.
-3. **Which process hosts the plugins:** the Sandbox app or the engine runtime.
+3. **Which process hosts the plugins:** the engine runtime (the plugin host module above), wired by the
+   Sandbox (slice 3 step 1).

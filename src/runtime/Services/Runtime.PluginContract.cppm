@@ -1,0 +1,103 @@
+// ARCH-022: what a plugin may use. A plugin is a shared library built in the same tree as the engine; it exports
+// the v1 entry points below, adds its registrations through them, and hands the host callables through these APIs
+// only, so the host holds every one of them and can remove them all before it closes the image.
+module;
+
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+export module Extrinsic.Runtime.PluginContract;
+
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.UiHostTypes;
+
+// Test instruments a plugin may call; they hold no host state, so they work before a load and through teardown.
+// Appends one line to the file named by INTRINSIC_PLUGIN_EVENT_LOG.
+export extern "C" void intrinsic_plugin_event(const char* event) noexcept;
+// Callable accounting: a plugin that reports each copy (+1) and destruction (-1) of the callables it hands over, per
+// generation and kind, and each invocation, also has a close refused while one of them is alive.
+export extern "C" void intrinsic_plugin_callable(int generation, const char* kind, int delta) noexcept;
+export extern "C" void intrinsic_plugin_invoked(int generation, const char* kind) noexcept;
+
+export namespace Extrinsic::Runtime
+{
+    // An editor history command: the host registers it by name, so undo and redo entries hold data and find the
+    // current plugin's code when they run. Returns false when it cannot apply.
+    struct PluginHistoryCommand
+    {
+        std::string Name{};
+        std::function<bool(std::string_view payload, bool undo)> Apply{};
+    };
+
+    // What a plugin's register entry adds; the host commits it atomically on a later frame.
+    struct PluginRegistrations
+    {
+        int Generation{0}; // the plugin build's version, for callable accounting
+        std::vector<Core::Config::EngineConfigSectionRegistration> ConfigSections{};
+        std::vector<AgentOperationSpec> Operations{}; // answered deferred_unsupported if they defer their result
+        std::vector<EditorWindowDescriptor> Windows{};
+        std::vector<PluginHistoryCommand> HistoryCommands{};
+    };
+
+    // The v1 entry points (extern "C"; nothing throws across them). v1 means the same build: the build id
+    // (INTRINSIC_PLUGIN_BUILD_ID from the generated PluginBuildId.h, which the plugin returns) covers the toolchain,
+    // standard library, flags, definitions, build type, sanitizers, shared engine and every engine module interface.
+    // The host refuses another id, and a missing entry point.
+    using PluginRegisterFn = bool (*)(PluginRegistrations& staged, std::string& error) noexcept;
+    using PluginShutdownFn = void (*)() noexcept;
+    using PluginBuildIdFn = const char* (*)() noexcept;
+    inline constexpr const char* kPluginRegisterSymbol = "intrinsic_plugin_register_v1";
+    inline constexpr const char* kPluginShutdownSymbol = "intrinsic_plugin_shutdown_v1";
+    inline constexpr const char* kPluginBuildIdSymbol = "intrinsic_plugin_build_id_v1";
+
+    // Records an undo entry through the editor history without the plugin naming editor types: the entry holds
+    // data and calls the registered command. Executes the redo first; false when it fails or no history exists.
+    [[nodiscard]] bool RecordPluginCommand(const AgentOperationContext& context, std::string label,
+                                           std::string command, std::string payload);
+
+    // A plugin's CPU job: Work runs on a worker and polls `cancelled`; Completion runs on the main thread, with
+    // false when the job was cancelled.
+    struct PluginJob
+    {
+        std::function<void(const std::function<bool()>& cancelled)> Work{};
+        std::function<void(bool published)> Completion{};
+    };
+
+    // The host keeps a plugin's jobs and GPU work and drains them before an unload: jobs are cancelled and reaped,
+    // GPU work (a queue participant that needs RecordFrameCommands, HasInFlightWork and ShutdownAfterDeviceIdle)
+    // stops recording and is unregistered once retired. False while draining, without a host or job service, for
+    // incomplete callables, or when the service rejects the work.
+    [[nodiscard]] bool SubmitPluginJob(const AgentOperationContext& context, PluginJob job);
+    [[nodiscard]] bool StartPluginGpuWork(const AgentOperationContext& context, GpuQueueParticipantDesc work);
+    // The engine's services, for a plugin to find what it needs (the RHI device); null without a host.
+    [[nodiscard]] ServiceRegistry* PluginServices() noexcept;
+}
+
+// Test instruments for the fixture plugin (plugins/spike) and its drivers.
+export namespace Extrinsic::Runtime::PluginProbes
+{
+    // One definition in the engine, reached from a plugin through imported code: the identity probes.
+    [[nodiscard]] int& HostCounter() noexcept;
+    [[nodiscard]] int& HostThreadLocal() noexcept;
+    [[nodiscard]] inline int& HostInlineStatic() noexcept
+    {
+        static int value = 0;
+        return value;
+    }
+
+    // Host state the fixture's undoable edits change; it survives a reload, as scene data does. Edits move it by at
+    // most kMaxUndoDelta, which makes an overflow impractical.
+    inline constexpr std::int64_t kMaxUndoDelta = 1'000'000;
+    [[nodiscard]] std::int64_t& HostUndoValue() noexcept;
+
+    // The closure form of an undo entry: it holds the plugin's closures, as editor entries do today (the negative
+    // control for registered commands). False unless the Sandbox runs with --plugin-test-hooks.
+    [[nodiscard]] bool RecordClosureCommand(const AgentOperationContext& context, std::string label,
+                                            std::function<bool()> redo, std::function<bool()> undo);
+}

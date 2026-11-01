@@ -23,6 +23,10 @@ function(intrinsic_add_module_boundary_test name)
             ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
             ${ARGN})
 endfunction()
+# ARCH-022: the plugin build id covers the build settings and every module interface, and its wiring rebuilds it.
+add_test(NAME PluginBuildId.Script
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.PluginBuildId.py)
+set_tests_properties(PluginBuildId.Script PROPERTIES LABELS "contract;build;runtime" TIMEOUT 120)
 # CurvatureSegmentationConfig.cpp validates geometry algorithm parameters; only
 # its authoring interface, not that algorithm adapter, belongs to this boundary.
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyTypes
@@ -1379,6 +1383,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ProceduralGeometryExtraction.cpp
         Test.CameraModule.cpp
         Test.RuntimeCameraControllers.cpp
+        Test.PluginHost.cpp
         Test.RuntimeConfigControl.cpp
         Test.RuntimeEngineConfigBoot.cpp
         Test.RuntimeInputActions.cpp

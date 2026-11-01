@@ -4,8 +4,9 @@
 Starts the Sandbox like spike_driver.py (isolated socket, built-in config, the driver's LSan settings). Builds of
 the plugin come from rewriting <build>/plugins/spike/generated/SpikeVersion.inc (its generation, or a Register that
 stages and then fails) and building IntrinsicSpikePlugin; repository sources are never touched. Before the session
-it prebuilds generation 2 (A), 3 (B), 4 (Register fails), 6 (unresolved symbol), 7 (clamping validator) and 8 (an
-empty history handler); during it, it builds generation 5 and a broken header.
+it prebuilds generation 2 (A), 3 (B), 4 (Register fails), 6 (unresolved symbol), 7 (clamping validator), 8 (an
+empty history handler), 9 (16 MiB larger), 10 (a stale build id) and 11 (no shutdown entry point); during it, it
+builds generation 5 and a broken header.
 It checks, in order:
   1. a seeded scene (an imported mesh, renamed, moved and scaled through a loaded scene file) saves to identical
      files twice (the comparison's own control);
@@ -17,9 +18,10 @@ It checks, in order:
      answers, only it is invoked, registries equal the loaded state, 12 and the 96 px marker survive, the scene file
      is unchanged, the identity probes still share one address;
   5. a failed build leaves the plugin file and the running version unchanged;
-  6. a failed load (generation 6 needs a symbol the host does not export), a failed Register (generation 4), a
-     failed commit (fail_at windows) and a staged history command without a handler (generation 8) each leave
-     no plugin, with the reason, registries equal to the baseline and no live callable at the close;
+  6. a failed load (generation 6 needs a symbol the host does not export), a stale build id (abi_mismatch), a missing
+     v1 entry point (dlsym_failed, naming it), a failed Register (generation 4), a failed commit (fail_at windows)
+     and a staged history command without a handler (generation 8) each leave no plugin, with the reason,
+     registries equal to the baseline and no live callable at the close (a refused image is closed and unmapped);
   7. 20 reloads alternating A and B: version, registries and close records each cycle; then a build whose validator
      clamps 12 to 10 with a fallback: the saved 12 is reported rejected and not applied (the default 8 stays);
   8. undo and redo across a reload (S2b): add 5 and 3, undo, reload, then undo, redo, redo give 0, 5, 8, served
@@ -35,10 +37,11 @@ It checks, in order:
      records again; frames 3 records exactly three frames. The retirement check uses the plugin's own frame numbers.
   12. the close guard: an unload with one plugin callable kept alive (test hook) unregisters everything but leaves the
      image mapped, with callables_alive;
-  13. a quit while a reload drains is refused with load_pending; a quit whose drain times out (a job that ignores
-     cancellation) fails with drain_timeout and does not quit;
-  14. a quit with a job and GPU work outstanding settles both before the shutdown hook, unloads the plugin, and a job
-     request sent right behind it is not admitted; a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
+  13. a quit while a reload drains is refused with load_pending;
+  14. a quit with a job and GPU work outstanding: the engine's shutdown settles the GPU work, then the job, and then
+     the plugin host runs the plugin's shutdown hook (host_shutdown follows it); a job request sent right behind the
+     quit is refused or drained before the hook; a clean exit: status 0, no sanitizer report, every image's static
+     construction matched by its destruction.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
 With --closure-control it runs the S2b control instead: closure entries 5 and 3 (today's form) are recorded, 3 is
 undone, the plugin is reloaded to a 16 MiB larger build (so the freed range stays free), and the remaining entry is
@@ -46,7 +49,7 @@ undone after the old image left the process. The control counts only if the entr
 the host logged `closure_undo` as its last event, and the Sandbox then died with a sanitizer SEGV whose address lies
 in the closed image's former range, with EditorCommandHistory::Undo on the stack. A still-mapped image makes it
 inconclusive, and so does a new image mapped over the old range.
-Usage: python3 plugins/spike/reload_driver.py --build build/spike --out <new dir> [--icd <VK_DRIVER_FILES json>]
+Usage: python3 plugins/spike/reload_driver.py --build build/dev --out <new dir> [--icd <VK_DRIVER_FILES json>]
        [--closure-control]
 """
 
@@ -72,6 +75,8 @@ SCENE_MESH = s1.REPO / "tests/data/framework24-open-patch.obj"
 # Every kind of callable the plugin hands over; each must be counted while loaded and appear at every close.
 KINDS = {"validator", "change_callback", "operation", "window_draw", "window_state", "history_handler"}
 SEEDED = {"name": "SpikeSeeded", "position": [1.25, -0.5, 2.0], "scale": [1.5, 1.5, 1.5]}
+# The id a build of an older engine interface state would carry; the settings are otherwise identical.
+STALE_BUILD_ID = "0" * 64
 
 
 def sha256(path: Path) -> str:
@@ -88,10 +93,12 @@ class Builds:
         self.plugin = build / "plugins/libIntrinsicSpikePlugin.so"
 
     def write_header(self, generation: int, **options: bool) -> None:
-        """SPIKE_GENERATION plus one define per build option (fail_register, missing, clamp, empty_command)."""
+        """SPIKE_GENERATION plus one define per build option (fail_register, missing, clamp, empty_command, pad,
+        omit_shutdown); stale builds return another build id."""
         names = {"fail_register": "SPIKE_FAIL_REGISTER", "missing": "SPIKE_MISSING_SYMBOL", "clamp": "SPIKE_CLAMP_MARKER",
-                 "empty_command": "SPIKE_EMPTY_HISTORY_COMMAND", "pad": "SPIKE_PAD"}
-        self.header.write_text(f"#define SPIKE_GENERATION {generation}\n" +
+                 "empty_command": "SPIKE_EMPTY_HISTORY_COMMAND", "pad": "SPIKE_PAD", "omit_shutdown": "SPIKE_OMIT_SHUTDOWN"}
+        stale = f'#define SPIKE_BUILD_ID "{STALE_BUILD_ID}"\n' if options.get("stale") else ""
+        self.header.write_text(f"#define SPIKE_GENERATION {generation}\n" + stale +
                                "".join(f"#define {macro} {int(options.get(key, False))}\n" for key, macro in names.items()))
 
     def make(self, generation: int, broken: bool = False, **options: bool) -> bool:
@@ -284,6 +291,8 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     # 6. Failed load, failed Register, failed commit: no plugin, a reason, nothing left registered.
     for name, arguments, code, generation in (
             ("failed load", {"path": str(kept["missing"])}, "dlopen_failed", None),
+            ("stale build id", {"path": str(kept["stale"])}, "abi_mismatch", None),
+            ("missing entry point", {"path": str(kept["noshutdown"])}, "dlsym_failed", None),
             ("failed Register", {"path": str(kept["F"])}, "register_failed", 4),
             ("failed commit", {"path": str(kept["A"]), "fail_at": "windows"}, "commit_failed", 2),
             ("empty history handler", {"path": str(kept["empty"])}, "commit_failed", 8)):
@@ -295,6 +304,12 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
         if generation is not None:
             checks.check(f"{name}: no live callable of generation {generation} at its close",
                          last_close_clean(state, generation), state["closes"][-1:])
+        if code in ("abi_mismatch", "dlsym_failed"):
+            close = state["closes"][-1] if state["closes"] else {}
+            named = code != "dlsym_failed" or "intrinsic_plugin_shutdown_v1" in str(reply)
+            checks.check(f"{name}: the image was opened, refused before Register, closed and unmapped",
+                         named and close.get("generation") is None and close.get("closed") is True
+                         and close.get("unmapped") is True, [reply, close])
         ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
         checks.check(f"{name}: a later load works", ok and generation_of(reply) == 2, [reply, error])
 
@@ -484,17 +499,9 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
                  not quit_reply[0] and quit_reply[3] == "load_pending" and reload_reply[0]
                  and generation_of(reload_reply[1]) == 2, [quit_reply[3], reload_reply[1]])
 
-    # 13b. A quit whose drain times out does not quit: the shutdown hook must not run before the work settled.
-    agent.call("spike_start_job", {"seconds": 7, "ignore_cancel": True})
-    wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
-    ok, reply, _, error = agent.call("app_quit")
-    _, version, _, _ = agent.call("spike_version")
-    checks.check("quit timeout: app_quit fails with drain_timeout and the plugin keeps running",
-                 not ok and error == "drain_timeout" and version == {"generation": 2}, [error, reply, version])
-    wait_for(lambda: [j["finalized"] for j in host(agent)["jobs"]], lambda f: all(f), 10.0)
-
-    # 14. Quit with CPU and GPU work outstanding: both settle before the shutdown hook, and a job request sent right
-    # behind the quit is not admitted (the plugin is unloaded before the exit).
+    # 14. Quit with CPU and GPU work outstanding: the engine's shutdown settles both (GPU participants after a device
+    # wait, then the jobs) before the plugin host's, which runs the plugin's shutdown hook. A job request sent right
+    # behind the quit is refused or drained like the others.
     agent.call("spike_start_job", {"seconds": 60})
     agent.call("spike_gpu_work", {"frames": 100000})
     wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
@@ -571,7 +578,8 @@ def main() -> int:
     # A normal generation last, so an interrupted session leaves the build directory loadable.
     for name, generation, options in (("F", 4, {"fail_register": True}), ("missing", 6, {"missing": True}),
                                       ("clamp", 7, {"clamp": True}), ("empty", 8, {"empty_command": True}),
-                                      ("pad", 9, {"pad": True}),
+                                      ("pad", 9, {"pad": True}), ("stale", 10, {"stale": True}),
+                                      ("noshutdown", 11, {"omit_shutdown": True}),
                                       ("B", 3, {}), ("A", 2, {})):
         if not checks.check(f"prebuild: generation {generation} ({name}) built", builds.make(generation, **options)):
             return s1.finish(checks, args.out)
@@ -582,12 +590,14 @@ def main() -> int:
     if result is not None:
         _, _, lines = result
         tail = lines[QUIT_EVENTS_FROM[0]:]
+        # At the exit the engine waits for the device to be idle before the GPU work's shutdown, so the plugin's
+        # frame numbers do not show the retirement (gpu_retired); the order does.
         order_ok = all(e in tail for e in ("job_finalized", "gpu_shutdown", "shutdown")) and \
-            tail.index("job_finalized") < tail.index("shutdown") and tail.index("gpu_shutdown") < tail.index("shutdown") \
-            and gpu_retired(tail) and not any(e.startswith("job_") for e in tail[tail.index("shutdown"):]) \
-            and tail[tail.index("shutdown") + 1:tail.index("shutdown") + 2] == ["unload"]
-        checks.check("exit: the outstanding job and GPU work settled before the shutdown hook at quit, which unloaded "
-                     "the plugin", order_ok, tail[:8])
+            tail.index("gpu_shutdown") < tail.index("job_finalized") < tail.index("shutdown") \
+            and not any(e.startswith("job_") for e in tail[tail.index("shutdown"):]) \
+            and tail[tail.index("shutdown") + 1:tail.index("shutdown") + 2] == ["host_shutdown"]
+        checks.check("exit: the GPU work, then the outstanding job settled before the plugin's shutdown hook, which the "
+                     "plugin host ran during the engine's shutdown", order_ok, tail[:8])
         # A job dispatched in the quit's frame, before its drain began, is drained like the others; one dispatched
         # after the quit finds the plugin unloaded. Either way no plugin job event follows the shutdown hook.
         before_shutdown = tail[:tail.index("shutdown")] if "shutdown" in tail else []

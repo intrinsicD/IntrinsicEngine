@@ -1,5 +1,6 @@
-// ARCH-022 slice 2, S1 and S2: the spike plugin. Built against the host's module BMIs, linked to nothing of the
-// engine: every engine, ImGui and ImPlot symbol binds to the running Sandbox at dlopen.
+// ARCH-022: the plugin host's fixture plugin. It links the shared engine libraries; every engine, ImGui and ImPlot
+// symbol binds to the copy the running Sandbox already loaded. It uses only Extrinsic.Runtime.PluginContract to
+// reach the host.
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -17,8 +18,11 @@
 // SPIKE_MISSING_SYMBOL (optional), a build that needs a symbol the host does not export, so dlopen fails;
 // SPIKE_CLAMP_MARKER (optional), a build whose validator clamps marker_size above 10 with a fallback;
 // SPIKE_EMPTY_HISTORY_COMMAND (optional), a build that stages a second history command without a handler;
-// SPIKE_PAD (optional), a build 16 MiB larger, so it cannot be mapped into a smaller build's freed range.
+// SPIKE_PAD (optional), a build 16 MiB larger, so it cannot be mapped into a smaller build's freed range;
+// SPIKE_BUILD_ID (optional), a stale build: another build id under otherwise identical settings;
+// SPIKE_OMIT_SHUTDOWN (optional), a build without the v1 shutdown entry point.
 #include "SpikeVersion.inc"
+#include "PluginBuildId.h" // INTRINSIC_PLUGIN_BUILD_ID of the engine this build compiles against
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -29,11 +33,12 @@ import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.UiHostTypes;
-import Extrinsic.Sandbox.PluginSpike;
+import Extrinsic.Runtime.PluginContract;
 
 namespace
 {
-    namespace Spike = Extrinsic::Sandbox::Spike;
+    namespace Runtime = Extrinsic::Runtime;
+    namespace Probes = Extrinsic::Runtime::PluginProbes;
     namespace Config = Extrinsic::Core::Config;
     using Extrinsic::Runtime::AgentOperationContext;
     using Extrinsic::Runtime::AgentOperationOutcome;
@@ -45,8 +50,8 @@ namespace
 
     struct Lifecycle
     {
-        Lifecycle() noexcept { spike_lifecycle_event("static_construct"); }
-        ~Lifecycle() { spike_lifecycle_event("static_destruct"); }
+        Lifecycle() noexcept { intrinsic_plugin_event("static_construct"); }
+        ~Lifecycle() { intrinsic_plugin_event("static_destruct"); }
     };
     const Lifecycle g_Lifecycle{};
 
@@ -55,11 +60,11 @@ namespace
     class Tracked
     {
     public:
-        explicit Tracked(const char* kind) noexcept : m_Kind(kind) { spike_callable(SPIKE_GENERATION, m_Kind, +1); }
-        Tracked(const Tracked& other) noexcept : m_Kind(other.m_Kind) { spike_callable(SPIKE_GENERATION, m_Kind, +1); }
+        explicit Tracked(const char* kind) noexcept : m_Kind(kind) { intrinsic_plugin_callable(SPIKE_GENERATION, m_Kind, +1); }
+        Tracked(const Tracked& other) noexcept : m_Kind(other.m_Kind) { intrinsic_plugin_callable(SPIKE_GENERATION, m_Kind, +1); }
         Tracked& operator=(const Tracked&) = delete;
-        ~Tracked() { spike_callable(SPIKE_GENERATION, m_Kind, -1); }
-        void Invoked() const noexcept { spike_invoked(SPIKE_GENERATION, m_Kind); }
+        ~Tracked() { intrinsic_plugin_callable(SPIKE_GENERATION, m_Kind, -1); }
+        void Invoked() const noexcept { intrinsic_plugin_invoked(SPIKE_GENERATION, m_Kind); }
 
     private:
         const char* m_Kind;
@@ -103,23 +108,23 @@ namespace
     {
         if (const auto size = MarkerSize(current.PayloadJson)) g_MarkerSize = *size;
         ++g_ChangeCount;
-        spike_lifecycle_event("config_changed");
+        intrinsic_plugin_event("config_changed");
     }
 
     // Mutates the host's probes through imported code and reports what the plugin sees.
     AgentOperationOutcome Identity()
     {
-        ++Spike::HostCounter();
-        ++Spike::HostInlineStatic();
-        ++Spike::HostThreadLocal();
+        ++Probes::HostCounter();
+        ++Probes::HostInlineStatic();
+        ++Probes::HostThreadLocal();
         ImGuiMemAllocFunc alloc = nullptr;
         ImGuiMemFreeFunc free = nullptr;
         void* userData = nullptr;
         ImGui::GetAllocatorFunctions(&alloc, &free, &userData);
         const Json value = {
-            {"counter", {{"address", Address(&Spike::HostCounter())}, {"value", Spike::HostCounter()}}},
-            {"inline_static", {{"address", Address(&Spike::HostInlineStatic())}, {"value", Spike::HostInlineStatic()}}},
-            {"thread_local", {{"address", Address(&Spike::HostThreadLocal())}, {"value", Spike::HostThreadLocal()}}},
+            {"counter", {{"address", Address(&Probes::HostCounter())}, {"value", Probes::HostCounter()}}},
+            {"inline_static", {{"address", Address(&Probes::HostInlineStatic())}, {"value", Probes::HostInlineStatic()}}},
+            {"thread_local", {{"address", Address(&Probes::HostThreadLocal())}, {"value", Probes::HostThreadLocal()}}},
             {"imgui_context", Address(ImGui::GetCurrentContext())},
             {"imgui_alloc", reinterpret_cast<std::uintptr_t>(alloc)},
             {"imgui_free", reinterpret_cast<std::uintptr_t>(free)},
@@ -137,10 +142,10 @@ namespace
     std::optional<std::int64_t> Delta(const Json& value)
     {
         if (!value.is_number_integer()) return std::nullopt;
-        if (value.is_number_unsigned() && value.get<std::uint64_t>() > static_cast<std::uint64_t>(Spike::kMaxUndoDelta))
+        if (value.is_number_unsigned() && value.get<std::uint64_t>() > static_cast<std::uint64_t>(Probes::kMaxUndoDelta))
             return std::nullopt;
         const auto delta = value.get<std::int64_t>();
-        if (delta < -Spike::kMaxUndoDelta || delta > Spike::kMaxUndoDelta) return std::nullopt;
+        if (delta < -Probes::kMaxUndoDelta || delta > Probes::kMaxUndoDelta) return std::nullopt;
         return delta;
     }
 
@@ -154,12 +159,12 @@ namespace
         const bool closure = arguments.value("form", std::string{"command"}) == "closure";
         const std::string label = "Spike add " + std::to_string(delta) + (closure ? " (closure)" : "");
         const bool recorded = closure
-            ? Spike::RecordClosureCommand(context, label,
-                  [delta] { Spike::HostUndoValue() += delta; return true; },
-                  [delta] { Spike::HostUndoValue() -= delta; return true; })
-            : Spike::RecordCommand(context, label, "spike.add", std::to_string(delta));
+            ? Probes::RecordClosureCommand(context, label,
+                  [delta] { Probes::HostUndoValue() += delta; return true; },
+                  [delta] { Probes::HostUndoValue() -= delta; return true; })
+            : Runtime::RecordPluginCommand(context, label, "spike.add", std::to_string(delta));
         if (!recorded) return {.IsError = true, .Text = "the edit was not recorded", .ErrorCode = "not_recorded"};
-        return {.Text = Json{{"value", Spike::HostUndoValue()}}.dump()};
+        return {.Text = Json{{"value", Probes::HostUndoValue()}}.dump()};
     }
 
     // spike_start_job {seconds, ignore_cancel}: a CPU job of the plugin that runs for `seconds` (or until cancelled,
@@ -169,7 +174,7 @@ namespace
         const Json arguments = Json::parse(argumentsJson, nullptr, false);
         const double seconds = arguments.is_object() ? arguments.value("seconds", 1.0) : 1.0;
         const bool ignoreCancel = arguments.is_object() && arguments.value("ignore_cancel", false);
-        const bool submitted = Spike::SubmitPluginJob(context, {
+        const bool submitted = Runtime::SubmitPluginJob(context, {
             .Work = [t = Tracked{"job_work"}, seconds, ignoreCancel](const std::function<bool()>& cancelled)
             {
                 t.Invoked();
@@ -180,7 +185,7 @@ namespace
             .Completion = [t = Tracked{"job_completion"}](bool published)
             {
                 t.Invoked();
-                spike_lifecycle_event(published ? "job_published" : "job_finalized");
+                intrinsic_plugin_event(published ? "job_published" : "job_finalized");
             },
         });
         if (!submitted) return {.IsError = true, .Text = "the job was not submitted", .ErrorCode = "not_submitted"};
@@ -196,7 +201,8 @@ namespace
         const Json arguments = Json::parse(argumentsJson, nullptr, false);
         const auto frames = std::make_shared<std::int64_t>(
             arguments.is_object() ? arguments.value("frames", std::int64_t{1} << 40) : std::int64_t{1} << 40);
-        auto* device = Spike::Services().Find<Extrinsic::RHI::IDevice>();
+        auto* services = Runtime::PluginServices();
+        auto* device = services != nullptr ? services->Find<Extrinsic::RHI::IDevice>() : nullptr;
         if (device == nullptr)
             return {.IsError = true, .Text = "no RHI device", .ErrorCode = "no_device"};
         const auto slots = device->GetFramesInFlight();
@@ -204,7 +210,7 @@ namespace
                                                   .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
                                                   .DebugName = "spike plugin buffer"});
         auto last = std::make_shared<std::optional<std::uint64_t>>(); // the last recorded frame, if any
-        const bool started = Spike::StartPluginGpuWork(context, {
+        const bool started = Runtime::StartPluginGpuWork(context, {
             .DebugName = "spike plugin GPU work",
             .RecordFrameCommands = [t = Tracked{"gpu_record"}, device, buffer, slots, last, frames](
                                        Extrinsic::RHI::ICommandContext& commands)
@@ -227,9 +233,9 @@ namespace
                 t.Invoked();
                 const std::string frames = "gpu_frames:" + std::to_string(last->value_or(0)) + ":" +
                     std::to_string(device->GetGlobalFrameNumber()) + ":" + std::to_string(device->GetFramesInFlight());
-                spike_lifecycle_event(frames.c_str());
+                intrinsic_plugin_event(frames.c_str());
                 device->DestroyBuffer(buffer);
-                spike_lifecycle_event("gpu_shutdown");
+                intrinsic_plugin_event("gpu_shutdown");
             },
         });
         if (!started)
@@ -248,7 +254,7 @@ namespace
             if (!g_FirstDrawSeen)
             {
                 g_FirstDrawSeen = true;
-                spike_lifecycle_event("first_draw");
+                intrinsic_plugin_event("first_draw");
             }
             // The marker the driver looks for in a window capture: pure magenta, marker_size * 8 pixels square.
             const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -265,12 +271,21 @@ namespace
 extern "C" void spike_symbol_the_host_does_not_export() noexcept;
 #endif
 
-extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged, std::string& error) noexcept
+extern "C" const char* intrinsic_plugin_build_id_v1() noexcept
+{
+#if defined(SPIKE_BUILD_ID)
+    return SPIKE_BUILD_ID;
+#else
+    return INTRINSIC_PLUGIN_BUILD_ID;
+#endif
+}
+
+extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& staged, std::string& error) noexcept
 {
 #if defined(SPIKE_MISSING_SYMBOL) && SPIKE_MISSING_SYMBOL
     spike_symbol_the_host_does_not_export(); // never reached: RTLD_NOW refuses the image first
 #endif
-    spike_lifecycle_event("register");
+    intrinsic_plugin_event("register");
     staged.Generation = SPIKE_GENERATION;
     staged.ConfigSections.push_back({
         .DefaultSection = {.Name = "spike", .SchemaId = "intrinsic.spike", .SchemaVersion = 1u,
@@ -364,7 +379,7 @@ extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged,
             const Json delta = Json::parse(payload, nullptr, false);
             const auto bounded = Delta(delta);
             if (!bounded) return false;
-            Spike::HostUndoValue() += undo ? -*bounded : *bounded;
+            Probes::HostUndoValue() += undo ? -*bounded : *bounded;
             return true;
         },
     });
@@ -392,4 +407,6 @@ extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged,
 #endif
 }
 
-extern "C" void intrinsic_plugin_shutdown_v0() noexcept { spike_lifecycle_event("shutdown"); }
+#if !(defined(SPIKE_OMIT_SHUTDOWN) && SPIKE_OMIT_SHUTDOWN)
+extern "C" void intrinsic_plugin_shutdown_v1() noexcept { intrinsic_plugin_event("shutdown"); }
+#endif

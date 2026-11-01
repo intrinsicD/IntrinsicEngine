@@ -1702,3 +1702,52 @@ python3 tools/docs/check_doc_links.py --root . --strict
     non-zero numbers (a CI preset with JSON `true` fails it). Delta: "Verdict: APPROVE", bound to the diff
     sha256 `62dbd624…40b3e3`, with two notes answered here (54, not 55, executables; non-zero numbers).
   - The operator's `build/dev` needs one fresh `cmake --preset dev` and a full build.
+- 2026-11-01: Slice 3 step 1b, the plugin host in the runtime (as planned, revision 2), except:
+  - The module's name is `~Runtime.PluginHost`. The engine registers modules in name order and shuts them down
+    in reverse (`Engine::RegisterRuntimeModulesForBoot` sorts them), so the plan's "composed last" is a name
+    that sorts after every `Runtime.` module. The shutdown-order contract test found it; the drivers could not
+    (the services stay alive as objects until the engine is destroyed).
+  - `plugin_host_identity` is a test-hook tool; `app_quit` only requests the exit.
+  - The test instruments are `intrinsic_plugin_event`, `intrinsic_plugin_callable`, `intrinsic_plugin_invoked`
+    and `INTRINSIC_PLUGIN_EVENT_LOG`; the probes live in `Extrinsic::Runtime::PluginProbes`.
+  - Code: `src/runtime/Services/Runtime.PluginContract.*` and `Runtime.PluginHost.*`; `cmake/PluginBuildId.cmake`
+    (the build id); the fixture plugin links `ExtrinsicRuntime`; deleted: `INTRINSIC_PLUGIN_SPIKE`,
+    `Sandbox.PluginSpike.*`, `plugins/spike/CollectHostModules.cmake`.
+  - Reviews of the staged diff `cbad98e4…8739253c`:
+    - ponytail (fresh Claude subagent): "Verdict: Ship", no must-fix; applied: the report no longer repeats the
+      verification (it links here), the default opener is no longer exported, the shared image is built in one
+      step, the rollback reuses `Unregister`, redundant lines and the fixture's duplicate deferred-result check
+      (the contract test covers it) are gone, a misplaced CMake comment moved;
+    - Codex (fresh session `01a196e8-886c-7492-b7c5-e0c4f904a888`): REVISE, four blocking findings, answered:
+      1. the id lacked the configuration's flags, the definitions and the standard library: it now hashes the
+         compiler (id, version, path), the libstdc++ file the compiler resolves, `CMAKE_CXX_FLAGS` with the
+         configuration's flags, `INTRINSIC_COMPILE_FLAGS` and the runtime target's compile definitions;
+      2. removing an interface left the id stale: the sorted interface list is written at configure time (only
+         when it changes) and is a dependency of the id. The wiring is the function `intrinsic_add_plugin_build_id`
+         in `cmake/PluginBuildId.cmake`, tested in a small Ninja project (removal, `_GLIBCXX_DEBUG` in the Debug
+         flags, a compile definition; each test fails with the old wiring);
+      3. a static `plugin_reload` answered `not_loaded`: load and reload now answer `plugins_unsupported` first
+         (the contract test covers both; the mutation fails it in the static tree);
+      4. evidence: the closure control and the check outputs, below.
+      Non-blocking, answered: the deferred-result test covers continuation, progress and cancel (a mutation of
+      each predicate fails it); the stale-id fixture's artificial id is recorded as a limitation in the report;
+      the R4 runs on stale trees were three (below).
+  - Verification after the fixes, on `build/dev-shared` after a full build: S1 60 of 60, S2 116 of 116, the S2b
+    closure control 17 of 17, a technical R4 run 13 of 13 (pass/fail only); 10 contract tests and
+    `PluginBuildId.Script` (8 cases); 12 host mutations each fail their test; the CPU set passes (below).
+  - A static tree (`--preset dev -DBUILD_SHARED_LIBS=OFF`) builds the Sandbox and the runtime contract tests; the
+    plugin tests pass there, load and reload answer `plugins_unsupported`, no plugin is built.
+  - Technical R4 runs on stale trees failed (`r4-tech1`, `r4-tech3`, `r4-tech4`); on current trees they pass
+    (`r4-tech2`, `r4-r2`). Cause and safeguard: the lesson "A build tree a driver uses holds only what the driver
+    measures" in `docs/lessons/engineering.md`; the driver ends a session after a failed sample without `app_quit`
+    (recorded in the spike report).
+  - Docs: the target's "shape of a plugin" names the contract and answers the spike's three questions; the
+    [spike report](../../docs/reports/2026-11-01-arch-022-plugin-host-spike.md); the module inventory.
+  - Checks on HEAD plus the staged change, on a clean worktree: the whole ci-docs replay (23 `run:` blocks, the
+    module inventory's regeneration among them; 2 skipped need the GitHub context or package installs), the R1/R2
+    ratchet (`plugins/spike` 0/0), `check_layering.py --root src --strict` and `check_compiler_hazards.py`: all
+    pass.
+  - The CPU set after the fixes: 6070 of 6071; the one failure is an unrelated timing flake, filed as `BUG-256`.
+  - Codex delta (same thread): "Verdict: APPROVE", bound to the staged diff sha256 `a35a7e72…0effc41a`. Ponytail
+    delta: "Verdict: Ship"; its two optional code cuts (a second static check in `Load`, a settings test the wiring
+    test covers) are not applied, so the approved code stays as reviewed; its log note is applied here.

@@ -31,6 +31,7 @@ import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.PhysicsModule;
+import Extrinsic.Runtime.PluginHost;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -38,9 +39,6 @@ import Extrinsic.Runtime.ViewCapture;
 
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
-#if defined(INTRINSIC_PLUGIN_SPIKE)
-import Extrinsic.Sandbox.PluginSpike;
-#endif
 
 namespace
 {
@@ -56,6 +54,8 @@ namespace
         FramePacingCaptureOptions Capture{};
         // Opt-in agent control lane (MCP over an owner-only Unix socket).
         std::optional<Extrinsic::Runtime::AgentServerOptions> Agent{};
+        // ARCH-022: the plugin host's fault injection and probes, for the fixture plugin's drivers.
+        bool PluginTestHooks = false;
         bool Valid = true;
         std::string Error{};
     };
@@ -128,6 +128,10 @@ namespace
                 if (arg.size() > 15u) agent.SocketPath = std::string{arg.substr(15u)};
                 else if (index + 1u < args.size() && !args[index + 1u].starts_with("--"))
                     agent.SocketPath = std::string{args[++index]};
+            }
+            else if (arg == "--plugin-test-hooks")
+            {
+                parsed.PluginTestHooks = true;
             }
             else if (arg == "--agent-readonly")
             {
@@ -456,13 +460,13 @@ int main(int argc, char** argv)
         engine.AddModule(std::move(captureModule));
     }
 
+    auto pluginHost = std::make_unique<Extrinsic::Runtime::PluginHostModule>(Extrinsic::Runtime::PluginHostOptions{
+        .TestHooks = cli.PluginTestHooks, .RequestExit = [&engine] { engine.RequestExit(); }});
     if (cli.Agent)
     {
         auto agentOptions = *cli.Agent;
-#if defined(INTRINSIC_PLUGIN_SPIKE)
-        agentOptions.RegisterExtraOperations = [&engine](Extrinsic::Runtime::AgentOperationRegistry& registry)
-        { Extrinsic::Sandbox::Spike::RegisterHostOperations(registry, engine.Services(), [&engine] { engine.RequestExit(); }); };
-#endif
+        agentOptions.RegisterExtraOperations = [host = pluginHost.get()](Extrinsic::Runtime::AgentOperationRegistry& registry)
+        { host->RegisterOperations(registry); };
         engine.AddModule(std::make_unique<Extrinsic::Runtime::AgentServerModule>(std::move(agentOptions)));
     }
     engine.AddModule(std::move(configControl));
@@ -479,6 +483,8 @@ int main(int argc, char** argv)
     engine.EmplaceModule<Extrinsic::Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Extrinsic::Runtime::AssetWorkflowModule>();
     engine.EmplaceModule<Extrinsic::Runtime::TextureBakeModule>();
+    // Its name sorts last, so it shuts down first, while the services its plugin registered with are alive.
+    engine.AddModule(std::move(pluginHost));
     engine.Initialize();
     Extrinsic::Sandbox::SandboxSession sandbox{};
     sandbox.Initialize(config, engine.Worlds(), engine.Services());

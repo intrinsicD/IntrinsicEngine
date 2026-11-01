@@ -8,7 +8,7 @@ Root scanned: `src`
 
 | Layer | Module Count |
 |---|---:|
-| `app` | 8 |
+| `app` | 7 |
 | `assets` | 11 |
 | `core` | 38 |
 | `ecs` | 25 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 119 |
+| `runtime` | 121 |
 
 ## Modules
 
@@ -32,7 +32,6 @@ Root scanned: `src`
 | `Extrinsic.Sandbox.Editor.MeshProcessingPanels` | `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm` | `app` |
 | `Extrinsic.Sandbox.Editor.MethodPanels` | `src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm` | `app` |
 | `Extrinsic.Sandbox.ConfigSections` | `src/app/Sandbox/Sandbox.ConfigSections.cppm` | `app` |
-| `Extrinsic.Sandbox.PluginSpike` | `src/app/Sandbox/Sandbox.PluginSpike.cppm` | `app` |
 | `Extrinsic.Sandbox` | `src/app/Sandbox/Sandbox.cppm` | `app` |
 | `Extrinsic.Asset.EventBus` | `src/assets/Asset.EventBus.cppm` | `assets` |
 | `Extrinsic.Asset.GeometryPayload` | `src/assets/Asset.GeometryPayload.cppm` | `assets` |
@@ -479,8 +478,10 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Scene/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Scene/Runtime.SelectionController.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
+| `Extrinsic.Runtime.PluginContract` | `src/runtime/Services/Runtime.PluginContract.cppm` | `runtime` |
+| `Extrinsic.Runtime.PluginHost` | `src/runtime/Services/Runtime.PluginHost.cppm` | `runtime` |
 | `Extrinsic.Runtime.UiHostTypes` | `src/runtime/Services/Runtime.UiHostTypes.cppm` | `runtime` |
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **456**
+Total modules: **457**

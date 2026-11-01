@@ -23,6 +23,7 @@ Start with [Runtime architecture](../../docs/architecture/runtime.md), the
 | `Modules/` | Feature configuration and runtime modules, including the ECS–physics bridge. |
 | `Cameras/`, `Gizmos/`, `ImGui/`, `Visualization/` | Camera/input adapters, manipulation, editor overlay handoff and visualization recipes. |
 | `Agent/` | The local agent protocol, server and command routing. |
+| `Services/` | Service-level contracts: UI host types, the plugin contract and the plugin host (ARCH-022). |
 
 These directories group responsibilities within the Runtime target. C++ module
 names and public interfaces identify API ownership.

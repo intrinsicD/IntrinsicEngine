@@ -134,3 +134,12 @@ following `git stash pop` applied an older, unrelated stash (`BUG-137 slice C WI
 conflict. No work was lost (a conflicted pop keeps the entry), but the tree had to be restored by hand. Safeguard:
 push without stashing; when a stash is really needed, check `git diff --quiet -- <path>` first and pop the exact
 entry it created (`git stash pop stash@{n}` after reading `git stash list`).
+
+## A build tree a driver uses holds only what the driver measures
+
+The plugin drivers (`plugins/spike`) build in the tree they run against and check that a plugin build compiles only
+plugin edges. ARCH-022 slice 3 broke that twice: a mutation run rebuilt only the test aggregate and left the Sandbox
+stale, so the next technical R4 run rebuilt it and failed `plugin_edges_only`; later a comment edit in a module
+interface during a driver run would have rebuilt the host inside the S2 session (restoring the file's content and
+mtime avoided it, since Ninja compares mtimes, not content). Safeguard: run `cmake --build <tree>` (all targets) after
+any mutation or source edit and before a driver run, and edit nothing under `src/` while a driver runs.

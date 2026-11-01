@@ -103,7 +103,7 @@ export namespace Extrinsic::Runtime
         std::size_t MaxMessageBytes{8u << 20u};
         std::chrono::milliseconds ProgressInterval{250}; // between progress notifications of one call
         // Called once after the built-in operations are registered; the registry outlives the module's
-        // users. Only the ARCH-022 plugin-host spike sets it.
+        // users. The Sandbox adds the plugin host's tools through it.
         std::function<void(AgentOperationRegistry&)> RegisterExtraOperations{};
     };
 

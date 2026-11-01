@@ -13,7 +13,7 @@ Phases in wall-clock seconds (time.monotonic): build = t1 - t0, reload = t2 - t1
 compile_s and link_s are the plugin's compile and link steps from the tree's .ninja_log.
 A sample is valid only if all of these hold:
   - the build's Ninja edges (its "[n/m] description" lines) include the plugin's compile and link, and every edge is
-    the plugin's: its description names "plugins/", the host-module collection or the glob re-check (no host edge);
+    the plugin's: its description names "plugins/" or the glob re-check (no host edge);
   - the reload reply has generation g, its config report restored ["spike"] and rejected nothing;
   - the previous generation's close record is new and clean: closed, unmapped, every callable count 0;
   - spike_version answers generation g.
@@ -37,7 +37,7 @@ Summaries per phase over the measured samples: median, minimum, maximum. Decisio
   median_met  median total < 10 s, but at least one total >= 10 s;
   not_met     median total >= 10 s.
 summary.json holds the verdict only when every check passed; otherwise its verdict is UNEVALUATED.
-Usage: python3 plugins/spike/r4_driver.py --build build/spike --out <new dir> [--samples 10] [--warmup 1]
+Usage: python3 plugins/spike/r4_driver.py --build build/dev --out <new dir> [--samples 10] [--warmup 1]
        [--probes 3] [--generation-base 100] [--icd <VK_DRIVER_FILES json>]
 """
 
@@ -89,7 +89,7 @@ EDGE = re.compile(r"^\[\d+/\d+\] (.+)$", re.MULTILINE)
 
 
 def plugin_edge(description: str) -> bool:
-    return "plugins/" in description or "host's module BMIs" in description or "globbed directories" in description
+    return "plugins/" in description or "globbed directories" in description
 
 
 ACTIVE_GROUP: list[subprocess.Popen] = []  # the build whose process group is running, if any

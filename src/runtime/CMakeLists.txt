@@ -79,6 +79,8 @@ target_sources(${target_name}
         Editor/Runtime.EditorUiModule.cppm
         Editor/Runtime.EditorWindowRegistry.cppm
         Services/Runtime.UiHostTypes.cppm
+        Services/Runtime.PluginContract.cppm
+        Services/Runtime.PluginHost.cppm
         Kernel/Runtime.Engine.cppm
         Config/Runtime.EngineConfigBoot.cppm
         Config/Runtime.EngineConfigControl.cppm
@@ -274,6 +276,8 @@ target_sources(${target_name}
         Agent/internal/Runtime.AgentArguments.hpp
         Agent/Runtime.AgentOperations.Capture.cpp
         Agent/Runtime.AgentServer.cpp
+        Services/Runtime.PluginContract.cpp
+        Services/Runtime.PluginHost.cpp
         Kernel/Runtime.InputActions.cpp
         Kernel/Runtime.KernelEvents.cpp
         Kernel/Runtime.Module.cpp
@@ -351,6 +355,16 @@ target_link_libraries(${target_name} PRIVATE
 # runtime-private. The exported registration seam only mentions promoted asset
 # bridge types, so tinygltf/stb headers and symbols do not leak into assets.
 target_link_libraries(${target_name} PRIVATE tinygltf stb nlohmann_json::nlohmann_json)
+
+# ARCH-022: the plugin host loads plugins only when the engine is shared (dev); a static build answers
+# plugins_unsupported. The build id (cmake/PluginBuildId.cmake) changes with the build settings and with any module
+# interface; a plugin returns it from PluginBuildId.h and the host refuses another.
+target_link_libraries(${target_name} PRIVATE ${CMAKE_DL_LIBS})
+if(BUILD_SHARED_LIBS)
+        target_compile_definitions(${target_name} PRIVATE INTRINSIC_PLUGINS_SUPPORTED=1)
+endif()
+include(${CMAKE_SOURCE_DIR}/cmake/PluginBuildId.cmake)
+intrinsic_add_plugin_build_id(${target_name} ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated/plugin)
 
 if(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN)
         if(TARGET ExtrinsicBackendsVulkan)

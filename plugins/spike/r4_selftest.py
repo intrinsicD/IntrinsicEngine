@@ -157,11 +157,12 @@ class Reports(unittest.TestCase):
     def test_plugin_edge_classification(self) -> None:
         for edge in ("Building CXX object plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/SpikePlugin.cpp.o",
                      "Linking CXX shared module plugins/libIntrinsicSpikePlugin.so",
-                     "Collecting the host's module BMIs for the spike plugin", "Re-checking globbed directories...",
+                     "Re-checking globbed directories...",
                      "Scanning /home/alex/Documents/IntrinsicEngine/plugins/spike/SpikePlugin.cpp for CXX dependencies",
                      "Generating CXX dyndep file plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/CXX.dd"):
             self.assertTrue(r4_driver.plugin_edge(edge), edge)
         for edge in ("Linking CXX executable bin/ExtrinsicSandbox", "Building CXX object src/runtime/CMakeFiles/x.o",
+                     "Plugin build id",
                      "Linking CXX shared library lib/libExtrinsicRuntime.so"):
             self.assertFalse(r4_driver.plugin_edge(edge), edge)
 
