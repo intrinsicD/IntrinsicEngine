@@ -3,7 +3,6 @@
 // over is counted per generation, and an image is closed only when none of its callables is alive.
 module;
 
-#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -38,6 +37,9 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ServiceRegistry;
+
+// Named only as a reference parameter, so the app layer does not import the RHI (as Runtime.JobService does).
+extern "C++" { namespace Extrinsic::RHI { class ICommandContext; } }
 
 namespace
 {
@@ -100,22 +102,20 @@ namespace Extrinsic::Sandbox::Spike
 
     namespace
     {
-        // A plugin job, owned on the main thread. The worker reaches it only through host code and a raw pointer,
-        // and sets Returned in host code after the plugin's Work returned.
+        // A plugin job, owned on the main thread; the worker reaches it only through host code and a raw pointer.
+        // The service finalizes a job only after its Work returned or when it never started, so a finalized
+        // entry is no longer on a worker.
         struct JobEntry
         {
             PluginJob Job{};
             Runtime::JobToken Token{};
-            std::atomic<bool> Started{false};
-            std::atomic<bool> Returned{false};
             bool Finalized{false}; // its Completion ran (main thread)
         };
 
         struct GpuEntry
         {
-            PluginGpuWork Work{};
+            Runtime::GpuQueueParticipantDesc Work{};
             Runtime::GpuQueueParticipantHandle Handle{};
-            bool Stopping{false}; // draining: no more recording
         };
 
         Runtime::ServiceRegistry* g_Services{nullptr};
@@ -137,10 +137,8 @@ namespace Extrinsic::Sandbox::Spike
         desc.DebugName = "spike plugin job";
         desc.Work = [raw](const Runtime::JobCancellation& cancellation)
         {
-            raw->Started = true;
-            const bool finished = raw->Job.Work([&cancellation] { return cancellation.IsCancelled(); });
-            raw->Returned = true; // the plugin call has returned; only host code runs on this worker from here
-            return Runtime::JobResultEnvelope::Make(finished);
+            raw->Job.Work([&cancellation] { return cancellation.IsCancelled(); });
+            return Runtime::JobResultEnvelope::Make(true);
         };
         desc.PublishCompletion = [raw](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&)
         {
@@ -160,19 +158,26 @@ namespace Extrinsic::Sandbox::Spike
         return true;
     }
 
-    bool StartPluginGpuWork(const Runtime::AgentOperationContext& context, PluginGpuWork work)
+    bool StartPluginGpuWork(const Runtime::AgentOperationContext& context, Runtime::GpuQueueParticipantDesc work)
     {
-        if (g_Draining || g_Gpu || context.Jobs == nullptr || !work.Record || !work.InFlight || !work.Shutdown)
+        if (g_Draining || g_Gpu || context.Jobs == nullptr || !work.RecordFrameCommands || !work.HasInFlightWork ||
+            !work.ShutdownAfterDeviceIdle)
             return false;
         g_Gpu = std::make_unique<GpuEntry>(GpuEntry{.Work = std::move(work)});
+        // Host forwarders, so the service holds no plugin callable and recording stops while draining.
         g_Gpu->Handle = context.Jobs->RegisterGpuQueueParticipant({
             .DebugName = "spike plugin GPU work",
+            .Scope = g_Gpu->Work.Scope,
             .RecordFrameCommands = [](RHI::ICommandContext& commands)
             {
-                if (!g_Gpu->Stopping) g_Gpu->Work.Record(commands);
+                if (!g_Draining) g_Gpu->Work.RecordFrameCommands(commands);
             },
-            .HasInFlightWork = [] { return g_Gpu->Work.InFlight(); },
-            .ShutdownAfterDeviceIdle = [] { g_Gpu->Work.Shutdown(); },
+            .DrainCompletedTransfers = []
+            {
+                if (g_Gpu->Work.DrainCompletedTransfers) g_Gpu->Work.DrainCompletedTransfers();
+            },
+            .HasInFlightWork = [] { return g_Gpu->Work.HasInFlightWork(); },
+            .ShutdownAfterDeviceIdle = [] { g_Gpu->Work.ShutdownAfterDeviceIdle(); },
         });
         g_Jobs = context.Jobs;
         return true;
@@ -507,34 +512,58 @@ namespace Extrinsic::Sandbox::Spike
             return std::nullopt;
         }
 
-        // One frame of draining (S2c): destroys the plugin callables of every job that is finalized and no longer
-        // on a worker, and unregisters the GPU work once its last frame retired. True when nothing is left.
-        bool DrainStep()
+        // One frame of draining (S2c): destroys the plugin callables of every finalized job, and unregisters the
+        // GPU work once its last frame retired. True when nothing is left.
+        // simulateGpuStall (test hook) treats the GPU work as never retiring.
+        bool DrainStep(const bool simulateGpuStall)
         {
             std::erase_if(g_PluginJobs, [](const std::unique_ptr<JobEntry>& entry)
-                          { return entry->Finalized && (entry->Returned || !entry->Started); });
-            if (g_Gpu)
+                          { return entry->Finalized; });
+            if (g_Gpu && !simulateGpuStall && !g_Gpu->Work.HasInFlightWork())
             {
-                g_Gpu->Stopping = true;
-                if (!g_Gpu->Work.InFlight())
-                {
-                    // Logged for the driver: the RHI defers buffer frees anyway, so only this shows the wait.
-                    spike_lifecycle_event(g_Gpu->Work.InFlight() ? "gpu_unregistered_in_flight" : "gpu_unregistered_retired");
-                    g_Jobs->UnregisterGpuQueueParticipant(g_Gpu->Handle); // not in flight: no device wait
-                    g_Gpu.reset();
-                }
+                g_Jobs->UnregisterGpuQueueParticipant(g_Gpu->Handle); // not in flight: no device wait
+                g_Gpu.reset();
             }
             return g_PluginJobs.empty() && !g_Gpu;
         }
 
-        constexpr std::chrono::seconds kDrainDeadline{5};
+        constexpr std::chrono::milliseconds kDrainDeadline{5000};
+        enum class DrainState : std::uint8_t { Pending, Drained, TimedOut };
+
+        // One poll of a continuation's drain. The first poll starts it: submissions refused, jobs cancelled. The
+        // deadline is checked before success, so work that ends after it still times out. On timeout admission
+        // and GPU recording come back (as they do when the continuation is dropped, through its reservation).
+        DrainState PollDrain(std::optional<std::chrono::steady_clock::time_point>& deadline,
+                             const std::chrono::milliseconds budget, const bool simulateGpuStall)
+        {
+            const auto now = std::chrono::steady_clock::now();
+            if (!deadline)
+            {
+                deadline = now + budget;
+                g_Draining = true;
+                for (const auto& entry : g_PluginJobs) (void)g_Jobs->Cancel(entry->Token);
+            }
+            if (now >= *deadline)
+            {
+                g_Draining = false;
+                return DrainState::TimedOut;
+            }
+            if (!DrainStep(simulateGpuStall)) return DrainState::Pending;
+            g_Draining = false;
+            return DrainState::Drained;
+        }
 
         // The commit, unload and reload run on a later frame, after this call's dispatch through the registry
         // returned; the reservation ends when the continuation is destroyed (completed or dropped).
         std::shared_ptr<void> Reserve()
         {
             g_LoadPending = true;
-            return {nullptr, [](void*) { g_LoadPending = false; }};
+            return {nullptr, [](void*)
+                    {
+                        g_LoadPending = false;
+                        // A drain ends with its continuation; a dropped one must not keep refusing work.
+                        g_Draining = false;
+                    }};
         }
 
         Runtime::EditorUiHost* Ui(Runtime::ServiceRegistry& services, const Runtime::AgentOperationContext& context)
@@ -601,6 +630,9 @@ namespace Extrinsic::Sandbox::Spike
             if (g_LoadPending) return Fail("load_pending", "another load has not committed yet");
             const std::string path = reload ? arguments["path"].get<std::string>() : std::string{};
             const std::string failAt = arguments.value("fail_at", std::string{});
+            // Spike test hooks: a drain deadline other than 5 s, and GPU work treated as never retiring.
+            const auto budget = std::chrono::milliseconds{arguments.value("drain_deadline_ms", kDrainDeadline.count())};
+            const bool simulateGpuStall = arguments.value("simulate_gpu_stall", false);
             // Spike test hook: keep a copy of one plugin operation alive, so the close must refuse.
             if (!reload && arguments.value("retain_callable", false) && !g_Plugin->Operations.empty())
             {
@@ -608,7 +640,7 @@ namespace Extrinsic::Sandbox::Spike
                 retained->push_back(*g_Operations->Find(g_Plugin->Operations.front()));
             }
             Runtime::AgentOperationOutcome outcome{.Text = "{}"};
-            outcome.Continuation = [&services, reservation = Reserve(), reload, path, failAt,
+            outcome.Continuation = [&services, reservation = Reserve(), reload, path, failAt, budget, simulateGpuStall,
                                     deadline = std::optional<std::chrono::steady_clock::time_point>{}](
                 const Runtime::AgentOperationContext& context, Runtime::AgentOperationOutcome& result) mutable
             {
@@ -618,23 +650,14 @@ namespace Extrinsic::Sandbox::Spike
                     result = Fail("host_unavailable", "editor UI host, config control or history missing");
                     return true;
                 }
-                // Drain first, frame by frame: no new plugin work, jobs cancelled, then everything reaped. On the
-                // deadline the plugin stays loaded and registered, and admission is restored.
-                if (!deadline)
+                // Drain first, frame by frame; on the deadline the plugin stays loaded and registered.
+                const DrainState drain = PollDrain(deadline, budget, simulateGpuStall);
+                if (drain == DrainState::Pending) return false;
+                if (drain == DrainState::TimedOut)
                 {
-                    deadline = std::chrono::steady_clock::now() + kDrainDeadline;
-                    g_Draining = true;
-                    for (const auto& entry : g_PluginJobs) (void)g_Jobs->Cancel(entry->Token);
-                }
-                if (!DrainStep())
-                {
-                    if (std::chrono::steady_clock::now() < *deadline) return false;
-                    g_Draining = false;
-                    if (g_Gpu) g_Gpu->Stopping = false;
-                    result = Fail("drain_timeout", "plugin work did not finish within 5 s; the plugin stays loaded");
+                    result = Fail("drain_timeout", "plugin work did not finish before the deadline; the plugin stays loaded");
                     return true;
                 }
-                g_Draining = false;
                 if (const auto error = Unload(*context.ConfigControl, *ui, context.History))
                 {
                     result = Fail(*error, "a callable of the closing generation is still alive; the image stays mapped");
@@ -659,7 +682,6 @@ namespace Extrinsic::Sandbox::Spike
             Json jobs = Json::array();
             for (const auto& entry : g_PluginJobs)
                 jobs.push_back({{"state", std::string{Runtime::ToString(g_Jobs->GetState(entry->Token))}},
-                                {"started", entry->Started.load()}, {"returned", entry->Returned.load()},
                                 {"finalized", entry->Finalized}});
             return jobs;
         }
@@ -690,8 +712,7 @@ namespace Extrinsic::Sandbox::Spike
                 {"loaded", g_Plugin ? Json(g_Plugin->Generation) : Json(nullptr)},
                 {"loaded_range", g_Plugin ? MappedRange(g_Plugin->Copy) : Json::array()},
                 {"jobs", PluginJobsJson()},
-                {"gpu", g_Gpu ? Json{{"in_flight", g_Gpu->Work.InFlight()}, {"stopping", g_Gpu->Stopping}}
-                              : Json(nullptr)},
+                {"gpu", g_Gpu ? Json{{"in_flight", g_Gpu->Work.HasInFlightWork()}} : Json(nullptr)},
                 {"draining", g_Draining},
                 {"invoked", CountsJson(Invoked())},
                 {"closes", g_Closes},
@@ -725,7 +746,7 @@ namespace Extrinsic::Sandbox::Spike
                            "drain_timeout), the plugin's shutdown hook, all its registrations out (config section "
                            "payloads saved for a later load), then dlclose once none of its callables is alive. "
                            "retain_callable (test hook) keeps a copy of one plugin operation alive.",
-            .InputSchemaJson = R"({"type":"object","properties":{"retain_callable":{"type":"boolean"}},"additionalProperties":false})",
+            .InputSchemaJson = R"({"type":"object","properties":{"retain_callable":{"type":"boolean"},"drain_deadline_ms":{"type":"integer"},"simulate_gpu_stall":{"type":"boolean"}},"additionalProperties":false})",
             .ReadOnly = false,
             .Invoke = [&services](const Runtime::AgentOperationContext&, std::string_view arguments)
             { return UnloadOrReload(services, arguments, false); },
@@ -736,7 +757,7 @@ namespace Extrinsic::Sandbox::Spike
             .Description = std::string{"From the next frame: unload (draining first, as plugin_unload), then load the "
                                        "build at path and reapply the saved config payloads. A failure after the "
                                        "unload leaves no plugin. "} + kFailAt,
-            .InputSchemaJson = R"({"type":"object","properties":{"path":{"type":"string"},"fail_at":{"type":"string"}},"required":["path"],"additionalProperties":false})",
+            .InputSchemaJson = R"({"type":"object","properties":{"path":{"type":"string"},"fail_at":{"type":"string"},"drain_deadline_ms":{"type":"integer"},"simulate_gpu_stall":{"type":"boolean"}},"required":["path"],"additionalProperties":false})",
             .ReadOnly = false,
             .Invoke = [&services](const Runtime::AgentOperationContext&, std::string_view arguments)
             { return UnloadOrReload(services, arguments, true); },
@@ -753,13 +774,24 @@ namespace Extrinsic::Sandbox::Spike
         (void)registry.Register({
             .Name = "app_quit",
             .Title = "Quit the Sandbox (ARCH-022 spike)",
-            .Description = "Calls the loaded plugin's shutdown hook, then requests the engine's exit.",
+            .Description = "From the next frame: drains the loaded plugin's work (within 5 s), calls its shutdown hook, then "
+                           "requests the engine's exit.",
             .ReadOnly = false,
             .Invoke = [requestExit = std::move(requestExit)](const Runtime::AgentOperationContext&, std::string_view)
             {
-                if (g_Plugin) g_Plugin->Shutdown();
-                requestExit();
-                return Runtime::AgentOperationOutcome{.Text = R"({"quitting":true})"};
+                Runtime::AgentOperationOutcome outcome{.Text = "{}"};
+                outcome.Continuation = [requestExit, reservation = Reserve(),
+                                        deadline = std::optional<std::chrono::steady_clock::time_point>{}](
+                    const Runtime::AgentOperationContext&, Runtime::AgentOperationOutcome& result) mutable
+                {
+                    const DrainState drain = g_Plugin ? PollDrain(deadline, kDrainDeadline, false) : DrainState::Drained;
+                    if (drain == DrainState::Pending) return false;
+                    if (g_Plugin) g_Plugin->Shutdown();
+                    requestExit();
+                    result = {.Text = Json{{"quitting", true}, {"drained", drain == DrainState::Drained}}.dump()};
+                    return true;
+                };
+                return outcome;
             },
         });
     }

@@ -1404,23 +1404,17 @@ python3 tools/docs/check_doc_links.py --root . --strict
     empty-handler guard removed fails every empty-handler check.
   - Codex delta of `dd49e901a`: "APPROVE — commit `dd49e901a`." One wording note: "cannot
     overflow" overstated; it now says an overflow is impractical. S2a and S2b are pushed.
-- 2026-11-01: S2c implemented (bounded draining, CPU and GPU).
-  - Host:
-    - `SubmitPluginJob` keeps each job's plugin callables in a host entry on the main thread;
-    - the worker reaches them through a host lambda and a raw pointer, and sets `Returned` after
-      the plugin call;
-    - completion and the unpublished finalizer run the plugin's completion on the main thread;
-    - `StartPluginGpuWork` registers a GPU queue participant whose callbacks forward to the
-      plugin's;
-    - unload and reload drain first, frame by frame: submissions refused, jobs cancelled,
-      entries destroyed once finalized and no longer on a worker, GPU work stopped and
-      unregistered only once its last frame retired (no device wait).
-
-    The 5 s deadline applies in code; on timeout the plugin stays and admission is restored.
-  - The app layer may import only runtime, so the contract names `RHI::ICommandContext` by a
-    forward declaration (as `Runtime.JobService` does). The plugin finds the device through
-    `Services()` and reports its own in-flight state (the cache's retirement rule); it imports
-    RHI directly, and R2 stays 0/0.
+- 2026-11-01: S2c implemented (bounded draining, CPU and GPU), as planned, except:
+  - The contract takes a `Runtime::GpuQueueParticipantDesc` for GPU work. The host forwards its
+    callbacks and gates recording on draining. The plugin finds the device through `Services()`
+    and reports its own retirement by the cache's rule; it imports RHI directly (`plugins/` is
+    outside `src` layering), and R2 stays 0/0.
+  - The ignoring job runs 12 s, not 10 s.
+  - Test hooks: `drain_deadline_ms` and `simulate_gpu_stall` on unload and reload.
+  - A job entry is released once finalized. The planned `returned` flag was dropped, since the
+    service finalizes only after `Work` returned or for a job that never started. Codex confirmed
+    this, and the ponytail review found the flag could not change the result.
+  - `app_quit` drains too, before the shutdown hook.
   - Driver, variant (a), run 2: 94 of 94.
     - 66 jobs (31 running, 35 queued) are all cancelled, each completion before the shutdown hook.
     - A job that ignores cancellation: `drain_timeout` after 5.04 s; the old version answers and
@@ -1440,3 +1434,41 @@ python3 tools/docs/check_doc_links.py --root . --strict
     fire at retirement (readbacks into plugin code), which the spike's GPU work does not have.
     The host now logs whether the work was still in flight when it unregistered, and the driver
     requires "retired". With that check the mutation is caught; run 3: 95 of 95.
+- 2026-11-01: S2c review of `4e3a00ea5`.
+  - Codex (fresh session `01a1944d-c439-7ed3-98a7-254980416870`, diff SHA-256 prefix
+    `0bcce28041eddcaf`): REVISE.
+    - Musts:
+      1. a dropped drain continuation left admission blocked;
+      2. `app_quit` ran the shutdown hook before outstanding work settled;
+      3. a drain could succeed after its deadline.
+    - Shoulds:
+      4. the GPU checks trusted the same predicate they test, and missed the timeout restoration;
+      5. the planned `{frames}` argument was missing.
+  - Fresh Claude ponytail review: fix 2 and 3 first:
+    - the `Started`/`Returned` flags cannot change the result;
+    - `Work`'s bool was thrown away;
+    - `Stopping` duplicated `g_Draining`;
+    - `PluginGpuWork` duplicated `GpuQueueParticipantDesc`;
+    - two shared values for one fact;
+    - the log restated the plan.
+  - Fixes:
+    1. the reservation's end restores admission; checked by a disconnect during a drain and a
+       reconnect;
+    2. `app_quit` drains first; a quit with a job and GPU work outstanding settles both before the
+       shutdown hook;
+    3. the deadline is checked before success; checked deterministically with a 0 ms budget;
+    4. retirement is checked from the plugin's own frame numbers, logged at its GPU shutdown;
+       a simulated stall times out, and recording resumes;
+    5. `{frames}` records exactly that many frames.
+
+    All ponytail findings are applied. Variant (a), run 5: 102 of 102.
+  - Variant (b): 102 of 102. Control 15 of 15 and S1 58 of 58 in both variants.
+  - Mutations, each caught by its intended check:
+    - the reservation not restoring admission: the dropped-drain check;
+    - success checked before the deadline: the 0 ms check;
+    - quit without a drain: the quit-order check;
+    - a retirement predicate one frame short: the frame-number check;
+    - `frames` ignored: the three-frames check.
+
+    Not mutation-checkable: removing the explicit admission reset on timeout, since the
+    reservation's end restores it as well.

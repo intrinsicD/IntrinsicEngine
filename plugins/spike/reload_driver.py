@@ -30,9 +30,12 @@ It checks, in order:
      submissions are admitted again, and once the job ended a reload succeeds;
   11. GPU work in flight during a reload stops recording and retires before its shutdown and the plugin's; nothing
      alive at the close, no Vulkan validation error;
+     Then: a 0 ms drain budget times out even with nothing outstanding (the deadline is checked first); a caller that
+     disconnects during a drain leaves nothing draining; GPU work that does not retire (test hook) times out and
+     records again; frames 3 records exactly three frames. The retirement check uses the plugin's own frame numbers.
   12. the close guard: an unload with one plugin callable kept alive (test hook) unregisters everything but leaves the
      image mapped, with callables_alive;
-  13. a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
+  13. a quit with a job and GPU work outstanding settles both before the shutdown hook; a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
 With --closure-control it runs the S2b control instead: closure entries 5 and 3 (today's form) are recorded, 3 is
 undone, the plugin is reloaded to a 16 MiB larger build (so the freed range stays free), and the remaining entry is
@@ -60,6 +63,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import spike_driver as s1  # noqa: E402  (shared session helpers)
 
 CYCLES = 20
+QUIT_EVENTS_FROM = [0]  # the event index at the quit, for the exit-order check
 SCENE_MESH = s1.REPO / "tests/data/framework24-open-patch.obj"
 # Every kind of callable the plugin hands over; each must be counted while loaded and appear at every close.
 KINDS = {"validator", "change_callback", "operation", "window_draw", "window_state", "history_handler"}
@@ -141,6 +145,19 @@ def save_scene(agent: s1.Agent, out: Path, name: str) -> str:
     if not ok:
         raise RuntimeError(f"save_scene failed: {value}")
     return sha256(out / name)
+
+
+def gpu_retired(events: list[str]) -> bool:
+    """The plugin's own record at its GPU shutdown: the last recorded frame had retired (FramesInFlight + 1 newer)."""
+    frames = [e for e in events if e.startswith("gpu_frames:")]
+    if len(frames) != 1:
+        return False
+    last, now, in_flight = (int(x) for x in frames[0].split(":")[1:])
+    return now >= last + in_flight + 1
+
+
+def invoked_count(agent: s1.Agent, generation: int, kind: str) -> int:
+    return host(agent)["invoked"].get(str(generation), {}).get(kind, 0)
 
 
 def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path], out: Path) -> None:
@@ -366,8 +383,29 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     checks.check("timeout: after the job ended, a reload succeeds", all(finished) and ok and generation_of(reply) == 2,
                  [finished, reply, error])
 
+    # 10b. The deadline is checked before success: with a 0 ms budget even an empty drain times out.
+    ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["A"]), "drain_deadline_ms": 0})
+    _, version, _, _ = agent.call("spike_version")
+    checks.check("deadline: an expired deadline wins over a finished drain (0 ms budget, nothing outstanding)",
+                 not ok and error == "drain_timeout" and version == {"generation": 2}
+                 and agent.call("spike_start_job", {"seconds": 0.05})[0], [error, reply, version])
+
+    # 10c. A drain whose caller disconnects: the dropped continuation gives admission back.
+    agent.call("spike_start_job", {"seconds": 4, "ignore_cancel": True})
+    wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
+    agent.send("tools/call", {"name": "plugin_reload", "arguments": {"path": str(kept["B"])}})
+    time.sleep(0.5)
+    agent.sock.close()
+    agent = s1.Agent(out / "agent.sock", 60.0)
+    draining = wait_for(lambda: host(agent)["draining"], lambda d: d is False, 5.0)
+    checks.check("dropped drain: after the caller disconnected, nothing is draining and a submission is admitted",
+                 draining is False and agent.call("spike_start_job", {"seconds": 0.05})[0], draining)
+    wait_for(lambda: [j["finalized"] for j in host(agent)["jobs"]], lambda f: all(f), 10.0)
+    _, version, _, _ = agent.call("spike_version")
+    checks.check("dropped drain: the old version still answers", version == {"generation": 2}, version)
+
     # 11. GPU work in flight during a reload: it stops recording, retires, then the plugin shuts down.
-    ok, reply, _, error = agent.call("spike_gpu_work")
+    ok, reply, _, error = agent.call("spike_gpu_work", {"frames": 100000})
     gpu = wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
     checks.check("gpu: the plugin's work is in flight before the reload", ok and bool(gpu) and gpu.get("in_flight") is True,
                  [reply, error, gpu])
@@ -379,9 +417,8 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
                  ok and generation_of(reply) == 3 and state["gpu"] is None and "gpu_shutdown" in new_events
                  and "shutdown" in new_events and new_events.index("gpu_shutdown") < new_events.index("shutdown"),
                  [reply, error, new_events[:6]])
-    checks.check("gpu: the participant was unregistered only after its last frame retired",
-                 "gpu_unregistered_retired" in new_events and "gpu_unregistered_in_flight" not in new_events,
-                 new_events[:6])
+    checks.check("gpu: by the plugin's own frame numbers, its last recorded frame had retired at its shutdown",
+                 gpu_retired(new_events), [e for e in new_events if e.startswith("gpu_frames:")])
     checks.check("gpu: no live callable of generation 2 at the close, GPU callables included",
                  last_close_clean(state, 2) and {"gpu_record", "gpu_in_flight", "gpu_shutdown"} <= set(state["closes"][-1]["live"]),
                  state["closes"][-1:])
@@ -389,6 +426,29 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     status = s1.find(diagnostics, "device_status")
     checks.check("gpu: no Vulkan validation error", ok and isinstance(status, dict) and status.get("validation_enabled") is True
                  and status.get("validation_error_count") == 0, status)
+
+    # 11b. GPU work that does not retire (test hook): the drain times out, the participant stays and records again.
+    agent.call("spike_gpu_work", {"frames": 100000})
+    wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
+    ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["B"]), "simulate_gpu_stall": True})
+    gpu = host(agent)["gpu"]
+    recorded = invoked_count(agent, 3, "gpu_record")
+    resumed = wait_for(lambda: invoked_count(agent, 3, "gpu_record"), lambda n: n > recorded + 2, 3.0)
+    checks.check("gpu stall: drain_timeout, the participant stays, nothing is draining, and it records again",
+                 not ok and error == "drain_timeout" and bool(gpu) and host(agent)["draining"] is False
+                 and resumed > recorded + 2, [error, gpu, recorded, resumed])
+    ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["B"])})
+    checks.check("gpu stall: a normal reload then drains it", ok and generation_of(reply) == 3 and host(agent)["gpu"] is None,
+                 [reply, error])
+
+    # 11c. A bounded fixture: frames 3 records exactly three frames, then retires while still registered.
+    before = invoked_count(agent, 3, "gpu_record")
+    agent.call("spike_gpu_work", {"frames": 3})
+    gpu = wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is False, 5.0)
+    time.sleep(0.3)
+    checks.check("gpu frames: exactly 3 frames recorded, then retired, the participant still registered",
+                 invoked_count(agent, 3, "gpu_record") - before == 3 and bool(gpu) and gpu.get("in_flight") is False,
+                 [invoked_count(agent, 3, "gpu_record") - before, gpu])
 
     # 12. The close guard: with a plugin callable kept alive, the unload unregisters everything but must not close.
     ok, reply, _, error = agent.call("plugin_unload", {"retain_callable": True})
@@ -399,7 +459,15 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
                  close.get("generation") == 3 and close.get("closed") is False and close.get("live", {}).get("operation") == 1,
                  close)
     checks.check("guard: no plugin is registered", state["loaded"] is None and s1.registries(agent) == baseline, "changed")
+
+    # 13. Quit with CPU and GPU work outstanding: both settle before the shutdown hook.
+    ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
+    agent.call("spike_start_job", {"seconds": 60})
+    agent.call("spike_gpu_work", {"frames": 100000})
+    wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
+    seen = len((out / "events.log").read_text().splitlines())
     checks.check("exit: app_quit accepted", agent.quit())
+    QUIT_EVENTS_FROM[0] = seen
 
 
 def control(agent: s1.Agent, checks: s1.Checks, kept: dict[str, Path], state: dict) -> None:
@@ -473,6 +541,11 @@ def main() -> int:
     result = s1.launch(args, checks, lambda agent: run(agent, checks, builds, kept, args.out))
     if result is not None:
         _, _, lines = result
+        tail = lines[QUIT_EVENTS_FROM[0]:]
+        order_ok = all(e in tail for e in ("job_finalized", "gpu_shutdown", "shutdown")) and \
+            tail.index("job_finalized") < tail.index("shutdown") and tail.index("gpu_shutdown") < tail.index("shutdown") \
+            and gpu_retired(tail)
+        checks.check("exit: the outstanding job and GPU work settled before the shutdown hook at quit", order_ok, tail[:8])
         # The image the guard kept open is destroyed at exit like every other.
         constructed, destructed = lines.count("static_construct"), lines.count("static_destruct")
         checks.check("lifecycle: every image's static construction matched by its destruction",

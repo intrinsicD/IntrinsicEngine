@@ -26,6 +26,7 @@ import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.UiHostTypes;
 import Extrinsic.Sandbox.PluginSpike;
@@ -175,7 +176,6 @@ namespace
                 const auto end = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);
                 while (std::chrono::steady_clock::now() < end && (ignoreCancel || !cancelled()))
                     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                return !cancelled();
             },
             .Completion = [t = Tracked{"job_completion"}](bool published)
             {
@@ -187,11 +187,15 @@ namespace
         return {.Text = R"({"submitted":true})"};
     }
 
-    // spike_gpu_work: fills a slice of the plugin's own buffer in every recorded frame, one slice per frame in
-    // flight, so no two unretired frames write the same bytes.
-    AgentOperationOutcome GpuWork(const AgentOperationContext& context, std::string_view)
+    // spike_gpu_work {frames}: fills a slice of the plugin's own buffer in each of the next `frames` recorded frames,
+    // one slice per frame in flight, so no two unretired frames write the same bytes. Its shutdown logs the last
+    // recorded frame, the current frame and the frames in flight, so the driver can check the retirement itself.
+    AgentOperationOutcome GpuWork(const AgentOperationContext& context, std::string_view argumentsJson)
     {
         constexpr std::uint64_t kSlice = 64u << 10u;
+        const Json arguments = Json::parse(argumentsJson, nullptr, false);
+        const auto frames = std::make_shared<std::int64_t>(
+            arguments.is_object() ? arguments.value("frames", std::int64_t{1} << 40) : std::int64_t{1} << 40);
         auto* device = Spike::Services().Find<Extrinsic::RHI::IDevice>();
         if (device == nullptr)
             return {.IsError = true, .Text = "no RHI device", .ErrorCode = "no_device"};
@@ -199,27 +203,31 @@ namespace
         const auto buffer = device->CreateBuffer({.SizeBytes = kSlice * slots,
                                                   .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
                                                   .DebugName = "spike plugin buffer"});
-        auto lastRecorded = std::make_shared<std::uint64_t>(0);
-        auto recorded = std::make_shared<bool>(false);
+        auto last = std::make_shared<std::optional<std::uint64_t>>(); // the last recorded frame, if any
         const bool started = Spike::StartPluginGpuWork(context, {
-            .Record = [t = Tracked{"gpu_record"}, device, buffer, slots, lastRecorded, recorded](
-                          Extrinsic::RHI::ICommandContext& commands)
+            .DebugName = "spike plugin GPU work",
+            .RecordFrameCommands = [t = Tracked{"gpu_record"}, device, buffer, slots, last, frames](
+                                       Extrinsic::RHI::ICommandContext& commands)
             {
+                if (*frames <= 0) return;
+                --*frames;
                 t.Invoked();
                 const std::uint64_t frame = device->GetGlobalFrameNumber();
                 commands.FillBuffer(buffer, (frame % slots) * kSlice, kSlice, 0x5eedu);
-                *lastRecorded = frame;
-                *recorded = true;
+                *last = frame;
             },
-            .InFlight = [t = Tracked{"gpu_in_flight"}, device, lastRecorded, recorded]
+            .HasInFlightWork = [t = Tracked{"gpu_in_flight"}, device, last]
             {
                 t.Invoked();
                 // The cache's rule: a frame has retired once FramesInFlight + 1 newer frames began.
-                return *recorded && device->GetGlobalFrameNumber() < *lastRecorded + device->GetFramesInFlight() + 1u;
+                return last->has_value() && device->GetGlobalFrameNumber() < **last + device->GetFramesInFlight() + 1u;
             },
-            .Shutdown = [t = Tracked{"gpu_shutdown"}, device, buffer]
+            .ShutdownAfterDeviceIdle = [t = Tracked{"gpu_shutdown"}, device, buffer, last]
             {
                 t.Invoked();
+                const std::string frames = "gpu_frames:" + std::to_string(last->value_or(0)) + ":" +
+                    std::to_string(device->GetGlobalFrameNumber()) + ":" + std::to_string(device->GetFramesInFlight());
+                spike_lifecycle_event(frames.c_str());
                 device->DestroyBuffer(buffer);
                 spike_lifecycle_event("gpu_shutdown");
             },
@@ -338,7 +346,9 @@ extern "C" bool intrinsic_plugin_register_v0(Spike::StagedRegistrations& staged,
     staged.Operations.push_back({
         .Name = "spike_gpu_work",
         .Title = "GPU work (spike plugin)",
-        .Description = "Fills the plugin's own buffer in every recorded frame until the plugin unloads.",
+        .Description = "Fills the plugin's own buffer in each of the next frames recorded frames (default: until it "
+                       "unloads).",
+        .InputSchemaJson = R"({"type":"object","properties":{"frames":{"type":"integer"}},"additionalProperties":false})",
         .ReadOnly = false,
         .Invoke = [t = Tracked{"operation"}](const AgentOperationContext& context, std::string_view arguments)
         {
