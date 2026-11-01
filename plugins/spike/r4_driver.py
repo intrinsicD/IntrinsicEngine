@@ -15,7 +15,7 @@ A sample is valid only if all of these hold:
   - the build's Ninja edges (its "[n/m] description" lines) include the plugin's compile and link, and every edge is
     the plugin's: its description names "plugins/", the host-module collection or the glob re-check (no host edge);
   - the reload reply has generation g, its config report restored ["spike"] and rejected nothing;
-  - the previous generation's close record is clean: closed, unmapped, every callable count 0;
+  - the previous generation's close record is new and clean: closed, unmapped, every callable count 0;
   - spike_version answers generation g.
 A build that exceeds its timeout or a reload whose reply does not come within the socket's 60 s is recorded as a
 failed sample with its elapsed time. The first failed sample stops the session.
@@ -24,7 +24,10 @@ Samples: --warmup (not summarized) then --samples measured ones. After them, two
                      (sha256) and no plugin compile or link edge ran;
   reload_unchanged   plugin_reload of the current build, with no edit and no build; valid if it answers the last
                      generation and the close before it is clean.
-Session validity: the Sandbox binary's sha256 is the same after the samples as before them.
+A sample also needs finite compile_s and link_s, and its previous-generation close must be a new record (one more
+close than before the reload), so an older record is never reused; the reload probe checks the same.
+Session validity: the Sandbox binary's sha256 is the same after the samples as before them. Recorded before the
+quit: the Sandbox's VmHWM and the largest finished child process's max RSS (the builds), in KiB.
 Before and after every sample and probe it records /proc/loadavg and the "some avg10" of /proc/pressure/cpu and
 /proc/pressure/memory. A failed step or a wrong generation fails that sample, and the run stops there.
 Writes, in <out> (which must not exist): samples.jsonl (one object per sample or probe), summary.json (the checks and
@@ -43,8 +46,11 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import math
 import os
 import re
+import resource
+import signal
 import statistics
 import subprocess
 import sys
@@ -55,6 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import spike_driver as s1  # noqa: E402  (shared session helpers)
 
 TARGET_S = 10.0
+MEMORY: dict = {}  # peak memory of the session, filled before the quit
 PHASES = ("build", "reload", "answer", "total")
 
 
@@ -86,18 +93,20 @@ def plugin_edge(description: str) -> bool:
 
 
 def build(target_build: Path, log: Path) -> tuple[bool, list[str]]:
-    """(succeeded, the Ninja edge descriptions it ran); a timeout counts as a failed build."""
+    """(succeeded, the Ninja edge descriptions it ran). The build runs in its own process group; on the 600 s timeout
+    the whole group (cmake, ninja, compilers) is killed and reaped, and the build counts as failed."""
+    process = subprocess.Popen(["cmake", "--build", str(target_build), "--target", "IntrinsicSpikePlugin"],
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
     try:
-        result = subprocess.run(["cmake", "--build", str(target_build), "--target", "IntrinsicSpikePlugin"],
-                                capture_output=True, text=True, timeout=600)
-    except subprocess.TimeoutExpired as expired:
-        output = (expired.stdout or b"").decode(errors="replace") if isinstance(expired.stdout, bytes) else (expired.stdout or "")
-        with log.open("a") as file:
-            file.write(output + "\n[r4_driver] build timed out after 600 s\n")
-        return False, EDGE.findall(output)
+        output, _ = process.communicate(timeout=600)
+        timed_out = False
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        output, _ = process.communicate()
+        timed_out = True
     with log.open("a") as file:
-        file.write(result.stdout + result.stderr)
-    return result.returncode == 0, EDGE.findall(result.stdout)
+        file.write((output or "") + ("\n[r4_driver] build timed out after 600 s\n" if timed_out else ""))
+    return not timed_out and process.returncode == 0, EDGE.findall(output or "")
 
 
 def step_seconds(target_build: Path, output: str) -> float | None:
@@ -110,14 +119,19 @@ def step_seconds(target_build: Path, output: str) -> float | None:
     return seconds
 
 
-def last_close(agent: s1.Agent) -> dict:
+def closes(agent: s1.Agent) -> list[dict]:
     ok, value, _, _ = agent.call("plugin_host_identity")
-    closes = value.get("closes", []) if ok and isinstance(value, dict) else []
-    return closes[-1] if closes else {}
+    return value.get("closes", []) if ok and isinstance(value, dict) else []
 
 
-def clean_close(close: dict, generation: int) -> bool:
-    return close.get("generation") == generation and s1.clean_close(close)
+def new_clean_close(count_before: int, after: list[dict], generation: int) -> bool:
+    """Exactly one close happened since count_before, of this generation, closed and unmapped with nothing alive;
+    an older record (a reload that closed nothing) does not count."""
+    return len(after) == count_before + 1 and after[-1].get("generation") == generation and s1.clean_close(after[-1])
+
+
+def finite(value: object) -> bool:
+    return isinstance(value, (int, float)) and math.isfinite(value)
 
 
 def generation_of(reply: object) -> object:
@@ -129,6 +143,7 @@ def sample(agent: s1.Agent, args, index: int, kind: str, previous: int) -> dict:
     plugin = args.build / "plugins/libIntrinsicSpikePlugin.so"
     generation = args.generation_base + index
     record: dict = {"index": index, "kind": kind, "generation": generation, "load_before": host_load()}
+    closes_before = len(closes(agent))
     t0 = time.monotonic()
     save(header, generation)
     t0_end = time.monotonic()
@@ -144,19 +159,21 @@ def sample(agent: s1.Agent, args, index: int, kind: str, previous: int) -> dict:
     if ok:
         ok_version, version, _, _ = agent.call("spike_version")
     t3 = time.monotonic()
-    close = last_close(agent) if ok else {}
+    closes_after = closes(agent) if ok else []
     config = reply.get("config", {}) if isinstance(reply, dict) else {}
     record.update(save_s=t0_end - t0, build=t1 - t0, reload=t2 - t1, answer=t3 - t2, total=t3 - t0,
                   compile_s=step_seconds(args.build, PLUGIN_OBJECT), link_s=step_seconds(args.build, PLUGIN_LIBRARY),
                   edges=edges, built=built, reload_ok=ok, reload_generation=generation_of(reply), reload_error=error,
-                  reload_config=config, previous_close=close, version=version, load_after=host_load())
+                  reload_config=config, previous_close=closes_after[-1] if closes_after else {}, version=version,
+                  load_after=host_load())
     record["checks"] = {
         "plugin_edges_only": built and any(PLUGIN_OBJECT in e for e in edges) and any(PLUGIN_LIBRARY in e for e in edges)
         and all(plugin_edge(e) for e in edges),
         "reload_generation": ok and generation_of(reply) == generation,
         "config_restored": config.get("restored") == ["spike"] and config.get("rejected") == [],
-        "previous_close_clean": clean_close(close, previous),
+        "previous_close_clean": new_clean_close(closes_before, closes_after, previous),
         "version": ok_version and version == {"generation": generation},
+        "steps_recorded": finite(record["compile_s"]) and finite(record["link_s"]),
     }
     record["ok"] = all(record["checks"].values())
     return record
@@ -174,10 +191,11 @@ def probe(agent: s1.Agent, args, name: str, index: int, generation: int) -> dict
         record["ok"] = built and hashlib.sha256(plugin.read_bytes()).hexdigest() == before and \
             not any(PLUGIN_OBJECT in e or PLUGIN_LIBRARY in e for e in edges)
     else:
+        count_before = len(closes(agent))
         ok, reply, _, error = agent.call("plugin_reload", {"path": str(plugin)})
         record["seconds"] = time.monotonic() - start
         record["reload_error"] = error
-        record["ok"] = ok and generation_of(reply) == generation and clean_close(last_close(agent), generation)
+        record["ok"] = ok and generation_of(reply) == generation and new_clean_close(count_before, closes(agent), generation)
     record["load_after"] = host_load()
     return record
 
@@ -187,9 +205,9 @@ def summarize(records: list[dict]) -> dict:
     summary = {phase: {"median": statistics.median(r[phase] for r in measured),
                        "min": min(r[phase] for r in measured), "max": max(r[phase] for r in measured)}
                for phase in PHASES} if measured else {}
-    for step in ("compile_s", "link_s"):  # the plugin's own steps, when every measured sample has them
+    for step in ("compile_s", "link_s"):  # the plugin's own steps (a valid sample has both)
         values = [r.get(step) for r in measured]
-        if values and all(isinstance(v, (int, float)) for v in values):
+        if values and all(finite(v) for v in values):
             summary[step] = {"median": statistics.median(values), "min": min(values), "max": max(values)}
     for name in ("rebuild_unchanged", "reload_unchanged"):
         values = [r["seconds"] for r in records if r["kind"] == name]
@@ -283,6 +301,11 @@ def run(agent: s1.Agent, checks: s1.Checks, args, records: list[dict]) -> None:
             with (args.out / "samples.jsonl").open("a") as file:
                 file.write(json.dumps(record) + "\n")
         checks.check(f"probe: {name} ran {args.probes} times", all(r["ok"] for r in records if r["kind"] == name))
+    # Peak memory: the Sandbox's high-water mark, and the largest process of any build (cmake, ninja, compilers).
+    _, identity, _, _ = agent.call("plugin_host_identity")
+    status = Path(f"/proc/{identity.get('pid')}/status").read_text() if isinstance(identity, dict) else ""
+    hwm = next((int(line.split()[1]) for line in status.splitlines() if line.startswith("VmHWM:")), None)
+    MEMORY.update(sandbox_vmhwm_kib=hwm, build_max_rss_kib=resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)
     checks.check("exit: app_quit accepted", agent.quit())
 
 
@@ -306,7 +329,7 @@ def main() -> int:
         summary["verdict"] = "UNEVALUATED"
     report(records, summary, args.out, valid=code == 0)
     data = json.loads((args.out / "summary.json").read_text())
-    data["summary"] = summary
+    data["summary"], data["memory"] = summary, MEMORY
     (args.out / "summary.json").write_text(json.dumps(data, indent=2) + "\n")
     return code
 

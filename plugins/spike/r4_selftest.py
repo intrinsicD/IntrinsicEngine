@@ -49,6 +49,21 @@ class Summaries(unittest.TestCase):
         self.assertNotIn("verdict", r4_driver.summarize([record(0, 5.0, "warmup")]))
 
 
+class Closes(unittest.TestCase):
+    def test_only_a_new_clean_close_of_the_generation_counts(self) -> None:
+        clean = {"generation": 7, "closed": True, "unmapped": True, "live": {"operation": 0}}
+        self.assertTrue(r4_driver.new_clean_close(2, [{}, {}, clean], 7))
+        self.assertFalse(r4_driver.new_clean_close(3, [{}, {}, clean], 7))   # reused: no new record
+        self.assertFalse(r4_driver.new_clean_close(2, [{}, {}, clean], 8))   # another generation
+        self.assertFalse(r4_driver.new_clean_close(2, [{}, {}, dict(clean, unmapped=False)], 7))
+        self.assertFalse(r4_driver.new_clean_close(2, [{}, {}, dict(clean, live={"operation": 1})], 7))
+
+    def test_step_durations_must_be_finite(self) -> None:
+        self.assertTrue(r4_driver.finite(0.5))
+        for value in (None, float("nan"), float("inf"), "1.0"):
+            self.assertFalse(r4_driver.finite(value), value)
+
+
 class Reports(unittest.TestCase):
     def test_report_shows_the_verdict_only_for_a_valid_run(self) -> None:
         records = [record(i, 5.0) for i in range(3)]
@@ -113,7 +128,9 @@ class Reports(unittest.TestCase):
     def test_plugin_edge_classification(self) -> None:
         for edge in ("Building CXX object plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/SpikePlugin.cpp.o",
                      "Linking CXX shared module plugins/libIntrinsicSpikePlugin.so",
-                     "Collecting the host's module BMIs for the spike plugin", "Re-checking globbed directories..."):
+                     "Collecting the host's module BMIs for the spike plugin", "Re-checking globbed directories...",
+                     "Scanning /home/alex/Documents/IntrinsicEngine/plugins/spike/SpikePlugin.cpp for CXX dependencies",
+                     "Generating CXX dyndep file plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/CXX.dd"):
             self.assertTrue(r4_driver.plugin_edge(edge), edge)
         for edge in ("Linking CXX executable bin/ExtrinsicSandbox", "Building CXX object src/runtime/CMakeFiles/x.o",
                      "Linking CXX shared library lib/libExtrinsicRuntime.so"):
