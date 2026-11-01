@@ -1491,3 +1491,17 @@ python3 tools/docs/check_doc_links.py --root . --strict
     `app_quit` refuses with `load_pending` like the other lifecycle operations. Check: a quit sent
     while a reload drains is refused, and the reload completes. Run 9: 105 of 105 (variant b:
     105 of 105); S1 58 of 58 in both. The mutation without the check fails the overlap check.
+  - Codex delta of `b43916988`: "APPROVE — commit `b43916988`." S2c is approved.
+- 2026-11-01: S2d packet (R4 baseline, full pre-flight) prepared in
+  `tasks/evidence/ARCH-022/preflight-r4/`. Layer A and Layer B are there; Layer B opens with Q36,
+  Q46 and Q50 verbatim.
+  - Code:
+    - `plugins/spike/r4_driver.py`: a sample is the save, the plugin build, `plugin_reload`, and
+      `spike_version` answering the new generation; plus null probes, load records, a host-binary
+      validity check, and a report;
+    - `r4_report.py`: pools the sessions per variant;
+    - `r4_selftest.py`: known answers; each of its four mechanisms is shown to fail the test when
+      removed;
+    - `tasks/evidence/ARCH-022/r4_run.sh`: the plan, ABBA over the two link variants, 1 warmup and
+      5 measured samples per session.
+  - Technical tests t1 to t3 passed their checks. No timing was read.
