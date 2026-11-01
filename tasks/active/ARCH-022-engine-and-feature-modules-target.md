@@ -1472,3 +1472,17 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
     Not mutation-checkable: removing the explicit admission reset on timeout, since the
     reservation's end restores it as well.
+  - Codex delta of `caea4cc34` (same thread): findings 1, 3, 4 and 5 resolved and the
+    simplifications sound; REVISE on finding 2. On a timeout the quit still ran the shutdown hook,
+    and after a successful quit a later request could still reach the plugin. Fix: a quit whose
+    drain times out fails with `drain_timeout` and does not exit. A drained quit unloads the
+    plugin like `plugin_unload` (shutdown hook, all registrations out, close) before the exit.
+  - Checks:
+    - a quit with a job that ignores cancellation fails, and the plugin keeps running;
+    - a job request sent right behind a quit was dispatched in the quit's frame, before its drain
+      began, so it was admitted and then drained before the shutdown hook. After the hook, no job
+      event follows. A request dispatched after the quit finds the plugin unloaded.
+  - Run 8: 104 of 104 (variant b, run b3: 104 of 104); S1 (now expecting `unload` at quit): 58 of
+    58 in both variants.
+  - Mutations: quitting on timeout is caught by the quit checks; quitting without the unload is
+    caught by the quit-order check (and by S1).

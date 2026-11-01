@@ -774,21 +774,37 @@ namespace Extrinsic::Sandbox::Spike
         (void)registry.Register({
             .Name = "app_quit",
             .Title = "Quit the Sandbox (ARCH-022 spike)",
-            .Description = "From the next frame: drains the loaded plugin's work (within 5 s), calls its shutdown hook, then "
-                           "requests the engine's exit.",
+            .Description = "From the next frame: drains the loaded plugin's work (within 5 s, else drain_timeout and no "
+                           "exit), unloads it like plugin_unload, then requests the engine's exit.",
             .ReadOnly = false,
-            .Invoke = [requestExit = std::move(requestExit)](const Runtime::AgentOperationContext&, std::string_view)
+            .Invoke = [&services, requestExit = std::move(requestExit)](const Runtime::AgentOperationContext&,
+                                                                        std::string_view)
             {
                 Runtime::AgentOperationOutcome outcome{.Text = "{}"};
-                outcome.Continuation = [requestExit, reservation = Reserve(),
+                outcome.Continuation = [&services, requestExit, reservation = Reserve(),
                                         deadline = std::optional<std::chrono::steady_clock::time_point>{}](
-                    const Runtime::AgentOperationContext&, Runtime::AgentOperationOutcome& result) mutable
+                    const Runtime::AgentOperationContext& context, Runtime::AgentOperationOutcome& result) mutable
                 {
-                    const DrainState drain = g_Plugin ? PollDrain(deadline, kDrainDeadline, false) : DrainState::Drained;
-                    if (drain == DrainState::Pending) return false;
-                    if (g_Plugin) g_Plugin->Shutdown();
+                    if (g_Plugin)
+                    {
+                        auto* ui = Ui(services, context);
+                        if (ui == nullptr)
+                        {
+                            result = Fail("host_unavailable", "editor UI host, config control or history missing");
+                            return true;
+                        }
+                        const DrainState drain = PollDrain(deadline, kDrainDeadline, false);
+                        if (drain == DrainState::Pending) return false;
+                        if (drain == DrainState::TimedOut)
+                        {
+                            result = Fail("drain_timeout", "plugin work did not finish before the deadline; not quitting");
+                            return true;
+                        }
+                        // Unregistered before the exit, so no request dispatched later in this frame reaches it.
+                        (void)Unload(*context.ConfigControl, *ui, context.History);
+                    }
                     requestExit();
-                    result = {.Text = Json{{"quitting", true}, {"drained", drain == DrainState::Drained}}.dump()};
+                    result = {.Text = R"({"quitting":true})"};
                     return true;
                 };
                 return outcome;

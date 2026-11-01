@@ -288,7 +288,9 @@ def main() -> int:
     expected = []
     for stage in opened:
         expected += ["static_construct"] + (["register"] if FAIL_STAGES[stage] == "commit_failed" else []) + ["static_destruct"]
-    expected += ["static_construct", "register", "commit", "first_draw", "config_changed", "shutdown", "static_destruct"]
+    # app_quit unloads the plugin like plugin_unload, so its image closes before the exit.
+    expected += ["static_construct", "register", "commit", "first_draw", "config_changed", "shutdown", "unload",
+                 "static_destruct"]
     checks.check("lifecycle: events in order (Register once per staged attempt)", lines == expected, lines)
     return finish(checks, args.out)
 

@@ -35,7 +35,9 @@ It checks, in order:
      records again; frames 3 records exactly three frames. The retirement check uses the plugin's own frame numbers.
   12. the close guard: an unload with one plugin callable kept alive (test hook) unregisters everything but leaves the
      image mapped, with callables_alive;
-  13. a quit with a job and GPU work outstanding settles both before the shutdown hook; a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
+  13. a quit whose drain times out (a job that ignores cancellation) fails with drain_timeout and does not quit;
+  14. a quit with a job and GPU work outstanding settles both before the shutdown hook, unloads the plugin, and a job
+     request sent right behind it is not admitted; a clean exit: status 0, no sanitizer report, every image's static construction matched by its destruction.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
 With --closure-control it runs the S2b control instead: closure entries 5 and 3 (today's form) are recorded, 3 is
 undone, the plugin is reloaded to a 16 MiB larger build (so the freed range stays free), and the remaining entry is
@@ -64,6 +66,7 @@ import spike_driver as s1  # noqa: E402  (shared session helpers)
 
 CYCLES = 20
 QUIT_EVENTS_FROM = [0]  # the event index at the quit, for the exit-order check
+LATE_JOB_ADMITTED = [False]  # whether the job sent right behind the quit was admitted (dispatched before the drain)
 SCENE_MESH = s1.REPO / "tests/data/framework24-open-patch.obj"
 # Every kind of callable the plugin hands over; each must be counted while loaded and appear at every close.
 KINDS = {"validator", "change_callback", "operation", "window_draw", "window_state", "history_handler"}
@@ -138,6 +141,16 @@ def wait_for(read, done, timeout_s: float = 10.0, poll_s: float = 0.1):
         time.sleep(poll_s)
         value = read()
     return value
+
+
+def send_both(agent: s1.Agent, first: tuple[str, dict], second: tuple[str, dict]) -> list[dict]:
+    """Sends both tool calls before reading; returns the raw replies in request order."""
+    ids = [agent.send("tools/call", {"name": name, "arguments": args}) for name, args in (first, second)]
+    replies: dict[int, dict] = {}
+    while len(replies) < 2:
+        if (message := agent.read()).get("id") in ids:
+            replies[message["id"]] = message
+    return [replies[i] for i in ids]
 
 
 def save_scene(agent: s1.Agent, out: Path, name: str) -> str:
@@ -460,14 +473,31 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
                  close)
     checks.check("guard: no plugin is registered", state["loaded"] is None and s1.registries(agent) == baseline, "changed")
 
-    # 13. Quit with CPU and GPU work outstanding: both settle before the shutdown hook.
+    # 13. A quit whose drain times out does not quit: the shutdown hook must not run before the work settled.
     ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
+    agent.call("spike_start_job", {"seconds": 7, "ignore_cancel": True})
+    wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
+    ok, reply, _, error = agent.call("app_quit")
+    _, version, _, _ = agent.call("spike_version")
+    checks.check("quit timeout: app_quit fails with drain_timeout and the plugin keeps running",
+                 not ok and error == "drain_timeout" and version == {"generation": 2}, [error, reply, version])
+    wait_for(lambda: [j["finalized"] for j in host(agent)["jobs"]], lambda f: all(f), 10.0)
+
+    # 14. Quit with CPU and GPU work outstanding: both settle before the shutdown hook, and a job request sent right
+    # behind the quit is not admitted (the plugin is unloaded before the exit).
     agent.call("spike_start_job", {"seconds": 60})
     agent.call("spike_gpu_work", {"frames": 100000})
     wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
     seen = len((out / "events.log").read_text().splitlines())
-    checks.check("exit: app_quit accepted", agent.quit())
-    QUIT_EVENTS_FROM[0] = seen
+    replies: list = []
+    try:
+        replies = [agent.outcome(r) if "result" in r else (False, r.get("error"), [], "") for r in
+                   send_both(agent, ("app_quit", {}), ("spike_start_job", {"seconds": 60}))]
+        quit_ok, late_ok = replies[0][0], replies[1][0]
+    except OSError:
+        quit_ok, late_ok = True, False  # the exit closed the socket first: nothing was admitted
+    checks.check("exit: app_quit accepted", quit_ok, replies if quit_ok else quit_ok)
+    QUIT_EVENTS_FROM[0], LATE_JOB_ADMITTED[0] = seen, late_ok
 
 
 def control(agent: s1.Agent, checks: s1.Checks, kept: dict[str, Path], state: dict) -> None:
@@ -544,8 +574,16 @@ def main() -> int:
         tail = lines[QUIT_EVENTS_FROM[0]:]
         order_ok = all(e in tail for e in ("job_finalized", "gpu_shutdown", "shutdown")) and \
             tail.index("job_finalized") < tail.index("shutdown") and tail.index("gpu_shutdown") < tail.index("shutdown") \
-            and gpu_retired(tail)
-        checks.check("exit: the outstanding job and GPU work settled before the shutdown hook at quit", order_ok, tail[:8])
+            and gpu_retired(tail) and not any(e.startswith("job_") for e in tail[tail.index("shutdown"):]) \
+            and tail[tail.index("shutdown") + 1:tail.index("shutdown") + 2] == ["unload"]
+        checks.check("exit: the outstanding job and GPU work settled before the shutdown hook at quit, which unloaded "
+                     "the plugin", order_ok, tail[:8])
+        # A job dispatched in the quit's frame, before its drain began, is drained like the others; one dispatched
+        # after the quit finds the plugin unloaded. Either way no plugin job event follows the shutdown hook.
+        before_shutdown = tail[:tail.index("shutdown")] if "shutdown" in tail else []
+        checks.check("exit: the job sent right behind the quit was refused, or drained before the shutdown hook",
+                     order_ok and (not LATE_JOB_ADMITTED[0] or before_shutdown.count("job_finalized") >= 2),
+                     [LATE_JOB_ADMITTED[0], before_shutdown.count("job_finalized")])
         # The image the guard kept open is destroyed at exit like every other.
         constructed, destructed = lines.count("static_construct"), lines.count("static_destruct")
         checks.check("lifecycle: every image's static construction matched by its destruction",
