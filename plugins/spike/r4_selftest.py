@@ -73,18 +73,51 @@ class Reports(unittest.TestCase):
                 (run / "samples.jsonl").write_text("".join(json.dumps(r) + "\n" for r in lines))
                 (run / "summary.json").write_text(json.dumps({"failed": failed}))
             script = Path(__file__).resolve().parent / "r4_report.py"
-            ok = subprocess.run([sys.executable, "-B", str(script), str(root / "a"), str(root / "run1"), str(root / "run2")],
-                                capture_output=True, text=True)
+            expect = ["--expect", "1,2,0"]
+            ok = subprocess.run([sys.executable, "-B", str(script), *expect, str(root / "a"), str(root / "run1"),
+                                 str(root / "run2")], capture_output=True, text=True)
             self.assertEqual(ok.returncode, 0, ok.stderr)
             summary = json.loads((root / "a" / "summary.json").read_text())
             self.assertTrue(summary["valid"])
             self.assertEqual(summary["summary"]["total"], {"median": 5.5, "min": 4.0, "max": 7.0})
             (root / "run2" / "summary.json").write_text(json.dumps({"failed": ["validity: something"]}))
-            bad = subprocess.run([sys.executable, "-B", str(script), str(root / "b"), str(root / "run1"), str(root / "run2")],
-                                 capture_output=True, text=True)
+            bad = subprocess.run([sys.executable, "-B", str(script), *expect, str(root / "b"), str(root / "run1"),
+                                  str(root / "run2")], capture_output=True, text=True)
             self.assertEqual(bad.returncode, 1)
-            self.assertFalse(json.loads((root / "b" / "summary.json").read_text())["valid"])
+            combined = json.loads((root / "b" / "summary.json").read_text())
+            self.assertFalse(combined["valid"])
+            self.assertEqual(combined["summary"]["verdict"], "UNEVALUATED")
             self.assertIn("UNEVALUATED", (root / "b" / "report.html").read_text())
+
+    def test_a_run_with_other_counts_than_frozen_invalidates_the_pool(self) -> None:
+        import subprocess
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run = root / "run1"
+            run.mkdir()
+            lines = [record(0, 40.0, "warmup")] + [record(i, 5.0) for i in (1, 2)]
+            (run / "samples.jsonl").write_text("".join(json.dumps(r) + "\n" for r in lines))
+            (run / "summary.json").write_text(json.dumps({"failed": []}))
+            script = Path(__file__).resolve().parent / "r4_report.py"
+            short = subprocess.run([sys.executable, "-B", str(script), str(root / "a"), str(run)],
+                                   capture_output=True, text=True)
+            self.assertEqual(short.returncode, 1)  # the frozen 1, 5, 3 expects five measured samples and the probes
+            self.assertEqual(json.loads((root / "a" / "summary.json").read_text())["summary"]["verdict"], "UNEVALUATED")
+
+    def test_plugin_steps_are_summarized_only_when_every_sample_has_them(self) -> None:
+        records = [dict(record(i, 5.0), compile_s=3.0 + i, link_s=0.5) for i in range(3)]
+        self.assertEqual(r4_driver.summarize(records)["compile_s"], {"median": 4.0, "min": 3.0, "max": 5.0})
+        records[1]["compile_s"] = None
+        self.assertNotIn("compile_s", r4_driver.summarize(records))
+
+    def test_plugin_edge_classification(self) -> None:
+        for edge in ("Building CXX object plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/SpikePlugin.cpp.o",
+                     "Linking CXX shared module plugins/libIntrinsicSpikePlugin.so",
+                     "Collecting the host's module BMIs for the spike plugin", "Re-checking globbed directories..."):
+            self.assertTrue(r4_driver.plugin_edge(edge), edge)
+        for edge in ("Linking CXX executable bin/ExtrinsicSandbox", "Building CXX object src/runtime/CMakeFiles/x.o",
+                     "Linking CXX shared library lib/libExtrinsicRuntime.so"):
+            self.assertFalse(r4_driver.plugin_edge(edge), edge)
 
 
 if __name__ == "__main__":
