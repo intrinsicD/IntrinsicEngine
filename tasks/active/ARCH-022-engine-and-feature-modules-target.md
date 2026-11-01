@@ -1505,3 +1505,17 @@ python3 tools/docs/check_doc_links.py --root . --strict
     - `tasks/evidence/ARCH-022/r4_run.sh`: the plan, ABBA over the two link variants, 1 warmup and
       5 measured samples per session.
   - Technical tests t1 to t3 passed their checks. No timing was read.
+- 2026-11-01: S2d, the R4 baseline, measured under the full pre-flight.
+  - Packet digest `1445006114b8…a5fb1f35` at `2b26c6d4f`: Claude and Codex PASS after four rounds
+    (`tasks/evidence/ARCH-022/preflight-r4/reviews/README.md`).
+  - Run 01:28 to 01:32 UTC, exit 0. All 40 sample checks and 24 probes passed.
+  - Results (median total, n = 10 per variant):
+    - shared engine libraries: 4.49 s (max 4.50);
+    - static engine: 9.74 s (max 9.85);
+    - both `met` (under 10 s).
+  - Surprise: in the static variant, the spike's host-module collection (`CollectHostModules.cmake`) costs 5.4 s on
+    every build; it was predicted under 1 s. The plugin compile is 3.9 s, the reload 0.2 s.
+  - The audit recomputed every summary from the raw samples.
+  - Report: `docs/reports/2026-11-01-arch-022-r4-baseline.md`. The target's R4 cell holds it as the spike-fixture
+    baseline; a typical plugin stays open.
+  - S2 is complete: S2a to S2c approved, S2d measured.
