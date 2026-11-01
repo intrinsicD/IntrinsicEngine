@@ -85,8 +85,9 @@ CI helper scripts and workflow validation tools.
   `ci-linux-clang` runs require the comparison over artifacts from the
   unsanitized job and its reusable ASan/UBSan jobs. Selected CTest tests that
   run an allowlisted repository script (`SCRIPT_TESTS`, currently the
-  `tools/analysis/compile_hotspots.py` compilation-locality contracts and
-  `tools/repo/check_source_rules.py` source-structure contracts) have no
+  `tools/analysis/compile_hotspots.py` compilation-locality contracts,
+  `tools/repo/check_source_rules.py` source-structure contracts and the plugin
+  build-id test `tests/regression/tooling/Test.PluginBuildId.py`) have no
   producer binary; they are recorded as `script_tests` and counted in
   `selected-test-count`. Any other selected test without a producer blocks.
   `collect_test_timing.py` times the same script tests with the script as executable.

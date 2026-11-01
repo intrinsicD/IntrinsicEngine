@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_TESTS = (
     "tools/analysis/compile_hotspots.py",
     "tools/repo/check_source_rules.py",
+    "tests/regression/tooling/Test.PluginBuildId.py",
 )
 _PYTHON_LAUNCHER_RE = re.compile(r"python(?:3(?:\.[0-9]+)?)?")
 _GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")

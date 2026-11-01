@@ -124,7 +124,11 @@ result before pushing the next. A replay that collects the commands from the wor
 `run: python3 ...` steps; ARCH-022 missed 14 of them once and broke `main` again (`01095d834`). `ci-linux-clang`
 runs repository checks before its build (`check_layering.py --root src --strict`, `check_compiler_hazards.py`);
 replay those too for a change under `src/`. Replay whole `run:` blocks with `bash -e`, not extracted `python3`
-lines: a generator followed by `git diff --exit-code` (the module inventory) only fails as a block.
+lines: a generator followed by `git diff --exit-code` (the module inventory) only fails as a block. `ci-linux-clang`
+also captures the CPU test selection from the CTest inventory (`tools/ci/cpu_test_selection.py capture`): a new
+CTest test that is no GoogleTest binary must run an allowlisted script (`SCRIPT_TESTS`). ARCH-022 registered
+`PluginBuildId.Script` without it and broke `main` (`bfb76bb39`); run the capture on a built tree when the change adds
+a CTest test.
 
 ## Do not wrap a push in `git stash push`/`pop`
 

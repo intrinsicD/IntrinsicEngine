@@ -642,6 +642,25 @@ Alpha.
         self.assertEqual(report["summary"]["selected_test_count"], 4)
         self.assertNotIn(str(REPO_ROOT), output.read_text(encoding="utf-8"))
 
+    def test_capture_records_the_plugin_build_id_test_as_a_script_test(self) -> None:
+        # ARCH-022: the build-id test is a Python script registered with CTest.
+        build = self.root / "build"
+        record = _script_record(build, "PluginBuildId.Script", "tests/regression/tooling/Test.PluginBuildId.py")
+        record["command"] = [sys.executable, str(REPO_ROOT / "tests/regression/tooling/Test.PluginBuildId.py")]
+        _write_build(build, "none", tests=[*_default_tests(build), record])
+
+        _result, output = self._capture(build, "ci", "none")
+        report = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(
+            report["selection"]["normalized"]["script_tests"],
+            [{
+                "disabled": False,
+                "labels": ["build", "contract", "runtime"],
+                "name": "PluginBuildId.Script",
+                "script": "tests/regression/tooling/Test.PluginBuildId.py",
+            }],
+        )
+
     def test_capture_records_allowlisted_script_tests_without_build_paths(
         self,
     ) -> None:
