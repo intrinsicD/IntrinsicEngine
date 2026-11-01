@@ -77,6 +77,8 @@ AUTO_VULKAN = Configuration(
     name="auto-vulkan",
     preset="dev",
     values=(
+        # The dev presets build the engine shared (ARCH-022); this case compares backend resolution only.
+        ("BUILD_SHARED_LIBS", "OFF"),
         ("INTRINSIC_BUILD_SANDBOX", "OFF"),
         ("INTRINSIC_PLATFORM_BACKEND", "Auto"),
         ("INTRINSIC_HEADLESS_NO_GLFW", "OFF"),

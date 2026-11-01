@@ -30,7 +30,10 @@
       "description": "Default developer configuration. Keeps the CUDA backend disabled unless explicitly requested.",
       "cacheVariables": {
         "INTRINSIC_ENABLE_CUDA": "OFF",
-        "INTRINSIC_USE_LLD": "ON"
+        "INTRINSIC_USE_LLD": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_SHARED_LIBS": "ON",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON"
       }
     },
     {
@@ -40,7 +43,10 @@
       "description": "Developer configuration with the optional CUDA backend enabled. Requires a working CUDA toolkit/driver install.",
       "cacheVariables": {
         "INTRINSIC_ENABLE_CUDA": "ON",
-        "INTRINSIC_USE_LLD": "ON"
+        "INTRINSIC_USE_LLD": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_SHARED_LIBS": "ON",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON"
       }
     },
     {

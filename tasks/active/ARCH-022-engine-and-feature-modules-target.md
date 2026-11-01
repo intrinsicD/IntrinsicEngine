@@ -1678,3 +1678,27 @@ python3 tools/docs/check_doc_links.py --root . --strict
     - round 2: findings 1 and 2 resolved;
     - round 3: the digest missed transitive layouts;
     - round 4: "**Verdict: APPROVE.** The amended plan resolves the remaining digest-coverage finding."
+- 2026-11-01: Slice 3 step 1a, the dev presets shared.
+  - `dev` and `dev-cuda` set `BUILD_SHARED_LIBS`, `CMAKE_POSITION_INDEPENDENT_CODE` and
+    `CMAKE_EXPORT_COMPILE_COMMANDS`; no `ci*` preset is shared (`Test.SanitizerPresets.py`).
+  - The first CPU run on a fresh shared tree had 97 failures, from two causes:
+    - 96 `*CompilationLocality` tests read `compile_commands.json`, which no dev preset wrote (since
+      2026-07-18 only the `ci*` presets export it). They fail on a static dev tree too. The dev presets
+      now export it; `base` stays without it, as `Test.WorkflowConcurrency.py` requires.
+    - `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` counts `glfwTerminate` through
+      `--wrap`, which reaches only calls linked into its executable; a shared `ExtrinsicPlatform`
+      calls it from its own library (`terminate_calls=0`). The test is registered in static builds only
+      (checked: registered in a static configure, absent in the shared one). CI is static and keeps it.
+  - Verification on a fresh `build/dev-shared` (`--preset dev`, lld 24): every default target builds
+    (`cmake --build`, 13 engine libraries, 54 executables; a second build has no work); the CPU set
+    (`-LE "gpu|vulkan|slow|flaky-quarantine"`) passes 6060 of 6060 in 4 min 43 s. The Sandbox starts on
+    the shared build and answers `diagnostics_read`. The S1 driver needs the plugin host's `app_quit` and
+    runs in 1b.
+  - Unverified in shared builds: GLFW's exactly-once static teardown (the gated test). The Vulkan shutdown
+    contract keeps the synthetic leak control but is a GPU test.
+  - Codex review (thread `01a196af-9473-7932-8322-e834a5e8e8ad`): REVISE, one blocking finding: every
+    default target must build, not only the CPU tests and the Sandbox (23 were unbuilt). Answered above.
+    Non-blocking: the preset test read only a literal "ON"; it now also reads a JSON bool, TRUE, YES, Y and
+    non-zero numbers (a CI preset with JSON `true` fails it). Delta: "Verdict: APPROVE", bound to the diff
+    sha256 `62dbd624…40b3e3`, with two notes answered here (54, not 55, executables; non-zero numbers).
+  - The operator's `build/dev` needs one fresh `cmake --preset dev` and a full build.

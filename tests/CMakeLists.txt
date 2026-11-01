@@ -2632,20 +2632,24 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
         LABELS regression platform glfw
     )
 
-    add_test(NAME GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
-        COMMAND ${CMAKE_COMMAND}
-            -DPROBE_EXE=$<TARGET_FILE:IntrinsicGlfwLifecycleLsanProcess>
-            -DSUPPRESSIONS_PATH=${CMAKE_SOURCE_DIR}/lsan.supp
-            -DSYMBOLIZER_PATH=${INTRINSIC_LSAN_SYMBOLIZER}
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/regression/platform/Run.GlfwLifecycleLsanContract.cmake
-    )
-    set_tests_properties(
-        GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
-        PROPERTIES
-            LABELS "regression;platform;glfw"
-            SKIP_REGULAR_EXPRESSION "BUG082_SKIP:"
-            TIMEOUT ${_intrinsic_default_test_timeout_seconds}
-    )
+    # --wrap reaches only calls linked into this executable; a shared
+    # ExtrinsicPlatform calls glfwTerminate from its own library. CI is static.
+    if(NOT BUILD_SHARED_LIBS)
+        add_test(NAME GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+            COMMAND ${CMAKE_COMMAND}
+                -DPROBE_EXE=$<TARGET_FILE:IntrinsicGlfwLifecycleLsanProcess>
+                -DSUPPRESSIONS_PATH=${CMAKE_SOURCE_DIR}/lsan.supp
+                -DSYMBOLIZER_PATH=${INTRINSIC_LSAN_SYMBOLIZER}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/regression/platform/Run.GlfwLifecycleLsanContract.cmake
+        )
+        set_tests_properties(
+            GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+            PROPERTIES
+                LABELS "regression;platform;glfw"
+                SKIP_REGULAR_EXPRESSION "BUG082_SKIP:"
+                TIMEOUT ${_intrinsic_default_test_timeout_seconds}
+        )
+    endif()
 endif()
 
 if(TARGET GraphicsVulkanSmokeTestObjs)

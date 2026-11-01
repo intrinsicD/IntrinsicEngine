@@ -67,6 +67,20 @@ def _one_line(command: object) -> str:
     return " ".join(command.split())
 
 
+def _cmake_true(value: object) -> bool:
+    # A cache variable may be a bool, a string or {"type": ..., "value": ...}; CMake reads all as one constant.
+    if isinstance(value, dict):
+        value = value.get("value")
+    if isinstance(value, bool):
+        return value
+    if not isinstance(value, str):
+        return False
+    try:
+        return float(value) != 0  # CMake reads a non-zero number as true
+    except ValueError:
+        return value.upper() in {"ON", "TRUE", "YES", "Y"}
+
+
 class SanitizerPresetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -162,11 +176,28 @@ class SanitizerPresetTests(unittest.TestCase):
         self.assertEqual(len(build_dirs), len(expected))
         self.assertEqual(len(install_dirs), len(expected))
 
+    def test_only_the_dev_presets_build_the_engine_shared(self) -> None:
+        # Plugins need the shared engine; CI and release stay static (ARCH-022 Q52).
+        shared = {
+            name for name in self.configure_presets
+            if _cmake_true(self._resolved_configure_preset(name)["cacheVariables"].get("BUILD_SHARED_LIBS"))
+        }
+        self.assertEqual(shared, {"dev", "dev-cuda"})
+        for name in shared:
+            self.assertEqual(
+                self._resolved_configure_preset(name)["cacheVariables"].get("CMAKE_POSITION_INDEPENDENT_CODE"), "ON")
+
+    def test_dev_presets_export_compile_commands(self) -> None:
+        # The *CompilationLocality tests read compile_commands.json in every tree that registers them.
+        for name in ("dev", "dev-cuda"):
+            self.assertEqual(
+                self._resolved_configure_preset(name)["cacheVariables"].get("CMAKE_EXPORT_COMPILE_COMMANDS"), "ON")
+
     def test_only_the_dev_presets_link_with_lld(self) -> None:
         # CI keeps GNU ld until the operator adopts lld there (ARCH-022 Q49).
         opted = {
             name for name in self.configure_presets
-            if self._resolved_configure_preset(name)["cacheVariables"].get("INTRINSIC_USE_LLD") == "ON"
+            if _cmake_true(self._resolved_configure_preset(name)["cacheVariables"].get("INTRINSIC_USE_LLD"))
         }
         self.assertEqual(opted, {"dev", "dev-cuda"})
 
