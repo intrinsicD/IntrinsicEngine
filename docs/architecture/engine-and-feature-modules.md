@@ -284,6 +284,17 @@ partitions not counted).
 - Agents control the engine completely over MCP.
 - Rebuilding things for these goals is allowed.
 
+**Decided by the operator (2026-11-01, `ARCH-022` Q51 and Q52), after the hot-reload spike:**
+- Dev builds link the engine as shared libraries. Plugins then build like any target. The measured one-file
+  spike plugin ran its edit in 4.5 s ([R4 baseline](../reports/2026-11-01-arch-022-r4-baseline.md)); that is not
+  a guarantee for every plugin. CI and release stay static for now.
+- The order of the next steps:
+  1. the plugin host as a module service;
+  2. a first real feature as a plugin, through every layer;
+  3. the features one by one;
+  4. the job form (S3) before the GPU-heavy features.
+- lld in CI: its link share is measured the next time CI changes anyway.
+
 **Open, for the first plan** (`ARCH-022`):
 1. **Numeric targets for R4 and R6**: set on 2026-10-31 (table above).
 2. **Order of steps.** The proposal starts with the riskiest assumption:

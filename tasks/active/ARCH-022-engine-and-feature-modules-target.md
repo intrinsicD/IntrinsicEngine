@@ -82,6 +82,15 @@ contract_review: tracker only; each slice declares its own contracts
     narrow suppression; 2: prepare lld as the dev linker; 3: late config registration through
     `RegisterSection`/`UnregisterSection`; 4: the window types in a contract module outside the
     editor; 5: S2)
+51. (2026-11-01) "Zu 1. welche vor und Nachteile hat statisch oder Shared? Was empfiehlst du hier?
+    2. ja ich würde gerne anfangen mit refactoring und Plugins bauen, damit die Engine aufgeräumt und
+    sauber wird, runtime und editor auch. 3. ist das sinnvoll?" (1: the link variant; 2: the next
+    step; 3: lld in CI)
+52. (2026-11-01) "Ja, ja uns ja, das nächste Mal wenn ci eh gemacht werden muss, nicht extra
+    vorher." (yes to shared libraries for the dev builds, CI and release static for now; yes to the
+    order: 1. the plugin host as a module service, 2. a first real feature as a plugin, 3. feature by
+    feature, 4. S3 before the GPU-heavy features; yes to measuring CI's link share, the next time CI
+    has to change anyway, not as a separate step)
 
 ## Goal
 - Reach the target in
@@ -1519,3 +1528,153 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - Report: `docs/reports/2026-11-01-arch-022-r4-baseline.md`. The target's R4 cell holds it as the spike-fixture
     baseline; a typical plugin stays open.
   - S2 is complete: S2a to S2c approved, S2d measured.
+- 2026-11-01: Operator decisions Q51/Q52: shared libraries for the dev builds; the order of the next steps
+  (plugin host, a first feature, features one by one, S3 before the GPU-heavy features); CI's link share
+  measured at the next CI change. Recorded in the target ("Decisions and open points").
+- 2026-11-01: Plan for slice 3, step 1: the plugin host as a module service, revision 2 (amended after round 2:
+  GPU shutdown order, deferred operation results, the contract digest). Codex plan review 1
+  (fresh session `01a19679-254f-7371-95a2-03dbac6ac621`) returned REVISE with four blocking findings, answered
+  in "Revision 2" below:
+  1. ordinary shutdown was unspecified;
+  2. a static Sandbox's behaviour was undefined;
+  3. test instruments and lifetime enforcement were conflated;
+  4. "v1" needed a bounded compatibility contract.
+  - Questions served:
+    - Q51: "ja ich würde gerne anfangen mit refactoring und Plugins bauen, damit die Engine aufgeräumt
+      und sauber wird, runtime und editor auch";
+    - Q52: "Ja, ja uns ja" (shared dev builds, the order, the deferred CI measurement);
+    - through them Q36: plugins that register themselves, run-time compilation, changes are cheap.
+  - Goal item: the target's module service 7 ("plugin host: load, register, unload, reload"). It
+    answers the open point 3, "which process hosts the plugins": the engine runtime, wired by the
+    Sandbox.
+  - Why first: every later step moves a feature into a plugin, and a plugin needs a host that is not
+    a spike behind an option. The spike's host code is reviewed and tested (S1 to S3 of slice 2's
+    reload part), so this step moves it into place rather than writing it anew. The slice 2 plan said
+    the spike code "either becomes the start of slice 3 or is deleted".
+  - **1a, dev presets shared (its own commit, first).**
+    - `dev` and `dev-cuda` set `BUILD_SHARED_LIBS=ON` and `CMAKE_POSITION_INDEPENDENT_CODE=ON`; the
+      `ci*` presets do not.
+    - `Test.SanitizerPresets.py` pins both: the dev presets shared, no CI preset shared.
+    - Verification: a fresh tree with `--preset dev` builds every default target (Sandbox and tests)
+      and passes the CPU test set (`ctest`), and the Sandbox starts (the S1 driver). The operator's
+      `build/dev` needs one fresh `cmake --preset dev` and a full build.
+  - **1b, the plugin host in the runtime.** The spike's host code moves from
+    `src/app/Sandbox/Sandbox.PluginSpike.*` to `src/runtime/Services/`, split by job:
+    - `Extrinsic.Runtime.PluginContract`: what a plugin may use. That is the registrations (config
+      sections, operations, windows, history commands), the entry symbols with a version
+      (`intrinsic_plugin_register_v1`, `intrinsic_plugin_shutdown_v1`), and the host functions for
+      jobs, GPU work and history records. The lifecycle-event and callable-accounting hooks stay;
+      they are test instruments a plugin may call.
+    - `Extrinsic.Runtime.PluginHost`: an `IRuntimeModule` that provides the service and holds the
+      host's behaviour from S2:
+      - private copies;
+      - the drain with its deadline and GPU retirement;
+      - the close guard;
+      - saved config payloads;
+      - registered history commands;
+      - the reservation that serializes lifecycle calls, quit included.
+
+      Its MCP tools are `plugin_load`, `plugin_unload`, `plugin_reload` and `plugin_list`, plus the
+      test hooks the drivers use, registered through a function the Sandbox calls (as the spike
+      does today).
+    - The host core takes an opened image through a small interface (register, shutdown, close).
+      Contract tests can then drive commit, rollback, unload, the close guard, the drain (with the real
+      `JobService`), config restore and history commands with in-process fixtures, without `dlopen`.
+      These run in CI, which stays static. `dlopen` itself stays covered by the drivers on the shared
+      dev build.
+    - The Sandbox always composes the plugin host; `INTRINSIC_PLUGIN_SPIKE` and
+      `Sandbox.PluginSpike` are deleted.
+    - `plugins/` builds when the engine is shared (dev). Static builds (CI) build no plugin, and the
+      variant (a) module-collection path (`CollectHostModules.cmake`, 5.4 s per build) is deleted.
+    - `plugins/spike` stays as the fixture plugin and its drivers stay its tests. It links `ExtrinsicRuntime`
+      directly instead of `ExtrinsicSandboxEditor`. R2 stays 0/0.
+    - R2 counts a plugin's direct imports only; `AgentOperations` still exposes editor types through its
+      context. 0/0 is the boundary this step reaches, not full editor independence; later steps narrow it.
+  - **Revision 2:**
+    - **Ordinary exit (finding 1).** `Engine::BeginShutdown` already shuts the GPU queue participants down,
+      the plugin's included. `Engine::Shutdown` then runs `JobService::CancelAndDrain`, so every job
+      completion and unpublished finalizer runs, the plugin's included. It then runs each module's
+      `OnShutdown` in reverse composition order, and only then shuts the renderer and device down. The
+      document history belongs to `SceneDocumentModule`; the shutdown announcement clears its entries, and
+      registered handlers stay until removed.
+      - The Sandbox composes the plugin host last, so it shuts down first, while the agent server, config
+        control, UI module and document history it unregisters from are still alive.
+      - Its `OnShutdown`: calls the plugin's shutdown hook; removes every registration; releases the GPU
+        work entry (its participant was already shut down) and the finalized job entries; and leaves the
+        image mapped. The process ends, so a callable destroyed later still finds its code.
+      - `app_quit` only requests the exit; window close and quit take the same path. Pending lifecycle
+        continuations are dropped by the agent server, and their reservation restores admission.
+      - Tests:
+        - a contract test composes the host with an in-process fixture that holds registrations, a
+          running job and GPU work, shuts the engine down, and checks the order: the GPU participant's
+          shutdown first, then the job completion, then the shutdown hook; no fixture callable invoked
+          after it; every registration removed;
+        - the drivers' exit checks run on the shared build.
+    - **Static Sandbox (finding 2).** In a static build, `plugin_load` and `plugin_reload` answer
+      `plugins_unsupported` ("plugins need the shared engine build"); the capability is a compile-time
+      definition from `BUILD_SHARED_LIBS`. A CI contract test checks that answer. Deleting the variant (a)
+      path drops plugin loading into a static executable, which no agreed workflow uses; a release that
+      wants plugins builds shared. Recorded in the target.
+    - **Lifetime versus diagnostics (finding 3).**
+      - Required, enforced by the host: every plugin callable the host holds lives in a host registry
+        entry (registrations, jobs, GPU work, history commands). The host removes and destroys all of
+        them before a close, and the contract states that a plugin hands callables to the host through
+        these APIs only.
+      - Deferred operation results: the agent server moves an outcome's `Continuation`, `Progress` and
+        `Cancel` into its own pending-call storage, beyond the reach of an unregistration. v1 therefore
+        rejects deferred plugin operations. The host wraps each plugin operation, and an outcome carrying
+        any of the three is answered `deferred_unsupported`, with those callables destroyed at once while
+        the image is mapped. A contract test checks this without diagnostic counts: an in-process fixture
+        operation returns a continuation that holds a shared object, and the test checks the reply and
+        that the object was released.
+      - Diagnostic: the callable counts. A plugin may report them; the host then also refuses a close
+        while one is alive. The fixture always reports and tests the structural rule with them.
+      - Fault injection stays fixture-only. `fail_at`, `simulate_drop`, `retain_callable`,
+        `drain_deadline_ms`, `simulate_gpu_stall` and the closure-form history record (the S2b negative
+        control) are active only when the Sandbox starts with `--plugin-test-hooks`, which the drivers
+        pass. Without the flag the hook arguments are rejected and the closure form returns false.
+    - **Compatibility (finding 4).** v1 means the same build and the same exchanged contract.
+      - The same build: the same toolchain, standard library, build type, sanitizers and shared-engine
+        setting.
+      - The same contract: a sha256 over every module interface file (`.cppm`) under `src/`, sorted by
+        path. A hand-kept list of boundary files misses transitive layouts: `GpuQueueParticipantDesc`
+        holds a `WorldHandle`, defined through `Runtime.WorldHandle.cppm` and `Core.StrongHandle.cppm`.
+        Hashing every interface is stricter than needed: any engine interface edit changes the id. But a
+        plugin compiled against older interfaces is unsafe anyway, and the dev build recompiles it after
+        such an edit.
+      - A build-time custom command (a `cmake -P` script) computes the hash into a generated header. It
+        depends on the files from a `CONFIGURE_DEPENDS` glob, so an edit or a new interface file changes
+        the id and rebuilds both sides.
+      - A tooling test runs the script on a temporary copy before and after changing a nested file (a
+        `StrongHandle`-like layout), and the id must change.
+      - The plugin exports `intrinsic_plugin_build_id_v1`. The host refuses a different id
+        (`abi_mismatch`) or missing v1 entry points (`dlsym_failed`, naming the symbol).
+      - Fixture builds check both refusals, among them a plugin built with a stale id (an older interface
+        state) under otherwise identical settings. There is no compatibility layer beyond that.
+    - **Named risks for 1a:**
+      - imported static vcpkg archives may need PIC;
+      - singletons (ImGui, ImPlot and others) must keep one identity across the shared libraries
+        (S1's identity probes cover ImGui, ImPlot and three host statics);
+      - sanitizer linkage and the private copy's run path (the plugin's `RUNPATH` is absolute in the
+        build tree, which S2's copies in `/tmp` relied on);
+      - `dev-cuda` is not built on this machine; its preset gets the same settings, unverified.
+      - The operator's `build/dev` is kept; one fresh `cmake --preset dev` reconfigures it.
+  - **Done when:**
+    - the three drivers pass against the real host on the shared dev build: S1, S2 with its
+      control, and a technical R4 run (pass/fail only);
+    - the new contract tests pass and are mutation-checked;
+    - the ratchet, layering, module inventory and the whole ci-docs replay pass;
+    - the target's "shape of a plugin" names the real contract and answers the spike's three open
+      questions from S1 and S2;
+    - a short spike report records the answers, the link variant and the history-entry form (slice
+      2's done criterion).
+  - Not in step 1:
+    - moving any feature (step 2);
+    - buttons calling commands;
+    - S3;
+    - CI changes;
+    - renaming `plugins/spike`.
+  - Codex plan review (thread `01a19679-254f-7371-95a2-03dbac6ac621`):
+    - round 2: findings 1 and 2 resolved;
+    - round 3: the digest missed transitive layouts;
+    - round 4: "**Verdict: APPROVE.** The amended plan resolves the remaining digest-coverage finding."
