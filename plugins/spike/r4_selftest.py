@@ -64,6 +64,35 @@ class Closes(unittest.TestCase):
             self.assertFalse(r4_driver.finite(value), value)
 
 
+class BuildGroups(unittest.TestCase):
+    def test_a_terminated_driver_kills_its_running_build_group(self) -> None:
+        import os
+        import signal
+        import subprocess
+        import time
+        with tempfile.TemporaryDirectory() as directory:
+            pid_file = Path(directory) / "pid"
+            child = subprocess.Popen([sys.executable, "-B", "-c", (
+                "import signal, sys; sys.path.insert(0, %r); import r4_driver; "
+                "signal.signal(signal.SIGTERM, r4_driver.stop_active_group); "
+                "r4_driver.run_group(['bash', '-c', 'echo $$ > %s; exec sleep 30'], 60)"
+            ) % (str(Path(__file__).resolve().parent), pid_file)])
+            for _ in range(100):
+                if pid_file.exists() and pid_file.read_text().strip():
+                    break
+                time.sleep(0.05)
+            group_leader = int(pid_file.read_text())
+            child.send_signal(signal.SIGTERM)
+            self.assertEqual(child.wait(timeout=10), 128 + signal.SIGTERM)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(group_leader, 0)  # the build group's process is gone
+
+    def test_the_inner_timeout_kills_the_group(self) -> None:
+        timed_out, code, _ = r4_driver.run_group(["bash", "-c", "sleep 30"], 0.3)
+        self.assertTrue(timed_out)
+        self.assertIsNone(code)
+
+
 class Reports(unittest.TestCase):
     def test_report_shows_the_verdict_only_for_a_valid_run(self) -> None:
         records = [record(i, 5.0) for i in range(3)]

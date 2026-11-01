@@ -92,21 +92,41 @@ def plugin_edge(description: str) -> bool:
     return "plugins/" in description or "host's module BMIs" in description or "globbed directories" in description
 
 
-def build(target_build: Path, log: Path) -> tuple[bool, list[str]]:
-    """(succeeded, the Ninja edge descriptions it ran). The build runs in its own process group; on the 600 s timeout
-    the whole group (cmake, ninja, compilers) is killed and reaped, and the build counts as failed."""
-    process = subprocess.Popen(["cmake", "--build", str(target_build), "--target", "IntrinsicSpikePlugin"],
-                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+ACTIVE_GROUP: list[subprocess.Popen] = []  # the build whose process group is running, if any
+
+
+def stop_active_group(signum: int, _frame) -> None:
+    """On SIGTERM (the outer `timeout`): kill and reap the running build's group, which is outside the driver's own
+    process group, then exit."""
+    for process in ACTIVE_GROUP:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    sys.exit(128 + signum)
+
+
+def run_group(command: list[str], timeout_s: float) -> tuple[bool, int | None, str]:
+    """Runs command in its own process group; (timed out, return code, combined output). On the timeout the whole
+    group (cmake, ninja, compilers) is killed and reaped."""
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                               start_new_session=True)
+    ACTIVE_GROUP.append(process)
     try:
-        output, _ = process.communicate(timeout=600)
-        timed_out = False
+        output, _ = process.communicate(timeout=timeout_s)
+        return False, process.returncode, output or ""
     except subprocess.TimeoutExpired:
         os.killpg(process.pid, signal.SIGKILL)
         output, _ = process.communicate()
-        timed_out = True
+        return True, None, output or ""
+    finally:
+        ACTIVE_GROUP.remove(process)
+
+
+def build(target_build: Path, log: Path) -> tuple[bool, list[str]]:
+    """(succeeded, the Ninja edge descriptions it ran); past 600 s the build is killed and counts as failed."""
+    timed_out, code, output = run_group(["cmake", "--build", str(target_build), "--target", "IntrinsicSpikePlugin"], 600)
     with log.open("a") as file:
-        file.write((output or "") + ("\n[r4_driver] build timed out after 600 s\n" if timed_out else ""))
-    return not timed_out and process.returncode == 0, EDGE.findall(output or "")
+        file.write(output + ("\n[r4_driver] build timed out after 600 s\n" if timed_out else ""))
+    return not timed_out and code == 0, EDGE.findall(output)
 
 
 def step_seconds(target_build: Path, output: str) -> float | None:
@@ -192,6 +212,7 @@ def probe(agent: s1.Agent, args, name: str, index: int, generation: int) -> dict
             not any(PLUGIN_OBJECT in e or PLUGIN_LIBRARY in e for e in edges)
     else:
         count_before = len(closes(agent))
+        start = time.monotonic()  # the reload alone, as in a sample's reload phase
         ok, reply, _, error = agent.call("plugin_reload", {"path": str(plugin)})
         record["seconds"] = time.monotonic() - start
         record["reload_error"] = error
@@ -320,6 +341,7 @@ def main() -> int:
     args = s1.arguments(__doc__)
     args.samples, args.warmup, args.probes = values["--samples"], values["--warmup"], values["--probes"]
     args.generation_base = values["--generation-base"]
+    signal.signal(signal.SIGTERM, stop_active_group)
     checks = s1.Checks()
     records: list[dict] = []
     s1.launch(args, checks, lambda agent: run(agent, checks, args, records))
