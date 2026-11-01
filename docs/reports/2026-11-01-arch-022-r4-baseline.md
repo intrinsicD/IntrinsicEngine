@@ -31,8 +31,12 @@ plugin running.
   the order a, b, b, a, with 1 warmup and 5 measured samples per session.
 
 ## Result
-All four sessions passed every check (40 sample checks, 24 probes; no failed check). Machine: PSI CPU 0.00 before
-every sample, load average at most 2.0.
+All four sessions passed every check, none failed:
+- 120 checks on the 20 measured samples (six predicates each) and 24 on the 4 warmups;
+- 24 probes;
+- 52 session-level checks.
+
+Machine: PSI CPU 0.00 before every sample, load average at most 2.02.
 
 | seconds, n = 10 per variant | (a) static, exporting executable | (b) shared libraries |
 |---|---|---|
@@ -56,14 +60,19 @@ Verdict by the frozen rule (every total under 10 s): **met** in both variants. V
 | build 2 to 8 s | (a) 9.50, (b) 4.24 | (a) outside |
 | reload 0.05 to 1 s | 0.20, 0.22 | inside |
 | answer under 0.1 s | 0.02 | inside |
+| compiling the one TU is most of the build | (a) 41 %, (b) 92 % | (a) not supported, (b) supported |
 | total median 2.5 to 9 s, verdict met | (a) 9.74, (b) 4.49; met in both | (a) outside the range, the verdict as predicted |
 | rebuild with nothing changed under 1 s | (a) 5.55, (b) 0.14 | (a) outside |
+| reload without an edit close to the measured reload | 0.20 / 0.20 (a), 0.22 / 0.22 (b) | supported |
 
-The surprise is variant (a)'s fixed cost.
-- Its build runs `CollectHostModules.cmake` every time: 5.43 s per build in the tree's `.ninja_log`. The script
+The surprise is variant (a)'s fixed cost. This attribution is a post-hoc analysis; the frozen plan attributed no
+difference to a single cause.
+- Its build runs `CollectHostModules.cmake` every time: 5.40 s median (5.37 to 5.44 s) over the ten measured builds,
+  from the tree's `.ninja_log`. The script
   reads all of the host's `.modmap` files to pass the host's module files to the plugin compile, because CMake 4.3's
   `$<COMPILE_ONLY:...>` does not carry module sets (S1).
-- Without it, (a) would be about (b)'s time: 3.92 s compile, 0.04 s link, 0.2 s reload.
+- Without it, (a) would come near (b)'s time (3.92 s compile, 0.04 s link, 0.2 s reload). That is an unmeasured
+  estimate.
 - Variant (b) needs no such step, since CMake carries the module sets of linked shared libraries.
 
 The surprise does not change the verdict. It does say where (a)'s time goes.
@@ -71,8 +80,8 @@ The surprise does not change the verdict. It does say where (a)'s time goes.
 ## What this does and does not show
 - A one-file plugin edit reaches the running Sandbox in about 4.5 s with shared engine libraries, and in about 9.7 s
   with the static engine, of which 5.4 s is the spike's host-module collection.
-- Compiling the plugin's one translation unit (3.9 s, Debug and sanitizers) is the largest real cost. The reload
-  itself (0.2 s) and the answer (one frame) are small.
+- Compiling the plugin's one translation unit (3.9 s, Debug and sanitizers) is the largest cost in (b); in (a) the
+  collection is. The reload (0.2 s) and the answer (0.02 to 0.04 s, frame-pump latency included) are small.
 - Not shown:
   - a typical plugin with several translation units;
   - edits that change the host;
@@ -91,5 +100,5 @@ The summaries above were recomputed from `samples.jsonl` and equal the pooled on
 
 ## Follow-ups (not done; for the operator)
 - If the static arrangement (a) is kept for plugins, collecting the host's module files only when the host relinks,
-  instead of on every build, would remove about 5.4 s per edit.
+  instead of on every build, could remove up to about 5.4 s per edit (estimated, not measured).
 - R4 for a typical plugin needs a fixture with several translation units.
