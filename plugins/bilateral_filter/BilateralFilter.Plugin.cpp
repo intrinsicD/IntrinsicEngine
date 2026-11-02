@@ -19,12 +19,3 @@ namespace Intrinsic::Plugins::BilateralFilter
 
     void Shutdown() noexcept { ShutdownWindow(); }
 }
-
-// The plugin linked into a static Sandbox (no dlopen): the Sandbox wraps these in an in-process image.
-extern "C" bool intrinsic_bilateral_filter_register(Extrinsic::Runtime::PluginRegistrations& staged,
-                                                    std::string& error) noexcept
-{
-    return Intrinsic::Plugins::BilateralFilter::Register(staged, error);
-}
-
-extern "C" void intrinsic_bilateral_filter_shutdown() noexcept { Intrinsic::Plugins::BilateralFilter::Shutdown(); }

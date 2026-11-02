@@ -29,21 +29,15 @@ namespace
     using D = R::GeometryElementDomain;
     using Intrinsic::Tests::PointDomainProperties;
 
-    // Samples on a 3-wide grid with fixed normals and an unrelated float property; a point cloud also gets a
-    // deleted NaN row 4.
+    // The shared sample grid; a point cloud also gets a deleted NaN row 4.
     entt::entity Make(Extrinsic::ECS::Scene::Registry& scene, const D domain)
     {
-        const auto entity = Intrinsic::Tests::MakePointDomainSource(scene, domain);
-        auto& props = PointDomainProperties(scene, entity, domain);
-        auto samples = props.GetOrAdd<glm::vec3>("samples");
-        for (std::size_t i = 0; i < samples.Size(); ++i)
-            samples[i] = {float(i % 3), float(i / 3), .15f * float(int(i % 3) - 1)};
-        props.GetOrAdd<glm::vec3>("directions").Vector().assign(props.Size(), glm::vec3(0, 0, 1));
-        std::ranges::fill(props.GetOrAdd<float>("keep").Vector(), 42.f);
+        const auto entity = Intrinsic::Tests::PointCloudEditing::MakeOrientedSamples(scene, domain);
         if (domain == D::PointCloudPoint)
         {
+            auto& props = PointDomainProperties(scene, entity, domain);
             props.GetOrAdd<bool>("v:deleted")[4] = true;
-            samples[4] = {std::numeric_limits<float>::quiet_NaN(), 0, 0};
+            props.Get<glm::vec3>("samples")[4] = {std::numeric_limits<float>::quiet_NaN(), 0, 0};
         }
         return entity;
     }

@@ -41,6 +41,9 @@ import Extrinsic.Runtime.ViewCapture;
 
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
+#if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
+import Intrinsic.Plugin.BilateralFilter; // linked into a static Sandbox (plugins/bilateral_filter)
+#endif
 
 namespace
 {
@@ -416,13 +419,6 @@ namespace
     }
 }
 
-#if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
-// The bilateral filter plugin linked into a static Sandbox (plugins/bilateral_filter).
-extern "C" bool intrinsic_bilateral_filter_register(Extrinsic::Runtime::PluginRegistrations& staged,
-                                                    std::string& error) noexcept;
-extern "C" void intrinsic_bilateral_filter_shutdown() noexcept;
-#endif
-
 namespace
 {
     // ARCH-022: the bilateral filter plugin, opened before the config boot so its section's saved payload loads.
@@ -434,8 +430,8 @@ namespace
         std::string error;
 #if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
         (void)argv0;
-        image = Extrinsic::Runtime::MakeInProcessPlugin(&intrinsic_bilateral_filter_register,
-                                                        &intrinsic_bilateral_filter_shutdown);
+        image = Extrinsic::Runtime::MakeInProcessPlugin(&Intrinsic::Plugins::BilateralFilter::Register,
+                                                        &Intrinsic::Plugins::BilateralFilter::Shutdown);
 #else
         std::error_code ec;
         auto exe = std::filesystem::read_symlink("/proc/self/exe", ec);

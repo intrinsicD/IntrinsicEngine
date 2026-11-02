@@ -32,7 +32,7 @@ import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorWorkspaceSlot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProcessingOperations;
@@ -74,18 +74,7 @@ namespace Extrinsic::Runtime
 
     struct PointCloudEditingService::Impl
     {
-        EditorWorkspaceAttachment OwnWorkspace{};
-        EditorWorkspaceAttachment* Workspace{nullptr};
-
-        // The workspace's commands for this call; the own workspace prepares its frame here, the app's shell
-        // prepares one every frame.
-        EditorProcessingCommands Commands()
-        {
-            if (Workspace == nullptr) return {};
-            if (Workspace == &OwnWorkspace && OwnWorkspace.IsAttached())
-                (void)PrepareEditorWorkspaceSnapshotFrame(OwnWorkspace);
-            return PrepareEditorProcessingCommands(*Workspace);
-        }
+        EditorWorkspaceSlot Workspace{};
 
         static bool InputsCurrent(const PointEdit& edit)
         {
@@ -100,14 +89,12 @@ namespace Extrinsic::Runtime
 
     void PointCloudEditingService::UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept
     {
-        m_Impl->Workspace = &workspace;
+        m_Impl->Workspace.Use(workspace);
     }
 
     void PointCloudEditingService::ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept
     {
-        auto& impl = *m_Impl;
-        if (impl.Workspace == &workspace)
-            impl.Workspace = impl.OwnWorkspace.IsAttached() ? &impl.OwnWorkspace : nullptr;
+        m_Impl->Workspace.Release(workspace);
     }
 
     std::shared_ptr<PointEdit> PointCloudEditingService::Capture(const PointEditRequest& request,
@@ -118,7 +105,7 @@ namespace Extrinsic::Runtime
             diagnostic = std::move(why);
             return {};
         };
-        const EditorProcessingCommands commands = m_Impl->Commands();
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
         const EditorProcessingContext& context = EditorProcessingCommandsAccess::Resolve(commands);
         if (context.Scene == nullptr) return fail("Scene is unavailable.");
         const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), request.StableEntityId);
@@ -186,7 +173,7 @@ namespace Extrinsic::Runtime
 
     bool PointCloudEditingService::GpuQueriesAvailable()
     {
-        const EditorProcessingCommands commands = m_Impl->Commands();
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
         const EditorProcessingContext& context = EditorProcessingCommandsAccess::Resolve(commands);
         return context.JobCommands.Available() && context.SpatialIndices != nullptr &&
             context.SpatialIndices->GpuQueriesAvailable();
@@ -329,7 +316,7 @@ namespace Extrinsic::Runtime
     GeometryPropertyCatalogSnapshot PointCloudEditingService::InputCatalog(const std::uint32_t stableEntityId,
                                                                           const std::size_t minimumLiveCount)
     {
-        const EditorProcessingCommands commands = m_Impl->Commands();
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
         return Detail::BuildPointInputCatalog(EditorProcessingCommandsAccess::Resolve(commands), stableEntityId,
                                               minimumLiveCount);
     }
@@ -344,19 +331,12 @@ namespace Extrinsic::Runtime
 
     RuntimeModuleResult PointCloudEditingModule::OnResolve(EngineSetup& setup)
     {
-        auto& impl = *m_Service.m_Impl;
-        if (impl.Workspace == nullptr)
-        {
-            impl.OwnWorkspace.Attach(setup.Worlds(), setup.Services());
-            impl.Workspace = &impl.OwnWorkspace;
-        }
+        m_Service.m_Impl->Workspace.AttachOwn(setup.Worlds(), setup.Services());
         return RuntimeModuleOk();
     }
 
     void PointCloudEditingModule::OnShutdown(RuntimeModuleShutdownContext&)
     {
-        auto& impl = *m_Service.m_Impl;
-        impl.OwnWorkspace.Detach();
-        impl.Workspace = nullptr;
+        m_Service.m_Impl->Workspace.DetachOwn();
     }
 }

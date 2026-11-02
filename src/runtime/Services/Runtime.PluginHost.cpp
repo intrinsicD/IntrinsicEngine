@@ -39,7 +39,7 @@ import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorWorkspaceSlot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProcessingOperations;
@@ -409,10 +409,8 @@ namespace Extrinsic::Runtime
         bool LoadPending{false}; // a load, unload or reload whose continuation has not finished (or been dropped)
         // Active payloads of an unloaded plugin's sections, reapplied when a plugin registers them again.
         std::map<std::string, Core::Config::EngineConfigSection> SavedSections{};
-        WorldRegistry* Worlds{nullptr};
-        // The workspace plugin jobs belong to: the app's (UseEditorWorkspace), else this one.
-        EditorWorkspaceAttachment OwnWorkspace{};
-        EditorWorkspaceAttachment* Workspace{nullptr};
+        // The workspace plugin jobs belong to: the app's (UseEditorWorkspace), else the host's own.
+        EditorWorkspaceSlot Workspace{};
         std::vector<std::weak_ptr<DeferredEntry>> Deferred{};
         // Plugin callables the host is running now (deferred results); an unload waits for zero, since it would
         // destroy the running callable and unmap its code.
@@ -470,15 +468,6 @@ namespace Extrinsic::Runtime
             Deferred.clear();
         }
 
-        // The workspace's editor commands for one call. The app's shell prepares a frame every frame; the host's own
-        // workspace prepares one here, as the agent server does per call.
-        EditorProcessingCommands JobCommands()
-        {
-            if (Workspace == nullptr) return {};
-            if (Workspace == &OwnWorkspace && OwnWorkspace.IsAttached())
-                (void)PrepareEditorWorkspaceSnapshotFrame(OwnWorkspace);
-            return PrepareEditorProcessingCommands(*Workspace);
-        }
 
         // The run a job belongs to: its run's first job.
         JobToken RunOf(const JobToken job) const
@@ -496,7 +485,7 @@ namespace Extrinsic::Runtime
             for (const auto& entry : PluginJobs)
                 if (const JobToken run = RunOf(entry->Token); std::ranges::find(runs, run) == runs.end())
                     runs.push_back(run);
-            const EditorProcessingCommands commands = JobCommands();
+            const EditorProcessingCommands commands = Workspace.Commands();
             (void)CancelEditorRunJobs(commands, runs);
             for (const auto& entry : PluginJobs) (void)Jobs->Cancel(entry->Token);
         }
@@ -958,32 +947,25 @@ namespace Extrinsic::Runtime
     {
         m_Impl->Services = &setup.Services();
         m_Impl->Jobs = &setup.Jobs();
-        m_Impl->Worlds = &setup.Worlds();
         return setup.Services().Provide<PluginHostModule>(*this, Name());
     }
 
-    RuntimeModuleResult PluginHostModule::OnResolve(EngineSetup&)
+    RuntimeModuleResult PluginHostModule::OnResolve(EngineSetup& setup)
     {
         auto& impl = *m_Impl;
-        if (impl.Workspace == nullptr)
-        {
-            impl.OwnWorkspace.Attach(*impl.Worlds, *impl.Services);
-            impl.Workspace = &impl.OwnWorkspace;
-        }
+        impl.Workspace.AttachOwn(setup.Worlds(), setup.Services());
         if (impl.Options.Startup) impl.CommitStartup();
         return RuntimeModuleOk();
     }
 
     void PluginHostModule::UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept
     {
-        m_Impl->Workspace = &workspace;
+        m_Impl->Workspace.Use(workspace);
     }
 
     void PluginHostModule::ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept
     {
-        auto& impl = *m_Impl;
-        if (impl.Workspace == &workspace)
-            impl.Workspace = impl.OwnWorkspace.IsAttached() ? &impl.OwnWorkspace : nullptr;
+        m_Impl->Workspace.Release(workspace);
     }
 
     void PluginHostModule::OnShutdown(RuntimeModuleShutdownContext& context)
@@ -999,14 +981,9 @@ namespace Extrinsic::Runtime
         // stays (its image stays mapped too).
         std::erase_if(impl.PluginJobs, [](const std::unique_ptr<JobEntry>& entry) { return entry->Finalized; });
         // The own workspace leaves the services it attached to while they are alive (as the agent server's does).
-        const auto detach = [&impl]
-        {
-            impl.OwnWorkspace.Detach();
-            impl.Workspace = nullptr;
-        };
         if (!impl.Plugin)
         {
-            detach();
+            impl.Workspace.DetachOwn();
             return;
         }
         LoadedPlugin plugin = std::move(*impl.Plugin);
@@ -1018,7 +995,7 @@ namespace Extrinsic::Runtime
         if (config != nullptr && ui != nullptr && history != nullptr)
             impl.Unregister(plugin, *config, *ui, *history, false);
         impl.ClearDeferred();
-        detach();
+        impl.Workspace.DetachOwn();
         intrinsic_plugin_event("host_shutdown");
         // Destroyed without Close, the image stays mapped: callables the engine destroys later (history entries, a
         // dropped call) still find their code, and the process ends.
@@ -1028,7 +1005,7 @@ namespace Extrinsic::Runtime
     {
         auto& impl = *m_Impl;
         if (impl.Draining || !job.Work || !job.Completion) return {};
-        const EditorProcessingCommands commands = impl.JobCommands();
+        const EditorProcessingCommands commands = impl.Workspace.Commands();
         const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
         if (!surface.Submit) return {};
         EditorJobIdentity identity{
@@ -1090,7 +1067,7 @@ namespace Extrinsic::Runtime
 
     bool PluginHostModule::CancelJob(const PluginJobHandle job)
     {
-        const EditorProcessingCommands commands = m_Impl->JobCommands();
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
         const JobToken run = m_Impl->RunOf(job.Token);
         return CancelEditorRunJobs(commands, std::span<const JobToken>{&run, 1u}).Requested > 0u;
     }
@@ -1098,7 +1075,7 @@ namespace Extrinsic::Runtime
     void PluginHostModule::ReportJobOutcome(const PluginJobHandle job, const PluginJobDomain resolved,
                                             std::string diagnostic)
     {
-        const EditorProcessingCommands commands = m_Impl->JobCommands();
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
         const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
         if (surface.ReportOutcome)
             surface.ReportOutcome(job.Token, {.ResolvedDomain = resolved == PluginJobDomain::Gpu ? EditorJobDomain::GpuCompute

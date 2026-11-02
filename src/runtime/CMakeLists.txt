@@ -79,6 +79,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorWindowRegistry.cppm
         Services/Runtime.UiHostTypes.cppm
         Services/Runtime.PluginContract.cppm
+        Services/Runtime.EditorWorkspaceSlot.cppm
         Services/Runtime.PluginHost.cppm
         Services/Runtime.PointCloudEditing.cppm
         Kernel/Runtime.Engine.cppm
@@ -276,6 +277,7 @@ target_sources(${target_name}
         Agent/Runtime.AgentOperations.Capture.cpp
         Agent/Runtime.AgentServer.cpp
         Services/Runtime.PluginContract.cpp
+        Services/Runtime.EditorWorkspaceSlot.cpp
         Services/Runtime.PluginHost.cpp
         Services/Runtime.PointCloudEditing.cpp
         Kernel/Runtime.InputActions.cpp

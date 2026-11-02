@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 121 |
+| `runtime` | 122 |
 
 ## Modules
 
@@ -477,6 +477,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Scene/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Scene/Runtime.SelectionController.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
+| `Extrinsic.Runtime.EditorWorkspaceSlot` | `src/runtime/Services/Runtime.EditorWorkspaceSlot.cppm` | `runtime` |
 | `Extrinsic.Runtime.PluginContract` | `src/runtime/Services/Runtime.PluginContract.cppm` | `runtime` |
 | `Extrinsic.Runtime.PluginHost` | `src/runtime/Services/Runtime.PluginHost.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudEditing` | `src/runtime/Services/Runtime.PointCloudEditing.cppm` | `runtime` |
@@ -484,4 +485,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **457**
+Total modules: **458**

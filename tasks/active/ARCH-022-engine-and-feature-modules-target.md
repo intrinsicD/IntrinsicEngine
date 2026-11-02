@@ -105,6 +105,14 @@ contract_review: tracker only; each slice declares its own contracts
 58. (2026-11-02) "btw lld-24 ist nun installiert"
 59. (2026-11-02) "Der Rechner hängt, kannst du die Tests beenden und rausfinden was da los ist?"
 60. (2026-11-02) "ja bitte setze 1. um" (1: a Ninja compile pool sized from the RAM)
+61. (2026-11-02) "ja, bitte mach 1 - 3." (1: amend the plugin commit with the two pinned references, including
+    `ara/logic/claims.md`; 2: the compile pool as its own commit; 3: replay ci-docs and push)
+62. (2026-11-02) "während du baust: wenn ich in der Apperance UI Faces:Color auf v:normal setze bekomme ich bei
+    Color interpretation Normal direction und Components. Was ist dieses Components? das sieht seltsam aus auf dem
+    mesh..." (answered: Components uses the values as RGB in 0..1, so negative normal components turn black)
+63. (2026-11-02) "danke. ist ci fertig?" / "Was gehen wir dann nach ci an?"
+64. (2026-11-02) "ja bitte" (the cleanup block: the own-or-borrowed workspace logic once, one test harness, no
+    extern "C" forwarders; then kernel density and point spacing as plugins; then S3)
 
 ## Goal
 - Reach the target in
@@ -2091,3 +2099,51 @@ python3 tools/docs/check_doc_links.py --root . --strict
     pool does; a `shortcut:` comment that a container's memory limit is not read. Open: GitHub's 16 GB runners report
     about 15,980 MiB, so CI gets 3 compiles (Ninja's default was 6 on 4 cores); the CI job time is compared after the
     push.
+- 2026-11-02, CI on `399b3931d`: ci-docs and ci-linux-clang green. The runner reports 15,982 MiB, so 3 compiles;
+  `full-cpu` 37.4 min (build 32.2 min) against 42.4 min (35.0 min) on `616cdf17e` without the pool: no slowdown
+  seen (two runs, ccache hit rates vary).
+- 2026-11-02, plan of the cleanup block (Q64), the three items the ponytail review of 2c deferred. Goal: the plugin
+  template is copied without its duplicates. Done when the three are gone and the 2c tests, the GPU smoke and the
+  live driver pass unchanged; this is a refactoring, so no behaviour changes and no new tests beyond moved ones.
+  1. **The workspace slot once.** `PluginHostModule` and `PointCloudEditingService` each hold an own workspace, a
+     current pointer, `Use`/`Release`, the per-call frame of the own workspace, attach at resolve and detach at
+     shutdown. One small class `EditorWorkspaceSlot` (`src/runtime/Services/Runtime.EditorWorkspaceSlot.*`) holds
+     it; both services keep their `UseEditorWorkspace`/`ReleaseEditorWorkspace` (one line each), so the shell is
+     unchanged. Not chosen: the service asking the host for its commands (it would tie the service to the plugin
+     host; the service tests compose it without one).
+  2. **One test harness.** `tests/support/PointCloudEditingHarness.hpp` composes the engine as the Sandbox does
+     (modules, shell, `Frame`, a generic `Settled`, the sample grid); `BilateralFilterHarness.hpp` adds the staged
+     plugin and the host. `Test.PointCloudEditing.cpp` and the plugin tests use them.
+  3. **No named extern "C" forwarders.** `BilateralFilter.Entry.cpp` calls `Register`/`Shutdown` of the module;
+     the static Sandbox imports the module under `INTRINSIC_BILATERAL_FILTER_IN_PROCESS` and the test harness
+     imports it, both passing `&Register`/`&Shutdown`.
+  Verification: the plugin, service and host contract tests and `BilateralFilterPluginGpuSmoke` on `build/dev`
+  (shared), the plugin tests and the in-process Sandbox on a static tree (`build/ci-vulkan`), the live driver
+  (it unloads and loads the `.so`, so it runs the new entry points), layering, hazards, R1/R2, ci-docs replay.
+- 2026-11-02, the cleanup block (Q64) implemented as planned:
+  1. `EditorWorkspaceSlot` (`src/runtime/Services/Runtime.EditorWorkspaceSlot.*`) holds the own-or-lent workspace;
+     the plugin host and the editing service use it (their `UseEditorWorkspace`/`ReleaseEditorWorkspace` forward).
+  2. `tests/support/PointCloudEditingHarness.hpp` composes the engine; `BilateralFilterHarness.hpp` derives from
+     `Boot` (registry, boot sections, staged plugin; built first, destroyed last) and from it.
+     `Test.PointCloudEditing.cpp` and the plugin tests share the sample grid; the old copies are gone (jscpd: four
+     clones of 6 to 11 lines remain inside test cases of the two suites, left as they test different layers).
+  3. The named extern "C" forwarders are gone; `Entry.cpp`, the static Sandbox (import under
+     `INTRINSIC_BILATERAL_FILTER_IN_PROCESS`) and the harness pass `Register`/`Shutdown` of the module.
+  - Codex plan review (fresh session `01a19c70-129a-7d82-9262-47bf49dd3072`): "Verdict: REVISE"; answered: the
+    destruction order through the `Boot` base, `Frame(60)` where the service tests advanced 60 frames, and the
+    verification of both build kinds and the `ci` preset.
+  - Verification: dev-shared 97 contract tests (plugin, service, host, point readiness, queued point jobs) and 2
+    `BilateralFilterPluginGpuSmoke`; `ci-vulkan` (static, ASan, Sandbox) 94 of them and the static Sandbox
+    registers the plugin in-process (`plugin_list` file "", tools, section, exit 0); `ci` (static, unsanitized) 97;
+    live MCP driver 49 of 49 (unloads and loads the `.so`, so the new entry points ran); layering, hazards, R1/R2,
+    module inventory clean. Every build ran under a memory guard; at least 30 GB stayed free.
+  - Codex code review (same session, diff sha256 `611fc004…31c98b`): "Verdict: APPROVE"; its non-blocking note
+    (the harness's `Settled` previewed twice) taken.
+  - Ponytail review (Claude subagent, same diff): "Verdict: Ship." Taken: 1 (the unused `ui` option of the
+    harnesses), 2 (a test of the slot's release fallback, `PointCloudEditing.AReleasedWorkspaceFallsBackToTheServicesOwn`;
+    it fails when `Release` keeps the detached workspace), 3 (`Settled` without the optional round trip), 4 (the
+    one-line `JobCommands`/`Commands` renames, the detach lambda, unused includes). Deferred: 5, a general plugin
+    harness (`Boot`, the host hook, `Call`, `Jobs`), when the second plugin's harness is written. These fixes go
+    into the next block's review.
+  - After them: dev-shared 98 contract tests and 2 Vulkan smoke tests, `ci-vulkan` 98, `ci` 98, the static Sandbox
+    still registers the plugin in-process.
