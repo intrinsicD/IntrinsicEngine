@@ -482,6 +482,17 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
 
+## Memory headroom
+
+A heavy C++23 module TU under ASan peaks at about 3.4 GB. Ninja's default of
+nproc+2 compiles let a full rebuild outgrow 62 GB of RAM and hang the machine
+(2026-11-02). Compiles therefore share the Ninja pool `intrinsic_compile`, one
+compile per 4 GiB of RAM ([`cmake/CompilePool.cmake`](../cmake/CompilePool.cmake));
+the configure prints `Compile pool: <n> parallel compiles`. Links are not pooled
+(one lld link of the largest test binary peaks at 1.7 GB). A full rebuild follows
+any change of `BUILD_SHARED_LIBS` or position-independent code, for example
+configuring an existing static tree with the shared `dev` preset.
+
 ## Disk headroom
 
 Before expensive local verification (a clean configure, reconciling several

@@ -99,6 +99,12 @@ contract_review: tracker only; each slice declares its own contracts
     MCP waits for the result and can cancel; the contract grows for it) and "Eigene Plugin-Tools (Recommended)"
     (the plugin registers its own MCP tools; the `run_operation` row goes)
 55. (2026-11-02) "Kannst du bitte weiter machen?"
+56. (2026-11-02) "Kannst du bitte weiter machen?" (again, after a reset of the workstation)
+57. (2026-11-02) "kannst du mir kurz zwischendrin nochmal sagen welche terminal commandos ich heute (montag) an
+    meinem rechner hier ausführen sollte?" (answered: `sudo apt update`, `sudo apt install lld-24`, Q49)
+58. (2026-11-02) "btw lld-24 ist nun installiert"
+59. (2026-11-02) "Der Rechner hängt, kannst du die Tests beenden und rausfinden was da los ist?"
+60. (2026-11-02) "ja bitte setze 1. um" (1: a Ninja compile pool sized from the RAM)
 
 ## Goal
 - Reach the target in
@@ -2073,3 +2079,15 @@ python3 tools/docs/check_doc_links.py --root . --strict
     remain."
   - Open after 2c: port the eight-domain Vulkan benchmark (`geometry.point_lbvh.bilateral_runtime_smoke` has no
     producer); a failed GPU page with current inputs has no test (no fault hook); ponytail 1, 3, 4 (next block).
+- 2026-11-02, Q58–Q60: `build/dev` and `build/dev-shared` link with `/usr/bin/ld.lld-24`. Reconfiguring `build/dev`
+  with the `dev` preset made the static tree shared and started a full rebuild with 34 parallel ASan compiles; the
+  workstation ran out of memory and hung (an OOM kill at 10:19 had already forced a reset earlier the same morning).
+  Measured: a heavy compile peaks at 3.4 GB, the largest lld link at 1.7 GB. Fix (Q60): Ninja compile pool, one
+  compile per 4 GiB of RAM (`cmake/CompilePool.cmake`, 15 here), `Test.CompilePool.py` (three mutations fail it),
+  `docs/build-troubleshooting.md`, lesson in `docs/lessons/engineering.md`. `build/dev` is now shared; a static
+  check needs its own tree.
+  - Codex review of the compile pool (fresh session `01a19bb9-5f22-7a20-9414-108792efa51b`, diff sha256
+    `cec370ab…729c84`): "Verdict: APPROVE", no blocking findings. Taken: the test's description limited to what the
+    pool does; a `shortcut:` comment that a container's memory limit is not read. Open: GitHub's 16 GB runners report
+    about 15,980 MiB, so CI gets 3 compiles (Ninja's default was 6 on 4 cores); the CI job time is compared after the
+    push.

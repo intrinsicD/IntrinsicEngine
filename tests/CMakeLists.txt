@@ -27,6 +27,10 @@ endfunction()
 add_test(NAME PluginBuildId.Script
         COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.PluginBuildId.py)
 set_tests_properties(PluginBuildId.Script PROPERTIES LABELS "contract;build;runtime" TIMEOUT 120)
+# Compiles share a pool sized from the RAM (cmake/CompilePool.cmake).
+add_test(NAME CompilePool.Script
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.CompilePool.py)
+set_tests_properties(CompilePool.Script PROPERTIES LABELS "contract;build" TIMEOUT 120)
 # CurvatureSegmentationConfig.cpp validates geometry algorithm parameters; only
 # its authoring interface, not that algorithm adapter, belongs to this boundary.
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyTypes

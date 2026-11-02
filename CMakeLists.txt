@@ -97,6 +97,7 @@ set(EXTRINSIC_PLATFORM "${CMAKE_SYSTEM_NAME}" CACHE STRING "Configured target pl
 set(EXTRINSIC_BACKEND "Vulkan" CACHE STRING "Graphics backend selection")
 
 include(cmake/ClangToolchainSelection.cmake)
+include(cmake/CompilePool.cmake)
 
 if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang"
     OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

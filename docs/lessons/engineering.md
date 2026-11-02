@@ -147,3 +147,13 @@ stale, so the next technical R4 run rebuilt it and failed `plugin_edges_only`; l
 interface during a driver run would have rebuilt the host inside the S2 session (restoring the file's content and
 mtime avoided it, since Ninja compares mtimes, not content). Safeguard: run `cmake --build <tree>` (all targets) after
 any mutation or source edit and before a driver run, and edit nothing under `src/` while a driver runs.
+
+## A full rebuild must fit the machine's memory
+
+On 2026-11-02 the workstation hung twice and was reset. The second time, `cmake --preset dev` was run on the existing
+static tree `build/dev` only to pick up lld; the preset sets `BUILD_SHARED_LIBS` and position-independent code, so all
+2804 objects were invalidated and Ninja's default of nproc+2 (34) compiles ran at once. A heavy C++23 module TU under
+ASan peaks at about 3.4 GB, which outgrew 62 GB of RAM with 1 GB of swap. Safeguard: compiles share the Ninja pool
+`intrinsic_compile`, one per 4 GiB of RAM (`cmake/CompilePool.cmake`, `Test.CompilePool.py`); before configuring an
+existing tree with a preset, compare its `BUILD_SHARED_LIBS` with the preset's, and keep a static tree in its own
+directory.
