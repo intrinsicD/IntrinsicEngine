@@ -55,9 +55,6 @@ class PluginBuildIdScript(unittest.TestCase):
         self.write("runtime/Kernel/Runtime.JobService.cpp", "module Runtime.JobService; // edited\n")
         self.assertEqual(self.build_id(), before)
 
-    def test_the_build_settings_change_the_id(self) -> None:
-        self.assertNotEqual(self.build_id("clang 24|Debug|none|shared"), self.build_id("clang 24|Release|none|shared"))
-
     def test_an_unchanged_id_leaves_the_header_untouched(self) -> None:
         # Dependents (the host's loader and every plugin) rebuild only when the id changes.
         self.build_id()

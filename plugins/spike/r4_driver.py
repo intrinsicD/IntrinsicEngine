@@ -311,6 +311,7 @@ def run(agent: s1.Agent, checks: s1.Checks, args, records: list[dict]) -> None:
             index, previous = index + 1, record["generation"]
             if not record["ok"]:
                 checks.check(f"sample {record['index']} ({kind}) passed every sample check", False, record["checks"])
+                agent.quit()  # end the session now, so the exit checks still judge a clean exit
                 return
     checks.check(f"samples: {args.warmup} warmup and {args.samples} measured, each passing every sample check", True)
     # Validity: a plugin build that relinked the Sandbox would put a host rebuild into every total.

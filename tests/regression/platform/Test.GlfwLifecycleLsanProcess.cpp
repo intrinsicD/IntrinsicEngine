@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <string_view>
 
+#include <dlfcn.h>
+
 #if defined(__has_feature)
 #  if __has_feature(address_sanitizer)
 #    define INTRINSIC_BUG082_HAS_ASAN 1
@@ -99,6 +101,15 @@ namespace
     }
 }
 
+#if defined(INTRINSIC_BUG082_INTERPOSE)
+// Shared engine libraries: ExtrinsicPlatform calls glfwTerminate through its PLT, so this definition interposes it.
+extern "C" void glfwTerminate()
+{
+    ++g_GlfwTerminateCalls;
+    static auto* const next = reinterpret_cast<void (*)()>(dlsym(RTLD_NEXT, "glfwTerminate"));
+    next();
+}
+#else
 extern "C" void __real_glfwTerminate();
 
 extern "C" void __wrap_glfwTerminate()
@@ -106,6 +117,7 @@ extern "C" void __wrap_glfwTerminate()
     ++g_GlfwTerminateCalls;
     __real_glfwTerminate();
 }
+#endif
 
 int main(int argc, char** argv)
 {

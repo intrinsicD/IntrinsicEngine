@@ -346,9 +346,6 @@ namespace Extrinsic::Runtime
         // Active payloads of an unloaded plugin's sections, reapplied when a plugin registers them again.
         std::map<std::string, Core::Config::EngineConfigSection> SavedSections{};
 
-        // Without an opener of its own (tests), the host loads only in a shared engine build.
-        bool Unsupported() const { return !Options.Open && !PluginsSupported(); }
-
         std::unique_ptr<PluginImage> Open(const std::string& path, const std::string_view failAt,
                                           AgentOperationOutcome& failure) const
         {
@@ -605,7 +602,6 @@ namespace Extrinsic::Runtime
                 return Fail("invalid_params", "path is required");
             const std::string path = arguments["path"].get<std::string>();
             const std::string failAt = arguments.value("fail_at", std::string{});
-            if (Unsupported()) return Fail("plugins_unsupported", kUnsupported);
             if (Plugin) return Fail("already_loaded", "a plugin is already loaded");
             if (LoadPending) return Fail("load_pending", "another load has not committed yet");
 
@@ -652,7 +648,8 @@ namespace Extrinsic::Runtime
             const Json arguments = Json::parse(argumentsJson, nullptr, false);
             if (!arguments.is_object() || (reload && !(arguments.contains("path") && arguments["path"].is_string())))
                 return Fail("invalid_params", "path is required");
-            if (reload && Unsupported()) return Fail("plugins_unsupported", kUnsupported);
+            // A static build without an opener of its own (tests) has no plugin to reload: say why.
+            if (reload && !Options.Open && !PluginsSupported()) return Fail("plugins_unsupported", kUnsupported);
             if (!Plugin) return Fail("not_loaded", "no plugin is loaded");
             if (LoadPending) return Fail("load_pending", "another load has not committed yet");
             const std::string path = reload ? arguments["path"].get<std::string>() : std::string{};

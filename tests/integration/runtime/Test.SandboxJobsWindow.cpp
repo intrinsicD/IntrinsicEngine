@@ -112,13 +112,15 @@ namespace
         return true;
     }
 
-    R::JobDesc LongJob(std::string name, std::atomic_bool& release)
+    // With stopOnCancel false the job keeps running after a cancel request until `release`, so a test can read
+    // the state between the request and the job's end (BUG-256).
+    R::JobDesc LongJob(std::string name, std::atomic_bool& release, const bool stopOnCancel = true)
     {
         R::JobDesc desc{};
         desc.DebugName = std::move(name);
-        desc.Work = [&release](const R::JobCancellation& cancellation) {
+        desc.Work = [&release, stopOnCancel](const R::JobCancellation& cancellation) {
             cancellation.ReportProgress(0.25f);
-            while (!release.load(std::memory_order_acquire) && !cancellation.IsCancelled())
+            while (!release.load(std::memory_order_acquire) && !(stopOnCancel && cancellation.IsCancelled()))
                 std::this_thread::sleep_for(std::chrono::milliseconds{1});
             return R::JobResultEnvelope::Make(true);
         };
@@ -147,6 +149,7 @@ namespace
 TEST(SandboxJobsWindow, ListsALongJobAndCancelsItThroughTheSurface)
 {
     TestSupport::ImGuiFrameScope frame;
+    std::atomic_bool release{false}; // outlives the harness, whose drain waits for the job reading it
     Extrinsic::Tests::EditorJobHarness harness{2u};
     harness.SetSceneEpoch(1u);
     R::EditorProcessingContext context{};
@@ -159,7 +162,9 @@ TEST(SandboxJobsWindow, ListsALongJobAndCancelsItThroughTheSurface)
     const R::EditorJobCommandSurface surface = context.JobCommands;
     const R::EditorProcessingCommands commands = R::BindEditorProcessingCommands(std::move(context));
     Editor::JobsWindowState state;
-    std::atomic_bool release{false};
+    // The job ignores cancellation until released; a failed assertion must not leave it running for the drain.
+    const std::unique_ptr<std::atomic_bool, void (*)(std::atomic_bool*)> releaseOnExit{
+        &release, [](std::atomic_bool* flag) { flag->store(true, std::memory_order_release); }};
     const auto draw = [&] {
         frame.NextFrame();
         ImGui::SetNextWindowPos({0, 0});
@@ -172,7 +177,7 @@ TEST(SandboxJobsWindow, ListsALongJobAndCancelsItThroughTheSurface)
     draw();
     EXPECT_TRUE(state.History.Rows().empty());
 
-    const R::JobToken token = surface.Submit(LongJob("Long smoothing", release), Identity("smoothed"));
+    const R::JobToken token = surface.Submit(LongJob("Long smoothing", release, false), Identity("smoothed"));
     ASSERT_TRUE(token.IsValid());
     ASSERT_TRUE(WaitFor([&] { return harness.Jobs().GetState(token) == R::JobState::Running; }));
     draw();
@@ -201,6 +206,7 @@ TEST(SandboxJobsWindow, ListsALongJobAndCancelsItThroughTheSurface)
     draw();
     EXPECT_EQ(cancels, 1) << "a disabled Cancel does not reach the surface";
 
+    release.store(true, std::memory_order_release);
     ASSERT_TRUE(harness.DrainUntilTerminal());
     draw();
     ASSERT_EQ(state.History.Rows().size(), 1u);

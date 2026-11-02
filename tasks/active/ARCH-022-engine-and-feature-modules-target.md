@@ -91,6 +91,14 @@ contract_review: tracker only; each slice declares its own contracts
     order: 1. the plugin host as a module service, 2. a first real feature as a plugin, 3. feature by
     feature, 4. S3 before the GPU-heavy features; yes to measuring CI's link share, the next time CI
     has to change anyway, not as a separate step)
+53. (2026-11-01) "Ja bitte. Plane bilateral Filter als erstes Plugin. Außerdem fixe die offenen Sachen
+    die du fixen kannst. Wenn der Plan steht implementier bitte das Plugin und teste es via Live
+    sandbox und auch mcp" (after the report on slice 3 step 1)
+54. (2026-11-01, answers to two questions on the step 2 plan) "Volle Parität (Recommended)" (the plugin's
+    runs keep today's behaviour: rows of the Jobs window and cancellable there, several runs on different outputs,
+    MCP waits for the result and can cancel; the contract grows for it) and "Eigene Plugin-Tools (Recommended)"
+    (the plugin registers its own MCP tools; the `run_operation` row goes)
+55. (2026-11-02) "Kannst du bitte weiter machen?"
 
 ## Goal
 - Reach the target in
@@ -1751,3 +1759,121 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - Codex delta (same thread): "Verdict: APPROVE", bound to the staged diff sha256 `a35a7e72…0effc41a`. Ponytail
     delta: "Verdict: Ship"; its two optional code cuts (a second static check in `Load`, a settings test the wiring
     test covers) are not applied, so the approved code stays as reviewed; its log note is applied here.
+- 2026-11-01: Open points of step 1 fixed (Q53, "fixe die offenen Sachen die du fixen kannst"):
+  - `BUG-256` (the Jobs window test's race), retired;
+  - GLFW's exactly-once teardown is tested in shared builds again: the probe interposes `glfwTerminate` (the shared
+    `ExtrinsicPlatform` calls it through its PLT) instead of `--wrap`, which static builds keep; it passes in the
+    shared and the static tree, and fails in the shared tree without the counter;
+  - the R4 driver sends `app_quit` after a failed sample, so the exit checks still judge a clean exit;
+  - the ponytail review's optional cuts: `plugin_load` no longer checks for a static build before the opener
+    does; the settings-only build-id test is gone (the wiring test covers it).
+  - Not fixed here, decisions for the operator: dlopen in CI (CI is static; a shared CI job is a CI change); R4
+    for a typical plugin (a measurement with its own pre-flight); the dev presets' `compile_commands.json`
+    (reverses the decision of 2026-07-18; kept unless the operator objects).
+  - Codex review of the fix block (session `01a1973c-80b4-7881-8c35-e6573a58ff0e`): REVISE on `f47ccb8c…cc415d84`
+    for `BUG-256`'s record only; delta "Verdict: APPROVE" on `1e23b24d…3d46d5c26` (the record, and an early-failure
+    guard in the Jobs window test).
+  - `main` was red after `bfb76bb39`: the CPU test selection refused the new Python CTest test. Fixed in
+    `e2813a899` (allowlisted; reviewed by Codex, APPROVE), and `ci-linux-clang` is green again.
+- 2026-11-01: Plan for slice 3, step 2: the bilateral point filter as the first feature plugin, revision 1.
+  - Questions served:
+    - Q53: "Ja bitte. Plane bilateral Filter als erstes Plugin. Außerdem fixe die offenen Sachen die du fixen
+      kannst. Wenn der Plan steht implementier bitte das Plugin und teste es via Live sandbox und auch mcp";
+    - Q52's order, item 2: "a first real feature as a plugin, through every layer";
+    - Q51: "Plugins bauen, damit die Engine aufgeräumt und sauber wird, runtime und editor auch".
+  - Goal items: the target's "Plugins: what goes where" and R1, R2, R3, R5. Measured here: R2 for
+    `plugins/bilateral_filter` is 0/0; R1 loses the bilateral filter in its hub files; R5 keeps the feature
+    reachable over MCP.
+  - Today (map of 2026-11-01): about 940 lines of runtime and app code are bilateral-only. They are spread over
+    10 hub files: the editor operation `Runtime.PointSetOperations.Bilateral.cpp` (656 lines), its interface part,
+    a result slot and a catalog entry; the config module and part of a shared codec; one row of the agent's
+    `run_operation` table; and a Sandbox panel. The algorithm stays in `Geometry.PointCloud.Utils`. The operation
+    uses no shared transaction runtime, but it depends on editor helpers that 24 files share: point capture,
+    output-revision guards and history rebasing, the spatial index and the GPU kNN paging. The plugin contract
+    lacks four things it needs:
+    1. a job gate for GPU paging;
+    2. undo data for large arrays;
+    3. a result an agent can wait for;
+    4. editor context for the window.
+  - Shape: the plugin holds everything bilateral-specific. One new module service, the point-cloud editing
+    service, wraps the shared editor helpers for plugins, so the plugin imports no editor module. It is the
+    service the next point plugins need too (KDE, spacing, outliers, normals).
+  - **2a, the host: startup plugins and a job gate.**
+    - The Sandbox opens its built-in plugins before the config boot:
+      - a shared build opens `plugins/lib<Name>Plugin.so` of its own build tree;
+      - a static build (CI, release) registers the same code linked into the executable, through an
+        in-process image (the `PluginImage` seam of step 1).
+    - `StagePlugin(image)` calls Register. The plugin's config sections join the boot section registry, so a
+      saved `engine.json` payload loads as today. The host commits the rest at `OnResolve` (operations, windows,
+      history commands) and owns the sections, so unload and reload work as in step 1.
+    - The host holds one plugin at a time. The fixture's drivers start the Sandbox with `--no-startup-plugins`.
+      Several plugins at once come with the second feature plugin.
+    - `PluginJob` gains an optional `IsReadyToApply`, a main-thread gate the host forwards like the GPU
+      forwarders, before Completion. A chain submits its next job from a completion.
+    - Tests: startup staging (the section is active at boot with a file payload; a startup plugin unloads and
+      reloads); the gate (Completion waits for it; a drain cancels a gated job).
+  - **2b, the service `Extrinsic.Runtime.PointCloudEditing`** (`src/runtime/Services/`): a runtime module that
+    provides `PointCloudEditingService`.
+    - Its interface names only foundation and service types. Its implementation wraps today's editor helpers
+      unchanged (`CapturePointNormalInput`, the property watches and history rebasing, `AcquirePointIndex`,
+      `GpuRowPages`, `SpatialIndexWorkspace`), through its own workspace attachment, as the agent server does.
+    - Calls, with data in and data out; it holds no plugin callable:
+      - `Capture`: an entity, and position, normal and output refs. The live points, normals and slot count, or
+        a diagnostic. Resolves unknown domains and checks the refs, as today's capture does.
+      - `Current`: inputs and output unchanged since the capture.
+      - `Publish`: writes new positions into the output for the live slots, records one undo entry, rebases the
+        watches and marks the entity dirty. The entry holds the before and after arrays in host code, so undo
+        and redo work after the plugin is unloaded or reloaded.
+      - `InputCatalog`: the point property catalog for the window.
+      - kNN rows: CPU rows from the cached LBVH; GPU rows paged (Begin, then Advance until Ready or Failed),
+        including the private index over moving points from the second pass on.
+    - Tests: the cases of `Test.BilateralFilterOperations` that concern input, staleness and history, through
+      the service (every domain, copy and in place, a changed input refused, undo and redo).
+  - **2c, the plugin `plugins/bilateral_filter/`:**
+    - Config: the section keeps its name and schema id (`sandbox.bilateral_filter`), so saved configs load. The
+      codec is derived from rows (`Extrinsic.Runtime.DerivedConfigSections`) instead of the hand-written codec.
+    - Run: capture, then CPU octree, CPU LBVH or Vulkan LBVH rows through the service, then the algorithm (stays in
+      `Geometry.PointCloud.Utils`), then publish. One run at a time; jobs through `SubmitPluginJob`, GPU pages
+      behind the gate; the last result is kept by the plugin.
+    - MCP tools (operations answer at once):
+      - `bilateral_filter_run`: submits a run with the section's settings and answers with its id;
+      - `bilateral_filter_preview`: readiness and the reason;
+      - `bilateral_filter_status`: the run's state and result.
+    - Window `view.bilateral_filter`, plain ImGui:
+      - the entity from the selection service;
+      - property pickers from the service catalog;
+      - the section's fields;
+      - Run calls the run command;
+      - the last result.
+    - Build: one object library of the plugin's sources. Shared builds wrap it in a MODULE with the v1 entry
+      points; static builds link it into the Sandbox. Tests link it in both.
+    - Deleted:
+      - the editor operation and its interface, result slot and catalog entry;
+      - the `run_operation` row (`bilateral_filter`) and its schema fixture entries;
+      - the panel and its windows;
+      - the central config registration;
+      - the runtime config module and the codec part.
+      Tests move with the code.
+  - **2d, live verification (Q53),** a driver `plugins/bilateral_filter/live_driver.py` on the shared dev
+    build, over MCP:
+    - the Sandbox starts with the plugin: `plugin_list`, its tools, its window and its section with the
+      defaults;
+    - `import_file` of a point cloud with normals; `config_apply` sets the entity and settings; preview; a run
+      on each backend; status until done;
+    - `property_values` and `property_stats` show the output moved by the reported displacement. The three
+      backends agree, since they compute the same neighborhoods;
+    - undo restores the output and redo reapplies it, also after a `plugin_reload`;
+    - a capture of the window shows the panel;
+    - a clean exit (sanitizers).
+    Plus the static build: the contract tests pass through the in-process image.
+  - Gaps kept for later (named, not hidden):
+    - plugin runs are not rows of the Jobs window (job observation is S3);
+    - MCP waits by polling `bilateral_filter_status` (no deferred plugin results);
+    - several plugins at once;
+    - R4 for this plugin (a measurement with its own pre-flight, for the operator).
+  - Done when:
+    - 2a to 2c pass their contract tests in the shared and static trees, and the CPU set;
+    - the live driver passes on the shared dev build;
+    - R2 for `plugins/bilateral_filter` is 0/0, and R1 has dropped by the bilateral filter;
+    - the reviews pass;
+    - the target and `docs/architecture/bilateral-point-filter.md` are updated.
