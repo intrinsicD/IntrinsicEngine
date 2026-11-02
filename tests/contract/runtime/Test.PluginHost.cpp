@@ -160,7 +160,7 @@ namespace
         Log Events{};
         std::function<bool(Runtime::PluginRegistrations&)> Next{}; // what the next opened image registers
         std::map<std::string, std::function<bool(Runtime::PluginRegistrations&)>> Builds{}; // by path, before Next
-        std::map<std::string, std::function<void()>> ShutdownHooks{}; // by path: run in the image's shutdown hook
+        std::map<std::string, std::function<void()>> OnShutdownOf{}; // by path: run in the image's shutdown hook
         // Outlives the engine, whose shutdown unregisters the plugin's tools (the agent server's registry does too).
         Runtime::AgentOperationRegistry Registry{};
         Intrinsic::Tests::RuntimeTestKernel Engine;
@@ -200,9 +200,9 @@ namespace
                 hostOptions.Open = [this](const std::string& path, std::string_view, Runtime::AgentOperationOutcome&)
                 {
                     const auto build = Builds.find(path);
-                    const auto hook = ShutdownHooks.find(path);
+                    const auto hook = OnShutdownOf.find(path);
                     return std::make_unique<FixtureImage>(build != Builds.end() ? build->second : Next, Events,
-                                                          hook != ShutdownHooks.end() ? hook->second : nullptr);
+                                                          hook != OnShutdownOf.end() ? hook->second : nullptr);
                 };
             auto host = std::make_unique<Runtime::PluginHostModule>(std::move(hostOptions));
             Host = host.get();
@@ -1431,7 +1431,7 @@ TEST(PluginHost, APluginsRegisterAndShutdownHookCannotSubmitWorkAsAnotherPlugin)
         submit("register");
         return Fixture(281, harness.Events, "alpha")(staged);
     };
-    harness.ShutdownHooks["a"] = [&submit] { submit("shutdown"); };
+    harness.OnShutdownOf["a"] = [&submit] { submit("shutdown"); };
     ASSERT_FALSE(harness.Call("plugin_load", {{"path", "b"}}).IsError);
     ASSERT_FALSE(harness.Call("plugin_load", {{"path", "a"}}).IsError);
     ASSERT_FALSE(harness.Call("plugin_unload", {{"plugin", "alpha"}}).IsError);
