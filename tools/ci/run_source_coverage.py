@@ -434,10 +434,14 @@ def _execute_gtest_target(
         raise CoverageError(
             f"{target['name']}: stale GoogleTest execution XML exists: {result_xml}"
         )
+    # A flag file: the joined filter can exceed one argument's limit (128 KiB on Linux).
+    flag_file = output / "gtest-filters" / f"{prefix}.flags"
+    flag_file.parent.mkdir(parents=True, exist_ok=True)
+    flag_file.write_text(f"--gtest_filter={':'.join(enabled)}\n", encoding="utf-8")
     _run_logged(
         [
             str(executable),
-            f"--gtest_filter={':'.join(enabled)}",
+            f"--gtest_flagfile={flag_file}",
             "--gtest_also_run_disabled_tests",
             f"--gtest_output=xml:{result_xml}",
         ],

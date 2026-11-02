@@ -21,7 +21,9 @@ CI helper scripts and workflow validation tools.
 - `run_source_coverage.py`: reconciles either the default `IntrinsicCpuTests`
   inventory or the `cpu-coverage` cohort that adds ordinary slow correctness,
   executes each selected GoogleTest producer once with its exact enabled-case
-  filter, reconciles exact execution from per-target XML, merges collision-safe
+  filter (passed in a `--gtest_flagfile` under `gtest-filters/`, since a joined
+  filter can exceed one argument's 128 KiB limit), reconciles exact execution
+  from per-target XML, merges collision-safe
   execution profiles, and writes the raw and normalized CPU coverage artifacts.
   Discovery profiles are isolated and retained for diagnostics but excluded
   from the merge. Coverage builds use atomic profile-counter updates because

@@ -2238,5 +2238,45 @@ class SourceCoverageTests(unittest.TestCase):
         inflate(report["coverage"].get("raw_totals", {}))
 
 
+
+class LongGoogleTestFilter(unittest.TestCase):
+    """A producer whose joined case filter exceeds one argument's limit (128 KiB on Linux) still runs."""
+
+    def test_a_filter_longer_than_one_argument_still_runs(self) -> None:
+        import run_source_coverage
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = [f"LongSuite{index // 100}.Case{index:05d}WithAVeryLongDescriptiveName" for index in range(20000)]
+            self.assertGreater(len(":".join(cases)), 131072)
+            # Runs the requested cases: from --gtest_filter or a --gtest_flagfile holding it.
+            fake = root / "fake_gtest.py"
+            fake.write_text(textwrap.dedent("""\
+                #!/usr/bin/env python3
+                import os, sys
+                from pathlib import Path
+                arguments = sys.argv[1:]
+                for argument in list(arguments):
+                    if argument.startswith("--gtest_flagfile="):
+                        arguments += Path(argument.split("=", 1)[1]).read_text().split()
+                selected = next(a for a in arguments if a.startswith("--gtest_filter=")).split("=", 1)[1].split(":")
+                output = Path(next(a for a in arguments if a.startswith("--gtest_output=xml:")).split(":", 1)[1])
+                output.parent.mkdir(parents=True, exist_ok=True)
+                rows = "".join(f'<testcase name="{c.split(".")[1]}" classname="{c.split(".")[0]}" status="run" result="completed"/>'
+                               for c in selected)
+                output.write_text(f'<testsuites><testsuite name="all">{rows}</testsuite></testsuites>')
+                Path(os.environ["LLVM_PROFILE_FILE"].replace("%m", "fake").replace("%p", str(os.getpid()))).write_bytes(b"x")
+            """), encoding="utf-8")
+            fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+            output = root / "coverage"
+            (output / "gtest-results").mkdir(parents=True)
+            target = {"name": "LongTests", "executable": str(fake), "working_directory": str(root),
+                      "cases": [{"gtest_filter": case, "disabled": False} for case in cases]}
+            profiles, result_xml = run_source_coverage._execute_gtest_target(
+                target, prefix="long", output=output, common_environment={})
+            self.assertTrue(profiles)
+            self.assertEqual(len(ET.parse(result_xml).getroot().findall(".//testcase")), len(cases))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
