@@ -93,6 +93,8 @@ export namespace Extrinsic::Runtime
         // The editor workspace plugin jobs belong to: the Sandbox gives its shell's, so every plugin run is a row of
         // its Jobs window, whether it started from a window or over MCP.
         void UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept;
+        // Before that workspace detaches: back to the host's own.
+        void ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept;
 
         // Adds plugin_load, plugin_unload, plugin_reload, plugin_list and app_quit, and with test hooks
         // plugin_host_identity; keeps the registry to commit and remove plugin tools later.

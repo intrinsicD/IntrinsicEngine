@@ -501,6 +501,8 @@ add_subdirectory(${INTRINSIC_GRAPHICS_RENDERER_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_GRAPHICS_RENDERERGRAPH_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_PLATFORM_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_RUNTIME_SOURCE_ROOT})
+# ARCH-022: feature plugins; their objects also link into static Sandboxes and into tests.
+add_subdirectory(plugins/bilateral_filter)
 if(NOT INTRINSIC_HEADLESS_NO_GLFW OR INTRINSIC_BUILD_TESTS)
     add_subdirectory(${INTRINSIC_APP_SOURCE_ROOT})
 endif()

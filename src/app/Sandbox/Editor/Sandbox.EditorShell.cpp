@@ -50,6 +50,8 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.PluginHost;
+import Extrinsic.Runtime.PointCloudEditing;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -2227,6 +2229,9 @@ namespace Extrinsic::Sandbox::Editor
             };
 
             Runtime::EditorWorkspaceAttachment Attachment{};
+            // ARCH-022: plugin runs and their edits go through this workspace, so they are rows of its Jobs window.
+            Runtime::PluginHostModule* PluginHost{nullptr};
+            Runtime::PointCloudEditingService* PointCloudEditing{nullptr};
             Runtime::EditorUiHost* Host{nullptr};
             Runtime::ViewCaptureModule* ViewCapture{nullptr};
             const Runtime::SelectionController* Selection{nullptr};
@@ -2960,6 +2965,10 @@ namespace Extrinsic::Sandbox::Editor
                     Detach();
                     return;
                 }
+                PluginHost = services.Find<Runtime::PluginHostModule>();
+                PointCloudEditing = services.Find<Runtime::PointCloudEditingService>();
+                if (PluginHost != nullptr) PluginHost->UseEditorWorkspace(Attachment);
+                if (PointCloudEditing != nullptr) PointCloudEditing->UseEditorWorkspace(Attachment);
                 FrameContribution = Host->RegisterFrameContribution(
                     [this]
                     {
@@ -2997,6 +3006,10 @@ namespace Extrinsic::Sandbox::Editor
                 Interaction = nullptr;
                 ConfigControl = nullptr;
                 UserCaptureTicket = 0u;
+                if (PluginHost != nullptr) PluginHost->ReleaseEditorWorkspace(Attachment);
+                if (PointCloudEditing != nullptr) PointCloudEditing->ReleaseEditorWorkspace(Attachment);
+                PluginHost = nullptr;
+                PointCloudEditing = nullptr;
                 Attachment.Detach();
             }
         };

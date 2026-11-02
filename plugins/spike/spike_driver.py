@@ -223,11 +223,13 @@ def arguments(description: str) -> argparse.Namespace:
     return args
 
 
-def launch(args: argparse.Namespace, checks: Checks, scenario, expect_crash: bool = False
+def launch(args: argparse.Namespace, checks: Checks, scenario, expect_crash: bool = False,
+           flags: tuple[str, ...] = ("--plugin-test-hooks", "--no-startup-plugins"), client: type | None = None
            ) -> tuple[object, str, list[str]] | None:
-    """Runs scenario(agent) against a Sandbox started with the driver's environment and waits for its exit.
-    Returns (exit code, stderr, lifecycle events), or None when the environment is not ready. With expect_crash
-    the caller judges the exit; the clean-exit checks are skipped."""
+    """Runs scenario(agent) against a Sandbox started with the driver's environment and `flags`, and waits for its
+    exit. Returns (exit code, stderr, lifecycle events), or None when the environment is not ready. With
+    expect_crash the caller judges the exit; the clean-exit checks are skipped. The default flags load no
+    built-in plugin, so the fixture plugin is the only one. `client` is the Agent class the scenario gets."""
     out, build = args.out, args.build
     ready = [checks.check("environment: DISPLAY is set", bool(os.environ.get("DISPLAY")), os.environ.get("DISPLAY")),
              checks.check("environment: the Vulkan ICD exists", args.icd.is_file(), str(args.icd)),
@@ -248,10 +250,10 @@ def launch(args: argparse.Namespace, checks: Checks, scenario, expect_crash: boo
                UBSAN_OPTIONS="print_stacktrace=1")
     with (out / "sandbox.stdout").open("wb") as stdout, (out / "sandbox.stderr").open("wb") as stderr:
         sandbox = subprocess.Popen([str(build / "bin/ExtrinsicSandbox"), "--agent-socket", str(out / "agent.sock"),
-                                    "--agent-root", str(out), "--plugin-test-hooks"],
+                                    "--agent-root", str(out), *flags],
                                    cwd=REPO, env=env, stdout=stdout, stderr=stderr)
         try:
-            scenario(Agent(out / "agent.sock", args.deadline))
+            scenario((client or Agent)(out / "agent.sock", args.deadline))
         except Exception as error:  # a crash or a protocol failure is a failed check, not a driver traceback
             checks.check("driver: the session completed", False, f"{type(error).__name__}: {error}")
         try:

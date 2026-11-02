@@ -93,7 +93,6 @@ export namespace Extrinsic::Runtime
         Parameterization,
         BooleanCSG,
         Registration,
-        BilateralFilter,
         OutlierEstimation,
         KernelDensity,
         StatisticalOutlierRemoval,

@@ -36,7 +36,7 @@ correctness_tests:
   - ../../../tests/unit/geometry/Test.KeypointAnalysis.cpp
   - ../../../tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
   - ../../../tests/unit/geometry/Test.BilateralPointFilter.cpp
-  - ../../../tests/contract/runtime/Test.BilateralFilterOperations.cpp
+  - ../../../tests/contract/runtime/Test.BilateralFilterPlugin.cpp
   - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
   - ../../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
 benchmarks:

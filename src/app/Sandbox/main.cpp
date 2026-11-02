@@ -31,7 +31,9 @@ import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.PhysicsModule;
+import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.PluginHost;
+import Extrinsic.Runtime.PointCloudEditing;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -56,6 +58,8 @@ namespace
         std::optional<Extrinsic::Runtime::AgentServerOptions> Agent{};
         // ARCH-022: the plugin host's fault injection and probes, for the fixture plugin's drivers.
         bool PluginTestHooks = false;
+        // ARCH-022: without the built-in plugins (the fixture plugin's drivers load their own).
+        bool NoStartupPlugins = false;
         bool Valid = true;
         std::string Error{};
     };
@@ -132,6 +136,10 @@ namespace
             else if (arg == "--plugin-test-hooks")
             {
                 parsed.PluginTestHooks = true;
+            }
+            else if (arg == "--no-startup-plugins")
+            {
+                parsed.NoStartupPlugins = true;
             }
             else if (arg == "--agent-readonly")
             {
@@ -408,6 +416,42 @@ namespace
     }
 }
 
+#if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
+// The bilateral filter plugin linked into a static Sandbox (plugins/bilateral_filter).
+extern "C" bool intrinsic_bilateral_filter_register(Extrinsic::Runtime::PluginRegistrations& staged,
+                                                    std::string& error) noexcept;
+extern "C" void intrinsic_bilateral_filter_shutdown() noexcept;
+#endif
+
+namespace
+{
+    // ARCH-022: the bilateral filter plugin, opened before the config boot so its section's saved payload loads.
+    // Shared builds dlopen the build beside the executable (it can be reloaded); static builds register it
+    // in-process. A plugin that cannot open leaves the Sandbox without it, with the reason on stderr.
+    std::optional<Extrinsic::Runtime::StagedPlugin> StageBilateralFilter(const std::string_view argv0)
+    {
+        std::unique_ptr<Extrinsic::Runtime::PluginImage> image;
+        std::string error;
+#if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
+        (void)argv0;
+        image = Extrinsic::Runtime::MakeInProcessPlugin(&intrinsic_bilateral_filter_register,
+                                                        &intrinsic_bilateral_filter_shutdown);
+#else
+        std::error_code ec;
+        auto exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+        if (ec) exe = std::filesystem::absolute(std::filesystem::path{argv0}, ec);
+        const auto path = exe.parent_path().parent_path() / "plugins" / "libIntrinsicBilateralFilterPlugin.so";
+        Extrinsic::Runtime::AgentOperationOutcome failure{};
+        image = Extrinsic::Runtime::OpenSharedPlugin(path.string(), {}, failure);
+        if (image == nullptr) error = failure.Text;
+#endif
+        std::optional<Extrinsic::Runtime::StagedPlugin> staged;
+        if (image != nullptr) staged = Extrinsic::Runtime::StagePlugin(std::move(image), error);
+        if (!staged) std::cerr << "bilateral filter plugin not loaded: " << error << '\n';
+        return staged;
+    }
+}
+
 int main(int argc, char** argv)
 {
     std::vector<std::string_view> args{};
@@ -427,15 +471,24 @@ int main(int argc, char** argv)
     auto physicsModule =
         std::make_unique<Extrinsic::Runtime::PhysicsModule>();
     Extrinsic::Runtime::PhysicsModule* const physics = physicsModule.get();
-    auto configControl =
-        std::make_unique<Extrinsic::Runtime::EngineConfigControl>(
-            Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry({
-                .Physics =
-                    [physics](const Extrinsic::Runtime::PhysicsModuleConfig& value)
-                    {
-                        (void)physics->ApplyConfig(value);
-                    },
-            }));
+    auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry({
+        .Physics =
+            [physics](const Extrinsic::Runtime::PhysicsModuleConfig& value)
+            {
+                (void)physics->ApplyConfig(value);
+            },
+    });
+    std::optional<Extrinsic::Runtime::StagedPlugin> startup;
+    if (!cli.NoStartupPlugins) startup = StageBilateralFilter(args.front());
+    if (startup)
+    {
+        // Its sections join the boot registry; the host commits the rest of its registrations when it resolves.
+        for (auto& section : startup->Registrations.ConfigSections)
+            if (!sections.Register(std::move(section)))
+                std::cerr << "bilateral filter plugin: a config section name is taken\n";
+        startup->Registrations.ConfigSections.clear();
+    }
+    auto configControl = std::make_unique<Extrinsic::Runtime::EngineConfigControl>(std::move(sections));
     auto boot = Extrinsic::Runtime::ResolveEngineConfigForBoot(
         args,
         configControl->SectionRegistry());
@@ -461,7 +514,9 @@ int main(int argc, char** argv)
     }
 
     auto pluginHost = std::make_unique<Extrinsic::Runtime::PluginHostModule>(Extrinsic::Runtime::PluginHostOptions{
-        .TestHooks = cli.PluginTestHooks, .RequestExit = [&engine] { engine.RequestExit(); }});
+        .TestHooks = cli.PluginTestHooks,
+        .RequestExit = [&engine] { engine.RequestExit(); },
+        .Startup = std::move(startup)});
     if (cli.Agent)
     {
         auto agentOptions = *cli.Agent;
@@ -483,6 +538,7 @@ int main(int argc, char** argv)
     engine.EmplaceModule<Extrinsic::Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Extrinsic::Runtime::AssetWorkflowModule>();
     engine.EmplaceModule<Extrinsic::Runtime::TextureBakeModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::PointCloudEditingModule>();
     // Its name sorts last, so it shuts down first, while the services its plugin registered with are alive.
     engine.AddModule(std::move(pluginHost));
     engine.Initialize();

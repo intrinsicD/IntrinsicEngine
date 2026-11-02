@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Ratchet the feature boundaries of the architecture target (ARCH-022, rules R1 and R2).
 
-R1: files under src/runtime and src/app, outside plugin folders, that name two or more of the
-operations in the `run_operation` tool's `operation` enum (tests/data/agent_declared_tool_schemas.json).
+R1: files under src/runtime and src/app, outside plugin folders, that name two or more features: the
+operations in the `run_operation` tool's `operation` enum (tests/data/agent_declared_tool_schemas.json)
+and the plugins, by their folder name under plugins/ (a feature that became a plugin left the enum).
 A name matches as its snake_case form not adjacent to [A-Za-z0-9], or as its PascalCase form not
 preceded by an uppercase letter and not followed by a lowercase one (so it is found inside
 identifiers such as `ApplyEditorKernelDensityConfig`). Comments and strings count: they name it too.
@@ -201,9 +202,15 @@ def baseline_history(root: Path) -> list[dict]:
     return versions
 
 
+def feature_names(root: Path, folders: list[str]) -> list[str]:
+    names = operation_names(root)
+    plugins = [Path(f).name for f in folders if f.startswith("plugins/") and NAME_RE.fullmatch(Path(f).name)]
+    return names + [name for name in plugins if name not in names]
+
+
 def check(root: Path) -> tuple[list[str], list[str]]:
     folders = plugin_folders(root)
-    hubs = measure_r1(root, name_matchers(operation_names(root)), folders)
+    hubs = measure_r1(root, name_matchers(feature_names(root, folders)), folders)
     r2 = measure_r2(root, folders)
     try:
         baseline = parse_baseline((root / BASELINE).read_text(), str(BASELINE))

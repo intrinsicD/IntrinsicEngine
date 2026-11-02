@@ -1,4 +1,4 @@
-// Compiles BilateralFilter, KeypointAnalysis, DescriptorAnalysis, PointConstruction config codecs together to share JSON work.
+// Compiles KeypointAnalysis, DescriptorAnalysis, PointConstruction config codecs together to share JSON work.
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -14,7 +14,6 @@ import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
-import Extrinsic.Runtime.BilateralFilterConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
@@ -29,20 +28,6 @@ namespace Extrinsic::Runtime
         constexpr Geometry::PropertyValueKind kFloatKind[]{Geometry::PropertyValueKind::Float};
         constexpr Geometry::PropertyValueKind kUInt32Kind[]{Geometry::PropertyValueKind::UInt32};
         constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
-        constexpr std::string_view kBilateralFilterBackend[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
-        constexpr std::string_view kBilateralFilterBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
-        constexpr ConfigFieldSpec kBilateralFilterFields[]{
-            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
-            {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors."},
-            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
-            {.Name = "iterations", .Type = ConfigFieldType::UInt, .Description = "Iterations.", .Min = 0, .Max = 100},
-            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kBilateralFilterBackendNames, .EnumValues = kBilateralFilterBackend},
-            {.Name = "spatial_sigma", .Type = ConfigFieldType::Float, .Description = "Zero selects automatic spatial sigma; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "normal_sigma", .Type = ConfigFieldType::Float, .Description = "Nonnegative normal sigma; positive values must remain positive in float storage. The method floors it to 1e-6.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions, normals and output must share an element domain.", .RefKinds = kVec3Kind},
-            {.Name = "normals", .Type = ConfigFieldType::PropertyRef, .Description = "Normals.", .RefKinds = kVec3Kind},
-            {.Name = "output", .Type = ConfigFieldType::PropertyRef, .Description = "May replace positions; cannot overwrite a normal input distinct from the positions input.", .RefKinds = kVec3Kind},
-        };
         constexpr std::string_view kKeypointAnalysisBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh", "vulkan_compute"};
         constexpr std::string_view kKeypointAnalysisBackendNames[]{"CPU KD-tree", "CPU LBVH (cached)", "Vulkan LBVH neighborhoods", "Vulkan"};
         constexpr ConfigFieldSpec kKeypointAnalysisFields[]{
@@ -96,72 +81,7 @@ namespace Extrinsic::Runtime
             {.Name = "normals", .Type = ConfigFieldType::PropertyRef, .Description = "For Hoppe with estimate_normals disabled, supplied normals must share the position domain.", .RefKinds = kVec3Kind},
         };
 
-        using Json=nlohmann::json;
-        BilateralFilterConfig ParseBilateralFilterConfig(const Json& data)
-        {
-            BilateralFilterConfig c;c.StableEntityId=data.at("entity");
-            for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(BilateralFilterBackend(i)))c.Backend=BilateralFilterBackend(i);
-            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("normals"),c.Normals);ConfigDetail::DecodePointPropertyRef(data.at("output"),c.Output);
-            c.KNeighbors=data.at("k_neighbors");
-            c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.SpatialSigma=data.at("spatial_sigma");c.NormalSigma=data.at("normal_sigma");c.Iterations=data.at("iterations");
-            return c;
-        }
     }
-    const char* ToString(BilateralFilterBackend b) noexcept
-    {
-        switch(b){case BilateralFilterBackend::CpuOctree:return "cpu_octree";case BilateralFilterBackend::CpuLBVH:return "cpu_lbvh";case BilateralFilterBackend::VulkanLBVH:return "vulkan_lbvh";}
-        return "invalid";
-    }
-    std::string SerializeBilateralFilterConfig(const BilateralFilterConfig& c)
-    {
-        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
-                    {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"normals",ConfigDetail::EncodePointPropertyRef(c.Normals)},{"output",ConfigDetail::EncodePointPropertyRef(c.Output)},
-                    {"k_neighbors",c.KNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-                    {"spatial_sigma",c.SpatialSigma},{"normal_sigma",c.NormalSigma},{"iterations",c.Iterations}});
-    }
-    Core::Config::EngineConfigSectionValidationResult ValidateBilateralFilterConfigSection(
-        std::string_view payload,std::string_view,std::string_view subject)
-    {
-        using namespace Core::Config;
-        using ConfigDetail::RejectConfigSection;
-        auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeBilateralFilterConfig({}), true);
-        if (auto error = ConfigDetail::ValidatePointConfigFields(
-            input, data, "Bilateral filter config must be an object.", "Unknown output field: ",
-            kBilateralFilterFields))
-            return RejectConfigSection(subject, std::move(*error));
-        if(!ConfigDetail::InConfigFieldRange(kBilateralFilterFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()))
-            return RejectConfigSection(subject, "GPU query batch size must be 1..16384.");
-        if(!ConfigDetail::IsConfigFieldToken(kBilateralFilterFields, "backend", data["backend"]))return RejectConfigSection(subject, "Unknown output backend.");
-        if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
-            data, kBilateralFilterFields))
-            return RejectConfigSection(subject, std::move(*error));
-        if(!ConfigDetail::InConfigFieldRange(kBilateralFilterFields, "iterations", data["iterations"].get<double>())) return RejectConfigSection(subject, "Bilateral iterations must be 0..100.");
-        for(auto key:{"spatial_sigma","normal_sigma"})
-            if(data[key].get<double>()>0 && data[key].get<float>()==0)
-                return RejectConfigSection(subject, std::string(key)+" must remain positive in float storage.");
-        if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
-            data, kBilateralFilterFields))
-            return RejectConfigSection(subject, std::move(*error));
-        if(data["positions"]["domain"]!=data["output"]["domain"] || data["positions"]["domain"]!=data["normals"]["domain"])
-            return RejectConfigSection(subject, "Positions, normals and output must share an element domain.");
-        if(data["output"]["name"]==data["normals"]["name"] && data["positions"]["name"]!=data["normals"]["name"])
-            return RejectConfigSection(subject, "Output cannot overwrite a distinct normal input.");
-        return ConfigDetail::AcceptConfigSection(SerializeBilateralFilterConfig(ParseBilateralFilterConfig(data)), input.size());
-    }
-    std::optional<BilateralFilterConfig> GetBilateralFilterConfig(const Core::Config::EngineConfig& c)
-    {
-        return ConfigDetail::GetPointConfig(c, kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1u, ValidateBilateralFilterConfigSection, ParseBilateralFilterConfig);
-    }
-    void SetBilateralFilterConfig(Core::Config::EngineConfig& c,const BilateralFilterConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
-            kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1, SerializeBilateralFilterConfig(value)));}
-    std::span<const ConfigFieldSpec> BilateralFilterConfigFieldSpecs() noexcept
-    { return kBilateralFilterFields; }
-    Core::Config::EngineConfigSectionRegistration MakeBilateralFilterConfigSectionRegistration()
-    {return ConfigDetail::MakeSectionRegistration(
-            kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1, SerializeBilateralFilterConfig({}), ValidateBilateralFilterConfigSection,
-            ConfigDetail::BuildSectionSchemaJson(kBilateralFilterConfigSectionSchemaId, "BilateralFilter", "Validated BilateralFilter configuration.",
-                kBilateralFilterFields, ConfigDetail::ParseConfigJson(SerializeBilateralFilterConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime

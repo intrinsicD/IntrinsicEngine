@@ -50,7 +50,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyT
         --check-source src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
         --check-source src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
         --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
-        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
         --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         # RuntimeReuseDriftGuard lets only sources in this boundary keep a serialized v:position default literal.
         --check-source src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm
@@ -117,7 +116,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointFieldResul
         --forbid-module Geometry.PointCloud.Utils
         --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
-        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
         --check-source src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp
@@ -307,7 +305,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshSupport
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSet
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Processing.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp
         --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Geometry.HalfedgeMesh
         --forbid-module Geometry.MeshSoup
@@ -385,14 +382,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Discovery
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetTests
-        --check-source tests/contract/runtime/Test.BilateralFilterOperations.cpp
-        --forbid-module Extrinsic.Runtime.PointAnalysisOperations
-        --forbid-module Extrinsic.Runtime.PointFieldOperations
-        --forbid-module Extrinsic.Runtime.KernelDensityConfig
-        --forbid-module Extrinsic.Runtime.PointSpacingConfig
-        --forbid-module Extrinsic.Runtime.PointConstructionOperations
-        --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointConstructionTests
         --check-source tests/contract/runtime/Test.PointConstructionOperations.cpp
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
@@ -570,7 +559,7 @@ set_tests_properties(ProcessingCompilationLocality.Family ProcessingCompilationL
     ProcessingCompilationLocality.ParameterizationSolve
     ProcessingCompilationLocality.PointSet ProcessingCompilationLocality.PointConstruction
     ProcessingCompilationLocality.PointCloudService ProcessingCompilationLocality.Discovery
-    ProcessingCompilationLocality.PointSetTests ProcessingCompilationLocality.PointConstructionTests
+    ProcessingCompilationLocality.PointConstructionTests
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 
 # The runtime's frame-pacing and recipe-activation data contracts, and the
@@ -896,7 +885,6 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.TestContext
         --check-source tests/contract/runtime/Test.NormalEstimation.cpp
         --check-source tests/contract/runtime/Test.OutlierAnalysis.cpp
         --check-source tests/contract/runtime/Test.KernelDensityOperations.cpp
-        --check-source tests/contract/runtime/Test.BilateralFilterOperations.cpp
         --check-source tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
         --check-source tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp
         --check-source tests/contract/runtime/Test.DensityWeightOperations.cpp
@@ -1370,7 +1358,6 @@ if(TARGET ExtrinsicRuntime)
         Test.NormalEstimation.cpp
         Test.OutlierAnalysis.cpp
         Test.KernelDensityOperations.cpp
-    Test.BilateralFilterOperations.cpp
     Test.KeypointAnalysisOperations.cpp
     Test.DescriptorAnalysisOperations.cpp
     Test.DensityWeightOperations.cpp
@@ -1384,6 +1371,8 @@ if(TARGET ExtrinsicRuntime)
         Test.CameraModule.cpp
         Test.RuntimeCameraControllers.cpp
         Test.PluginHost.cpp
+        Test.PointCloudEditing.cpp
+        Test.BilateralFilterPlugin.cpp
         Test.RuntimeConfigControl.cpp
         Test.RuntimeEngineConfigBoot.cpp
         Test.RuntimeInputActions.cpp
@@ -1446,6 +1435,8 @@ if(TARGET ExtrinsicRuntime)
     )
     # Test.QueuedEditorJobContract.cpp scans the editor operation sources (RUNTIME-313 drift guard).
     target_compile_definitions(RuntimeContractTestObjs PRIVATE INTRINSIC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    # ARCH-022: Test.BilateralFilterPlugin.cpp links the bilateral filter plugin's objects (in-process plugin).
+    target_link_libraries(RuntimeContractTestObjs PRIVATE IntrinsicBilateralFilterPluginObjects)
 
     intrinsic_resolve_test_sources(_runtime_contract_slow_test_sources
         SEARCH_DIRS contract/runtime
@@ -1913,13 +1904,15 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.VertexNormalsTransactionGpuSmoke.cpp
                 integration/graphics/Test.PointNormalsTransactionGpuSmoke.cpp
                 integration/graphics/Test.GpuTransactionCancelSmoke.cpp
+                integration/graphics/Test.BilateralFilterPluginGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+             IntrinsicBilateralFilterPluginObjects
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
     target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners)
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
         OBJECTS PointLBVHGpuTestObjs RuntimeTestModuleSupportObjs
-        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicBilateralFilterPluginObjects
         LABELS integration graphics gpu vulkan
     )
     intrinsic_add_glsl_shaders(IntrinsicPointLBVHGpuTests)
@@ -2403,7 +2396,7 @@ endif()
 if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
         OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs RuntimeTestModuleSupportObjs
-        LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference
+        LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference IntrinsicBilateralFilterPluginObjects
         LABELS contract runtime
     )
 endif()
@@ -3048,7 +3041,6 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
-        "  set_tests_properties(PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.KeypointVulkanComputePublishesAcrossDomains PointLBVHGpuSmoke.KeypointVulkanComputeRejectsStaleCancellationAndIgnoresHybridCapacity PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.DescriptorPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.DescriptorRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.DescriptorLowestIdCapSupportsDenseRadius PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample PROPERTIES TIMEOUT 120)\n"

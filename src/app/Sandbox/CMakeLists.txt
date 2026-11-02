@@ -54,6 +54,14 @@ if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         ExtrinsicSandboxEditor
         nlohmann_json::nlohmann_json
     )
+    # ARCH-022: the bilateral filter plugin. Shared builds load (and reload) its MODULE beside the executable;
+    # static builds link its objects and register it in-process.
+    if(BUILD_SHARED_LIBS)
+        add_dependencies(ExtrinsicSandbox IntrinsicBilateralFilterPlugin)
+    else()
+        target_link_libraries(ExtrinsicSandbox PRIVATE IntrinsicBilateralFilterPluginObjects)
+        target_compile_definitions(ExtrinsicSandbox PRIVATE INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
+    endif()
 
     include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
 

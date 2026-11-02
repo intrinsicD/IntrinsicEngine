@@ -215,10 +215,9 @@ TEST(GpuPositionsAccept, SuccessiveEditsReplayAndRejectForeignOutputChanges)
     EXPECT_EQ(mixed.History.UndoCount(), 2u);
     EXPECT_EQ(mixed.History.RedoCount(), 0u);
 
-    // Local-watch authors must also preserve an earlier position command's legal undo prefix.
-    for (const bool cpd : {true, false})
+    // Local-watch authors must also preserve an earlier position command's legal undo prefix. (The bilateral filter,
+    // the other author here, is a plugin now; its publication goes through the point-cloud editing service.)
     {
-        SCOPED_TRACE(cpd ? "Positions -> CPD" : "Positions -> Bilateral");
         Harness reverse;
         reverse.Props().Get<glm::vec3>("v:position").Vector() =
             {{0, 0, 0}, {1, 0, .2f}, {0, 1, 0}, {1, 1, 0}, {.5f, .5f, .1f}};
@@ -236,32 +235,17 @@ TEST(GpuPositionsAccept, SuccessiveEditsReplayAndRejectForeignOutputChanges)
         ASSERT_EQ(delivered->Status, R::EditorCommandStatus::Applied) << delivered->Message;
         auto direct = reverse.Context;
         direct.JobCommands = {};
-        if (cpd)
-        {
-            const auto target = Intrinsic::Tests::MakePointDomainSource(reverse.Scene, Domain::PointCloudPoint);
-            Intrinsic::Tests::PointDomainProperties(reverse.Scene, target, Domain::PointCloudPoint)
-                .GetOrAdd<glm::vec3>("v:position").Vector() = reverse.Shifted({.1f, .2f, .3f});
-            R::CoherentPointDriftConfig config;
-            config.SourceStableEntityId = reverse.Id();
-            config.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
-            config.OutlierWeight = 0;
-            config.Output = R::CoherentPointDriftOutput::Positions;
-            config.EStep = R::CoherentPointDriftEStep::Reference;
-            const auto registered = R::ApplyEditorCoherentPointDriftCommand(R::BindEditorProcessingCommands(direct), config);
-            ASSERT_TRUE(registered.Succeeded()) << registered.Message;
-        }
-        else
-        {
-            R::BilateralFilterConfig config;
-            config.StableEntityId = reverse.Id();
-            config.Positions = config.Output = reverse.Positions;
-            config.Normals = {Domain::PointCloudPoint, "v:normal", K::Vec3};
-            config.KNeighbors = 2;
-            config.SpatialSigma = 2;
-            config.Iterations = 3;
-            const auto filtered = R::ApplyEditorBilateralFilterCommand(R::BindEditorProcessingCommands(direct), config);
-            ASSERT_TRUE(filtered.Succeeded()) << filtered.Message;
-        }
+        const auto target = Intrinsic::Tests::MakePointDomainSource(reverse.Scene, Domain::PointCloudPoint);
+        Intrinsic::Tests::PointDomainProperties(reverse.Scene, target, Domain::PointCloudPoint)
+            .GetOrAdd<glm::vec3>("v:position").Vector() = reverse.Shifted({.1f, .2f, .3f});
+        R::CoherentPointDriftConfig config;
+        config.SourceStableEntityId = reverse.Id();
+        config.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
+        config.OutlierWeight = 0;
+        config.Output = R::CoherentPointDriftOutput::Positions;
+        config.EStep = R::CoherentPointDriftEStep::Reference;
+        const auto registered = R::ApplyEditorCoherentPointDriftCommand(R::BindEditorProcessingCommands(direct), config);
+        ASSERT_TRUE(registered.Succeeded()) << registered.Message;
         ASSERT_NE(reverse.Rows(), movedRows);
         ASSERT_EQ(reverse.History.UndoCount(), 2u);
         ASSERT_TRUE(reverse.History.Undo().Succeeded());

@@ -324,6 +324,13 @@ partitions not counted).
   4. the job form (S3) before the GPU-heavy features.
 - lld in CI: its link share is measured the next time CI changes anyway.
 
+**State (2026-11-02):** step 1 is done: the plugin host is a module service. Step 2's feature is the bilateral point
+filter ([plugin](bilateral-point-filter.md), `plugins/bilateral_filter`): it owns its config section, its MCP tools
+and its window, and runs as plugin jobs of the editor's Jobs window. What it needs from the editor (capture,
+indices, GPU kNN pages, publication with undo) is the module service `PointCloudEditingService`, which later point
+plugins reuse. The Sandbox loads it at startup (static builds link it). The domain Processing menus' entries for it
+are gone: they were Sandbox redirects, which a plugin cannot register.
+
 **Open, for the first plan** (`ARCH-022`):
 1. **Numeric targets for R4 and R6**: set on 2026-10-31 (table above).
 2. **Order of steps.** The proposal starts with the riskiest assumption:

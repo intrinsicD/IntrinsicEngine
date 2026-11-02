@@ -1,8 +1,9 @@
-// Point-set commands and copied results for bilateral filtering and progressive
-// Poisson sampling. Both consume only the shared processing context, choose a
-// CPU/GPU backend with truthful requested/actual/fallback reporting, and publish
-// same-domain properties on the originating element domain without topology
-// changes. Progressive Poisson uses the canonical serialized playground config.
+// Point-set commands and copied results for progressive Poisson sampling. It
+// consumes only the shared processing context, chooses a CPU/GPU backend with
+// truthful requested/actual/fallback reporting, and publishes same-domain
+// properties on the originating element domain without topology changes. It uses
+// the canonical serialized playground config. (The bilateral point filter that
+// shared this family is a plugin now.)
 module;
 #include <cstddef>
 #include <cstdint>
@@ -13,32 +14,12 @@ module;
 export module Extrinsic.Runtime.PointSetOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
-export import Extrinsic.Runtime.BilateralFilterConfig;
 export import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 export namespace Extrinsic::Runtime
 {
-    struct EditorBilateralFilterResult
-    {
-        EditorCommandStatus Status{EditorCommandStatus::NoChange};
-        BilateralFilterBackend RequestedBackend{BilateralFilterBackend::CpuOctree};
-        GeometryPropertyRef Output{};
-        std::string ActualBackend{}, Message{};
-        std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
-        float SpatialSigmaUsed{};
-        // Diagnostics describe the last completed pass; zero before any pass.
-        std::size_t PointsFiltered{}, DegenerateNormals{};
-        float AverageDisplacement{}, MaxDisplacement{};
-        std::uint32_t CompletedIterations{};
-        std::size_t WorkspaceBuilds{};
-        bool IndexReused{};
-        std::size_t GpuQueryBatches{};
-        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
-        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
-    };
-
     [[nodiscard]] const char*
     DebugNameForProgressivePoissonChannel(ProgressivePoissonPlaygroundChannel channel) noexcept;
 
@@ -84,7 +65,7 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    enum class EditorPointSetResultSlot : std::uint8_t { BilateralFilter, ProgressivePoisson };
+    enum class EditorPointSetResultSlot : std::uint8_t { ProgressivePoisson };
     // Private workspace bindings borrow incomplete containers so sibling features
     // need not import these method records.
     extern "C++"
@@ -92,12 +73,10 @@ export namespace Extrinsic::Runtime
         struct EditorPointSetResultSinks
         {
             std::function<void(EditorPointSetResultSlot)> DismissResult{};
-            std::function<void(EditorBilateralFilterResult)> BilateralFilter{};
             std::function<void(EditorProgressivePoissonResult)> ProgressivePoisson{};
         };
         struct EditorPointSetResultsSnapshot
         {
-            std::optional<EditorBilateralFilterResult> LastBilateralFilterResult{};
             std::optional<EditorProgressivePoissonResult> LastProgressivePoissonResult{};
         };
     }
@@ -108,19 +87,6 @@ export namespace Extrinsic::Runtime
         EditorPointSetResultsSnapshot Results{};
     };
     [[nodiscard]] EditorPointSetPreparedFrame PrepareEditorPointSetFrame(const EditorWorkspaceAttachment&);
-
-    // Apply returns immediate outcomes directly. onComplete receives only the
-    // terminal outcome of a newly queued job while its attachment remains active.
-    // Pending for an already active output observes that job and registers no
-    // additional callback. Configured Apply follows the same delivery contract.
-    [[nodiscard]] ActionReadiness PreviewEditorBilateralFilterCommand(const EditorProcessingCommands&, const BilateralFilterConfig&);
-    // Narrower than the shared point-input catalog: each candidate must also
-    // supply count-matched normals and trial-capture a distinct filtered output.
-    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorBilateralFilterInputCatalog(const EditorProcessingCommands&, std::uint32_t stableId);
-    [[nodiscard]] EditorBilateralFilterResult ApplyEditorBilateralFilterCommand(const EditorProcessingCommands&, const BilateralFilterConfig&, std::function<void(EditorBilateralFilterResult)> onComplete = {});
-    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorBilateralFilterConfig(const EditorProcessingCommands&, const BilateralFilterConfig&, std::string sourceId = {});
-    [[nodiscard]] std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(const EditorProcessingCommands&);
-    [[nodiscard]] EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(const EditorProcessingCommands&, std::function<void(EditorBilateralFilterResult)> onComplete = {});
 
     // Admission uses metadata only; apply checks finite values before submission.
     [[nodiscard]] ActionReadiness PreviewEditorProgressivePoissonCommand(

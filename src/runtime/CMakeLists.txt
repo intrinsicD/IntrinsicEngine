@@ -32,7 +32,6 @@ target_sources(${target_name}
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm
         Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
         Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
-        Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
         Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
@@ -81,6 +80,7 @@ target_sources(${target_name}
         Services/Runtime.UiHostTypes.cppm
         Services/Runtime.PluginContract.cppm
         Services/Runtime.PluginHost.cppm
+        Services/Runtime.PointCloudEditing.cppm
         Kernel/Runtime.Engine.cppm
         Config/Runtime.EngineConfigBoot.cppm
         Config/Runtime.EngineConfigControl.cppm
@@ -176,7 +176,6 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         Editor/Operations/Runtime.GpuTransactionLifecycle.cpp
-        Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp
         Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
         Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp
         Editor/Operations/Runtime.PointConstructionOperations.Processing.cpp
@@ -278,6 +277,7 @@ target_sources(${target_name}
         Agent/Runtime.AgentServer.cpp
         Services/Runtime.PluginContract.cpp
         Services/Runtime.PluginHost.cpp
+        Services/Runtime.PointCloudEditing.cpp
         Kernel/Runtime.InputActions.cpp
         Kernel/Runtime.KernelEvents.cpp
         Kernel/Runtime.Module.cpp

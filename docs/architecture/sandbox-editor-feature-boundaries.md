@@ -962,7 +962,7 @@ outputs must be exactly representable in the selected storage.
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
 `.Normals`, `.NormalTests`, `.MeshSupport`, `.Registration`, `.Parameterization`,
 `.RegistrationTests`, `.MeshField`, `.MeshTopology`, `.MeshFieldTests`,
-`.GeodesicResults`, `.SegmentationDiagnostics`, `.PointSet`, `.PointSetResults`, `.PointAnalysisResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
+`.GeodesicResults`, `.SegmentationDiagnostics`, `.PointSet`, `.PointSetResults`, `.PointAnalysisResults`, `.PointConstruction`, `.PointConstructionTests`,
 `.PointCloudService`, `.Discovery` and `.UnrelatedAdapters` inspect actual
 Clang scanner requirements and CMake module closures through
 `tools/analysis/compile_hotspots.py`. Missing, ambiguous or stale source scans

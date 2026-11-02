@@ -23,7 +23,7 @@ Start with [Runtime architecture](../../docs/architecture/runtime.md), the
 | `Modules/` | Feature configuration and runtime modules, including the ECS–physics bridge. |
 | `Cameras/`, `Gizmos/`, `ImGui/`, `Visualization/` | Camera/input adapters, manipulation, editor overlay handoff and visualization recipes. |
 | `Agent/` | The local agent protocol, server and command routing. |
-| `Services/` | Service-level contracts: UI host types, the plugin contract and the plugin host (ARCH-022). |
+| `Services/` | Service-level contracts: UI host types, the plugin contract, the plugin host and the point-cloud editing service plugins edit through (ARCH-022). |
 
 These directories group responsibilities within the Runtime target. C++ module
 names and public interfaces identify API ownership.
@@ -71,7 +71,7 @@ Point-method owners document [normal estimation](../../docs/architecture/normal-
 [kernel density](../../docs/architecture/kernel-density.md),
 [point spacing](../../docs/architecture/point-spacing.md),
 [density weights](../../docs/architecture/density-weights.md),
-[bilateral filtering](../../docs/architecture/bilateral-point-filter.md),
+[bilateral filtering](../../docs/architecture/bilateral-point-filter.md) (a plugin, `plugins/bilateral_filter`),
 [keypoints](../../docs/architecture/keypoint-analysis.md),
 [descriptors](../../docs/architecture/descriptor-analysis.md), and
 [point construction](../../docs/architecture/point-construction.md).

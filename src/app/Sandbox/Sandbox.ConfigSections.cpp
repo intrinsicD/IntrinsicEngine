@@ -14,7 +14,6 @@ import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.PointSpacingConfig;
-import Extrinsic.Runtime.BilateralFilterConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
@@ -50,7 +49,6 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kOutlierAnalysisSection>()) ||
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kKernelDensitySection>()) ||
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kPointSpacingSection>()) ||
-            !registry.Register(Runtime::MakeBilateralFilterConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDescriptorAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDensityWeightConfigSectionRegistration()) ||

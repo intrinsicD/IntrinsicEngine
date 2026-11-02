@@ -34,7 +34,6 @@ import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Sandbox.ConfigSections;
-import Extrinsic.Runtime.BilateralFilterConfig;
 import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
@@ -1172,12 +1171,6 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
         bool (*Get)(const CoreConfig::EngineConfig&);
     };
     const Case cases[]{
-        {Runtime::kBilateralFilterConfigSectionName,
-            Runtime::kBilateralFilterConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c)
-            {
-                return Runtime::GetBilateralFilterConfig(c).has_value();
-            }},
         {Runtime::kKernelDensityConfigSectionName,
             Runtime::kKernelDensityConfigSectionSchemaId,
             [](const CoreConfig::EngineConfig& c)
@@ -1321,10 +1314,6 @@ namespace
 TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContract)
 {
     using namespace Extrinsic::Runtime;
-    ExpectPointConfigSectionContract<BilateralFilterConfig>(kBilateralFilterConfigSectionName,
-        kBilateralFilterConfigSectionSchemaId, SerializeBilateralFilterConfig, ValidateBilateralFilterConfigSection,
-        MakeBilateralFilterConfigSectionRegistration, SetBilateralFilterConfig, GetBilateralFilterConfig,
-        ZeroGpuQueryBatch<BilateralFilterConfig>);
     ExpectPointConfigSectionContract<KeypointAnalysisConfig>(kKeypointAnalysisConfigSectionName,
         kKeypointAnalysisConfigSectionSchemaId, SerializeKeypointAnalysisConfig, ValidateKeypointAnalysisConfigSection,
         MakeKeypointAnalysisConfigSectionRegistration, SetKeypointAnalysisConfig, GetKeypointAnalysisConfig,
@@ -1388,15 +1377,7 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         Writer Write;
         Validator Validate;
     };
-    const std::array<Family, 7> writers{{
-        {"BilateralFilter",
-            +[](const Runtime::GeometryPropertyRef& ref)
-            {
-                Runtime::BilateralFilterConfig config;
-                config.Positions = ref;
-                return Runtime::SerializeBilateralFilterConfig(config);
-            },
-            Runtime::ValidateBilateralFilterConfigSection},
+    const std::array<Family, 6> writers{{
         {"KernelDensity",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
@@ -1544,8 +1525,6 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
                   std::string::npos) << payload;
         EXPECT_EQ(payload.find('\n'), std::string::npos);
     };
-    check(Runtime::BilateralFilterConfig{}, &Runtime::BilateralFilterConfig::Positions,
-          Runtime::SerializeBilateralFilterConfig);
     check(Runtime::KernelDensityConfig{},
         &Runtime::KernelDensityConfig::Positions,
         Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>);
@@ -1591,17 +1570,6 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
         std::string_view PositionField{"positions"};
     };
     const std::array families{
-        Family{"BilateralFilter",
-            Runtime::ValidateBilateralFilterConfigSection,
-            "Bilateral filter config must be an object.",
-            "Unknown output field: ",
-            {"entity", "k_neighbors", "gpu_query_batch_size", "iterations"},
-            [](std::uint32_t id)
-            {
-                Runtime::BilateralFilterConfig c;
-                c.StableEntityId = id;
-                return Runtime::SerializeBilateralFilterConfig(c);
-            }},
         Family{"KernelDensity",
             Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
             "Kernel density config must be an object.",
@@ -1787,10 +1755,6 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
             Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
             {"scale_factor"},
             "Unknown radii backend."},
-        Family{"BilateralFilter",
-            Runtime::ValidateBilateralFilterConfigSection,
-            {"spatial_sigma", "normal_sigma"},
-            "Unknown output backend."},
         Family{"KernelDensity",
             Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
             {"bandwidth"},
@@ -1858,12 +1822,6 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
     reject(Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
         R"({"bandwidth":1e-50})",
         "Positive bandwidth must remain positive in float storage.");
-    reject(Runtime::ValidateBilateralFilterConfigSection, R"({"spatial_sigma":1e-50,"normal_sigma":-1})",
-        "normal_sigma must be a finite nonnegative float.");
-    reject(Runtime::ValidateBilateralFilterConfigSection, R"({"spatial_sigma":1e-50,"iterations":101})",
-        "Bilateral iterations must be 0..100.");
-    reject(Runtime::ValidateBilateralFilterConfigSection, R"({"normal_sigma":1e-50})",
-        "normal_sigma must remain positive in float storage.");
     reject(Runtime::ValidatePointConstructionConfigSection, R"({"kernel_sigma_scale":0})",
         "Kernel sigma scale must be positive.");
     reject(Runtime::ValidatePointConstructionConfigSection, R"({"kernel_sigma_scale":1e-50})",
@@ -1906,7 +1864,6 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
     constexpr std::string_view density =
         "Position and weight bindings need distinct canonical vec3/float properties on the same domain.";
     const std::array families{
-        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection, typed, domain},
         Family{"KernelDensity", Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>, typed, domain},
         Family{"PointSpacing", Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>, typed, domain},
         Family{"OutlierAnalysis", Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>, typed, domain},
@@ -1978,9 +1935,6 @@ TEST(SandboxConfigSections, PointPropertyFieldsPreserveKindsAndFirstErrorOrder)
         std::vector<std::pair<std::string, std::string>> Fields;
     };
     const std::array families{
-        Family{"BilateralFilter",
-            Runtime::ValidateBilateralFilterConfigSection,
-            {{"positions", "vec3"}, {"normals", "vec3"}, {"output", "vec3"}}},
         Family{"KernelDensity",
             Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
             {{"positions", "vec3"}, {"density", "float"}}},
@@ -2060,12 +2014,6 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
             EXPECT_EQ(serialize(*restored), serialize(requested));
         }
     };
-    {
-        SCOPED_TRACE("BilateralFilter");
-        using C = Runtime::BilateralFilterConfig;
-        check(C{}, {&C::Positions, &C::Normals, &C::Output}, Runtime::SetBilateralFilterConfig,
-            Runtime::GetBilateralFilterConfig, Runtime::SerializeBilateralFilterConfig);
-    }
     {
         SCOPED_TRACE("KernelDensity");
         using C = Runtime::KernelDensityConfig;

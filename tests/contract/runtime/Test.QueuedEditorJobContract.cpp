@@ -151,9 +151,6 @@ namespace
             check("Descriptor analysis", [&](auto done) {
                 return R::ApplyEditorDescriptorAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Normals = Normals(), .Outputs = R::MakeDescriptorOutputProperties(D::PointCloudPoint, "descriptor")}, done); });
-            check("Bilateral filter", [&](auto done) {
-                return R::ApplyEditorBilateralFilterCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-                    .Normals = Normals(), .Output = Ref("filtered", Geometry::PropertyValueKind::Vec3), .KNeighbors = 2}, done); });
             check("Point construction", [&](auto done) {
                 return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2}, done); });
@@ -250,10 +247,6 @@ TEST_F(QueuedEditorJobContract, RejectedLaterStageAbandonsTheQueuedStagesWithout
         return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
             .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
             .Backend = R::PointConstructionBackend::VulkanLBVH}, done); });
-    check("Bilateral filter", [&](auto done) {
-        return R::ApplyEditorBilateralFilterCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-            .Normals = Normals(), .Output = Ref("filtered", Geometry::PropertyValueKind::Vec3), .KNeighbors = 2,
-            .Iterations = 1, .Backend = R::BilateralFilterBackend::VulkanLBVH}, done); });
 }
 
 // Every later stage of a chain carries the run's first job token as EditorJobIdentity::Run, so a
@@ -286,10 +279,6 @@ TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
         return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
             .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
             .Backend = R::PointConstructionBackend::VulkanLBVH}, done); });
-    check("Bilateral filter", [&](auto done) {
-        return R::ApplyEditorBilateralFilterCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-            .Normals = Normals(), .Output = Ref("filtered", Geometry::PropertyValueKind::Vec3), .KNeighbors = 2,
-            .Iterations = 1, .Backend = R::BilateralFilterBackend::VulkanLBVH}, done); });
 }
 
 // RUNTIME-317: a queued job reports the backend domain its config requested (at submit) and,
@@ -595,9 +584,8 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         "ProcessingCompilationLocality.ConsolidationContracts",
     };
     // RUNTIME-349: kernel density and point spacing left the boundary and use kPosition.
-    constexpr std::array<std::string_view, 20> allowedPositionLiterals{
+    constexpr std::array<std::string_view, 19> allowedPositionLiterals{
         "GeometryIntegration/Runtime.GeometryProperty.Types.cpp",
-        "Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm",
         "Modules/Clustering/Runtime.ClusteringTypes.cppm",
         "Modules/Curvature/Runtime.MeshCurvatureConfig.cpp",
         "Modules/Curvature/Runtime.MeshCurvatureConfig.cppm",
@@ -741,5 +729,5 @@ TEST(QueuedEditorJobDriftGuard, EveryEditorJobIdentityNamesItsRequestedDomain)
                     << "an editor job identity names its config's requested backend domain: " << initializer;
             }
         }
-    EXPECT_GE(identities, 22u) << "the scan found the operations' identities";
+    EXPECT_GE(identities, 21u) << "the scan found the operations' identities"; // the bilateral filter is a plugin
 }

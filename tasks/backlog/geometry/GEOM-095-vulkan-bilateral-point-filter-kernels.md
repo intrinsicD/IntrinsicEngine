@@ -33,7 +33,7 @@ Existing owners and evidence:
 
 - [`src/geometry/Geometry.PointCloud.Utils.cpp`](../../../src/geometry/Geometry.PointCloud.Utils.cpp)
 - [`docs/architecture/bilateral-point-filter.md`](../../../docs/architecture/bilateral-point-filter.md)
-- [`src/runtime/Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp`](../../../src/runtime/Editor/Operations/Runtime.PointSetOperations.Bilateral.cpp)
+- [`plugins/bilateral_filter/BilateralFilter.Run.cpp`](../../../plugins/bilateral_filter/BilateralFilter.Run.cpp) (the filter is a plugin since ARCH-022)
 
 ## Engine integration
 

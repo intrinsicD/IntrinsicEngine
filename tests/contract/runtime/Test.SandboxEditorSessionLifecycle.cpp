@@ -40,6 +40,7 @@ import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSamplingConfig;
 import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointCloudEditing;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Asset.ImportRouter;
@@ -450,11 +451,11 @@ TEST(SandboxEditorSession, DismissClearsOneGeometryProcessingResultSlot)
                                            .ActualBackend = "cpu_lbvh", .Message = "named normals published"});
     ASSERT_TRUE(Runtime::PrepareEditorNormalFrame(attachment).Results.LastNormalEstimationResult);
     EXPECT_EQ(Runtime::PrepareEditorNormalFrame(attachment).Results.LastNormalEstimationResult->ActualBackend, "cpu_lbvh");
-    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.BilateralFilter));
-    prepared.ResultSinks.BilateralFilter({.Status = Runtime::EditorCommandStatus::Applied,
-                                           .ActualBackend = "cpu_lbvh", .Message = "positions filtered"});
-    ASSERT_TRUE(observe().LastBilateralFilterResult);
-    EXPECT_EQ(observe().LastBilateralFilterResult->ActualBackend, "cpu_lbvh");
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.ProgressivePoisson));
+    prepared.ResultSinks.ProgressivePoisson({.Status = Runtime::EditorCommandStatus::Applied,
+                                              .Message = "samples ranked"});
+    ASSERT_TRUE(observe().LastProgressivePoissonResult);
+    EXPECT_EQ(observe().LastProgressivePoissonResult->Message, "samples ranked");
 
     Runtime::EditorMeshSimplifyResult simplify{};
     simplify.Status = Runtime::EditorCommandStatus::GeometryProcessingFailed;
@@ -549,9 +550,9 @@ TEST(SandboxEditorSession, DismissClearsOneGeometryProcessingResultSlot)
     // Registration owns its own slot: dismissing it leaves sibling families alone.
     registration.ResultSinks.DismissResult();
     EXPECT_FALSE(Runtime::PrepareEditorRegistrationFrame(attachment).Results.LastRegistrationResult);
-    EXPECT_TRUE(observe().LastBilateralFilterResult);
-    prepared.ResultSinks.DismissResult(Runtime::EditorPointSetResultSlot::BilateralFilter);
-    EXPECT_FALSE(observe().LastBilateralFilterResult);
+    EXPECT_TRUE(observe().LastProgressivePoissonResult);
+    prepared.ResultSinks.DismissResult(Runtime::EditorPointSetResultSlot::ProgressivePoisson);
+    EXPECT_FALSE(observe().LastProgressivePoissonResult);
 
     // A dismissal sink copied out of a prepared frame must not reach into a
     // detached session, which is the same epoch rule every result sink obeys.
@@ -621,9 +622,6 @@ TEST(SandboxEditorSession, TypedResultSinksCopyDismissAndRejectExpiredAttachment
               &PointSetSinks::ProgressivePoisson,
               &PointSetResults::LastProgressivePoissonResult,
               PointSetSlot::ProgressivePoisson);
-        check(&Runtime::PrepareEditorPointSetFrame, unattachedPointSet,
-              &PointSetSinks::BilateralFilter,
-              &PointSetResults::LastBilateralFilterResult, PointSetSlot::BilateralFilter);
         check(&Runtime::PrepareEditorPointAnalysisFrame, unattachedAnalysis,
               &Runtime::EditorPointAnalysisResultSinks::DescriptorAnalysis,
               &Runtime::EditorPointAnalysisResultsSnapshot::LastDescriptorAnalysisResult,
@@ -636,27 +634,27 @@ TEST(SandboxEditorSession, TypedResultSinksCopyDismissAndRejectExpiredAttachment
         expired = Runtime::PrepareEditorPointSetFrame(attachment);
         expiredService = Runtime::PrepareEditorPointCloudServiceFrame(attachment);
         expiredParameterization = Runtime::PrepareEditorParameterizationFrame(attachment);
-        expired.ResultSinks.BilateralFilter({.Message = "before detach"});
+        expired.ResultSinks.ProgressivePoisson({.Message = "before detach"});
         ASSERT_TRUE(Runtime::PrepareEditorPointSetFrame(attachment)
-                        .Results.LastBilateralFilterResult);
+                        .Results.LastProgressivePoissonResult);
         attachment.Detach();
         const auto detached = Runtime::PrepareEditorPointSetFrame(attachment);
         EXPECT_FALSE(detached.Commands.IsBound());
-        EXPECT_FALSE(detached.Results.LastBilateralFilterResult);
+        EXPECT_FALSE(detached.Results.LastProgressivePoissonResult);
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
         auto current = Runtime::PrepareEditorPointSetFrame(attachment);
-        current.ResultSinks.BilateralFilter({.Message = "new attachment"});
-        expired.ResultSinks.BilateralFilter({.Message = "old attachment"});
-        expired.ResultSinks.DismissResult(PointSetSlot::BilateralFilter);
+        current.ResultSinks.ProgressivePoisson({.Message = "new attachment"});
+        expired.ResultSinks.ProgressivePoisson({.Message = "old attachment"});
+        expired.ResultSinks.DismissResult(PointSetSlot::ProgressivePoisson);
         const auto fresh = Runtime::PrepareEditorPointSetFrame(attachment);
-        ASSERT_TRUE(fresh.Results.LastBilateralFilterResult);
-        EXPECT_EQ(fresh.Results.LastBilateralFilterResult->Message, "new attachment");
+        ASSERT_TRUE(fresh.Results.LastProgressivePoissonResult);
+        EXPECT_EQ(fresh.Results.LastProgressivePoissonResult->Message, "new attachment");
         EXPECT_FALSE(expired.Commands.IsBound());
     }
     // The callbacks can outlive the session object itself.
-    expired.ResultSinks.BilateralFilter({.Message = "after destruction"});
-    expired.ResultSinks.DismissResult(Runtime::EditorPointSetResultSlot::BilateralFilter);
+    expired.ResultSinks.ProgressivePoisson({.Message = "after destruction"});
+    expired.ResultSinks.DismissResult(Runtime::EditorPointSetResultSlot::ProgressivePoisson);
     EXPECT_FALSE(expired.Commands.IsBound());
     // A service frame copied out of a destroyed session still holds its borrowed
     // pointers; the handle check keeps every entry point from dereferencing one.
@@ -1148,7 +1146,7 @@ namespace
         Runtime::KernelDensityConfig Density{};
         Runtime::PointSpacingConfig Spacing{};
         Runtime::DensityWeightConfig Weights{};
-        Runtime::BilateralFilterConfig Bilateral{};
+        Runtime::PointEditRequest Bilateral{.MinimumLiveCount = 2u}; // the bilateral plugin's capture
         Runtime::DescriptorAnalysisConfig Descriptors{};
         Runtime::PointConstructionConfig Construction{};
         Runtime::EditorRegistrationCommand Registration{};
@@ -1162,6 +1160,7 @@ namespace
             Engine.EmplaceModule<Runtime::AsyncWorkModule>();
             Engine.EmplaceModule<Runtime::SceneInteractionModule>();
             Engine.EmplaceModule<Runtime::SpatialIndexCache>();
+            Engine.EmplaceModule<Runtime::PointCloudEditingModule>();
             Engine.Initialize();
             Scene = Engine.Worlds().Get(Engine.Worlds().ActiveWorld());
             Entity = Scene->Create();
@@ -1194,6 +1193,7 @@ namespace
             Construction.KNeighbors = 2;
             Construction.Resolution = 6;
             Attachment.Attach(Engine.Worlds(), Engine.Services());
+            Editing().UseEditorWorkspace(Attachment);
             PrepareFrame();
         }
         void TearDown() override
@@ -1230,15 +1230,24 @@ namespace
             Bilateral.Normals = Descriptors.Normals =
                 {Keypoints.Positions.Domain, "directions", Geometry::PropertyValueKind::Vec3};
             Bilateral.Output = {Keypoints.Positions.Domain, "filtered", Geometry::PropertyValueKind::Vec3};
-            Bilateral.KNeighbors = 2;
             Descriptors.Outputs = Runtime::MakeDescriptorOutputProperties(Keypoints.Positions.Domain, "descriptor");
         }
         std::array<Runtime::ActionReadiness, 2> PreviewOriented()
         {
-            return {Runtime::PreviewEditorBilateralFilterCommand(
-                        Runtime::PrepareEditorPointSetFrame(Attachment).Commands, Bilateral),
-                    Runtime::PreviewEditorDescriptorAnalysisCommand(Commands, Descriptors)};
+            return {PreviewEdit(), Runtime::PreviewEditorDescriptorAnalysisCommand(Commands, Descriptors)};
         }
+        Runtime::PointCloudEditingService& Editing() { return *Engine.Services().Find<Runtime::PointCloudEditingService>(); }
+        // The point-cloud editing service's readiness capture (copies nothing), as the bilateral plugin previews.
+        Runtime::ActionReadiness PreviewEdit()
+        {
+            auto request = Bilateral;
+            request.CopyValues = false;
+            std::string diagnostic;
+            const bool ready = Editing().Capture(request, diagnostic) != nullptr;
+            return {.Enabled = ready, .DisabledReason = ready ? std::string{} : diagnostic};
+        }
+        // The service's input catalog for the plugin's minimum of two live samples.
+        Runtime::GeometryPropertyCatalogSnapshot EditCatalog() { return Editing().InputCatalog(Bilateral.StableEntityId, 2u); }
         Runtime::EditorPointConstructionReadiness PreviewConstruction()
         {
             return Runtime::PreviewEditorPointConstructionCommand(
@@ -1499,15 +1508,14 @@ TEST_F(EditorPointReadiness, ScalarCommandsRecaptureDespiteWarmReadiness)
 TEST_F(EditorPointReadiness, OrientedInputsShareCatalogAndScalarVerdictsAcrossFrames)
 {
     SetNormalInputs();
-    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
     for (const auto& preview : PreviewOriented())
         EXPECT_EQ(preview.DisabledReason, "Checking live point samples. Wait for input validation.");
-    const auto pending = Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId);
+    const auto pending = EditCatalog();
     EXPECT_TRUE(pending.Empty());
     EXPECT_EQ(Stats().ChecksQueued, 2u);
     EXPECT_EQ(Stats().PropertyScans, 0u);
     Drain();
-    const auto ready = Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId);
+    const auto ready = EditCatalog();
     EXPECT_EQ(ready.Size(), 2u);
     EXPECT_NE(ready.SourceGeneration, pending.SourceGeneration);
     for (unsigned frame = 0; frame < 3; ++frame)
@@ -1598,10 +1606,9 @@ TEST_F(EditorPointReadiness, OrientedMetadataPrecedesPendingAndMinimumCountsRema
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     Drain();
     auto one = PreviewOriented();
-    EXPECT_EQ(one[0].DisabledReason, "Bilateral filtering requires at least two live samples.");
+    EXPECT_EQ(one[0].DisabledReason, "At least 2 live samples are required.");
     EXPECT_EQ(one[1].DisabledReason, "Descriptor analysis requires at least two live samples and positive spacing.");
-    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
-    EXPECT_TRUE(Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId).Empty());
+    EXPECT_TRUE(EditCatalog().Empty());
     deleted[0] = true;
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     Drain();
@@ -1615,26 +1622,21 @@ TEST_F(EditorPointReadiness, OrientedBackendLimitsApplyToPositionsAndRetainFamil
 {
     SetNormalInputs();
     Properties().Get<glm::vec3>("directions")[0] = {2e18f,0,1};
-    Bilateral.Backend = Runtime::BilateralFilterBackend::CpuLBVH;
     Descriptors.Backend = Runtime::DescriptorAnalysisBackend::CpuLBVH;
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     Drain();
     for (const auto& preview : PreviewOriented()) ASSERT_TRUE(preview.Enabled) << preview.DisabledReason;
-    Bilateral.Backend = Runtime::BilateralFilterBackend::VulkanLBVH;
+    // The service has no backends: its readiness ignores them (the plugin checks LBVH limits on the capture).
     Descriptors.Backend = Runtime::DescriptorAnalysisBackend::VulkanLBVH;
-    for (const auto& preview : PreviewOriented())
-    {
-        EXPECT_FALSE(preview.Enabled);
-        EXPECT_EQ(preview.DisabledReason.find("Vulkan"), 0u);
-    }
-    Bilateral.Backend = Runtime::BilateralFilterBackend::CpuLBVH;
+    EXPECT_TRUE(PreviewOriented()[0].Enabled);
+    EXPECT_EQ(PreviewOriented()[1].DisabledReason.find("Vulkan"), 0u);
     Descriptors.Backend = Runtime::DescriptorAnalysisBackend::CpuLBVH;
     Properties().Get<glm::vec3>("samples")[0].x = 2e18f;
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     Drain();
-    for (const auto& preview : PreviewOriented()) EXPECT_EQ(preview.DisabledReason.find("LBVH"), 0u);
-    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
-    EXPECT_EQ(Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId).Size(), 2u);
+    EXPECT_TRUE(PreviewOriented()[0].Enabled);
+    EXPECT_EQ(PreviewOriented()[1].DisabledReason.find("LBVH"), 0u);
+    EXPECT_EQ(EditCatalog().Size(), 2u);
     EXPECT_EQ(Stats().PropertyScans, 3u);
 }
 
@@ -1662,8 +1664,8 @@ TEST_F(EditorPointReadiness, OrientedCommandsSubmitWhileReadinessIsPending)
 {
     SetNormalInputs();
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
-    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
-    EXPECT_EQ(Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral).Status, Runtime::EditorCommandStatus::Pending);
+    std::string diagnostic;
+    EXPECT_NE(Editing().Capture(Bilateral, diagnostic), nullptr) << diagnostic; // a run's capture copies at once
     EXPECT_EQ(Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors).Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_EQ(Stats().PropertyScans, 0u);
 }
@@ -1672,16 +1674,15 @@ TEST_F(EditorPointReadiness, OrientedCommandsRecaptureWarmNormals)
 {
     SetNormalInputs();
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
-    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
     Drain();
     for (const auto& preview : PreviewOriented()) ASSERT_TRUE(preview.Enabled);
     Properties().Get<glm::vec3>("directions")[0].x = NAN;
-    const auto bilateral = Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral);
+    std::string bilateral;
+    EXPECT_EQ(Editing().Capture(Bilateral, bilateral), nullptr);
     const auto descriptor = Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors);
-    EXPECT_EQ(bilateral.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_EQ(descriptor.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_EQ(bilateral.Message, "Live normal samples must be finite.");
-    EXPECT_EQ(descriptor.Message, bilateral.Message);
+    EXPECT_EQ(bilateral, "Live normal samples must be finite.");
+    EXPECT_EQ(descriptor.Message, bilateral);
     EXPECT_FALSE(Properties().Exists(Bilateral.Output.Name));
     for (const auto& output : Descriptors.Outputs) EXPECT_FALSE(Properties().Exists(output.Name));
     EXPECT_EQ(Stats().PropertyScans, 2u);
@@ -2676,8 +2677,7 @@ TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
     EXPECT_TRUE(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Empty());
     for (const auto& oriented : PreviewOriented())
         EXPECT_EQ(oriented.DisabledReason, preview.DisabledReason);
-    EXPECT_TRUE(Runtime::GetEditorBilateralFilterInputCatalog(
-        Runtime::PrepareEditorPointSetFrame(Attachment).Commands, Bilateral.StableEntityId).Empty());
+    EXPECT_TRUE(EditCatalog().Empty());
     EXPECT_EQ(PreviewRegistration().DisabledReason, preview.DisabledReason);
     EXPECT_TRUE(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.SourceStableEntityId).Empty());
     EXPECT_TRUE(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.TargetStableEntityId).Empty());
@@ -3749,9 +3749,6 @@ TEST_F(EditorQueuedPointJobs, DuplicateSubmissionAnswersPendingWithTheSharedMess
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectDuplicateRefused("Point construction", [&](auto done) {
         return Runtime::ApplyEditorPointConstructionCommand(construction, Construction, done); });
-    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
-    ExpectDuplicateRefused("Bilateral filter", [&](auto done) {
-        return Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral, done); });
 }
 
 // RUNTIME-348: a queued run whose attachment is detached and replaced, or destroyed, before it delivers
@@ -3842,9 +3839,6 @@ TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectCancelFinalizesOnce("Point construction", [&](auto done) {
         return Runtime::ApplyEditorPointConstructionCommand(construction, Construction, done); });
-    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
-    ExpectCancelFinalizesOnce("Bilateral filter", [&](auto done) {
-        return Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral, done); });
 }
 
 // RUNTIME-313 (from RUNTIME-279): a job reaped between two polls of jobs_wait while the scene

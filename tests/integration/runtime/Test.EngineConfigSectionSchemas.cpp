@@ -65,7 +65,7 @@ namespace
 TEST(EngineConfigSectionSchemas, EveryRegisteredSectionPublishesASchema)
 {
     const auto registry = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
-    ASSERT_EQ(registry.Entries().size(), 26u);
+    ASSERT_EQ(registry.Entries().size(), 25u);
     for (const auto& registration : registry.Entries())
         EXPECT_FALSE(registration.SchemaJson.empty())
             << registration.DefaultSection.Name << " has no generated schema";
@@ -114,12 +114,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerLiteralRangesRemainUnchanged)
         {"density_weights", "gpu_query_batch_size", 1, 16384, true},
         {"density_weights", "gpu_radius_capacity", 1, 1024, true},
         {"density_weights", "support_radius", 0, f32, false},
-        {"bilateral_filter", "entity", 0, u32, true},
-        {"bilateral_filter", "k_neighbors", 0, u32, true},
-        {"bilateral_filter", "gpu_query_batch_size", 1, 16384, true},
-        {"bilateral_filter", "iterations", 0, 100, true},
-        {"bilateral_filter", "spatial_sigma", 0, f32, false},
-        {"bilateral_filter", "normal_sigma", 0, f32, false},
         {"keypoint_analysis", "entity", 0, u32, true},
         {"keypoint_analysis", "minimum_neighbors", 0, u32, true},
         {"keypoint_analysis", "gpu_query_batch_size", 1, 16384, true},
@@ -195,7 +189,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         {"density_weights", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"}},
         {"density_weights", "kernel", {"gaussian", "theta_lop", "wendland_c2"}},
         {"density_weights", "mode", {"direct", "reciprocal"}},
-        {"bilateral_filter", "backend", {"cpu_octree", "cpu_lbvh", "vulkan_lbvh"}},
         {"keypoint_analysis", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh", "vulkan_compute"}},
         {"descriptor_analysis", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"}},
         {"point_construction", "method", {"hoppe", "knn_graph"}},
@@ -221,7 +214,7 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         EXPECT_FALSE(registration->Validate(Json{{row.Field, "foreign-token"}}.dump(), registration->DefaultSection.PayloadJson, "literal-token").Usable());
     }
     for (const auto* section : {"normal_estimation", "registration", "outlier_analysis", "kernel_density", "point_spacing",
-                                "density_weights", "bilateral_filter", "keypoint_analysis", "descriptor_analysis", "point_construction", "selection"})
+                                "density_weights", "keypoint_analysis", "descriptor_analysis", "point_construction", "selection"})
     {
         const Config::EngineConfigSectionRegistration* registration = nullptr;
         for (const auto& candidate : registry.Entries())
@@ -321,7 +314,7 @@ TEST(EngineConfigSectionSchemas, NewSchemasPreserveNestedDefaultsAndBindingEncod
         schema["default"] = defaults;
         check(check, schema, defaults, registration.DefaultSection.Name);
     }
-    EXPECT_EQ(checked, 17u);
+    EXPECT_EQ(checked, 16u);
 }
 
 TEST(EngineConfigSectionSchemas, GeneratedSchemasAgreeWithTheirValidators)

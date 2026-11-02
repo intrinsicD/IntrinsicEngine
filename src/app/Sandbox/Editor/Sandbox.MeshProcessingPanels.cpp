@@ -338,8 +338,6 @@ namespace Extrinsic::Sandbox::Editor
         using ConstructionState =
             ProcessingDraftState<Runtime::PointConstructionConfig, Runtime::EditorPointConstructionResult>;
         using SpacingState = ProcessingDraftState<Runtime::PointSpacingConfig, Runtime::EditorPointSpacingResult>;
-        using BilateralState =
-            ProcessingDraftState<Runtime::BilateralFilterConfig, Runtime::EditorBilateralFilterResult>;
 
         struct RegistrationState
         {
@@ -440,7 +438,6 @@ namespace Extrinsic::Sandbox::Editor
         DensityWeightsState DensityWeights{};
         ConstructionState Construction{};
         SpacingState Spacing{};
-        BilateralState Bilateral{};
 
         void Register(EditorShell& editorShell);
         void Unregister();
@@ -482,7 +479,6 @@ namespace Extrinsic::Sandbox::Editor
         void DrawDensityWeightsWindow(bool&, const SandboxEditorContext&);
         void DrawConstructionWindow(bool&, const SandboxEditorContext&);
         void DrawSpacingWindow(bool&, const SandboxEditorContext&);
-        void DrawBilateralWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
         void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
         void DrawPointSamplingWindow(bool&, const SandboxEditorContext&);
@@ -642,16 +638,6 @@ namespace Extrinsic::Sandbox::Editor
                 {"pointcloud.processing.point_spacing", "PointCloud"}}})
             RegisterRedirectWindow(
                 id, {domain, "Processing", "Sampling & Density"}, "Point Spacing and Radii", "view.point_spacing");
-        RegisterWindow("view.bilateral_filter",
-            {"View", "Processing", "Filtering & Smoothing"},
-            "Bilateral Point Filter",
-            &Impl::DrawBilateralWindow);
-        for (const auto& [id, domain] :
-            std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.bilateral_filter", "Mesh"},
-                {"graph.processing.bilateral_filter", "Graph"},
-                {"pointcloud.processing.bilateral_filter", "PointCloud"}}})
-            RegisterRedirectWindow(
-                id, {domain, "Processing", "Filtering & Smoothing"}, "Bilateral Point Filter", "view.bilateral_filter");
         RegisterWindow(
             "view.normal_estimation", {"View", "Processing", "Normals"}, "Normal Estimation", &Impl::DrawNormalsWindow);
         for (const auto& [id, domain] :
@@ -763,7 +749,6 @@ namespace Extrinsic::Sandbox::Editor
         DensityWeights = {};
         Construction = {};
         Spacing = {};
-        Bilateral = {};
     }
 
     void MeshProcessingPanels::Impl::RegisterWindow(
@@ -3145,122 +3130,6 @@ namespace Extrinsic::Sandbox::Editor
                 Spacing.LastResult,
                 &Runtime::OperationResultKey<Runtime::PointSpacingOperation>::Tag,
                 context.PointFields.DismissResult);
-        }
-        ImGui::End();
-    }
-
-    void MeshProcessingPanels::Impl::DrawBilateralWindow(bool& open, const SandboxEditorContext& context)
-    {
-        if (context.PointSet.Results.LastBilateralFilterResult)
-            Bilateral.LastResult = context.PointSet.Results.LastBilateralFilterResult;
-        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Bilateral Point Filter", &open))
-        {
-            ImGui::End();
-            return;
-        }
-        const auto active = Runtime::GetEditorBilateralFilterConfig(context.PointSet.Commands)
-                                .value_or(Runtime::BilateralFilterConfig{});
-        const auto serialized = Runtime::SerializeBilateralFilterConfig(active);
-        Bilateral.Synchronize(active, serialized);
-        auto& config = Bilateral.Draft;
-        bool changed = false;
-        changed |=
-            DrawProcessingEntity("Entity##Bilateral", context, config.StableEntityId, Bilateral.LastSelectedEntity);
-        if (DrawProcessingPointInput(
-                "Positions##Bilateral",
-                [&]
-                {
-                    return Runtime::GetEditorBilateralFilterInputCatalog(
-                        context.PointSet.Commands, config.StableEntityId);
-                },
-                config.Positions))
-        {
-            config.Output.Domain = config.Normals.Domain = config.Positions.Domain;
-            changed = true;
-        }
-        changed |= DrawProcessingPointInput(
-            "Normals##Bilateral",
-            [&]
-            {
-                return Runtime::GetEditorBilateralFilterInputCatalog(context.PointSet.Commands, config.StableEntityId);
-            },
-            config.Normals,
-            config.Positions.Domain);
-        if (ImGui::Button("Write to input positions"))
-        {
-            config.Output = config.Positions;
-            changed = true;
-        }
-        for (auto [label, ref] : {std::pair{"Output positions", &config.Output}})
-            changed |= DrawProcessingPropertyName(label, ref->Name);
-        int backend = int(config.Backend);
-        if (ImGui::Combo("Backend",
-                &backend,
-                OwnerConfigEnumLabels<Runtime::BilateralFilterBackend, 3>(
-                    Runtime::BilateralFilterConfigFieldSpecs(), "backend")
-                    .data(),
-                3))
-        {
-            config.Backend = Runtime::BilateralFilterBackend(backend);
-            changed = true;
-        }
-        changed |= ImGui::InputScalar("Neighbors k", ImGuiDataType_U32, &config.KNeighbors);
-        changed |= ImGui::InputFloat("Spatial sigma (0 = automatic)", &config.SpatialSigma);
-        changed |= ImGui::InputFloat("Normal sigma", &config.NormalSigma);
-        changed |= ImGui::InputScalar("Iterations", ImGuiDataType_U32, &config.Iterations);
-        ImGui::TextWrapped(
-            "Filters positions along fixed input normals. Each pass rebuilds neighborhoods; automatic spatial sigma is resolved once.");
-        if (config.Backend == Runtime::BilateralFilterBackend::VulkanLBVH)
-            changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-        DrawProcessingExecution(
-            context.PointSet.Commands,
-            Bilateral,
-            changed,
-            [&](const auto& request)
-            {
-                return Runtime::PreviewEditorBilateralFilterCommand(context.PointSet.Commands, request);
-            },
-            [&](const auto& request)
-            {
-                return Runtime::ApplyEditorBilateralFilterConfig(context.PointSet.Commands, request);
-            },
-            [&]
-            {
-                return Runtime::ApplyEditorConfiguredBilateralFilter(
-                    context.PointSet.Commands, context.PointSet.ResultSinks.BilateralFilter);
-            },
-            context.PointSet.ResultSinks.BilateralFilter,
-            "Filter positions",
-            "Controls were rejected by filter config validation.",
-            "Bilateral config was rejected.",
-            [](const auto& c)
-            {
-                return std::pair{c.StableEntityId, c.Output.Name};
-            });
-        const Runtime::EditorOutputRef bilateralDraft{config.StableEntityId, config.Output.Name};
-        Bilateral.Run.Draw(context.PointSet.Commands, config.StableEntityId, "bilateral_progress", &bilateralDraft);
-        ImGui::TextWrapped(
-            "Vulkan computes neighbors; weights and position updates run on CPU. Only the final result is published. Choose the input position property as output to update the displayed geometry; Undo restores it.");
-        if (Bilateral.LastResult)
-        {
-            const auto& result = *Bilateral.LastResult;
-            ImGui::Separator();
-            ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
-            ImGui::Text(
-                "Requested: %s; ran: %s", Runtime::ToString(result.RequestedBackend), result.ActualBackend.c_str());
-            ImGui::Text("Live / total: %zu / %zu", result.LiveCount, result.SlotCount);
-            ImGui::Text("Passes: %u; spatial sigma: %.5g", result.CompletedIterations, double(result.SpatialSigmaUsed));
-            ImGui::Text("Last-pass displacement mean / max: %.5g / %.5g",
-                double(result.AverageDisplacement),
-                double(result.MaxDisplacement));
-            ImGui::Text(
-                "Degenerate normals: %zu; private index builds: %zu", result.DegenerateNormals, result.WorkspaceBuilds);
-            ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Bilateral",
-                Bilateral.LastResult,
-                Runtime::EditorPointSetResultSlot::BilateralFilter,
-                context.PointSet.ResultSinks.DismissResult);
         }
         ImGui::End();
     }

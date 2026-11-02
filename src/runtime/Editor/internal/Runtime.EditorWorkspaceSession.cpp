@@ -778,7 +778,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             if (!AttachmentEpochIsActive(epoch)) return;
             switch (slot)
             {
-            case EditorPointSetResultSlot::BilateralFilter: m_PointSetResults.LastBilateralFilterResult.reset(); break;
             case EditorPointSetResultSlot::ProgressivePoisson: m_PointSetResults.LastProgressivePoissonResult.reset(); break;
             }
         };
@@ -872,8 +871,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         {
             if (epoch && epoch->load()) m_NormalResults.LastNormalEstimationResult.reset();
         };
-        m_PointSetResultSinks.BilateralFilter =
-            retain(m_PointSetResults, &EditorPointSetResultsSnapshot::LastBilateralFilterResult);
         m_PointAnalysisResultSinks.KeypointAnalysis =
             retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastKeypointAnalysisResult);
         m_PointAnalysisResultSinks.DescriptorAnalysis =

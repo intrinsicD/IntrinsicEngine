@@ -88,6 +88,16 @@ class FeatureBoundaryRatchet(unittest.TestCase):
         write(self.root, "src/runtime/Editor/NewHub.cpp", "// OutlierAnalysis kernel_density\n")
         self.assert_fails("R1")
 
+    def test_a_plugin_named_with_an_operation_makes_a_hub(self) -> None:
+        # A feature that became a plugin left the operation enum; its folder name still counts for R1.
+        write(self.root, "plugins/bilateral_filter/BilateralFilter.cpp", "// kernel_density outlier_analysis\n")
+        write(self.root, "src/runtime/Editor/Mixed.cpp", "// BilateralFilter and point_spacing\n")
+        self.save_baseline(r1=1, alpha=(1, 0), beta=(0, 0), **{"plugins/bilateral_filter": (0, 0)})
+        self.assert_fails("R1")
+        write(self.root, "src/runtime/Editor/Mixed.cpp", "// bilateral filter and point_spacing\n")
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_editor_import_fails_r2(self) -> None:
         write(self.root, "src/runtime/Modules/Beta/Runtime.Beta.cppm",
               "export module Extrinsic.Runtime.Beta;\nimport Extrinsic.Runtime.EditorThing;\n")

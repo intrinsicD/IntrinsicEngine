@@ -979,6 +979,13 @@ namespace Extrinsic::Runtime
         m_Impl->Workspace = &workspace;
     }
 
+    void PluginHostModule::ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept
+    {
+        auto& impl = *m_Impl;
+        if (impl.Workspace == &workspace)
+            impl.Workspace = impl.OwnWorkspace.IsAttached() ? &impl.OwnWorkspace : nullptr;
+    }
+
     void PluginHostModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
         auto& impl = *m_Impl;

@@ -543,7 +543,7 @@ TEST(PluginHost, AJobCompletionThatUnloadsItsOwnPluginFinishesBeforeTheUnload)
 
 TEST(PluginHost, ADrainTimeoutKeepsTheLoadedPluginsDeferredCallWorking)
 {
-    std::atomic<bool> release{false}; // outlives the harness, whose drain waits for the job reading it
+    std::atomic<bool> release{false}, started{false}; // outlive the harness, whose drain waits for the job
     Harness harness{};
     bool finish = false;
     const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
@@ -553,9 +553,15 @@ TEST(PluginHost, ADrainTimeoutKeepsTheLoadedPluginsDeferredCallWorking)
     auto outcome = CallDeferred(harness);
     ASSERT_TRUE(Runtime::SubmitPluginJob(harness.Context, {
         .Label = "Stubborn job",
-        .Work = [&release](const std::function<bool()>&) { while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1)); },
+        .Work = [&release, &started](const std::function<bool()>&)
+        {
+            started = true;
+            while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        },
         .Completion = [](const bool published) { return published; },
     }).IsValid());
+    // Running, not queued: a queued job is cancelled before it starts and leaves nothing to drain.
+    while (!started) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     EXPECT_EQ(harness.Call("plugin_unload", {{"drain_deadline_ms", 20}}).ErrorCode, "drain_timeout");
     finish = true;
     Runtime::AgentOperationOutcome result{};

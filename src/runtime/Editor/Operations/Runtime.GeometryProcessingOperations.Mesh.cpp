@@ -67,7 +67,6 @@ namespace GeometryProcessingDetail::MeshDiscovery
             case EditorGeometryProcessingAlgorithm::Parameterization:
             case EditorGeometryProcessingAlgorithm::BooleanCSG:
             case EditorGeometryProcessingAlgorithm::Registration:
-            case EditorGeometryProcessingAlgorithm::BilateralFilter:
             case EditorGeometryProcessingAlgorithm::OutlierEstimation:
             case EditorGeometryProcessingAlgorithm::KernelDensity:
             case EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
@@ -182,7 +181,6 @@ GetEditorGeometryProcessingMenuItems(
         case EditorGeometryProcessingAlgorithm::KMeans:
         case EditorGeometryProcessingAlgorithm::NormalEstimation:
         case EditorGeometryProcessingAlgorithm::Registration:
-        case EditorGeometryProcessingAlgorithm::BilateralFilter:
         case EditorGeometryProcessingAlgorithm::OutlierEstimation:
         case EditorGeometryProcessingAlgorithm::KernelDensity:
         case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
@@ -261,14 +259,13 @@ GetEditorGeometryProcessingCapabilities(
 ResolveEditorGeometryProcessingEntries(
         const EditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<EditorGeometryProcessingAlgorithm, 25> kAlgorithmOrder{
+        static constexpr std::array<EditorGeometryProcessingAlgorithm, 24> kAlgorithmOrder{
             EditorGeometryProcessingAlgorithm::KMeans,
             EditorGeometryProcessingAlgorithm::NormalEstimation,
             EditorGeometryProcessingAlgorithm::MeshDenoise,
             EditorGeometryProcessingAlgorithm::Curvature,
             EditorGeometryProcessingAlgorithm::CurvatureSegmentation,
             EditorGeometryProcessingAlgorithm::Registration,
-            EditorGeometryProcessingAlgorithm::BilateralFilter,
             EditorGeometryProcessingAlgorithm::OutlierEstimation,
             EditorGeometryProcessingAlgorithm::KernelDensity,
             EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling,
@@ -394,8 +391,6 @@ ResolveEditorGeometryProcessingEntries(
             return "Boolean CSG";
         case EditorGeometryProcessingAlgorithm::Registration:
             return "ICP Registration";
-        case EditorGeometryProcessingAlgorithm::BilateralFilter:
-            return "Bilateral Filter";
         case EditorGeometryProcessingAlgorithm::OutlierEstimation:
             return "Outlier Estimation";
         case EditorGeometryProcessingAlgorithm::KernelDensity:

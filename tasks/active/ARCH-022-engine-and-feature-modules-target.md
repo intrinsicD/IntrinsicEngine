@@ -2010,3 +2010,66 @@ python3 tools/docs/check_doc_links.py --root . --strict
     callables); a test unloads from a completion, and the unload waits. 26 plugin host tests pass.
   - Codex delta 2 (same session): "Verdict: APPROVE", bound to the staged diff sha256 `9b47b4cc…1d05775d`; gate and
     finalizer reentrancy checked by inspection, the publication guard by a test.
+- 2026-11-02: Steps 2b and 2c implemented (uncommitted until review): the bilateral point filter is the first real
+  plugin.
+  - 2b, module service `PointCloudEditingService` (`src/runtime/Services/Runtime.PointCloudEditing.*`): capture of
+    positions and normals on all eight point domains, the cached CPU index, paged GPU kNN rows, publication with one
+    undo entry of host code and host data (so undo and redo work after an unload). The Sandbox shell hands its
+    workspace to the host and the service (`UseEditorWorkspace`, `ReleaseEditorWorkspace` before it detaches).
+  - 2c, `plugins/bilateral_filter`: section `sandbox.bilateral_filter` (name and schema id kept, saved configs load),
+    tools `bilateral_filter` (waits, cancellable over MCP) and `bilateral_filter_preview`, window
+    `view.bilateral_filter`, CPU runs as one plugin job and the Vulkan chain as stages of one run. The Sandbox stages
+    it before the config boot (shared: the `.so` beside the executable, reloadable; static: linked, in-process);
+    `--no-startup-plugins` skips it (the spike drivers pass it). The built-in filter is removed: its operation,
+    config codec, window, editor session slot, catalog entry and `run_operation` row.
+  - Deviations, recorded: the mesh/graph/point-cloud Processing menus no longer list it (their entries were Sandbox
+    redirects); `bilateral_filter` sends no progress notifications; plugin rows belong to the shell's session, so
+    the agent's `jobs_cancel` refuses them (MCP cancels through `notifications/cancelled`, the Jobs window through
+    its Cancel); the built-in filter's eight-domain Vulkan smoke is not ported (the plugin's own Vulkan smoke
+    replaces its stale/cancel cases), so benchmark `geometry.point_lbvh.bilateral_runtime_smoke` has no producer
+    (open).
+  - R1/R2: plugin folder names count as features for R1 (regression test, fails with the change removed); R1 ceiling
+    31 -> 30; R2 `plugins/bilateral_filter` 0/0 (its tests live under `tests/`, as the layout requires).
+  - Verification on `build/dev-shared`: `Test.BilateralFilterPlugin.cpp` (7 tests: section, MCP tool and Jobs row,
+    all domains with undo and agreeing CPU backends, stale and cancelled runs, Jobs-window cancel, preflight, the
+    window's Run button), `Test.PointCloudEditing.cpp` (4), the ported Sandbox tests; the CPU set (ctest, non-GPU)
+    passes except a benchmark smoke that timed out under load and passes alone. Live MCP driver
+    `plugins/bilateral_filter/live_driver.py`: see the run below.
+  - Live MCP driver `plugins/bilateral_filter/live_driver.py` on the first revision (`build/live-bilateral-094630`):
+    49 of 49 checks. Reference error 3e-8 (one pass) and 7e-8 (three passes) against a float64 reference; CPU LBVH
+    and Vulkan LBVH equal to the octree run; 15 Vulkan query batches of 64 over three passes; MCP cancel ended a
+    run within the pass in flight (18.0 s; one pass on 50k points takes 17.6 s in this ASan build); undo/redo while
+    unloaded and after reload; clean, sanitizer-clean exit.
+  - Ponytail review (Claude subagent, diff sha256 `634ca195…80ec05`): "Verdict: Ship after 1 and 2 (1 and 3 can also
+    go into the next block)." Taken: 2 (a Vulkan test, below), 5 (backend names from one table), 6 (one
+    `FindService`), 7 (unused view fields and stored pointers). Deferred to the next block, as the reviewer allows:
+    1 (the own-or-borrowed workspace logic copied in host and service), 3 (the two test harnesses), 4 (the
+    extern "C" forwarders).
+  - Codex review (fresh session `01a19b72-c851-70e3-9f97-65815573276b`, same diff): "Verdict: REVISE", four blocking
+    findings, answered (each new test fails with its fix removed, except 1):
+    1. finished runs kept their buffers, index lease and GPU workspace: `Finish` releases them; the callbacks that
+       could still run afterwards return early (by inspection, no observable signal without a test hook);
+    2. the window allowed one run at a time: it keeps one row per running run, the host refuses the same output
+       (contract test with two outputs and a refused third; window test runs twice while the first is pending);
+    3. the Vulkan chain had no failure tests: `BilateralFilterPluginGpuSmoke` (agreement and paging, stale before
+       GPU recording, cancel between stages). It found a bug: inputs changed under the gated stage ended the run
+       `failed`; the chain now ends `stale`;
+    4. (and its non-blocking 5) the history rebasing case was dropped: the service guards the output with the
+       shared history slot (`CapturePointPropertyHistory`, stamped on every write); successive in-place runs undo
+       in turn (test; it fails without the stamp).
+  - CI on 4b1202da1 was red: `PluginHost.ADrainTimeoutKeepsTheLoadedPluginsDeferredCallWorking` unloaded before its
+    stubborn job had started (a queued job is cancelled cleanly, nothing to drain). The test now waits for the job
+    to run (100 repeats pass; the race was not reproduced locally, the CI log is the evidence).
+  - Codex delta 1 (same session, diff sha256 `d928e687…4237d5`): "Verdict: REVISE", two findings, answered:
+    1. `= {}` kept the vectors' capacity: `Finish` move-assigns empty vectors;
+    2. the GPU cancel test matched the stale run's finished neighbourhood job: it now waits for this run's active
+       neighbourhood stage (`Identity.Run` equal to the run's token); with the neighbourhood completion ignoring
+       the cancel, the test fails.
+    Closed per the reviewer: window concurrency, the shared history guard, the drain-timeout test.
+  - Live MCP driver on the revision (`build/live-bilateral-102856`): 49 of 49. One earlier attempt was cut short by
+    a window close from the desktop ("Window close requested … source=platform-event"; exit 0, sanitizer clean).
+  - Codex delta 2 (same session): "Verdict: APPROVE", bound to diff sha256 `c67d4af3…2132de`; "Tests and mutation
+    checks were not rerun; those results remain author-reported. Previously disclosed fault-injection coverage gaps
+    remain."
+  - Open after 2c: port the eight-domain Vulkan benchmark (`geometry.point_lbvh.bilateral_runtime_smoke` has no
+    producer); a failed GPU page with current inputs has no test (no fault hook); ponytail 1, 3, 4 (next block).

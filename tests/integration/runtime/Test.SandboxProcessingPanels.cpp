@@ -220,8 +220,7 @@ namespace
     constexpr std::array kInputWindows{
         "view.normal_estimation", "view.outlier_analysis", "view.keypoint_analysis",
         "view.descriptor_analysis", "view.kernel_density", "view.density_weights",
-        "view.point_construction", "view.point_spacing", "view.bilateral_filter",
-        "view.registration"};
+        "view.point_construction", "view.point_spacing", "view.registration"};
 
     void ExpectInputEntities(const Config::EngineConfig& config, std::uint32_t expected,
                              std::uint32_t target = 0u)
@@ -234,7 +233,6 @@ namespace
         EXPECT_EQ(R::GetDensityWeightConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetPointConstructionConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDerivedSection<R::kPointSpacingSection>(config)->StableEntityId, expected);
-        EXPECT_EQ(R::GetBilateralFilterConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetRegistrationConfig(config)->SourceStableEntityId, expected);
         EXPECT_EQ(R::GetRegistrationConfig(config)->TargetStableEntityId, target);
     }
@@ -1194,8 +1192,6 @@ TEST(SandboxProcessingPanels, NormalInputsPreserveDomainFiltersAndPersistSelecti
     const std::array controls{
         Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Normals##Descriptors",
             [](const auto& c) { return R::GetDescriptorAnalysisConfig(c)->Normals; }},
-        Control{"view.bilateral_filter", "Bilateral Point Filter", "Normals##Bilateral",
-            [](const auto& c) { return R::GetBilateralFilterConfig(c)->Normals; }},
         Control{"view.point_construction", "Construct from Points", "Normals",
             [](const auto& c) { return R::GetPointConstructionConfig(c)->Normals; }, true}};
     for (const auto& control : controls)
@@ -1221,10 +1217,6 @@ TEST(SandboxProcessingPanels, NormalInputsPreserveDomainFiltersAndPersistSelecti
         descriptors.Positions.Domain = descriptors.Normals.Domain = domain;
         for (auto& output : descriptors.Outputs) output.Domain = domain;
         R::SetDescriptorAnalysisConfig(config, descriptors);
-        auto bilateral = *R::GetBilateralFilterConfig(config);
-        bilateral.StableEntityId = id;
-        bilateral.Positions.Domain = bilateral.Normals.Domain = bilateral.Output.Domain = domain;
-        R::SetBilateralFilterConfig(config, bilateral);
         auto construction = *R::GetPointConstructionConfig(config);
         construction.StableEntityId = id;
         construction.Positions.Domain = construction.Normals.Domain = domain;
@@ -1557,34 +1549,6 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
             {
                 return int(R::GetDerivedSection<R::kPointSpacingSection>(c)->Backend);
             }},
-        Control{"view.bilateral_filter",
-            "Bilateral Point Filter",
-            "Backend",
-            "CPU LBVH (cached)",
-            [](const auto& c)
-            {
-                return int(R::GetBilateralFilterConfig(c)->Backend);
-            },
-            1,
-            1},
-        Control{"view.bilateral_filter",
-            "Bilateral Point Filter",
-            "Backend",
-            "CPU octree",
-            [](const auto& c)
-            {
-                return int(R::GetBilateralFilterConfig(c)->Backend);
-            },
-            0,
-            0},
-        Control{"view.bilateral_filter",
-            "Bilateral Point Filter",
-            "Backend",
-            "Vulkan LBVH",
-            [](const auto& c)
-            {
-                return int(R::GetBilateralFilterConfig(c)->Backend);
-            }},
         Control{"view.registration",
             "ICP Registration",
             "Backend##ICP",
@@ -1908,7 +1872,6 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
         Method{"view.keypoint_analysis", "ISS Keypoint Analysis", "Detect keypoints", "Salient radius (0 = automatic)"},
         Method{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Compute FPFH descriptors", "Feature radius (0 = automatic)"},
         Method{"view.density_weights", "Compact Density Weights", "Compute compact weights", "Support radius (0 = automatic)"},
-        Method{"view.bilateral_filter", "Bilateral Point Filter", "Filter positions", "Normal sigma"},
         Method{"view.normal_estimation", "Normal Estimation", "Estimate normals", "Radius##Normals"}};
     for (std::size_t method = 0; method < methods.size(); ++method)
     {
@@ -1963,18 +1926,6 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             c.Positions.Name = "v:position";
             c.Weights.Name = reference;
             ASSERT_TRUE(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
-        }
-        else if (method == 3)
-        {
-            auto c = *R::GetBilateralFilterConfig(config);
-            c.StableEntityId = id; c.KNeighbors = 3; c.SpatialSigma = 1; c.NormalSigma = 2;
-            c.Normals.Name = "input_normals"; c.Output.Name = output;
-            R::SetBilateralFilterConfig(config, c);
-            c.Positions.Name = "missing_positions";
-            R::SetBilateralFilterConfig(missingInputConfig, c);
-            c.Positions.Name = "v:position";
-            c.Output.Name = reference;
-            ASSERT_TRUE(R::ApplyEditorBilateralFilterCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
         }
         else
         {
