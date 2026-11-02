@@ -729,7 +729,7 @@ TEST(PluginHost, CancellingALaterStageCancelsItsWholeRun)
 
 TEST(PluginHost, ADrainCancelsThroughTheWorkspaceSoTheJobsWindowSeesTheRequest)
 {
-    std::atomic<bool> release{false};
+    std::atomic<bool> release{false}, started{false};
     Harness harness{};
     const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
         &release, [](std::atomic<bool>* flag) { *flag = true; }};
@@ -737,10 +737,16 @@ TEST(PluginHost, ADrainCancelsThroughTheWorkspaceSoTheJobsWindowSeesTheRequest)
     const auto run = Runtime::SubmitPluginJob(harness.Context, {
         .Label = "Stubborn job",
         .Output = OutputOf(7, "a"),
-        .Work = [&release](const std::function<bool()>&) { while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1)); },
+        .Work = [&release, &started](const std::function<bool()>&)
+        {
+            started = true;
+            while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        },
         .Completion = [](const bool published) { return published; },
     });
     ASSERT_TRUE(run.IsValid());
+    // Running, not queued: a queued job is cancelled before it starts and leaves nothing to drain.
+    while (!started) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     EXPECT_EQ(harness.Call("plugin_unload", {{"drain_deadline_ms", 20}}).ErrorCode, "drain_timeout");
     (void)Runtime::PrepareEditorWorkspaceSnapshotFrame(harness.Shell);
     EXPECT_TRUE(Runtime::IsEditorRunCancelRequested(Runtime::PrepareEditorProcessingCommands(harness.Shell), run.Token));
