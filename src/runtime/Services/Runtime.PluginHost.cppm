@@ -7,12 +7,15 @@ module;
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 export module Extrinsic.Runtime.PluginHost;
 
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.PluginContract;
@@ -41,14 +44,32 @@ export namespace Extrinsic::Runtime
 
     // False in a static engine build: plugins need the shared engine libraries.
     [[nodiscard]] bool PluginsSupported() noexcept;
+    // dlopen of a private copy of the build at `path`, the v1 entry points, the same build id; null with
+    // `failure` set when it cannot (plugins_unsupported in a static build). `failAt` injects a failure (test hook).
+    [[nodiscard]] std::unique_ptr<PluginImage> OpenSharedPlugin(const std::string& path, std::string_view failAt,
+                                                                AgentOperationOutcome& failure);
+    // A plugin linked into the executable (static builds), behind the same seam; its close does nothing.
+    [[nodiscard]] std::unique_ptr<PluginImage> MakeInProcessPlugin(PluginRegisterFn registerFn,
+                                                                   PluginShutdownFn shutdownFn);
+
+    // A built-in plugin opened and registered before the config boot: the Sandbox moves its config sections into
+    // the boot section registry (so a saved payload loads), and the host commits the rest when it resolves.
+    struct StagedPlugin
+    {
+        std::unique_ptr<PluginImage> Image{};
+        PluginRegistrations Registrations{};
+        std::vector<std::string> SectionNames{}; // the sections moved to the boot registry
+    };
+    [[nodiscard]] std::optional<StagedPlugin> StagePlugin(std::unique_ptr<PluginImage> image, std::string& error);
 
     struct PluginHostOptions
     {
         // Fault injection and probes for the fixture plugin's drivers (--plugin-test-hooks): the tools' hook
         // arguments, plugin_host_identity and the closure form of undo entries. Without it they are rejected.
         bool TestHooks{false};
-        PluginOpener Open{}; // empty selects dlopen of a private copy (shared engine builds only)
+        PluginOpener Open{}; // empty selects OpenSharedPlugin
         std::function<void()> RequestExit{};
+        std::optional<StagedPlugin> Startup{}; // committed when the host resolves
     };
 
     class PluginHostModule final : public IRuntimeModule
@@ -63,9 +84,15 @@ export namespace Extrinsic::Runtime
         // host shuts down first, while the services its plugin registered with are alive.
         [[nodiscard]] std::string_view Name() const noexcept override { return "~Runtime.PluginHost"; }
         [[nodiscard]] RuntimeModuleResult OnRegister(EngineSetup& setup) override;
+        // Commits the startup plugin; without a workspace from the app, attaches one of its own.
+        [[nodiscard]] RuntimeModuleResult OnResolve(EngineSetup& setup) override;
         // The ordinary exit (after the GPU work was shut down and the jobs drained): the plugin's shutdown hook,
         // then every registration out. The image stays mapped; the process ends.
         void OnShutdown(RuntimeModuleShutdownContext& context) override;
+
+        // The editor workspace plugin jobs belong to: the Sandbox gives its shell's, so every plugin run is a row of
+        // its Jobs window, whether it started from a window or over MCP.
+        void UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept;
 
         // Adds plugin_load, plugin_unload, plugin_reload, plugin_list and app_quit, and with test hooks
         // plugin_host_identity; keeps the registry to commit and remove plugin tools later.
@@ -73,7 +100,9 @@ export namespace Extrinsic::Runtime
 
         // The contract's host functions reach the composed host through these.
         [[nodiscard]] static PluginHostModule* Current() noexcept;
-        [[nodiscard]] bool SubmitJob(const AgentOperationContext& context, PluginJob job);
+        [[nodiscard]] PluginJobHandle SubmitJob(PluginJob job, std::string* refusal);
+        bool CancelJob(PluginJobHandle job);
+        void ReportJobOutcome(PluginJobHandle job, PluginJobDomain resolved, std::string diagnostic);
         [[nodiscard]] bool StartGpuWork(const AgentOperationContext& context, GpuQueueParticipantDesc work);
         [[nodiscard]] ServiceRegistry* Services() const noexcept;
         [[nodiscard]] bool TestHooks() const noexcept;

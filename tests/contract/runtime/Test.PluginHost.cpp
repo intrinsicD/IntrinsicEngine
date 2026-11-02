@@ -1,5 +1,6 @@
 // ARCH-022: the plugin host's contract, driven with in-process images (no dlopen), so it runs in static builds too.
 // dlopen itself is covered by the fixture plugin's drivers on the shared dev build (plugins/spike).
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -20,11 +21,19 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.PluginHost;
@@ -147,23 +156,50 @@ namespace
         Runtime::PluginHostModule* Host{nullptr};
         Runtime::AgentOperationContext Context{};
 
-        explicit Harness(const bool testHooks = true, const bool inProcess = true,
-                         std::function<void(Runtime::RuntimeModuleShutdownContext&)> probe = {})
-            : Engine(HeadlessConfig(), std::make_unique<Intrinsic::Tests::OneFrameApplication>())
+        // The app's editor workspace (the Sandbox shell's): plugin jobs are rows of its session.
+        Runtime::EditorWorkspaceAttachment Shell{};
+
+        struct Options
         {
-            Engine.EmplaceModule<Runtime::EngineConfigControl>();
-            Engine.EmplaceModule<Runtime::EditorUiModule>();
+            bool TestHooks{true};
+            bool InProcess{true};
+            std::function<void(Runtime::RuntimeModuleShutdownContext&)> Probe{};
+            std::optional<Runtime::StagedPlugin> Startup{};
+            Config::EngineConfigSectionRegistry BootSections{};
+            bool Agent{true};
+            Config::EngineConfig Config{HeadlessConfig()};
+            bool Ui{true};
+            bool UseShell{true}; // false: plugin jobs go through the host's own workspace
+        };
+
+        Harness() : Harness(Options{}) {}
+        explicit Harness(Options options)
+            : Engine(std::move(options.Config), std::make_unique<Intrinsic::Tests::OneFrameApplication>())
+        {
+            const bool testHooks = options.TestHooks, inProcess = options.InProcess, agent = options.Agent;
+            auto probe = std::move(options.Probe);
+            auto startup = std::move(options.Startup);
+            Engine.EmplaceModule<Runtime::AsyncWorkModule>(); // provides the JobService the editor session submits to
+            Engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(options.BootSections));
+            if (options.Ui) Engine.EmplaceModule<Runtime::EditorUiModule>();
             Engine.EmplaceModule<Runtime::SceneDocumentModule>();
             if (probe) Engine.AddModule(std::make_unique<ShutdownProbe>(std::move(probe)));
-            Runtime::PluginHostOptions options{.TestHooks = testHooks};
+            Runtime::PluginHostOptions hostOptions{.TestHooks = testHooks, .Startup = std::move(startup)};
             if (inProcess)
-                options.Open = [this](const std::string&, std::string_view, Runtime::AgentOperationOutcome&)
+                hostOptions.Open = [this](const std::string&, std::string_view, Runtime::AgentOperationOutcome&)
                 { return std::make_unique<FixtureImage>(Next, Events); };
-            auto host = std::make_unique<Runtime::PluginHostModule>(std::move(options));
+            auto host = std::make_unique<Runtime::PluginHostModule>(std::move(hostOptions));
             Host = host.get();
             Engine.AddModule(std::move(host));
+            // The agent server registers the host's tools before the engine initializes.
+            if (agent) Host->RegisterOperations(Registry);
             Engine.Initialize();
-            Host->RegisterOperations(Registry);
+            if (options.UseShell)
+            {
+                Shell.Attach(Engine.Worlds(), Engine.Services());
+                (void)Runtime::PrepareEditorWorkspaceSnapshotFrame(Shell); // the shell prepares one every frame
+                Host->UseEditorWorkspace(Shell);
+            }
             Context = {.ConfigControl = Engine.Services().Find<Runtime::EngineConfigControl>(),
                        .Jobs = &Engine.Jobs(),
                        .History = Engine.Services().Find<Runtime::EditorCommandHistory>()};
@@ -199,7 +235,9 @@ namespace
         }
         [[nodiscard]] bool WindowRegistered()
         {
-            for (const auto& entry : Engine.Services().Find<Runtime::EditorUiHost>()->BuildWindowMenuModel())
+            auto* ui = Engine.Services().Find<Runtime::EditorUiHost>();
+            if (ui == nullptr) return false;
+            for (const auto& entry : ui->BuildWindowMenuModel())
                 if (entry.Id == "view.fixture") return true;
             return false;
         }
@@ -212,6 +250,24 @@ namespace
             (void)Context.History->UnregisterCommand("fixture.add");
             return false;
         }
+        // The engine shuts down while the shell is attached, as in the Sandbox (completions may report to it).
+        ~Harness() { Engine.Shutdown(); }
+
+        // The shell session's job records, as its Jobs window lists them.
+        std::vector<Runtime::EditorJobRecord> Jobs()
+        {
+            (void)Runtime::PrepareEditorWorkspaceSnapshotFrame(Shell);
+            return Runtime::GetEditorJobs(Runtime::PrepareEditorProcessingCommands(Shell));
+        }
+        void Drain(const int frames = 50)
+        {
+            for (int frame = 0; frame < frames; ++frame)
+            {
+                (void)Engine.Jobs().DrainCompletions(Engine.Events());
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+        }
+
         [[nodiscard]] bool NothingRegistered()
         {
             return Registry.Find("fixture_echo") == nullptr && !SectionRegistered() && !WindowRegistered() &&
@@ -224,13 +280,18 @@ namespace
     {
         auto started = std::make_shared<std::atomic<bool>>(false);
         const bool submitted = Runtime::SubmitPluginJob(context, {
+            .Label = "Fixture job",
             .Work = [started](const std::function<bool()>& cancelled)
             {
                 *started = true;
                 while (!cancelled()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
             },
-            .Completion = [&log](const bool published) { log.push_back(published ? "job_published" : "job_finalized"); },
-        });
+            .Completion = [&log](const bool published)
+            {
+                log.push_back(published ? "job_published" : "job_finalized");
+                return published;
+            },
+        }).IsValid();
         if (!submitted) return testing::AssertionFailure() << "the job was not submitted";
         while (!*started) std::this_thread::sleep_for(std::chrono::milliseconds(1));
         return testing::AssertionSuccess();
@@ -308,68 +369,446 @@ TEST(PluginHost, AnUnloadDrainsThePluginsJobsBeforeItsShutdownHook)
     EXPECT_EQ(harness.Events, (Log{"job_finalized", "shutdown", "close"}));
 }
 
-TEST(PluginHost, ADeferredPluginResultIsRefusedAndItsCallablesReleasedAtOnce)
+namespace
 {
-    Harness harness{};
-    const auto held = std::make_shared<int>(0);
-    const std::weak_ptr<int> watch = held;
-    using Progress = decltype(Runtime::AgentOperationOutcome::Progress)::result_type;
-    // Each operation defers through one of the three callables the agent server would keep.
-    const std::vector<std::pair<std::string, std::function<void(Runtime::AgentOperationOutcome&)>>> deferrals{
-        {"fixture_continuation", [held](Runtime::AgentOperationOutcome& outcome)
-         {
-             outcome.Continuation = [held](const Runtime::AgentOperationContext&, Runtime::AgentOperationOutcome&)
-             {
-                 (void)held;
-                 return true;
-             };
-         }},
-        {"fixture_progress", [held](Runtime::AgentOperationOutcome& outcome)
-         {
-             outcome.Progress = [held](const Runtime::AgentOperationContext&)
-             {
-                 (void)held;
-                 return Progress{};
-             };
-         }},
-        {"fixture_cancel", [held](Runtime::AgentOperationOutcome& outcome)
-         {
-             outcome.Cancel = [held](const Runtime::AgentOperationContext&)
-             {
-                 (void)held;
-                 return std::string{};
-             };
-         }},
-    };
-    harness.Next = [&deferrals](Runtime::PluginRegistrations& staged)
+    // Logs its destruction once: shared by the three callables of one deferred result.
+    struct DeferredProbe
     {
-        staged.Generation = 107;
-        for (const auto& [name, defer] : deferrals)
+        Log* Events{nullptr};
+        ~DeferredProbe() { Events->push_back("deferred_destroyed"); }
+    };
+
+    // fixture_deferred: a deferred result whose continuation answers once `finish` is set; its progress and cancel
+    // are logged. `tag` names the generation in the log.
+    std::function<bool(Runtime::PluginRegistrations&)> DeferredFixture(const int generation, std::string tag, Log& log,
+                                                                      const bool& finish,
+                                                                      std::function<void()>* inside = nullptr)
+    {
+        return [generation, tag, &log, &finish, inside](Runtime::PluginRegistrations& staged)
+        {
+            staged.Generation = generation;
             staged.Operations.push_back({
-                .Name = name,
-                .Invoke = [defer](const Runtime::AgentOperationContext&, std::string_view)
+                .Name = "fixture_deferred",
+                .Invoke = [tag, &log, &finish, inside](const Runtime::AgentOperationContext&, std::string_view)
                 {
+                    auto probe = std::make_shared<DeferredProbe>();
+                    probe->Events = &log;
                     Runtime::AgentOperationOutcome outcome{};
-                    defer(outcome);
+                    outcome.Continuation = [probe, tag, &log, &finish, inside](const Runtime::AgentOperationContext&,
+                                                                              Runtime::AgentOperationOutcome& result)
+                    {
+                        log.push_back("continue " + tag);
+                        if (inside != nullptr && *inside) (*inside)();
+                        if (!finish) return false;
+                        result = {.Text = R"({"done":true})"};
+                        return true;
+                    };
+                    outcome.Progress = [probe](const Runtime::AgentOperationContext&)
+                    { return decltype(Runtime::AgentOperationOutcome::Progress)::result_type{}; };
+                    outcome.Cancel = [probe, &log](const Runtime::AgentOperationContext&)
+                    {
+                        log.push_back("cancel");
+                        return std::string{"cancelled"};
+                    };
                     return outcome;
                 },
             });
-        return true;
-    };
-    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "fixture"}}).IsError);
-    const long before = watch.use_count(); // the handles of the test, the deferrals and the registered operations
-    for (const auto& [name, defer] : deferrals)
-    {
-        const auto reply = Runtime::InvokeAgentOperation(harness.Registry, name, harness.Context, "{}", false);
-        EXPECT_EQ(reply.ErrorCode, "deferred_unsupported") << name;
-        EXPECT_FALSE(reply.Continuation || reply.Progress || reply.Cancel) << name;
-        EXPECT_EQ(watch.use_count(), before) << name; // the deferred callable's copy is gone
+            return true;
+        };
     }
+
+    Runtime::AgentOperationOutcome CallDeferred(Harness& harness)
+    {
+        return Runtime::InvokeAgentOperation(harness.Registry, "fixture_deferred", harness.Context, "{}", false);
+    }
+}
+
+TEST(PluginHost, ADeferredResultIsHeldByTheHostAndReleasedWhenItCompletes)
+{
+    Harness harness{};
+    bool finish = false;
+    harness.Next = DeferredFixture(110, "a", harness.Events, finish);
+    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "fixture"}}).IsError);
+    {
+        auto outcome = CallDeferred(harness);
+        ASSERT_TRUE(outcome.Continuation && outcome.Progress && outcome.Cancel);
+        Runtime::AgentOperationOutcome result{};
+        EXPECT_FALSE(outcome.Continuation(harness.Context, result));
+        EXPECT_EQ(outcome.Cancel(harness.Context), "cancelled");
+        finish = true;
+        EXPECT_TRUE(outcome.Continuation(harness.Context, result));
+        EXPECT_EQ(result.Text, R"({"done":true})");
+    } // the agent server drops a finished call
+    EXPECT_EQ(harness.Events, (Log{"continue a", "cancel", "continue a", "deferred_destroyed"}));
+}
+
+TEST(PluginHost, ADroppedDeferredCallReleasesThePluginsCallables)
+{
+    Harness harness{};
+    bool finish = false;
+    harness.Next = DeferredFixture(111, "a", harness.Events, finish);
+    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "fixture"}}).IsError);
+    { auto outcome = CallDeferred(harness); } // a disconnect drops the pending call
+    EXPECT_EQ(harness.Events, (Log{"deferred_destroyed"}));
+}
+
+TEST(PluginHost, AnUnloadDestroysAPendingCallsCallablesBeforeTheCloseAndTheCallAnswersUnloaded)
+{
+    Harness harness{};
+    bool finish = false;
+    harness.Next = DeferredFixture(112, "a", harness.Events, finish);
+    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "fixture"}}).IsError);
+    auto outcome = CallDeferred(harness);
+    ASSERT_FALSE(harness.Call("plugin_unload").IsError);
+    EXPECT_EQ(harness.Events, (Log{"shutdown", "deferred_destroyed", "close"}));
+    Runtime::AgentOperationOutcome result{};
+    EXPECT_TRUE(outcome.Continuation(harness.Context, result));
+    EXPECT_EQ(result.ErrorCode, "plugin_unloaded");
+    EXPECT_EQ(outcome.Cancel(harness.Context), "");
+    EXPECT_EQ(harness.Events.size(), 3u); // no plugin code ran
+}
+
+TEST(PluginHost, AnOldDeferredCallNeverReachesTheReloadedGeneration)
+{
+    Harness harness{};
+    bool finish = false;
+    harness.Next = DeferredFixture(113, "a", harness.Events, finish);
+    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "fixture"}}).IsError);
+    auto old = CallDeferred(harness);
+    harness.Next = DeferredFixture(114, "b", harness.Events, finish);
+    ASSERT_FALSE(harness.Call("plugin_reload", {{"path", "fixture"}}).IsError);
+    Runtime::AgentOperationOutcome result{};
+    EXPECT_TRUE(old.Continuation(harness.Context, result));
+    EXPECT_EQ(result.ErrorCode, "plugin_unloaded");
+    auto fresh = CallDeferred(harness);
+    EXPECT_FALSE(fresh.Continuation(harness.Context, result));
+    EXPECT_EQ(harness.Events, (Log{"shutdown", "deferred_destroyed", "close", "continue b"}));
+}
+
+TEST(PluginHost, ADeferredCallThatUnloadsItsOwnPluginFinishesBeforeTheUnload)
+{
+    Harness harness{};
+    bool finish = false;
+    std::function<void()> inside{};
+    harness.Next = DeferredFixture(116, "a", harness.Events, finish, &inside);
+    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "fixture"}}).IsError);
+    auto unload = Runtime::AgentOperationOutcome{};
+    bool unloadedInside = true, fired = false;
+    inside = [&]
+    {
+        if (fired) return;
+        fired = true;
+        unload = Runtime::InvokeAgentOperation(harness.Registry, "plugin_unload", harness.Context, "{}", false);
+        Runtime::AgentOperationOutcome result{};
+        unloadedInside = unload.Continuation && unload.Continuation(harness.Context, result);
+    };
+    auto outcome = CallDeferred(harness);
+    finish = true;
+    Runtime::AgentOperationOutcome result{};
+    EXPECT_TRUE(outcome.Continuation(harness.Context, result)); // the plugin's code returns normally
+    EXPECT_FALSE(unloadedInside);                               // the unload waited
+    outcome = {};
+    Runtime::AgentOperationOutcome unloaded{};
+    EXPECT_TRUE(unload.Continuation(harness.Context, unloaded));
+    EXPECT_FALSE(unloaded.IsError) << unloaded.Text;
+    EXPECT_EQ(harness.Events, (Log{"continue a", "deferred_destroyed", "shutdown", "close"}));
+}
+
+TEST(PluginHost, AJobCompletionThatUnloadsItsOwnPluginFinishesBeforeTheUnload)
+{
+    Harness harness{};
+    ASSERT_TRUE(harness.Loaded(127));
+    Runtime::AgentOperationOutcome unload{};
+    bool unloadedInside = true;
+    ASSERT_TRUE(Runtime::SubmitPluginJob(harness.Context, {
+        .Label = "Self-unloading job",
+        .Work = [](const std::function<bool()>&) {},
+        .Completion = [&](const bool applied)
+        {
+            unload = Runtime::InvokeAgentOperation(harness.Registry, "plugin_unload", harness.Context, "{}", false);
+            Runtime::AgentOperationOutcome result{};
+            unloadedInside = unload.Continuation && unload.Continuation(harness.Context, result);
+            harness.Events.push_back("completion returns");
+            return applied;
+        },
+    }).IsValid());
+    harness.Drain();
+    EXPECT_FALSE(unloadedInside); // the unload waited for the completion
+    Runtime::AgentOperationOutcome unloaded{};
+    ASSERT_TRUE(unload.Continuation);
+    EXPECT_TRUE(unload.Continuation(harness.Context, unloaded));
+    EXPECT_FALSE(unloaded.IsError) << unloaded.Text;
+    EXPECT_EQ(harness.Events, (Log{"completion returns", "shutdown", "close"}));
+}
+
+TEST(PluginHost, ADrainTimeoutKeepsTheLoadedPluginsDeferredCallWorking)
+{
+    std::atomic<bool> release{false}; // outlives the harness, whose drain waits for the job reading it
+    Harness harness{};
+    bool finish = false;
+    const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
+        &release, [](std::atomic<bool>* flag) { *flag = true; }};
+    harness.Next = DeferredFixture(115, "a", harness.Events, finish);
+    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "fixture"}}).IsError);
+    auto outcome = CallDeferred(harness);
+    ASSERT_TRUE(Runtime::SubmitPluginJob(harness.Context, {
+        .Label = "Stubborn job",
+        .Work = [&release](const std::function<bool()>&) { while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1)); },
+        .Completion = [](const bool published) { return published; },
+    }).IsValid());
+    EXPECT_EQ(harness.Call("plugin_unload", {{"drain_deadline_ms", 20}}).ErrorCode, "drain_timeout");
+    finish = true;
+    Runtime::AgentOperationOutcome result{};
+    EXPECT_TRUE(outcome.Continuation(harness.Context, result));
+    EXPECT_EQ(result.Text, R"({"done":true})");
+}
+
+
+namespace
+{
+    Runtime::PluginJobOutput OutputOf(const std::uint32_t entity, std::string name)
+    {
+        return {.StableEntityId = entity,
+                .Property = {.Domain = Runtime::GeometryElementDomain::PointCloudPoint, .Name = std::move(name),
+                             .ValueKind = Geometry::PropertyValueKind::Vec3}};
+    }
+
+    // A job that waits until released (or cancelled) and logs its completion with `tag`.
+    Runtime::PluginJob HeldJob(std::string tag, Log& log, std::atomic<bool>& release, std::optional<Runtime::PluginJobOutput> output,
+                               const bool verdict = true)
+    {
+        return {.Label = "Fixture " + tag,
+                .Output = std::move(output),
+                .Work = [&release](const std::function<bool()>& cancelled)
+                { while (!release && !cancelled()) std::this_thread::sleep_for(std::chrono::milliseconds(1)); },
+                .Completion = [tag, &log, verdict](const bool applied)
+                {
+                    log.push_back(tag + (applied ? " applied" : " finalized"));
+                    return applied && verdict;
+                }};
+    }
+
+    std::optional<Runtime::EditorJobRecord> RecordOf(Harness& harness, const Runtime::PluginJobHandle job)
+    {
+        for (auto& record : harness.Jobs())
+            if (record.Token == job.Token) return record;
+        return std::nullopt;
+    }
+}
+
+TEST(PluginHost, APluginJobIsARowOfTheShellSessionAndItsCompletionIsTheVerdict)
+{
+    std::atomic<bool> release{false};
+    Harness harness{};
+    const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
+        &release, [](std::atomic<bool>* flag) { *flag = true; }};
+    ASSERT_TRUE(harness.Loaded(120));
+    const auto good = Runtime::SubmitPluginJob(harness.Context, HeldJob("good", harness.Events, release, OutputOf(7, "a")));
+    const auto bad = Runtime::SubmitPluginJob(harness.Context, HeldJob("bad", harness.Events, release, OutputOf(7, "b"), false));
+    ASSERT_TRUE(good.IsValid() && bad.IsValid());
+    const auto row = RecordOf(harness, good);
+    ASSERT_TRUE(row.has_value());
+    EXPECT_EQ(row->Name, "Fixture good");
+    EXPECT_EQ(row->Identity.EntityId, 7u);
+    EXPECT_EQ(row->Identity.OutputName, "a");
+    Runtime::ReportPluginJobOutcome(good, Runtime::PluginJobDomain::Gpu, "ran on the GPU");
+    release = true;
+    harness.Drain();
+    EXPECT_EQ(RecordOf(harness, good)->State, Runtime::JobState::Published);
+    EXPECT_NE(RecordOf(harness, bad)->State, Runtime::JobState::Published); // a failed publication is not reported published
+    // One terminal completion each: the refused publication is not finalized a second time.
+    EXPECT_EQ(std::count(harness.Events.begin(), harness.Events.end(), "bad applied"), 1);
+    EXPECT_EQ(std::count(harness.Events.begin(), harness.Events.end(), "bad finalized"), 0);
+    EXPECT_EQ(RecordOf(harness, good)->ResolvedJobDomain, Runtime::EditorJobDomain::GpuCompute);
+}
+
+TEST(PluginHost, AdmissionRefusesASecondRunOnTheSameOutputOnly)
+{
+    std::atomic<bool> release{false};
+    Harness harness{};
+    const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
+        &release, [](std::atomic<bool>* flag) { *flag = true; }};
+    ASSERT_TRUE(harness.Loaded(121));
+    const auto first = Runtime::SubmitPluginJob(harness.Context, HeldJob("first", harness.Events, release, OutputOf(7, "a")));
+    ASSERT_TRUE(first.IsValid());
+    std::string refusal;
+    EXPECT_FALSE(Runtime::SubmitPluginJob(harness.Context, HeldJob("same", harness.Events, release, OutputOf(7, "a")), &refusal).IsValid());
+    EXPECT_NE(refusal.find("already running"), std::string::npos) << refusal;
+    EXPECT_TRUE(Runtime::SubmitPluginJob(harness.Context, HeldJob("other", harness.Events, release, OutputOf(7, "b"))).IsValid());
+    auto stage = HeldJob("stage", harness.Events, release, OutputOf(7, "a"));
+    stage.Run = first; // a later stage of the same run is admitted
+    EXPECT_TRUE(Runtime::SubmitPluginJob(harness.Context, std::move(stage)).IsValid());
+}
+
+TEST(PluginHost, CancellingAPluginRunFinalizesItsJobs)
+{
+    std::atomic<bool> release{false};
+    Harness harness{};
+    const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
+        &release, [](std::atomic<bool>* flag) { *flag = true; }};
+    ASSERT_TRUE(harness.Loaded(122));
+    const auto run = Runtime::SubmitPluginJob(harness.Context, HeldJob("run", harness.Events, release, OutputOf(7, "a")));
+    ASSERT_TRUE(run.IsValid());
+    EXPECT_TRUE(Runtime::CancelPluginJob(run));
+    harness.Drain();
+    EXPECT_EQ(harness.Events, (Log{"run finalized"}));
+    EXPECT_EQ(RecordOf(harness, run)->State, Runtime::JobState::Cancelled);
+}
+
+TEST(PluginHost, AGatedJobCompletesOnlyOnceItsGateOpensAndADrainCancelsIt)
+{
+    Harness harness{};
+    ASSERT_TRUE(harness.Loaded(123));
+    bool ready = false;
+    const auto gated = [&](std::string tag)
+    {
+        return Runtime::PluginJob{.Label = "Gated " + tag,
+                                  .Work = [](const std::function<bool()>&) {},
+                                  .IsReadyToApply = [&ready] { return ready; },
+                                  .Completion = [tag, &harness](const bool applied)
+                                  {
+                                      harness.Events.push_back(tag + (applied ? " applied" : " finalized"));
+                                      return applied;
+                                  }};
+    };
+    ASSERT_TRUE(Runtime::SubmitPluginJob(harness.Context, gated("a")).IsValid());
+    harness.Drain();
+    EXPECT_TRUE(harness.Events.empty()); // finished on the worker, parked behind the gate
+    ready = true;
+    harness.Drain();
+    EXPECT_EQ(harness.Events, (Log{"a applied"}));
+    ready = false;
+    ASSERT_TRUE(Runtime::SubmitPluginJob(harness.Context, gated("b")).IsValid());
+    harness.Drain();
+    ASSERT_FALSE(harness.Call("plugin_unload").IsError);
+    EXPECT_EQ(harness.Events, (Log{"a applied", "b finalized", "shutdown", "close"}));
+}
+
+TEST(PluginHost, CancellingALaterStageCancelsItsWholeRun)
+{
+    std::atomic<bool> release{false};
+    Harness harness{};
+    const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
+        &release, [](std::atomic<bool>* flag) { *flag = true; }};
+    ASSERT_TRUE(harness.Loaded(124));
+    const auto root = Runtime::SubmitPluginJob(harness.Context, HeldJob("root", harness.Events, release, OutputOf(7, "a")));
+    auto stage = HeldJob("stage", harness.Events, release, OutputOf(7, "a"));
+    stage.Run = root;
+    const auto later = Runtime::SubmitPluginJob(harness.Context, std::move(stage));
+    ASSERT_TRUE(root.IsValid() && later.IsValid());
+    EXPECT_TRUE(Runtime::CancelPluginJob(later));
+    harness.Drain();
+    EXPECT_EQ(RecordOf(harness, root)->State, Runtime::JobState::Cancelled);
+    EXPECT_EQ(RecordOf(harness, later)->State, Runtime::JobState::Cancelled);
+}
+
+TEST(PluginHost, ADrainCancelsThroughTheWorkspaceSoTheJobsWindowSeesTheRequest)
+{
+    std::atomic<bool> release{false};
+    Harness harness{};
+    const std::unique_ptr<std::atomic<bool>, void (*)(std::atomic<bool>*)> releaseOnExit{
+        &release, [](std::atomic<bool>* flag) { *flag = true; }};
+    ASSERT_TRUE(harness.Loaded(125));
+    const auto run = Runtime::SubmitPluginJob(harness.Context, {
+        .Label = "Stubborn job",
+        .Output = OutputOf(7, "a"),
+        .Work = [&release](const std::function<bool()>&) { while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1)); },
+        .Completion = [](const bool published) { return published; },
+    });
+    ASSERT_TRUE(run.IsValid());
+    EXPECT_EQ(harness.Call("plugin_unload", {{"drain_deadline_ms", 20}}).ErrorCode, "drain_timeout");
+    (void)Runtime::PrepareEditorWorkspaceSnapshotFrame(harness.Shell);
+    EXPECT_TRUE(Runtime::IsEditorRunCancelRequested(Runtime::PrepareEditorProcessingCommands(harness.Shell), run.Token));
+}
+
+TEST(PluginHost, WithoutAnAppWorkspaceJobsGoThroughTheHostsOwn)
+{
+    Harness harness{{.UseShell = false}};
+    ASSERT_TRUE(harness.Loaded(126));
+    ASSERT_TRUE(StartCancellableJob(harness.Context, harness.Events));
+    ASSERT_FALSE(harness.Call("plugin_unload").IsError);
+    EXPECT_EQ(harness.Events, (Log{"job_finalized", "shutdown", "close"}));
+}
+
+namespace
+{
+    Log* g_StartupEvents = nullptr;
+    bool StartupRegister(Runtime::PluginRegistrations& staged, std::string&) noexcept
+    {
+        return Fixture(130, *g_StartupEvents)(staged);
+    }
+    void StartupShutdown() noexcept { g_StartupEvents->push_back("shutdown"); }
+
+    // Stages the in-process fixture as the Sandbox does before the config boot: its section joins the boot registry.
+    std::pair<Runtime::StagedPlugin, Config::EngineConfigSectionRegistry> StageFixture(Log& log)
+    {
+        g_StartupEvents = &log;
+        std::string error;
+        auto staged = Runtime::StagePlugin(Runtime::MakeInProcessPlugin(&StartupRegister, &StartupShutdown), error);
+        EXPECT_TRUE(staged.has_value()) << error;
+        Config::EngineConfigSectionRegistry sections;
+        for (auto& section : staged->Registrations.ConfigSections) EXPECT_TRUE(sections.Register(std::move(section)));
+        staged->Registrations.ConfigSections.clear();
+        return {std::move(*staged), std::move(sections)};
+    }
+
+    // A boot config whose saved payload for the fixture's section differs from the default.
+    Config::EngineConfig BootConfigWithSavedPayload(const Config::EngineConfigSectionRegistry& sections)
+    {
+        auto config = HeadlessConfig();
+        Config::PopulateEngineConfigSectionDefaults(config, sections);
+        Config::UpsertEngineConfigSection(config.AppSections, {.Name = "fixture", .SchemaId = "test.fixture",
+                                                               .SchemaVersion = 1u, .PayloadJson = R"({"value":7})"});
+        return config;
+    }
+}
+
+TEST(PluginHost, AStartupPluginLoadsItsSavedPayloadAtBootAndWorksWithoutAnAgentServer)
+{
+    Log startupLog;
+    auto [staged, sections] = StageFixture(startupLog);
+    auto config = BootConfigWithSavedPayload(sections);
+    Harness harness{{.Startup = std::move(staged), .BootSections = std::move(sections), .Agent = false,
+                     .Config = std::move(config)}};
+    EXPECT_TRUE(harness.SectionRegistered());
+    EXPECT_TRUE(harness.WindowRegistered());
+    EXPECT_TRUE(harness.HistoryCommandRegistered());
+    EXPECT_EQ(harness.Registry.Find("fixture_echo"), nullptr); // no agent server, no tools
+    const auto* section = Config::FindEngineConfigSection(
+        harness.Context.ConfigControl->GetEngineConfigControlState().ActiveConfig.AppSections, "fixture");
+    ASSERT_NE(section, nullptr);
+    EXPECT_EQ(section->PayloadJson, R"({"value":7})");
+}
+
+TEST(PluginHost, AStartupPluginThatCannotCommitLeavesNoBootSectionBehind)
+{
+    Log startupLog;
+    auto [staged, sections] = StageFixture(startupLog);
+    auto config = BootConfigWithSavedPayload(sections);
+    Harness harness{{.Startup = std::move(staged), .BootSections = std::move(sections), .Config = std::move(config),
+                     .Ui = false}};
+    EXPECT_FALSE(harness.SectionRegistered()); // no UI host: the commit failed, and the boot section went too
+}
+
+TEST(PluginHost, AStartupPluginUnloadsAndReloadsLikeALoadedOne)
+{
+    Log startupLog;
+    auto [staged, sections] = StageFixture(startupLog);
+    auto config = BootConfigWithSavedPayload(sections);
+    Harness harness{{.Startup = std::move(staged), .BootSections = std::move(sections), .Config = std::move(config)}};
+    EXPECT_NE(harness.Registry.Find("fixture_echo"), nullptr);
+    harness.Next = Fixture(131, harness.Events);
+    const auto reply = harness.Call("plugin_reload", {{"path", "fixture"}});
+    ASSERT_FALSE(reply.IsError) << reply.Text;
+    EXPECT_EQ(Json::parse(reply.Text)["config"]["restored"], Json::array({"fixture"}));
+    EXPECT_EQ(startupLog, (Log{"shutdown"}));
+    ASSERT_FALSE(harness.Call("plugin_unload").IsError);
+    EXPECT_TRUE(harness.NothingRegistered());
 }
 
 TEST(PluginHost, TestHooksAreRejectedWithoutTheFlag)
 {
-    Harness plain{false};
+    Harness plain{{.TestHooks = false}};
     plain.Next = Fixture(108, plain.Events);
     const auto reply = plain.Call("plugin_load", {{"path", "fixture"}, {"fail_at", "windows"}});
     EXPECT_EQ(reply.ErrorCode, "invalid_params");
@@ -381,7 +820,7 @@ TEST(PluginHost, TestHooksAreRejectedWithoutTheFlag)
 
 TEST(PluginHost, TestHooksAreAcceptedWithTheFlag)
 {
-    Harness hooked{true};
+    Harness hooked{{.TestHooks = true}};
     EXPECT_NE(hooked.Registry.Find("plugin_host_identity"), nullptr);
     EXPECT_TRUE(Runtime::PluginProbes::RecordClosureCommand(hooked.Context, "closure", [] { return true; },
                                                             [] { return true; }));
@@ -389,7 +828,7 @@ TEST(PluginHost, TestHooksAreAcceptedWithTheFlag)
 
 TEST(PluginHost, AStaticBuildAnswersPluginsUnsupported)
 {
-    Harness harness{true, false};
+    Harness harness{{.InProcess = false}};
     const Json path = {{"path", "/nonexistent/libplugin.so"}};
     // A shared build gets as far as the private copy, or finds no plugin to reload.
     const auto load = harness.Call("plugin_load", path);
@@ -403,11 +842,11 @@ TEST(PluginHost, TheOrdinaryExitSettlesGpuWorkThenJobsThenRunsTheShutdownHookAnd
     Log* events = nullptr;
     bool clean = false;
     Harness* self = nullptr;
-    Harness harness{true, true, [&](Runtime::RuntimeModuleShutdownContext&)
-                    {
-                        clean = self->NothingRegistered();
-                        events->push_back("host_done");
-                    }};
+    Harness harness{{.Probe = [&](Runtime::RuntimeModuleShutdownContext&)
+                     {
+                         clean = self->NothingRegistered();
+                         events->push_back("host_done");
+                     }}};
     self = &harness;
     events = &harness.Events;
     ASSERT_TRUE(harness.Loaded(109));

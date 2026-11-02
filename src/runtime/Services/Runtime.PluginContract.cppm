@@ -5,6 +5,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -13,6 +14,7 @@ export module Extrinsic.Runtime.PluginContract;
 
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.UiHostTypes;
@@ -40,7 +42,7 @@ export namespace Extrinsic::Runtime
     {
         int Generation{0}; // the plugin build's version, for callable accounting
         std::vector<Core::Config::EngineConfigSectionRegistration> ConfigSections{};
-        std::vector<AgentOperationSpec> Operations{}; // answered deferred_unsupported if they defer their result
+        std::vector<AgentOperationSpec> Operations{}; // a deferred result is held by the host
         std::vector<EditorWindowDescriptor> Windows{};
         std::vector<PluginHistoryCommand> HistoryCommands{};
     };
@@ -61,19 +63,48 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool RecordPluginCommand(const AgentOperationContext& context, std::string label,
                                            std::string command, std::string payload);
 
-    // A plugin's CPU job: Work runs on a worker and polls `cancelled`; Completion runs on the main thread, with
-    // false when the job was cancelled.
+    enum class PluginJobDomain : std::uint8_t { Cpu, Gpu };
+
+    // The output a job writes: it makes the job a row of the editor's Jobs window, and admission refuses a second
+    // run on the same output.
+    struct PluginJobOutput
+    {
+        std::uint32_t StableEntityId{0u};
+        GeometryPropertyRef Property{};
+    };
+
+    struct PluginJobHandle
+    {
+        JobToken Token{};
+        [[nodiscard]] bool IsValid() const noexcept { return Token.IsValid(); }
+    };
+
+    // A plugin's job. Work runs on a worker and polls `cancelled`. IsReadyToApply (optional) is polled on the main
+    // thread before Completion. Completion runs on the main thread with false when the job was cancelled or its
+    // run abandoned, and returns whether it published (the job's verdict). A later stage of a run joins it through
+    // `Run`, the handle of the run's first job.
     struct PluginJob
     {
+        std::string Label{};
+        std::optional<PluginJobOutput> Output{};
+        PluginJobHandle Run{};
+        PluginJobDomain Domain{PluginJobDomain::Cpu};
         std::function<void(const std::function<bool()>& cancelled)> Work{};
-        std::function<void(bool published)> Completion{};
+        std::function<bool()> IsReadyToApply{};
+        std::function<bool(bool applied)> Completion{};
     };
 
     // The host keeps a plugin's jobs and GPU work and drains them before an unload: jobs are cancelled and reaped,
     // GPU work (a queue participant that needs RecordFrameCommands, HasInFlightWork and ShutdownAfterDeviceIdle)
-    // stops recording and is unregistered once retired. False while draining, without a host or job service, for
-    // incomplete callables, or when the service rejects the work.
-    [[nodiscard]] bool SubmitPluginJob(const AgentOperationContext& context, PluginJob job);
+    // stops recording and is unregistered once retired. Invalid while draining, without a host or job service,
+    // for incomplete callables, when another run is active on the same output (`refusal` says why), or when the
+    // service rejects the work.
+    [[nodiscard]] PluginJobHandle SubmitPluginJob(const AgentOperationContext& context, PluginJob job,
+                                                  std::string* refusal = nullptr);
+    // Cancels the job's run, as the Jobs window does; false when it is not active.
+    bool CancelPluginJob(PluginJobHandle job);
+    // What the run resolved to, for the Jobs window: the domain it ran in and its diagnostic.
+    void ReportPluginJobOutcome(PluginJobHandle job, PluginJobDomain resolved, std::string diagnostic);
     [[nodiscard]] bool StartPluginGpuWork(const AgentOperationContext& context, GpuQueueParticipantDesc work);
     // The engine's services, for a plugin to find what it needs (the RHI device); null without a host.
     [[nodiscard]] ServiceRegistry* PluginServices() noexcept;

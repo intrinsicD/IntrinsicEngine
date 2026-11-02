@@ -20,10 +20,21 @@ namespace Extrinsic::Runtime
             std::move(label), std::move(command), std::move(payload))).Succeeded();
     }
 
-    bool SubmitPluginJob(const AgentOperationContext& context, PluginJob job)
+    PluginJobHandle SubmitPluginJob(const AgentOperationContext&, PluginJob job, std::string* refusal)
     {
         auto* host = PluginHostModule::Current();
-        return host != nullptr && host->SubmitJob(context, std::move(job));
+        return host != nullptr ? host->SubmitJob(std::move(job), refusal) : PluginJobHandle{};
+    }
+
+    bool CancelPluginJob(const PluginJobHandle job)
+    {
+        auto* host = PluginHostModule::Current();
+        return host != nullptr && host->CancelJob(job);
+    }
+
+    void ReportPluginJobOutcome(const PluginJobHandle job, const PluginJobDomain resolved, std::string diagnostic)
+    {
+        if (auto* host = PluginHostModule::Current()) host->ReportJobOutcome(job, resolved, std::move(diagnostic));
     }
 
     bool StartPluginGpuWork(const AgentOperationContext& context, GpuQueueParticipantDesc work)

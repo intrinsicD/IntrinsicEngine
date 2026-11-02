@@ -1877,3 +1877,136 @@ python3 tools/docs/check_doc_links.py --root . --strict
     - R2 for `plugins/bilateral_filter` is 0/0, and R1 has dropped by the bilateral filter;
     - the reviews pass;
     - the target and `docs/architecture/bilateral-point-filter.md` are updated.
+- 2026-11-02: Plan for slice 3, step 2, revision 2. Codex plan review 1 (fresh session
+  `01a1973c-80af-7353-83fc-08edff1eac21`): REVISE, five blocking findings, answered here together with the
+  operator's decisions Q54. Revision 1 stands except:
+  - **Parity (finding 1, Q54 "Volle Parität").** The contract grows by what parity needs, and no more:
+    - `PluginJob` gains:
+      - `Label`;
+      - an optional `Output` (stable entity id and property ref);
+      - `Run`, the handle of an earlier job to join its run;
+      - `IsReadyToApply`.
+
+      `SubmitPluginJob` returns a `PluginJobHandle` (invalid when refused). The host submits through the editor's
+      job surface with an editor job identity built from these fields. So a run is a row of the Jobs window,
+      cancellable there, and admission refuses a second run on the same output only.
+    - Deferred plugin results: the host keeps an operation outcome's `Continuation`, `Progress` and `Cancel` in a
+      host entry and gives the agent server host forwarders. An unload or a drain destroys the plugin's
+      callables, and a pending call then answers `plugin_unloaded`. This replaces step 1's
+      `deferred_unsupported` and keeps the rule that every plugin callable lives in a host entry.
+    - MCP (Q54 "Eigene Plugin-Tools"): `bilateral_filter` runs and waits for the result (cancellable, with
+      progress), as `run_operation` did. `bilateral_filter_preview` gives readiness. The `run_operation` row goes.
+  - **Without an agent server (finding 2).** A commit without an operation registry registers no tools; config,
+    windows and history commands are unaffected. The window's Run calls the plugin's own command function with a
+    context built from the services. Tests: a startup plugin composed without an agent server (shared harness and
+    static tree), with the window's Run pressed through ImGui (as the Jobs window test does).
+  - **The run's failure contract (finding 3).** A run is one state machine:
+    - each stage checks staleness and cancellation;
+    - a failed gate (failed GPU rows), a stale capture, a cancellation or a refused next submission stops the
+      run and publishes nothing;
+    - the run ends with exactly one terminal status (published, failed with a reason, cancelled), which the
+      waiting MCP call and the window read.
+
+    Tests: a cancellation between stages, a refused continuation (a drain during the chain), a gated job drained,
+    a failed GPU page.
+  - **Live verification with known answers (finding 4).** The driver writes a fixed fixture: a seeded noisy
+    plane of 400 points with normals. It computes the expected answer independently in Python: a brute-force kNN
+    including self, and the update rule of `Geometry.PointCloud.Utils` (written out in the driver from the
+    implementation). The tolerance is 1e-4.
+    - Controls:
+      - zero iterations leaves the output equal to the input;
+      - one iteration matches the reference, with the reported displacement compared per pass;
+      - three iterations match a three-pass reference on each backend, and the GPU runs use 64-query pages, so
+        several pages;
+      - each run reports the requested and actual backend, the completed iterations and GPU batches above zero
+        for Vulkan;
+      - unrelated properties are unchanged;
+      - undo and redo restore the values exactly, while the plugin is unloaded and after a reload;
+      - a cancelled run publishes nothing.
+    - The polling of every wait is bounded. The window is checked in a capture; its Run is covered by the ImGui
+      test of finding 2.
+  - **R1 measured honestly (finding 5).** `check_feature_boundaries.py` adds the features that moved into
+    plugins (the plugin folder names under `plugins/`, the fixture excluded) to its vocabulary, so a bilateral
+    reference left in `src/runtime` or `src/app` still counts. A regression test plants one. The report gives the
+    bilateral references removed per hub file apart from R1's file count. The R2 baseline gains
+    `plugins/bilateral_filter` (0/0) and loses `src/runtime/Modules/BilateralFilter`.
+  - Non-blocking, taken:
+    - the service's readiness capture copies no values (as today's preview);
+    - undo and redo are tested while the plugin is unloaded;
+    - the bilateral assertions of `Test.SandboxEditorSessionLifecycle.cpp`
+      (readiness, queued jobs, cancellation) move to the plugin's tests;
+    - static builds keep the feature through the in-process registration, while loading and reloading stay
+      `plugins_unsupported` there.
+  - Cuts, taken: the service carries only what the bilateral filter needs; the live driver reuses the fixture
+    driver's process and socket helpers; `--no-startup-plugins` goes into the common launcher.
+- 2026-11-02: Plan for slice 3, step 2, revision 3. Codex delta on revision 2 (same session): REVISE, three
+  findings, answered:
+  1. **One job owner for every entry point.** Editor job identities, outcomes and cancel records live per
+     workspace attachment, and the Jobs window shows the Sandbox shell's. The Sandbox therefore gives the plugin
+     host and the point-cloud editing service its shell's attachment once it is attached (a host and a service
+     setter). Every plugin run, whether from its window or over MCP, is submitted, admitted and cancelled
+     through that one session, and it is used for the service's captures and history too, as the panel does
+     today. Without a shell (tests, a headless engine) the host and the service attach their own.
+     - New over today: a run started over MCP is a Jobs window row too (today MCP runs live in the agent
+       server's own session).
+     - Tests (an integration test composing the shell's Jobs window and the plugin's static form):
+       - start over the plugin's command and cancel in the Jobs window;
+       - start from the window and cancel over the MCP call;
+       - the same output refused across both, different outputs concurrent.
+  2. **Outcomes reach the Jobs window.**
+     - `PluginJob::Completion` returns the publication verdict (`bool(bool applied)`). The host's
+       `PublishCompletion` returns it, so a stale or failed publication is not reported as published.
+     - `PluginJob` names its requested domain (`PluginJobDomain`: CPU, GPU); the host maps it to the editor job
+       identity.
+     - `ReportPluginJobOutcome(handle, resolved domain, diagnostic)` forwards to the surface's `ReportOutcome`.
+     - `CancelPluginJob(handle)` cancels through the same surface.
+     - Tests: a failed GPU page and a stale publication show failed or stale, with the backend and the reason,
+       in the Jobs window's records and in the MCP reply.
+  3. **Deferred results' lifetime.**
+     - Each forwarder (continuation, progress, cancel) shares one host entry holding the plugin's callables. The
+       host keeps only a weak reference per plugin.
+     - When the agent server drops the call (completion, disconnect, reconnect, a minimized-window failure,
+       `DropPending`), the forwarders and with them the entry and the plugin's callables are destroyed, then
+       and there, while the image is mapped.
+     - An unload clears every live entry of the plugin before its close, so its callables die first. A
+       surviving forwarder then answers `plugin_unloaded` (continuation), an empty progress and an empty
+       cancel, and never reaches a later generation, whose entries are new. A drain timeout keeps the plugin
+       and its entries. The ordinary exit clears them like an unload.
+     - Tests, replacing step 1's `deferred_unsupported` test (all three forwarders alive in each):
+       - completion releases the callables;
+       - a cancel runs the plugin's cancel once;
+       - a dropped call releases them;
+       - an unload with a pending call destroys them before the close, and the forwarder answers
+         `plugin_unloaded`;
+       - a reload: the old forwarder does not reach the new generation;
+       - a drain timeout keeps the call working.
+  - Codex delta on revision 3 (session `01a1973c-80af-7353-83fc-08edff1eac21`): "Verdict: APPROVE for revision 3,
+    together with revisions 1 and 2 as amended. Blocking findings: none."
+- 2026-11-02: Step 2a implemented (the host: parity contract, held deferred results, startup plugins), as planned
+  in revision 3, except:
+  - the host's own workspace is attached in `OnResolve` and detached in `OnShutdown` (the agent server's pattern);
+    detaching in its destructor touched the already destroyed scene document module;
+  - the host prepares a workspace frame per call only for its own workspace; the app's shell prepares one every
+    frame;
+  - the contract's job output carries no presentation semantic (the module would pull heavy imports into every
+    plugin); the host uses the displacement semantic, as the bilateral filter does today.
+  - Verification on `build/dev-shared`: 20 plugin host contract tests (the deferred-result lifecycle, job rows and
+    verdicts, admission per output, run cancel, the gate, startup plugins with and without an agent server);
+    8 mutations of the new mechanisms each fail their test; S1 60 of 60, S2 116 of 116.
+  - Codex review of step 2a (fresh session `01a19b2d-b290-70b1-a8c9-8cc86323aaef`): REVISE, five blocking findings,
+    answered (each test fails with its fix removed):
+    1. a refused publication was finalized a second time: the finalizer returns when Completion already ran;
+    2. a deferred call that unloads its own plugin could destroy the running callable: the host counts the plugin
+       code it is running, and an unload or reload waits a frame while it is above zero;
+    3. a startup plugin whose commit failed without a UI host was closed with its boot sections registered: they
+       are unregistered first, and without config control the image stays mapped;
+    4. `CancelPluginJob` of a later stage cancelled that job only: the host resolves the stage's run first;
+    5. the drain cancelled through `JobService` directly: it cancels the runs through the workspace (the session
+       records the request), then the jobs.
+    Non-blocking, taken: the harness shuts the engine down while its shell is attached; a test submits through
+    the host's own workspace. 25 plugin host contract tests pass.
+  - Codex delta 1 (same session): REVISE, one finding: a job's completion (or gate) could unload its own plugin while
+    running. The host counts every main-thread plugin call it forwards (gate, completion, finalizer, deferred
+    callables); a test unloads from a completion, and the unload waits. 26 plugin host tests pass.
+  - Codex delta 2 (same session): "Verdict: APPROVE", bound to the staged diff sha256 `9b47b4cc…1d05775d`; gate and
+    finalizer reentrancy checked by inspection, the publication guard by a test.

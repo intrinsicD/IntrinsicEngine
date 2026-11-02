@@ -12,6 +12,7 @@ module;
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -29,17 +30,28 @@ module;
 module Extrinsic.Runtime.PluginHost;
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Logging;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.WorldRegistry;
+
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
 // Named only as a reference parameter, as Runtime.JobService does.
 extern "C++" { namespace Extrinsic::RHI { class ICommandContext; } }
@@ -215,9 +227,8 @@ namespace Extrinsic::Runtime
 
         constexpr const char* kUnsupported = "plugins need the shared engine build";
 
-        // The default opener: dlopen of a private copy, the v1 entry points, the same build id.
-        std::unique_ptr<PluginImage> OpenSharedPlugin(const std::string& path, const std::string_view failAt,
-                                                      AgentOperationOutcome& failure)
+        std::unique_ptr<PluginImage> OpenShared(const std::string& path, const std::string_view failAt,
+                                                AgentOperationOutcome& failure)
         {
 #if defined(INTRINSIC_PLUGINS_SUPPORTED)
             std::string error{};
@@ -278,6 +289,50 @@ namespace Extrinsic::Runtime
 #endif
     }
 
+    std::unique_ptr<PluginImage> OpenSharedPlugin(const std::string& path, const std::string_view failAt,
+                                                  AgentOperationOutcome& failure)
+    {
+        return OpenShared(path, failAt, failure);
+    }
+
+    std::unique_ptr<PluginImage> MakeInProcessPlugin(const PluginRegisterFn registerFn, const PluginShutdownFn shutdownFn)
+    {
+        class InProcessImage final : public PluginImage
+        {
+        public:
+            InProcessImage(PluginRegisterFn registerFn, PluginShutdownFn shutdownFn)
+                : m_Register(registerFn), m_Shutdown(shutdownFn) {}
+            bool Register(PluginRegistrations& staged, std::string& error) noexcept override
+            {
+                return m_Register(staged, error);
+            }
+            void Shutdown() noexcept override { m_Shutdown(); }
+            void Close() noexcept override {}
+            const std::filesystem::path& File() const noexcept override { return m_File; }
+
+        private:
+            PluginRegisterFn m_Register;
+            PluginShutdownFn m_Shutdown;
+            std::filesystem::path m_File{};
+        };
+        return std::make_unique<InProcessImage>(registerFn, shutdownFn);
+    }
+
+    std::optional<StagedPlugin> StagePlugin(std::unique_ptr<PluginImage> image, std::string& error)
+    {
+        StagedPlugin staged{.Image = std::move(image)};
+        if (!staged.Image->Register(staged.Registrations, error))
+        {
+            const int generation = staged.Registrations.Generation;
+            staged.Registrations = {};
+            (void)Close(std::move(staged.Image), generation);
+            return std::nullopt;
+        }
+        for (const auto& section : staged.Registrations.ConfigSections)
+            staged.SectionNames.push_back(section.DefaultSection.Name);
+        return staged;
+    }
+
     namespace
     {
         // A plugin job, owned on the main thread; the worker reaches it only through host code and a raw pointer.
@@ -288,6 +343,15 @@ namespace Extrinsic::Runtime
             PluginJob Job{};
             JobToken Token{};
             bool Finalized{false}; // its Completion ran (main thread)
+        };
+
+        // A deferred result of a plugin operation: the agent server holds host forwarders that share this entry,
+        // which holds the plugin's callables. Dropping the call frees it; an unload empties it first.
+        struct DeferredEntry
+        {
+            AgentOperationContinuation Continuation{};
+            decltype(AgentOperationOutcome::Progress) Progress{};
+            decltype(AgentOperationOutcome::Cancel) Cancel{};
         };
 
         struct GpuEntry
@@ -345,6 +409,125 @@ namespace Extrinsic::Runtime
         bool LoadPending{false}; // a load, unload or reload whose continuation has not finished (or been dropped)
         // Active payloads of an unloaded plugin's sections, reapplied when a plugin registers them again.
         std::map<std::string, Core::Config::EngineConfigSection> SavedSections{};
+        WorldRegistry* Worlds{nullptr};
+        // The workspace plugin jobs belong to: the app's (UseEditorWorkspace), else this one.
+        EditorWorkspaceAttachment OwnWorkspace{};
+        EditorWorkspaceAttachment* Workspace{nullptr};
+        std::vector<std::weak_ptr<DeferredEntry>> Deferred{};
+        // Plugin callables the host is running now (deferred results); an unload waits for zero, since it would
+        // destroy the running callable and unmap its code.
+        int RunningPluginCode{0};
+
+        // Counts plugin code the host runs on the main thread, for as long as the returned guard lives.
+        std::shared_ptr<void> Running()
+        {
+            ++RunningPluginCode;
+            return {nullptr, [this](void*) { --RunningPluginCode; }};
+        }
+
+        // Keeps a deferred result's callables in a host entry and hands the agent server forwarders to it.
+        AgentOperationOutcome HoldDeferred(AgentOperationOutcome outcome)
+        {
+            if (!outcome.Continuation && !outcome.Progress && !outcome.Cancel) return outcome;
+            auto entry = std::make_shared<DeferredEntry>(DeferredEntry{
+                std::move(outcome.Continuation), std::move(outcome.Progress), std::move(outcome.Cancel)});
+            std::erase_if(Deferred, [](const std::weak_ptr<DeferredEntry>& held) { return held.expired(); });
+            Deferred.push_back(entry);
+            const auto running = [this] { return Running(); };
+            if (entry->Continuation)
+                outcome.Continuation = [entry, running](const AgentOperationContext& context, AgentOperationOutcome& result)
+                {
+                    if (!entry->Continuation)
+                    {
+                        result = Fail("plugin_unloaded", "the plugin was unloaded before this call finished");
+                        return true;
+                    }
+                    const auto guard = running();
+                    return entry->Continuation(context, result);
+                };
+            if (entry->Progress)
+                outcome.Progress = [entry, running](const AgentOperationContext& context)
+                {
+                    if (!entry->Progress) return decltype(entry->Progress(context)){};
+                    const auto guard = running();
+                    return entry->Progress(context);
+                };
+            if (entry->Cancel)
+                outcome.Cancel = [entry, running](const AgentOperationContext& context)
+                {
+                    if (!entry->Cancel) return std::string{};
+                    const auto guard = running();
+                    return entry->Cancel(context);
+                };
+            return outcome;
+        }
+
+        // Destroys the plugin's callables of every pending call (before a close); their forwarders stay inert.
+        void ClearDeferred()
+        {
+            for (const auto& held : Deferred)
+                if (const auto entry = held.lock()) *entry = {};
+            Deferred.clear();
+        }
+
+        // The workspace's editor commands for one call. The app's shell prepares a frame every frame; the host's own
+        // workspace prepares one here, as the agent server does per call.
+        EditorProcessingCommands JobCommands()
+        {
+            if (Workspace == nullptr) return {};
+            if (Workspace == &OwnWorkspace && OwnWorkspace.IsAttached())
+                (void)PrepareEditorWorkspaceSnapshotFrame(OwnWorkspace);
+            return PrepareEditorProcessingCommands(*Workspace);
+        }
+
+        // The run a job belongs to: its run's first job.
+        JobToken RunOf(const JobToken job) const
+        {
+            for (const auto& entry : PluginJobs)
+                if (entry->Token == job) return entry->Job.Run.IsValid() ? entry->Job.Run.Token : job;
+            return job;
+        }
+
+        // Cancels every run of the plugin's jobs through the workspace, so its session records the requests (the
+        // Jobs window then offers no second cancel); jobs outside it are cancelled directly.
+        void CancelRuns()
+        {
+            std::vector<JobToken> runs{};
+            for (const auto& entry : PluginJobs)
+                if (const JobToken run = RunOf(entry->Token); std::ranges::find(runs, run) == runs.end())
+                    runs.push_back(run);
+            const EditorProcessingCommands commands = JobCommands();
+            (void)CancelEditorRunJobs(commands, runs);
+            for (const auto& entry : PluginJobs) (void)Jobs->Cancel(entry->Token);
+        }
+
+        // Commits the staged startup plugin; its config sections are already registered (the boot registry).
+        void CommitStartup()
+        {
+            auto staged = std::move(*Options.Startup);
+            Options.Startup.reset();
+            auto* config = Services->Find<EngineConfigControl>();
+            auto* ui = Services->Find<EditorUiHost>();
+            auto* history = Services->Find<EditorCommandHistory>();
+            LoadedPlugin plugin{.Image = std::move(staged.Image), .Generation = staged.Registrations.Generation,
+                                .Sections = std::move(staged.SectionNames)};
+            const auto failure = config && ui && history
+                ? Commit(staged.Registrations, plugin, *config, *ui, *history, {})
+                : std::optional<std::string>{"editor UI host, config control or history missing"};
+            staged.Registrations = {};
+            if (failure)
+            {
+                Core::Log::Error("[PluginHost] the startup plugin was not committed: {}", *failure);
+                // Its boot sections (a commit's rollback already removed them) must go before the close; without
+                // config control they cannot, so the image stays mapped.
+                if (config == nullptr) return;
+                for (const auto& name : plugin.Sections) (void)config->UnregisterSection(name);
+                (void)Close(std::move(plugin.Image), plugin.Generation);
+                return;
+            }
+            Plugin = std::move(plugin);
+            intrinsic_plugin_event("commit");
+        }
 
         std::unique_ptr<PluginImage> Open(const std::string& path, const std::string_view failAt,
                                           AgentOperationOutcome& failure) const
@@ -413,21 +596,17 @@ namespace Extrinsic::Runtime
             }
             if (failAt == "config") return rollback("config: injected failure after the config sections");
 
-            AgentOperationRegistry operationsCopy = *Operations;
+            // Without an agent server there is no registry: the plugin's tools are not registered.
+            AgentOperationRegistry operationsCopy = Operations != nullptr ? *Operations : AgentOperationRegistry{};
             for (auto& operation : staged.Operations)
             {
+                if (Operations == nullptr) break;
                 std::string name = operation.Name;
                 if (!operation.Invoke) return rollback("operations: operation rejected");
-                // v1 answers at once: the agent server keeps a deferred result's callables beyond the reach of an
-                // unload, so they are destroyed here, while the image is mapped.
-                operation.Invoke = [invoke = std::move(operation.Invoke)](const AgentOperationContext& context,
-                                                                          const std::string_view arguments)
-                {
-                    AgentOperationOutcome outcome = invoke(context, arguments);
-                    if (outcome.Continuation || outcome.Progress || outcome.Cancel)
-                        outcome = Fail("deferred_unsupported", "a plugin operation must answer at once");
-                    return outcome;
-                };
+                // The agent server keeps a deferred result beyond the reach of an unload, so the host holds it.
+                operation.Invoke = [this, invoke = std::move(operation.Invoke)](const AgentOperationContext& context,
+                                                                                const std::string_view arguments)
+                { return HoldDeferred(invoke(context, arguments)); };
                 if (!operationsCopy.Register(std::move(operation))) return rollback("operations: operation rejected");
                 plugin.Operations.push_back(std::move(name));
             }
@@ -455,7 +634,7 @@ namespace Extrinsic::Runtime
                 plugin.HistoryCommands.push_back(command.Name);
             }
 
-            *Operations = std::move(operationsCopy);
+            if (Operations != nullptr) *Operations = std::move(operationsCopy);
             return std::nullopt;
         }
 
@@ -511,7 +690,7 @@ namespace Extrinsic::Runtime
                     SavedSections[name] = *active;
                 (void)config.UnregisterSection(name);
             }
-            for (const auto& name : plugin.Operations) (void)Operations->Unregister(name);
+            for (const auto& name : plugin.Operations) (void)Operations->Unregister(name); // none without a registry
             for (const auto handle : plugin.Windows) (void)ui.UnregisterWindow(handle);
             // Entries recorded through these commands stay in the history; they wait for a plugin that registers
             // the same names again.
@@ -526,6 +705,7 @@ namespace Extrinsic::Runtime
             Plugin.reset();
             plugin.Image->Shutdown();
             Unregister(plugin, config, ui, history, true);
+            ClearDeferred();
             intrinsic_plugin_event("unload");
             if (!Close(std::move(plugin.Image), plugin.Generation)) return std::string{"callables_alive"};
             return std::nullopt;
@@ -556,7 +736,7 @@ namespace Extrinsic::Runtime
             {
                 deadline = now + budget;
                 Draining = true;
-                for (const auto& entry : PluginJobs) (void)Jobs->Cancel(entry->Token);
+                CancelRuns();
             }
             if (now >= *deadline)
             {
@@ -675,6 +855,8 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 // Drain first, frame by frame; on the deadline the plugin stays loaded and registered.
+                // Not while the plugin's own code is running (a deferred call that unloads its plugin): wait a frame.
+                if (RunningPluginCode > 0) return false;
                 const DrainState drain = PollDrain(deadline, budget, simulateGpuStall);
                 if (drain == DrainState::Pending) return false;
                 if (drain == DrainState::TimedOut)
@@ -776,7 +958,25 @@ namespace Extrinsic::Runtime
     {
         m_Impl->Services = &setup.Services();
         m_Impl->Jobs = &setup.Jobs();
+        m_Impl->Worlds = &setup.Worlds();
         return setup.Services().Provide<PluginHostModule>(*this, Name());
+    }
+
+    RuntimeModuleResult PluginHostModule::OnResolve(EngineSetup&)
+    {
+        auto& impl = *m_Impl;
+        if (impl.Workspace == nullptr)
+        {
+            impl.OwnWorkspace.Attach(*impl.Worlds, *impl.Services);
+            impl.Workspace = &impl.OwnWorkspace;
+        }
+        if (impl.Options.Startup) impl.CommitStartup();
+        return RuntimeModuleOk();
+    }
+
+    void PluginHostModule::UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept
+    {
+        m_Impl->Workspace = &workspace;
     }
 
     void PluginHostModule::OnShutdown(RuntimeModuleShutdownContext& context)
@@ -791,7 +991,17 @@ namespace Extrinsic::Runtime
         // The job service drained before the modules shut down, so every job is finalized; one that is not
         // stays (its image stays mapped too).
         std::erase_if(impl.PluginJobs, [](const std::unique_ptr<JobEntry>& entry) { return entry->Finalized; });
-        if (!impl.Plugin) return;
+        // The own workspace leaves the services it attached to while they are alive (as the agent server's does).
+        const auto detach = [&impl]
+        {
+            impl.OwnWorkspace.Detach();
+            impl.Workspace = nullptr;
+        };
+        if (!impl.Plugin)
+        {
+            detach();
+            return;
+        }
         LoadedPlugin plugin = std::move(*impl.Plugin);
         impl.Plugin.reset();
         plugin.Image->Shutdown();
@@ -800,40 +1010,93 @@ namespace Extrinsic::Runtime
         auto* history = context.Services.Find<EditorCommandHistory>();
         if (config != nullptr && ui != nullptr && history != nullptr)
             impl.Unregister(plugin, *config, *ui, *history, false);
+        impl.ClearDeferred();
+        detach();
         intrinsic_plugin_event("host_shutdown");
         // Destroyed without Close, the image stays mapped: callables the engine destroys later (history entries, a
         // dropped call) still find their code, and the process ends.
     }
 
-    bool PluginHostModule::SubmitJob(const AgentOperationContext& context, PluginJob job)
+    PluginJobHandle PluginHostModule::SubmitJob(PluginJob job, std::string* refusal)
     {
         auto& impl = *m_Impl;
-        if (impl.Draining || context.Jobs == nullptr || !job.Work || !job.Completion) return false;
+        if (impl.Draining || !job.Work || !job.Completion) return {};
+        const EditorProcessingCommands commands = impl.JobCommands();
+        const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
+        if (!surface.Submit) return {};
+        EditorJobIdentity identity{
+            .Run = job.Run.Token,
+            .RequestedDomain = job.Domain == PluginJobDomain::Gpu ? EditorJobDomain::GpuCompute : EditorJobDomain::Cpu};
+        if (job.Output)
+        {
+            identity.EntityId = job.Output->StableEntityId;
+            identity.Scope = ToEditorJobScope(job.Output->Property.Domain);
+            identity.OutputSemantic = GeometryPresentationSlotSemantic::Displacement;
+            identity.OutputName = job.Output->Property.Name;
+            // A run's first job is admitted only while no other run writes the same output.
+            if (!job.Run.IsValid() && surface.FindActive && surface.FindActive(identity))
+            {
+                if (refusal != nullptr)
+                    *refusal = job.Label + " is already running on '" + identity.OutputName + "'; wait or cancel it.";
+                return {};
+            }
+        }
         auto entry = std::make_unique<JobEntry>();
         entry->Job = std::move(job);
         JobEntry* raw = entry.get();
         JobDesc desc{};
-        desc.DebugName = "plugin job";
+        desc.DebugName = raw->Job.Label.empty() ? std::string{"plugin job"} : raw->Job.Label;
         desc.Work = [raw](const JobCancellation& cancellation)
         {
             raw->Job.Work([&cancellation] { return cancellation.IsCancelled(); });
             return JobResultEnvelope::Make(true);
         };
-        desc.PublishCompletion = [raw](KernelEventBus&, const JobResultEnvelope&)
+        // Main-thread plugin code runs counted, so an unload it triggers waits until it returned.
+        Impl* host = &impl;
+        if (raw->Job.IsReadyToApply)
+            desc.IsReadyToApply = [raw, host]
+            {
+                const auto guard = host->Running();
+                return raw->Job.IsReadyToApply();
+            };
+        // The plugin's verdict is the job's: a stale or failed publication is not reported as published.
+        desc.PublishCompletion = [raw, host](KernelEventBus&, const JobResultEnvelope&)
         {
             raw->Finalized = true;
-            raw->Job.Completion(true);
-            return true;
+            const auto guard = host->Running();
+            return raw->Job.Completion(true);
         };
-        desc.FinalizeUnpublishedOnMainThread = [raw]
+        // A publication the plugin refused is finalized too; its Completion already ran.
+        desc.FinalizeUnpublishedOnMainThread = [raw, host]
         {
+            if (raw->Finalized) return;
             raw->Finalized = true;
-            raw->Job.Completion(false);
+            const auto guard = host->Running();
+            (void)raw->Job.Completion(false);
         };
-        entry->Token = context.Jobs->Submit(std::move(desc));
-        if (!entry->Token.IsValid()) return false;
+        entry->Token = surface.Submit(std::move(desc), std::move(identity));
+        if (!entry->Token.IsValid()) return {};
+        const PluginJobHandle handle{entry->Token};
         impl.PluginJobs.push_back(std::move(entry));
-        return true;
+        return handle;
+    }
+
+    bool PluginHostModule::CancelJob(const PluginJobHandle job)
+    {
+        const EditorProcessingCommands commands = m_Impl->JobCommands();
+        const JobToken run = m_Impl->RunOf(job.Token);
+        return CancelEditorRunJobs(commands, std::span<const JobToken>{&run, 1u}).Requested > 0u;
+    }
+
+    void PluginHostModule::ReportJobOutcome(const PluginJobHandle job, const PluginJobDomain resolved,
+                                            std::string diagnostic)
+    {
+        const EditorProcessingCommands commands = m_Impl->JobCommands();
+        const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
+        if (surface.ReportOutcome)
+            surface.ReportOutcome(job.Token, {.ResolvedDomain = resolved == PluginJobDomain::Gpu ? EditorJobDomain::GpuCompute
+                                                                                               : EditorJobDomain::Cpu,
+                                              .Diagnostic = std::move(diagnostic)});
     }
 
     bool PluginHostModule::StartGpuWork(const AgentOperationContext& context, GpuQueueParticipantDesc work)

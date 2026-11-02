@@ -175,6 +175,7 @@ namespace
         const double seconds = arguments.is_object() ? arguments.value("seconds", 1.0) : 1.0;
         const bool ignoreCancel = arguments.is_object() && arguments.value("ignore_cancel", false);
         const bool submitted = Runtime::SubmitPluginJob(context, {
+            .Label = "Spike job",
             .Work = [t = Tracked{"job_work"}, seconds, ignoreCancel](const std::function<bool()>& cancelled)
             {
                 t.Invoked();
@@ -186,8 +187,9 @@ namespace
             {
                 t.Invoked();
                 intrinsic_plugin_event(published ? "job_published" : "job_finalized");
+                return published;
             },
-        });
+        }).IsValid();
         if (!submitted) return {.IsError = true, .Text = "the job was not submitted", .ErrorCode = "not_submitted"};
         return {.Text = R"({"submitted":true})"};
     }
