@@ -12,7 +12,9 @@ a point cloud with normals (a .pwn written here) and, over the agent socket:
   4. lists a long run in jobs_list and cancels it through MCP notifications/cancelled: the run ends, nothing is
      written (its row belongs to the editor's Jobs window, so jobs_cancel, the agent session's, is refused there);
   5. undoes and redoes a run while the plugin is unloaded and after it is loaded again, and runs it again;
-  6. takes a screenshot of the window for the record, quits through app_quit and checks a clean, sanitizer-clean exit.
+  6. loads the spike plugin beside it (a build of its own generation, made before the start): both are listed, an
+     unnamed unload is refused, each reloads by name with the other loaded and keeps working, the spike unloads;
+  7. takes a screenshot of the window for the record, quits through app_quit and checks a clean, sanitizer-clean exit.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
 Usage: python3 plugins/bilateral_filter/live_driver.py --build build/dev-shared --out <new dir> [--icd <json>]
 """
@@ -30,6 +32,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "spike"))
 import spike_driver as s1  # noqa: E402  (shared session helpers)
+import reload_driver as s2  # noqa: E402  (spike builds of a chosen generation)
+
+COEXIST_GENERATION = 9  # not the bilateral filter's 1
 
 SECTION = "sandbox.bilateral_filter"
 DOMAIN = "PointCloudPoint"
@@ -152,8 +157,8 @@ def scenario(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict
 def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -> None:
     session = Session(agent, checks)
     ok, listed, _ = session.call("plugin_list")
-    loaded = listed.get("loaded") if isinstance(listed, dict) else None
-    checks.check("startup: the bilateral filter plugin is loaded", isinstance(loaded, dict), listed)
+    loaded = [p.get("name") for p in (listed.get("loaded") or [])] if isinstance(listed, dict) else []
+    checks.check("startup: the bilateral filter plugin is loaded", "bilateral_filter" in loaded, listed)
     names = {tool["name"] for tool in agent.request("tools/list", {}).get("result", {}).get("tools", [])}
     checks.check("startup: its tools are registered", {"bilateral_filter", "bilateral_filter_preview"} <= names)
     ok, sections, _ = session.call("config_sections")
@@ -281,6 +286,34 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
     result = session.run()
     checks.check("reload: the tool runs again", result.get("status") == "applied", result)
 
+    # A second plugin beside it (ARCH-022 step 2d-0): each is addressed by name and leaves the other working.
+    spike = meta.get("coexist_spike", "no coexistence build")
+    ok, loaded, code = session.call("plugin_load", {"path": spike})
+    checks.check("coexist: the spike plugin loads beside it", ok, [code, loaded])
+    ok, listed, _ = session.call("plugin_list")
+    names = [p.get("name") for p in (listed.get("loaded") or [])] if isinstance(listed, dict) else []
+    checks.check("coexist: both are listed", sorted(names) == ["bilateral_filter", "spike"], listed)
+    ok, echo, _ = session.call("spike_echo", {"text": "beside"})
+    checks.check("coexist: the spike tool answers", ok and echo == {"echo": {"text": "beside"}}, echo)
+    ok, unnamed, code = session.call("plugin_unload")
+    checks.check("coexist: an unload without a name is refused", not ok and code == "invalid_params", [code, unnamed])
+    ok, reloaded, code = session.call("plugin_reload", {"plugin": "spike", "path": spike})
+    checks.check("coexist: the spike plugin reloads by name", ok, [code, reloaded])
+    ok, reloaded, code = session.call("plugin_reload", {"plugin": "bilateral_filter",
+                                                         "path": str(build / "plugins/libIntrinsicBilateralFilterPlugin.so")})
+    checks.check("coexist: the bilateral filter reloads by name beside the spike", ok, [code, reloaded])
+    result = session.run()
+    checks.check("coexist: the bilateral tool runs with both loaded", result.get("status") == "applied", result)
+    ok, echo, _ = session.call("spike_echo", {"text": "after"})
+    checks.check("coexist: the spike tool still answers", ok and echo == {"echo": {"text": "after"}}, echo)
+    ok, unloaded, code = session.call("plugin_unload", {"plugin": "spike"})
+    checks.check("coexist: the spike plugin unloads by name", ok, [code, unloaded])
+    ok, listed, _ = session.call("plugin_list")
+    names = [p.get("name") for p in (listed.get("loaded") or [])] if isinstance(listed, dict) else []
+    checks.check("coexist: the bilateral filter stays loaded", names == ["bilateral_filter"], listed)
+    result = session.run()
+    checks.check("coexist: the bilateral tool runs after the spike unload", result.get("status") == "applied", result)
+
     ok, _, content, _ = agent.call("view_capture", {"region": "window", "path": "bilateral.png", "overwrite": True})
     image = next((item for item in content if item.get("type") == "image"), None)
     if image is not None:
@@ -292,6 +325,11 @@ def main() -> int:
     args = s1.arguments(__doc__)
     checks = s1.Checks()
     meta: dict = {}
+    # The spike build for the coexistence steps gets a generation of its own: the host counts tracked callables
+    # by generation, and a fresh spike build's (1) is the bilateral filter's, so the spike's would refuse its close.
+    builds = s2.Builds(args.build, args.out)
+    if checks.check(f"coexist: a spike build of generation {COEXIST_GENERATION} is made", builds.make(COEXIST_GENERATION)):
+        meta["coexist_spike"] = str(builds.keep("coexist"))
     result = s1.launch(args, checks, lambda agent: scenario(agent, checks, args.out, args.build, meta),
                        flags=("--plugin-test-hooks",), client=Agent)
     (args.out / "meta.json").write_text(json.dumps(meta, indent=2, default=str))

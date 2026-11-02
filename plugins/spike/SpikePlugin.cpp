@@ -288,6 +288,7 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
     spike_symbol_the_host_does_not_export(); // never reached: RTLD_NOW refuses the image first
 #endif
     intrinsic_plugin_event("register");
+    staged.Name = "spike";
     staged.Generation = SPIKE_GENERATION;
     staged.ConfigSections.push_back({
         .DefaultSection = {.Name = "spike", .SchemaId = "intrinsic.spike", .SchemaVersion = 1u,

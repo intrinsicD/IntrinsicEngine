@@ -125,6 +125,21 @@ plugins/marching_cubes/
     (else `drain_timeout`, and the plugin stays). Then the shutdown hook runs and every registration goes, with
     the config payloads saved. The image is closed only when none of its callables is alive.
   - A reload is an unload and a load; the saved payloads are validated again and reapplied.
+  - Several plugins load side by side, each under the name its Register sets; a second plugin of a loaded name is
+    refused (`already_loaded`). With more than one loaded, `plugin_unload` and `plugin_reload` need `plugin`
+    (else `invalid_params`), and a reload whose build carries another name leaves the plugin unloaded
+    (`name_mismatch`). `plugin_list` returns `{"loaded": [...]}`, one entry per plugin.
+  - Each drain, unload and close concerns one plugin; the others keep running. A contract call (jobs, cancel,
+    report, GPU work) acts for the plugin whose code the host is running, else for the only loaded one; it runs
+    on the main thread, and with several loaded a call from outside any plugin is refused. A plugin cancels,
+    reports and joins only its own jobs. Close accounting counts callables by build generation, so two plugins
+    from one build share it: a live callable of one keeps the other's image mapped too (safe, never a close too
+    early).
+  - A cancelled job that has not started is reaped only when a worker reaches it, so another plugin's long jobs
+    on every worker can delay a drain to `drain_timeout`; the plugin stays loaded and the unload can be retried.
+  - A load, unload or reload waits while any plugin's code runs on the main thread (the registries it changes may
+    hold the running callable), so one polled from inside plugin code completes only after that code returned.
+    While its Register or shutdown hook runs a plugin is not loaded, and its contract calls are refused.
   - At the ordinary exit the engine settles GPU work and jobs; the host, which shuts down first, runs the
     shutdown hook and removes the registrations, and leaves the image mapped.
   - Fault injection and probes, for the fixture plugin's drivers, need `--plugin-test-hooks`.

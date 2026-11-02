@@ -40,6 +40,7 @@ export namespace Extrinsic::Runtime
     // What a plugin's register entry adds; the host commits it atomically on a later frame.
     struct PluginRegistrations
     {
+        std::string Name{}; // the plugin's name, unique among loaded plugins (plugin_unload, plugin_reload)
         int Generation{0}; // the plugin build's version, for callable accounting
         std::vector<Core::Config::EngineConfigSectionRegistration> ConfigSections{};
         std::vector<AgentOperationSpec> Operations{}; // a deferred result is held by the host

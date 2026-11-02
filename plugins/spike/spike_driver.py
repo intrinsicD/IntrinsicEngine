@@ -313,7 +313,7 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
     checks.check("host: plugin host tools present",
                  {"plugin_load", "plugin_unload", "plugin_reload", "plugin_list", "plugin_host_identity", "app_quit"} <= names)
     ok, listed, _, _ = agent.call("plugin_list")
-    checks.check("host: plugin_list reports no plugin", ok and listed == {"loaded": None}, listed)
+    checks.check("host: plugin_list reports no plugin", ok and listed == {"loaded": []}, listed)
     for stage, code in FAIL_STAGES.items():
         ok, reply, _, error = agent.call("plugin_load", {"path": str(plugin), "fail_at": stage})
         named = code != "commit_failed" or str(reply).startswith(f"{stage}:")
@@ -355,7 +355,8 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
     ok, echo, _, _ = agent.call("spike_echo", {"text": "hello"})
     checks.check("mcp: spike_echo answers", ok and echo == {"echo": {"text": "hello"}}, echo)
     ok, listed, _, _ = agent.call("plugin_list")
-    loaded = listed.get("loaded") if isinstance(listed, dict) else None
+    loaded = next((p for p in (listed.get("loaded") or []) if p.get("name") == "spike"), None) \
+        if isinstance(listed, dict) else None
     checks.check("host: plugin_list reports the loaded generation and its registrations",
                  ok and isinstance(loaded, dict) and loaded.get("generation") == generation
                  and "spike_echo" in loaded["operations"]

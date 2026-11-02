@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -16,6 +17,8 @@ module;
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -318,21 +321,6 @@ namespace Extrinsic::Runtime
         return std::make_unique<InProcessImage>(registerFn, shutdownFn);
     }
 
-    std::optional<StagedPlugin> StagePlugin(std::unique_ptr<PluginImage> image, std::string& error)
-    {
-        StagedPlugin staged{.Image = std::move(image)};
-        if (!staged.Image->Register(staged.Registrations, error))
-        {
-            const int generation = staged.Registrations.Generation;
-            staged.Registrations = {};
-            (void)Close(std::move(staged.Image), generation);
-            return std::nullopt;
-        }
-        for (const auto& section : staged.Registrations.ConfigSections)
-            staged.SectionNames.push_back(section.DefaultSection.Name);
-        return staged;
-    }
-
     namespace
     {
         // A plugin job, owned on the main thread; the worker reaches it only through host code and a raw pointer.
@@ -354,27 +342,18 @@ namespace Extrinsic::Runtime
             decltype(AgentOperationOutcome::Cancel) Cancel{};
         };
 
+        // A plugin's GPU work: the job service holds host forwarders to its callables; the host keeps the in-flight
+        // probe's for its drain and identity probe.
         struct GpuEntry
         {
-            GpuQueueParticipantDesc Work{};
+            std::function<bool()> InFlight{};
             GpuQueueParticipantHandle Handle{};
-        };
-
-        // The plugin that is loaded and committed; everything it registered, by name or handle.
-        struct LoadedPlugin
-        {
-            std::unique_ptr<PluginImage> Image{};
-            int Generation{0};
-            std::vector<std::string> Operations{};
-            std::vector<std::string> Sections{};
-            std::vector<EditorWindowHandle> Windows{};
-            std::vector<std::string> HistoryCommands{};
         };
 
         // An opened image whose Register succeeded; committed on a later frame.
         struct Candidate
         {
-            std::unique_ptr<PluginImage> Image{};
+            std::shared_ptr<PluginSlot> Slot{};
             PluginRegistrations Staged{};
         };
 
@@ -396,126 +375,298 @@ namespace Extrinsic::Runtime
         }
     }
 
+    // One plugin: its image, what it registered, and its jobs, GPU work, drain state and deferred results. The host
+    // lists the loaded ones; host forwarders share a slot, so a copy that outlives its plugin finds its entry empty.
+    struct PluginSlot
+    {
+        std::string Name{};
+        std::unique_ptr<PluginImage> Image{};
+        int Generation{0};
+        std::vector<std::string> Operations{};
+        std::vector<std::string> Sections{};
+        std::vector<EditorWindowHandle> Windows{};
+        std::vector<std::string> HistoryCommands{};
+        std::vector<std::unique_ptr<JobEntry>> Jobs{};
+        std::shared_ptr<GpuEntry> Gpu{};
+        std::vector<std::weak_ptr<DeferredEntry>> Deferred{};
+        std::vector<std::function<void()>> Clearers{}; // empty the held callables of its forwarders
+        std::function<void()> RetainOperation{}; // test hook: keeps a copy of its first tool's callable alive
+        bool Draining{false};
+        // Its code the host is running now (main thread and GPU callbacks); an unload waits for zero, since it
+        // would destroy the running callable and unmap its code.
+        std::atomic<int> Running{0};
+
+        // Destroys the plugin's callables of every pending call and every forwarder (before a close); the
+        // forwarders stay, inert.
+        void ClearCallables()
+        {
+            for (const auto& held : Deferred)
+                if (const auto entry = held.lock()) *entry = {};
+            Deferred.clear();
+            for (const auto& clear : Clearers) clear();
+            Clearers.clear();
+        }
+    };
+
+    namespace
+    {
+        // The plugin whose code the host is running on this thread (the caller of the contract functions).
+        thread_local PluginSlot* t_Caller{nullptr};
+
+        // Host code entering a plugin's code: counted as running, and the plugin is the caller until it returns
+        // (then the previous caller is again: a plugin's code that runs another's).
+        class Entered
+        {
+        public:
+            explicit Entered(PluginSlot& slot) : m_Slot(slot), m_Previous(t_Caller)
+            {
+                ++m_Slot.Running;
+                t_Caller = &m_Slot;
+            }
+            ~Entered()
+            {
+                t_Caller = m_Previous;
+                --m_Slot.Running;
+            }
+            Entered(const Entered&) = delete;
+            Entered& operator=(const Entered&) = delete;
+
+        private:
+            PluginSlot& m_Slot;
+            PluginSlot* m_Previous;
+        };
+
+        // A forwarder to a plugin callable held by the slot's clearable entry: it enters the slot, and calls
+        // nothing once the entry is cleared (returning `inert`).
+        // `retain` (test hook) receives a function that copies the plugin's callable out of the entry, beyond the
+        // clearing, so the close must refuse.
+        template <class R, class... Args>
+        std::function<R(Args...)> Forward(const std::shared_ptr<PluginSlot>& slot, std::function<R(Args...)> fn,
+                                          std::function<R()> inert = {}, std::function<void()>* retain = nullptr)
+        {
+            if (!fn) return {};
+            auto held = std::make_shared<std::function<R(Args...)>>(std::move(fn));
+            slot->Clearers.push_back([weak = std::weak_ptr(held)]
+            {
+                if (const auto entry = weak.lock()) *entry = {};
+            });
+            if (retain != nullptr)
+                *retain = [weak = std::weak_ptr(held)]
+                {
+                    static auto* kept = new std::vector<std::function<R(Args...)>>(); // never destroyed
+                    if (const auto entry = weak.lock(); entry && *entry) kept->push_back(*entry);
+                };
+            return [slot, held, inert = std::move(inert)](Args... args) -> R
+            {
+                if (!*held)
+                {
+                    if constexpr (std::is_void_v<R>) return;
+                    else return inert ? inert() : R{};
+                }
+                const Entered entered(*slot);
+                return (*held)(std::forward<Args>(args)...);
+            };
+        }
+
+        // The plugin's section callbacks enter its slot (at staging for a startup plugin, before the boot calls
+        // them).
+        void ForwardSection(const std::shared_ptr<PluginSlot>& slot, Core::Config::EngineConfigSectionRegistration& section)
+        {
+            section.Validate = Forward(slot, std::move(section.Validate));
+            section.OnChanged = Forward(slot, std::move(section.OnChanged));
+        }
+
+        // Open's Register, entered (a call into the plugin while it is not loaded, so it cannot submit work).
+        bool RegisterInto(PluginSlot& slot, PluginRegistrations& staged, std::string& error)
+        {
+            const Entered entered(slot);
+            return slot.Image->Register(staged, error);
+        }
+    }
+
+    std::vector<StagedPlugin> StageStartupPlugins(std::vector<std::unique_ptr<PluginImage>> images,
+                                                  Core::Config::EngineConfigSectionRegistry& boot,
+                                                  std::vector<std::string>& errors)
+    {
+        std::vector<StagedPlugin> staged{};
+        for (auto& image : images)
+        {
+            auto slot = std::make_shared<PluginSlot>();
+            slot->Image = std::move(image);
+            StagedPlugin plugin{.Slot = slot};
+            std::string error{};
+            const auto drop = [&](std::string why)
+            {
+                for (const auto& name : plugin.SectionNames) (void)boot.Unregister(name);
+                const int generation = plugin.Registrations.Generation;
+                plugin.Registrations = {};
+                slot->ClearCallables();
+                (void)Close(std::move(slot->Image), generation);
+                errors.push_back(std::move(why));
+            };
+            if (!RegisterInto(*slot, plugin.Registrations, error))
+            {
+                drop("register failed: " + error);
+                continue;
+            }
+            slot->Name = plugin.Registrations.Name;
+            slot->Generation = plugin.Registrations.Generation;
+            if (slot->Name.empty() || std::ranges::any_of(staged, [&](const StagedPlugin& other)
+                                                          { return other.Slot->Name == slot->Name; }))
+            {
+                drop("plugin '" + slot->Name + "': a startup plugin needs a name of its own");
+                continue;
+            }
+            bool registered = true;
+            for (auto& section : plugin.Registrations.ConfigSections)
+            {
+                std::string name = section.DefaultSection.Name;
+                ForwardSection(slot, section);
+                if (!boot.Register(std::move(section)))
+                {
+                    registered = false;
+                    break;
+                }
+                plugin.SectionNames.push_back(std::move(name));
+            }
+            if (!registered)
+            {
+                drop("plugin '" + slot->Name + "': a config section name is taken");
+                continue;
+            }
+            plugin.Registrations.ConfigSections.clear();
+            staged.push_back(std::move(plugin));
+        }
+        return staged;
+    }
+
     struct PluginHostModule::Impl
     {
         PluginHostOptions Options{};
         ServiceRegistry* Services{nullptr};
         AgentOperationRegistry* Operations{nullptr};
         JobService* Jobs{nullptr};
-        std::vector<std::unique_ptr<JobEntry>> PluginJobs{};
-        std::unique_ptr<GpuEntry> Gpu{};
-        bool Draining{false};
-        std::optional<LoadedPlugin> Plugin{};
+        std::thread::id MainThread{std::this_thread::get_id()};
+        std::vector<std::shared_ptr<PluginSlot>> Plugins{}; // the loaded ones, in load order
         bool LoadPending{false}; // a load, unload or reload whose continuation has not finished (or been dropped)
         // Active payloads of an unloaded plugin's sections, reapplied when a plugin registers them again.
         std::map<std::string, Core::Config::EngineConfigSection> SavedSections{};
         // The workspace plugin jobs belong to: the app's (UseEditorWorkspace), else the host's own.
         EditorWorkspaceSlot Workspace{};
-        std::vector<std::weak_ptr<DeferredEntry>> Deferred{};
-        // Plugin callables the host is running now (deferred results); an unload waits for zero, since it would
-        // destroy the running callable and unmap its code.
-        int RunningPluginCode{0};
 
-        // Counts plugin code the host runs on the main thread, for as long as the returned guard lives.
-        std::shared_ptr<void> Running()
+        std::shared_ptr<PluginSlot> Find(const std::string_view name) const
         {
-            ++RunningPluginCode;
-            return {nullptr, [this](void*) { --RunningPluginCode; }};
+            const auto found = std::ranges::find_if(Plugins, [&](const auto& slot) { return slot->Name == name; });
+            return found != Plugins.end() ? *found : nullptr;
         }
 
-        // Keeps a deferred result's callables in a host entry and hands the agent server forwarders to it.
-        AgentOperationOutcome HoldDeferred(AgentOperationOutcome outcome)
+        // The plugin a contract call acts for: the one whose code is running, else (a call from outside any plugin
+        // call, a test's own code) the only loaded one. Main thread only.
+        std::shared_ptr<PluginSlot> Caller(std::string* refusal) const
+        {
+            const auto refuse = [&](std::string why) -> std::shared_ptr<PluginSlot>
+            {
+                if (refusal != nullptr) *refusal = std::move(why);
+                return nullptr;
+            };
+            if (std::this_thread::get_id() != MainThread) return refuse("plugin contract calls run on the main thread");
+            if (t_Caller != nullptr)
+            {
+                const auto found = std::ranges::find_if(Plugins, [](const auto& slot) { return slot.get() == t_Caller; });
+                return found != Plugins.end() ? *found : refuse("the calling plugin is not loaded");
+            }
+            if (Plugins.size() == 1u) return Plugins.front();
+            return refuse(Plugins.empty() ? "no plugin is loaded" : "several plugins are loaded; call from a plugin");
+        }
+
+        // Keeps a deferred result's callables in a host entry of the plugin and hands the agent server forwarders.
+        AgentOperationOutcome HoldDeferred(const std::shared_ptr<PluginSlot>& slot, AgentOperationOutcome outcome)
         {
             if (!outcome.Continuation && !outcome.Progress && !outcome.Cancel) return outcome;
             auto entry = std::make_shared<DeferredEntry>(DeferredEntry{
                 std::move(outcome.Continuation), std::move(outcome.Progress), std::move(outcome.Cancel)});
-            std::erase_if(Deferred, [](const std::weak_ptr<DeferredEntry>& held) { return held.expired(); });
-            Deferred.push_back(entry);
-            const auto running = [this] { return Running(); };
+            std::erase_if(slot->Deferred, [](const std::weak_ptr<DeferredEntry>& held) { return held.expired(); });
+            slot->Deferred.push_back(entry);
             if (entry->Continuation)
-                outcome.Continuation = [entry, running](const AgentOperationContext& context, AgentOperationOutcome& result)
+                outcome.Continuation = [entry, slot](const AgentOperationContext& context, AgentOperationOutcome& result)
                 {
                     if (!entry->Continuation)
                     {
                         result = Fail("plugin_unloaded", "the plugin was unloaded before this call finished");
                         return true;
                     }
-                    const auto guard = running();
+                    const Entered entered(*slot);
                     return entry->Continuation(context, result);
                 };
             if (entry->Progress)
-                outcome.Progress = [entry, running](const AgentOperationContext& context)
+                outcome.Progress = [entry, slot](const AgentOperationContext& context)
                 {
                     if (!entry->Progress) return decltype(entry->Progress(context)){};
-                    const auto guard = running();
+                    const Entered entered(*slot);
                     return entry->Progress(context);
                 };
             if (entry->Cancel)
-                outcome.Cancel = [entry, running](const AgentOperationContext& context)
+                outcome.Cancel = [entry, slot](const AgentOperationContext& context)
                 {
                     if (!entry->Cancel) return std::string{};
-                    const auto guard = running();
+                    const Entered entered(*slot);
                     return entry->Cancel(context);
                 };
             return outcome;
         }
 
-        // Destroys the plugin's callables of every pending call (before a close); their forwarders stay inert.
-        void ClearDeferred()
+        // The run a job of the plugin belongs to (its run's first job); none when the job is not the plugin's.
+        static std::optional<JobToken> RunOf(const PluginSlot& slot, const JobToken job)
         {
-            for (const auto& held : Deferred)
-                if (const auto entry = held.lock()) *entry = {};
-            Deferred.clear();
-        }
-
-
-        // The run a job belongs to: its run's first job.
-        JobToken RunOf(const JobToken job) const
-        {
-            for (const auto& entry : PluginJobs)
+            for (const auto& entry : slot.Jobs)
                 if (entry->Token == job) return entry->Job.Run.IsValid() ? entry->Job.Run.Token : job;
-            return job;
+            return std::nullopt;
         }
 
         // Cancels every run of the plugin's jobs through the workspace, so its session records the requests (the
         // Jobs window then offers no second cancel); jobs outside it are cancelled directly.
-        void CancelRuns()
+        void CancelRuns(const PluginSlot& slot)
         {
             std::vector<JobToken> runs{};
-            for (const auto& entry : PluginJobs)
-                if (const JobToken run = RunOf(entry->Token); std::ranges::find(runs, run) == runs.end())
-                    runs.push_back(run);
+            for (const auto& entry : slot.Jobs)
+                if (const auto run = RunOf(slot, entry->Token); run && std::ranges::find(runs, *run) == runs.end())
+                    runs.push_back(*run);
             const EditorProcessingCommands commands = Workspace.Commands();
             (void)CancelEditorRunJobs(commands, runs);
-            for (const auto& entry : PluginJobs) (void)Jobs->Cancel(entry->Token);
+            for (const auto& entry : slot.Jobs) (void)Jobs->Cancel(entry->Token);
         }
 
-        // Commits the staged startup plugin; its config sections are already registered (the boot registry).
+        // Commits the staged startup plugins in order; their config sections are already registered (the boot
+        // registry). One that fails is logged and closed, its own sections removed; the others are unaffected.
         void CommitStartup()
         {
-            auto staged = std::move(*Options.Startup);
-            Options.Startup.reset();
+            auto startup = std::move(Options.Startup);
+            Options.Startup.clear();
             auto* config = Services->Find<EngineConfigControl>();
             auto* ui = Services->Find<EditorUiHost>();
             auto* history = Services->Find<EditorCommandHistory>();
-            LoadedPlugin plugin{.Image = std::move(staged.Image), .Generation = staged.Registrations.Generation,
-                                .Sections = std::move(staged.SectionNames)};
-            const auto failure = config && ui && history
-                ? Commit(staged.Registrations, plugin, *config, *ui, *history, {})
-                : std::optional<std::string>{"editor UI host, config control or history missing"};
-            staged.Registrations = {};
-            if (failure)
+            for (auto& staged : startup)
             {
-                Core::Log::Error("[PluginHost] the startup plugin was not committed: {}", *failure);
-                // Its boot sections (a commit's rollback already removed them) must go before the close; without
-                // config control they cannot, so the image stays mapped.
-                if (config == nullptr) return;
-                for (const auto& name : plugin.Sections) (void)config->UnregisterSection(name);
-                (void)Close(std::move(plugin.Image), plugin.Generation);
-                return;
+                const auto slot = staged.Slot;
+                slot->Sections = std::move(staged.SectionNames);
+                const auto failure = config && ui && history
+                    ? Commit(staged.Registrations, slot, *config, *ui, *history, {})
+                    : std::optional<std::string>{"editor UI host, config control or history missing"};
+                staged.Registrations = {};
+                if (failure)
+                {
+                    Core::Log::Error("[PluginHost] the startup plugin '{}' was not committed: {}", slot->Name, *failure);
+                    // Its boot sections (a commit's rollback already removed them) must go before the close; without
+                    // config control they cannot, so the image stays mapped.
+                    if (config == nullptr) continue;
+                    for (const auto& name : slot->Sections) (void)config->UnregisterSection(name);
+                    slot->ClearCallables();
+                    (void)Close(std::move(slot->Image), slot->Generation);
+                    continue;
+                }
+                Plugins.push_back(slot);
+                intrinsic_plugin_event("commit");
             }
-            Plugin = std::move(plugin);
-            intrinsic_plugin_event("commit");
         }
 
         std::unique_ptr<PluginImage> Open(const std::string& path, const std::string_view failAt,
@@ -530,16 +681,19 @@ namespace Extrinsic::Runtime
         {
             auto image = Open(path, failAt, failure);
             if (!image) return std::nullopt;
-            Candidate candidate{.Image = std::move(image)};
+            Candidate candidate{.Slot = std::make_shared<PluginSlot>()};
+            candidate.Slot->Image = std::move(image);
             std::string error{};
-            if (!candidate.Image->Register(candidate.Staged, error))
+            if (!RegisterInto(*candidate.Slot, candidate.Staged, error))
             {
                 const int generation = candidate.Staged.Generation;
                 candidate.Staged = {}; // the staged callables die while their code is still mapped
-                (void)Close(std::move(candidate.Image), generation);
+                (void)Close(std::move(candidate.Slot->Image), generation);
                 failure = Fail("register_failed", error);
                 return std::nullopt;
             }
+            candidate.Slot->Name = candidate.Staged.Name;
+            candidate.Slot->Generation = candidate.Staged.Generation;
             return candidate;
         }
 
@@ -549,11 +703,10 @@ namespace Extrinsic::Runtime
         {
             return {new Candidate(std::move(candidate)), [](Candidate* pending)
                     {
-                        if (pending->Image)
+                        if (pending->Slot && pending->Slot->Image)
                         {
-                            const int generation = pending->Staged.Generation;
                             pending->Staged = {};
-                            (void)Close(std::move(pending->Image), generation);
+                            (void)Close(std::move(pending->Slot->Image), pending->Slot->Generation);
                         }
                         delete pending;
                     }};
@@ -561,11 +714,13 @@ namespace Extrinsic::Runtime
 
         // All or nothing: any failure unregisters every config section, window and history command this commit
         // added (their registration runs no callback, so nothing else needs undoing). The operation registry is
-        // replaced last, so a failure never has to restore it.
-        std::optional<std::string> Commit(PluginRegistrations& staged, LoadedPlugin& plugin,
+        // replaced last, so a failure never has to restore it. Every callable is registered through a forwarder
+        // that enters the plugin's slot.
+        std::optional<std::string> Commit(PluginRegistrations& staged, const std::shared_ptr<PluginSlot>& slot,
                                           EngineConfigControl& config, EditorUiHost& ui,
                                           EditorCommandHistory& history, const std::string_view failAt)
         {
+            PluginSlot& plugin = *slot;
             const auto rollback = [&](std::string reason) -> std::optional<std::string>
             {
                 // The staged operations are only in the copy below, so their unregistration finds nothing.
@@ -580,6 +735,7 @@ namespace Extrinsic::Runtime
             for (auto& section : staged.ConfigSections)
             {
                 std::string name = section.DefaultSection.Name;
+                ForwardSection(slot, section);
                 if (!config.RegisterSection(std::move(section))) return rollback("config: section rejected");
                 plugin.Sections.push_back(std::move(name));
             }
@@ -593,9 +749,13 @@ namespace Extrinsic::Runtime
                 std::string name = operation.Name;
                 if (!operation.Invoke) return rollback("operations: operation rejected");
                 // The agent server keeps a deferred result beyond the reach of an unload, so the host holds it.
-                operation.Invoke = [this, invoke = std::move(operation.Invoke)](const AgentOperationContext& context,
-                                                                                const std::string_view arguments)
-                { return HoldDeferred(invoke(context, arguments)); };
+                auto invoke = Forward(slot, std::move(operation.Invoke),
+                                      std::function<AgentOperationOutcome()>{[]
+                                      { return Fail("plugin_unloaded", "the plugin is not loaded"); }},
+                                      plugin.RetainOperation ? nullptr : &plugin.RetainOperation);
+                operation.Invoke = [this, slot, invoke = std::move(invoke)](const AgentOperationContext& context,
+                                                                           const std::string_view arguments)
+                { return HoldDeferred(slot, invoke(context, arguments)); };
                 if (!operationsCopy.Register(std::move(operation))) return rollback("operations: operation rejected");
                 plugin.Operations.push_back(std::move(name));
             }
@@ -603,6 +763,8 @@ namespace Extrinsic::Runtime
 
             for (auto& window : staged.Windows)
             {
+                window.Draw = Forward(slot, std::move(window.Draw));
+                window.OpenStateChanged = Forward(slot, std::move(window.OpenStateChanged));
                 const auto handle = ui.RegisterWindow(std::move(window));
                 if (!handle.IsValid()) return rollback("windows: window rejected");
                 plugin.Windows.push_back(handle);
@@ -614,7 +776,7 @@ namespace Extrinsic::Runtime
             {
                 // An empty Apply would pass RegisterCommand inside the host's wrapper and only fail when called.
                 const bool registered = command.Apply && history.RegisterCommand(command.Name,
-                    [apply = std::move(command.Apply)](const std::string_view payload, const bool undo)
+                    [apply = Forward(slot, std::move(command.Apply))](const std::string_view payload, const bool undo)
                     {
                         if (apply(payload, undo)) return undo ? Status::Undone : Status::Applied;
                         return undo ? Status::UndoFailed : Status::CommandFailed;
@@ -630,7 +792,7 @@ namespace Extrinsic::Runtime
         // Reapplies the saved payloads of the plugin's sections through preview and apply, so the new
         // registration validates them and its OnChanged receives them. A payload the preview does not keep as
         // saved (rejected, or changed by a fallback) is not applied: the section keeps its default.
-        Json Restore(const LoadedPlugin& plugin, EngineConfigControl& config)
+        Json Restore(const PluginSlot& plugin, EngineConfigControl& config)
         {
             Json report{{"restored", Json::array()}, {"rejected", Json::array()}};
             for (const auto& name : plugin.Sections)
@@ -650,26 +812,45 @@ namespace Extrinsic::Runtime
             return report;
         }
 
+        // Closes a candidate that will not be committed (its callables die first).
+        static void Discard(Candidate& candidate)
+        {
+            candidate.Staged = {};
+            (void)Close(std::move(candidate.Slot->Image), candidate.Slot->Generation);
+        }
+
         AgentOperationOutcome Finish(Candidate candidate, EngineConfigControl& config, EditorUiHost& ui,
                                      EditorCommandHistory& history, const std::string_view failAt)
         {
-            LoadedPlugin plugin{.Image = std::move(candidate.Image), .Generation = candidate.Staged.Generation};
-            const auto failure = Commit(candidate.Staged, plugin, config, ui, history, failAt);
+            const auto slot = candidate.Slot;
+            if (slot->Name.empty())
+            {
+                Discard(candidate);
+                return Fail("commit_failed", "a plugin needs a name");
+            }
+            if (Find(slot->Name))
+            {
+                Discard(candidate);
+                return Fail("already_loaded", "a plugin named '" + slot->Name + "' is already loaded");
+            }
+            const auto failure = Commit(candidate.Staged, slot, config, ui, history, failAt);
             candidate.Staged = {}; // leftover staged callables die before any close
             if (failure)
             {
-                (void)Close(std::move(plugin.Image), plugin.Generation);
+                slot->ClearCallables();
+                (void)Close(std::move(slot->Image), slot->Generation);
                 return Fail("commit_failed", *failure);
             }
-            Plugin = std::move(plugin);
+            Plugins.push_back(slot);
             intrinsic_plugin_event("commit");
-            const Json restored = Restore(*Plugin, config);
-            return {.Text = Json{{"loaded", true}, {"generation", Plugin->Generation}, {"config", restored}}.dump()};
+            const Json restored = Restore(*slot, config);
+            return {.Text = Json{{"loaded", true}, {"plugin", slot->Name}, {"generation", slot->Generation},
+                                 {"config", restored}}.dump()};
         }
 
         // Every registration of the plugin out; with `save`, its sections' active payloads are kept for a later
         // load first.
-        void Unregister(const LoadedPlugin& plugin, EngineConfigControl& config, EditorUiHost& ui,
+        void Unregister(const PluginSlot& plugin, EngineConfigControl& config, EditorUiHost& ui,
                         EditorCommandHistory& history, const bool save)
         {
             for (const auto& name : plugin.Sections)
@@ -686,67 +867,84 @@ namespace Extrinsic::Runtime
             for (const auto& name : plugin.HistoryCommands) (void)history.UnregisterCommand(name);
         }
 
-        // Shutdown hook, then every registration out (section payloads saved first), then the close. On
-        // callables_alive the plugin is unregistered but stays mapped.
-        std::optional<std::string> Unload(EngineConfigControl& config, EditorUiHost& ui, EditorCommandHistory& history)
+        // Shutdown hook, then every registration out (section payloads saved first), its callables cleared, then the
+        // close. On callables_alive the plugin is unregistered but stays mapped.
+        std::optional<std::string> Unload(const std::shared_ptr<PluginSlot>& slot, EngineConfigControl& config,
+                                          EditorUiHost& ui, EditorCommandHistory& history)
         {
-            LoadedPlugin plugin = std::move(*Plugin);
-            Plugin.reset();
-            plugin.Image->Shutdown();
-            Unregister(plugin, config, ui, history, true);
-            ClearDeferred();
+            std::erase(Plugins, slot); // its calls are refused from here: the caller is not loaded
+            {
+                const Entered entered(*slot);
+                slot->Image->Shutdown();
+            }
+            Unregister(*slot, config, ui, history, true);
+            slot->ClearCallables();
             intrinsic_plugin_event("unload");
-            if (!Close(std::move(plugin.Image), plugin.Generation)) return std::string{"callables_alive"};
+            if (!Close(std::move(slot->Image), slot->Generation)) return std::string{"callables_alive"};
             return std::nullopt;
         }
 
-        // One frame of draining: destroys the plugin callables of every finalized job, and unregisters the GPU
-        // work once its last frame retired. True when nothing is left. simulateGpuStall (test hook) treats the
-        // GPU work as never retiring.
-        bool DrainStep(const bool simulateGpuStall)
+        // A commit or an unload waits while any plugin's code runs on the main thread: the registries it changes
+        // may hold the very callable that is running (a tool that polls a load or another plugin's unload).
+        bool AnyRunning() const
         {
-            std::erase_if(PluginJobs, [](const std::unique_ptr<JobEntry>& entry) { return entry->Finalized; });
-            if (Gpu && !simulateGpuStall && !Gpu->Work.HasInFlightWork())
-            {
-                Jobs->UnregisterGpuQueueParticipant(Gpu->Handle); // not in flight: no device wait
-                Gpu.reset();
-            }
-            return PluginJobs.empty() && !Gpu;
+            return std::ranges::any_of(Plugins, [](const auto& slot) { return slot->Running > 0; });
         }
 
-        // One poll of a continuation's drain. The first poll starts it: submissions refused, jobs cancelled. The
-        // deadline is checked before success, so work that ends after it still times out. On timeout admission
-        // and GPU recording come back (as they do when the continuation is dropped, through its reservation).
-        DrainState PollDrain(std::optional<std::chrono::steady_clock::time_point>& deadline,
+        // One frame of draining a plugin: destroys the callables of its finalized jobs, and unregisters its GPU work
+        // once its last frame retired. True when nothing is left. simulateGpuStall (test hook) treats the GPU work
+        // as never retiring.
+        bool DrainStep(PluginSlot& slot, const bool simulateGpuStall)
+        {
+            std::erase_if(slot.Jobs, [](const std::unique_ptr<JobEntry>& entry) { return entry->Finalized; });
+            if (slot.Gpu && !simulateGpuStall)
+            {
+                if (!slot.Gpu->InFlight())
+                {
+                    Jobs->UnregisterGpuQueueParticipant(slot.Gpu->Handle); // not in flight: no device wait
+                    slot.Gpu.reset();
+                }
+            }
+            return slot.Jobs.empty() && !slot.Gpu;
+        }
+
+        // One poll of a continuation's drain of a plugin. The first poll starts it: its submissions refused, its
+        // jobs cancelled. The deadline is checked before success, so work that ends after it still times out. On
+        // timeout admission and GPU recording come back (as they do when the continuation is dropped, through its
+        // reservation).
+        // shortcut: a cancelled job that has not started is reaped only when a worker reaches it, so another plugin's
+        // long jobs on every worker delay this drain, up to drain_timeout (the plugin stays; retry). Reap queued jobs
+        // at cancel in the JobService if that bites.
+        DrainState PollDrain(PluginSlot& slot, std::optional<std::chrono::steady_clock::time_point>& deadline,
                              const std::chrono::milliseconds budget, const bool simulateGpuStall)
         {
             const auto now = std::chrono::steady_clock::now();
             if (!deadline)
             {
                 deadline = now + budget;
-                Draining = true;
-                CancelRuns();
+                slot.Draining = true;
+                CancelRuns(slot);
             }
             if (now >= *deadline)
             {
-                Draining = false;
+                slot.Draining = false;
                 return DrainState::TimedOut;
             }
-            if (!DrainStep(simulateGpuStall)) return DrainState::Pending;
-            Draining = false;
+            if (!DrainStep(slot, simulateGpuStall)) return DrainState::Pending;
+            slot.Draining = false;
             return DrainState::Drained;
         }
 
         // The commit, unload and reload run on a later frame, after this call's dispatch through the registry
         // returned; the reservation ends when the continuation is destroyed (completed or dropped).
-        std::shared_ptr<void> Reserve()
+        std::shared_ptr<void> Reserve(std::weak_ptr<PluginSlot> draining = {})
         {
             LoadPending = true;
-            return {nullptr, [this](void*)
+            return {nullptr, [this, draining = std::move(draining)](void*)
                     {
                         LoadPending = false;
                         // A drain ends with its continuation; a dropped one must not keep refusing work.
-                        Draining = false;
+                        if (const auto slot = draining.lock()) slot->Draining = false;
                     }};
         }
 
@@ -757,7 +955,7 @@ namespace Extrinsic::Runtime
             EditorCommandHistory& History;
         };
 
-        std::optional<Hosts> Find(const AgentOperationContext& context) const
+        std::optional<Hosts> FindHosts(const AgentOperationContext& context) const
         {
             auto* ui = Services != nullptr ? Services->Find<EditorUiHost>() : nullptr;
             if (context.ConfigControl == nullptr || context.History == nullptr || ui == nullptr) return std::nullopt;
@@ -771,12 +969,11 @@ namespace Extrinsic::Runtime
                 return Fail("invalid_params", "path is required");
             const std::string path = arguments["path"].get<std::string>();
             const std::string failAt = arguments.value("fail_at", std::string{});
-            if (Plugin) return Fail("already_loaded", "a plugin is already loaded");
             if (LoadPending) return Fail("load_pending", "another load has not committed yet");
 
             AgentOperationOutcome failure{};
             auto candidate = Stage(path, failAt, failure);
-            if (!candidate) return failure;
+            if (!candidate) return failure; // a taken name is refused at the commit (Finish)
             auto opened = Own(std::move(*candidate));
             // Test hook: drop the pending load as a disconnect would; the owner closes the image.
             if (arguments.value("simulate_drop", false))
@@ -792,12 +989,13 @@ namespace Extrinsic::Runtime
             outcome.Continuation = [this, opened = std::move(opened), failAt, reservation, second](
                 const AgentOperationContext& context, AgentOperationOutcome& result)
             {
-                const auto hosts = Find(context);
+                const auto hosts = FindHosts(context);
                 if (!hosts)
                 {
                     result = Fail("host_unavailable", "editor UI host, config control or history missing");
                     return true;
                 }
+                if (AnyRunning()) return false; // polled from plugin code: commit once it returned
                 result = Finish(std::exchange(*opened, Candidate{}), hosts->Config, hosts->Ui, hosts->History, failAt);
                 if (!result.IsError && !second.empty())
                 {
@@ -810,8 +1008,30 @@ namespace Extrinsic::Runtime
             return outcome;
         }
 
-        // plugin_unload, and plugin_reload when `path` is set: drain, unload, then open, register and commit the
-        // new build. A failure after the unload leaves no plugin, with the reason.
+        // The plugin a call names (`plugin`), or the only loaded one when it names none.
+        std::shared_ptr<PluginSlot> Target(const Json& arguments, AgentOperationOutcome& failure) const
+        {
+            if (arguments.contains("plugin"))
+            {
+                const auto named = arguments["plugin"].is_string() ? Find(arguments["plugin"].get<std::string>()) : nullptr;
+                if (!named) failure = Fail("not_loaded", "no plugin of that name is loaded");
+                return named;
+            }
+            if (Plugins.size() == 1u) return Plugins.front();
+            if (Plugins.empty())
+            {
+                failure = Fail("not_loaded", "no plugin is loaded");
+                return nullptr;
+            }
+            std::string names{};
+            for (const auto& slot : Plugins) names += (names.empty() ? "" : ", ") + slot->Name;
+            failure = Fail("invalid_params", "several plugins are loaded (" + names + "); name one with plugin");
+            return nullptr;
+        }
+
+        // plugin_unload, and plugin_reload when `path` is set: drain the plugin, unload it, then open, register and
+        // commit the new build, which must carry the same name. A failure after the unload leaves that plugin
+        // unloaded, with the reason; the other plugins are untouched.
         AgentOperationOutcome UnloadOrReload(const std::string_view argumentsJson, const bool reload)
         {
             const Json arguments = Json::parse(argumentsJson, nullptr, false);
@@ -819,52 +1039,59 @@ namespace Extrinsic::Runtime
                 return Fail("invalid_params", "path is required");
             // A static build without an opener of its own (tests) has no plugin to reload: say why.
             if (reload && !Options.Open && !PluginsSupported()) return Fail("plugins_unsupported", kUnsupported);
-            if (!Plugin) return Fail("not_loaded", "no plugin is loaded");
+            AgentOperationOutcome failure{};
+            const auto slot = Target(arguments, failure);
+            if (!slot) return failure;
             if (LoadPending) return Fail("load_pending", "another load has not committed yet");
             const std::string path = reload ? arguments["path"].get<std::string>() : std::string{};
             const std::string failAt = arguments.value("fail_at", std::string{});
             // Test hooks: a drain deadline other than 5 s, and GPU work treated as never retiring.
             const auto budget = std::chrono::milliseconds{arguments.value("drain_deadline_ms", kDrainDeadline.count())};
             const bool simulateGpuStall = arguments.value("simulate_gpu_stall", false);
-            // Test hook: keep a copy of one plugin operation alive, so the close must refuse.
-            if (!reload && arguments.value("retain_callable", false) && !Plugin->Operations.empty())
-            {
-                static auto* retained = new std::vector<AgentOperationSpec>(); // never destroyed
-                retained->push_back(*Operations->Find(Plugin->Operations.front()));
-            }
+            // Test hook: keep a copy of one plugin callable alive, so the close must refuse.
+            if (!reload && arguments.value("retain_callable", false) && slot->RetainOperation) slot->RetainOperation();
             AgentOperationOutcome outcome{.Text = "{}"};
-            outcome.Continuation = [this, reservation = Reserve(), reload, path, failAt, budget, simulateGpuStall,
-                                    deadline = std::optional<std::chrono::steady_clock::time_point>{}](
+            outcome.Continuation = [this, slot, reservation = Reserve(slot), reload, path, failAt, budget,
+                                    simulateGpuStall, deadline = std::optional<std::chrono::steady_clock::time_point>{}](
                 const AgentOperationContext& context, AgentOperationOutcome& result) mutable
             {
-                const auto hosts = Find(context);
+                const auto hosts = FindHosts(context);
                 if (!hosts)
                 {
                     result = Fail("host_unavailable", "editor UI host, config control or history missing");
                     return true;
                 }
                 // Drain first, frame by frame; on the deadline the plugin stays loaded and registered.
-                // Not while the plugin's own code is running (a deferred call that unloads its plugin): wait a frame.
-                if (RunningPluginCode > 0) return false;
-                const DrainState drain = PollDrain(deadline, budget, simulateGpuStall);
+                // Not while plugin code is running (a deferred call that unloads its own plugin or another): wait a frame.
+                if (AnyRunning()) return false;
+                const DrainState drain = PollDrain(*slot, deadline, budget, simulateGpuStall);
                 if (drain == DrainState::Pending) return false;
                 if (drain == DrainState::TimedOut)
                 {
                     result = Fail("drain_timeout", "plugin work did not finish before the deadline; the plugin stays loaded");
                     return true;
                 }
-                if (const auto error = Unload(hosts->Config, hosts->Ui, hosts->History))
+                const std::string name = slot->Name;
+                if (const auto error = Unload(slot, hosts->Config, hosts->Ui, hosts->History))
                 {
                     result = Fail(*error, "a callable of the closing generation is still alive; the image stays mapped");
                     return true;
                 }
                 if (!reload)
                 {
-                    result = {.Text = Json{{"unloaded", true}, {"close", Closes().back()}}.dump()};
+                    result = {.Text = Json{{"unloaded", true}, {"plugin", name}, {"close", Closes().back()}}.dump()};
                     return true;
                 }
                 AgentOperationOutcome failure{};
                 auto candidate = Stage(path, failAt, failure);
+                if (candidate && candidate->Slot->Name != name)
+                {
+                    const std::string other = candidate->Slot->Name;
+                    Discard(*candidate);
+                    result = Fail("name_mismatch", "the build at path is the plugin '" + other + "', not '" + name +
+                                                       "'; '" + name + "' stays unloaded");
+                    return true;
+                }
                 result = candidate ? Finish(std::move(*candidate), hosts->Config, hosts->Ui, hosts->History, failAt)
                                    : failure;
                 return true;
@@ -872,23 +1099,34 @@ namespace Extrinsic::Runtime
             return outcome;
         }
 
+        static Json PluginJson(const PluginSlot& slot)
+        {
+            return {{"name", slot.Name},
+                    {"generation", slot.Generation},
+                    {"file", slot.Image->File().string()},
+                    {"operations", slot.Operations},
+                    {"config_sections", slot.Sections},
+                    {"windows", slot.Windows.size()},
+                    {"history_commands", slot.HistoryCommands}};
+        }
+
         AgentOperationOutcome List() const
         {
-            if (!Plugin) return {.Text = R"({"loaded":null})"};
-            return {.Text = Json{{"loaded", {{"generation", Plugin->Generation},
-                                             {"file", Plugin->Image->File().string()},
-                                             {"operations", Plugin->Operations},
-                                             {"config_sections", Plugin->Sections},
-                                             {"windows", Plugin->Windows.size()},
-                                             {"history_commands", Plugin->HistoryCommands}}}}.dump()};
+            Json loaded = Json::array();
+            for (const auto& slot : Plugins) loaded.push_back(PluginJson(*slot));
+            return {.Text = Json{{"loaded", loaded}}.dump()};
         }
 
         Json PluginJobsJson() const
         {
             Json jobs = Json::array();
-            for (const auto& entry : PluginJobs)
-                jobs.push_back({{"state", std::string{ToString(Jobs->GetState(entry->Token))}},
-                                {"finalized", entry->Finalized}});
+            for (const auto& slot : Plugins)
+                for (const auto& entry : slot->Jobs)
+                    jobs.push_back({{"plugin", slot->Name},
+                                    {"token", std::to_string(entry->Token.Index) + ":" +
+                                                  std::to_string(entry->Token.Generation)},
+                                    {"state", std::string{ToString(Jobs->GetState(entry->Token))}},
+                                    {"finalized", entry->Finalized}});
             return jobs;
         }
 
@@ -903,6 +1141,13 @@ namespace Extrinsic::Runtime
             ImGuiMemFreeFunc free = nullptr;
             void* userData = nullptr;
             ImGui::GetAllocatorFunctions(&alloc, &free, &userData);
+            Json plugins = Json::array();
+            for (const auto& slot : Plugins)
+                plugins.push_back({{"name", slot->Name}, {"generation", slot->Generation},
+                                   {"range", MappedRange(slot->Image->File())}, {"draining", slot->Draining},
+                                   {"gpu", slot->Gpu ? Json{{"in_flight", slot->Gpu->InFlight()}} : Json(nullptr)}});
+            // The single plugin's fields, as the single-plugin drivers read them; null unless exactly one is loaded.
+            const PluginSlot* only = Plugins.size() == 1u ? Plugins.front().get() : nullptr;
             const Json value = {
                 {"counter", {{"address", Address(&HostCounter())}, {"value", HostCounter()}}},
                 {"inline_static", {{"address", Address(&HostInlineStatic())}, {"value", HostInlineStatic()}}},
@@ -916,11 +1161,12 @@ namespace Extrinsic::Runtime
                 {"pid", getpid()},
                 {"undo_value", HostUndoValue()},
                 {"live", CountsJson(Live())},
-                {"loaded", Plugin ? Json(Plugin->Generation) : Json(nullptr)},
-                {"loaded_range", Plugin ? MappedRange(Plugin->Image->File()) : Json::array()},
+                {"loaded", only ? Json(only->Generation) : Json(nullptr)},
+                {"loaded_range", only ? MappedRange(only->Image->File()) : Json::array()},
+                {"plugins", plugins},
                 {"jobs", PluginJobsJson()},
-                {"gpu", Gpu ? Json{{"in_flight", Gpu->Work.HasInFlightWork()}} : Json(nullptr)},
-                {"draining", Draining},
+                {"gpu", only ? plugins.front()["gpu"] : Json(nullptr)},
+                {"draining", std::ranges::any_of(Plugins, [](const auto& slot) { return slot->Draining; })},
                 {"invoked", CountsJson(Invoked())},
                 {"closes", Closes()},
             };
@@ -954,7 +1200,7 @@ namespace Extrinsic::Runtime
     {
         auto& impl = *m_Impl;
         impl.Workspace.AttachOwn(setup.Worlds(), setup.Services());
-        if (impl.Options.Startup) impl.CommitStartup();
+        if (!impl.Options.Startup.empty()) impl.CommitStartup();
         return RuntimeModuleOk();
     }
 
@@ -971,40 +1217,47 @@ namespace Extrinsic::Runtime
     void PluginHostModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
         auto& impl = *m_Impl;
-        if (impl.Gpu)
-        {
-            // Already shut down with every queue participant at the engine's BeginShutdown; a no-op then.
-            context.Jobs.UnregisterGpuQueueParticipant(impl.Gpu->Handle);
-            impl.Gpu.reset();
-        }
-        // The job service drained before the modules shut down, so every job is finalized; one that is not
-        // stays (its image stays mapped too).
-        std::erase_if(impl.PluginJobs, [](const std::unique_ptr<JobEntry>& entry) { return entry->Finalized; });
-        // The own workspace leaves the services it attached to while they are alive (as the agent server's does).
-        if (!impl.Plugin)
-        {
-            impl.Workspace.DetachOwn();
-            return;
-        }
-        LoadedPlugin plugin = std::move(*impl.Plugin);
-        impl.Plugin.reset();
-        plugin.Image->Shutdown();
         auto* config = context.Services.Find<EngineConfigControl>();
         auto* ui = context.Services.Find<EditorUiHost>();
         auto* history = context.Services.Find<EditorCommandHistory>();
-        if (config != nullptr && ui != nullptr && history != nullptr)
-            impl.Unregister(plugin, *config, *ui, *history, false);
-        impl.ClearDeferred();
+        const bool any = !impl.Plugins.empty();
+        // Last loaded first, each off the list before its hook (its calls are refused from there). Destroyed without
+        // Close, the images stay mapped: callables the engine destroys later (history entries, a dropped call) still
+        // find their code, and the process ends.
+        while (!impl.Plugins.empty())
+        {
+            const auto held = std::move(impl.Plugins.back());
+            impl.Plugins.pop_back();
+            PluginSlot& slot = *held;
+            if (slot.Gpu)
+            {
+                // Already shut down with every queue participant at the engine's BeginShutdown; a no-op then.
+                context.Jobs.UnregisterGpuQueueParticipant(slot.Gpu->Handle);
+                slot.Gpu.reset();
+            }
+            // The job service drained before the modules shut down, so every job is finalized; one that is not
+            // stays (its image stays mapped too).
+            std::erase_if(slot.Jobs, [](const std::unique_ptr<JobEntry>& entry) { return entry->Finalized; });
+            {
+                const Entered entered(slot);
+                slot.Image->Shutdown();
+            }
+            if (config != nullptr && ui != nullptr && history != nullptr)
+                impl.Unregister(slot, *config, *ui, *history, false);
+            slot.ClearCallables();
+        }
+        // The own workspace leaves the services it attached to while they are alive (as the agent server's does).
         impl.Workspace.DetachOwn();
-        intrinsic_plugin_event("host_shutdown");
-        // Destroyed without Close, the image stays mapped: callables the engine destroys later (history entries, a
-        // dropped call) still find their code, and the process ends.
+        if (any) intrinsic_plugin_event("host_shutdown");
     }
 
     PluginJobHandle PluginHostModule::SubmitJob(PluginJob job, std::string* refusal)
     {
         auto& impl = *m_Impl;
-        if (impl.Draining || !job.Work || !job.Completion) return {};
+        const auto slot = impl.Caller(refusal);
+        if (!slot || slot->Draining || !job.Work || !job.Completion) return {};
+        // A job joins only a run of its own plugin.
+        if (job.Run.IsValid() && !Impl::RunOf(*slot, job.Run.Token)) return {};
         const EditorProcessingCommands commands = impl.Workspace.Commands();
         const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
         if (!surface.Submit) return {};
@@ -1017,7 +1270,7 @@ namespace Extrinsic::Runtime
             identity.Scope = ToEditorJobScope(job.Output->Property.Domain);
             identity.OutputSemantic = GeometryPresentationSlotSemantic::Displacement;
             identity.OutputName = job.Output->Property.Name;
-            // A run's first job is admitted only while no other run writes the same output.
+            // A run's first job is admitted only while no other run (of any plugin) writes the same output.
             if (!job.Run.IsValid() && surface.FindActive && surface.FindActive(identity))
             {
                 if (refusal != nullptr)
@@ -1030,51 +1283,55 @@ namespace Extrinsic::Runtime
         JobEntry* raw = entry.get();
         JobDesc desc{};
         desc.DebugName = raw->Job.Label.empty() ? std::string{"plugin job"} : raw->Job.Label;
+        // A worker runs Work; contract calls from there are refused (they run on the main thread).
         desc.Work = [raw](const JobCancellation& cancellation)
         {
             raw->Job.Work([&cancellation] { return cancellation.IsCancelled(); });
             return JobResultEnvelope::Make(true);
         };
-        // Main-thread plugin code runs counted, so an unload it triggers waits until it returned.
-        Impl* host = &impl;
+        // Main-thread plugin code runs entered, so an unload it triggers waits until it returned.
         if (raw->Job.IsReadyToApply)
-            desc.IsReadyToApply = [raw, host]
+            desc.IsReadyToApply = [raw, slot]
             {
-                const auto guard = host->Running();
+                const Entered entered(*slot);
                 return raw->Job.IsReadyToApply();
             };
         // The plugin's verdict is the job's: a stale or failed publication is not reported as published.
-        desc.PublishCompletion = [raw, host](KernelEventBus&, const JobResultEnvelope&)
+        desc.PublishCompletion = [raw, slot](KernelEventBus&, const JobResultEnvelope&)
         {
             raw->Finalized = true;
-            const auto guard = host->Running();
+            const Entered entered(*slot);
             return raw->Job.Completion(true);
         };
         // A publication the plugin refused is finalized too; its Completion already ran.
-        desc.FinalizeUnpublishedOnMainThread = [raw, host]
+        desc.FinalizeUnpublishedOnMainThread = [raw, slot]
         {
             if (raw->Finalized) return;
             raw->Finalized = true;
-            const auto guard = host->Running();
+            const Entered entered(*slot);
             (void)raw->Job.Completion(false);
         };
         entry->Token = surface.Submit(std::move(desc), std::move(identity));
         if (!entry->Token.IsValid()) return {};
         const PluginJobHandle handle{entry->Token};
-        impl.PluginJobs.push_back(std::move(entry));
+        slot->Jobs.push_back(std::move(entry));
         return handle;
     }
 
     bool PluginHostModule::CancelJob(const PluginJobHandle job)
     {
+        const auto slot = m_Impl->Caller(nullptr);
+        const auto run = slot ? Impl::RunOf(*slot, job.Token) : std::nullopt;
+        if (!run) return false; // only the plugin's own jobs
         const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
-        const JobToken run = m_Impl->RunOf(job.Token);
-        return CancelEditorRunJobs(commands, std::span<const JobToken>{&run, 1u}).Requested > 0u;
+        return CancelEditorRunJobs(commands, std::span<const JobToken>{&*run, 1u}).Requested > 0u;
     }
 
     void PluginHostModule::ReportJobOutcome(const PluginJobHandle job, const PluginJobDomain resolved,
                                             std::string diagnostic)
     {
+        const auto slot = m_Impl->Caller(nullptr);
+        if (!slot || !Impl::RunOf(*slot, job.Token)) return; // only the plugin's own jobs
         const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
         const auto& surface = EditorProcessingCommandsAccess::Resolve(commands).JobCommands;
         if (surface.ReportOutcome)
@@ -1086,26 +1343,26 @@ namespace Extrinsic::Runtime
     bool PluginHostModule::StartGpuWork(const AgentOperationContext& context, GpuQueueParticipantDesc work)
     {
         auto& impl = *m_Impl;
-        if (impl.Draining || impl.Gpu || context.Jobs == nullptr || !work.RecordFrameCommands ||
-            !work.HasInFlightWork || !work.ShutdownAfterDeviceIdle)
+        const auto slot = impl.Caller(nullptr);
+        if (!slot || slot->Draining || slot->Gpu || context.Jobs == nullptr ||
+            !work.RecordFrameCommands || !work.HasInFlightWork || !work.ShutdownAfterDeviceIdle)
             return false;
-        impl.Gpu = std::make_unique<GpuEntry>(GpuEntry{.Work = std::move(work)});
-        // Host forwarders, so the service holds no plugin callable and recording stops while draining.
-        GpuEntry* gpu = impl.Gpu.get();
-        impl.Gpu->Handle = context.Jobs->RegisterGpuQueueParticipant({
+        // Host forwarders, so the service holds no plugin callable and a copy it keeps after the unload calls
+        // nothing; recording stops while draining.
+        auto gpu = std::make_shared<GpuEntry>(GpuEntry{.InFlight = Forward(slot, std::move(work.HasInFlightWork))});
+        gpu->Handle = context.Jobs->RegisterGpuQueueParticipant({
             .DebugName = "plugin GPU work",
-            .Scope = gpu->Work.Scope,
-            .RecordFrameCommands = [this, gpu](RHI::ICommandContext& commands)
+            .Scope = work.Scope,
+            .RecordFrameCommands = [slot, record = Forward(slot, std::move(work.RecordFrameCommands))](
+                                       RHI::ICommandContext& commands)
             {
-                if (!m_Impl->Draining) gpu->Work.RecordFrameCommands(commands);
+                if (!slot->Draining) record(commands);
             },
-            .DrainCompletedTransfers = [gpu]
-            {
-                if (gpu->Work.DrainCompletedTransfers) gpu->Work.DrainCompletedTransfers();
-            },
-            .HasInFlightWork = [gpu] { return gpu->Work.HasInFlightWork(); },
-            .ShutdownAfterDeviceIdle = [gpu] { gpu->Work.ShutdownAfterDeviceIdle(); },
+            .DrainCompletedTransfers = Forward(slot, std::move(work.DrainCompletedTransfers)),
+            .HasInFlightWork = gpu->InFlight,
+            .ShutdownAfterDeviceIdle = Forward(slot, std::move(work.ShutdownAfterDeviceIdle)),
         });
+        slot->Gpu = std::move(gpu);
         return true;
     }
 
@@ -1116,11 +1373,13 @@ namespace Extrinsic::Runtime
         const bool hooks = impl.Options.TestHooks;
         constexpr const char* kFailAt = R"("fail_at":{"type":"string","enum":["dlopen","dlsym","config","operations","windows"]})";
         constexpr const char* kDrainHooks = R"("drain_deadline_ms":{"type":"integer","minimum":0},"simulate_gpu_stall":{"type":"boolean"})";
+        constexpr const char* kPlugin = R"("plugin":{"type":"string","description":"The plugin's name (plugin_list); optional while one plugin is loaded."})";
         (void)registry.Register({
             .Name = "plugin_load",
             .Title = "Load a plugin",
             .Description = "dlopen a private copy of a plugin built in this build tree (same build id), and commit its "
-                           "registrations (config sections, tools, windows, history commands) on the next frame.",
+                           "registrations (config sections, tools, windows, history commands) on the next frame. "
+                           "Refused when a plugin of its name is loaded.",
             .InputSchemaJson = Schema(R"("path":{"type":"string"})", hooks,
                                       std::string{kFailAt} + R"(,"probe_pending":{"type":"boolean"},"simulate_drop":{"type":"boolean"})",
                                       "path"),
@@ -1129,35 +1388,38 @@ namespace Extrinsic::Runtime
         });
         (void)registry.Register({
             .Name = "plugin_unload",
-            .Title = "Unload the plugin",
+            .Title = "Unload a plugin",
             .Description = "From the next frame: its jobs cancelled and its GPU work retired (within 5 s, else "
                            "drain_timeout), the plugin's shutdown hook, all its registrations out (config section "
-                           "payloads saved for a later load), then dlclose once none of its callables is alive.",
-            .InputSchemaJson = Schema("", hooks, std::string{kDrainHooks} + R"(,"retain_callable":{"type":"boolean"})"),
+                           "payloads saved for a later load), then dlclose once none of its callables is alive. Other "
+                           "plugins keep running.",
+            .InputSchemaJson = Schema(kPlugin, hooks, std::string{kDrainHooks} + R"(,"retain_callable":{"type":"boolean"})"),
             .ReadOnly = false,
             .Invoke = [&impl](const AgentOperationContext&, const std::string_view arguments)
             { return impl.UnloadOrReload(arguments, false); },
         });
         (void)registry.Register({
             .Name = "plugin_reload",
-            .Title = "Reload the plugin",
-            .Description = "From the next frame: unload (draining first, as plugin_unload), then load the build at path "
-                           "and reapply the saved config payloads. A failure after the unload leaves no plugin.",
-            .InputSchemaJson = Schema(R"("path":{"type":"string"})", hooks, std::string{kFailAt} + "," + kDrainHooks, "path"),
+            .Title = "Reload a plugin",
+            .Description = "From the next frame: unload (draining first, as plugin_unload), then load the build at path, "
+                           "which must carry the same plugin name, and reapply the saved config payloads. A failure "
+                           "after the unload leaves that plugin unloaded.",
+            .InputSchemaJson = Schema(std::string{R"("path":{"type":"string"},)"} + kPlugin, hooks,
+                                      std::string{kFailAt} + "," + kDrainHooks, "path"),
             .ReadOnly = false,
             .Invoke = [&impl](const AgentOperationContext&, const std::string_view arguments)
             { return impl.UnloadOrReload(arguments, true); },
         });
         (void)registry.Register({
             .Name = "plugin_list",
-            .Title = "The loaded plugin",
-            .Description = "The loaded plugin's generation, file and registrations, or null.",
+            .Title = "The loaded plugins",
+            .Description = "Every loaded plugin's name, generation, file and registrations.",
             .Invoke = [&impl](const AgentOperationContext&, std::string_view) { return impl.List(); },
         });
         (void)registry.Register({
             .Name = "app_quit",
             .Title = "Quit the Sandbox",
-            .Description = "Requests the engine's exit; the plugin host unloads the plugin during the shutdown. Refused "
+            .Description = "Requests the engine's exit; the plugin host unloads the plugins during the shutdown. Refused "
                            "while a load, unload or reload has not finished.",
             .ReadOnly = false,
             .Invoke = [&impl](const AgentOperationContext&, std::string_view)
@@ -1174,8 +1436,8 @@ namespace Extrinsic::Runtime
             .Title = "Host identity probes (test hook)",
             .Description = "Addresses and values of the host's probes, ImGui context and allocator, ImPlot context, "
                            "registered windows with their open state, the process id, the host undo value, the loaded "
-                           "generation, live and invoked plugin callables per generation and kind, and every close "
-                           "attempt.",
+                           "plugins (and the generation and mapping of the only one), live and invoked plugin callables "
+                           "per generation and kind, and every close attempt.",
             .Invoke = [&impl](const AgentOperationContext&, std::string_view) { return impl.Identity(); },
         });
     }

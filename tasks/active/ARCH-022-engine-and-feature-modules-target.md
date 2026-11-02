@@ -113,6 +113,19 @@ contract_review: tracker only; each slice declares its own contracts
 63. (2026-11-02) "danke. ist ci fertig?" / "Was gehen wir dann nach ci an?"
 64. (2026-11-02) "ja bitte" (the cleanup block: the own-or-borrowed workspace logic once, one test harness, no
     extern "C" forwarders; then kernel density and point spacing as plugins; then S3)
+65. (2026-11-02) "wenn du fertig bist bitte nach main mergen und pushen"
+66. (2026-11-02) "Ok gut. Dann mach das bitte so" (next: kernel density and point spacing as plugins; the point-cloud
+    editing service learns scalar outputs; the general plugin harness with the second plugin)
+67. (2026-11-02, answer to: kernel density and point spacing run on the shared operation runtime with a GPU-resident
+    preview and accept, so per Q52 they come after S3; how to go on?) "FPFH-Deskriptoren (Recommended)" (next plugin:
+    FPFH descriptors, the same inputs as the bilateral filter, CPU and Vulkan neighbourhoods (radius, not kNN as
+    stated then), no GPU preview; the service learns
+    scalar outputs with several columns; the general plugin harness; then S3; then the kernel density, point
+    spacing, density weight and outlier family on the job form)
+68. (2026-11-02, answer to: the plugin host holds one plugin, the bilateral filter takes it at startup; for FPFH as
+    the second plugin it must hold several; how to go on?) "Erst Multi-Plugin-Host (Recommended)" (a step of its
+    own before FPFH: several plugins by name, load, unload, reload and list; drain, jobs and deferred results per
+    plugin; several startup plugins; tools take a plugin name and need none while one is loaded; then FPFH)
 
 ## Goal
 - Reach the target in
@@ -2147,3 +2160,193 @@ python3 tools/docs/check_doc_links.py --root . --strict
     into the next block's review.
   - After them: dev-shared 98 contract tests and 2 Vulkan smoke tests, `ci-vulkan` 98, `ci` 98, the static Sandbox
     still registers the plugin in-process.
+- 2026-11-02, plan of step 2d (Q67): the FPFH descriptor analysis as the second plugin, `plugins/descriptor_analysis`.
+  Goal: the second feature leaves the editor; the plugin template, the editing service and the test harness serve a
+  second plugin. Done when the built-in descriptor analysis is gone, the plugin reproduces it (golden parity), and
+  its tests, the GPU smoke and a live MCP run pass. Inventory: an Explore pass over every reference (operation,
+  codec, session slots, agent row, Sandbox window and redirects, 7 R1 hub files, boundary tests, 8 test files, docs,
+  ARA C87, method and benchmark manifests).
+  - **Golden, recorded first** on `60de92325` (built-in, over MCP, `build/descriptor-golden-150556`): a 300-point
+    cloud with normals, automatic radius, the 33 columns of `cpu_kdtree`, `cpu_lbvh` and `vulkan_lbvh` (identical to
+    each other; every 11-bin block sums to 100). The plugin must reproduce them exactly.
+  1. **Config: an array of property references in derived sections.** The section keeps its name, schema id and
+     payload (`outputs`: exactly 33 scalar references). `Bind` binds a `std::array<GeometryPropertyRef, N>` member
+     to an `Array` row whose item is a `PropertyRef`; the derived codec encodes, decodes and validates it with the
+     existing array and reference checks; the cross-field rule (distinct names, not an input, the input domain)
+     is the section's `Check`. Not chosen: keeping the runtime codec (a plugin may not import a feature module: R2
+     starts at 0) or a prefix instead of 33 names (breaks saved configs).
+  2. **The editing service learns** (all host code, reused by later point plugins):
+     - several scalar outputs per capture (`ScalarOutputs` beside the vec3 `Output`): checked as the operation
+       checks them today, snapshotted at capture, published as one undo entry through `PublishPointScalarField`
+       (atomic over all columns, shared history guards);
+     - zero normals reported in the view (FPFH refuses them, the bilateral filter keeps them);
+     - GPU radius rows paged with a capacity and the lowest-ID cap (`AdvanceGpuRadiusRows` over
+       `AdvancePointRadiusRows`); CPU radius rows come from the cached index the service already hands out;
+     - `ShowProperty(entity, property)`: the Color binding `show_property` uses, for the window's "Show histogram
+       bin".
+  3. **The plugin** (as the bilateral filter): section, tools `descriptor_analysis` (waits, cancellable) and
+     `descriptor_analysis_preview`, window `view.descriptor_analysis` (inputs, the 33 names with "Name all 33
+     bins", backend and limits, Run and Cancel per running run, the display-bin slider and "Show histogram bin",
+     the result). Runs: CPU k-d tree and CPU LBVH one job each; Vulkan: scale, then gated GPU radius rows, then the
+     histograms; terminal state released at the end.
+  4. **The built-in feature removed**: operation, config module and its codec block, result slot and sinks, agent
+     row, Sandbox registration, window and redirects, CMake and boundary-test entries. Shared tests keep their
+     intent: the point-readiness fixture's second oriented consumer becomes a service capture that refuses zero
+     normals (the role-specific verdicts stay tested); the queued-job contract keeps its other operations; config,
+     schema, panel, presentation and agent lists lose the feature. ARA C87 pins its removed proofs to `36a7b50`.
+  5. **One plugin harness** (the deferred ponytail item): `tests/support/PluginHarness.hpp` holds the boot, the
+     host, `Call` and `Jobs` for any plugin's `Register`/`Shutdown`; the bilateral and descriptor harnesses keep
+     only their own helpers.
+  6. **Tests**: the operation's contract tests ported to the plugin (round trip and refusals, every domain with
+     history and deleted rows, all backends agree, stale, cancel and changed outputs, zero-normal and preflight
+     refusals, double columns, atomic multi-output publication); the window (Run, the display-bin slider follows
+     only after Show); a Vulkan smoke (agreement, stale before recording, cancel between stages, radius-capacity
+     overflow) that writes the existing benchmark's JSON, so `geometry.point_lbvh.descriptor_runtime_smoke` keeps a
+     producer; each new test fails with its mechanism removed. A live MCP driver: the golden for all three backends,
+     MCP cancel, undo and redo across unload and reload.
+  Verification: dev-shared, `ci-vulkan` (static, Sandbox), `ci`; GPU smoke; live driver; gates; ci-docs replay.
+  Builds run one at a time under the memory guard.
+  - Codex plan review (fresh session `01a19c9a-b996-7d53-9c94-7f00b1e330aa`): "Verdict: REVISE", four blocking
+    findings; revision 2 of the plan answers them:
+    1. (finding 2) The array row validates every item before decoding: its length equals the bound array's,
+       each item is a canonical reference of the item's kind (`AnyScalar` kept: double and checked integer columns
+       stay valid), an unknown domain is refused; the plugin's `Check` refuses duplicate names, an output named
+       like an input and outputs or normals on another domain. Tests: 32 and 34 items, wrong kinds, unknown
+       domains, duplicates, input names, a normal domain mismatch, and a **saved section of the built-in codec**
+       (`tests/data/descriptor_analysis_saved_section.json`: `config_get` of the built-in at `60de92325`, custom
+       names with spaces and slashes, float and double columns, non-default limits) that the plugin loads at boot
+       unchanged.
+    2. (finding 3) The built-in's Vulkan smoke cases move to the plugin's Vulkan smoke: eight domains with
+       deleted slots, cold, warm and index reuse, the lowest-ID cap with a dense radius, radius-capacity overflow,
+       stale inputs, cancel between stages, and a later stage refused (the host refuses submissions while an
+       unload drains): the run fails or is cancelled once, outputs and history unchanged.
+    3. (finding 4) Stages are sequential: a later stage is submitted from the previous stage's completion, so a
+       refused submission leaves no earlier job running; the host's drain keeps the image mapped until accepted
+       jobs settle, and `Finish` releases the run's state once. Test: unload during a running chain (the run ends
+       once, nothing written, the unload completes), then reload and run again.
+    4. (finding 7) The benchmark keeps its contract: the eight-domain requests through publication with the
+       manifest's parameters, warmup and measured iteration, `INTRINSIC_DESCRIPTOR_BENCHMARK_OUTPUT`, its
+       diagnostics, now written by the plugin's Vulkan smoke.
+    Non-blocking taken: `PublishPointScalarField` reused as is with its preparation-failure and last-column guard
+    tests ported; R1 lowered only to its measured value; the shared-library load/reload and the static Sandbox's
+    registration checked for real (live driver, static check).
+  - 2026-11-02, while planning the plugin: the host holds one plugin (`std::optional<LoadedPlugin>`, `already_loaded`
+    on a second load); Q68 puts a multi-plugin host first. Done so far for 2d, uncommitted, kept for its block: the
+    derived array row with its test, and the service's scalar outputs, radius rows, zero-normal flag and Show.
+- 2026-11-02, plan of step 2d-0 (Q68): the plugin host holds several plugins. Goal: a second feature plugin can be
+  loaded beside the bilateral filter, each loaded, unloaded and reloaded on its own. Done when two in-process
+  plugins and a shared plugin beside a startup plugin load, run jobs, drain and unload independently; S1, S2 and R4
+  pass; the 2c tests and the live driver pass.
+  1. **A name per plugin.** `PluginRegistrations` gains `Name` (required, non-empty, unique among loaded plugins;
+     a second load of a loaded name answers `already_loaded`). The bilateral filter is `bilateral_filter`, the spike
+     `spike`, the fixtures name themselves. It changes the contract's layout, so the build id changes with it.
+  2. **A slot per plugin** holds what the single plugin held: the loaded image and its registrations, its jobs, its
+     GPU work, its drain state, its deferred results and the count of its code running on the main thread. Slots
+     are held by pointer, so the host's callbacks into a slot stay valid; a slot is removed with its plugin.
+  3. **The calling plugin is known.** Every host entry into plugin code enters the plugin's slot (counts it as
+     running and makes it the caller): tool invocations, deferred continuations, progress and cancel, job gates,
+     completions and finalizers, GPU recording, and newly window drawing, history commands and config-section
+     callbacks (validate, changed). `SubmitPluginJob`, `CancelPluginJob`, `ReportPluginJobOutcome` and
+     `StartPluginGpuWork` act for the caller; called from outside any plugin call (a test's own code) they act for
+     the only loaded plugin, and refuse when several are loaded.
+  4. **Tools by name.** `plugin_load {path}`; `plugin_unload {plugin?}` and `plugin_reload {path, plugin?}` name the
+     plugin, optional while one is loaded (`not_loaded` without, `invalid_params` naming the loaded ones when
+     several are and none is named); one load, unload or reload at a time (`load_pending`), as today. A drain covers
+     the named plugin's jobs and GPU work only; the other plugins keep running. `plugin_list` answers
+     `{"loaded": [ {name, generation, file, operations, config_sections, windows, history_commands} ]}`;
+     `plugin_host_identity` keeps `loaded` and `loaded_range` for the single loaded plugin (null otherwise) and adds
+     `plugins`.
+  5. **Several startup plugins.** `PluginHostOptions::Startup` is a list, committed in order at resolve; one that
+     fails is logged and closed without touching the others. The Sandbox stages its built-in plugins from one list.
+  6. Limitation kept and documented: the test hooks' callable accounting counts by generation number, so two loaded
+     plugins with the same generation share counts; a shared count can only refuse a close (the image stays
+     mapped), never allow one.
+  Tests (each fails with its mechanism removed): two plugins registered at once, unloading one by name keeps the
+  other's tools, sections, windows and jobs; unload without a name refused while two are loaded; a duplicate name
+  refused; a drain of one plugin leaves the other's running job alone; a job submitted from a window draw belongs to
+  that window's plugin; two startup plugins, one failing; deferred results of the remaining plugin survive the
+  other's unload. The existing 27 host tests pass with named fixtures. Drivers: S1's `plugin_list` check reads the
+  list.
+  - Codex plan review (fresh session `01a19cc4-ff2c-75f0-a7ff-137605acea1e`): "Verdict: REVISE", six blocking findings.
+    Revision 2 of the plan:
+    1. **Slot lifetime.** A slot is a `shared_ptr` the host lists; every host forwarder into plugin code (tool
+       wrapper, deferred entry, job callbacks, GPU participant, window, history command, section callbacks) shares
+       the slot or a host entry and checks it before calling: an unload empties the plugin's callables in its
+       entries (they die while the image is mapped) and marks the slot closed, so a copy the job service, agent
+       server, UI host or history still holds calls nothing. The host's list drops the slot; forwarders keep it
+       alive as inert host data. Test: after a plugin's unload its GPU and window forwarders, invoked again, call
+       nothing.
+    2. **Every entry into plugin code enters the slot** (counted as running, the slot is the caller): the above,
+       all four GPU callbacks and the host's own `HasInFlightWork` probe, `Register` and the shutdown hook. A
+       caller stack per thread restores the previous caller on return (A, then B, then A). Contract calls are
+       main-thread only: from another thread (a job's `Work`) they are refused; during `Register` and the shutdown
+       hook submissions are refused; from outside any plugin call (a test's own code) they act for the only loaded
+       plugin and are refused when several are loaded.
+    3. **Ownership.** `CancelPluginJob`, `ReportPluginJobOutcome` and a job joining a run (`PluginJob::Run`) accept
+       only the caller's own jobs; the output exclusion stays global (two plugins cannot write one output at once).
+    4. **Startup isolation before the boot.** One host function stages the startup images into the boot section
+       registry: a duplicate plugin name, or a section that does not register, drops that plugin (its own inserted
+       sections removed again, its image closed) and keeps the others; `SectionNames` lists only inserted sections;
+       the section callbacks are wrapped at staging, before the boot calls them. The Sandbox and the tests use it.
+       A later commit failure removes only that plugin's sections.
+    5. **Drivers.** S1 reads an empty `loaded` list; the bilateral live driver selects `bilateral_filter` by name and
+       gains a coexistence scenario: the shared spike plugin loaded beside the startup bilateral filter, its tool
+       called, the spike unloaded and reloaded by name, the bilateral filter reloaded by name while the spike is
+       loaded, both working after each step. S2 and R4 keep their single-plugin runs (no startup plugins).
+    6. **Reload identity.** `plugin_reload {plugin, path}` requires the new build to carry the same name: a
+       different one is refused (`name_mismatch`) and, as any failure after the unload, leaves that plugin unloaded;
+       other plugins are untouched.
+    Non-blocking taken: the build id needs no extra machinery; the generation limitation gets a test (two plugins
+    with one generation: a live callable of one refuses the other's close) and keeps the retention control.
+    Tests added for 1 to 4 and 6: forwarders inert after unload, nested attribution, a worker-thread call refused,
+    cross-plugin cancel, report and run joining refused, a drain timeout of one plugin leaving the other's admission
+    intact, duplicate startup names and section collisions, a name mismatch on reload.
+- 2026-11-02, step 2d-0 implemented (plan revision 2): `PluginSlot` per plugin (shared, listed by the host); every
+  host entry into plugin code goes through `Entered` (running count, thread-local caller restored on return);
+  plugin callables sit in clearable host entries, so forwarder copies are inert after the unload; contract calls
+  run on the main thread for the caller, else the only loaded plugin; cancel, report and run joining only for the
+  caller's own jobs; `StageStartupPlugins` stages the Sandbox's and the tests' startup images; tools take
+  `plugin`; `plugin_list` answers `{"loaded": [...]}`; a reload to another name is `name_mismatch`. Found while
+  testing: a cancelled job that has not started is reaped only when a worker reaches it, so another plugin's long
+  jobs on every worker can delay a drain to `drain_timeout` (the plugin stays; `shortcut:` note at `PollDrain`,
+  documented in the target doc). Tests: 12 new host tests (two plugins by name, duplicate name, ownership of
+  cancel/report/join, one plugin's drain timeout leaving the other's job, nested attribution, worker-thread call
+  refused, a window draw's job owned by its plugin and an inert forwarder after the unload, reload name mismatch,
+  startup duplicate name and section collision, a startup commit failure removing only its own sections, the
+  shared-generation close guard, a deferred result surviving the other plugin's unload). Drivers: S1 reads an
+  empty list; the bilateral live driver selects its plugin by name and gains the coexistence scenario.
+  - Mutation checks of the new tests (source mutated, test rebuilt and run, source restored): 22 mechanisms, each
+    killed by its test. Two survived at first and were fixed: the early name check in `plugin_load` duplicated the
+    commit's (removed); the startup duplicate-name case was masked by the section collision (now its own section).
+  - Codex code review (fresh session `01a19ce8-c358-7f81-856b-95d402a709cb`, diff sha256 e32a150f…): "Verdict:
+    REVISE", five blocking: (1) a cross-plugin unload polled inside a completion could free a pending finalizer's
+    entry; (2) a load polled inside a plugin tool replaces the registry entry that is running; (3) the identity
+    probe called `HasInFlightWork` without entering the plugin; (4) the coexistence driver fails on a fresh build,
+    the spike's generation (1) being the bilateral filter's; (5) no test of retained GPU forwarders. Fixed: a commit
+    and an unload wait while any plugin's code runs (`AnyRunning`, closes 1 and 2); the probe enters the plugin;
+    the driver builds the spike at generation 9; tests for a load and an unload polled from plugin code, the probe
+    as its plugin, and GPU forwarders held by a second job service after the unload. Round 2 (same session, diff
+    sha256 59397b82…): "Verdict: APPROVE", no remaining findings.
+  - Ponytail review (fresh Claude subagent, diff sha256 6ea6f412…): "Verdict: fix 1 and 2 first", "Lean: -55 lines
+    possible". Done: (1) the unread `Closed` flag removed; (2) `Admitting` removed, the ordinary exit taking each
+    slot off the list before its hook (new test: Register and shutdown hook refused even with another plugin
+    loaded); (3) the GPU forwarders use `Forward`; (5) `Held<F>` replaced by the `std::function` itself; (6) the
+    stubborn-job test releases its job on any exit. Deferred, not a bug: (4) one type for `Candidate` and
+    `StagedPlugin` and one discard path (five copies of "clear, close"; `Stage`'s failure path skips
+    `ClearCallables`, safe while no forwarder exists at that point); it changes the exported `StagedPlugin`, so it
+    goes with the next host change.
+  - Codex round 3 on the ponytail delta (diff sha256 29d226bd…): "Verdict: REVISE", one blocking: the ordinary-exit
+    case of the new refusal test passed for the job service's refusal too, and its mutation broke the loop's
+    termination. Fixed: the test asserts the host's reason ("the calling plugin is not loaded"); the mutation keeps
+    the slot listed through the iteration and pops it at its end (killed with exit 1, the exit call's refusal
+    empty). Round 4 (diff sha256 be6f3026…): "Verdict: APPROVE", no remaining findings.
+  - Verification in this session, on the final source: 56 tests (PluginHost, BilateralFilterPlugin,
+    PointCloudEditing) in `build/dev-shared`; S1 60 of 60; the bilateral live driver 61 of 61 (11 coexistence
+    checks); jscpd (src, tests, plugins; min 8 lines, 70 tokens): no clone touching the changed files. S2: 112 of 116;
+    the four failed checks are timing checks (the 66 queued 60 s jobs, the 12 s job that ignores cancellation, the
+    GPU frames' retirement) invalidated by the display: the monitor was off and the session locked, so
+    presentation ran at the X server's 1 Hz fallback (frame pacing report without any plugin: 0.86 s mean per
+    frame, 98 % in `present`); submitting 66 jobs then outlasted their 60 s, so 8 ran to completion before the
+    reload. S2 and R4 are to be rerun with the display on; R4 was not run. Static trees (working tree with the
+    later block's uncommitted files, which the 2d-0 files do not use): `build/ci` 56 tests pass; `build/ci-vulkan`
+    builds the static Sandbox with the in-process bilateral filter.

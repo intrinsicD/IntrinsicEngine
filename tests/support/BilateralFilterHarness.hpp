@@ -37,20 +37,16 @@ namespace Intrinsic::Tests::BilateralFilter
     {
         R::AgentOperationRegistry Registry{};
         Config::EngineConfigSectionRegistry Sections{};
-        std::optional<R::StagedPlugin> Startup{};
+        std::vector<R::StagedPlugin> Startup{};
         Config::EngineConfig Booted{};
 
         explicit Boot(Config::EngineConfig config)
         {
-            std::string error;
-            Startup = R::StagePlugin(R::MakeInProcessPlugin(&BF::Register, &BF::Shutdown), error);
-            EXPECT_TRUE(Startup.has_value()) << error;
-            if (Startup)
-            {
-                for (auto& section : Startup->Registrations.ConfigSections)
-                    EXPECT_TRUE(Sections.Register(std::move(section)));
-                Startup->Registrations.ConfigSections.clear();
-            }
+            std::vector<std::string> errors;
+            std::vector<std::unique_ptr<R::PluginImage>> images;
+            images.push_back(R::MakeInProcessPlugin(&BF::Register, &BF::Shutdown));
+            Startup = R::StageStartupPlugins(std::move(images), Sections, errors);
+            EXPECT_EQ(Startup.size(), 1u) << (errors.empty() ? "" : errors.front());
             Config::PopulateEngineConfigSectionDefaults(config, Sections);
             Booted = std::move(config);
         }

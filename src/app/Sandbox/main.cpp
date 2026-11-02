@@ -421,30 +421,30 @@ namespace
 
 namespace
 {
-    // ARCH-022: the bilateral filter plugin, opened before the config boot so its section's saved payload loads.
-    // Shared builds dlopen the build beside the executable (it can be reloaded); static builds register it
-    // in-process. A plugin that cannot open leaves the Sandbox without it, with the reason on stderr.
-    std::optional<Extrinsic::Runtime::StagedPlugin> StageBilateralFilter(const std::string_view argv0)
+    // ARCH-022: the built-in plugins, opened before the config boot so their sections' saved payloads load. Shared
+    // builds dlopen the builds beside the executable (they can be reloaded); static builds register them in-process.
+    // A plugin that cannot open or stage leaves the Sandbox without it, with the reason on stderr.
+    std::vector<std::unique_ptr<Extrinsic::Runtime::PluginImage>> OpenStartupPlugins(const std::string_view argv0)
     {
-        std::unique_ptr<Extrinsic::Runtime::PluginImage> image;
-        std::string error;
+        std::vector<std::unique_ptr<Extrinsic::Runtime::PluginImage>> images;
 #if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
         (void)argv0;
-        image = Extrinsic::Runtime::MakeInProcessPlugin(&Intrinsic::Plugins::BilateralFilter::Register,
-                                                        &Intrinsic::Plugins::BilateralFilter::Shutdown);
+        images.push_back(Extrinsic::Runtime::MakeInProcessPlugin(&Intrinsic::Plugins::BilateralFilter::Register,
+                                                                 &Intrinsic::Plugins::BilateralFilter::Shutdown));
 #else
         std::error_code ec;
         auto exe = std::filesystem::read_symlink("/proc/self/exe", ec);
         if (ec) exe = std::filesystem::absolute(std::filesystem::path{argv0}, ec);
-        const auto path = exe.parent_path().parent_path() / "plugins" / "libIntrinsicBilateralFilterPlugin.so";
-        Extrinsic::Runtime::AgentOperationOutcome failure{};
-        image = Extrinsic::Runtime::OpenSharedPlugin(path.string(), {}, failure);
-        if (image == nullptr) error = failure.Text;
+        for (const char* file : {"libIntrinsicBilateralFilterPlugin.so"})
+        {
+            Extrinsic::Runtime::AgentOperationOutcome failure{};
+            auto image = Extrinsic::Runtime::OpenSharedPlugin(
+                (exe.parent_path().parent_path() / "plugins" / file).string(), {}, failure);
+            if (image == nullptr) std::cerr << "plugin " << file << " not loaded: " << failure.Text << '\n';
+            else images.push_back(std::move(image));
+        }
 #endif
-        std::optional<Extrinsic::Runtime::StagedPlugin> staged;
-        if (image != nullptr) staged = Extrinsic::Runtime::StagePlugin(std::move(image), error);
-        if (!staged) std::cerr << "bilateral filter plugin not loaded: " << error << '\n';
-        return staged;
+        return images;
     }
 }
 
@@ -474,15 +474,13 @@ int main(int argc, char** argv)
                 (void)physics->ApplyConfig(value);
             },
     });
-    std::optional<Extrinsic::Runtime::StagedPlugin> startup;
-    if (!cli.NoStartupPlugins) startup = StageBilateralFilter(args.front());
-    if (startup)
+    std::vector<Extrinsic::Runtime::StagedPlugin> startup;
+    if (!cli.NoStartupPlugins)
     {
-        // Its sections join the boot registry; the host commits the rest of its registrations when it resolves.
-        for (auto& section : startup->Registrations.ConfigSections)
-            if (!sections.Register(std::move(section)))
-                std::cerr << "bilateral filter plugin: a config section name is taken\n";
-        startup->Registrations.ConfigSections.clear();
+        // Their sections join the boot registry; the host commits the rest of their registrations when it resolves.
+        std::vector<std::string> errors;
+        startup = Extrinsic::Runtime::StageStartupPlugins(OpenStartupPlugins(args.front()), sections, errors);
+        for (const auto& error : errors) std::cerr << "startup plugin dropped: " << error << '\n';
     }
     auto configControl = std::make_unique<Extrinsic::Runtime::EngineConfigControl>(std::move(sections));
     auto boot = Extrinsic::Runtime::ResolveEngineConfigForBoot(

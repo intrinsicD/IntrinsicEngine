@@ -1,7 +1,7 @@
-// ARCH-022: the plugin host, a runtime module. It loads one plugin at a time from a private copy, commits the
-// plugin's registrations atomically, drains its jobs and GPU work before an unload, closes an image only when none
-// of its callables is alive, and reapplies saved config payloads on a reload. It shuts down before every other
-// runtime module (see Name), while the services it unregisters from are still alive.
+// ARCH-022: the plugin host, a runtime module. It loads plugins by name, each from a private copy, commits a
+// plugin's registrations atomically, drains its jobs and GPU work before its unload (the others keep running),
+// closes an image only when none of its callables is alive, and reapplies saved config payloads on a reload. It
+// shuts down before every other runtime module (see Name), while the services it unregisters from are still alive.
 module;
 
 #include <filesystem>
@@ -14,6 +14,7 @@ module;
 
 export module Extrinsic.Runtime.PluginHost;
 
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.JobService;
@@ -52,15 +53,22 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::unique_ptr<PluginImage> MakeInProcessPlugin(PluginRegisterFn registerFn,
                                                                    PluginShutdownFn shutdownFn);
 
-    // A built-in plugin opened and registered before the config boot: the Sandbox moves its config sections into
-    // the boot section registry (so a saved payload loads), and the host commits the rest when it resolves.
+    struct PluginSlot; // the host's state of one plugin
+
+    // A built-in plugin opened and registered before the config boot: its config sections are in the boot section
+    // registry (so a saved payload loads), and the host commits the rest when it resolves.
     struct StagedPlugin
     {
-        std::unique_ptr<PluginImage> Image{};
+        std::shared_ptr<PluginSlot> Slot{}; // holds the image
         PluginRegistrations Registrations{};
-        std::vector<std::string> SectionNames{}; // the sections moved to the boot registry
+        std::vector<std::string> SectionNames{}; // the sections it inserted into the boot registry
     };
-    [[nodiscard]] std::optional<StagedPlugin> StagePlugin(std::unique_ptr<PluginImage> image, std::string& error);
+    // Registers each image and inserts its config sections into `boot`. A plugin whose Register fails, whose name is
+    // empty or taken by an earlier one, or whose section does not insert is dropped (its own inserted sections
+    // removed, its image closed) with a line in `errors`; the others are kept, in order.
+    [[nodiscard]] std::vector<StagedPlugin> StageStartupPlugins(std::vector<std::unique_ptr<PluginImage>> images,
+                                                                Core::Config::EngineConfigSectionRegistry& boot,
+                                                                std::vector<std::string>& errors);
 
     struct PluginHostOptions
     {
@@ -69,7 +77,7 @@ export namespace Extrinsic::Runtime
         bool TestHooks{false};
         PluginOpener Open{}; // empty selects OpenSharedPlugin
         std::function<void()> RequestExit{};
-        std::optional<StagedPlugin> Startup{}; // committed when the host resolves
+        std::vector<StagedPlugin> Startup{}; // committed in order when the host resolves
     };
 
     class PluginHostModule final : public IRuntimeModule
@@ -84,10 +92,10 @@ export namespace Extrinsic::Runtime
         // host shuts down first, while the services its plugin registered with are alive.
         [[nodiscard]] std::string_view Name() const noexcept override { return "~Runtime.PluginHost"; }
         [[nodiscard]] RuntimeModuleResult OnRegister(EngineSetup& setup) override;
-        // Commits the startup plugin; without a workspace from the app, attaches one of its own.
+        // Commits the startup plugins; without a workspace from the app, attaches one of its own.
         [[nodiscard]] RuntimeModuleResult OnResolve(EngineSetup& setup) override;
-        // The ordinary exit (after the GPU work was shut down and the jobs drained): the plugin's shutdown hook,
-        // then every registration out. The image stays mapped; the process ends.
+        // The ordinary exit (after the GPU work was shut down and the jobs drained): each plugin's shutdown hook,
+        // then its registrations out. The images stay mapped; the process ends.
         void OnShutdown(RuntimeModuleShutdownContext& context) override;
 
         // The editor workspace plugin jobs belong to: the Sandbox gives its shell's, so every plugin run is a row of
@@ -100,7 +108,8 @@ export namespace Extrinsic::Runtime
         // plugin_host_identity; keeps the registry to commit and remove plugin tools later.
         void RegisterOperations(AgentOperationRegistry& registry);
 
-        // The contract's host functions reach the composed host through these.
+        // The contract's host functions reach the composed host through these. They act for the calling plugin
+        // (the one whose code the host is running), else for the only loaded one; main thread only.
         [[nodiscard]] static PluginHostModule* Current() noexcept;
         [[nodiscard]] PluginJobHandle SubmitJob(PluginJob job, std::string* refusal);
         bool CancelJob(PluginJobHandle job);
