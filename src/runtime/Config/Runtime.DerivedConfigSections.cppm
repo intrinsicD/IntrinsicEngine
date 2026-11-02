@@ -2,7 +2,8 @@
 // module since RUNTIME-351: an operation's interface exports its section declaration and callers use
 // the generic functions below (serialize, validate, get, set, registration). Rows are UInt and Float
 // rows bound to number members, StringEnum rows bound to an enum (enumerator i is token
-// EnumValues[i]) and PropertyRef rows bound to a GeometryPropertyRef. The payload is checked before
+// EnumValues[i]), PropertyRef rows bound to a GeometryPropertyRef and Array rows of PropertyRef items bound
+// to a std::array of them (exactly its size). The payload is checked before
 // conversion, in the stage order of the hand-written point codecs. A Float row refuses a positive
 // value that stores as zero, unless its Positivity rule says when (outlier analysis' mode-dependent
 // radius, RUNTIME-354); the cross-field Check runs after the references. A section whose rules
@@ -59,8 +60,11 @@ export extern "C++"
                     return false;
                 const bool number = type == ConfigFieldType::UInt || type == ConfigFieldType::Float ||
                     type == ConfigFieldType::StringEnum || type == ConfigFieldType::Bool;
+                const bool refs = type == ConfigFieldType::Array && row.Refs != nullptr &&
+                    row.MutableRefs != nullptr && row.Spec.Item != nullptr &&
+                    row.Spec.Item->Type == ConfigFieldType::PropertyRef && row.Spec.Item->RefKinds.size() == 1u;
                 if (number ? row.Get == nullptr || row.Set == nullptr
-                           : type != ConfigFieldType::PropertyRef || row.Ref == nullptr)
+                           : !refs && (type != ConfigFieldType::PropertyRef || row.Ref == nullptr))
                     return false;
             }
             return true;
@@ -81,6 +85,12 @@ extern "C++"
                 const std::string name(row.Spec.Name);
                 if (row.Ref != nullptr)
                     out[name] = EncodePointPropertyRef(config.*row.Ref);
+                else if (row.Refs != nullptr)
+                {
+                    nlohmann::json refs = nlohmann::json::array();
+                    for (const GeometryPropertyRef& ref : row.Refs(config)) refs.push_back(EncodePointPropertyRef(ref));
+                    out[name] = std::move(refs);
+                }
                 else if (row.Spec.Type == ConfigFieldType::StringEnum)
                 {
                     const double index = row.Get(config);
@@ -112,6 +122,15 @@ extern "C++"
                 {
                     if (references)
                         DecodePointPropertyRef(value, config.*row.Ref);
+                }
+                else if (row.MutableRefs != nullptr)
+                {
+                    if (references)
+                    {
+                        const std::span<GeometryPropertyRef> refs = row.MutableRefs(config);
+                        for (std::size_t i = 0; i < refs.size() && i < value.size(); ++i)
+                            DecodePointPropertyRef(value[i], refs[i]);
+                    }
                 }
                 else if (row.Spec.Type == ConfigFieldType::StringEnum)
                 {
@@ -177,6 +196,10 @@ extern "C++"
             }
             if (auto error = ValidatePointConfigPropertyRefs(data, section.Fields))
                 return RejectConfigSection(subject, std::move(*error));
+            for (const BoundField<Cfg>& row : section.Rows) // arrays of references: length (the bound array's) and items
+                if (row.Refs != nullptr)
+                    if (const auto errors = CollectDeclaredFieldErrors(data, std::span(&row.Spec, 1)); !errors.empty())
+                        return refuse(row, errors.front().Message);
             const Cfg config = ParseDerivedConfig(section, data);
             if (section.Check != nullptr)
                 if (const std::string_view refusal = section.Check(config); !refusal.empty())

@@ -109,6 +109,13 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool StartPluginGpuWork(const AgentOperationContext& context, GpuQueueParticipantDesc work);
     // The engine's services, for a plugin to find what it needs (the RHI device); null without a host.
     [[nodiscard]] ServiceRegistry* PluginServices() noexcept;
+    // A host service the plugin uses, or null while the host does not offer it.
+    template <class T>
+    [[nodiscard]] T* PluginService()
+    {
+        auto* services = PluginServices();
+        return services != nullptr ? services->Find<T>() : nullptr;
+    }
 }
 
 // Test instruments for the fixture plugin (plugins/spike) and its drivers.

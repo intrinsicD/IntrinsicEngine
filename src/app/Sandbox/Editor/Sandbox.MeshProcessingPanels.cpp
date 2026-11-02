@@ -325,13 +325,6 @@ namespace Extrinsic::Sandbox::Editor
             ProcessingDraftState<Runtime::OutlierAnalysisConfig, Runtime::EditorOutlierAnalysisResult>;
         using KeypointsState =
             ProcessingDraftState<Runtime::KeypointAnalysisConfig, Runtime::EditorKeypointAnalysisResult>;
-        struct DescriptorsState
-            : ProcessingDraftState<Runtime::DescriptorAnalysisConfig, Runtime::EditorDescriptorAnalysisResult>
-        {
-            std::array<char, 256> Prefix{"fpfh"};
-            int DisplayBin{};
-            bool FollowDisplayBin{false};
-        };
         using DensityState = ProcessingDraftState<Runtime::KernelDensityConfig, Runtime::EditorKernelDensityResult>;
         using DensityWeightsState =
             ProcessingDraftState<Runtime::DensityWeightConfig, Runtime::EditorDensityWeightResult>;
@@ -433,7 +426,6 @@ namespace Extrinsic::Sandbox::Editor
         Runtime::EditorPointScalarTransactionHandle DensityTransaction{}, SpacingTransaction{}, WeightTransaction{},
             KeypointTransaction{};
         KeypointsState Keypoints{};
-        DescriptorsState Descriptors{};
         DensityState Density{};
         DensityWeightsState DensityWeights{};
         ConstructionState Construction{};
@@ -474,7 +466,6 @@ namespace Extrinsic::Sandbox::Editor
         void DrawNormalTransaction(const SandboxEditorContext&);
         void DrawOutliersWindow(bool&, const SandboxEditorContext&);
         void DrawKeypointsWindow(bool&, const SandboxEditorContext&);
-        void DrawDescriptorsWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWeightsWindow(bool&, const SandboxEditorContext&);
         void DrawConstructionWindow(bool&, const SandboxEditorContext&);
@@ -584,18 +575,6 @@ namespace Extrinsic::Sandbox::Editor
                 {domain, "Processing", "Features & Descriptors"},
                 "ISS Keypoint Analysis",
                 "view.keypoint_analysis");
-        RegisterWindow("view.descriptor_analysis",
-            {"View", "Processing", "Features & Descriptors"},
-            "FPFH Descriptor Analysis",
-            &Impl::DrawDescriptorsWindow);
-        for (const auto& [id, domain] :
-            std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.descriptors", "Mesh"},
-                {"graph.processing.descriptors", "Graph"},
-                {"pointcloud.processing.descriptors", "PointCloud"}}})
-            RegisterRedirectWindow(id,
-                {domain, "Processing", "Features & Descriptors"},
-                "FPFH Descriptor Analysis",
-                "view.descriptor_analysis");
         RegisterWindow("view.kernel_density",
             {"View", "Processing", "Sampling & Density"},
             "Kernel Density",
@@ -744,7 +723,6 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::DiscardEditorPointScalar({}, KeypointTransaction);
         KeypointTransaction.reset();
         Keypoints = {};
-        Descriptors = {};
         Density = {};
         DensityWeights = {};
         Construction = {};
@@ -2448,156 +2426,6 @@ namespace Extrinsic::Sandbox::Editor
             DrawDismissLastResultButton("Dismiss##Keypoints",
                 Keypoints.LastResult,
                 Runtime::EditorPointAnalysisResultSlot::KeypointAnalysis,
-                context.PointAnalysis.ResultSinks.DismissResult);
-        }
-        ImGui::End();
-    }
-
-    void MeshProcessingPanels::Impl::DrawDescriptorsWindow(bool& open, const SandboxEditorContext& context)
-    {
-        if (context.PointAnalysis.Results.LastDescriptorAnalysisResult)
-            Descriptors.LastResult = context.PointAnalysis.Results.LastDescriptorAnalysisResult;
-        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("FPFH Descriptor Analysis", &open))
-        {
-            ImGui::End();
-            return;
-        }
-        const auto active = Runtime::GetEditorDescriptorAnalysisConfig(context.PointAnalysis.Commands)
-                                .value_or(Runtime::DescriptorAnalysisConfig{});
-        const auto serialized = Runtime::SerializeDescriptorAnalysisConfig(active);
-        if (Descriptors.Synchronize(active, serialized))
-            Descriptors.FollowDisplayBin = false;
-        auto& config = Descriptors.Draft;
-        bool changed = false;
-        if (DrawProcessingEntity("Entity##Descriptors", context, config.StableEntityId, Descriptors.LastSelectedEntity))
-        {
-            changed = true;
-            Descriptors.FollowDisplayBin = false;
-        }
-        if (DrawProcessingPointInput(
-                "Positions##Descriptors",
-                [&]
-                {
-                    return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId);
-                },
-                config.Positions))
-        {
-            config.Normals.Domain = config.Positions.Domain;
-            for (auto& output : config.Outputs)
-                output.Domain = config.Positions.Domain;
-            changed = true;
-        }
-        changed |= DrawProcessingPointInput(
-            "Normals##Descriptors",
-            [&]
-            {
-                return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId);
-            },
-            config.Normals,
-            config.Positions.Domain);
-        if (ImGui::TreeNode("Histogram output properties"))
-        {
-            ImGui::InputText("Output prefix", Descriptors.Prefix.data(), Descriptors.Prefix.size());
-            if (ImGui::Button("Name all 33 bins"))
-            {
-                config.Outputs =
-                    Runtime::MakeDescriptorOutputProperties(config.Positions.Domain, Descriptors.Prefix.data());
-                changed = true;
-            }
-            constexpr std::array blocks{"alpha", "phi", "theta"};
-            for (unsigned i = 0; i < 33; ++i)
-            {
-                const auto label = std::string(blocks[i / 11]) + " bin " + std::to_string(i % 11);
-                changed |= DrawProcessingScalarOutput(label.c_str(), config.Outputs[i]);
-            }
-            ImGui::TreePop();
-        }
-        int backend = int(config.Backend);
-        if (ImGui::Combo("Backend",
-                &backend,
-                OwnerConfigEnumLabels<Runtime::DescriptorAnalysisBackend, 3>(
-                    Runtime::DescriptorAnalysisConfigFieldSpecs(), "backend")
-                    .data(),
-                3))
-        {
-            config.Backend = Runtime::DescriptorAnalysisBackend(backend);
-            changed = true;
-        }
-        changed |= ImGui::InputFloat("Feature radius (0 = automatic)", &config.FeatureRadius);
-        changed |= ImGui::InputScalar("Maximum neighbors (0 = all)", ImGuiDataType_U32, &config.MaxNeighbors);
-        ImGui::TextWrapped(
-            "FPFH uses three eleven-bin histograms and nonzero normals. Automatic radius is five times mean nearest-neighbor spacing. A neighbor cap keeps the lowest source IDs within the radius.");
-        if (config.Backend == Runtime::DescriptorAnalysisBackend::VulkanLBVH)
-        {
-            changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-            changed |= ImGui::InputScalar("Radius result capacity", ImGuiDataType_U32, &config.GpuRadiusCapacity);
-            ImGui::TextWrapped(
-                "Uncapped radius support must fit the selected capacity (up to 1024). A neighbor cap within that capacity can use the exact lowest-ID prefix even in denser neighborhoods. Scale, SPFH and FPFH run on CPU.");
-        }
-        DrawProcessingExecution(
-            context.PointAnalysis.Commands,
-            Descriptors,
-            changed,
-            [&](const auto& request)
-            {
-                return Runtime::PreviewEditorDescriptorAnalysisCommand(context.PointAnalysis.Commands, request);
-            },
-            [&](const auto& request)
-            {
-                return Runtime::ApplyEditorDescriptorAnalysisConfig(context.PointAnalysis.Commands, request);
-            },
-            [&]
-            {
-                return Runtime::ApplyEditorConfiguredDescriptorAnalysis(
-                    context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DescriptorAnalysis);
-            },
-            context.PointAnalysis.ResultSinks.DescriptorAnalysis,
-            "Compute FPFH descriptors",
-            "Controls were rejected by descriptor config validation.",
-            "Descriptor config was rejected.",
-            [](const auto& c)
-            {
-                return std::pair{c.StableEntityId, c.Outputs[0].Name};
-            });
-        const Runtime::EditorOutputRef descriptorsDraft{config.StableEntityId, config.Outputs[0].Name};
-        Descriptors.Run.Draw(
-            context.PointAnalysis.Commands, config.StableEntityId, "descriptors_progress", &descriptorsDraft);
-        ImGui::TextWrapped(
-            "Writes 33 named float histogram properties in one undoable operation. Each nonempty eleven-bin block sums to 100.");
-        const bool displayBinChanged = ImGui::SliderInt(
-            "Display histogram bin", &Descriptors.DisplayBin, 0, 32, "%d", ImGuiSliderFlags_AlwaysClamp);
-        const auto score = config.Outputs[Descriptors.DisplayBin];
-        ImGui::Text("Property: %s", score.Name.c_str());
-        if (const auto status = DrawProcessingPropertyShowButton(context,
-                config.StableEntityId,
-                score,
-                Descriptors.VisualizationDiagnostic,
-                "Show histogram bin",
-                false,
-                displayBinChanged && Descriptors.FollowDisplayBin))
-        {
-            if (*status == Runtime::EditorCommandStatus::Applied || *status == Runtime::EditorCommandStatus::NoChange)
-                Descriptors.FollowDisplayBin = true;
-        }
-        DrawProcessingDisplayDiagnostic(Descriptors.VisualizationDiagnostic);
-        if (Descriptors.LastResult)
-        {
-            const auto& result = *Descriptors.LastResult;
-            ImGui::Separator();
-            ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
-            ImGui::Text(
-                "Requested: %s; ran: %s", Runtime::ToString(result.RequestedBackend), result.ActualBackend.c_str());
-            ImGui::Text(
-                "Live / total: %zu / %zu; rows written: %zu", result.LiveCount, result.SlotCount, result.WrittenCount);
-            ImGui::Text(
-                "Spacing: %.5g; feature radius: %.5g", double(result.MeanSpacing), double(result.FeatureRadius));
-            ImGui::Text(
-                "GPU batches: %zu; largest indexed support: %zu", result.GpuQueryBatches, result.MaximumNeighbors);
-            ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Descriptors",
-                Descriptors.LastResult,
-                Runtime::EditorPointAnalysisResultSlot::DescriptorAnalysis,
                 context.PointAnalysis.ResultSinks.DismissResult);
         }
         ImGui::End();

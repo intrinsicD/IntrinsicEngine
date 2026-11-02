@@ -1163,3 +1163,74 @@ namespace
     static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
         .Rows = R::kKernelDensityRows, .Fields = kKernelDensityRetyped}));
 }
+
+namespace
+{
+    // An Array row of property references bound to a std::array (the FPFH plugin's 33 outputs).
+    struct RefArrayConfig
+    {
+        std::uint32_t Entity{};
+        std::array<R::GeometryPropertyRef, 3> Outputs{{{R::GeometryElementDomain::Unknown, "a", Geometry::PropertyValueKind::Float},
+                                                      {R::GeometryElementDomain::Unknown, "b", Geometry::PropertyValueKind::Float},
+                                                      {R::GeometryElementDomain::Unknown, "c", Geometry::PropertyValueKind::Float}}};
+    };
+    constexpr Geometry::PropertyValueKind kRefArrayKinds[]{Geometry::PropertyValueKind::Float};
+    constexpr R::ConfigFieldSpec kRefArrayItem{.Name = "output", .Type = R::ConfigFieldType::PropertyRef,
+                                               .RefKinds = kRefArrayKinds, .AnyScalar = true};
+    constexpr std::array kRefArrayRows{
+        R::Bind<&RefArrayConfig::Entity>({.Name = "entity", .Type = R::ConfigFieldType::UInt}),
+        R::Bind<&RefArrayConfig::Outputs>({.Name = "outputs", .Type = R::ConfigFieldType::Array,
+                                           .Item = &kRefArrayItem}), // three items: the array's length
+    };
+    constexpr auto kRefArrayFields = R::SpecsOf(kRefArrayRows);
+    static_assert(kRefArrayFields[1].MinItems == 3u && kRefArrayFields[1].MaxItems == 3u); // the schema's bounds
+    constexpr R::DerivedConfigSection<RefArrayConfig> kRefArraySection{
+        .Name = "test.ref_array", .SchemaId = "test.ref_array", .Title = "RefArray", .Rows = kRefArrayRows,
+        .Fields = kRefArrayFields, .ObjectError = "must be an object", .UnknownFieldPrefix = "unknown: "};
+    static_assert(R::IsDerivable(kRefArraySection));
+    constexpr R::ConfigFieldSpec kRefArrayUntypedItem{.Name = "output", .Type = R::ConfigFieldType::PropertyRef};
+    constexpr std::array kRefArrayUntypedRows{
+        R::Bind<&RefArrayConfig::Entity>({.Name = "entity", .Type = R::ConfigFieldType::UInt}),
+        R::Bind<&RefArrayConfig::Outputs>({.Name = "outputs", .Type = R::ConfigFieldType::Array,
+                                           .Item = &kRefArrayUntypedItem}),
+    };
+    constexpr auto kRefArrayUntypedFields = R::SpecsOf(kRefArrayUntypedRows);
+    static_assert(!R::IsDerivable(R::DerivedConfigSection<RefArrayConfig>{
+        .Rows = kRefArrayUntypedRows, .Fields = kRefArrayUntypedFields})); // an item without its value kind
+
+    testing::AssertionResult RefArrayUsable(const std::string& payload)
+    {
+        const auto result = R::ValidateDerivedSection<kRefArraySection>(payload, {}, "test");
+        if (result.Usable()) return testing::AssertionSuccess();
+        return testing::AssertionFailure() << (result.Diagnostics.empty() ? "" : result.Diagnostics.front().Message);
+    }
+}
+
+TEST(DeclaredFieldContracts, PropertyReferenceArraysRoundTripAndRefuseMalformedItems)
+{
+    RefArrayConfig config{.Entity = 7u};
+    config.Outputs[1] = {R::GeometryElementDomain::MeshFace, "renamed", Geometry::PropertyValueKind::Double};
+    const std::string payload = R::SerializeDerivedSection<kRefArraySection>(config);
+    const auto validated = R::ValidateDerivedSection<kRefArraySection>(payload, {}, "test");
+    ASSERT_TRUE(validated.Usable()) << payload;
+    EXPECT_EQ(validated.CanonicalPayloadJson, payload);
+    Extrinsic::Core::Config::EngineConfig engine{};
+    R::SetDerivedSection<kRefArraySection>(engine, config);
+    const auto read = R::GetDerivedSection<kRefArraySection>(engine);
+    ASSERT_TRUE(read);
+    EXPECT_EQ(read->Entity, 7u);
+    EXPECT_EQ(read->Outputs[1].Name, "renamed");
+    EXPECT_EQ(read->Outputs[1].Domain, R::GeometryElementDomain::MeshFace);
+    EXPECT_EQ(read->Outputs[1].ValueKind, Geometry::PropertyValueKind::Double);
+    EXPECT_EQ(read->Outputs[2].Name, "c");
+
+    const auto ref = [](const char* name, const char* kind, const char* domain = "Unknown")
+    { return Json{{"domain", domain}, {"name", name}, {"kind", kind}}; };
+    EXPECT_TRUE(RefArrayUsable(Json{{"outputs", {ref("x", "float"), ref("y", "double"), ref("z", "float")}}}.dump()));
+    EXPECT_FALSE(RefArrayUsable(Json{{"outputs", {ref("x", "float"), ref("y", "float")}}}.dump())); // too few
+    EXPECT_FALSE(RefArrayUsable(
+        Json{{"outputs", {ref("x", "float"), ref("y", "float"), ref("z", "float"), ref("w", "float")}}}.dump()));
+    EXPECT_FALSE(RefArrayUsable(Json{{"outputs", {ref("x", "float"), ref("y", "vec3"), ref("z", "float")}}}.dump()));
+    EXPECT_FALSE(RefArrayUsable(Json{{"outputs", {ref("x", "float"), ref("y", "float", "nowhere"), ref("z", "float")}}}.dump()));
+    EXPECT_FALSE(RefArrayUsable(Json{{"outputs", "x"}}.dump()));
+}

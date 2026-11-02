@@ -10,6 +10,7 @@ module Intrinsic.Plugin.BilateralFilter;
 
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.PluginContract;
+import Extrinsic.Runtime.PluginSections;
 
 namespace Intrinsic::Plugins::BilateralFilter
 {
@@ -64,7 +65,7 @@ namespace Intrinsic::Plugins::BilateralFilter
             .ReadOnly = false,
             .Invoke = [](const R::AgentOperationContext&, std::string_view)
             {
-                const auto config = ActiveConfig();
+                const auto config = R::ActivePluginSection<kSection>();
                 if (!config) return NoConfig();
                 const auto run = Start(*config);
                 if (run->Final) return Answer(*run->Final);
@@ -86,7 +87,7 @@ namespace Intrinsic::Plugins::BilateralFilter
             .Description = "Whether bilateral_filter can run with the section's settings, and why not.",
             .Invoke = [](const R::AgentOperationContext&, std::string_view)
             {
-                const auto config = ActiveConfig();
+                const auto config = R::ActivePluginSection<kSection>();
                 if (!config) return NoConfig();
                 const auto reason = Preview(*config);
                 return R::AgentOperationOutcome{.Text = Json{{"ready", reason.empty()}, {"reason", reason}}.dump()};

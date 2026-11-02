@@ -65,7 +65,7 @@ namespace
 TEST(EngineConfigSectionSchemas, EveryRegisteredSectionPublishesASchema)
 {
     const auto registry = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
-    ASSERT_EQ(registry.Entries().size(), 25u);
+    ASSERT_EQ(registry.Entries().size(), 24u);
     for (const auto& registration : registry.Entries())
         EXPECT_FALSE(registration.SchemaJson.empty())
             << registration.DefaultSection.Name << " has no generated schema";
@@ -122,11 +122,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerLiteralRangesRemainUnchanged)
         {"keypoint_analysis", "nonmax_radius", 0, f32, false},
         {"keypoint_analysis", "gamma21", 0, 1, false},
         {"keypoint_analysis", "gamma32", 0, 1, false},
-        {"descriptor_analysis", "entity", 0, u32, true},
-        {"descriptor_analysis", "max_neighbors", 0, u32, true},
-        {"descriptor_analysis", "gpu_query_batch_size", 1, 16384, true},
-        {"descriptor_analysis", "gpu_radius_capacity", 1, 1024, true},
-        {"descriptor_analysis", "feature_radius", 0, f32, false},
         {"point_construction", "entity", 0, u32, true},
         {"point_construction", "resolution", 1, 512, true},
         {"point_construction", "k_neighbors", 1, 63, true},
@@ -190,7 +185,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         {"density_weights", "kernel", {"gaussian", "theta_lop", "wendland_c2"}},
         {"density_weights", "mode", {"direct", "reciprocal"}},
         {"keypoint_analysis", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh", "vulkan_compute"}},
-        {"descriptor_analysis", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"}},
         {"point_construction", "method", {"hoppe", "knn_graph"}},
         {"point_construction", "backend", {"cpu_reference", "cpu_lbvh", "vulkan_lbvh"}},
         {"selection", "target", {"entity", "vertex", "edge", "face"}},
@@ -214,7 +208,7 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         EXPECT_FALSE(registration->Validate(Json{{row.Field, "foreign-token"}}.dump(), registration->DefaultSection.PayloadJson, "literal-token").Usable());
     }
     for (const auto* section : {"normal_estimation", "registration", "outlier_analysis", "kernel_density", "point_spacing",
-                                "density_weights", "keypoint_analysis", "descriptor_analysis", "point_construction", "selection"})
+                                "density_weights", "keypoint_analysis", "point_construction", "selection"})
     {
         const Config::EngineConfigSectionRegistration* registration = nullptr;
         for (const auto& candidate : registry.Entries())
@@ -250,17 +244,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerArrayAndNameLimitsRemainUnchanged)
                 EXPECT_FALSE(validate(Json{{"fallback_normal", value}}).Usable());
             EXPECT_FALSE(validate(Json{{"use_radius", true}, {"radius", 0}}).Usable());
             EXPECT_EQ(validate(Json{{"use_radius", true}, {"radius", 1}}).State, Config::EngineConfigState::Valid);
-        }
-        if (registration.DefaultSection.Name == "sandbox.descriptor_analysis")
-        {
-            Json outputs = Json::parse(registration.DefaultSection.PayloadJson).at("outputs");
-            ASSERT_EQ(outputs.size(), 33u);
-            EXPECT_EQ(validate(Json{{"outputs", outputs}}).State, Config::EngineConfigState::Valid);
-            outputs.erase(outputs.end() - 1);
-            EXPECT_FALSE(validate(Json{{"outputs", outputs}}).Usable());
-            outputs.push_back(outputs.front());
-            outputs.push_back(outputs.front());
-            EXPECT_FALSE(validate(Json{{"outputs", outputs}}).Usable());
         }
         if (registration.DefaultSection.Name == "sandbox.point_construction")
         {
@@ -314,7 +297,7 @@ TEST(EngineConfigSectionSchemas, NewSchemasPreserveNestedDefaultsAndBindingEncod
         schema["default"] = defaults;
         check(check, schema, defaults, registration.DefaultSection.Name);
     }
-    EXPECT_EQ(checked, 16u);
+    EXPECT_EQ(checked, 15u);
 }
 
 TEST(EngineConfigSectionSchemas, GeneratedSchemasAgreeWithTheirValidators)

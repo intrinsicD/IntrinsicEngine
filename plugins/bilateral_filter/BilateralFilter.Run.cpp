@@ -18,12 +18,8 @@ module Intrinsic.Plugin.BilateralFilter;
 
 import Geometry.PointCloud.Utils;
 import Geometry.PointLBVH;
-import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.PointCloudEditing;
-import Extrinsic.Runtime.ServiceRegistry;
 
 namespace Intrinsic::Plugins::BilateralFilter
 {
@@ -258,7 +254,7 @@ namespace Intrinsic::Plugins::BilateralFilter
                 diagnostic = validation.Diagnostics.empty() ? "Invalid bilateral settings." : validation.Diagnostics.front().Message;
                 return {};
             }
-            auto* service = FindService<R::PointCloudEditingService>();
+            auto* service = R::PluginService<R::PointCloudEditingService>();
             if (service == nullptr)
             {
                 diagnostic = "The point-cloud editing service is unavailable.";
@@ -307,38 +303,6 @@ namespace Intrinsic::Plugins::BilateralFilter
     {
         // The tokens are string literals, so their views end in a NUL.
         return std::size_t(backend) < std::size(kBackendTokens) ? kBackendTokens[std::size_t(backend)].data() : "invalid";
-    }
-
-    std::optional<Config> ActiveConfig()
-    {
-        auto* control = FindService<R::EngineConfigControl>();
-        if (control == nullptr) return std::nullopt;
-        return R::GetDerivedSection<kSection>(control->GetEngineConfigControlState().ActiveConfig);
-    }
-
-    bool ApplyConfig(const Config& config, std::string& error)
-    {
-        auto* control = FindService<R::EngineConfigControl>();
-        if (control == nullptr)
-        {
-            error = "Config control is unavailable.";
-            return false;
-        }
-        auto candidate = control->GetEngineConfigControlState().ActiveConfig;
-        R::SetDerivedSection<kSection>(candidate, config);
-        const auto preview = control->PreviewEngineConfigControlDocument(
-            Extrinsic::Core::Config::SerializeEngineConfig(candidate), "bilateral_filter");
-        if (!Extrinsic::Core::Config::IsConfigUsable(preview))
-        {
-            error = preview.Diagnostics.empty() ? "The settings were rejected." : preview.Diagnostics.front().Message;
-            return false;
-        }
-        if (!control->ApplyEngineConfigHotSubset(preview).Succeeded())
-        {
-            error = "The settings could not be applied.";
-            return false;
-        }
-        return true;
     }
 
     std::string Preview(const Config& config)

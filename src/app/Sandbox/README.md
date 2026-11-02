@@ -246,8 +246,9 @@ inspect the fixed boundary profile. Configured Run uses the shared selected-mesh
 preflight and undoable property publication. Its position input and face/edge
 output names are editable, and each output has a Show button. Automatic display
 uses the configured region and feature colors on the surface and edge overlay.
-Normal estimation, density/spacing, keypoint/descriptor analysis, density weights
-and bilateral filtering share the draft/apply/run control. Construction, outlier
+Normal estimation, density/spacing, keypoint analysis and density weights share the
+draft/apply/run control (the bilateral filter and FPFH descriptors are plugins with
+windows of their own). Construction, outlier
 detection/removal and ICP reuse its apply-before-execute mechanism and the runtime
 readiness button. Construction preserves its normalized request; outlier actions
 set their respective operation; ICP preserves final-pose and trajectory-step triggers.

@@ -763,9 +763,9 @@ its preferred half-width; representable neighboring values prevent rounded-flat
 endpoints, and overflow clamps only the outward endpoint to the original value.
 Thus even `±FLT_MAX` has a finite nonempty display range. Nonfinite input remains
 invalid and is not converted into a valid range.
-After a successful FPFH histogram display request, moving the display-bin slider
-selects the corresponding output property without recomputing descriptors.
-Changing the analysis configuration resets this live display selection.
+In the FPFH descriptor plugin's window, after a successful histogram display request,
+moving the display-bin slider shows the corresponding output property without
+recomputing descriptors; choosing another entity resets this live display selection.
 Progressive Poisson operation bodies and clustering config-control helpers compile
 in the private `Runtime.PointSetOperations.Processing.cpp` implementation unit. K-Means
 execution goes directly from the app panel to the borrowed `ClusteringService`;
@@ -1749,9 +1749,9 @@ ICP uses the existing editor command/job owner with the shared spatial-index cac
 
 [ISS-style keypoint analysis](keypoint-analysis.md) uses the existing geometry operations, spatial cache and jobs. Scale preparation precedes complete radius queries and CPU covariance/suppression; one revision-checked history command publishes both named output properties. Shared private property-watch/domain helpers serve keypoints, outliers and bilateral filtering without a new service or module boundary.
 
-FPFH histogram analysis uses the shared [descriptor config, spatial queries and property publication](descriptor-analysis.md) on compatible position/normal domains.
+FPFH histogram analysis is a feature plugin ([descriptor analysis](descriptor-analysis.md)); the point-cloud editing service gives it the capture, the radius rows and the publication on compatible position/normal domains.
 
-[Compact density weights](density-weights.md) use the same geometry operations and spatial cache. Private radius-row pagination is shared with keypoints and descriptors; numerical reductions and guarded publication stay with each method.
+[Compact density weights](density-weights.md) use the same geometry operations and spatial cache. Private radius-row pagination is shared with keypoints and, through the point-cloud editing service, the descriptor plugin; numerical reductions and guarded publication stay with each method.
 
 ## Editor diagnostics stream
 

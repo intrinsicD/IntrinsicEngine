@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <initializer_list>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -41,9 +42,8 @@ import Extrinsic.Runtime.ViewCapture;
 
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
-#if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
-import Intrinsic.Plugin.BilateralFilter; // linked into a static Sandbox (plugins/bilateral_filter)
-#endif
+// Generated: the startup plugins (each plugin's CMake adds itself), imported when linked into a static Sandbox.
+#include "SandboxStartupPlugins.hpp"
 
 namespace
 {
@@ -427,15 +427,16 @@ namespace
     std::vector<std::unique_ptr<Extrinsic::Runtime::PluginImage>> OpenStartupPlugins(const std::string_view argv0)
     {
         std::vector<std::unique_ptr<Extrinsic::Runtime::PluginImage>> images;
-#if defined(INTRINSIC_BILATERAL_FILTER_IN_PROCESS)
+#if defined(INTRINSIC_PLUGINS_IN_PROCESS)
         (void)argv0;
-        images.push_back(Extrinsic::Runtime::MakeInProcessPlugin(&Intrinsic::Plugins::BilateralFilter::Register,
-                                                                 &Intrinsic::Plugins::BilateralFilter::Shutdown));
+        using Entry = std::pair<Extrinsic::Runtime::PluginRegisterFn, Extrinsic::Runtime::PluginShutdownFn>;
+        for (const auto& [registerFn, shutdownFn] : std::initializer_list<Entry>{INTRINSIC_STARTUP_PLUGIN_ENTRIES})
+            images.push_back(Extrinsic::Runtime::MakeInProcessPlugin(registerFn, shutdownFn));
 #else
         std::error_code ec;
         auto exe = std::filesystem::read_symlink("/proc/self/exe", ec);
         if (ec) exe = std::filesystem::absolute(std::filesystem::path{argv0}, ec);
-        for (const char* file : {"libIntrinsicBilateralFilterPlugin.so"})
+        for (const char* file : std::initializer_list<const char*>{INTRINSIC_STARTUP_PLUGIN_FILES})
         {
             Extrinsic::Runtime::AgentOperationOutcome failure{};
             auto image = Extrinsic::Runtime::OpenSharedPlugin(

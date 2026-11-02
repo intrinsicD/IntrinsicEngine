@@ -623,9 +623,9 @@ TEST(SandboxEditorSession, TypedResultSinksCopyDismissAndRejectExpiredAttachment
               &PointSetResults::LastProgressivePoissonResult,
               PointSetSlot::ProgressivePoisson);
         check(&Runtime::PrepareEditorPointAnalysisFrame, unattachedAnalysis,
-              &Runtime::EditorPointAnalysisResultSinks::DescriptorAnalysis,
-              &Runtime::EditorPointAnalysisResultsSnapshot::LastDescriptorAnalysisResult,
-              Runtime::EditorPointAnalysisResultSlot::DescriptorAnalysis);
+              &Runtime::EditorPointAnalysisResultSinks::KeypointAnalysis,
+              &Runtime::EditorPointAnalysisResultsSnapshot::LastKeypointAnalysisResult,
+              Runtime::EditorPointAnalysisResultSlot::KeypointAnalysis);
         check(&Runtime::PrepareEditorPointConstructionFrame, unattachedConstruction,
               &Runtime::EditorPointConstructionResultSinks::PointConstruction,
               &Runtime::EditorPointConstructionResultsSnapshot::LastPointConstructionResult,
@@ -974,19 +974,16 @@ TEST(SandboxEditorSessionLifecycle, PointAnalysisFramesRetainAllSlotsAndRejectEx
         // RUNTIME-354: outlier analysis left the family for the operation result store (its checks are in
         // PointFieldFramesRetainIndependentResultsAndRejectExpiredDelivery).
         check(&S::KeypointAnalysis, &R::LastKeypointAnalysisResult, Slot::KeypointAnalysis);
-        // RUNTIME-353: density weights left the family for the operation result store; descriptors keep
-        // the per-slot and cross-slot checks.
-        check(&S::DescriptorAnalysis, &R::LastDescriptorAnalysisResult, Slot::DescriptorAnalysis);
+        // RUNTIME-353: density weights left the family for the operation result store; ARCH-022: the
+        // descriptor analysis is a plugin, so keypoints are the family's one slot.
         empty.ResultSinks.KeypointAnalysis({.Message="keypoints"});
-        empty.ResultSinks.DescriptorAnalysis({.Message="descriptors"});
-        empty.ResultSinks.DismissResult(Slot::KeypointAnalysis);
-        ASSERT_TRUE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastDescriptorAnalysisResult);
+        ASSERT_TRUE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastKeypointAnalysisResult);
         expired = empty;
         attachment.Detach();
         EXPECT_FALSE(expired.Commands.IsBound());
         EXPECT_FALSE(Runtime::GetEditorDensityWeightConfig(expired.Commands));
         EXPECT_FALSE(Runtime::PreviewEditorKeypointAnalysisCommand(expired.Commands, {}).Enabled);
-        EXPECT_FALSE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastDescriptorAnalysisResult);
+        EXPECT_FALSE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastKeypointAnalysisResult);
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
         const auto current = Runtime::PrepareEditorPointAnalysisFrame(attachment);
@@ -998,7 +995,6 @@ TEST(SandboxEditorSessionLifecycle, PointAnalysisFramesRetainAllSlotsAndRejectEx
         expired = current;
     }
     expired.ResultSinks.KeypointAnalysis({.Message="after destruction"});
-    expired.ResultSinks.DescriptorAnalysis({.Message="after destruction"});
     expired.ResultSinks.DismissResult(Runtime::EditorPointAnalysisResultSlot::KeypointAnalysis);
     EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(expired.Commands, {}).Enabled);
     engine.Shutdown();
@@ -1147,7 +1143,9 @@ namespace
         Runtime::PointSpacingConfig Spacing{};
         Runtime::DensityWeightConfig Weights{};
         Runtime::PointEditRequest Bilateral{.MinimumLiveCount = 2u}; // the bilateral plugin's capture
-        Runtime::DescriptorAnalysisConfig Descriptors{};
+        // The descriptor plugin's capture (scalar outputs; PreviewScalarEdit refuses zero normals), but with a
+        // minimum of one live sample, so the two consumers' minimums differ.
+        Runtime::PointEditRequest Descriptors{.MinimumLiveCount = 1u};
         Runtime::PointConstructionConfig Construction{};
         Runtime::EditorRegistrationCommand Registration{};
         entt::entity RegistrationTarget{};
@@ -1230,12 +1228,10 @@ namespace
             Bilateral.Normals = Descriptors.Normals =
                 {Keypoints.Positions.Domain, "directions", Geometry::PropertyValueKind::Vec3};
             Bilateral.Output = {Keypoints.Positions.Domain, "filtered", Geometry::PropertyValueKind::Vec3};
-            Descriptors.Outputs = Runtime::MakeDescriptorOutputProperties(Keypoints.Positions.Domain, "descriptor");
+            Descriptors.ScalarOutputs = {{Keypoints.Positions.Domain, "descriptor.alpha0", Geometry::PropertyValueKind::Float},
+                                         {Keypoints.Positions.Domain, "descriptor.alpha1", Geometry::PropertyValueKind::Float}};
         }
-        std::array<Runtime::ActionReadiness, 2> PreviewOriented()
-        {
-            return {PreviewEdit(), Runtime::PreviewEditorDescriptorAnalysisCommand(Commands, Descriptors)};
-        }
+        std::array<Runtime::ActionReadiness, 2> PreviewOriented() { return {PreviewEdit(), PreviewScalarEdit()}; }
         Runtime::PointCloudEditingService& Editing() { return *Engine.Services().Find<Runtime::PointCloudEditingService>(); }
         // The point-cloud editing service's readiness capture (copies nothing), as the bilateral plugin previews.
         Runtime::ActionReadiness PreviewEdit()
@@ -1246,6 +1242,27 @@ namespace
             const bool ready = Editing().Capture(request, diagnostic) != nullptr;
             return {.Enabled = ready, .DisabledReason = ready ? std::string{} : diagnostic};
         }
+        // The service's scalar readiness capture, refused for a live zero normal as the descriptor plugin refuses it.
+        Runtime::ActionReadiness PreviewScalarEdit()
+        {
+            auto request = Descriptors;
+            request.CopyValues = false;
+            std::string diagnostic;
+            const auto edit = Editing().Capture(request, diagnostic);
+            const bool zero = edit && Editing().View(*edit).HasZeroNormals;
+            const bool ready = edit && !zero;
+            return {.Enabled = ready, .DisabledReason = ready ? std::string{} : zero ? std::string{kZeroNormal} : diagnostic};
+        }
+        // Whether the scalar capture's points fit an LBVH (the plugins' backend limit).
+        bool ScalarEditFitsLbvh()
+        {
+            auto request = Descriptors;
+            request.CopyValues = false;
+            std::string diagnostic;
+            const auto edit = Editing().Capture(request, diagnostic);
+            return edit && Editing().View(*edit).ValidLbvh;
+        }
+        static constexpr std::string_view kZeroNormal = "A live normal is zero.";
         // The service's input catalog for the plugin's minimum of two live samples.
         Runtime::GeometryPropertyCatalogSnapshot EditCatalog() { return Editing().InputCatalog(Bilateral.StableEntityId, 2u); }
         Runtime::EditorPointConstructionReadiness PreviewConstruction()
@@ -1555,7 +1572,7 @@ TEST_F(EditorPointReadiness, OrientedNegativeAndZeroNormalVerdictsRemainRoleSpec
         PrepareFrame();
         const auto ready = PreviewOriented();
         EXPECT_TRUE(ready[0].Enabled);
-        EXPECT_EQ(ready[1].DisabledReason, "Live positions must be finite and normals finite and nonzero.");
+        EXPECT_EQ(ready[1].DisabledReason, kZeroNormal);
         for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
         EXPECT_EQ(Stats().PropertyScans, 3u);
     }
@@ -1587,15 +1604,15 @@ TEST_F(EditorPointReadiness, OrientedMetadataPrecedesPendingAndMinimumCountsRema
 {
     SetNormalInputs();
     const auto output = Bilateral.Output;
-    const auto histogram = Descriptors.Outputs[0];
+    const auto histogram = Descriptors.ScalarOutputs[0];
     Bilateral.Output = Bilateral.Normals;
-    Descriptors.Outputs[0].Name = Descriptors.Normals.Name;
+    Descriptors.ScalarOutputs[0].Name = Descriptors.Normals.Name;
     auto bad = PreviewOriented();
     EXPECT_NE(bad[0].DisabledReason.find("cannot overwrite"), std::string::npos);
-    EXPECT_NE(bad[1].DisabledReason.find("distinct from inputs"), std::string::npos);
+    EXPECT_NE(bad[1].DisabledReason.find("must be distinct properties"), std::string::npos);
     EXPECT_EQ(Stats().ChecksQueued, 0u);
     Bilateral.Output = output;
-    Descriptors.Outputs[0] = histogram;
+    Descriptors.ScalarOutputs[0] = histogram;
     Bilateral.Normals.Name = Descriptors.Normals.Name = "missing";
     for (const auto& preview : PreviewOriented())
         EXPECT_EQ(preview.DisabledReason, "Choose count-matched vec3 normals on the position domain.");
@@ -1607,14 +1624,14 @@ TEST_F(EditorPointReadiness, OrientedMetadataPrecedesPendingAndMinimumCountsRema
     Drain();
     auto one = PreviewOriented();
     EXPECT_EQ(one[0].DisabledReason, "At least 2 live samples are required.");
-    EXPECT_EQ(one[1].DisabledReason, "Descriptor analysis requires at least two live samples and positive spacing.");
+    EXPECT_TRUE(one[1].Enabled) << one[1].DisabledReason;
     EXPECT_TRUE(EditCatalog().Empty());
     deleted[0] = true;
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     Drain();
     auto zero = PreviewOriented();
     EXPECT_EQ(zero[0].DisabledReason, one[0].DisabledReason);
-    EXPECT_EQ(zero[1].DisabledReason, "Descriptor analysis requires live input samples.");
+    EXPECT_EQ(zero[1].DisabledReason, "At least 1 live samples are required.");
     EXPECT_EQ(Stats().PropertyScans, 4u);
 }
 
@@ -1622,20 +1639,17 @@ TEST_F(EditorPointReadiness, OrientedBackendLimitsApplyToPositionsAndRetainFamil
 {
     SetNormalInputs();
     Properties().Get<glm::vec3>("directions")[0] = {2e18f,0,1};
-    Descriptors.Backend = Runtime::DescriptorAnalysisBackend::CpuLBVH;
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     Drain();
     for (const auto& preview : PreviewOriented()) ASSERT_TRUE(preview.Enabled) << preview.DisabledReason;
-    // The service has no backends: its readiness ignores them (the plugin checks LBVH limits on the capture).
-    Descriptors.Backend = Runtime::DescriptorAnalysisBackend::VulkanLBVH;
-    EXPECT_TRUE(PreviewOriented()[0].Enabled);
-    EXPECT_EQ(PreviewOriented()[1].DisabledReason.find("Vulkan"), 0u);
-    Descriptors.Backend = Runtime::DescriptorAnalysisBackend::CpuLBVH;
+    // The service has no backends: its readiness ignores them, and the plugins check the capture's LBVH fit,
+    // which only the positions decide.
+    EXPECT_TRUE(ScalarEditFitsLbvh());
     Properties().Get<glm::vec3>("samples")[0].x = 2e18f;
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     Drain();
-    EXPECT_TRUE(PreviewOriented()[0].Enabled);
-    EXPECT_EQ(PreviewOriented()[1].DisabledReason.find("LBVH"), 0u);
+    for (const auto& preview : PreviewOriented()) EXPECT_TRUE(preview.Enabled) << preview.DisabledReason;
+    EXPECT_FALSE(ScalarEditFitsLbvh());
     EXPECT_EQ(EditCatalog().Size(), 2u);
     EXPECT_EQ(Stats().PropertyScans, 3u);
 }
@@ -1666,7 +1680,9 @@ TEST_F(EditorPointReadiness, OrientedCommandsSubmitWhileReadinessIsPending)
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     std::string diagnostic;
     EXPECT_NE(Editing().Capture(Bilateral, diagnostic), nullptr) << diagnostic; // a run's capture copies at once
-    EXPECT_EQ(Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors).Status, Runtime::EditorCommandStatus::Pending);
+    const auto scalar = Editing().Capture(Descriptors, diagnostic);
+    ASSERT_NE(scalar, nullptr) << diagnostic;
+    EXPECT_FALSE(Editing().View(*scalar).HasZeroNormals);
     EXPECT_EQ(Stats().PropertyScans, 0u);
 }
 
@@ -1677,14 +1693,13 @@ TEST_F(EditorPointReadiness, OrientedCommandsRecaptureWarmNormals)
     Drain();
     for (const auto& preview : PreviewOriented()) ASSERT_TRUE(preview.Enabled);
     Properties().Get<glm::vec3>("directions")[0].x = NAN;
-    std::string bilateral;
+    std::string bilateral, scalar;
     EXPECT_EQ(Editing().Capture(Bilateral, bilateral), nullptr);
-    const auto descriptor = Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors);
-    EXPECT_EQ(descriptor.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(Editing().Capture(Descriptors, scalar), nullptr);
     EXPECT_EQ(bilateral, "Live normal samples must be finite.");
-    EXPECT_EQ(descriptor.Message, bilateral);
+    EXPECT_EQ(scalar, bilateral);
     EXPECT_FALSE(Properties().Exists(Bilateral.Output.Name));
-    for (const auto& output : Descriptors.Outputs) EXPECT_FALSE(Properties().Exists(output.Name));
+    for (const auto& output : Descriptors.ScalarOutputs) EXPECT_FALSE(Properties().Exists(output.Name));
     EXPECT_EQ(Stats().PropertyScans, 2u);
 }
 
@@ -2522,7 +2537,7 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
         {{0,0,1}, {0,1,0}, {1,0,0}, {0,0,1}, {NAN,0,0}, {0,0,0}};
     Bilateral.Positions.Domain = Bilateral.Normals.Domain = Bilateral.Output.Domain =
         Descriptors.Positions.Domain = Descriptors.Normals.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
-    Descriptors.Outputs = Runtime::MakeDescriptorOutputProperties(Descriptors.Positions.Domain, "descriptor");
+    for (auto& output : Descriptors.ScalarOutputs) output.Domain = Descriptors.Positions.Domain;
     auto& edges = Scene->Raw().get<GS::Edges>(Entity).Properties;
     edges.GetOrAdd<bool>("e:deleted")[2] = true;
     Construction.Positions.Domain = Construction.Normals.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
@@ -3743,8 +3758,6 @@ TEST_F(EditorQueuedPointJobs, DuplicateSubmissionAnswersPendingWithTheSharedMess
     const auto construction = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
     ExpectDuplicateRefused("Density weights", [&](auto done) {
         return Runtime::ApplyEditorDensityWeightCommand(Commands, Weights, done); });
-    ExpectDuplicateRefused("Descriptor analysis", [&](auto done) {
-        return Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors, done); });
     ExpectDuplicateRefused("Keypoint analysis", [&](auto done) {
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectDuplicateRefused("Point construction", [&](auto done) {
@@ -3833,8 +3846,6 @@ TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
     const auto construction = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
     ExpectCancelFinalizesOnce("Density weights", [&](auto done) {
         return Runtime::ApplyEditorDensityWeightCommand(Commands, Weights, done); });
-    ExpectCancelFinalizesOnce("Descriptor analysis", [&](auto done) {
-        return Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors, done); });
     ExpectCancelFinalizesOnce("Keypoint analysis", [&](auto done) {
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectCancelFinalizesOnce("Point construction", [&](auto done) {

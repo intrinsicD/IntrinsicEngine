@@ -1253,7 +1253,7 @@ TEST(SandboxAgentServer, RunOperationOutlierAnalysisPublishesAndUndoes)
             "parameterization preview: " + uvReadiness.dump());
         // Every Config row names a real section.
         for (const char* op : {"mesh_curvature", "normal_estimation", "kernel_density", "point_spacing", "outlier_analysis",
-                               "density_weight", "descriptor_analysis", "point_construction"})
+                               "density_weight", "point_construction"})
         {
             const auto refusal = c.Tool("preview_operation", {{"operation", op}, {"entity", cloud}}, &isError);
             const auto text = refusal.is_string() ? refusal.get<std::string>() : refusal.dump();

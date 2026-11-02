@@ -12,6 +12,7 @@ module;
 module Intrinsic.Plugin.BilateralFilter;
 
 import Extrinsic.Runtime.PluginContract;
+import Extrinsic.Runtime.PluginSections;
 import Extrinsic.Runtime.PointCloudEditing;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -60,13 +61,15 @@ namespace Intrinsic::Plugins::BilateralFilter
 
         void Draw(bool& open)
         {
+            // Made on the first draw, not in Register: a load the host refuses after Register calls no shutdown hook.
+            if (g_Window == nullptr) g_Window = new WindowState();
             auto& state = *g_Window;
             if (!ImGui::Begin("Bilateral Point Filter###view.bilateral_filter", &open))
             {
                 ImGui::End();
                 return;
             }
-            if (!state.Draft) state.Draft = ActiveConfig();
+            if (!state.Draft) state.Draft = R::ActivePluginSection<kSection>();
             if (!state.Draft)
             {
                 ImGui::TextWrapped("The bilateral filter section is missing or invalid.");
@@ -76,14 +79,14 @@ namespace Intrinsic::Plugins::BilateralFilter
             auto& draft = *state.Draft;
             ImGui::InputScalar("Entity", ImGuiDataType_U32, &draft.StableEntityId);
             ImGui::SameLine();
-            if (auto* selection = FindService<R::SelectionController>(); selection != nullptr &&
+            if (auto* selection = R::PluginService<R::SelectionController>(); selection != nullptr &&
                 !selection->SelectedStableIds().empty() && ImGui::Button("Use selection"))
                 draft.StableEntityId = selection->SelectedStableIds().front();
-            if (auto* editing = FindService<R::PointCloudEditingService>())
+            if (auto* editing = R::PluginService<R::PointCloudEditingService>())
             {
-                const auto catalog = editing->InputCatalog(draft.StableEntityId, 2u);
-                PropertyCombo("Positions", draft.Positions, catalog);
-                PropertyCombo("Normals", draft.Normals, catalog);
+                PropertyCombo("Positions", draft.Positions, editing->InputCatalog(draft.StableEntityId, 2u));
+                PropertyCombo("Normals", draft.Normals,
+                              editing->InputCatalog(draft.StableEntityId, 2u, draft.Positions.Domain));
             }
             char output[128]{};
             draft.Output.Name.copy(output, sizeof(output) - 1);
@@ -106,14 +109,14 @@ namespace Intrinsic::Plugins::BilateralFilter
             if (ImGui::Button("Apply settings"))
             {
                 std::string error;
-                state.Message = ApplyConfig(draft, error) ? "Settings applied." : error;
+                state.Message = R::ApplyPluginSection<kSection>(draft, error) ? "Settings applied." : error;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Revert")) state.Draft = ActiveConfig();
+            if (ImGui::Button("Revert")) state.Draft = R::ActivePluginSection<kSection>();
             if (!state.Message.empty()) ImGui::TextWrapped("%s", state.Message.c_str());
             ImGui::Separator();
             // Run uses the applied settings, as the MCP tool does.
-            const auto active = ActiveConfig();
+            const auto active = R::ActivePluginSection<kSection>();
             const std::string reason = active ? Preview(*active) : "The section is invalid.";
             std::erase_if(state.Running, [](const auto& run) { return run->Final.has_value(); });
             ImGui::BeginDisabled(!reason.empty());
@@ -139,7 +142,6 @@ namespace Intrinsic::Plugins::BilateralFilter
 
     void AddWindow(R::PluginRegistrations& staged)
     {
-        if (g_Window == nullptr) g_Window = new WindowState();
         staged.Windows.push_back({
             .Id = "view.bilateral_filter",
             .MenuPath = {"View", "Processing", "Filtering & Smoothing"},

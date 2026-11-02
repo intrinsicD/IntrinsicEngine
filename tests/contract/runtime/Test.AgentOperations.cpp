@@ -1034,11 +1034,12 @@ TEST(AgentOperations, ConfiguredOperationEnumMatchesTable)
     EXPECT_EQ(all, enumOf("preview_operation"));
     for (const char* name : {"property_smoothing", "spectral_modes", "harmonic_field", "scalar_gradient", "mesh_curvature", "geodesics",
                              "curvature_segmentation", "normal_estimation", "kernel_density", "point_spacing", "outlier_analysis",
-                             "density_weight", "descriptor_analysis", "point_construction", "mesh_denoise",
+                             "density_weight", "point_construction", "mesh_denoise",
                              "mesh_remesh", "mesh_subdivide", "mesh_simplify", "scalar_ridge", "progressive_poisson", "parameterization"})
         EXPECT_NE(std::ranges::find(all, name), all.end()) << name;
-    // ARCH-022: the bilateral filter is a plugin with its own tools.
-    EXPECT_EQ(std::ranges::find(all, "bilateral_filter"), all.end());
+    // ARCH-022: the bilateral filter and the descriptor analysis are plugins with their own tools.
+    for (const char* plugin : {"bilateral_filter", "descriptor_analysis"})
+        EXPECT_EQ(std::ranges::find(all, plugin), all.end()) << plugin;
     // The mesh aliases keep their four-operation enum, all of which the table serves.
     EXPECT_EQ(enumOf("run_mesh_operation"), (Json{"property_smoothing", "spectral_modes", "harmonic_field", "scalar_gradient"}));
     EXPECT_EQ(enumOf("preview_mesh_operation"), enumOf("run_mesh_operation"));

@@ -1,10 +1,7 @@
-// Point-analysis commands and copied results for keypoints and FPFH descriptors (density
-// weights and outlier analysis moved to their operation modules, RUNTIME-353 and RUNTIME-354).
-// These share one radius/neighborhood analysis mechanism: a resolved feature
+// Point-analysis commands and copied results for keypoints: a resolved feature
 // scale, a capped radius support row per sample, and named same-domain scalar
 // outputs published in one undoable transaction.
 module;
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -17,7 +14,6 @@ export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.OutlierAnalysisOperation;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
 export import Extrinsic.Runtime.DensityWeightOperation;
-export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 export namespace Extrinsic::Runtime
@@ -38,22 +34,7 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    struct EditorDescriptorAnalysisResult
-    {
-        EditorCommandStatus Status{EditorCommandStatus::NoChange};
-        DescriptorAnalysisBackend RequestedBackend{DescriptorAnalysisBackend::CpuKDTree};
-        std::array<GeometryPropertyRef,33> Outputs{};
-        std::string ActualBackend{}, Message{};
-        std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
-        // Resolved spacing and radii in source-property coordinate units.
-        float MeanSpacing{}, FeatureRadius{};
-        std::size_t MaximumNeighbors{};
-        bool IndexReused{};
-        std::size_t GpuQueryBatches{};
-        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
-        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
-    };
-    enum class EditorPointAnalysisResultSlot : std::uint8_t { KeypointAnalysis, DescriptorAnalysis };
+    enum class EditorPointAnalysisResultSlot : std::uint8_t { KeypointAnalysis };
     // Private workspace bindings borrow incomplete containers so sibling features
     // need not import these method records.
     extern "C++"
@@ -62,12 +43,10 @@ export namespace Extrinsic::Runtime
         {
             std::function<void(EditorPointAnalysisResultSlot)> DismissResult{};
             std::function<void(EditorKeypointAnalysisResult)> KeypointAnalysis{};
-            std::function<void(EditorDescriptorAnalysisResult)> DescriptorAnalysis{};
         };
         struct EditorPointAnalysisResultsSnapshot
         {
             std::optional<EditorKeypointAnalysisResult> LastKeypointAnalysisResult{};
-            std::optional<EditorDescriptorAnalysisResult> LastDescriptorAnalysisResult{};
         };
     }
     struct EditorPointAnalysisPreparedFrame
@@ -90,10 +69,4 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(const EditorProcessingCommands&, const KeypointAnalysisConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorProcessingCommands&, std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
-
-    [[nodiscard]] ActionReadiness PreviewEditorDescriptorAnalysisCommand(const EditorProcessingCommands&, const DescriptorAnalysisConfig&);
-    [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(const EditorProcessingCommands&, const DescriptorAnalysisConfig&, std::function<void(EditorDescriptorAnalysisResult)> onComplete = {});
-    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(const EditorProcessingCommands&, const DescriptorAnalysisConfig&, std::string sourceId = {});
-    [[nodiscard]] std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(const EditorProcessingCommands&);
-    [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(const EditorProcessingCommands&, std::function<void(EditorDescriptorAnalysisResult)> onComplete = {});
 }

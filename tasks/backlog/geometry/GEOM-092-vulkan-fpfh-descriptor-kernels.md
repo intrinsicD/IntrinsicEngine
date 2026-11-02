@@ -33,7 +33,7 @@ Existing owners and evidence:
 
 - [`src/geometry/Geometry.PointCloud.Features.cpp`](../../../src/geometry/Geometry.PointCloud.Features.cpp)
 - [`docs/architecture/descriptor-analysis.md`](../../../docs/architecture/descriptor-analysis.md)
-- [`src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp`](../../../src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp)
+- [`plugins/descriptor_analysis/DescriptorAnalysis.Run.cpp`](../../../plugins/descriptor_analysis/DescriptorAnalysis.Run.cpp) (the built-in operation moved into this plugin, ARCH-022)
 
 ## Engine integration
 

@@ -824,10 +824,12 @@ describe different contracts and remain with their current owners.
 attachment-checked command handle, independent of method configs, results and
 workspace storage. `Extrinsic.Runtime.PointFieldOperations` owns density and
 spacing contracts, validated config operations and typed result sinks.
-`Extrinsic.Runtime.PointAnalysisOperations` owns weights, keypoints, outliers and
-FPFH descriptors: one family because all four resolve a feature scale, page
-radius or kNN support through the shared row helpers, and publish named
-same-domain scalars in one undoable transaction. The family and its shared
+`Extrinsic.Runtime.PointAnalysisOperations` owns weights, keypoints and outliers:
+one family because all three resolve a feature scale, page radius or kNN support
+through the shared row helpers, and publish named same-domain scalars in one
+undoable transaction. FPFH descriptors left it for a plugin
+(`plugins/descriptor_analysis`), which reaches the same row helpers through the
+point-cloud editing service. The family and its shared
 property/row helpers import neither `Geometry.HalfedgeMesh` nor
 `Geometry.MeshSoup`; they operate on resolved property domains, including mesh
 domains, without owning a full mesh representation.

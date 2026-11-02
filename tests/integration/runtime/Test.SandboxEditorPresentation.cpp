@@ -436,7 +436,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 95u);
+    ASSERT_EQ(menu.size(), 91u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -458,7 +458,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
                       segmentation = "Segmentation & Clustering", fields = "Fields & Spectral",
                       sampling = "Sampling & Density", remeshing = "Remeshing & UV",
                       reconstruction = "Reconstruction & Registration";
-    const std::array<ExpectedWindow, 82> expected{{
+    const std::array<ExpectedWindow, 78> expected{{
         {"view.property_inspector", {"View"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -508,25 +508,21 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"view.kernel_density", {"View", "Processing", sampling}},
         {"view.point_spacing", {"View", "Processing", sampling}},
         {"view.keypoint_analysis", {"View", "Processing", features}},
-        {"view.descriptor_analysis", {"View", "Processing", features}},
         {"view.density_weights", {"View", "Processing", sampling}},
         {"view.point_construction", {"View", "Processing", reconstruction}},
         {"mesh.processing.kernel_density", {"Mesh", "Processing", sampling}},
         {"mesh.processing.point_spacing", {"Mesh", "Processing", sampling}},
         {"mesh.processing.keypoints", {"Mesh", "Processing", features}},
-        {"mesh.processing.descriptors", {"Mesh", "Processing", features}},
         {"mesh.processing.density_weights", {"Mesh", "Processing", sampling}},
         {"mesh.processing.point_construction", {"Mesh", "Processing", reconstruction}},
         {"graph.processing.kernel_density", {"Graph", "Processing", sampling}},
         {"graph.processing.point_spacing", {"Graph", "Processing", sampling}},
         {"graph.processing.keypoints", {"Graph", "Processing", features}},
-        {"graph.processing.descriptors", {"Graph", "Processing", features}},
         {"graph.processing.density_weights", {"Graph", "Processing", sampling}},
         {"graph.processing.point_construction", {"Graph", "Processing", reconstruction}},
         {"pointcloud.processing.kernel_density", {"PointCloud", "Processing", sampling}},
         {"pointcloud.processing.point_spacing", {"PointCloud", "Processing", sampling}},
         {"pointcloud.processing.keypoints", {"PointCloud", "Processing", features}},
-        {"pointcloud.processing.descriptors", {"PointCloud", "Processing", features}},
         {"pointcloud.processing.density_weights", {"PointCloud", "Processing", sampling}},
         {"pointcloud.processing.point_construction", {"PointCloud", "Processing", reconstruction}},
         {"view.outlier_analysis", {"View", "Processing", filtering}},
@@ -1959,7 +1955,6 @@ TEST(SandboxEditorPresentation, DomainMenusOpenOneSharedWindow)
         {"view.kernel_density", {"mesh.processing.kernel_density", "graph.processing.kernel_density", "pointcloud.processing.kernel_density"}, true},
         {"view.point_spacing", {"mesh.processing.point_spacing", "graph.processing.point_spacing", "pointcloud.processing.point_spacing"}, true},
         {"view.keypoint_analysis", {"mesh.processing.keypoints", "graph.processing.keypoints", "pointcloud.processing.keypoints"}, true},
-        {"view.descriptor_analysis", {"mesh.processing.descriptors", "graph.processing.descriptors", "pointcloud.processing.descriptors"}, true},
         {"view.density_weights", {"mesh.processing.density_weights", "graph.processing.density_weights", "pointcloud.processing.density_weights"}, true},
         {"view.point_construction", {"mesh.processing.point_construction", "graph.processing.point_construction", "pointcloud.processing.point_construction"}, true},
     };

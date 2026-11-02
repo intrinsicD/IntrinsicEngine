@@ -135,13 +135,14 @@ class Session:
         ok, reply, _ = self.call("property_list", {"entity": entity})
         return {entry.get("name") for entry in (s1.find(reply, "properties") or [])} if ok else set()
 
-    def running(self, label: str, deadline_s: float = 30.0) -> dict | None:
+    def running(self, label: str, deadline_s: float = 30.0,
+                states: tuple[str, ...] = ("queued", "running")) -> dict | None:
         end = time.monotonic() + deadline_s
         while time.monotonic() < end:
             ok, reply, _ = self.call("jobs_list")
             self.last_jobs = reply
             for job in (s1.find(reply, "jobs") or []) if ok else []:
-                if job.get("name") == label and job.get("state") in ("queued", "running"):
+                if job.get("name") == label and job.get("state") in states:
                     return job
             time.sleep(0.05)
         return None
@@ -265,7 +266,7 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
     result = session.run()
     written = session.values(entity, "history_output", len(points))
     checks.check("history: a run applied", result.get("status") == "applied" and written is not None, result)
-    ok, unloaded, code = session.call("plugin_unload")
+    ok, unloaded, code = session.call("plugin_unload", {"plugin": "bilateral_filter"})
     checks.check("history: plugin unloaded", ok, [code, unloaded])
     ok, _, _ = session.call("undo")
     checks.check("history: undo while unloaded removes the output",
@@ -292,9 +293,13 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
     checks.check("coexist: the spike plugin loads beside it", ok, [code, loaded])
     ok, listed, _ = session.call("plugin_list")
     names = [p.get("name") for p in (listed.get("loaded") or [])] if isinstance(listed, dict) else []
-    checks.check("coexist: both are listed", sorted(names) == ["bilateral_filter", "spike"], listed)
+    checks.check("coexist: both are listed", {"bilateral_filter", "spike"} <= set(names), listed)
     ok, echo, _ = session.call("spike_echo", {"text": "beside"})
     checks.check("coexist: the spike tool answers", ok and echo == {"echo": {"text": "beside"}}, echo)
+    # A second load of a loaded plugin is refused after its Register ran; the exit's leak check covers what it made.
+    ok, twice, code = session.call("plugin_load", {"path": str(build / "plugins/libIntrinsicBilateralFilterPlugin.so")})
+    checks.check("coexist: a second load of a loaded plugin is refused", not ok and code == "already_loaded",
+                 [code, twice])
     ok, unnamed, code = session.call("plugin_unload")
     checks.check("coexist: an unload without a name is refused", not ok and code == "invalid_params", [code, unnamed])
     ok, reloaded, code = session.call("plugin_reload", {"plugin": "spike", "path": spike})
@@ -310,7 +315,8 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
     checks.check("coexist: the spike plugin unloads by name", ok, [code, unloaded])
     ok, listed, _ = session.call("plugin_list")
     names = [p.get("name") for p in (listed.get("loaded") or [])] if isinstance(listed, dict) else []
-    checks.check("coexist: the bilateral filter stays loaded", names == ["bilateral_filter"], listed)
+    checks.check("coexist: the bilateral filter stays loaded", "bilateral_filter" in names and "spike" not in names,
+                 listed)
     result = session.run()
     checks.check("coexist: the bilateral tool runs after the spike unload", result.get("status") == "applied", result)
 

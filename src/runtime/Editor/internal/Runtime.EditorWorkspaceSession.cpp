@@ -770,7 +770,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             switch (slot)
             {
             case EditorPointAnalysisResultSlot::KeypointAnalysis: m_PointAnalysisResults.LastKeypointAnalysisResult.reset(); break;
-            case EditorPointAnalysisResultSlot::DescriptorAnalysis: m_PointAnalysisResults.LastDescriptorAnalysisResult.reset(); break;
             }
         };
         m_PointSetResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this](EditorPointSetResultSlot slot)
@@ -873,8 +872,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         };
         m_PointAnalysisResultSinks.KeypointAnalysis =
             retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastKeypointAnalysisResult);
-        m_PointAnalysisResultSinks.DescriptorAnalysis =
-            retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastDescriptorAnalysisResult);
         m_PointConstructionResultSinks.PointConstruction =
             retain(m_PointConstructionResults, &EditorPointConstructionResultsSnapshot::LastPointConstructionResult);
         context.PendingAssetImportPath =

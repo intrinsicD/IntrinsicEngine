@@ -1,0 +1,185 @@
+{
+ "backend": "cpu_lbvh",
+ "entity": 12,
+ "feature_radius": 0.25,
+ "gpu_query_batch_size": 512,
+ "gpu_radius_capacity": 64,
+ "max_neighbors": 17,
+ "normals": {
+  "domain": "PointCloudPoint",
+  "kind": "vec3",
+  "name": "n"
+ },
+ "outputs": [
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 0"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 1"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 2"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 3"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 4"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 5"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 6"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 7"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 8"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 9"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 10"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 11"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 12"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 13"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 14"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 15"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 16"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 17"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 18"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 19"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 20"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 21"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 22"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 23"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 24"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 25"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 26"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 27"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 28"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 29"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 30"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "double",
+   "name": "saved/bin 31"
+  },
+  {
+   "domain": "PointCloudPoint",
+   "kind": "float",
+   "name": "saved/bin 32"
+  }
+ ],
+ "positions": {
+  "domain": "PointCloudPoint",
+  "kind": "vec3",
+  "name": "p"
+ }
+}

@@ -15,7 +15,6 @@ import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
-import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
 import Extrinsic.Runtime.SceneInteractionModule;
@@ -50,7 +49,6 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kKernelDensitySection>()) ||
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kPointSpacingSection>()) ||
             !registry.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()) ||
-            !registry.Register(Runtime::MakeDescriptorAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDensityWeightConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakePointConstructionConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeClusteringConfigSectionRegistration(std::move(callbacks.Clustering))) ||

@@ -24,18 +24,4 @@ namespace Extrinsic::Runtime
         if (!context.EngineConfigControlState) return std::nullopt;
         return GetKeypointAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
     }
-    RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(
-        const EditorProcessingCommands& commands, const DescriptorAnalysisConfig& config, std::string sourceId)
-    {
-        return ApplyEditorProcessingConfig(commands,
-            ValidateDescriptorAnalysisConfigSection(SerializeDescriptorAnalysisConfig(config), {}, kDescriptorAnalysisConfigSectionName),
-            sourceId.empty() ? std::string{kDescriptorAnalysisConfigSectionName} : sourceId,
-            [&](Core::Config::EngineConfig& candidate) { SetDescriptorAnalysisConfig(candidate, config); });
-    }
-    std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(const EditorProcessingCommands& commands)
-    {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (!context.EngineConfigControlState) return std::nullopt;
-        return GetDescriptorAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
-    }
 }

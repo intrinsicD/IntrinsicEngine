@@ -22,6 +22,8 @@ export namespace Extrinsic::Runtime
         // The current workspace's commands for one call; the own workspace prepares its frame here (the app's shell
         // prepares one every frame). Unbound without a workspace.
         [[nodiscard]] EditorProcessingCommands Commands();
+        // The current workspace, null without one.
+        [[nodiscard]] EditorWorkspaceAttachment* Current() const noexcept { return m_Current; }
 
     private:
         EditorWorkspaceAttachment m_Own{};

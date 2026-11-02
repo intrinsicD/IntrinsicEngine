@@ -1,8 +1,12 @@
 {
   "schema_version": 1,
-  "r1_files": 30,
+  "r1_files": 29,
   "r2": {
     "plugins/bilateral_filter": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "plugins/descriptor_analysis": {
       "editor_internals": 0,
       "other_plugins": 0
     },
@@ -24,10 +28,6 @@
     },
     "src/runtime/Modules/DensityWeight": {
       "editor_internals": 4,
-      "other_plugins": 0
-    },
-    "src/runtime/Modules/DescriptorAnalysis": {
-      "editor_internals": 0,
       "other_plugins": 0
     },
     "src/runtime/Modules/Geodesics": {

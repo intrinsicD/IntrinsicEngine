@@ -120,7 +120,9 @@ plugins/marching_cubes/
   plugin is rebuilt with the engine.
 - **The host** is `Extrinsic.Runtime.PluginHost`, a runtime module the Sandbox composes. Its MCP tools are
   `plugin_load`, `plugin_unload`, `plugin_reload`, `plugin_list` and `app_quit`.
-  - A load opens a private copy, calls Register and commits everything atomically on the next frame.
+  - A load opens a private copy, calls Register and commits everything atomically on the next frame. A load refused
+    after Register (a taken name, a failed commit) closes the image without the shutdown hook, so Register allocates
+    nothing the plugin would have to free (the plugins make their window state on the first draw).
   - An unload drains first: the plugin's jobs are cancelled and reaped and its GPU work retired, within 5 s
     (else `drain_timeout`, and the plugin stays). Then the shutdown hook runs and every registration goes, with
     the config payloads saved. The image is closed only when none of its callables is alive.
@@ -344,7 +346,11 @@ filter ([plugin](bilateral-point-filter.md), `plugins/bilateral_filter`): it own
 and its window, and runs as plugin jobs of the editor's Jobs window. What it needs from the editor (capture,
 indices, GPU kNN pages, publication with undo) is the module service `PointCloudEditingService`, which later point
 plugins reuse. The Sandbox loads it at startup (static builds link it). The domain Processing menus' entries for it
-are gone: they were Sandbox redirects, which a plugin cannot register.
+are gone: they were Sandbox redirects, which a plugin cannot register. The second plugin is the FPFH descriptor
+analysis ([feature](descriptor-analysis.md), `plugins/descriptor_analysis`), loaded beside it: the editing service
+learned radius rows and the publication of several scalar columns as one undo entry; what both plugins need moved
+into the services ring (`PluginService`, `Extrinsic.Runtime.PluginSections`), and their tests share one plugin
+harness (`tests/support/PluginHarness.hpp`).
 
 **Open, for the first plan** (`ARCH-022`):
 1. **Numeric targets for R4 and R6**: set on 2026-10-31 (table above).

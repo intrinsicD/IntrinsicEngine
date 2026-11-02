@@ -18,7 +18,6 @@ export import Extrinsic.Runtime.DerivedConfigSections;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.PluginContract;
-import Extrinsic.Runtime.ServiceRegistry;
 
 export namespace Intrinsic::Plugins::BilateralFilter
 {
@@ -140,24 +139,12 @@ export namespace Intrinsic::Plugins::BilateralFilter
         R::PluginJobHandle Handle{};
     };
 
-    // The active config of the section; nullopt without config control or with an unusable payload.
-    [[nodiscard]] std::optional<Config> ActiveConfig();
-    // Writes the section through config preview and apply; false with the reason.
-    [[nodiscard]] bool ApplyConfig(const Config& config, std::string& error);
     // Readiness: empty when a run can start, else why not (copies no values).
     [[nodiscard]] std::string Preview(const Config& config);
     // Starts a run (main thread). An immediate failure sets `Final` at once.
     [[nodiscard]] std::shared_ptr<Run> Start(const Config& config);
     // Cancels the run's jobs; false when nothing is active.
     bool Cancel(const Run& run);
-
-    // A host service the plugin uses, or null while the host does not offer it.
-    template <class T>
-    [[nodiscard]] T* FindService()
-    {
-        auto* services = R::PluginServices();
-        return services != nullptr ? services->Find<T>() : nullptr;
-    }
 
     // The plugin's entry points (the v1 symbols forward to them; static builds call them in-process).
     [[nodiscard]] bool Register(R::PluginRegistrations& staged, std::string& error) noexcept;

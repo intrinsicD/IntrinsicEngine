@@ -148,9 +148,6 @@ namespace
                 return R::ApplyEditorKeypointAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
                     .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1}, done); });
-            check("Descriptor analysis", [&](auto done) {
-                return R::ApplyEditorDescriptorAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-                    .Normals = Normals(), .Outputs = R::MakeDescriptorOutputProperties(D::PointCloudPoint, "descriptor")}, done); });
             check("Point construction", [&](auto done) {
                 return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2}, done); });
@@ -239,10 +236,6 @@ TEST_F(QueuedEditorJobContract, RejectedLaterStageAbandonsTheQueuedStagesWithout
             .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
             .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1,
             .Backend = R::KeypointAnalysisBackend::VulkanLBVH}, done); });
-    check("Descriptor analysis", [&](auto done) {
-        return R::ApplyEditorDescriptorAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-            .Normals = Normals(), .Outputs = R::MakeDescriptorOutputProperties(D::PointCloudPoint, "descriptor"),
-            .Backend = R::DescriptorAnalysisBackend::VulkanLBVH}, done); });
     check("Point construction", [&](auto done) {
         return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
             .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
@@ -271,10 +264,6 @@ TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
             .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
             .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1,
             .Backend = R::KeypointAnalysisBackend::VulkanLBVH}, done); });
-    check("Descriptor analysis", [&](auto done) {
-        return R::ApplyEditorDescriptorAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-            .Normals = Normals(), .Outputs = R::MakeDescriptorOutputProperties(D::PointCloudPoint, "descriptor"),
-            .Backend = R::DescriptorAnalysisBackend::VulkanLBVH}, done); });
     check("Point construction", [&](auto done) {
         return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
             .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
@@ -584,14 +573,13 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         "ProcessingCompilationLocality.ConsolidationContracts",
     };
     // RUNTIME-349: kernel density and point spacing left the boundary and use kPosition.
-    constexpr std::array<std::string_view, 19> allowedPositionLiterals{
+    constexpr std::array<std::string_view, 18> allowedPositionLiterals{
         "GeometryIntegration/Runtime.GeometryProperty.Types.cpp",
         "Modules/Clustering/Runtime.ClusteringTypes.cppm",
         "Modules/Curvature/Runtime.MeshCurvatureConfig.cpp",
         "Modules/Curvature/Runtime.MeshCurvatureConfig.cppm",
         "Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm",
         "Modules/DensityWeight/Runtime.DensityWeightConfig.cppm",
-        "Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm",
         "Modules/Geodesics/Runtime.GeodesicsConfig.cpp",
         "Modules/Geodesics/Runtime.GeodesicsConfig.cppm",
         "Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm",
@@ -729,5 +717,5 @@ TEST(QueuedEditorJobDriftGuard, EveryEditorJobIdentityNamesItsRequestedDomain)
                     << "an editor job identity names its config's requested backend domain: " << initializer;
             }
         }
-    EXPECT_GE(identities, 21u) << "the scan found the operations' identities"; // the bilateral filter is a plugin
+    EXPECT_GE(identities, 20u) << "the scan found the operations' identities"; // bilateral filter, descriptors: plugins
 }

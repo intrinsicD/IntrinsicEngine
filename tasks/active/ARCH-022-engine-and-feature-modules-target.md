@@ -2350,3 +2350,62 @@ python3 tools/docs/check_doc_links.py --root . --strict
     reload. S2 and R4 are to be rerun with the display on; R4 was not run. Static trees (working tree with the
     later block's uncommitted files, which the 2d-0 files do not use): `build/ci` 56 tests pass; `build/ci-vulkan`
     builds the static Sandbox with the in-process bilateral filter.
+- 2026-11-02, step 2d in progress (after 2d-0 landed in `aef5dc81c`, `41b85ebe0`, `c441a0bac`): `plugins/descriptor_analysis`
+  (section `sandbox.descriptor_analysis` with the derived array row, tools `descriptor_analysis` and
+  `descriptor_analysis_preview`, window `view.descriptor_analysis`; runs: CPU k-d tree and CPU LBVH one job each,
+  Vulkan scale, gated GPU radius rows and histograms, each stage submitted from the previous one's completion).
+  Promoted for both plugins: `PluginService<T>` (contract) and `ActivePluginSection`/`ApplyPluginSection`
+  (`Extrinsic.Runtime.PluginSections`); `tests/support/PluginHarness.hpp` is the general harness, the bilateral and
+  descriptor harnesses add only their helpers. 10 contract tests (`Test.DescriptorAnalysisPlugin.cpp`) pass with the
+  built-in still present. Open: golden parity, removal of the built-in, Sandbox wiring, GPU smoke with the benchmark
+  contract, live driver, mutation checks, reviews, docs.
+  - The built-in removed (by a delegated session, reviewed here): config module and codec block, operation, result
+    slot and sinks, agent row, Sandbox section, window and redirects, CMake, the two built-in-only test files and
+    the three `PointLBVHGpuSmoke.Descriptor*` cases (their successor, `DescriptorAnalysisPluginGpuSmoke`, also writes
+    the benchmark JSON of `geometry.point_lbvh.descriptor_runtime_smoke`). Shared tests keep their intent; the
+    point-readiness fixture's second oriented consumer is a `PointCloudEditingService` capture with two scalar
+    outputs that refuses zero normals (minimum live count 1, so the two consumers' minimums stay distinct). Lost:
+    the Sandbox's only normals picker that hid unresolved-domain rows was the built-in's (construction's remains,
+    which shows them). The Sandbox no longer names its plugins: each plugin's CMake adds itself to
+    `INTRINSIC_STARTUP_PLUGINS`, and a generated `SandboxStartupPlugins.hpp` carries the list into `main.cpp`
+    (R1 30 -> 29). ARA C87 pins its removed proofs to `36a7b50` (as C86's bilateral proof was pinned in
+    `c9968295c`). Golden parity: `Test.DescriptorAnalysisPlugin.cpp` loads the 300-point cloud the built-in was
+    recorded on (`tests/data/descriptor_golden_cloud.json`) and both CPU backends reproduce its 9900 values
+    exactly; the live driver `plugins/descriptor_analysis/live_driver.py` checks all three backends over MCP.
+  - Mutation checks of the new tests (source mutated, test rebuilt and run, source restored), each killed: zero
+    normals accepted; stale reported as cancelled (killed after a new case: an input change, then a cancel);
+    unrepresentable reported as failed; columns shifted; CPU LBVH without its scale; CPU LBVH rows capped;
+    duplicate output names allowed; the window following the bin without a Show; PublishScalars accepting a wrong
+    column count (killed after a new service test); the catalog's domain filter off; the array items unchecked.
+  - Codex code review (fresh session `01a19de3-aa27-7010-8dfd-571da38988ca`, diff sha256 1a1a3549…): "Verdict:
+    REVISE", three blocking: the Normals picker offered every domain and then overwrote the domain (the bilateral
+    window too); CPU LBVH counted its scale time twice; no unload/reload test. Fixed: `InputCatalog` takes a domain
+    and both windows offer the positions' domain for normals; Compute times itself after Prepare; a contract test
+    unloads, undoes and redoes, reloads and runs again (the plugin harness reopens the plugin in-process for any
+    load path), and the GPU smoke's unload case reloads and runs again. A deterministic later-stage refusal has no
+    host path (the drain cancels every stage before it refuses submissions); argued in round 2.
+  - Ponytail review (fresh Claude subagent, same diff): "Verdict: fix 1, 2 and 3 first", "Lean: -80 lines
+    possible". Done: (2) the array row's length comes from the bound array (Bind sets MinItems/MaxItems, so schema
+    and validator agree) and its items go through `CollectDeclaredFieldErrors`; (3) the CPU backends' stage is
+    `SubmitHistograms`; (4) a no-op restore in `CpuRadiusRows` removed (deviation from the plan: CPU radius rows are a
+    service method, the built-in's loop moved down for later point plugins, not rows made by the plugin from
+    `CpuIndex`); (5) one LBVH refusal, after the zero-normal check as in the built-in. Deferred to one "plugin
+    template" step before a third plugin (the review allows it): (1) the run protocol both plugins copy (`Run`,
+    `Submit`, `Cancel`, the waiting tool, the property combo) into the services ring, and (6) one CMake function
+    for a plugin's targets and its startup entry. (7) skipped (test code).
+  - Codex round 2 (diff sha256 85da3cfc…): "Verdict: APPROVE" (the refusal analysis accepted, no host hook). Then the
+    Vulkan smoke ran (its swapchain has VSync off, so the throttled display did not stop it) and found two test
+    defects, fixed: the dense case's reference columns were not prefilled like the outputs; the unload case kept the
+    answered unload's reservation alive. Live driver: the gated GPU stage is active as `awaiting-apply`.
+  - Verification in this session: dev-shared full build; IntrinsicRuntimeContractTests 1935/1935 (exit 1 from a
+    LeakSanitizer report in the Vulkan ICD at process exit), IntrinsicRuntimeIntegrationTests 80/80,
+    IntrinsicSandboxEditorIntegrationTests 291/291; plugin tests 6 repeats under 40 busy loops; Vulkan smoke
+    `DescriptorAnalysisPluginGpuSmoke` 4/4 and `BilateralFilterPluginGpuSmoke` 2/2; live driver 39/39 (all three
+    backends equal the built-in golden over MCP, sha256 18f798d0…; MCP cancel during the GPU stage; undo and redo
+    across unload and reload); static `build/ci` 173 filtered tests and `build/ci-vulkan` static Sandbox with both
+    plugins in-process; jscpd (src, tests, plugins): no clone touching the changed files; R1/R2 checker strict.
+  - Found by the bilateral live driver (which still unloaded without a name and expected one startup plugin; fixed):
+    a load the host refuses after Register closes the image without the shutdown hook, so what Register allocated
+    leaks (LSan: the window state, 256 bytes). Fixed in the plugins (window state made on the first draw) and
+    documented in the target doc; open for the plugin template step: whether the host should call the shutdown
+    hook for a candidate it discards after a successful Register (it changes the spike drivers' event order).

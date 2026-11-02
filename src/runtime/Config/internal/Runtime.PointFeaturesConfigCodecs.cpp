@@ -1,4 +1,4 @@
-// Compiles KeypointAnalysis, DescriptorAnalysis, PointConstruction config codecs together to share JSON work.
+// Compiles KeypointAnalysis and PointConstruction config codecs together to share JSON work.
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -15,7 +15,6 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
 import Extrinsic.Runtime.KeypointAnalysisConfig;
-import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
@@ -43,20 +42,6 @@ namespace Extrinsic::Runtime
             {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions, mask and score must have distinct names on the same element domain.", .RefKinds = kVec3Kind},
             {.Name = "mask", .Type = ConfigFieldType::PropertyRef, .Description = "Mask.", .RefKinds = kUInt32Kind, .AnyScalar = true},
             {.Name = "score", .Type = ConfigFieldType::PropertyRef, .Description = "Score.", .RefKinds = kFloatKind, .AnyScalar = true},
-        };
-        constexpr std::string_view kDescriptorAnalysisBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"};
-        constexpr ConfigFieldSpec kDescriptorAnalysisOutputsItem{.Name = "output", .Type = ConfigFieldType::PropertyRef, .RefKinds = kFloatKind, .AnyScalar = true};
-        constexpr std::string_view kDescriptorAnalysisBackendNames[]{"CPU KD-tree", "CPU LBVH (cached)", "Vulkan LBVH"};
-        constexpr ConfigFieldSpec kDescriptorAnalysisFields[]{
-            {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
-            {.Name = "max_neighbors", .Type = ConfigFieldType::UInt, .Description = "Max neighbors."},
-            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
-            {.Name = "gpu_radius_capacity", .Type = ConfigFieldType::UInt, .Description = "Gpu radius capacity.", .Min = 1, .Max = 1024},
-            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kDescriptorAnalysisBackendNames, .EnumValues = kDescriptorAnalysisBackend},
-            {.Name = "feature_radius", .Type = ConfigFieldType::Float, .Description = "Zero selects an automatic radius; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Position and normal inputs must share an element domain.", .RefKinds = kVec3Kind},
-            {.Name = "normals", .Type = ConfigFieldType::PropertyRef, .Description = "Normals.", .RefKinds = kVec3Kind},
-            {.Name = "outputs", .Type = ConfigFieldType::Array, .Description = "Exactly 33 uniquely named scalar outputs on the input domain, distinct from both input names.", .Item = &kDescriptorAnalysisOutputsItem, .MinItems = 33u, .MaxItems = 33u},
         };
         constexpr std::string_view kPointConstructionBackend[]{"cpu_reference", "cpu_lbvh", "vulkan_lbvh"};
         constexpr std::string_view kPointConstructionMethod[]{"hoppe", "knn_graph"};
@@ -159,97 +144,6 @@ namespace Extrinsic::Runtime
             kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1, SerializeKeypointAnalysisConfig({}), ValidateKeypointAnalysisConfigSection,
             ConfigDetail::BuildSectionSchemaJson(kKeypointAnalysisConfigSectionSchemaId, "KeypointAnalysis", "Validated KeypointAnalysis configuration.",
                 kKeypointAnalysisFields, ConfigDetail::ParseConfigJson(SerializeKeypointAnalysisConfig({}), true)));}
-}
-
-namespace Extrinsic::Runtime
-{
-    namespace
-    {
-        using Json=nlohmann::json;
-        DescriptorAnalysisConfig ParseDescriptorAnalysisConfig(const Json& data)
-        {
-            DescriptorAnalysisConfig c;c.StableEntityId=data.at("entity");
-            for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(DescriptorAnalysisBackend(i)))c.Backend=DescriptorAnalysisBackend(i);
-            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("normals"),c.Normals);
-            for(unsigned i=0;i<33;++i)ConfigDetail::DecodePointPropertyRef(data.at("outputs").at(i),c.Outputs[i]);
-            c.MaxNeighbors=data.at("max_neighbors");c.GpuQueryBatchSize=data.at("gpu_query_batch_size");
-            c.GpuRadiusCapacity=data.at("gpu_radius_capacity");c.FeatureRadius=data.at("feature_radius");
-            return c;
-        }
-    }
-
-    std::array<GeometryPropertyRef,33> MakeDescriptorOutputProperties(GeometryElementDomain domain,std::string_view prefix)
-    {
-        std::array<GeometryPropertyRef,33> outputs;
-        constexpr std::array names{"alpha","phi","theta"};
-        for(unsigned i=0;i<33;++i)outputs[i]={domain,std::string(prefix)+"."+names[i/11]+std::to_string(i%11),Geometry::PropertyValueKind::Float};
-        return outputs;
-    }
-
-    const char* ToString(DescriptorAnalysisBackend b) noexcept
-    {
-        switch(b){case DescriptorAnalysisBackend::CpuKDTree:return "cpu_kdtree";case DescriptorAnalysisBackend::CpuLBVH:return "cpu_lbvh";case DescriptorAnalysisBackend::VulkanLBVH:return "vulkan_lbvh";}
-        return "invalid";
-    }
-
-    std::string SerializeDescriptorAnalysisConfig(const DescriptorAnalysisConfig& c)
-    {
-        auto outputs=Json::array();for(const auto& output:c.Outputs)outputs.push_back(ConfigDetail::EncodePointPropertyRef(output));
-        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
-            {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"normals",ConfigDetail::EncodePointPropertyRef(c.Normals)},{"outputs",outputs},
-            {"max_neighbors",c.MaxNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-            {"gpu_radius_capacity",c.GpuRadiusCapacity},{"feature_radius",c.FeatureRadius}});
-    }
-    Core::Config::EngineConfigSectionValidationResult ValidateDescriptorAnalysisConfigSection(
-        std::string_view payload,std::string_view,std::string_view subject)
-    {
-        using namespace Core::Config;
-        using ConfigDetail::RejectConfigSection;
-        auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDescriptorAnalysisConfig({}), true);
-        if (auto error = ConfigDetail::ValidatePointConfigFields(
-            input, data, "Descriptor analysis config must be an object.", "Unknown descriptor field: ",
-            kDescriptorAnalysisFields))
-            return RejectConfigSection(subject, std::move(*error));
-        if(!ConfigDetail::InConfigFieldRange(kDescriptorAnalysisFields, "gpu_query_batch_size", data["gpu_query_batch_size"].get<double>()) ||
-           !ConfigDetail::InConfigFieldRange(kDescriptorAnalysisFields, "gpu_radius_capacity", data["gpu_radius_capacity"].get<double>()))
-            return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
-        if(!ConfigDetail::IsConfigFieldToken(kDescriptorAnalysisFields, "backend", data["backend"]))
-            return RejectConfigSection(subject, "Unknown descriptor backend.");
-        for(auto key:{"feature_radius"})
-            if(!data[key].is_number() || !ConfigDetail::InConfigFieldRange(kDescriptorAnalysisFields, key, data[key].get<double>()) ||
-               (data[key]>0 && data[key].get<float>()==0))
-                return RejectConfigSection(subject, std::string(key)+" must be zero (automatic) or a positive representable float.");
-        using ConfigDetail::PointPropertyValidation;
-        if(ConfigDetail::ValidatePointPropertyRef(data["positions"], FindConfigFieldSpec(kDescriptorAnalysisFields, "positions")->RefKinds.front(), FindConfigFieldSpec(kDescriptorAnalysisFields, "positions")->AnyScalar) != PointPropertyValidation::Valid ||
-           ConfigDetail::ValidatePointPropertyRef(data["normals"], FindConfigFieldSpec(kDescriptorAnalysisFields, "normals")->RefKinds.front(), FindConfigFieldSpec(kDescriptorAnalysisFields, "normals")->AnyScalar) != PointPropertyValidation::Valid ||
-           data["positions"]["domain"]!=data["normals"]["domain"])
-            return RejectConfigSection(subject, "Positions and normals need canonical vec3 references on the same domain.");
-        if(!data["outputs"].is_array() || data["outputs"].size()!=*FindConfigFieldSpec(kDescriptorAnalysisFields, "outputs")->MinItems)return RejectConfigSection(subject, "FPFH requires exactly 33 float output references.");
-        for(std::size_t i=0;i<data["outputs"].size();++i)
-        {
-            const auto& ref=data["outputs"][i];
-            if(ConfigDetail::ValidatePointPropertyRef(ref, FindConfigFieldSpec(kDescriptorAnalysisFields, "outputs")->Item->RefKinds.front(), FindConfigFieldSpec(kDescriptorAnalysisFields, "outputs")->Item->AnyScalar) != PointPropertyValidation::Valid || ref["domain"]!=data["positions"]["domain"] ||
-               ref["name"]==data["positions"]["name"] || ref["name"]==data["normals"]["name"])
-                return RejectConfigSection(subject, "Descriptor outputs must be float properties on the input domain, distinct from inputs.");
-            for(unsigned j=0;j<i;++j)if(ref["name"]==data["outputs"][j]["name"])
-                return RejectConfigSection(subject, "Descriptor output names must be unique.");
-        }
-        return ConfigDetail::AcceptConfigSection(SerializeDescriptorAnalysisConfig(ParseDescriptorAnalysisConfig(data)), input.size());
-    }
-    std::optional<DescriptorAnalysisConfig> GetDescriptorAnalysisConfig(const Core::Config::EngineConfig& c)
-    {
-        return ConfigDetail::GetPointConfig(c, kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1u, ValidateDescriptorAnalysisConfigSection, ParseDescriptorAnalysisConfig);
-    }
-    void SetDescriptorAnalysisConfig(Core::Config::EngineConfig& c,const DescriptorAnalysisConfig& value)
-    {Core::Config::UpsertEngineConfigSection(c.AppSections,ConfigDetail::MakeConfigSection(
-            kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1, SerializeDescriptorAnalysisConfig(value)));}
-    std::span<const ConfigFieldSpec> DescriptorAnalysisConfigFieldSpecs() noexcept
-    { return kDescriptorAnalysisFields; }
-    Core::Config::EngineConfigSectionRegistration MakeDescriptorAnalysisConfigSectionRegistration()
-    {return ConfigDetail::MakeSectionRegistration(
-            kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1, SerializeDescriptorAnalysisConfig({}), ValidateDescriptorAnalysisConfigSection,
-            ConfigDetail::BuildSectionSchemaJson(kDescriptorAnalysisConfigSectionSchemaId, "DescriptorAnalysis", "Validated DescriptorAnalysis configuration.",
-                kDescriptorAnalysisFields, ConfigDetail::ParseConfigJson(SerializeDescriptorAnalysisConfig({}), true)));}
 }
 
 namespace Extrinsic::Runtime

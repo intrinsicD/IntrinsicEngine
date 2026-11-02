@@ -41,6 +41,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -62,6 +63,9 @@ namespace Extrinsic::Runtime
         Detail::PointNormalCapture Capture{};
         Detail::PointPropertyWatch OutputWatch{};
         std::vector<glm::vec3> BeforeOutput{}, AfterOutput{};
+        std::vector<Detail::PointPropertyWatch> ScalarWatches{};
+        std::vector<GeometryScalarPropertySnapshot> ScalarBefore{};
+        Detail::PointRadiusRows RadiusPages{};
         std::shared_ptr<const SpatialIndexSnapshot> Index{};
         SpatialIndexHandle GpuIndex{};
         bool IndexReused{false};
@@ -80,7 +84,9 @@ namespace Extrinsic::Runtime
         {
             const std::array outputs{edit.OutputWatch};
             return Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, edit.Capture.Inputs) &&
-                Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, outputs);
+                (!edit.Request.ScalarOutputs.empty() ||
+                 Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, outputs)) &&
+                Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, edit.ScalarWatches);
         }
     };
 
@@ -119,22 +125,44 @@ namespace Extrinsic::Runtime
         if (r.Positions.Domain == D::Unknown) r.Positions.Domain = Detail::PrimaryPointDomain(a);
         if (r.Output.Domain == D::Unknown) r.Output.Domain = r.Positions.Domain;
         if (r.Normals.Domain == D::Unknown) r.Normals.Domain = r.Positions.Domain;
+        for (auto& output : r.ScalarOutputs)
+            if (output.Domain == D::Unknown) output.Domain = r.Positions.Domain;
         const auto* props = ResolveGeometryPropertySet(a, r.Positions.Domain);
         if (props == nullptr || !ResolveGeometryProperty(a, r.Positions, props->Size(), false).Resolved())
             return fail("Choose a count-matched vec3 position property on a resolved element domain.");
-        if (r.Output.Domain != r.Positions.Domain || (r.Output.Name == r.Normals.Name && r.Normals.Name != r.Positions.Name))
+        const bool scalar = !r.ScalarOutputs.empty();
+        for (std::size_t i = 0; i < r.ScalarOutputs.size(); ++i)
+        {
+            const auto& output = r.ScalarOutputs[i];
+            if (output.Domain != r.Positions.Domain || output.Name == r.Positions.Name ||
+                output.Name == r.Normals.Name ||
+                std::any_of(r.ScalarOutputs.begin(), r.ScalarOutputs.begin() + std::ptrdiff_t(i),
+                            [&](const auto& earlier) { return earlier.Name == output.Name; }))
+                return fail("The outputs must be distinct properties on the input domain.");
+            if (IsTopologyProperty(output.Domain, output.Name))
+                return fail("The outputs cannot replace topology or deletion properties.");
+            if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
+                return fail("The outputs must be absent or count-matched scalar properties.");
+        }
+        if (!scalar && (r.Output.Domain != r.Positions.Domain ||
+                        (r.Output.Name == r.Normals.Name && r.Normals.Name != r.Positions.Name)))
             return fail("The output must share the input domain and cannot overwrite a distinct normal input.");
-        if (IsTopologyProperty(r.Output.Domain, r.Output.Name))
+        if (!scalar && IsTopologyProperty(r.Output.Domain, r.Output.Name))
             return fail("The output cannot replace topology or deletion properties.");
-        if (props->Exists(r.Output.Name) && !ResolveGeometryProperty(a, r.Output, props->Size(), false).Resolved())
+        if (!scalar && props->Exists(r.Output.Name) && !ResolveGeometryProperty(a, r.Output, props->Size(), false).Resolved())
             return fail("The output must be absent or a count-matched vec3 property.");
         if (!Detail::CapturePointNormalInput(context, *entity, a, r.Positions, r.Normals, r.CopyValues, edit->Capture,
                                              diagnostic))
             return {};
-        edit->OutputWatch = Detail::ObserveGeometryProperty(a, r.Output.Domain, r.Output.Name);
+        if (!scalar) edit->OutputWatch = Detail::ObserveGeometryProperty(a, r.Output.Domain, r.Output.Name);
+        for (const auto& output : r.ScalarOutputs)
+            edit->ScalarWatches.push_back(Detail::ObserveGeometryProperty(a, output.Domain, output.Name));
         if (edit->Capture.LiveCount < r.MinimumLiveCount)
             return fail("At least " + std::to_string(r.MinimumLiveCount) + " live samples are required.");
-        if (r.CopyValues)
+        if (r.CopyValues && scalar)
+            for (const auto& output : r.ScalarOutputs)
+                edit->ScalarBefore.push_back(CaptureGeometryScalarProperty(*props, output));
+        if (r.CopyValues && !scalar)
         {
             if (edit->OutputWatch.Revision) edit->BeforeOutput = props->Get<glm::vec3>(r.Output.Name).Vector();
             edit->AfterOutput = edit->OutputWatch.Revision ? edit->BeforeOutput
@@ -161,7 +189,9 @@ namespace Extrinsic::Runtime
                 .LiveCount = edit.Capture.LiveCount,
                 .ValidLbvh = edit.Capture.ValidLbvh,
                 .IndexReused = edit.IndexReused,
-                .Output = edit.Request.Output};
+                .HasZeroNormals = edit.Capture.HasZeroNormals,
+                .Output = edit.Request.Output,
+                .ScalarOutputs = edit.Request.ScalarOutputs};
     }
 
     bool PointCloudEditingService::Current(const PointEdit& edit) { return Impl::InputsCurrent(edit); }
@@ -260,6 +290,70 @@ namespace Extrinsic::Runtime
 
     PointGpuRowStats PointCloudEditingService::GpuRowStats(const PointEdit& edit) const { return edit.Stats; }
 
+    bool PointCloudEditingService::CpuRadiusRows(const PointEdit& edit, const float radius,
+                                                 const std::uint32_t lowestIdLimit, PointNeighbourRows& rows,
+                                                 std::string& diagnostic) const
+    {
+        if (!edit.Index)
+        {
+            diagnostic = "The CPU index is unavailable.";
+            return false;
+        }
+        const auto& points = edit.Capture.Points;
+        Detail::PointRadiusRows packed{};
+        std::vector<std::uint32_t> row;
+        for (std::uint32_t i = 0; i < points.size(); ++i)
+        {
+            const auto others = std::uint32_t(points.size() - 1);
+            const auto capacity = lowestIdLimit ? std::min(lowestIdLimit, others) : others;
+            const auto neighbors = edit.Index->Index.Radius(points[i], radius, capacity, i);
+            packed.MaximumNeighbors = std::max(packed.MaximumNeighbors, std::size_t(neighbors.TotalCount));
+            const auto required = lowestIdLimit ? std::min(lowestIdLimit, neighbors.TotalCount) : neighbors.TotalCount;
+            if (neighbors.Neighbors.size() < required)
+            {
+                diagnostic = "Incomplete CPU radius support.";
+                return false;
+            }
+            row.clear();
+            for (const auto& neighbor : neighbors.Neighbors) row.push_back(neighbor.Index);
+            if (!Detail::AppendPointRadiusRow(packed, row, diagnostic)) return false;
+        }
+        rows = {.Offsets = std::move(packed.Offsets), .Indices = std::move(packed.Indices),
+                .MaximumNeighbors = packed.MaximumNeighbors};
+        return true;
+    }
+
+    PointRowsState PointCloudEditingService::AdvanceGpuRadiusRows(PointEdit& edit, const float radius,
+                                                                  const std::uint32_t batchSize,
+                                                                  const std::uint32_t capacity,
+                                                                  const std::uint32_t lowestIdLimit,
+                                                                  PointNeighbourRows& rows, std::string& diagnostic)
+    {
+        auto& pages = edit.RadiusPages;
+        if (edit.Context.SpatialIndices == nullptr)
+        {
+            diagnostic = "The spatial index cache is unavailable.";
+            return PointRowsState::Failed;
+        }
+        if (!Impl::InputsCurrent(edit))
+        {
+            diagnostic = "The inputs changed.";
+            pages.Batch.reset();
+            return PointRowsState::Failed;
+        }
+        const auto state = Detail::AdvancePointRadiusRows(*edit.Context.SpatialIndices, edit.GpuIndex,
+                                                          edit.Capture.Points, edit.Capture.Slots, radius, batchSize,
+                                                          capacity, lowestIdLimit, pages, diagnostic);
+        edit.Stats.QueryBatches = pages.QueryBatches;
+        edit.Stats.Milliseconds = pages.Milliseconds;
+        rows.MaximumNeighbors = pages.MaximumNeighbors;
+        if (state == Detail::RowsState::Failed) return PointRowsState::Failed;
+        if (state == Detail::RowsState::Pending) return PointRowsState::Pending;
+        rows.Offsets = std::move(pages.Offsets);
+        rows.Indices = std::move(pages.Indices);
+        return PointRowsState::Ready;
+    }
+
     PointPublishStatus PointCloudEditingService::Publish(PointEdit& edit, const std::span<const glm::vec3> live,
                                                          std::string label)
     {
@@ -313,12 +407,57 @@ namespace Extrinsic::Runtime
                                                                  : PointPublishStatus::Rejected;
     }
 
-    GeometryPropertyCatalogSnapshot PointCloudEditingService::InputCatalog(const std::uint32_t stableEntityId,
-                                                                          const std::size_t minimumLiveCount)
+    PointPublishStatus PointCloudEditingService::PublishScalars(PointEdit& edit,
+                                                                const std::span<const std::vector<float>> columns,
+                                                                std::string label)
+    {
+        const auto& r = edit.Request;
+        const auto& slots = edit.Capture.Slots;
+        if (columns.size() != r.ScalarOutputs.size() || edit.ScalarBefore.size() != columns.size())
+            return PointPublishStatus::Rejected;
+        // Indexed by source slot, as the publisher reads them; it writes the live slots only.
+        std::vector<std::vector<float>> after(columns.size(), std::vector<float>(edit.Capture.SlotCount));
+        std::vector<Detail::PointScalarOutput> outputs(columns.size());
+        for (std::size_t c = 0; c < columns.size(); ++c)
+        {
+            if (columns[c].size() != slots.size()) return PointPublishStatus::Rejected;
+            for (std::size_t i = 0; i < slots.size(); ++i) after[c][slots[i]] = columns[c][i];
+            outputs[c] = {.Output = r.ScalarOutputs[c], .Watch = edit.ScalarWatches[c], .Before = &edit.ScalarBefore[c],
+                          .After = after[c]};
+        }
+        const auto status = Detail::PublishPointScalarField(edit.Context, edit.Entity, edit.Capture, outputs,
+                                                            std::move(label));
+        if (status == EditorCommandHistoryStatus::Applied) return PointPublishStatus::Applied;
+        if (status == EditorCommandHistoryStatus::InvalidCommand) return PointPublishStatus::Unrepresentable;
+        return status == EditorCommandHistoryStatus::StaleEntity ? PointPublishStatus::Stale
+                                                                 : PointPublishStatus::Rejected;
+    }
+
+    bool PointCloudEditingService::ShowProperty(const std::uint32_t stableEntityId, const GeometryPropertyRef& property,
+                                                std::string& diagnostic)
+    {
+        auto* workspace = m_Impl->Workspace.Current();
+        if (workspace == nullptr)
+        {
+            diagnostic = "No editor workspace.";
+            return false;
+        }
+        const auto status = ApplyEditorVisualizationRecipeCommand(
+            PrepareEditorVisualizationEditingFrame(*workspace).Commands,
+            {.StableEntityId = stableEntityId, .Recipe = MakeEditorPropertyVisualizationRecipe(property)});
+        diagnostic = DebugNameForEditorCommandStatus(status);
+        return status == EditorCommandStatus::Applied || status == EditorCommandStatus::NoChange;
+    }
+
+    GeometryPropertyCatalogSnapshot PointCloudEditingService::InputCatalog(
+        const std::uint32_t stableEntityId, const std::size_t minimumLiveCount,
+        const std::optional<GeometryElementDomain> domain)
     {
         const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
-        return Detail::BuildPointInputCatalog(EditorProcessingCommandsAccess::Resolve(commands), stableEntityId,
-                                              minimumLiveCount);
+        auto catalog = Detail::BuildPointInputCatalog(EditorProcessingCommandsAccess::Resolve(commands), stableEntityId,
+                                                      minimumLiveCount);
+        if (domain) std::erase_if(catalog.Entries, [&](const auto& entry) { return entry.Ref.Domain != *domain; });
+        return catalog;
     }
 
     PointCloudEditingModule::PointCloudEditingModule() = default;

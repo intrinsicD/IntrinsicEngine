@@ -1,5 +1,6 @@
 // ARCH-022: point-cloud edits for plugins. Captures an entity's live points and normals, gives neighbourhood rows
-// on the CPU or the GPU, and publishes new positions into an output property with an undo entry. It wraps the
+// (k nearest or within a radius) on the CPU or the GPU, and publishes new positions into a vec3 output, or values
+// into several scalar outputs, with one undo entry. It wraps the
 // editor's shared point helpers, so a plugin imports no editor module, and it holds no plugin callable: undo
 // entries hold host data, so they work after the plugin that recorded them is unloaded.
 module;
@@ -7,6 +8,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -24,14 +26,16 @@ import Extrinsic.Runtime.ModuleLifecycle;
 
 export namespace Extrinsic::Runtime
 {
-    // What to read and where to write. Unknown domains resolve to the entity's primary point domain, the normals'
-    // and the output's to the positions'.
+    // What to read and where to write: a vec3 `Output` (Publish), or with `ScalarOutputs` one scalar column each
+    // (PublishScalars; `Output` is unused then). Unknown domains resolve to the entity's primary point domain, the
+    // normals' and the outputs' to the positions'.
     struct PointEditRequest
     {
         std::uint32_t StableEntityId{0u};
         GeometryPropertyRef Positions{};
         GeometryPropertyRef Normals{};
         GeometryPropertyRef Output{};
+        std::vector<GeometryPropertyRef> ScalarOutputs{};
         std::size_t MinimumLiveCount{2u};
         bool CopyValues{true};    // false: readiness only, nothing copied
         bool AcquireIndex{false}; // the cached spatial index of the points (CPU and GPU neighbourhoods)
@@ -46,7 +50,17 @@ export namespace Extrinsic::Runtime
         std::size_t SlotCount{0u}, LiveCount{0u};
         bool ValidLbvh{false};  // the points fit an LBVH (count and coordinates)
         bool IndexReused{false};
+        bool HasZeroNormals{false}; // a live normal of length zero
         GeometryPropertyRef Output{}; // with its resolved domain
+        std::span<const GeometryPropertyRef> ScalarOutputs{}; // with their resolved domains
+    };
+
+    // Neighbour rows within a radius, compact indices: point i's neighbours are Indices[Offsets[i], Offsets[i+1]),
+    // ascending, self excluded.
+    struct PointNeighbourRows
+    {
+        std::vector<std::uint32_t> Offsets{0u}, Indices{};
+        std::size_t MaximumNeighbors{0u}; // the largest support found, before a lowest-ID limit
     };
 
     enum class PointRowsState : std::uint8_t { Pending, Ready, Failed };
@@ -57,7 +71,8 @@ export namespace Extrinsic::Runtime
         double Milliseconds{0.0};
     };
 
-    enum class PointPublishStatus : std::uint8_t { Applied, Stale, Rejected };
+    // Unrepresentable: a value does not fit a scalar output's storage exactly (nothing is written).
+    enum class PointPublishStatus : std::uint8_t { Applied, Stale, Rejected, Unrepresentable };
 
     class PointCloudEditingService
     {
@@ -83,13 +98,32 @@ export namespace Extrinsic::Runtime
                                                        std::uint32_t width, std::uint32_t batchSize,
                                                        std::vector<std::uint32_t>& rows, std::string& diagnostic);
         void RestartGpuKnnRows(PointEdit& edit);
+        // Rows within `radius` (with AcquireIndex). A positive `lowestIdLimit` keeps a point's lowest-ID neighbours
+        // up to that many; 0 requires the complete support. CPU: from the cached index, any thread. GPU: main thread,
+        // once per frame until Ready or Failed, pages of `batchSize` queries with `capacity` candidates each; Failed
+        // when the inputs changed. False or Failed with a diagnostic when a support is incomplete.
+        [[nodiscard]] bool CpuRadiusRows(const PointEdit& edit, float radius, std::uint32_t lowestIdLimit,
+                                         PointNeighbourRows& rows, std::string& diagnostic) const;
+        [[nodiscard]] PointRowsState AdvanceGpuRadiusRows(PointEdit& edit, float radius, std::uint32_t batchSize,
+                                                          std::uint32_t capacity, std::uint32_t lowestIdLimit,
+                                                          PointNeighbourRows& rows, std::string& diagnostic);
         [[nodiscard]] PointGpuRowStats GpuRowStats(const PointEdit& edit) const;
         // Main thread: writes `live` (one position per captured point) into the output for the live slots, records
         // one undo entry named `label` and marks the entity dirty. Stale when an input or the output changed.
         [[nodiscard]] PointPublishStatus Publish(PointEdit& edit, std::span<const glm::vec3> live, std::string label);
-        // The entity's vec3 point properties with at least `minimumLiveCount` live rows, for pickers.
-        [[nodiscard]] GeometryPropertyCatalogSnapshot InputCatalog(std::uint32_t stableEntityId,
-                                                                   std::size_t minimumLiveCount);
+        // Main thread: writes one column per scalar output (one value per captured point) for the live slots, all or
+        // none, as one undo entry named `label`. Deleted slots keep their values.
+        [[nodiscard]] PointPublishStatus PublishScalars(PointEdit& edit, std::span<const std::vector<float>> columns,
+                                                        std::string label);
+        // Main thread: shows a property of the entity in the viewport (the processing panels' "Show"); false with
+        // the reason when the editor refuses.
+        [[nodiscard]] bool ShowProperty(std::uint32_t stableEntityId, const GeometryPropertyRef& property,
+                                        std::string& diagnostic);
+        // The entity's vec3 point properties with at least `minimumLiveCount` live rows, for pickers; with `domain`,
+        // only that domain's (a normals picker offers the positions' domain).
+        [[nodiscard]] GeometryPropertyCatalogSnapshot InputCatalog(
+            std::uint32_t stableEntityId, std::size_t minimumLiveCount,
+            std::optional<GeometryElementDomain> domain = std::nullopt);
         // The app's editor workspace (the Sandbox shell's), so edits share its history guards and session.
         void UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept;
         // Before that workspace detaches: back to the service's own.

@@ -1,6 +1,6 @@
 # ARCH-022: the bilateral point filter plugin. Its code is one object library: shared builds wrap it in a MODULE
 # the Sandbox loads (and reloads) at run time; static builds link it into the Sandbox, which registers it in-process.
-# Tests link the objects in both.
+# Tests link the objects in both. The Sandbox loads every plugin of INTRINSIC_STARTUP_PLUGINS at startup.
 add_library(IntrinsicBilateralFilterPluginObjects OBJECT)
 target_sources(IntrinsicBilateralFilterPluginObjects
         PUBLIC FILE_SET CXX_MODULES FILES BilateralFilter.cppm
@@ -22,3 +22,4 @@ if(BUILD_SHARED_LIBS)
     target_link_options(IntrinsicBilateralFilterPlugin PRIVATE ${INTRINSIC_LINK_FLAGS})
     target_link_libraries(IntrinsicBilateralFilterPlugin PRIVATE IntrinsicBilateralFilterPluginObjects)
 endif()
+set_property(GLOBAL APPEND PROPERTY INTRINSIC_STARTUP_PLUGINS BilateralFilter)

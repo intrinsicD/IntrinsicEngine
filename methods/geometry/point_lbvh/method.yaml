@@ -32,12 +32,13 @@ correctness_tests:
   - ../../../tests/contract/runtime/Test.KernelDensityOperations.cpp
   - ../../../tests/unit/geometry/Test.KernelDensity.cpp
   - ../../../tests/unit/geometry/Test.DescriptorAnalysis.cpp
-  - ../../../tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp
+  - ../../../tests/contract/runtime/Test.DescriptorAnalysisPlugin.cpp
   - ../../../tests/unit/geometry/Test.KeypointAnalysis.cpp
   - ../../../tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
   - ../../../tests/unit/geometry/Test.BilateralPointFilter.cpp
   - ../../../tests/contract/runtime/Test.BilateralFilterPlugin.cpp
   - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - ../../../tests/integration/graphics/Test.DescriptorAnalysisPluginGpuSmoke.cpp
   - ../../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
 benchmarks:
   - ../../../benchmarks/geometry/manifests/point_lbvh_point_construction_runtime_smoke.yaml

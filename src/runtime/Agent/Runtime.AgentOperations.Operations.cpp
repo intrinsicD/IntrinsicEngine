@@ -477,10 +477,6 @@ namespace Extrinsic::Runtime
                     "density_weight", "point", "sandbox.density_weights", &PrepareEditorPointAnalysisFrame,
                     &GetEditorDensityWeightConfig, &PreviewEditorDensityWeightCommand,
                     [](const auto& c, auto onComplete) { return ApplyEditorConfiguredDensityWeight(c, std::move(onComplete)); }));
-                ops.push_back(ConfigSourced<EditorDescriptorAnalysisResult>(
-                    "descriptor_analysis", "point", "sandbox.descriptor_analysis", &PrepareEditorPointAnalysisFrame,
-                    &GetEditorDescriptorAnalysisConfig, &PreviewEditorDescriptorAnalysisCommand,
-                    [](const auto& c, auto onComplete) { return ApplyEditorConfiguredDescriptorAnalysis(c, std::move(onComplete)); }));
                 ops.push_back(ConfigSourced<EditorPointConstructionResult>(
                     "point_construction", "point", "sandbox.point_construction", &PrepareEditorPointConstructionFrame,
                     &GetEditorPointConstructionConfig,
@@ -1114,7 +1110,7 @@ namespace Extrinsic::Runtime
         add("run_operation", "Run operation",
             "Run a configured editor operation (mesh-field operations, mesh curvature, geodesics, curvature segmentation, "
             "parameterization, scalar ridges, mesh denoise, remesh, subdivide and simplify, normal estimation, kernel density, "
-            "point spacing, outlier analysis, density weight, descriptor analysis, point construction, "
+            "point spacing, outlier analysis, density weight, point construction, "
             "progressive Poisson) with its config section or `params`; one undoable step like the panel button, answers when "
             "done. Operations: " + OperationSummary(nullptr) + ".",
             configuredSchema, false, [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, false, nullptr); },

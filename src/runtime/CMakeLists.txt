@@ -33,7 +33,6 @@ target_sources(${target_name}
         Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
         Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
-        Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
         Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
         Modules/DensityWeight/Runtime.DensityWeightOperation.cppm
         Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
@@ -81,6 +80,7 @@ target_sources(${target_name}
         Services/Runtime.PluginContract.cppm
         Services/Runtime.EditorWorkspaceSlot.cppm
         Services/Runtime.PluginHost.cppm
+        Services/Runtime.PluginSections.cppm
         Services/Runtime.PointCloudEditing.cppm
         Kernel/Runtime.Engine.cppm
         Config/Runtime.EngineConfigBoot.cppm
@@ -178,7 +178,6 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         Editor/Operations/Runtime.GpuTransactionLifecycle.cpp
         Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
-        Editor/Operations/Runtime.PointAnalysisOperations.Descriptors.cpp
         Editor/Operations/Runtime.PointConstructionOperations.Processing.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         Editor/Operations/Runtime.NormalOperations.Processing.cpp

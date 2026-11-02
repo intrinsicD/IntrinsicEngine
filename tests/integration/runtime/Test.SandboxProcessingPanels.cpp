@@ -219,8 +219,8 @@ namespace
 
     constexpr std::array kInputWindows{
         "view.normal_estimation", "view.outlier_analysis", "view.keypoint_analysis",
-        "view.descriptor_analysis", "view.kernel_density", "view.density_weights",
-        "view.point_construction", "view.point_spacing", "view.registration"};
+        "view.kernel_density", "view.density_weights", "view.point_construction",
+        "view.point_spacing", "view.registration"};
 
     void ExpectInputEntities(const Config::EngineConfig& config, std::uint32_t expected,
                              std::uint32_t target = 0u)
@@ -228,7 +228,6 @@ namespace
         EXPECT_EQ(R::GetNormalEstimationConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDerivedSection<R::kOutlierAnalysisSection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetKeypointAnalysisConfig(config)->StableEntityId, expected);
-        EXPECT_EQ(R::GetDescriptorAnalysisConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDerivedSection<R::kKernelDensitySection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDensityWeightConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetPointConstructionConfig(config)->StableEntityId, expected);
@@ -664,9 +663,6 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
             (void)properties.GetOrAdd<float>(name, 0.5f);
         for (const auto* name : {"outlier_mask", "keypoint_mask"})
             (void)properties.GetOrAdd<std::uint32_t>(name, 1u);
-        const auto descriptors = R::MakeDescriptorOutputProperties(domain);
-        for (const auto& output : descriptors)
-            (void)properties.GetOrAdd<float>(output.Name, 1.0f);
         ASSERT_TRUE(harness.Selection().SetSelectedEntity(scene, entity));
         auto config = harness.Control().GetEngineConfigControlState().ActiveConfig;
         auto normals = *R::GetNormalEstimationConfig(config);
@@ -683,7 +679,6 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
             ShowAction{"view.outlier_analysis", "Outlier Analysis", "Show score", "outlier_score", true},
             ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show mask", "keypoint_mask", true},
             ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show saliency", "keypoint_saliency", true},
-            ShowAction{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Show histogram bin", descriptors[0].Name, true},
             ShowAction{"view.kernel_density", "Kernel Density", "Show density", "density", true},
             ShowAction{"view.density_weights", "Compact Density Weights", "Show weights", "density_weight", true},
             ShowAction{"view.point_spacing", "Point Spacing and Radii", "Show radii", "radii", true}};
@@ -1190,8 +1185,6 @@ TEST(SandboxProcessingPanels, NormalInputsPreserveDomainFiltersAndPersistSelecti
         bool AllowsUnresolvedDomain{};
     };
     const std::array controls{
-        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Normals##Descriptors",
-            [](const auto& c) { return R::GetDescriptorAnalysisConfig(c)->Normals; }},
         Control{"view.point_construction", "Construct from Points", "Normals",
             [](const auto& c) { return R::GetPointConstructionConfig(c)->Normals; }, true}};
     for (const auto& control : controls)
@@ -1212,11 +1205,6 @@ TEST(SandboxProcessingPanels, NormalInputsPreserveDomainFiltersAndPersistSelecti
         const auto domain = unresolved ? R::GeometryElementDomain::Unknown
                                        : R::GeometryElementDomain::MeshVertex;
         auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-        auto descriptors = *R::GetDescriptorAnalysisConfig(config);
-        descriptors.StableEntityId = id;
-        descriptors.Positions.Domain = descriptors.Normals.Domain = domain;
-        for (auto& output : descriptors.Outputs) output.Domain = domain;
-        R::SetDescriptorAnalysisConfig(config, descriptors);
         auto construction = *R::GetPointConstructionConfig(config);
         construction.StableEntityId = id;
         construction.Positions.Domain = construction.Normals.Domain = domain;
@@ -1409,34 +1397,6 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
             },
             1,
             3},
-        Control{"view.descriptor_analysis",
-            "FPFH Descriptor Analysis",
-            "Backend",
-            "CPU LBVH (cached)",
-            [](const auto& c)
-            {
-                return int(R::GetDescriptorAnalysisConfig(c)->Backend);
-            },
-            1,
-            1},
-        Control{"view.descriptor_analysis",
-            "FPFH Descriptor Analysis",
-            "Backend",
-            "CPU KD-tree",
-            [](const auto& c)
-            {
-                return int(R::GetDescriptorAnalysisConfig(c)->Backend);
-            },
-            0,
-            0},
-        Control{"view.descriptor_analysis",
-            "FPFH Descriptor Analysis",
-            "Backend",
-            "Vulkan LBVH",
-            [](const auto& c)
-            {
-                return int(R::GetDescriptorAnalysisConfig(c)->Backend);
-            }},
         Control{"view.kernel_density",
             "Kernel Density",
             "Backend",
@@ -1870,7 +1830,6 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
     };
     constexpr std::array methods{
         Method{"view.keypoint_analysis", "ISS Keypoint Analysis", "Detect keypoints", "Salient radius (0 = automatic)"},
-        Method{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Compute FPFH descriptors", "Feature radius (0 = automatic)"},
         Method{"view.density_weights", "Compact Density Weights", "Compute compact weights", "Support radius (0 = automatic)"},
         Method{"view.normal_estimation", "Normal Estimation", "Estimate normals", "Radius##Normals"}};
     for (std::size_t method = 0; method < methods.size(); ++method)
@@ -1885,7 +1844,6 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
         ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
         const auto id = R::SelectionController::ToStableEntityId(entity);
         auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
-        (void)props.GetOrAdd<glm::vec3>("input_normals", {0, 0, 1});
         auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
         auto missingInputConfig = config;
         R::EditorProcessingContext referenceContext{.Scene = &scene};
@@ -1903,20 +1861,6 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             ASSERT_TRUE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
         }
         else if (method == 1)
-        {
-            auto c = *R::GetDescriptorAnalysisConfig(config);
-            c.StableEntityId = id; c.FeatureRadius = 2; c.Normals.Name = "input_normals";
-            c.Outputs = R::MakeDescriptorOutputProperties(c.Positions.Domain, "configured");
-            c.Outputs[0].Name = output;
-            R::SetDescriptorAnalysisConfig(config, c);
-            c.Positions.Name = "missing_positions";
-            R::SetDescriptorAnalysisConfig(missingInputConfig, c);
-            c.Positions.Name = "v:position";
-            c.Outputs = R::MakeDescriptorOutputProperties(c.Positions.Domain, "reference");
-            c.Outputs[0].Name = reference;
-            ASSERT_TRUE(R::ApplyEditorDescriptorAnalysisCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
-        }
-        else if (method == 2)
         {
             auto c = *R::GetDensityWeightConfig(config);
             c.StableEntityId = id; c.SupportRadius = 2; c.Weights.Name = output;
@@ -1980,7 +1924,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             if (step < 30) return;
             if (!props.Exists(output)) return;
             const auto& values = std::as_const(props);
-            if (method >= 3)
+            if (method >= 2)
                 EXPECT_EQ(values.Get<glm::vec3>(output).Vector(), values.Get<glm::vec3>(reference).Vector());
             else
                 EXPECT_EQ(values.Get<float>(output).Vector(), values.Get<float>(reference).Vector());
@@ -2004,7 +1948,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
                 const auto shown = read();
                 EXPECT_NE(shown.find("done"), std::string::npos) << "the finished run stays visible";
                 // RUNTIME-291: the result reports the radius the run used.
-                if (method == 2) EXPECT_NE(shown.find("Support radius 2;"), std::string::npos) << shown;
+                if (method == 1) EXPECT_NE(shown.find("Support radius 2;"), std::string::npos) << shown;
                 EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, other));
                 shownPhase = 2; shownAt = frame;
             }

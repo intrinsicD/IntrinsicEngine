@@ -326,7 +326,7 @@ stack ends the requested batch successfully; it does not mask a failed command.
 - Configured operations. `run_operation` / `preview_operation` select a row of one table by
   `operation`: property smoothing, spectral modes, harmonic field, scalar gradient, mesh
   curvature, geodesics, curvature segmentation, normal estimation, kernel density, point
-  spacing, outlier analysis, density weight, descriptor analysis, bilateral filter, point
+  spacing, outlier analysis, density weight, point
   construction, progressive Poisson, parameterization, scalar ridges and the mesh topology
   operations (denoise, remesh, subdivide, simplify). Each row calls its panel's
   `Preview*`/`Apply*` path with the settings of its config section (`config_apply` first). The

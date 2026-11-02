@@ -104,6 +104,9 @@ export namespace Extrinsic::Runtime
         double (*Get)(const Cmd&){nullptr};
         void (*Set)(Cmd&, double){nullptr};
         GeometryPropertyRef Cmd::* Ref{nullptr};
+        // An Array row of property references (a std::array member): read and written in place.
+        std::span<const GeometryPropertyRef> (*Refs)(const Cmd&){nullptr};
+        std::span<GeometryPropertyRef> (*MutableRefs)(Cmd&){nullptr};
         bool Narrow{}; // a float member: a config number converts straight into it, not through double
     // A Float row's positivity rule (RUNTIME-354): while it holds on the record converted so far, a
     // value that is not positive is refused with PositiveRefusal and one that stores as zero with
@@ -111,6 +114,9 @@ export namespace Extrinsic::Runtime
         bool (*Positivity)(const Cmd&){nullptr};
         std::string_view PositiveRefusal{};
     };
+
+    template <class> struct IsPropertyRefArray : std::false_type {};
+    template <std::size_t N> struct IsPropertyRefArray<std::array<GeometryPropertyRef, N>> : std::true_type {};
 
     template <class> struct BoundMember;
     template <class C, class T> struct BoundMember<T C::*>
@@ -120,7 +126,7 @@ export namespace Extrinsic::Runtime
     };
 
     // The row of `spec` bound to `Member` (a pointer to a numeric, bool, enum or property
-    // reference member).
+    // reference member, or a std::array of property references for an Array row).
     template <auto Member>
     [[nodiscard]] constexpr auto Bind(const ConfigFieldSpec& spec,
         bool (*positivity)(const typename BoundMember<decltype(Member)>::Command&) = nullptr,
@@ -130,6 +136,14 @@ export namespace Extrinsic::Runtime
         using T = typename BoundMember<decltype(Member)>::Type;
         if constexpr (std::is_same_v<T, GeometryPropertyRef>)
             return BoundField<Cmd>{.Spec = spec, .Ref = Member};
+        else if constexpr (IsPropertyRefArray<T>::value)
+        {
+            ConfigFieldSpec exact = spec; // the schema and the validator take the length from the array
+            exact.MinItems = exact.MaxItems = std::tuple_size_v<T>;
+            return BoundField<Cmd>{.Spec = exact,
+                .Refs = [](const Cmd& command) { return std::span<const GeometryPropertyRef>(command.*Member); },
+                .MutableRefs = [](Cmd& command) { return std::span<GeometryPropertyRef>(command.*Member); }};
+        }
         else
             return BoundField<Cmd>{.Spec = spec,
                 .Get = [](const Cmd& command) -> double

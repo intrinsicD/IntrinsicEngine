@@ -38,7 +38,6 @@ import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
-import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
@@ -1201,12 +1200,6 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
             {
                 return Runtime::GetDerivedSection<Runtime::kOutlierAnalysisSection>(c).has_value();
             }},
-        {Runtime::kDescriptorAnalysisConfigSectionName,
-            Runtime::kDescriptorAnalysisConfigSectionSchemaId,
-            [](const CoreConfig::EngineConfig& c)
-            {
-                return Runtime::GetDescriptorAnalysisConfig(c).has_value();
-            }},
         {Runtime::kNormalEstimationConfigSectionName,
             Runtime::kNormalEstimationConfigSectionSchemaId,
             [](const CoreConfig::EngineConfig& c)
@@ -1318,10 +1311,6 @@ TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContrac
         kKeypointAnalysisConfigSectionSchemaId, SerializeKeypointAnalysisConfig, ValidateKeypointAnalysisConfigSection,
         MakeKeypointAnalysisConfigSectionRegistration, SetKeypointAnalysisConfig, GetKeypointAnalysisConfig,
         ZeroGpuQueryBatch<KeypointAnalysisConfig>);
-    ExpectPointConfigSectionContract<DescriptorAnalysisConfig>(kDescriptorAnalysisConfigSectionName,
-        kDescriptorAnalysisConfigSectionSchemaId, SerializeDescriptorAnalysisConfig, ValidateDescriptorAnalysisConfigSection,
-        MakeDescriptorAnalysisConfigSectionRegistration, SetDescriptorAnalysisConfig, GetDescriptorAnalysisConfig,
-        ZeroGpuQueryBatch<DescriptorAnalysisConfig>);
     ExpectPointConfigSectionContract<PointConstructionConfig>(kPointConstructionConfigSectionName,
         kPointConstructionConfigSectionSchemaId, SerializePointConstructionConfig, ValidatePointConstructionConfigSection,
         MakePointConstructionConfigSectionRegistration, SetPointConstructionConfig, GetPointConstructionConfig,
@@ -1377,7 +1366,7 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         Writer Write;
         Validator Validate;
     };
-    const std::array<Family, 6> writers{{
+    const std::array<Family, 5> writers{{
         {"KernelDensity",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
@@ -1410,14 +1399,6 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
                 return Runtime::SerializeKeypointAnalysisConfig(config);
             },
             Runtime::ValidateKeypointAnalysisConfigSection},
-        {"DescriptorAnalysis",
-            +[](const Runtime::GeometryPropertyRef& ref)
-            {
-                Runtime::DescriptorAnalysisConfig config;
-                config.Positions = ref;
-                return Runtime::SerializeDescriptorAnalysisConfig(config);
-            },
-            Runtime::ValidateDescriptorAnalysisConfigSection},
         {"DensityWeight",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
@@ -1536,8 +1517,6 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
         Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>);
     check(Runtime::KeypointAnalysisConfig{}, &Runtime::KeypointAnalysisConfig::Positions,
           Runtime::SerializeKeypointAnalysisConfig);
-    check(Runtime::DescriptorAnalysisConfig{}, &Runtime::DescriptorAnalysisConfig::Positions,
-          Runtime::SerializeDescriptorAnalysisConfig);
     check(Runtime::DensityWeightConfig{}, &Runtime::DensityWeightConfig::Positions,
           Runtime::SerializeDensityWeightConfig);
     check(Runtime::NormalEstimationConfig{}, &Runtime::NormalEstimationConfig::Positions,
@@ -1613,17 +1592,6 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
                 Runtime::KeypointAnalysisConfig c;
                 c.StableEntityId = id;
                 return Runtime::SerializeKeypointAnalysisConfig(c);
-            }},
-        Family{"DescriptorAnalysis",
-            Runtime::ValidateDescriptorAnalysisConfigSection,
-            "Descriptor analysis config must be an object.",
-            "Unknown descriptor field: ",
-            {"entity", "max_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"},
-            [](std::uint32_t id)
-            {
-                Runtime::DescriptorAnalysisConfig c;
-                c.StableEntityId = id;
-                return Runtime::SerializeDescriptorAnalysisConfig(c);
             }},
         Family{"DensityWeight",
             Runtime::ValidateDensityWeightConfigSection,
@@ -1859,8 +1827,6 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
     };
     constexpr std::string_view typed = "positions needs a canonical typed property reference.";
     constexpr std::string_view domain = "Unknown element domain.";
-    constexpr std::string_view descriptor =
-        "Positions and normals need canonical vec3 references on the same domain.";
     constexpr std::string_view density =
         "Position and weight bindings need distinct canonical vec3/float properties on the same domain.";
     const std::array families{
@@ -1868,7 +1834,6 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
         Family{"PointSpacing", Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>, typed, domain},
         Family{"OutlierAnalysis", Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>, typed, domain},
         Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
-        Family{"DescriptorAnalysis", Runtime::ValidateDescriptorAnalysisConfigSection, descriptor, descriptor},
         Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection, density, density},
         Family{"NormalEstimation",
             Runtime::ValidateNormalEstimationConfigSection,
@@ -2046,12 +2011,6 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
         using C = Runtime::KeypointAnalysisConfig;
         check(C{}, {&C::Positions, &C::Mask, &C::Score}, Runtime::SetKeypointAnalysisConfig,
             Runtime::GetKeypointAnalysisConfig, Runtime::SerializeKeypointAnalysisConfig);
-    }
-    {
-        SCOPED_TRACE("DescriptorAnalysis");
-        using C = Runtime::DescriptorAnalysisConfig;
-        check(C{}, {&C::Positions, &C::Normals}, Runtime::SetDescriptorAnalysisConfig,
-            Runtime::GetDescriptorAnalysisConfig, Runtime::SerializeDescriptorAnalysisConfig);
     }
     {
         SCOPED_TRACE("DensityWeight");

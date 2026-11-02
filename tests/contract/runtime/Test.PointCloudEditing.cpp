@@ -166,3 +166,51 @@ TEST(PointCloudEditing, TheCachedCpuIndexAnswersCompactNeighbours)
     EXPECT_TRUE(std::ranges::any_of(catalog.Entries, [&](const auto& entry) { return entry.Ref.Name == "directions"; }))
         << names;
 }
+
+TEST(PointCloudEditing, ScalarColumnsPublishOnlyWhenEveryOutputGetsOneValuePerPoint)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    auto request = Request(entity, D::MeshVertex);
+    request.ScalarOutputs = {{.Domain = D::MeshVertex, .Name = "a", .ValueKind = Geometry::PropertyValueKind::Float},
+                             {.Domain = D::MeshVertex, .Name = "b", .ValueKind = Geometry::PropertyValueKind::Float}};
+    std::string diagnostic;
+    const auto edit = harness.Editing().Capture(request, diagnostic);
+    ASSERT_TRUE(edit) << diagnostic;
+    const auto live = harness.Editing().View(*edit).LiveCount;
+    const std::vector<std::vector<float>> one{std::vector<float>(live, 1.f)};
+    EXPECT_EQ(harness.Editing().PublishScalars(*edit, one, "Scalars"), R::PointPublishStatus::Rejected) << "one of two";
+    const std::vector<std::vector<float>> shortColumn{std::vector<float>(live, 1.f), std::vector<float>(live - 1, 2.f)};
+    EXPECT_EQ(harness.Editing().PublishScalars(*edit, shortColumn, "Scalars"), R::PointPublishStatus::Rejected);
+    EXPECT_FALSE(props.Exists("a"));
+    EXPECT_FALSE(props.Exists("b"));
+    EXPECT_FALSE(harness.History().CanUndo());
+    const std::vector<std::vector<float>> both{std::vector<float>(live, 1.f), std::vector<float>(live, 2.f)};
+    ASSERT_EQ(harness.Editing().PublishScalars(*edit, both, "Scalars"), R::PointPublishStatus::Applied);
+    EXPECT_EQ(std::as_const(props).Get<float>("b")[0], 2.f);
+    EXPECT_EQ(harness.History().UndoCount(), 1u);
+}
+
+TEST(PointCloudEditing, AnInputCatalogOfOneDomainListsOnlyThatDomain)
+{
+    // A normals picker offers the positions' domain only: a mesh has vertex and face vectors.
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    PointDomainProperties(scene, entity, D::MeshFace).GetOrAdd<glm::vec3>("face_directions").Vector().assign(
+        PointDomainProperties(scene, entity, D::MeshFace).Size(), glm::vec3(0, 0, 1));
+    const auto stable = R::SelectionController::ToStableEntityId(entity);
+    R::GeometryPropertyCatalogSnapshot all{};
+    (void)harness.Settled([&] // the catalog comes from the workspace snapshot, which settles over frames
+    {
+        all = harness.Editing().InputCatalog(stable, 1u);
+        return std::ranges::any_of(all.Entries, [](const auto& e) { return e.Ref.Domain == D::MeshFace; });
+    });
+    EXPECT_TRUE(std::ranges::any_of(all.Entries, [](const auto& e) { return e.Ref.Domain == D::MeshFace; }));
+    EXPECT_TRUE(std::ranges::any_of(all.Entries, [](const auto& e) { return e.Ref.Domain == D::MeshVertex; }));
+    const auto faces = harness.Editing().InputCatalog(stable, 1u, D::MeshFace);
+    ASSERT_FALSE(faces.Entries.empty());
+    EXPECT_TRUE(std::ranges::all_of(faces.Entries, [](const auto& e) { return e.Ref.Domain == D::MeshFace; }));
+}
