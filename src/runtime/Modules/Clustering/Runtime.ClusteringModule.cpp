@@ -1009,18 +1009,8 @@ namespace Extrinsic::Runtime
         {
             stats.CommandsHandled += 1u;
             // A GPU request's capture and start, whichever way it ends (started, refused, or the CPU fallback queued).
-            struct CaptureTimer
-            {
-                ClusteringModuleStats& Stats;
-                bool Gpu;
-                std::chrono::steady_clock::time_point Begin{std::chrono::steady_clock::now()};
-                ~CaptureTimer()
-                {
-                    if (Gpu)
-                        Stats.GpuCaptureInitMicros += std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
-                            std::chrono::steady_clock::now() - Begin).count());
-                }
-            } const timer{stats, command.Backend == ClusteringBackend::VulkanCompute};
+            const ScopedMicros timer{
+                command.Backend == ClusteringBackend::VulkanCompute ? &stats.GpuCaptureInitMicros : nullptr};
             if (context.Jobs == nullptr ||
                 context.Worlds == nullptr ||
                 context.Events == nullptr)
@@ -1183,7 +1173,7 @@ namespace Extrinsic::Runtime
                     {
                         if (m_GpuState == nullptr)
                             return;
-                        const auto advanceBegin = std::chrono::steady_clock::now();
+                        const ScopedMicros timer{&m_Stats.GpuAdvanceMicros};
                         m_GpuState->DrainCompletedTransfers();
                         while (std::optional<ClusteringGpuResult> result =
                                    m_GpuState->ConsumeCompleted())
@@ -1192,8 +1182,6 @@ namespace Extrinsic::Runtime
                                 std::move(*result), m_Events, m_Stats);
                         }
                         StartHeld();
-                        m_Stats.GpuAdvanceMicros += std::uint64_t(std::chrono::duration_cast<
-                            std::chrono::microseconds>(std::chrono::steady_clock::now() - advanceBegin).count());
                     },
                     .HasInFlightWork = [this]() -> bool
                     {

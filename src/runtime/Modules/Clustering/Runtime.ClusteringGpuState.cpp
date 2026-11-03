@@ -294,6 +294,8 @@ namespace Extrinsic::Runtime
                         if (!op)
                             return EditorCommandStatus::StaleEntity;
                         op->Driver.Publishing(); // from here the publication decides the step run's end
+                        // The publication's time: the label decode and CommitKMeansOutputs.
+                        const ScopedMicros timer{&stats->GpuAcceptPublishMicros};
                         op->Geometry.Labels.resize(op->Count);
                         for (std::uint32_t i = 0; i < op->Count; ++i)
                         {
@@ -303,11 +305,7 @@ namespace Extrinsic::Runtime
                                 return EditorCommandStatus::GeometryProcessingFailed;
                             op->Geometry.Labels[i] = label;
                         }
-                        const auto publishBegin = std::chrono::steady_clock::now();
-                        const auto status = op->Publish(op->Geometry);
-                        stats->GpuAcceptPublishMicros += std::uint64_t(std::chrono::duration_cast<
-                            std::chrono::microseconds>(std::chrono::steady_clock::now() - publishBegin).count());
-                        return status;
+                        return op->Publish(op->Geometry);
                     }},
                 admission,
                 [this, alive = Alive, weak](EditorPointScalarTransactionSnapshot result)
@@ -615,11 +613,12 @@ namespace Extrinsic::Runtime
                 {
                     a->Presented = false;
                     a->Back.reset();
-                    const auto publishBegin = std::chrono::steady_clock::now();
-                    const bool published = PublishEditorPointScalarBack(
-                        a->Transaction, a->Terminal, std::array{0.f, float(std::max(1u, a->Clusters - 1u))});
-                    Stats.GpuPreviewPublishMicros += std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
-                        std::chrono::steady_clock::now() - publishBegin).count());
+                    bool published = false;
+                    {
+                        const ScopedMicros timer{&Stats.GpuPreviewPublishMicros};
+                        published = PublishEditorPointScalarBack(
+                            a->Transaction, a->Terminal, std::array{0.f, float(std::max(1u, a->Clusters - 1u))});
+                    }
                     if (!published)
                     {
                         Finish(KMeansRunStatus::GeometryProcessingFailed, "K-Means preview publication refused.");

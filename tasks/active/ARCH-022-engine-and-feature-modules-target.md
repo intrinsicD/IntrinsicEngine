@@ -3293,3 +3293,15 @@ python3 tools/docs/check_doc_links.py --root . --strict
     Also applied: control terms as tuples through `cost()` (no special interval name), the technical check fails
     instead of crashing on unusable frames, the GPU-fills environment knob removed (40 fixed), the seed test reduced
     to what the plan needs, and the HTML report plots the module's path times and counters over the frames too.
+- 2026-11-03, S3c-3 pre-flight, rounds 1 and 2 on packet `d65214bc…` (commit ebba1b9bf): Codex REVISE (B1 accounting
+  incomplete and renderer time charged to the run, B2 controls' process flags, B3 workload and cells not enforced, B4
+  cold window and the Accept timer, B5 uncertainty, B6 receipts and peak memory), Claude REVISE (MM1 to MM9, the same
+  plus the hypothesis's capture interval, the post-approval changes and the begin frame without a control). Record:
+  `tasks/evidence/ARCH-022/preflight-s3c3/reviews/`. Revision 2: the verdict on the whole frame (`TotalMicros`), `met`
+  below 4 ms, `not met` when the run's maximum minus the null arm's maximum still reaches 4 ms, else "within the
+  attribution band"; the six intervals and the module's path times only attribute; the null guard is gone; planned
+  cells, the 621 requests per stage, exit codes and the controls' flags are checked; the cold window starts after the
+  first request's frame; peak memory per process and the GPU's memory over the run are recorded. Code: the Accept's
+  path time now includes the label decode, and one `ScopedMicros` replaces the four hand-written timers. Open for the
+  operator (MM1): the harness's cloud is not renderable, so the render refresh after the accept is not measured;
+  Layer B states the exclusion.

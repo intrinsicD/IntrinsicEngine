@@ -4,6 +4,19 @@
 
 namespace Extrinsic::Runtime
 {
+    // Adds the scope's elapsed microseconds to a ClusteringModuleStats path time (null: not timed).
+    struct ScopedMicros
+    {
+        std::uint64_t* Micros;
+        std::chrono::steady_clock::time_point Begin{std::chrono::steady_clock::now()};
+        inline ~ScopedMicros() // explicit: module-attached member functions are not implicitly inline
+        {
+            if (Micros != nullptr)
+                *Micros += std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - Begin).count());
+        }
+    };
+
     struct KMeansOutputPropertyState
     {
         bool HadColors{false};
