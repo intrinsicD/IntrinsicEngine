@@ -2,15 +2,15 @@ module;
 
 #include <string>
 
-module Intrinsic.Plugin.JobFormSpike;
+module Intrinsic.Plugin.CoherentPointDrift;
 
 import Extrinsic.Runtime.PluginContract;
 
-namespace Intrinsic::Plugins::JobFormSpike
+namespace Intrinsic::Plugins::CoherentPointDrift
 {
     bool Register(R::PluginRegistrations& staged, std::string&) noexcept
     {
-        staged.Name = "job_form_spike";
+        staged.Name = "coherent_point_drift";
         staged.Generation = 1;
         AddTools(staged);
         AddWindow(staged);

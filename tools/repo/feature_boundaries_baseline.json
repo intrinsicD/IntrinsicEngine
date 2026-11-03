@@ -6,15 +6,15 @@
       "editor_internals": 0,
       "other_plugins": 0
     },
+    "plugins/coherent_point_drift": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
     "plugins/descriptor_analysis": {
       "editor_internals": 0,
       "other_plugins": 0
     },
-    "plugins/job_form_spike": {
-      "editor_internals": 0,
-      "other_plugins": 0
-    },
-    "plugins/spike": {
+    "plugins/fixture": {
       "editor_internals": 0,
       "other_plugins": 0
     },

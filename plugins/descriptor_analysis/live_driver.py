@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ARCH-022 step 2d: drives the FPFH descriptor analysis plugin through the running Sandbox over MCP.
 
-Starts <build>/bin/ExtrinsicSandbox like plugins/spike/spike_driver.py (isolated socket, built-in config, the LSan
+Starts <build>/bin/ExtrinsicSandbox like plugins/fixture/s1_driver.py (isolated socket, built-in config, the LSan
 settings for a Vulkan exit) with its built-in plugins, so the descriptor analysis and the bilateral filter are the
 startup plugins. It imports the golden cloud (tests/data/descriptor_golden_cloud.json: the 300 points with normals
 the built-in feature was recorded on before it moved into the plugin) as a .pwn and, over the agent socket:
@@ -27,9 +27,9 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "plugins/spike"))
+sys.path.insert(0, str(REPO / "plugins/fixture"))
 sys.path.insert(0, str(REPO / "plugins/bilateral_filter"))
-import spike_driver as s1  # noqa: E402  (shared session helpers)
+import s1_driver as s1  # noqa: E402  (shared session helpers)
 # shortcut: the bilateral driver's Agent, Session, cloud and write_pwn are reused as they are; move them into the
 # shared driver module when a third plugin driver needs them.
 import live_driver as bilateral  # noqa: E402

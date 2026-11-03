@@ -89,7 +89,7 @@ namespace Extrinsic::Runtime
         std::function<bool(std::string&)> PendingRestart{};
         std::uint64_t Generation{0u};
         std::optional<std::uint32_t> ShownStep{};
-        bool Unshown{false}; // the copy the reader holds was refused by Show
+        bool Unshown{false}; // the copy the reader holds is to be offered again (Show answered Later)
 
         // Written by the segment on a worker, read on the main thread after its completion (the job service orders
         // both), or observed while it runs (atomics).
@@ -191,8 +191,9 @@ namespace Extrinsic::Runtime
                 return;
             }
             if (!newer && !Unshown) return;
-            Unshown = !Callbacks.Show(Previews->Front());
-            if (!Unshown) ShownStep = Previews->Front().Step;
+            const StepRunShow shown = Callbacks.Show(Previews->Front());
+            Unshown = shown == StepRunShow::Later;
+            if (shown == StepRunShow::Shown) ShownStep = Previews->Front().Step;
         }
 
         bool Valid() const { return !Callbacks.Valid || Callbacks.Valid(); }

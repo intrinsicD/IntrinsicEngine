@@ -1,5 +1,5 @@
 // ARCH-022: the plugin host's contract, driven with in-process images (no dlopen), so it runs in static builds too.
-// dlopen itself is covered by the fixture plugin's drivers on the shared dev build (plugins/spike).
+// dlopen itself is covered by the fixture plugin's drivers on the shared dev build (plugins/fixture).
 #include <algorithm>
 #include <atomic>
 #include <chrono>

@@ -26,8 +26,10 @@
 
 #include "RuntimeTestModule.hpp"
 #include "MockRHI.hpp"
+#include "StartupPluginRegisters.hpp" // INTRINSIC_STARTUP_PLUGIN_REGISTERS and the plugins' imports
 
 import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
@@ -637,6 +639,24 @@ TEST(SandboxProcessingPanels, JobsWindowIsRegisteredUnderView)
     PanelHarness h;
     EXPECT_TRUE(h.Shell.SetEditorWindowOpen("view.jobs", true));
     EXPECT_TRUE(h.Shell.SetEditorWindowOpen("view.jobs", false));
+}
+
+// ARCH-022: a plugin's window is refused when its id is taken, so every startup plugin's window id must be free beside
+// the Sandbox's own panels (the editor's CPD panel is view.coherent_point_drift).
+TEST(SandboxProcessingPanels, EveryStartupPluginsWindowIdIsFreeBesideTheBuiltInPanels)
+{
+    PanelHarness h;
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.coherent_point_drift", true)) << "control: a built-in panel's id";
+    const std::vector<Extrinsic::Runtime::PluginRegisterFn> registers{INTRINSIC_STARTUP_PLUGIN_REGISTERS};
+    ASSERT_GE(registers.size(), 3u);
+    for (const auto registerFn : registers)
+    {
+        Extrinsic::Runtime::PluginRegistrations staged;
+        std::string error;
+        ASSERT_TRUE(registerFn(staged, error)) << error;
+        for (const auto& window : staged.Windows)
+            EXPECT_FALSE(h.Shell.SetEditorWindowOpen(window.Id, true)) << staged.Name << ": " << window.Id << " is taken";
+    }
 }
 
 TEST(SandboxProcessingPanels, GpuTransactionCountersUseOneFormat)

@@ -173,7 +173,7 @@ export namespace Extrinsic::Runtime
     }
 }
 
-// Test instruments for the fixture plugin (plugins/spike) and its drivers.
+// Test instruments for the fixture plugin (plugins/fixture) and its drivers.
 export namespace Extrinsic::Runtime::PluginProbes
 {
     // One definition in the engine, reached from a plugin through imported code: the identity probes.

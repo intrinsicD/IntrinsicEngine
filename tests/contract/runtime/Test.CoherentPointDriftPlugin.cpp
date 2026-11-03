@@ -1,4 +1,4 @@
-// ARCH-022 S3b: the job form spike plugin (coherent point drift as a step run) in an engine composed as the Sandbox
+// ARCH-022: the coherent point drift plugin (a step run) in an engine composed as the Sandbox
 // composes it, driven through its MCP tools and its window: the run equals the solver's own step sequence bit for bit,
 // Accept writes it once with one undo entry, changed inputs or another world end it without a write, a paused run
 // holds its output, and an unload ends it.
@@ -11,6 +11,7 @@
 
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -19,18 +20,19 @@
 #include "TestImGuiFrameScope.hpp"
 
 import Geometry.Registration.CoherentPointDrift;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StepRuns;
-import Intrinsic.Plugin.JobFormSpike;
+import Intrinsic.Plugin.CoherentPointDrift;
 
 namespace
 {
     namespace R = Extrinsic::Runtime;
     namespace CPD = Geometry::CoherentPointDrift;
     namespace GS = Extrinsic::ECS::Components::GeometrySources;
-    namespace JFS = Intrinsic::Plugins::JobFormSpike;
+    namespace Plugin = Intrinsic::Plugins::CoherentPointDrift;
     using Json = nlohmann::json;
 
     // A helix-like cloud (no symmetry to confuse a rigid fit), and the same cloud turned 10 degrees and shifted, with
@@ -74,7 +76,7 @@ namespace
     {
         entt::entity Source{}, Target{};
 
-        explicit Harness(const int points = 60) : Intrinsic::Tests::Plugins::Harness(&JFS::Register, &JFS::Shutdown)
+        explicit Harness(const int points = 60) : Intrinsic::Tests::Plugins::Harness(&Plugin::Register, &Plugin::Shutdown)
         {
             Source = Cloud(Scene(), SourcePoints(points));
             Target = Cloud(Scene(), TargetPoints(points));
@@ -91,7 +93,7 @@ namespace
             Json args{{"source", Id(Source)}, {"target", Id(Target)}, {"positions", "samples"}, {"max_iterations", 200},
                       {"tolerance", 1e-8}, {"preview", false}};
             args.update(extra);
-            const auto out = Call("job_form_spike_start", args);
+            const auto out = Call("coherent_point_drift_start", args);
             EXPECT_FALSE(out.IsError) << out.Text;
             return out.IsError ? 0u : Json::parse(out.Text)["run"].get<std::uint64_t>();
         }
@@ -144,7 +146,7 @@ namespace
     }
 }
 
-TEST(JobFormSpikePlugin, ARunEqualsTheSolversOwnStepsAndAcceptWritesItOnce)
+TEST(CoherentPointDriftPlugin, ARunEqualsTheSolversOwnStepsAndAcceptWritesItOnce)
 {
     const auto reference = Solve();
     ASSERT_EQ(reference.Result.Stop, CPD::Termination::Converged);
@@ -194,11 +196,103 @@ TEST(JobFormSpikePlugin, ARunEqualsTheSolversOwnStepsAndAcceptWritesItOnce)
     EXPECT_EQ(harness.Samples(harness.Source), before) << "one undo entry";
 }
 
-TEST(JobFormSpikePlugin, AChangedTargetOrAnotherWorldEndsTheRunWithoutAWrite)
+// Both clouds placed by their local Transforms (rotated, non-uniformly scaled, shifted): the run equals the solver's own
+// run on the mapped points, Accept writes the result mapped back by the full affine inverse into the source's live
+// slots (a deleted slot keeps its value), and undo and redo restore and reapply the stored local arrays.
+TEST(CoherentPointDriftPlugin, TransformedCloudsRegisterInWorldSpaceAndWriteBackLocally)
 {
-    for (const bool switchWorld : {false, true})
+    namespace TF = Extrinsic::ECS::Components::Transform;
+    Harness harness;
+    auto& raw = harness.Scene().Raw();
+    auto& sourceTransform = raw.emplace<TF::Component>(harness.Source);
+    sourceTransform.Position = {0.4f, -0.3f, 1.2f};
+    sourceTransform.Rotation = glm::angleAxis(0.6f, glm::normalize(glm::vec3(1.f, 2.f, 0.5f)));
+    sourceTransform.Scale = {1.5f, 0.75f, 2.f};
+    auto& targetTransform = raw.emplace<TF::Component>(harness.Target);
+    targetTransform.Position = {-0.2f, 0.1f, 0.3f};
+    targetTransform.Rotation = glm::angleAxis(-0.3f, glm::vec3(0.f, 0.f, 1.f));
+    targetTransform.Scale = {1.1f, 1.1f, 0.9f};
+    auto& sourceProps = raw.get<GS::Vertices>(harness.Source).Properties;
+    sourceProps.GetOrAdd<bool>("v:deleted")[5] = true;
+    const auto before = harness.Samples(harness.Source);
+
+    // The reference: the same mapping and solver, on the live points.
+    const glm::dmat4 sourceModel = TF::GetMatrixDouble(sourceTransform), targetModel = TF::GetMatrixDouble(targetTransform);
+    const auto map = [](const glm::dmat4& m, const std::vector<glm::vec3>& points)
     {
-        SCOPED_TRACE(switchWorld ? "another world" : "the target changed");
+        std::vector<glm::vec3> mapped;
+        for (const auto& p : points) mapped.emplace_back(m * glm::dvec4(glm::dvec3(p), 1.0));
+        return mapped;
+    };
+    std::vector<glm::vec3> liveSource;
+    for (std::size_t i = 0; i < before.size(); ++i)
+        if (i != 5u) liveSource.push_back(before[i]);
+    CPD::Solver solver;
+    ASSERT_EQ(solver.Initialize(map(targetModel, TargetPoints()), map(sourceModel, liveSource),
+                                CPD::Params{.MaxIterations = 200, .Tolerance = 1e-8}), CPD::Status::Success);
+    std::vector<CPD::IterationTrace> trace;
+    while (solver.Step([&](const CPD::IterationTrace& t) { trace.push_back(t); })) {}
+    const std::vector<glm::dvec3> moved = solver.Current().TransformedSource;
+
+    const auto run = harness.Start();
+    ASSERT_NE(run, 0u);
+    ASSERT_FALSE(harness.Control(run, "run").contains("error"));
+    ASSERT_TRUE(harness.Until(run, [](const Json& o) { return o["end"] != "none" && !o["computing"].get<bool>(); }));
+    const auto observed = harness.Observe(run, true);
+    ASSERT_EQ(observed["metrics"].size(), trace.size() + 1u);
+    for (std::size_t i = 0; i < trace.size(); ++i)
+        EXPECT_EQ(observed["metrics"][i]["values"]["sigma2"].get<double>(), trace[i].Sigma2) << i;
+    ASSERT_FALSE(harness.Control(run, "accept").contains("error"));
+    ASSERT_TRUE(harness.Until(run, [](const Json& o) { return o["phase"] == "committed" || o["phase"] == "failed"; }));
+    ASSERT_EQ(harness.Observe(run)["phase"], "committed") << harness.Observe(run).dump();
+    const glm::dmat4 back = glm::inverse(sourceModel);
+    const auto after = harness.Samples(harness.Source);
+    std::size_t live = 0;
+    for (std::size_t i = 0; i < after.size(); ++i)
+    {
+        if (i == 5u)
+        {
+            EXPECT_EQ(after[i], before[i]) << "a deleted slot keeps its value";
+            continue;
+        }
+        EXPECT_EQ(after[i], glm::vec3(back * glm::dvec4(moved[live++], 1.0))) << i;
+    }
+    ASSERT_TRUE(harness.History().Undo().Succeeded());
+    EXPECT_EQ(harness.Samples(harness.Source), before);
+    ASSERT_TRUE(harness.History().Redo().Succeeded());
+    EXPECT_EQ(harness.Samples(harness.Source), after);
+}
+
+// Without an operational device the preview cannot be shown: nothing counts as shown, the run still computes.
+TEST(CoherentPointDriftPlugin, APreviewWithoutADeviceIsNotCountedAsShown)
+{
+    Harness harness;
+    const auto run = harness.Start({{"preview", true}});
+    ASSERT_FALSE(harness.Control(run, "step", 3).contains("error"));
+    ASSERT_TRUE(harness.Stopped(run));
+    for (int frame = 0; frame < 10; ++frame) harness.Frame();
+    const auto observed = harness.Observe(run);
+    EXPECT_EQ(observed["steps"], 3);
+    EXPECT_GE(observed["preview_copies"].get<int>(), 1) << "a copy was made";
+    EXPECT_TRUE(observed["shown_step"].is_null()) << observed.dump();
+}
+
+TEST(CoherentPointDriftPlugin, ASourceWhoseTransformCannotBeInvertedIsRefused)
+{
+    Harness harness;
+    harness.Scene().Raw().emplace<Extrinsic::ECS::Components::Transform::Component>(harness.Source).Scale = {0.f, 1.f, 1.f};
+    const auto out = harness.Call("coherent_point_drift_start", {{"source", Id(harness.Source)}, {"target", Id(harness.Target)},
+                                                                 {"positions", "samples"}});
+    EXPECT_TRUE(out.IsError);
+    EXPECT_NE(out.Text.find("inverted"), std::string::npos) << out.Text;
+}
+
+TEST(CoherentPointDriftPlugin, AChangedTargetOrAnotherWorldEndsTheRunWithoutAWrite)
+{
+    for (const int change : {0, 1, 2})
+    {
+        const bool switchWorld = change == 2;
+        SCOPED_TRACE(change == 0 ? "the target changed" : change == 1 ? "the source moved" : "another world");
         Harness harness;
         const auto before = harness.Samples(harness.Source);
         const auto run = harness.Start();
@@ -211,8 +305,10 @@ TEST(JobFormSpikePlugin, AChangedTargetOrAnotherWorldEndsTheRunWithoutAWrite)
             ASSERT_TRUE(worlds.RequestSetActiveWorld(worlds.CreateWorld("other")).has_value());
             (void)worlds.ApplyMaintenance(harness.Engine.Events(), harness.Engine.Jobs());
         }
-        else
+        else if (change == 0)
             scene.Raw().get<GS::Vertices>(harness.Target).Properties.Get<glm::vec3>("samples")[0].x += 1.f;
+        else
+            scene.Raw().emplace<Extrinsic::ECS::Components::Transform::Component>(harness.Source).Position.x = 1.f;
         ASSERT_TRUE(harness.Until(run, [](const Json& o) { return o["phase"] != "paused"; }));
         const auto ended = harness.Observe(run);
         EXPECT_EQ(ended["phase"], "discarded");
@@ -227,16 +323,16 @@ TEST(JobFormSpikePlugin, AChangedTargetOrAnotherWorldEndsTheRunWithoutAWrite)
     }
 }
 
-TEST(JobFormSpikePlugin, AnEntityIdBeyond32BitsIsRefusedNotWrapped)
+TEST(CoherentPointDriftPlugin, AnEntityIdBeyond32BitsIsRefusedNotWrapped)
 {
     Harness harness;
-    const auto out = harness.Call("job_form_spike_start", {{"source", 4294967296ull + Id(harness.Source)},
+    const auto out = harness.Call("coherent_point_drift_start", {{"source", 4294967296ull + Id(harness.Source)},
                                                            {"target", Id(harness.Target)}, {"positions", "samples"}});
     EXPECT_TRUE(out.IsError);
     EXPECT_EQ(out.ErrorCode, "invalid_params") << out.Text;
 }
 
-TEST(JobFormSpikePlugin, APausedRunHoldsItsOutputUntilItEnds)
+TEST(CoherentPointDriftPlugin, APausedRunHoldsItsOutputUntilItEnds)
 {
     Harness harness;
     const auto first = harness.Start();
@@ -244,13 +340,13 @@ TEST(JobFormSpikePlugin, APausedRunHoldsItsOutputUntilItEnds)
     ASSERT_TRUE(harness.Stopped(first));
     EXPECT_EQ(harness.Observe(first)["phase"], "paused");
     for (int frame = 0; frame < 10; ++frame) harness.Frame();
-    const auto refused = harness.Call("job_form_spike_start", {{"source", Id(harness.Source)}, {"target", Id(harness.Target)},
+    const auto refused = harness.Call("coherent_point_drift_start", {{"source", Id(harness.Source)}, {"target", Id(harness.Target)},
                                                                {"positions", "samples"}, {"preview", false}});
     EXPECT_TRUE(refused.IsError);
     EXPECT_NE(refused.Text.find("already running"), std::string::npos) << refused.Text;
     const auto rows = harness.Jobs();
     EXPECT_TRUE(std::ranges::any_of(rows, [](const R::EditorJobRecord& row)
-                                    { return row.Name == "Coherent point drift (job form spike)" &&
+                                    { return row.Name == "Coherent point drift (steps)" &&
                                              R::IsActiveEditorJobState(row.State); }))
         << "the paused run is a row of the Jobs window";
     ASSERT_FALSE(harness.Control(first, "discard").contains("error"));
@@ -259,14 +355,14 @@ TEST(JobFormSpikePlugin, APausedRunHoldsItsOutputUntilItEnds)
     EXPECT_NE(harness.Start(), 0u) << "free after it ended";
 }
 
-TEST(JobFormSpikePlugin, AnUnloadEndsAPausedRunOnce)
+TEST(CoherentPointDriftPlugin, AnUnloadEndsAPausedRunOnce)
 {
     Harness harness;
     const auto before = harness.Samples(harness.Source);
     const auto run = harness.Start();
     ASSERT_FALSE(harness.Control(run, "step", 2).contains("error"));
     ASSERT_TRUE(harness.Stopped(run));
-    const auto unload = harness.Call("plugin_unload", {{"plugin", "job_form_spike"}});
+    const auto unload = harness.Call("plugin_unload", {{"plugin", "coherent_point_drift"}});
     ASSERT_FALSE(unload.IsError) << unload.Text;
     const auto ended = harness.Observe(run);
     EXPECT_EQ(ended["phase"], "discarded") << ended.dump();
@@ -274,14 +370,14 @@ TEST(JobFormSpikePlugin, AnUnloadEndsAPausedRunOnce)
     EXPECT_FALSE(harness.History().CanUndo());
 }
 
-TEST(JobFormSpikePlugin, TheWindowsButtonsControlTheRunStartedLast)
+TEST(CoherentPointDriftPlugin, TheWindowsButtonsControlTheRunStartedLast)
 {
     Harness harness{1500}; // steps of milliseconds: Pause lands while it computes
     const auto run = harness.Start({{"tolerance", 1e-14}, {"max_iterations", 5000}});
-    ASSERT_EQ(JFS::LastRun(), run);
+    ASSERT_EQ(Plugin::LastRun(), run);
     auto* ui = harness.Engine.Services().Find<R::EditorUiHost>();
     ASSERT_NE(ui, nullptr);
-    ASSERT_TRUE(ui->SetWindowOpen("view.job_form_spike", true));
+    ASSERT_TRUE(ui->SetWindowOpen("view.coherent_point_drift_steps", true));
     TestSupport::ImGuiFrameScope gui;
     ImGui::GetIO().DisplaySize = ImVec2(1280, 1600);
     const auto press = [&](const char* button)
@@ -289,7 +385,7 @@ TEST(JobFormSpikePlugin, TheWindowsButtonsControlTheRunStartedLast)
         for (int frame = 0; frame < 3; ++frame)
         {
             if (frame > 0 || ImGui::GetFrameCount() > 1) gui.NextFrame();
-            if (auto* window = ImGui::FindWindowByName("Job Form Spike (CPD)###view.job_form_spike"); window && frame == 1)
+            if (auto* window = ImGui::FindWindowByName("Coherent Point Drift (steps)###view.coherent_point_drift_steps"); window && frame == 1)
                 ImGui::ActivateItemByID(window->GetID(button));
             (void)ui->Windows().DrawOpenWindows();
             harness.Frame();
@@ -312,7 +408,7 @@ TEST(JobFormSpikePlugin, TheWindowsButtonsControlTheRunStartedLast)
     EXPECT_TRUE(harness.History().CanUndo());
     for (int frame = 0; frame < 5; ++frame) harness.Frame(); // its holder job finishes
     const auto next = harness.Start();
-    ASSERT_EQ(JFS::LastRun(), next) << "the window follows the run started last";
+    ASSERT_EQ(Plugin::LastRun(), next) << "the window follows the run started last";
     press("Discard");
     ASSERT_TRUE(harness.Until(next, [](const Json& o) { return o["phase"] == "discarded"; }));
 }

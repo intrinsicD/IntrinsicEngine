@@ -39,6 +39,8 @@ export namespace Extrinsic::Runtime
     enum class StepRunEnd : std::uint8_t { None, Converged, IterationCap, Stopped };
     enum class StepOutcome : std::uint8_t { Continue, Converged, Failed };
     enum class StepRunAction : std::uint8_t { Run, Pause, Step, Stop, Accept, Discard };
+    // What Show did with a copy: shown; not now (offered again until shown or replaced); cannot be shown (dropped).
+    enum class StepRunShow : std::uint8_t { Shown, Later, Never };
     [[nodiscard]] std::string_view ToString(StepRunPhase phase) noexcept;
     [[nodiscard]] std::string_view ToString(StepRunEnd end) noexcept;
     [[nodiscard]] std::optional<StepRunAction> ParseStepRunAction(std::string_view name) noexcept;
@@ -71,8 +73,7 @@ export namespace Extrinsic::Runtime
     {
         std::function<StepOutcome(StepRunMetric& metric)> Step{}; // one iteration; fills the metric's values
         std::function<void(std::vector<float>& values)> Preview{}; // copies the newest state; none: no preview
-        // A newer copy to display; false when it cannot be shown now (it is offered again until shown or replaced).
-        std::function<bool(const StepPreview& preview)> Show{};
+        std::function<StepRunShow(const StepPreview& preview)> Show{}; // a newer copy to display
         std::function<bool()> Valid{};                             // the captures are current (world and inputs)
         std::function<bool(std::string& diagnostic)> Commit{};     // publishes once; false when refused
         // Releases what the run shows, once, as soon as it ends without a commit (even while a step still runs: only

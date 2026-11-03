@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """ARCH-022 slice 2, S2d: measures R4, the time from saving a plugin edit to the reloaded plugin running.
 
-Starts the Sandbox like spike_driver.py (isolated socket, built-in config, the driver's LSan settings), saves
+Starts the Sandbox like s1_driver.py (isolated socket, built-in config, the driver's LSan settings), saves
 diagnostics_read as diagnostics.json, and loads the plugin once. Then, per sample (generation g = --generation-base +
 sample index):
-  t0  the save begins: <build>/plugins/spike/generated/SpikeVersion.inc is rewritten with generation g (written,
+  t0  the save begins: <build>/plugins/fixture/generated/FixtureVersion.inc is rewritten with generation g (written,
       flushed, fsynced, closed; save_s is that write alone);
-  t1  `cmake --build <build> --target IntrinsicSpikePlugin` returned 0 (600 s timeout);
-  t2  plugin_reload of <build>/plugins/libIntrinsicSpikePlugin.so answered, committed with generation g;
-  t3  spike_version answers generation g.
+  t1  `cmake --build <build> --target IntrinsicFixturePlugin` returned 0 (600 s timeout);
+  t2  plugin_reload of <build>/plugins/libIntrinsicFixturePlugin.so answered, committed with generation g;
+  t3  fixture_version answers generation g.
 Phases in wall-clock seconds (time.monotonic): build = t1 - t0, reload = t2 - t1, answer = t3 - t2, total = t3 - t0;
 compile_s and link_s are the plugin's compile and link steps from the tree's .ninja_log.
 A sample is valid only if all of these hold:
   - the build's Ninja edges (its "[n/m] description" lines) include the plugin's compile and link, and every edge is
     the plugin's: its description names "plugins/" or the glob re-check (no host edge);
-  - the reload reply has generation g, its config report restored ["spike"] and rejected nothing;
+  - the reload reply has generation g, its config report restored ["fixture"] and rejected nothing;
   - the previous generation's close record is new and clean: closed, unmapped, every callable count 0;
-  - spike_version answers generation g.
+  - fixture_version answers generation g.
 A build that exceeds its timeout or a reload whose reply does not come within the socket's 60 s is recorded as a
 failed sample with its elapsed time. The first failed sample stops the session.
 Samples: --warmup (not summarized) then --samples measured ones. After them, two null probes, each --probes times:
@@ -37,7 +37,7 @@ Summaries per phase over the measured samples: median, minimum, maximum. Decisio
   median_met  median total < 10 s, but at least one total >= 10 s;
   not_met     median total >= 10 s.
 summary.json holds the verdict only when every check passed; otherwise its verdict is UNEVALUATED.
-Usage: python3 plugins/spike/r4_driver.py --build build/dev --out <new dir> [--samples 10] [--warmup 1]
+Usage: python3 plugins/fixture/r4_driver.py --build build/dev --out <new dir> [--samples 10] [--warmup 1]
        [--probes 3] [--generation-base 100] [--icd <VK_DRIVER_FILES json>]
 """
 
@@ -58,7 +58,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import spike_driver as s1  # noqa: E402  (shared session helpers)
+import s1_driver as s1  # noqa: E402  (shared session helpers)
 
 TARGET_S = 10.0
 MEMORY: dict = {}  # peak memory of the session, filled before the quit
@@ -78,13 +78,13 @@ def host_load() -> dict:
 
 def save(header: Path, generation: int) -> None:
     with header.open("w") as file:
-        file.write(f"#define SPIKE_GENERATION {generation}\n#define SPIKE_FAIL_REGISTER 0\n")
+        file.write(f"#define FIXTURE_GENERATION {generation}\n#define FIXTURE_FAIL_REGISTER 0\n")
         file.flush()
         os.fsync(file.fileno())
 
 
-PLUGIN_OBJECT = "plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/SpikePlugin.cpp.o"
-PLUGIN_LIBRARY = "plugins/libIntrinsicSpikePlugin.so"
+PLUGIN_OBJECT = "plugins/fixture/CMakeFiles/IntrinsicFixturePlugin.dir/FixturePlugin.cpp.o"
+PLUGIN_LIBRARY = "plugins/libIntrinsicFixturePlugin.so"
 EDGE = re.compile(r"^\[\d+/\d+\] (.+)$", re.MULTILINE)
 
 
@@ -123,7 +123,7 @@ def run_group(command: list[str], timeout_s: float) -> tuple[bool, int | None, s
 
 def build(target_build: Path, log: Path) -> tuple[bool, list[str]]:
     """(succeeded, the Ninja edge descriptions it ran); past 600 s the build is killed and counts as failed."""
-    timed_out, code, output = run_group(["cmake", "--build", str(target_build), "--target", "IntrinsicSpikePlugin"], 600)
+    timed_out, code, output = run_group(["cmake", "--build", str(target_build), "--target", "IntrinsicFixturePlugin"], 600)
     with log.open("a") as file:
         file.write(output + ("\n[r4_driver] build timed out after 600 s\n" if timed_out else ""))
     return not timed_out and code == 0, EDGE.findall(output)
@@ -159,8 +159,8 @@ def generation_of(reply: object) -> object:
 
 
 def sample(agent: s1.Agent, args, index: int, kind: str, previous: int) -> dict:
-    header = args.build / "plugins/spike/generated/SpikeVersion.inc"
-    plugin = args.build / "plugins/libIntrinsicSpikePlugin.so"
+    header = args.build / "plugins/fixture/generated/FixtureVersion.inc"
+    plugin = args.build / "plugins/libIntrinsicFixturePlugin.so"
     generation = args.generation_base + index
     record: dict = {"index": index, "kind": kind, "generation": generation, "load_before": host_load()}
     closes_before = len(closes(agent))
@@ -177,7 +177,7 @@ def sample(agent: s1.Agent, args, index: int, kind: str, previous: int) -> dict:
             error = f"{type(failure).__name__}: {failure}"
     t2 = time.monotonic()
     if ok:
-        ok_version, version, _, _ = agent.call("spike_version")
+        ok_version, version, _, _ = agent.call("fixture_version")
     t3 = time.monotonic()
     closes_after = closes(agent) if ok else []
     config = reply.get("config", {}) if isinstance(reply, dict) else {}
@@ -190,7 +190,7 @@ def sample(agent: s1.Agent, args, index: int, kind: str, previous: int) -> dict:
         "plugin_edges_only": built and any(PLUGIN_OBJECT in e for e in edges) and any(PLUGIN_LIBRARY in e for e in edges)
         and all(plugin_edge(e) for e in edges),
         "reload_generation": ok and generation_of(reply) == generation,
-        "config_restored": config.get("restored") == ["spike"] and config.get("rejected") == [],
+        "config_restored": config.get("restored") == ["fixture"] and config.get("rejected") == [],
         "previous_close_clean": new_clean_close(closes_before, closes_after, previous),
         "version": ok_version and version == {"generation": generation},
         "steps_recorded": finite(record["compile_s"]) and finite(record["link_s"]),
@@ -201,7 +201,7 @@ def sample(agent: s1.Agent, args, index: int, kind: str, previous: int) -> dict:
 
 def probe(agent: s1.Agent, args, name: str, index: int, generation: int) -> dict:
     record: dict = {"index": index, "kind": name, "load_before": host_load()}
-    plugin = args.build / "plugins/libIntrinsicSpikePlugin.so"
+    plugin = args.build / "plugins/libIntrinsicFixturePlugin.so"
     before = hashlib.sha256(plugin.read_bytes()).hexdigest()
     start = time.monotonic()
     if name == "rebuild_unchanged":
@@ -297,7 +297,7 @@ def sandbox_sha(args) -> str:
 def run(agent: s1.Agent, checks: s1.Checks, args, records: list[dict]) -> None:
     _, diagnostics, _, _ = agent.call("diagnostics_read")
     (args.out / "diagnostics.json").write_text(json.dumps(diagnostics, indent=2) + "\n")
-    ok, reply, _, error = agent.call("plugin_load", {"path": str(args.build / "plugins/libIntrinsicSpikePlugin.so")})
+    ok, reply, _, error = agent.call("plugin_load", {"path": str(args.build / "plugins/libIntrinsicFixturePlugin.so")})
     if not checks.check("setup: the plugin loaded", ok, [reply, error]):
         return
     host_before = sandbox_sha(args)

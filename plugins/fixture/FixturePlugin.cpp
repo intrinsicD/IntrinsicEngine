@@ -14,14 +14,14 @@
 #include <nlohmann/json.hpp>
 
 // Generated in the build directory (CMake writes the default; the S2 driver rewrites it to make a new build):
-// SPIKE_GENERATION, the build's version; SPIKE_FAIL_REGISTER, a build whose Register stages and then fails;
-// SPIKE_MISSING_SYMBOL (optional), a build that needs a symbol the host does not export, so dlopen fails;
-// SPIKE_CLAMP_MARKER (optional), a build whose validator clamps marker_size above 10 with a fallback;
-// SPIKE_EMPTY_HISTORY_COMMAND (optional), a build that stages a second history command without a handler;
-// SPIKE_PAD (optional), a build 16 MiB larger, so it cannot be mapped into a smaller build's freed range;
-// SPIKE_BUILD_ID (optional), a stale build: another build id under otherwise identical settings;
-// SPIKE_OMIT_SHUTDOWN (optional), a build without the v1 shutdown entry point.
-#include "SpikeVersion.inc"
+// FIXTURE_GENERATION, the build's version; FIXTURE_FAIL_REGISTER, a build whose Register stages and then fails;
+// FIXTURE_MISSING_SYMBOL (optional), a build that needs a symbol the host does not export, so dlopen fails;
+// FIXTURE_CLAMP_MARKER (optional), a build whose validator clamps marker_size above 10 with a fallback;
+// FIXTURE_EMPTY_HISTORY_COMMAND (optional), a build that stages a second history command without a handler;
+// FIXTURE_PAD (optional), a build 16 MiB larger, so it cannot be mapped into a smaller build's freed range;
+// FIXTURE_BUILD_ID (optional), a stale build: another build id under otherwise identical settings;
+// FIXTURE_OMIT_SHUTDOWN (optional), a build without the v1 shutdown entry point.
+#include "FixtureVersion.inc"
 #include "PluginBuildId.h" // INTRINSIC_PLUGIN_BUILD_ID of the engine this build compiles against
 
 import Extrinsic.Core.Config.Engine;
@@ -44,7 +44,7 @@ namespace
     using Extrinsic::Runtime::AgentOperationOutcome;
     using Json = nlohmann::json;
 
-#if defined(SPIKE_PAD) && SPIKE_PAD
+#if defined(FIXTURE_PAD) && FIXTURE_PAD
     [[gnu::used]] const char g_Pad[16u << 20u] = {1};
 #endif
 
@@ -60,11 +60,11 @@ namespace
     class Tracked
     {
     public:
-        explicit Tracked(const char* kind) noexcept : m_Kind(kind) { intrinsic_plugin_callable(SPIKE_GENERATION, m_Kind, +1); }
-        Tracked(const Tracked& other) noexcept : m_Kind(other.m_Kind) { intrinsic_plugin_callable(SPIKE_GENERATION, m_Kind, +1); }
+        explicit Tracked(const char* kind) noexcept : m_Kind(kind) { intrinsic_plugin_callable(FIXTURE_GENERATION, m_Kind, +1); }
+        Tracked(const Tracked& other) noexcept : m_Kind(other.m_Kind) { intrinsic_plugin_callable(FIXTURE_GENERATION, m_Kind, +1); }
         Tracked& operator=(const Tracked&) = delete;
-        ~Tracked() { intrinsic_plugin_callable(SPIKE_GENERATION, m_Kind, -1); }
-        void Invoked() const noexcept { intrinsic_plugin_invoked(SPIKE_GENERATION, m_Kind); }
+        ~Tracked() { intrinsic_plugin_callable(FIXTURE_GENERATION, m_Kind, -1); }
+        void Invoked() const noexcept { intrinsic_plugin_invoked(FIXTURE_GENERATION, m_Kind); }
 
     private:
         const char* m_Kind;
@@ -93,7 +93,7 @@ namespace
     {
         const auto size = MarkerSize(document);
         if (!size) return {.State = Config::EngineConfigState::Invalid};
-#if defined(SPIKE_CLAMP_MARKER) && SPIKE_CLAMP_MARKER
+#if defined(FIXTURE_CLAMP_MARKER) && FIXTURE_CLAMP_MARKER
         if (*size > 10)
             return {.State = Config::EngineConfigState::FallbackApplied,
                     .CanonicalPayloadJson = Json{{"marker_size", 10}}.dump(),
@@ -136,7 +136,7 @@ namespace
         return {.Text = value.dump()};
     }
 
-    // spike_counter_add {delta, form}: an undoable edit of host state. The command form records data for the
+    // fixture_counter_add {delta, form}: an undoable edit of host state. The command form records data for the
     // registered history command; the closure form records this image's closures, as today's entries do.
     // A delta within [-kMaxUndoDelta, kMaxUndoDelta]; anything else (including integers too large to read) is not.
     std::optional<std::int64_t> Delta(const Json& value)
@@ -157,17 +157,17 @@ namespace
             return {.IsError = true, .Text = "delta must be an integer within +-1000000", .ErrorCode = "invalid_params"};
         const std::int64_t delta = *parsed;
         const bool closure = arguments.value("form", std::string{"command"}) == "closure";
-        const std::string label = "Spike add " + std::to_string(delta) + (closure ? " (closure)" : "");
+        const std::string label = "Fixture add " + std::to_string(delta) + (closure ? " (closure)" : "");
         const bool recorded = closure
             ? Probes::RecordClosureCommand(context, label,
                   [delta] { Probes::HostUndoValue() += delta; return true; },
                   [delta] { Probes::HostUndoValue() -= delta; return true; })
-            : Runtime::RecordPluginCommand(context, label, "spike.add", std::to_string(delta));
+            : Runtime::RecordPluginCommand(context, label, "fixture.add", std::to_string(delta));
         if (!recorded) return {.IsError = true, .Text = "the edit was not recorded", .ErrorCode = "not_recorded"};
         return {.Text = Json{{"value", Probes::HostUndoValue()}}.dump()};
     }
 
-    // spike_start_job {seconds, ignore_cancel}: a CPU job of the plugin that runs for `seconds` (or until cancelled,
+    // fixture_start_job {seconds, ignore_cancel}: a CPU job of the plugin that runs for `seconds` (or until cancelled,
     // unless it ignores cancellation); its completion logs whether it was published.
     AgentOperationOutcome StartJob(const AgentOperationContext& context, std::string_view argumentsJson)
     {
@@ -175,7 +175,7 @@ namespace
         const double seconds = arguments.is_object() ? arguments.value("seconds", 1.0) : 1.0;
         const bool ignoreCancel = arguments.is_object() && arguments.value("ignore_cancel", false);
         const bool submitted = Runtime::SubmitPluginJob(context, {
-            .Label = "Spike job",
+            .Label = "Fixture job",
             .Work = [t = Tracked{"job_work"}, seconds, ignoreCancel](const std::function<bool()>& cancelled)
             {
                 t.Invoked();
@@ -194,7 +194,7 @@ namespace
         return {.Text = R"({"submitted":true})"};
     }
 
-    // spike_gpu_work {frames}: fills a slice of the plugin's own buffer in each of the next `frames` recorded frames,
+    // fixture_gpu_work {frames}: fills a slice of the plugin's own buffer in each of the next `frames` recorded frames,
     // one slice per frame in flight, so no two unretired frames write the same bytes. Its shutdown logs the last
     // recorded frame, the current frame and the frames in flight, so the driver can check the retirement itself.
     AgentOperationOutcome GpuWork(const AgentOperationContext& context, std::string_view argumentsJson)
@@ -210,10 +210,10 @@ namespace
         const auto slots = device->GetFramesInFlight();
         const auto buffer = device->CreateBuffer({.SizeBytes = kSlice * slots,
                                                   .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-                                                  .DebugName = "spike plugin buffer"});
+                                                  .DebugName = "fixture plugin buffer"});
         auto last = std::make_shared<std::optional<std::uint64_t>>(); // the last recorded frame, if any
         const bool started = Runtime::StartPluginGpuWork(context, {
-            .DebugName = "spike plugin GPU work",
+            .DebugName = "fixture plugin GPU work",
             .RecordFrameCommands = [t = Tracked{"gpu_record"}, device, buffer, slots, last, frames](
                                        Extrinsic::RHI::ICommandContext& commands)
             {
@@ -251,7 +251,7 @@ namespace
     void DrawWindow(bool& open)
     {
         // Auto-resize: the window follows marker_size changes instead of clipping the marker.
-        if (ImGui::Begin("Spike plugin###view.spike", &open, ImGuiWindowFlags_AlwaysAutoResize))
+        if (ImGui::Begin("Fixture plugin###view.fixture", &open, ImGuiWindowFlags_AlwaysAutoResize))
         {
             if (!g_FirstDrawSeen)
             {
@@ -269,14 +269,14 @@ namespace
     }
 }
 
-#if defined(SPIKE_MISSING_SYMBOL) && SPIKE_MISSING_SYMBOL
-extern "C" void spike_symbol_the_host_does_not_export() noexcept;
+#if defined(FIXTURE_MISSING_SYMBOL) && FIXTURE_MISSING_SYMBOL
+extern "C" void fixture_symbol_the_host_does_not_export() noexcept;
 #endif
 
 extern "C" const char* intrinsic_plugin_build_id_v1() noexcept
 {
-#if defined(SPIKE_BUILD_ID)
-    return SPIKE_BUILD_ID;
+#if defined(FIXTURE_BUILD_ID)
+    return FIXTURE_BUILD_ID;
 #else
     return INTRINSIC_PLUGIN_BUILD_ID;
 #endif
@@ -284,14 +284,14 @@ extern "C" const char* intrinsic_plugin_build_id_v1() noexcept
 
 extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& staged, std::string& error) noexcept
 {
-#if defined(SPIKE_MISSING_SYMBOL) && SPIKE_MISSING_SYMBOL
-    spike_symbol_the_host_does_not_export(); // never reached: RTLD_NOW refuses the image first
+#if defined(FIXTURE_MISSING_SYMBOL) && FIXTURE_MISSING_SYMBOL
+    fixture_symbol_the_host_does_not_export(); // never reached: RTLD_NOW refuses the image first
 #endif
     intrinsic_plugin_event("register");
-    staged.Name = "spike";
-    staged.Generation = SPIKE_GENERATION;
+    staged.Name = "fixture";
+    staged.Generation = FIXTURE_GENERATION;
     staged.ConfigSections.push_back({
-        .DefaultSection = {.Name = "spike", .SchemaId = "intrinsic.spike", .SchemaVersion = 1u,
+        .DefaultSection = {.Name = "fixture", .SchemaId = "intrinsic.fixture", .SchemaVersion = 1u,
                            .PayloadJson = R"({"marker_size":8})"},
         .Validate = [t = Tracked{"validator"}](std::string_view document, std::string_view, std::string_view)
         {
@@ -307,8 +307,8 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
         .SchemaJson = R"({"type":"object","properties":{"marker_size":{"type":"integer","minimum":1,"maximum":64}},"additionalProperties":false})",
     });
     staged.Operations.push_back({
-        .Name = "spike_echo",
-        .Title = "Echo (spike plugin)",
+        .Name = "fixture_echo",
+        .Title = "Echo (fixture plugin)",
         .Description = "Returns its arguments; proves a plugin tool is callable over MCP.",
         .InputSchemaJson = R"({"type":"object","properties":{"text":{"type":"string"}},"additionalProperties":false})",
         .Invoke = [t = Tracked{"operation"}](const AgentOperationContext&, std::string_view arguments)
@@ -318,8 +318,8 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
         },
     });
     staged.Operations.push_back({
-        .Name = "spike_identity",
-        .Title = "Identity probes (spike plugin)",
+        .Name = "fixture_identity",
+        .Title = "Identity probes (fixture plugin)",
         .Description = "Mutates the host's probes through imported code and reports what the plugin sees.",
         .Invoke = [t = Tracked{"operation"}](const AgentOperationContext&, std::string_view)
         {
@@ -328,18 +328,18 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
         },
     });
     staged.Operations.push_back({
-        .Name = "spike_version",
-        .Title = "Version (spike plugin)",
-        .Description = "The plugin build's generation (SpikeVersion.inc).",
+        .Name = "fixture_version",
+        .Title = "Version (fixture plugin)",
+        .Description = "The plugin build's generation (FixtureVersion.inc).",
         .Invoke = [t = Tracked{"operation"}](const AgentOperationContext&, std::string_view)
         {
             t.Invoked();
-            return AgentOperationOutcome{.Text = Json{{"generation", SPIKE_GENERATION}}.dump()};
+            return AgentOperationOutcome{.Text = Json{{"generation", FIXTURE_GENERATION}}.dump()};
         },
     });
     staged.Operations.push_back({
-        .Name = "spike_counter_add",
-        .Title = "Undoable add (spike plugin)",
+        .Name = "fixture_counter_add",
+        .Title = "Undoable add (fixture plugin)",
         .Description = "Adds delta to the host's undo value as an undoable edit; form command (default) or closure.",
         .InputSchemaJson = R"({"type":"object","properties":{"delta":{"type":"integer"},"form":{"type":"string","enum":["command","closure"]}},"required":["delta"],"additionalProperties":false})",
         .ReadOnly = false,
@@ -350,8 +350,8 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
         },
     });
     staged.Operations.push_back({
-        .Name = "spike_start_job",
-        .Title = "CPU job (spike plugin)",
+        .Name = "fixture_start_job",
+        .Title = "CPU job (fixture plugin)",
         .Description = "Submits a plugin job that runs for seconds, or until cancelled unless ignore_cancel.",
         .InputSchemaJson = R"({"type":"object","properties":{"seconds":{"type":"number"},"ignore_cancel":{"type":"boolean"}},"additionalProperties":false})",
         .ReadOnly = false,
@@ -362,8 +362,8 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
         },
     });
     staged.Operations.push_back({
-        .Name = "spike_gpu_work",
-        .Title = "GPU work (spike plugin)",
+        .Name = "fixture_gpu_work",
+        .Title = "GPU work (fixture plugin)",
         .Description = "Fills the plugin's own buffer in each of the next frames recorded frames (default: until it "
                        "unloads).",
         .InputSchemaJson = R"({"type":"object","properties":{"frames":{"type":"integer"}},"additionalProperties":false})",
@@ -375,7 +375,7 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
         },
     });
     staged.HistoryCommands.push_back({
-        .Name = "spike.add",
+        .Name = "fixture.add",
         .Apply = [t = Tracked{"history_handler"}](std::string_view payload, bool undo)
         {
             t.Invoked();
@@ -386,13 +386,13 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
             return true;
         },
     });
-#if defined(SPIKE_EMPTY_HISTORY_COMMAND) && SPIKE_EMPTY_HISTORY_COMMAND
-    staged.HistoryCommands.push_back({.Name = "spike.empty"});
+#if defined(FIXTURE_EMPTY_HISTORY_COMMAND) && FIXTURE_EMPTY_HISTORY_COMMAND
+    staged.HistoryCommands.push_back({.Name = "fixture.empty"});
 #endif
     staged.Windows.push_back({
-        .Id = "view.spike",
+        .Id = "view.fixture",
         .MenuPath = {"View"},
-        .Title = "Spike plugin",
+        .Title = "Fixture plugin",
         .OpenByDefault = true,
         .Draw = [t = Tracked{"window_draw"}](bool& open)
         {
@@ -401,7 +401,7 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
         },
         .OpenStateChanged = [t = Tracked{"window_state"}](bool) { t.Invoked(); },
     });
-#if SPIKE_FAIL_REGISTER
+#if FIXTURE_FAIL_REGISTER
     error = "this build's Register stages everything and then fails";
     return false;
 #else
@@ -410,6 +410,6 @@ extern "C" bool intrinsic_plugin_register_v1(Runtime::PluginRegistrations& stage
 #endif
 }
 
-#if !(defined(SPIKE_OMIT_SHUTDOWN) && SPIKE_OMIT_SHUTDOWN)
+#if !(defined(FIXTURE_OMIT_SHUTDOWN) && FIXTURE_OMIT_SHUTDOWN)
 extern "C" void intrinsic_plugin_shutdown_v1() noexcept { intrinsic_plugin_event("shutdown"); }
 #endif

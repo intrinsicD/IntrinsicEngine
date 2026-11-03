@@ -1,25 +1,24 @@
-// ARCH-022 S3b: the job form spike. Coherent point drift (the CPU reference solver, Geometry.Registration.
-// CoherentPointDrift) as a step run: it moves a source cloud onto a target cloud one EM iteration at a time, shows the
-// moving source in the viewport, and runs, pauses, steps, stops, accepts or discards from its window or over MCP
-// (job_form_spike_start, then run_control and run_observe). Accept writes the source's positions with one undo entry.
-// Kept or deleted per the S3 spike report.
+// ARCH-022: coherent point drift as a step run (the job form). The CPU reference solver (Geometry.Registration.
+// CoherentPointDrift, rigid) moves a source cloud onto a target cloud in world space, one EM iteration at a time,
+// shows the moving source in the viewport, and runs, pauses, steps, stops, accepts or discards from its window or over
+// MCP (coherent_point_drift_start, then run_control and run_observe). Accept writes the source's positions, mapped back
+// into its local frame, with one undo entry. It runs beside the editor's built-in CPD until that feature migrates.
 module;
 
 #include <cstdint>
 #include <string>
 
-export module Intrinsic.Plugin.JobFormSpike;
+export module Intrinsic.Plugin.CoherentPointDrift;
 
 export import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.PluginContract;
 
-export namespace Intrinsic::Plugins::JobFormSpike
+export namespace Intrinsic::Plugins::CoherentPointDrift
 {
     namespace R = Extrinsic::Runtime;
 
-    // shortcut: both clouds are registered in their own object space (their entity transforms are ignored); fine for
-    // the spike's question (the job form), wrong for clouds placed apart in the world. Use the editor's world-space
-    // capture if the spike becomes the CPD plugin.
+    // Both clouds unparented (each mapped by its local Transform, as the editor's CPD does); the source's model matrix
+    // invertible.
     struct Request
     {
         std::uint32_t Source{}, Target{}; // stable entity ids; the source moves
@@ -29,7 +28,9 @@ export namespace Intrinsic::Plugins::JobFormSpike
         double Tolerance{1.0e-5};
         bool AcceptOnConvergence{false};
         bool Preview{true}; // the moving source in the viewport (needs an operational device)
-        std::uint32_t HoldStepMs{0u}; // test hook: every step waits this long first (a step in flight on demand)
+        // shortcut: a test hook in the public tool schema (a step in flight on demand); gate it on --plugin-test-hooks
+        // once a plugin can see that flag.
+        std::uint32_t HoldStepMs{0u}; // every step waits this long first
     };
 
     // Main thread, in the plugin's context: captures both clouds and starts a ready run (rigid CPD, reference E-step).

@@ -14,6 +14,7 @@ module;
 #include <string_view>
 #include <vector>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 export module Extrinsic.Runtime.PointCloudEditing;
@@ -28,7 +29,7 @@ export namespace Extrinsic::Runtime
 {
     // What to read and where to write: a vec3 `Output` (Publish), or with `ScalarOutputs` one scalar column each
     // (PublishScalars; `Output` is unused then). Unknown domains resolve to the entity's primary point domain, the
-    // normals' and the outputs' to the positions'.
+    // normals' and the outputs' to the positions'. An empty `Normals` name takes the positions alone.
     struct PointEditRequest
     {
         std::uint32_t StableEntityId{0u};
@@ -39,6 +40,9 @@ export namespace Extrinsic::Runtime
         std::size_t MinimumLiveCount{2u};
         bool CopyValues{true};    // false: readiness only, nothing copied
         bool AcquireIndex{false}; // the cached spatial index of the points (CPU and GPU neighbourhoods)
+        // The entity's local Transform (an unparented entity only): its matrix in the view, and the capture is stale
+        // once the entity gets a parent or its Transform changes, appears or goes.
+        bool CaptureTransform{false};
     };
 
     struct PointEdit; // a capture, owned by the service's code
@@ -53,6 +57,7 @@ export namespace Extrinsic::Runtime
         bool HasZeroNormals{false}; // a live normal of length zero
         GeometryPropertyRef Output{}; // with its resolved domain
         std::span<const GeometryPropertyRef> ScalarOutputs{}; // with their resolved domains
+        glm::dmat4 Model{1.0}; // with CaptureTransform: the local Transform's matrix (identity without a Transform)
     };
 
     // Neighbour rows within a radius, compact indices: point i's neighbours are Indices[Offsets[i], Offsets[i+1]),
@@ -115,7 +120,8 @@ export namespace Extrinsic::Runtime
                                                           PointNeighbourRows& rows, std::string& diagnostic);
         [[nodiscard]] PointGpuRowStats GpuRowStats(const PointEdit& edit) const;
         // Main thread: writes `live` (one position per captured point) into the output for the live slots, records
-        // one undo entry named `label` and marks the entity dirty. Stale when an input or the output changed.
+        // one undo entry named `label` and marks the entity dirty. Stale when an input or the output changed;
+        // Rejected (nothing written) for a non-finite position.
         [[nodiscard]] PointPublishStatus Publish(PointEdit& edit, std::span<const glm::vec3> live, std::string label);
         // Main thread, an in-place output (the positions): shows `live` (one position per captured point) as the
         // positions' ring front, which the renderer draws, without changing the positions or the history. Busy or

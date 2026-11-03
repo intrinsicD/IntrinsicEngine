@@ -113,13 +113,13 @@ class FeatureBoundaryRatchet(unittest.TestCase):
         self.assert_fails("Gamma")
 
     def test_plugins_folder_is_ratcheted_like_any_plugin_folder(self) -> None:
-        write(self.root, "plugins/spike/SpikePlugin.cpp", "import Extrinsic.Runtime.UiHostTypes;\n")
-        self.assert_fails("plugins/spike")
-        self.save_baseline(r1=1, alpha=(1, 0), beta=(0, 0), **{"plugins/spike": (0, 0)})
+        write(self.root, "plugins/fixture/FixturePlugin.cpp", "import Extrinsic.Runtime.UiHostTypes;\n")
+        self.assert_fails("plugins/fixture")
+        self.save_baseline(r1=1, alpha=(1, 0), beta=(0, 0), **{"plugins/fixture": (0, 0)})
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        write(self.root, "plugins/spike/SpikePlugin.cpp", "import Extrinsic.Runtime.EditorThing;\n")
-        self.assert_fails("plugins/spike")
+        write(self.root, "plugins/fixture/FixturePlugin.cpp", "import Extrinsic.Runtime.EditorThing;\n")
+        self.assert_fails("plugins/fixture")
 
     def test_stale_entry_fails(self) -> None:
         import shutil

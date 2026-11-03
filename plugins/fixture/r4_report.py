@@ -3,7 +3,7 @@
 same summaries and decision rule as r4_driver.py. Warmups are excluded. The pool is valid only if every run passed
 its checks and holds exactly the frozen counts (1 warmup, 5 measured, 3 of each probe; --expect W,M,P overrides);
 an invalid pool's verdict is UNEVALUATED.
-Usage: python3 plugins/spike/r4_report.py [--expect 1,5,3] <out dir> <run dir> [<run dir> ...]
+Usage: python3 plugins/fixture/r4_report.py [--expect 1,5,3] <out dir> <run dir> [<run dir> ...]
 """
 
 from __future__ import annotations

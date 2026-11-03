@@ -1,6 +1,7 @@
 // ARCH-022: the point-cloud editing service plugins use (capture, CPU index, publication with undo), in an engine
 // composed as the Sandbox does, its edits going through the app's workspace.
 #include <algorithm>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -13,6 +14,8 @@
 #include "MockRHI.hpp"
 #include "PointCloudEditingHarness.hpp"
 
+import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
@@ -272,4 +275,151 @@ TEST(PointCloudEditing, APreviewFrontWithAPendingUploadIsNeitherReusedNorFreed)
     device.TransferQueue.AlwaysComplete = true;
     residency.Tick();
     EXPECT_EQ(device.DestroyBufferCount, destroyed + 1) << "freed once complete";
+}
+
+// ARCH-022 block A: an empty normal name takes the positions alone, with and without copying values; a later normal
+// edit does not stale such a capture, while a given normal input stays watched and an invalid one still fails.
+TEST(PointCloudEditing, AnEmptyNormalNameTakesThePositionsAlone)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto oriented = Make(scene, D::PointCloudPoint);
+    const auto bare = Intrinsic::Tests::MakePointDomainSource(scene, D::PointCloudPoint);
+    PointDomainProperties(scene, bare, D::PointCloudPoint).GetOrAdd<glm::vec3>("samples", glm::vec3{1.f});
+    harness.Frame(60);
+    std::string diagnostic;
+    for (const auto entity : {oriented, bare})
+    {
+        auto request = Request(entity, D::PointCloudPoint, true);
+        request.Normals = {};
+        const auto edit = harness.Editing().Capture(request, diagnostic);
+        ASSERT_TRUE(edit) << diagnostic;
+        EXPECT_TRUE(harness.Editing().View(*edit).PointNormals.empty());
+        EXPECT_FALSE(harness.Editing().View(*edit).Points.empty());
+        request.CopyValues = false; // readiness: the asynchronous input check
+        const auto ready = harness.Settled([&] { return harness.Editing().Capture(request, diagnostic); });
+        ASSERT_TRUE(ready) << diagnostic;
+        EXPECT_GT(harness.Editing().View(*ready).LiveCount, 0u);
+    }
+    auto positionsOnly = Request(oriented, D::PointCloudPoint, true);
+    positionsOnly.Normals = {};
+    const auto withoutNormals = harness.Editing().Capture(positionsOnly, diagnostic);
+    const auto withNormals = harness.Editing().Capture(Request(oriented, D::PointCloudPoint, true), diagnostic);
+    ASSERT_TRUE(withoutNormals && withNormals) << diagnostic;
+    PointDomainProperties(scene, oriented, D::PointCloudPoint).Get<glm::vec3>("directions")[0] = glm::vec3(1, 0, 0);
+    EXPECT_TRUE(harness.Editing().Current(*withoutNormals)) << "no normal input, so a normal edit changes nothing";
+    EXPECT_FALSE(harness.Editing().Current(*withNormals)) << "a given normal input stays watched";
+    auto missing = Request(oriented, D::PointCloudPoint);
+    missing.Normals.Name = "no_such_normals";
+    EXPECT_FALSE(harness.Editing().Capture(missing, diagnostic)) << "a given but invalid normal input still fails";
+}
+
+// ARCH-022 block A: CaptureTransform takes the local Transform's matrix of an unparented entity; the capture is stale,
+// and a direct publication writes nothing, once the entity moves, gets a parent, or its Transform appears or goes.
+TEST(PointCloudEditing, ACapturedTransformMustStayAsCapturedUntilPublication)
+{
+    namespace ECSC = Extrinsic::ECS::Components;
+    for (int change = 0; change < 5; ++change)
+    {
+        SCOPED_TRACE(change);
+        Harness harness{};
+        auto& scene = harness.Scene();
+        auto& raw = scene.Raw();
+        const auto entity = Make(scene, D::PointCloudPoint);
+        if (change != 4)
+        {
+            auto& transform = raw.emplace<ECSC::Transform::Component>(entity);
+            transform.Position = {1.f, 2.f, 3.f};
+            transform.Scale = {2.f, 1.f, 0.5f};
+        }
+        auto request = Request(entity, D::PointCloudPoint, true);
+        request.Normals = {};
+        request.CaptureTransform = true;
+        std::string diagnostic;
+        const auto edit = harness.Editing().Capture(request, diagnostic);
+        ASSERT_TRUE(edit) << diagnostic;
+        auto scalarRequest = request;
+        scalarRequest.ScalarOutputs = {{.Domain = D::PointCloudPoint, .Name = "s", .ValueKind = Geometry::PropertyValueKind::Float}};
+        const auto scalars = harness.Editing().Capture(scalarRequest, diagnostic);
+        ASSERT_TRUE(scalars) << diagnostic;
+        const auto expected = change != 4 ? ECSC::Transform::GetMatrixDouble(raw.get<ECSC::Transform::Component>(entity))
+                                          : glm::dmat4(1.0);
+        EXPECT_EQ(harness.Editing().View(*edit).Model, expected);
+        EXPECT_TRUE(harness.Editing().Current(*edit));
+        const auto before = std::as_const(PointDomainProperties(scene, entity, D::PointCloudPoint)).Get<glm::vec3>("samples").Vector();
+        switch (change)
+        {
+        case 0: raw.get<ECSC::Transform::Component>(entity).Position.x += 1.f; break; // moved
+        case 1: // given a parent; its local Transform is unchanged
+        {
+            const auto parent = scene.Create();
+            raw.emplace<ECSC::Hierarchy::Component>(entity).Parent = parent;
+            break;
+        }
+        case 2: raw.remove<ECSC::Transform::Component>(entity); break;
+        case 3: raw.get<ECSC::Transform::Component>(entity).Scale.y = 3.f; break;
+        case 4: raw.emplace<ECSC::Transform::Component>(entity); break; // a Transform appears
+        }
+        EXPECT_FALSE(harness.Editing().Current(*edit));
+        std::vector<glm::vec3> moved(harness.Editing().View(*edit).Points.begin(), harness.Editing().View(*edit).Points.end());
+        for (auto& p : moved) p += glm::vec3(1.f);
+        EXPECT_EQ(harness.Editing().Publish(*edit, moved, "Moved"), R::PointPublishStatus::Stale);
+        const std::vector<std::vector<float>> column{std::vector<float>(moved.size(), 1.f)};
+        EXPECT_EQ(harness.Editing().PublishScalars(*scalars, column, "Scalars"), R::PointPublishStatus::Stale);
+        EXPECT_FALSE(PointDomainProperties(scene, entity, D::PointCloudPoint).Exists("s"));
+        EXPECT_EQ(std::as_const(PointDomainProperties(scene, entity, D::PointCloudPoint)).Get<glm::vec3>("samples").Vector(), before);
+        EXPECT_FALSE(harness.History().CanUndo());
+    }
+    // A parented entity is refused at capture.
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto child = Make(scene, D::PointCloudPoint);
+    scene.Raw().emplace<Extrinsic::ECS::Components::Hierarchy::Component>(child).Parent = scene.Create();
+    auto request = Request(child, D::PointCloudPoint, true);
+    request.CaptureTransform = true;
+    std::string diagnostic;
+    EXPECT_FALSE(harness.Editing().Capture(request, diagnostic));
+    EXPECT_NE(diagnostic.find("unparented"), std::string::npos) << diagnostic;
+}
+
+TEST(PointCloudEditing, ANonFinitePositionIsRefusedAndNothingIsWritten)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::PointCloudPoint);
+    std::string diagnostic;
+    const auto edit = harness.Editing().Capture(Request(entity, D::PointCloudPoint, true), diagnostic);
+    ASSERT_TRUE(edit) << diagnostic;
+    std::vector<glm::vec3> live(harness.Editing().View(*edit).Points.begin(), harness.Editing().View(*edit).Points.end());
+    const auto before = live;
+    live.back().y = std::numeric_limits<float>::infinity();
+    EXPECT_EQ(harness.Editing().Publish(*edit, live, "Infinite"), R::PointPublishStatus::Rejected);
+    EXPECT_EQ(std::as_const(PointDomainProperties(scene, entity, D::PointCloudPoint)).Get<glm::vec3>("samples").Vector()[0], before[0]);
+    EXPECT_FALSE(harness.History().CanUndo());
+}
+
+// Codex block A finding 1: a publication checks the world before it reads the captured scene, so a capture whose world
+// was destroyed is stale (and reads nothing freed).
+TEST(PointCloudEditing, ACaptureOfADestroyedWorldIsStaleWithoutReadingIt)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::PointCloudPoint);
+    auto request = Request(entity, D::PointCloudPoint, true);
+    request.Normals = {};
+    request.CaptureTransform = true;
+    request.ScalarOutputs = {{.Domain = D::PointCloudPoint, .Name = "s", .ValueKind = Geometry::PropertyValueKind::Float}};
+    std::string diagnostic;
+    const auto scalars = harness.Editing().Capture(request, diagnostic);
+    ASSERT_TRUE(scalars) << diagnostic;
+    auto& worlds = harness.Engine.Worlds();
+    const auto captured = harness.Engine.ActiveWorld();
+    ASSERT_TRUE(worlds.RequestSetActiveWorld(worlds.CreateWorld("other")).has_value());
+    (void)worlds.ApplyMaintenance(harness.Engine.Events(), harness.Engine.Jobs());
+    ASSERT_TRUE(worlds.RequestDestroyWorld(captured).has_value());
+    for (int i = 0; i < 3; ++i) (void)worlds.ApplyMaintenance(harness.Engine.Events(), harness.Engine.Jobs());
+    ASSERT_FALSE(worlds.Contains(captured)) << "the captured world is gone";
+    const std::vector<std::vector<float>> column{std::vector<float>(harness.Editing().View(*scalars).LiveCount, 1.f)};
+    EXPECT_EQ(harness.Editing().PublishScalars(*scalars, column, "Scalars"), R::PointPublishStatus::Stale);
+    EXPECT_FALSE(harness.Editing().Current(*scalars));
 }

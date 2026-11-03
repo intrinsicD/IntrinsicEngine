@@ -132,6 +132,15 @@ contract_review: tracker only; each slice declares its own contracts
 70. (2026-11-03) "Die Regel finde ich gut. Dann fixe auch den Spike Treiber. Setze den Template Schritt so um."
 71. (2026-11-03) "Ja, bitte S3. Und was ist mit ponytail Vorschlag?" (the open ponytail item: the picker test's
     ImGui setup through the repository's frame scope; done first, then S3)
+72. (2026-11-03) "Warum wird zwischen Spike und nicht Spike unterscheiden?" (answered: the slice-2 plan from before
+    Q51/Q52 defined S1 to S3 as one spike, ending in a report and keep-or-delete; after Q51/Q52 the host and the
+    feature plugins became ordinary work, only S3 kept the old definition) "Ja bitte, Spike soll raus. Ich will einfach
+    nur Plugins. Was war jetzt das nächste was ansteht?" (decided: no spike category for S3; its answers are recorded
+    as results here, the CPD plugin is an ordinary plugin)
+73. (2026-11-03) "ja bitte, 1 - 3. ausserdem ist der bildschirm nun eingeschaltet. plugins/spike soll eigentlich
+    verschwinden, von mir aus plugins/fixture" (1: the CPD plugin without spike, world-space capture, an optional
+    normal input; 2: S3c, k-means as a step run and the stall measurement; 3: kernel density and point spacing as
+    plugins, then density weight and outliers; the S1 test plugin becomes plugins/fixture; S2 and R4 can run now)
 
 ## Goal
 - Reach the target in
@@ -2840,3 +2849,93 @@ python3 tools/docs/check_doc_links.py --root . --strict
     previews do not get the driver's suppression or rate limit; (6) the Jobs row and cancel must go through the editor
     surface (today's clustering job adapter drops the identity). Scope: well beyond revision 3's "a step is one
     iteration of the existing paged state machine"; asked the operator before going on (AGENTS drift budget).
+- 2026-11-03, with the display on (Q73; `build/dev-shared` at b980e76f9): S1 60 of 60, S2 116 of 116 (the four timing
+  checks the 1 Hz presentation had failed now pass), the technical R4 run 13 of 13 (pass/fail only, no numbers read).
+- 2026-11-03, plan of block A (Q72, Q73 item 1 and the fixture): the spike category goes.
+  - `plugins/spike` becomes `plugins/fixture` (the host tests' and drivers' test plugin): its target, module, tools,
+    window, generated version header, the CMake option (`INTRINSIC_PLUGIN_SPIKE` becomes `INTRINSIC_PLUGIN_FIXTURE`),
+    the drivers, the probes namespace stays; current docs follow, dated reports and evidence keep their wording.
+  - `plugins/job_form_spike` becomes `plugins/coherent_point_drift` (plugin `coherent_point_drift`, tool
+    `coherent_point_drift_start`, window `view.coherent_point_drift`), an ordinary plugin beside the editor's
+    built-in CPD until that feature migrates.
+  - World space, as the editor's CPD does it: a request flag `CaptureTransform` in the point-cloud editing service
+    captures the entity's local Transform (the model matrix in the view), refuses a parented entity, and `Current`
+    then also requires the Transform unchanged (`SameTransformComponent`). The plugin registers model-mapped points
+    and publishes the source's positions mapped back by the inverse of its model matrix; previews likewise.
+  - An optional normal input: an empty `Normals` name captures the positions alone (no normals in the view).
+  - Tests: the editing service (no normals: captured, no normals in the view; with `CaptureTransform`: the model
+    matrix, a parented entity refused, a moved entity stale); the plugin's run equals the solver's own run on
+    model-mapped points with a transformed source and target, and the written local positions map back.
+  - Codex plan review (fresh, `codex-plan-a`): "Verdict: REVISE", seven findings. Revision 2:
+    1. **No window collision:** the editor's CPD panel already registers `view.coherent_point_drift`; the plugin's
+       window is `view.coherent_point_drift_steps` ("Coherent Point Drift (steps)"). Test (Sandbox editor integration,
+       the real panels): every startup plugin's window id is free in the Sandbox shell.
+    2. **Transform validity covers the hierarchy and publication:** with `CaptureTransform`, `Current` and `Publish`
+       (and `PublishScalars`) require the entity still unparented, the Transform component still present (or still
+       absent) and unchanged. Tests: the source or the target moved, given a parent, a Transform added or removed:
+       stale, and a direct `Publish` writes nothing.
+    3. **The inverse and the values are checked:** the plugin maps with the full affine model matrices (no TRS
+       decomposition), refuses a source whose model matrix is not invertible or not finite at Start, and checks every
+       mapped-back position finite before a preview or Accept; the service also refuses non-finite positions in
+       `Publish` and `PreviewPositions` (nothing written). Tests: a rotated, non-uniformly scaled and shifted source
+       and target against the solver's own run on the mapped points; a singular source refused; a non-finite value
+       refused by the service.
+    4. **The rename is complete:** root CMake, the plugin targets and module imports, the test sources and object
+       links, the named GPU timeout, both keys of `feature_boundaries_baseline.json` (zero ceilings kept),
+       `Test.CheckFeatureBoundaries.py`'s fixture paths, `PluginContract.cppm`'s comment, current docs and the lesson.
+       Corrected inventory: there is no `INTRINSIC_PLUGIN_SPIKE` option at HEAD (the fixture builds with
+       `BUILD_SHARED_LIBS` and the Sandbox target) and no fixture module; neither is introduced.
+    5. **Drivers together, history kept:** the maintained drivers and their self-tests (`spike_driver.py` becomes
+       `s1_driver.py`, `reload_driver.py`, `r4_driver.py`, `r4_report.py`, `r4_selftest.py`, the LSan suppression) move
+       with the fixture's target, library, generated header, macros and tool names; the bilateral and descriptor live
+       drivers import them from the new place. `tasks/evidence/ARCH-022/r4_run.sh` stays as it is: it runs only at its
+       frozen commit (it checks HEAD) and its raw results stay. S1, S2 and the technical R4 run on the renamed fixture
+       in a shared tree prove the rename (the in-process "fixture" of `Test.PluginHost.cpp` does not).
+    6. **Transformed preview and history:** the Vulkan smoke uses a transformed source (rotated, scaled, shifted): the
+       preview frame and the accepted frame agree; moving the source or the target while paused discards the run and
+       its ring without a write. Contract: Accept, undo, redo with transformed inputs and a deleted source slot restore
+       the stored local arrays.
+    7. **Optional normals on both paths:** an empty `Normals` name takes the positions alone through
+       `CapturePointInput` (copy) or `PreparePointInput` (readiness); tests: readiness without copy, a cloud without
+       normals, a later normal edit does not stale such a capture; a given but invalid normal binding still fails and a
+       given normal input stays watched.
+  - Codex round 2 on the block A plan: "Verdict: APPROVE", all seven findings "closed at plan level".
+- 2026-11-03, block A implemented: `plugins/fixture` (was `plugins/spike`: `IntrinsicFixturePlugin`,
+  `FixturePlugin.cpp`, `FixtureVersion.inc` with `FIXTURE_*` macros, plugin name and tools `fixture`, `fixture_echo`,
+  `fixture_identity`, `fixture_version`, the drivers `s1_driver.py`, `reload_driver.py`, `r4_driver.py`, `r4_report.py`,
+  `r4_selftest.py`; the bilateral and descriptor live drivers import them from there; the boundary baseline and its
+  test renamed; `tasks/evidence/ARCH-022/r4_run.sh` left as it is, it runs only at its frozen commit).
+  `plugins/coherent_point_drift` (was `plugins/job_form_spike`: plugin `coherent_point_drift`, tool
+  `coherent_point_drift_start`, window `view.coherent_point_drift_steps`), in world space: the point-cloud editing
+  service's `CaptureTransform` (an unparented entity only; its local Transform's matrix in the view; `Current`,
+  `Publish` and `PublishScalars` stale once the entity gets a parent or its Transform changes, appears or goes) and an
+  empty normal name (the positions alone, copied or readiness-only); the plugin maps both clouds by their model
+  matrices, refuses a source matrix that cannot be inverted, and maps the result back by the full affine inverse; the
+  service refuses non-finite positions in `Publish` and `PreviewPositions`. Tests: the editing service (positions
+  alone on two clouds and in readiness, a normal edit leaves such a capture current while a given normal input stays
+  watched, an invalid normal input still fails; the captured Transform moved, parented, removed, rescaled, appearing:
+  stale and neither publication writes; a parented entity refused; a non-finite position refused), the plugin
+  (transformed clouds: the run equals the solver's own run on the mapped points and Accept writes the mapped-back
+  values into the live slots, a deleted slot kept, undo and redo; a singular source refused; the source moved while
+  paused ends the run discarded), the Sandbox panels (every startup plugin's window id free beside the built-in
+  panels), the Vulkan smoke on rotated, scaled and shifted clouds (preview and accepted frames equal; moving the source
+  while a later run is paused discards it and its ring without a write). Live, display on: S1 60 of 60; S2 112 of 116
+  first (the four frame-rate checks: 8 of 66 queued 60 s jobs finished before the reload), then 116 of 116 on a rerun;
+  technical R4 13 of 13; the bilateral live driver 62 of 62; the descriptor live driver 39 of 39.
+- 2026-11-03, CI note: `RuntimeJobServiceEngineWiring.RunFrameAppliesSubmittedJob` failed once on 0a6fc4380 (its
+  application asks to exit after 8 frames, before a loaded runner's worker ran the job) and passed on the rerun; not
+  in ARCH-022's scope, recorded here as a flake.
+  - Mutation checks (10): all killed (`Current`, `Publish`, `PublishScalars` without the Transform check; no parent
+    check; non-finite positions published; no positions-only capture; no world mapping; no inverse mapping back; a
+    singular source accepted; the plugin's window on the built-in panel's id).
+  - Reviews of block A (diff sha256 a851a648…): ponytail (fresh agent): "fix 2 first. 1 is should-fix"; taken 1 to 7:
+    the panel test reads every startup plugin from `INTRINSIC_STARTUP_PLUGINS` (a generated header, as the Sandbox
+    builds its list) instead of naming three; rename leftovers (an evidence path the replacement broke, a comment,
+    the R4 row, the tests' `JFS` alias); one mapping helper; one inverse check (`glm::inverse` of a singular or
+    non-finite matrix is non-finite); the parent check in one place; `Geometry::Validation::IsFinite`; the test hook
+    `hold_step_ms` marked as a shortcut until a plugin can see `--plugin-test-hooks`. Codex (fresh, `codex-review-a`):
+    "Verdict: REVISE", three findings, fixed: (1) `PublishScalars` checks the world before the Transform, which reads
+    the captured scene (test: the captured world destroyed, stale without reading it); (2) `Show` answers Shown, Later
+    or Never, and only Shown counts (`StepRunShow`; a copy that cannot be shown, e.g. without a device, is neither
+    retried nor counted; tests in StepRuns and the plugin); (3) the Vulkan smoke checks a non-finite preview refused on
+    a real device (no ring) and the target moved while a run is paused (discarded, ring gone, no write).

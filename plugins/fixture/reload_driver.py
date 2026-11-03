@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""ARCH-022 slice 2, S2a: unloads and reloads the spike plugin in the running Sandbox and asserts the S2a checks.
+"""ARCH-022 slice 2, S2a: unloads and reloads the fixture plugin in the running Sandbox and asserts the S2a checks.
 
-Starts the Sandbox like spike_driver.py (isolated socket, built-in config, the driver's LSan settings). Builds of
-the plugin come from rewriting <build>/plugins/spike/generated/SpikeVersion.inc (its generation, or a Register that
-stages and then fails) and building IntrinsicSpikePlugin; repository sources are never touched. Before the session
+Starts the Sandbox like s1_driver.py (isolated socket, built-in config, the driver's LSan settings). Builds of
+the plugin come from rewriting <build>/plugins/fixture/generated/FixtureVersion.inc (its generation, or a Register that
+stages and then fails) and building IntrinsicFixturePlugin; repository sources are never touched. Before the session
 it prebuilds generation 2 (A), 3 (B), 4 (Register fails), 6 (unresolved symbol), 7 (clamping validator), 8 (an
 empty history handler), 9 (16 MiB larger), 10 (a stale build id) and 11 (no shutdown entry point); during it, it
 builds generation 5 and a broken header.
@@ -49,7 +49,7 @@ undone after the old image left the process. The control counts only if the entr
 the host logged `closure_undo` as its last event, and the Sandbox then died with a sanitizer SEGV whose address lies
 in the closed image's former range, with EditorCommandHistory::Undo on the stack. A still-mapped image makes it
 inconclusive, and so does a new image mapped over the old range.
-Usage: python3 plugins/spike/reload_driver.py --build build/dev --out <new dir> [--icd <VK_DRIVER_FILES json>]
+Usage: python3 plugins/fixture/reload_driver.py --build build/dev --out <new dir> [--icd <VK_DRIVER_FILES json>]
        [--closure-control]
 """
 
@@ -66,7 +66,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import spike_driver as s1  # noqa: E402  (shared session helpers)
+import s1_driver as s1  # noqa: E402  (shared session helpers)
 
 CYCLES = 20
 QUIT_EVENTS_FROM = [0]  # the event index at the quit, for the exit-order check
@@ -74,7 +74,7 @@ LATE_JOB_ADMITTED = [False]  # whether the job sent right behind the quit was ad
 SCENE_MESH = s1.REPO / "tests/data/framework24-open-patch.obj"
 # Every kind of callable the plugin hands over; each must be counted while loaded and appear at every close.
 KINDS = {"validator", "change_callback", "operation", "window_draw", "window_state", "history_handler"}
-SEEDED = {"name": "SpikeSeeded", "position": [1.25, -0.5, 2.0], "scale": [1.5, 1.5, 1.5]}
+SEEDED = {"name": "FixtureSeeded", "position": [1.25, -0.5, 2.0], "scale": [1.5, 1.5, 1.5]}
 # The id a build of an older engine interface state would carry; the settings are otherwise identical.
 STALE_BUILD_ID = "0" * 64
 
@@ -89,16 +89,16 @@ class Builds:
     def __init__(self, build: Path, out: Path) -> None:
         self.build, self.dir = build, out / "builds"
         self.dir.mkdir()
-        self.header = build / "plugins/spike/generated/SpikeVersion.inc"
-        self.plugin = build / "plugins/libIntrinsicSpikePlugin.so"
+        self.header = build / "plugins/fixture/generated/FixtureVersion.inc"
+        self.plugin = build / "plugins/libIntrinsicFixturePlugin.so"
 
     def write_header(self, generation: int, **options: bool) -> None:
-        """SPIKE_GENERATION plus one define per build option (fail_register, missing, clamp, empty_command, pad,
+        """FIXTURE_GENERATION plus one define per build option (fail_register, missing, clamp, empty_command, pad,
         omit_shutdown); stale builds return another build id."""
-        names = {"fail_register": "SPIKE_FAIL_REGISTER", "missing": "SPIKE_MISSING_SYMBOL", "clamp": "SPIKE_CLAMP_MARKER",
-                 "empty_command": "SPIKE_EMPTY_HISTORY_COMMAND", "pad": "SPIKE_PAD", "omit_shutdown": "SPIKE_OMIT_SHUTDOWN"}
-        stale = f'#define SPIKE_BUILD_ID "{STALE_BUILD_ID}"\n' if options.get("stale") else ""
-        self.header.write_text(f"#define SPIKE_GENERATION {generation}\n" + stale +
+        names = {"fail_register": "FIXTURE_FAIL_REGISTER", "missing": "FIXTURE_MISSING_SYMBOL", "clamp": "FIXTURE_CLAMP_MARKER",
+                 "empty_command": "FIXTURE_EMPTY_HISTORY_COMMAND", "pad": "FIXTURE_PAD", "omit_shutdown": "FIXTURE_OMIT_SHUTDOWN"}
+        stale = f'#define FIXTURE_BUILD_ID "{STALE_BUILD_ID}"\n' if options.get("stale") else ""
+        self.header.write_text(f"#define FIXTURE_GENERATION {generation}\n" + stale +
                                "".join(f"#define {macro} {int(options.get(key, False))}\n" for key, macro in names.items()))
 
     def make(self, generation: int, broken: bool = False, **options: bool) -> bool:
@@ -106,7 +106,7 @@ class Builds:
             self.header.write_text("#error a broken plugin build\n")
         else:
             self.write_header(generation, **options)
-        result = subprocess.run(["cmake", "--build", str(self.build), "--target", "IntrinsicSpikePlugin"],
+        result = subprocess.run(["cmake", "--build", str(self.build), "--target", "IntrinsicFixturePlugin"],
                                 capture_output=True, text=True, timeout=1800)
         (self.dir / f"build-{generation}{'-broken' if broken else ''}.log").write_text(result.stdout + result.stderr)
         return result.returncode == 0
@@ -214,7 +214,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     checks.check("load A: committed", ok and generation_of(reply) == 2, [reply, error])
     checks.check("load A: every callable kind is counted while loaded", counted_while_loaded(host(agent)),
                  host(agent)["live"])
-    ok, applied, _, _ = agent.call("config_apply", {"section": "spike", "payload": {"marker_size": 12}})
+    ok, applied, _, _ = agent.call("config_apply", {"section": "fixture", "payload": {"marker_size": 12}})
     checks.check("load A: marker_size 12 applied", ok, applied)
     loaded = s1.registries(agent)  # with 12 active, as every later state should be
     ok, reply, _, error = agent.call("plugin_unload")
@@ -222,7 +222,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     checks.check("unload: accepted", ok, [reply, error])
     checks.check("unload: tools, config sections and windows equal the pre-load baseline",
                  s1.registries(agent) == baseline, "changed")
-    reply = agent.request("tools/call", {"name": "spike_echo", "arguments": {"text": "gone"}})
+    reply = agent.request("tools/call", {"name": "fixture_echo", "arguments": {"text": "gone"}})
     checks.check("unload: the plugin's tools answer as unknown",
                  str(reply.get("error", {}).get("message", "")).startswith("Unknown tool"), reply)
     checks.check("unload: no live callable of generation 2 at the close", last_close_clean(state, 2), state["closes"][-1:])
@@ -241,8 +241,8 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     # 3. Load again: the saved payload comes back through the new registration.
     ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
     checks.check("load again: the saved payload 12 is reapplied",
-                 ok and isinstance(reply, dict) and reply.get("config", {}).get("restored") == ["spike"], [reply, error])
-    _, seen, _, _ = agent.call("spike_identity")
+                 ok and isinstance(reply, dict) and reply.get("config", {}).get("restored") == ["fixture"], [reply, error])
+    _, seen, _, _ = agent.call("fixture_identity")
     checks.check("load again: the new instance got one change callback with 12",
                  seen.get("marker_size") == 12 and seen.get("config_changes") == 1, seen)
     s1.expect_square(agent, checks, "load_again", 12 * 8)
@@ -261,16 +261,16 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     checks.check("reload: generation 5 committed", ok and generation_of(reply) == 5, [reply, error])
     state = host(agent)
     checks.check("reload: no live callable of generation 2 at the close", last_close_clean(state, 2), state["closes"][-1:])
-    ok, version, _, _ = agent.call("spike_version")
+    ok, version, _, _ = agent.call("fixture_version")
     checks.check("reload: the new version answers", ok and version == {"generation": 5}, version)
     invoked = host(agent)["invoked"]
-    agent.call("spike_echo", {"text": "new"})
+    agent.call("fixture_echo", {"text": "new"})
     now = host(agent)["invoked"]
     changed = {gen: kinds for gen, kinds in now.items() if kinds != invoked.get(gen)}
     checks.check("reload: only generation 5 is invoked", set(changed) == {"5"}, changed)
     checks.check("reload: tools, config sections and windows equal the loaded state", s1.registries(agent) == loaded,
                  "changed")
-    _, seen, _, _ = agent.call("spike_identity")
+    _, seen, _, _ = agent.call("fixture_identity")
     checks.check("reload: 12 survived, and the new instance got one change callback with it",
                  seen.get("marker_size") == 12 and seen.get("config_changes") == 1, seen)
     s1.expect_square(agent, checks, "reloaded", 12 * 8)
@@ -284,7 +284,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     plugin_sha = sha256(builds.plugin)
     checks.check("failed build: the build fails", not builds.make(5, broken=True))
     checks.check("failed build: the plugin file is unchanged", sha256(builds.plugin) == plugin_sha)
-    ok, version, _, _ = agent.call("spike_version")
+    ok, version, _, _ = agent.call("fixture_version")
     checks.check("failed build: the running version still answers", ok and version == {"generation": 5}, version)
     builds.write_header(5)
 
@@ -318,7 +318,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     for cycle in range(CYCLES):
         name, generation, previous = ("B", 3, 2) if cycle % 2 == 0 else ("A", 2, 3)
         ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept[name])})
-        _, version, _, _ = agent.call("spike_version")
+        _, version, _, _ = agent.call("fixture_version")
         state = host(agent)
         problems = [what for what, good in (
             ("reload", ok and generation_of(reply) == generation),
@@ -329,33 +329,33 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
             cycle_failures.append({"cycle": cycle, "problems": problems, "reply": reply, "error": error})
     checks.check(f"cycles: {CYCLES} reloads, each with the right version, a clean close and the loaded registries",
                  not cycle_failures, cycle_failures[:3])
-    _, seen, _, _ = agent.call("spike_identity")
+    _, seen, _, _ = agent.call("fixture_identity")
     checks.check("cycles: 12 is still active", seen.get("marker_size") == 12, seen)
 
     # 7b. A saved payload the new validator would change (12 clamped to 10 with a fallback) is not applied.
     ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["clamp"])})
-    _, seen, _, _ = agent.call("spike_identity")
+    _, seen, _, _ = agent.call("fixture_identity")
     checks.check("clamp: the reload reports the saved payload rejected and keeps the default 8, no change callback",
-                 ok and generation_of(reply) == 7 and reply.get("config", {}).get("rejected") == ["spike"]
+                 ok and generation_of(reply) == 7 and reply.get("config", {}).get("rejected") == ["fixture"]
                  and seen.get("marker_size") == 8 and seen.get("config_changes") == 0, [reply, error, seen])
 
     # 8. Undo and redo through the plugin across a reload (S2b): both stacks hold an entry when it reloads.
     start = host(agent)["undo_value"]
     _, before, _, _ = agent.call("history")
     for delta in (2147483648, -1000001):
-        ok, reply, _, error = agent.call("spike_counter_add", {"delta": delta})
+        ok, reply, _, error = agent.call("fixture_counter_add", {"delta": delta})
         _, after, _, _ = agent.call("history")
         checks.check(f"history: delta {delta} out of range is rejected, value and history unchanged",
                      not ok and error == "invalid_params" and host(agent)["undo_value"] == start and after == before,
                      [reply, error, after])
     for delta in (5, 3):
-        ok, reply, _, error = agent.call("spike_counter_add", {"delta": delta})
+        ok, reply, _, error = agent.call("fixture_counter_add", {"delta": delta})
         checks.check(f"history: add {delta} recorded", ok, [reply, error])
     undone = agent.call("undo")[0]
     _, history, _, _ = agent.call("history")
     checks.check("history: before the reload, the undo entry holds 5 and the redo entry 3",
-                 undone and str(history.get("undo_label", "")).endswith("Spike add 5")
-                 and str(history.get("redo_label", "")).endswith("Spike add 3") and host(agent)["undo_value"] == start + 5,
+                 undone and str(history.get("undo_label", "")).endswith("Fixture add 5")
+                 and str(history.get("redo_label", "")).endswith("Fixture add 3") and host(agent)["undo_value"] == start + 5,
                  history)
     invoked = host(agent)["invoked"]
     ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["B"])})
@@ -374,7 +374,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     # 9. Draining (S2c), CPU: more jobs than workers, so some run and some wait; the reload cancels and reaps them.
     events = out / "events.log"
     count = 2 * (os.cpu_count() or 8) + 2
-    submitted = sum(agent.call("spike_start_job", {"seconds": 60})[0] for _ in range(count))
+    submitted = sum(agent.call("fixture_start_job", {"seconds": 60})[0] for _ in range(count))
     states = wait_for(lambda: collections.Counter(j["state"] for j in host(agent)["jobs"]),
                       lambda s: s.get("running", 0) >= 1 and s.get("queued", 0) >= 1)
     checks.check("drain: jobs running and queued before the reload", submitted == count and states.get("running", 0) >= 1
@@ -394,7 +394,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
                  state["closes"][-1:])
 
     # 10. A job that ignores cancellation: the drain gives up on its 5 s deadline and the plugin stays.
-    ok = agent.call("spike_start_job", {"seconds": 12, "ignore_cancel": True})[0]
+    ok = agent.call("fixture_start_job", {"seconds": 12, "ignore_cancel": True})[0]
     wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
     before_timeout = s1.registries(agent)
     started = time.monotonic()
@@ -402,11 +402,11 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     elapsed = time.monotonic() - started
     checks.check("timeout: the reload fails with drain_timeout after the 5 s deadline",
                  ok and not ok_reload and error == "drain_timeout" and 5.0 <= elapsed < 8.0, [error, reply, round(elapsed, 2)])
-    _, version, _, _ = agent.call("spike_version")
+    _, version, _, _ = agent.call("fixture_version")
     checks.check("timeout: the old version still answers, registries unchanged, no longer draining",
                  version == {"generation": 2} and s1.registries(agent) == before_timeout and not host(agent)["draining"],
                  version)
-    checks.check("timeout: a new submission is admitted again", agent.call("spike_start_job", {"seconds": 0.05})[0])
+    checks.check("timeout: a new submission is admitted again", agent.call("fixture_start_job", {"seconds": 0.05})[0])
     finished = wait_for(lambda: [j["finalized"] for j in host(agent)["jobs"]], lambda f: all(f), 20.0)
     ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["A"])})
     checks.check("timeout: after the job ended, a reload succeeds", all(finished) and ok and generation_of(reply) == 2,
@@ -414,13 +414,13 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
 
     # 10b. The deadline is checked before success: with a 0 ms budget even an empty drain times out.
     ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["A"]), "drain_deadline_ms": 0})
-    _, version, _, _ = agent.call("spike_version")
+    _, version, _, _ = agent.call("fixture_version")
     checks.check("deadline: an expired deadline wins over a finished drain (0 ms budget, nothing outstanding)",
                  not ok and error == "drain_timeout" and version == {"generation": 2}
-                 and agent.call("spike_start_job", {"seconds": 0.05})[0], [error, reply, version])
+                 and agent.call("fixture_start_job", {"seconds": 0.05})[0], [error, reply, version])
 
     # 10c. A drain whose caller disconnects: the dropped continuation gives admission back.
-    agent.call("spike_start_job", {"seconds": 4, "ignore_cancel": True})
+    agent.call("fixture_start_job", {"seconds": 4, "ignore_cancel": True})
     wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
     agent.send("tools/call", {"name": "plugin_reload", "arguments": {"path": str(kept["B"])}})
     time.sleep(0.5)
@@ -428,13 +428,13 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     agent = s1.Agent(out / "agent.sock", 60.0)
     draining = wait_for(lambda: host(agent)["draining"], lambda d: d is False, 5.0)
     checks.check("dropped drain: after the caller disconnected, nothing is draining and a submission is admitted",
-                 draining is False and agent.call("spike_start_job", {"seconds": 0.05})[0], draining)
+                 draining is False and agent.call("fixture_start_job", {"seconds": 0.05})[0], draining)
     wait_for(lambda: [j["finalized"] for j in host(agent)["jobs"]], lambda f: all(f), 10.0)
-    _, version, _, _ = agent.call("spike_version")
+    _, version, _, _ = agent.call("fixture_version")
     checks.check("dropped drain: the old version still answers", version == {"generation": 2}, version)
 
     # 11. GPU work in flight during a reload: it stops recording, retires, then the plugin shuts down.
-    ok, reply, _, error = agent.call("spike_gpu_work", {"frames": 100000})
+    ok, reply, _, error = agent.call("fixture_gpu_work", {"frames": 100000})
     gpu = wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
     checks.check("gpu: the plugin's work is in flight before the reload", ok and bool(gpu) and gpu.get("in_flight") is True,
                  [reply, error, gpu])
@@ -457,7 +457,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
                  and status.get("validation_error_count") == 0, status)
 
     # 11b. GPU work that does not retire (test hook): the drain times out, the participant stays and records again.
-    agent.call("spike_gpu_work", {"frames": 100000})
+    agent.call("fixture_gpu_work", {"frames": 100000})
     wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
     ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["B"]), "simulate_gpu_stall": True})
     gpu = host(agent)["gpu"]
@@ -472,7 +472,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
 
     # 11c. A bounded fixture: frames 3 records exactly three frames, then retires while still registered.
     before = invoked_count(agent, 3, "gpu_record")
-    agent.call("spike_gpu_work", {"frames": 3})
+    agent.call("fixture_gpu_work", {"frames": 3})
     gpu = wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is False, 5.0)
     time.sleep(0.3)
     checks.check("gpu frames: exactly 3 frames recorded, then retired, the participant still registered",
@@ -491,7 +491,7 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
 
     # 13. A quit while a reload is draining is refused; the reload then completes.
     ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
-    agent.call("spike_start_job", {"seconds": 2, "ignore_cancel": True})
+    agent.call("fixture_start_job", {"seconds": 2, "ignore_cancel": True})
     wait_for(lambda: [j["state"] for j in host(agent)["jobs"]], lambda s: "running" in s)
     reload_reply, quit_reply = (agent.outcome(r) if "result" in r else (False, r.get("error"), [], "") for r in
                                 send_both(agent, ("plugin_reload", {"path": str(kept["A"])}), ("app_quit", {})))
@@ -502,14 +502,14 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
     # 14. Quit with CPU and GPU work outstanding: the engine's shutdown settles both (GPU participants after a device
     # wait, then the jobs) before the plugin host's, which runs the plugin's shutdown hook. A job request sent right
     # behind the quit is refused or drained like the others.
-    agent.call("spike_start_job", {"seconds": 60})
-    agent.call("spike_gpu_work", {"frames": 100000})
+    agent.call("fixture_start_job", {"seconds": 60})
+    agent.call("fixture_gpu_work", {"frames": 100000})
     wait_for(lambda: host(agent)["gpu"], lambda g: bool(g) and g.get("in_flight") is True)
     seen = len((out / "events.log").read_text().splitlines())
     replies: list = []
     try:
         replies = [agent.outcome(r) if "result" in r else (False, r.get("error"), [], "") for r in
-                   send_both(agent, ("app_quit", {}), ("spike_start_job", {"seconds": 60}))]
+                   send_both(agent, ("app_quit", {}), ("fixture_start_job", {"seconds": 60}))]
         quit_ok, late_ok = replies[0][0], replies[1][0]
     except OSError:
         quit_ok, late_ok = True, False  # the exit closed the socket first: nothing was admitted
@@ -520,13 +520,13 @@ def run(agent: s1.Agent, checks: s1.Checks, builds: Builds, kept: dict[str, Path
 def control(agent: s1.Agent, checks: s1.Checks, kept: dict[str, Path], state: dict) -> None:
     ok, reply, _, error = agent.call("plugin_load", {"path": str(kept["A"])})
     checks.check("control: loaded", ok and generation_of(reply) == 2, [reply, error])
-    replies = [agent.call("spike_counter_add", {"delta": delta, "form": "closure"}) for delta in (5, 3)]
+    replies = [agent.call("fixture_counter_add", {"delta": delta, "form": "closure"}) for delta in (5, 3)]
     undone = agent.call("undo")[0]
     _, history, _, _ = agent.call("history")
     checks.check("control: closure entries 5 and 3 recorded, 3 undone: undo holds 5, redo holds 3, value 5",
                  all(r[0] for r in replies) and undone and host(agent)["undo_value"] == 5
-                 and str(history.get("undo_label", "")).endswith("Spike add 5 (closure)")
-                 and str(history.get("redo_label", "")).endswith("Spike add 3 (closure)"), [replies, history])
+                 and str(history.get("undo_label", "")).endswith("Fixture add 5 (closure)")
+                 and str(history.get("redo_label", "")).endswith("Fixture add 3 (closure)"), [replies, history])
     # The padded build cannot be mapped into the freed range: a same-size build was, and the stale closure then
     # silently ran the new image's code (run s2b-ctl3).
     ok, reply, _, error = agent.call("plugin_reload", {"path": str(kept["pad"])})

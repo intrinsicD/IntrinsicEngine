@@ -508,14 +508,14 @@ add_subdirectory(${INTRINSIC_RUNTIME_SOURCE_ROOT})
 include(cmake/IntrinsicFeaturePlugin.cmake)
 add_subdirectory(plugins/bilateral_filter)
 add_subdirectory(plugins/descriptor_analysis)
-add_subdirectory(plugins/job_form_spike)
+add_subdirectory(plugins/coherent_point_drift)
 if(NOT INTRINSIC_HEADLESS_NO_GLFW OR INTRINSIC_BUILD_TESTS)
     add_subdirectory(${INTRINSIC_APP_SOURCE_ROOT})
 endif()
 
 # ARCH-022: plugins need the shared engine libraries (the dev presets); static builds (CI) build none.
 if(BUILD_SHARED_LIBS AND TARGET ExtrinsicSandbox)
-    add_subdirectory(plugins/spike)
+    add_subdirectory(plugins/fixture)
 endif()
 
 if(INTRINSIC_BUILD_BENCHMARKS)

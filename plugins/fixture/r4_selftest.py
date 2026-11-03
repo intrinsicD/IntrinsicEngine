@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Self-test of the R4 evaluation (r4_driver.summarize, report; r4_report): synthetic records with known answers.
-Usage: python3 -B plugins/spike/r4_selftest.py
+Usage: python3 -B plugins/fixture/r4_selftest.py
 """
 
 from __future__ import annotations
@@ -155,11 +155,11 @@ class Reports(unittest.TestCase):
         self.assertNotIn("compile_s", r4_driver.summarize(records))
 
     def test_plugin_edge_classification(self) -> None:
-        for edge in ("Building CXX object plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/SpikePlugin.cpp.o",
-                     "Linking CXX shared module plugins/libIntrinsicSpikePlugin.so",
+        for edge in ("Building CXX object plugins/fixture/CMakeFiles/IntrinsicFixturePlugin.dir/FixturePlugin.cpp.o",
+                     "Linking CXX shared module plugins/libIntrinsicFixturePlugin.so",
                      "Re-checking globbed directories...",
-                     "Scanning /home/alex/Documents/IntrinsicEngine/plugins/spike/SpikePlugin.cpp for CXX dependencies",
-                     "Generating CXX dyndep file plugins/spike/CMakeFiles/IntrinsicSpikePlugin.dir/CXX.dd"):
+                     "Scanning /home/alex/Documents/IntrinsicEngine/plugins/fixture/FixturePlugin.cpp for CXX dependencies",
+                     "Generating CXX dyndep file plugins/fixture/CMakeFiles/IntrinsicFixturePlugin.dir/CXX.dd"):
             self.assertTrue(r4_driver.plugin_edge(edge), edge)
         for edge in ("Linking CXX executable bin/ExtrinsicSandbox", "Building CXX object src/runtime/CMakeFiles/x.o",
                      "Plugin build id",

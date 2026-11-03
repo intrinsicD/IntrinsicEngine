@@ -1,13 +1,15 @@
-// ARCH-022 S3b: the job form spike's preview on a real device. A paused coherent point drift run shows its moving
-// source in the viewport (the render block shows the positions' ring front and the drawn pixels move) while the
-// canonical positions and the history stay unchanged, and an editor GPU position run on the same positions is
-// refused; Discard brings the CPU positions back (the ring is gone before the output is free); a successor run on
-// the same positions previews in its own ring; its Accept writes the positions once and the frame keeps the moved
-// cloud.
+// ARCH-022: the coherent point drift plugin's preview on a real device, with both clouds placed by rotated, scaled and
+// shifted Transforms. A paused run shows its moving source in the viewport (the render block shows the positions' ring
+// front, local values mapped back from world space, and the drawn pixels move) while the canonical positions and the
+// history stay unchanged, and an editor GPU position run on the same positions is refused; Discard brings the CPU
+// positions back (the ring is gone before the output is free); a successor run on the same positions previews in its
+// own ring; its Accept writes the positions once and the accepted frame equals the preview; moving the source while
+// a later run is paused discards it and its ring without a write.
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -17,6 +19,7 @@
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 
 #include "PluginGpuSmoke.hpp"
@@ -44,7 +47,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.StableEntityLookup;
-import Intrinsic.Plugin.JobFormSpike;
+import Intrinsic.Plugin.CoherentPointDrift;
 
 namespace
 {
@@ -52,14 +55,14 @@ namespace
     namespace GS = Extrinsic::ECS::Components::GeometrySources;
     namespace ECSC = Extrinsic::ECS::Components;
     namespace GC = Extrinsic::Graphics::Components;
-    namespace JFS = Intrinsic::Plugins::JobFormSpike;
+    namespace Plugin = Intrinsic::Plugins::CoherentPointDrift;
     using Json = nlohmann::json;
     using D = R::GeometryElementDomain;
 
     struct Harness : Intrinsic::Tests::Plugins::Harness
     {
         Harness(Extrinsic::Core::Config::EngineConfig config, std::unique_ptr<Intrinsic::Tests::RuntimeTestModule> app)
-            : Intrinsic::Tests::Plugins::Harness(&JFS::Register, &JFS::Shutdown, std::move(config), std::move(app),
+            : Intrinsic::Tests::Plugins::Harness(&Plugin::Register, &Plugin::Shutdown, std::move(config), std::move(app),
                                                  [](Intrinsic::Tests::RuntimeTestKernel& engine)
                                                  { engine.EmplaceModule<R::CameraModule>(); })
         {
@@ -77,14 +80,26 @@ namespace
         return points;
     }
 
+    // Rotated 10 degrees about z, scaled non-uniformly, shifted: the run maps by the full affine matrices.
+    ECSC::Transform::Component Placement(const glm::vec3 shift)
+    {
+        ECSC::Transform::Component transform{};
+        transform.Position = shift;
+        transform.Rotation = glm::angleAxis(0.1745f, glm::vec3(0.f, 0.f, 1.f));
+        transform.Scale = {1.15f, 0.85f, 1.f};
+        return transform;
+    }
+
     entt::entity Cloud(Extrinsic::ECS::Scene::Registry& scene, const std::vector<glm::vec3>& points, const bool drawn,
                        const std::uint32_t stable)
     {
         auto& raw = scene.Raw();
         const auto entity = scene.Create();
         raw.emplace<ECSC::MetaData>(entity, std::string{drawn ? "Source" : "Target"});
-        raw.emplace<ECSC::Transform::Component>(entity).Scale = glm::vec3{1.f};
-        raw.emplace<ECSC::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        const auto& transform = raw.emplace<ECSC::Transform::Component>(entity,
+                                                                        Placement(drawn ? glm::vec3(-0.15f, 0.f, 0.f)
+                                                                                        : glm::vec3(-0.13f, 0.03f, 0.f)));
+        raw.emplace<ECSC::Transform::WorldMatrix>(entity).Matrix = glm::mat4(ECSC::Transform::GetMatrixDouble(transform));
         raw.emplace<ECSC::StableId>(entity, ECSC::StableId{stable, 1u});
         if (drawn)
         {
@@ -175,7 +190,7 @@ namespace
                       {"target", R::SelectionController::ToStableEntityId(Target)}, {"max_iterations", 80},
                       {"tolerance", 1e-12}};
             args.update(extra);
-            const auto out = R::InvokeAgentOperation(H.Registry, "job_form_spike_start", H.Context, args.dump(), false);
+            const auto out = R::InvokeAgentOperation(H.Registry, "coherent_point_drift_start", H.Context, args.dump(), false);
             return out.IsError ? 0u : Json::parse(out.Text)["run"].get<std::uint64_t>();
         }
         // Paused (a step count done) and its newest copy is the one shown.
@@ -187,7 +202,7 @@ namespace
     };
 }
 
-TEST(JobFormSpikePluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWritesIt)
+TEST(CoherentPointDriftPluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWritesIt)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
     Scenario t;
@@ -209,7 +224,8 @@ TEST(JobFormSpikePluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWritesIt)
 
     Extrinsic::RHI::BufferHandle pixels{};
     Frame before{}, preview{}, restored{}, accepted{};
-    std::uint64_t first = 0, second = 0;
+    std::uint64_t first = 0, second = 0, third = 0, fourth = 0;
+    std::vector<glm::vec3> committed{};
     int step = 0, frames = 0, settle = 0;
     const auto capture = [&]
     {
@@ -237,7 +253,7 @@ TEST(JobFormSpikePluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWritesIt)
                 pixels = device.CreateBuffer({.SizeBytes = std::uint64_t(Extrinsic::RHI::BytesPerBlock(device.GetBackbufferFormat())) *
                                                            extent.Width * extent.Height,
                                               .Usage = Extrinsic::RHI::BufferUsage::TransferDst, .HostVisible = true,
-                                              .DebugName = "JobFormSpike.Pixels"});
+                                              .DebugName = "CoherentPointDrift.Pixels"});
                 h.Engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(pixels);
                 return false;
             }
@@ -245,6 +261,21 @@ TEST(JobFormSpikePluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWritesIt)
             before = capture();
             EXPECT_EQ(before.Right(), 0u) << "the source starts on the left";
             EXPECT_FALSE(extraction->ShowsUncommittedPositions(renderId));
+            {   // a non-finite preview is refused on a real device: no ring, nothing shown
+                std::string diagnostic;
+                const auto edit = h.Editing().Capture({.StableEntityId = R::SelectionController::ToStableEntityId(source),
+                                                       .Positions = positions, .Normals = {}, .Output = positions,
+                                                       .CaptureTransform = true},
+                                                      diagnostic);
+                EXPECT_TRUE(edit) << diagnostic;
+                if (edit)
+                {
+                    std::vector<glm::vec3> bad(h.Editing().View(*edit).Points.begin(), h.Editing().View(*edit).Points.end());
+                    bad[3].x = std::numeric_limits<float>::quiet_NaN();
+                    EXPECT_EQ(h.Editing().PreviewPositions(*edit, bad, diagnostic), R::PointPreviewStatus::Unavailable);
+                    EXPECT_FALSE(spatial->PropertyResidency()->HasRing(key)) << "nothing uploaded";
+                }
+            }
             first = start();
             EXPECT_TRUE(control(first, "step", 40));
             settle = 0;
@@ -304,6 +335,50 @@ TEST(JobFormSpikePluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWritesIt)
             EXPECT_TRUE(h.History().CanUndo());
             accepted = capture();
             EXPECT_EQ(accepted.Changed(preview), 0u) << "the accepted frame is the previewed one";
+            third = start();
+            EXPECT_NE(third, 0u);
+            EXPECT_TRUE(control(third, "step", 3));
+            settle = 0;
+            ++step;
+            return false;
+        }
+        case 5: // a later run previews; moving the source while it is paused discards it and its ring, no write
+        {
+            if (!shownAndPaused(third) || ++settle < 4) return false;
+            EXPECT_TRUE(spatial->PropertyResidency()->HasRing(key));
+            committed = canonical();
+            h.Scene().Raw().get<ECSC::Transform::Component>(source).Position.y += 0.01f;
+            settle = 0;
+            ++step;
+            return false;
+        }
+        case 6:
+        {
+            if (observe(third)["phase"] != "discarded" || ++settle < 4) return false;
+            EXPECT_NE(observe(third)["diagnostic"].get<std::string>().find("stale"), std::string::npos);
+            EXPECT_FALSE(spatial->PropertyResidency()->HasRing(key));
+            EXPECT_EQ(canonical(), committed) << "the discarded run wrote nothing";
+            fourth = start();
+            EXPECT_NE(fourth, 0u);
+            EXPECT_TRUE(control(fourth, "step", 3));
+            settle = 0;
+            ++step;
+            return false;
+        }
+        case 7: // the same for the target
+        {
+            if (!shownAndPaused(fourth) || ++settle < 4) return false;
+            EXPECT_TRUE(spatial->PropertyResidency()->HasRing(key));
+            h.Scene().Raw().get<ECSC::Transform::Component>(t.Target).Position.x += 0.01f;
+            settle = 0;
+            ++step;
+            return false;
+        }
+        case 8:
+        {
+            if (observe(fourth)["phase"] != "discarded" || ++settle < 4) return false;
+            EXPECT_FALSE(spatial->PropertyResidency()->HasRing(key));
+            EXPECT_EQ(canonical(), committed) << "moving the target wrote nothing either";
             h.Engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
             h.Engine.GetDevice().DestroyBuffer(pixels);
             return true;
@@ -315,7 +390,7 @@ TEST(JobFormSpikePluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWritesIt)
 
 // Revision 3's ordering: A is cancelled while its step is held inside the plugin's code; its ring goes at once, B is
 // admitted and previews in its own ring while A's step still runs, and A's late completion leaves B's ring.
-TEST(JobFormSpikePluginGpuSmoke, ALateCompletionLeavesItsSuccessorsRing)
+TEST(CoherentPointDriftPluginGpuSmoke, ALateCompletionLeavesItsSuccessorsRing)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
     Scenario t;

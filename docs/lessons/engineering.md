@@ -141,7 +141,7 @@ entry it created (`git stash pop stash@{n}` after reading `git stash list`).
 
 ## A build tree a driver uses holds only what the driver measures
 
-The plugin drivers (`plugins/spike`) build in the tree they run against and check that a plugin build compiles only
+The plugin drivers (`plugins/fixture`) build in the tree they run against and check that a plugin build compiles only
 plugin edges. ARCH-022 slice 3 broke that twice: a mutation run rebuilt only the test aggregate and left the Sandbox
 stale, so the next technical R4 run rebuilt it and failed `plugin_edges_only`; later a comment edit in a module
 interface during a driver run would have rebuilt the host inside the S2 session (restoring the file's content and

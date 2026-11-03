@@ -16,17 +16,21 @@ module;
 #include <vector>
 
 #include <entt/entity/registry.hpp>
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <imgui.h>
 
 module Extrinsic.Runtime.PointCloudEditing;
 
 import Geometry.Properties;
+import Geometry.Validation;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.RHI.Device;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -52,10 +56,12 @@ import Extrinsic.Runtime.WorldRegistry;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
+#include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 namespace Extrinsic::Runtime
 {
     namespace Detail = GeometryProcessingDetail;
+    namespace ECSC = ECS::Components;
     using D = GeometryElementDomain;
 
     struct PointEdit
@@ -78,17 +84,38 @@ namespace Extrinsic::Runtime
         bool Moved{false};
         PointGpuRowStats Stats{};
         std::uint64_t PreviewRing{0u}; // the generation of the positions' ring PreviewPositions made; 0: none
+        std::optional<ECSC::Transform::Component> Transform{}; // with CaptureTransform (empty: none)
+        glm::dmat4 Model{1.0};
     };
 
     struct PointCloudEditingService::Impl
     {
         EditorWorkspaceSlot Workspace{};
 
-        // The capture's world is still the active one and its inputs and outputs are unchanged.
+        // With CaptureTransform: the entity is still unparented and its local Transform as captured (or still none).
+        static bool TransformCurrent(const PointEdit& edit)
+        {
+            if (!edit.Request.CaptureTransform) return true;
+            const auto& raw = edit.Context.Scene->Raw();
+            if (!raw.valid(edit.Entity)) return false;
+            if (const auto* hierarchy = raw.try_get<ECSC::Hierarchy::Component>(edit.Entity);
+                hierarchy != nullptr && raw.valid(hierarchy->Parent))
+                return false;
+            const auto* transform = raw.try_get<ECSC::Transform::Component>(edit.Entity);
+            return edit.Transform ? transform != nullptr && EditorFeatureDetail::SameTransformComponent(*transform, *edit.Transform)
+                                  : transform == nullptr;
+        }
+
+        static bool Finite(const std::span<const glm::vec3> values)
+        {
+            return std::ranges::all_of(values, [](const glm::vec3& v) { return Geometry::Validation::IsFinite(v); });
+        }
+
+        // The capture's world is still the active one and its inputs, outputs and (if captured) Transform unchanged.
         static bool InputsCurrent(const PointEdit& edit)
         {
             const std::array outputs{edit.OutputWatch};
-            return Detail::EditorProcessingContextWorldCurrent(edit.Context) &&
+            return Detail::EditorProcessingContextWorldCurrent(edit.Context) && TransformCurrent(edit) &&
                 Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, edit.Capture.Inputs) &&
                 (!edit.Request.ScalarOutputs.empty() ||
                  Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, outputs)) &&
@@ -157,9 +184,22 @@ namespace Extrinsic::Runtime
             return fail("The output cannot replace topology or deletion properties.");
         if (!scalar && props->Exists(r.Output.Name) && !ResolveGeometryProperty(a, r.Output, props->Size(), false).Resolved())
             return fail("The output must be absent or a count-matched vec3 property.");
-        if (!Detail::CapturePointNormalInput(context, *entity, a, r.Positions, r.Normals, r.CopyValues, edit->Capture,
-                                             diagnostic))
-            return {};
+        if (r.CaptureTransform)
+        {
+            if (const auto* transform = context.Scene->Raw().try_get<ECSC::Transform::Component>(*entity))
+            {
+                edit->Transform = *transform;
+                edit->Model = ECSC::Transform::GetMatrixDouble(*transform);
+            }
+            if (!Impl::TransformCurrent(*edit)) // a parent
+                return fail("Choose an unparented entity: its points are mapped with its local Transform.");
+        }
+        const bool captured = r.Normals.Name.empty()
+            ? (r.CopyValues ? Detail::CapturePointInput(a, r.Positions, true, edit->Capture, diagnostic)
+                            : Detail::PreparePointInput(context, *entity, a, r.Positions, edit->Capture, diagnostic))
+            : Detail::CapturePointNormalInput(context, *entity, a, r.Positions, r.Normals, r.CopyValues, edit->Capture,
+                                              diagnostic);
+        if (!captured) return {};
         if (!scalar) edit->OutputWatch = Detail::ObserveGeometryProperty(a, r.Output.Domain, r.Output.Name);
         for (const auto& output : r.ScalarOutputs)
             edit->ScalarWatches.push_back(Detail::ObserveGeometryProperty(a, output.Domain, output.Name));
@@ -197,7 +237,8 @@ namespace Extrinsic::Runtime
                 .IndexReused = edit.IndexReused,
                 .HasZeroNormals = edit.Capture.HasZeroNormals,
                 .Output = edit.Request.Output,
-                .ScalarOutputs = edit.Request.ScalarOutputs};
+                .ScalarOutputs = edit.Request.ScalarOutputs,
+                .Model = edit.Model};
     }
 
     bool PointCloudEditingService::Current(const PointEdit& edit) { return Impl::InputsCurrent(edit); }
@@ -374,6 +415,7 @@ namespace Extrinsic::Runtime
         if (r.Output.Domain != r.Positions.Domain || r.Output.Name != r.Positions.Name)
             return fail(kUnavailable, "Only an in-place output (the positions) shows a preview.");
         if (!Impl::InputsCurrent(edit)) return fail(kUnavailable, "The inputs changed.");
+        if (!Impl::Finite(live)) return fail(kUnavailable, "A position is not finite.");
         const auto& context = edit.Context;
         auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
         if (residency == nullptr || context.Device == nullptr || !context.Device->IsOperational())
@@ -406,7 +448,7 @@ namespace Extrinsic::Runtime
         DiscardPreview(edit); // the canonical publication shows next
         // Staleness: checked here (the capture's revisions), then by the history entry on every redo and undo.
         const auto& slots = edit.Capture.Slots;
-        if (live.size() != slots.size()) return PointPublishStatus::Rejected;
+        if (live.size() != slots.size() || !Impl::Finite(live)) return PointPublishStatus::Rejected;
         for (std::size_t i = 0; i < slots.size(); ++i) edit.AfterOutput[slots[i]] = live[i];
         struct State
         {
@@ -420,7 +462,7 @@ namespace Extrinsic::Runtime
         std::erase_if(inputs, [&](const auto& input) { return input.Domain == r.Output.Domain && input.Name == r.Output.Name; });
         // The output's guard is the history slot every author of that property shares, so successive edits (and
         // other commands writing it, such as a GPU position accept) undo in turn; each write stamps it.
-        if (!Detail::EditorProcessingContextWorldCurrent(edit.Context) ||
+        if (!Detail::EditorProcessingContextWorldCurrent(edit.Context) || !Impl::TransformCurrent(edit) ||
             !Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, inputs) ||
             !Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, std::span(&edit.OutputWatch, 1)))
             return PointPublishStatus::Stale;
@@ -463,6 +505,9 @@ namespace Extrinsic::Runtime
         const auto& slots = edit.Capture.Slots;
         if (columns.size() != r.ScalarOutputs.size() || edit.ScalarBefore.size() != columns.size())
             return PointPublishStatus::Rejected;
+        // The world first: a Transform check reads the captured scene.
+        if (!Detail::EditorProcessingContextWorldCurrent(edit.Context) || !Impl::TransformCurrent(edit))
+            return PointPublishStatus::Stale;
         // Indexed by source slot, as the publisher reads them; it writes the live slots only.
         std::vector<std::vector<float>> after(columns.size(), std::vector<float>(edit.Capture.SlotCount));
         std::vector<Detail::PointScalarOutput> outputs(columns.size());

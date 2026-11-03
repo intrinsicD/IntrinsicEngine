@@ -133,7 +133,8 @@ namespace
     struct Probe
     {
         int Commits{0}, Discards{0}, Shows{0}, ShowAttempts{0};
-        int ShowRefusals{0}; // Show refuses this many times first (no free slot, say)
+        int ShowRefusals{0}; // Show answers Later this many times first (no free slot, say)
+        bool ShowNever{false}; // Show cannot show anything (no device, say)
         std::vector<std::uint64_t> ShownGenerations{};
         std::vector<std::uint32_t> ShownSteps{};
         bool CommitResult{true};
@@ -162,15 +163,16 @@ namespace
             .Show = [&probe](const R::StepPreview& preview)
             {
                 ++probe.ShowAttempts;
+                if (probe.ShowNever) return R::StepRunShow::Never;
                 if (probe.ShowRefusals > 0)
                 {
                     --probe.ShowRefusals;
-                    return false;
+                    return R::StepRunShow::Later;
                 }
                 ++probe.Shows;
                 probe.ShownGenerations.push_back(preview.Generation);
                 probe.ShownSteps.push_back(preview.Step);
-                return true;
+                return R::StepRunShow::Shown;
             },
             .Valid = [&probe] { return probe.Valid; },
             .Commit = [&probe](std::string& diagnostic)
@@ -712,4 +714,18 @@ TEST(StepRuns, ACopyShowRefusedIsOfferedAgainUntilShown)
     EXPECT_EQ(f.Observe(id).ShownStep, 1u) << "counted as shown only once it was";
     for (int i = 0; i < 5; ++i) f.Jobs.Frame();
     EXPECT_EQ(probe.ShowAttempts, 4) << "once shown, not offered again";
+}
+
+TEST(StepRuns, ACopyThatCannotBeShownIsNeitherRetriedNorCountedAsShown)
+{
+    auto problem = std::make_shared<Problem>();
+    Probe probe;
+    probe.ShowNever = true; // e.g. no operational device
+    Fixture f;
+    const auto id = f.Start(problem, probe, {.PreviewInterval = std::chrono::nanoseconds{0}});
+    ASSERT_TRUE(f.Control(id, R::StepRunAction::Step, 1u));
+    ASSERT_TRUE(f.Settle(id));
+    for (int i = 0; i < 10; ++i) f.Jobs.Frame();
+    EXPECT_EQ(probe.ShowAttempts, 1) << "offered once, not again";
+    EXPECT_FALSE(f.Observe(id).ShownStep) << "nothing was shown";
 }

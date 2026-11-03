@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""ARCH-022 slice 2, S1: drives the spike plugin through the running Sandbox and asserts the S1 pass checks.
+"""ARCH-022 slice 2, S1: drives the fixture plugin through the running Sandbox and asserts the S1 pass checks.
 
 Runs <build>/bin/ExtrinsicSandbox with an isolated agent socket, the built-in config (no --engine-config, no
 INTRINSIC_ENGINE_CONFIG, no config/engine.json) and the repository's LSan settings for a Vulkan exit (BUG-083: one
 ICD through VK_DRIVER_FILES, fast_unwind_on_malloc=0, lsan.supp). The ICD's library is preloaded so it stays mapped
-until LSan runs: its leaks are then named and suppressed by plugins/spike/lsan-driver.supp, appended to lsan.supp.
+until LSan runs: its leaks are then named and suppressed by plugins/fixture/lsan-driver.supp, appended to lsan.supp.
 Over the agent socket (newline-delimited JSON-RPC,
 as tools/agents/mcp_bridge.py speaks it) it:
   1. checks the Vulkan device through diagnostics_read and captures the window without a marker;
@@ -14,12 +14,12 @@ as tools/agents/mcp_bridge.py speaks it) it:
      config section and window are registered;
   4. asserts one identity of shared state: the plugin mutates the host's counter, inline static and thread-local
      through imported code, and both sides see the same addresses, ImGui context and allocator, ImPlot context;
-  5. calls spike_echo; checks the config section's schema, default 8, active state, invalid payloads and a change to 12;
+  5. calls fixture_echo; checks the config section's schema, default 8, active state, invalid payloads and a change to 12;
   6. finds a solid magenta square of the expected side in window captures before and after the change;
   7. quits through app_quit; checks a clean exit, sanitizer errors, the attribution of any leak record by its frames
      and the lifecycle event order.
 Every check is recorded in <out>/summary.json; the exit status is 1 if any failed.
-Usage: python3 plugins/spike/spike_driver.py --build build/dev --out <new dir> [--icd <VK_DRIVER_FILES json>]
+Usage: python3 plugins/fixture/s1_driver.py --build build/dev --out <new dir> [--icd <VK_DRIVER_FILES json>]
 """
 
 from __future__ import annotations
@@ -44,8 +44,8 @@ REPO = Path(__file__).resolve().parents[2]
 FAIL_STAGES = {"dlopen": "dlopen_failed", "dlsym": "dlsym_failed",
                "config": "commit_failed", "operations": "commit_failed", "windows": "commit_failed"}
 MAGENTA = (255, 0, 255)
-# A sanitizer frame in any of these is the spike's own code.
-SPIKE_FRAMES = ("libIntrinsicSpikePlugin", "SpikePlugin.cpp", "Runtime.PluginHost", "Runtime.PluginContract",
+# A sanitizer frame in any of these is the fixture's own code.
+FIXTURE_FRAMES = ("libIntrinsicFixturePlugin", "FixturePlugin.cpp", "Runtime.PluginHost", "Runtime.PluginContract",
                "PluginHostModule", "PluginProbes")
 # The only sanitizer lines a driver leak report may contain; anything else (a crash, a fatal LSan error, UBSan) fails.
 LEAK_REPORT = re.compile(r"ERROR: LeakSanitizer: detected memory leaks|SUMMARY: AddressSanitizer: \d+ byte\(s\) leaked")
@@ -79,7 +79,7 @@ class Agent:
         self.buffer = b""
         self.next_id = 0
         self.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
-                                    "clientInfo": {"name": "arch022-spike-driver", "version": "1"}})
+                                    "clientInfo": {"name": "arch022-fixture-driver", "version": "1"}})
         self.sock.sendall(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}).encode() + b"\n")
 
     def send(self, method: str, params: dict) -> int:
@@ -277,12 +277,12 @@ def main() -> int:
     args = arguments(__doc__)
     checks = Checks()
     closes: list[dict] = []
-    result = launch(args, checks, lambda agent: closes.extend(run(agent, checks, args.build / "plugins/libIntrinsicSpikePlugin.so")))
+    result = launch(args, checks, lambda agent: closes.extend(run(agent, checks, args.build / "plugins/libIntrinsicFixturePlugin.so")))
     if result is None:
         return finish(checks, args.out)
     _, log, lines = result
-    spike = [r for r in leak_records(log) if any(m in r for m in SPIKE_FRAMES)]
-    checks.check("exit: no leak record has a frame in the plugin or the plugin host code", not spike, spike[:2])
+    fixture = [r for r in leak_records(log) if any(m in r for m in FIXTURE_FRAMES)]
+    checks.check("exit: no leak record has a frame in the plugin or the plugin host code", not fixture, fixture[:2])
     # Each failed attempt that opened an image is closed with no live callable and leaves the process: static
     # construction, Register and its shutdown hook when it reached the commit (every successful Register gets one),
     # static destruction at the close.
@@ -335,14 +335,14 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
     checks.check("load: a second load right behind it is refused", not ok2 and error2 in ("load_pending", "already_loaded"),
                  error2)
     after = registries(agent)
-    checks.check("load: tools spike_echo and spike_identity registered",
-                 {"spike_echo", "spike_identity"} <= {tool["name"] for tool in after["tools"]})
-    checks.check("load: config section spike registered", "spike" in after["sections"], sorted(after["sections"]))
-    checks.check("load: window view.spike registered and open", {"id": "view.spike", "open": True} in after["windows"],
+    checks.check("load: tools fixture_echo and fixture_identity registered",
+                 {"fixture_echo", "fixture_identity"} <= {tool["name"] for tool in after["tools"]})
+    checks.check("load: config section fixture registered", "fixture" in after["sections"], sorted(after["sections"]))
+    checks.check("load: window view.fixture registered and open", {"id": "view.fixture", "open": True} in after["windows"],
                  after["windows"])
 
     _, before, _, _ = agent.call("plugin_host_identity")
-    _, seen, _, _ = agent.call("spike_identity")
+    _, seen, _, _ = agent.call("fixture_identity")
     _, host, _, _ = agent.call("plugin_host_identity")
     for probe in ("counter", "inline_static", "thread_local"):
         checks.check(f"identity: {probe} has one address", seen[probe]["address"] == host[probe]["address"],
@@ -354,17 +354,17 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
         set_by_host = key == "imgui_alloc_user_data" or host[key] != 0  # ImGui's default allocator has no user data
         checks.check(f"identity: {key} is the host's", seen[key] == host[key] and set_by_host, [seen[key], host[key]])
 
-    ok, echo, _, _ = agent.call("spike_echo", {"text": "hello"})
-    checks.check("mcp: spike_echo answers", ok and echo == {"echo": {"text": "hello"}}, echo)
+    ok, echo, _, _ = agent.call("fixture_echo", {"text": "hello"})
+    checks.check("mcp: fixture_echo answers", ok and echo == {"echo": {"text": "hello"}}, echo)
     ok, listed, _, _ = agent.call("plugin_list")
-    loaded = next((p for p in (listed.get("loaded") or []) if p.get("name") == "spike"), None) \
+    loaded = next((p for p in (listed.get("loaded") or []) if p.get("name") == "fixture"), None) \
         if isinstance(listed, dict) else None
     checks.check("host: plugin_list reports the loaded generation and its registrations",
                  ok and isinstance(loaded, dict) and loaded.get("generation") == generation
-                 and "spike_echo" in loaded["operations"]
-                 and loaded.get("config_sections") == ["spike"] and loaded.get("history_commands") == ["spike.add"], listed)
+                 and "fixture_echo" in loaded["operations"]
+                 and loaded.get("config_sections") == ["fixture"] and loaded.get("history_commands") == ["fixture.add"], listed)
 
-    section = after["sections"].get("spike", {}).get("get", {})
+    section = after["sections"].get("fixture", {}).get("get", {})
     checks.check("config: schema declares marker_size as an integer in [1, 64]",
                  section.get("schema", {}).get("properties", {}).get("marker_size")
                  == {"type": "integer", "minimum": 1, "maximum": 64}, section)
@@ -373,14 +373,14 @@ def run(agent: Agent, checks: Checks, plugin: Path) -> list[dict]:
     expect_square(agent, checks, "marker_default", 8 * 8)
     for bad in ({"marker_size": -12}, {"marker_size": "12"}, {"marker_size": 1.5}, {"marker_size": 65},
                 {"marker_size": 12, "extra": 1}):
-        ok, reply, _, _ = agent.call("config_apply", {"section": "spike", "payload": bad})
+        ok, reply, _, _ = agent.call("config_apply", {"section": "fixture", "payload": bad})
         checks.check(f"config: invalid payload {json.dumps(bad)} rejected", not ok, reply)
-    ok, applied, _, _ = agent.call("config_apply", {"section": "spike", "payload": {"marker_size": 12}})
+    ok, applied, _, _ = agent.call("config_apply", {"section": "fixture", "payload": {"marker_size": 12}})
     checks.check("config: change to 12 applied", ok, applied)
-    ok, section, _, _ = agent.call("config_get", {"section": "spike"})
+    ok, section, _, _ = agent.call("config_get", {"section": "fixture"})
     checks.check("config: active payload 12 after the change",
                  ok and section.get("active") is True and section.get("payload") == {"marker_size": 12}, section)
-    _, seen, _, _ = agent.call("spike_identity")
+    _, seen, _, _ = agent.call("fixture_identity")
     checks.check("config: the plugin got exactly one change callback with 12",
                  seen.get("marker_size") == 12 and seen.get("config_changes") == 1, seen)
     expect_square(agent, checks, "marker_changed", 12 * 8)

@@ -7,13 +7,13 @@ module;
 
 #include <imgui.h>
 
-module Intrinsic.Plugin.JobFormSpike;
+module Intrinsic.Plugin.CoherentPointDrift;
 
 import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.UiHostTypes;
 
-namespace Intrinsic::Plugins::JobFormSpike
+namespace Intrinsic::Plugins::CoherentPointDrift
 {
     namespace
     {
@@ -59,7 +59,7 @@ namespace Intrinsic::Plugins::JobFormSpike
             if (g_Window == nullptr) g_Window = new WindowState(); // freed by Shutdown
             auto& state = *g_Window;
             ImGui::SetNextWindowSize(ImVec2(420, 360), ImGuiCond_FirstUseEver);
-            if (!ImGui::Begin("Job Form Spike (CPD)###view.job_form_spike", &open))
+            if (!ImGui::Begin("Coherent Point Drift (steps)###view.coherent_point_drift_steps", &open))
             {
                 ImGui::End();
                 return;
@@ -86,9 +86,9 @@ namespace Intrinsic::Plugins::JobFormSpike
     void AddWindow(R::PluginRegistrations& staged)
     {
         staged.Windows.push_back({
-            .Id = "view.job_form_spike",
-            .MenuPath = {"View", "Processing", "Job Form Spike (CPD)"},
-            .Title = "Job Form Spike (CPD)",
+            .Id = "view.coherent_point_drift_steps",
+            .MenuPath = {"View", "Processing", "Coherent Point Drift (steps)"},
+            .Title = "Coherent Point Drift (steps)",
             .Draw = [](bool& open) { Draw(open); },
         });
     }
