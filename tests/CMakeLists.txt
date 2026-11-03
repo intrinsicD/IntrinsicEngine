@@ -31,18 +31,14 @@ set_tests_properties(PluginBuildId.Script PROPERTIES LABELS "contract;build;runt
 add_test(NAME CompilePool.Script
         COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.CompilePool.py)
 set_tests_properties(CompilePool.Script PROPERTIES LABELS "contract;build" TIMEOUT 120)
-# ARCH-022 S3: the triple buffer and the append log under ThreadSanitizer, built apart from this tree (configured,
-# built and run by CTest); "Not Run (Disabled)" without a TSan runtime.
+# ARCH-022 S3: the triple buffer and the append log under ThreadSanitizer, built apart from this tree by a script test
+# (CI selects script tests only from tools/ci/cpu_test_selection.py SCRIPT_TESTS); "Not Run (Disabled)" without a
+# TSan runtime.
 add_test(NAME Core.TripleBufferThreadSanitizer
-        COMMAND ${CMAKE_CTEST_COMMAND} --build-and-test
-            ${CMAKE_SOURCE_DIR}/tests/unit/core/tsan ${CMAKE_BINARY_DIR}/tsan-harness
-            --build-generator Ninja --build-makeprogram ${CMAKE_MAKE_PROGRAM} --build-noclean
-            --build-options -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}
-                -DINTRINSIC_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DCMAKE_BUILD_TYPE=Debug
-            --test-command tsan_harness)
-set_tests_properties(Core.TripleBufferThreadSanitizer PROPERTIES LABELS "unit;build;core" TIMEOUT 600
-        ENVIRONMENT "TSAN_OPTIONS=halt_on_error=1 second_deadlock_stack=1")
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.TsanHarness.py
+            --build ${CMAKE_BINARY_DIR}/tsan-harness --compiler ${CMAKE_CXX_COMPILER}
+            --scan-deps ${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS} --ninja ${CMAKE_MAKE_PROGRAM})
+set_tests_properties(Core.TripleBufferThreadSanitizer PROPERTIES LABELS "unit;build;core" TIMEOUT 600)
 if(NOT INTRINSIC_TSAN_AVAILABLE)
     set_tests_properties(Core.TripleBufferThreadSanitizer PROPERTIES DISABLED TRUE)
 endif()

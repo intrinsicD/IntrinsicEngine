@@ -1,5 +1,6 @@
 # ARCH-022 S3: the triple buffer and the append log under ThreadSanitizer, built apart from the main tree (whose
-# sanitizer modes are address and undefined). CTest Core.TripleBufferThreadSanitizer configures, builds and runs it.
+# sanitizer modes are address and undefined). tests/regression/tooling/Test.TsanHarness.py (CTest
+# Core.TripleBufferThreadSanitizer) configures, builds and runs it.
 cmake_minimum_required(VERSION 3.28)
 project(IntrinsicTsanHarness CXX)
 set(CMAKE_CXX_STANDARD 23)

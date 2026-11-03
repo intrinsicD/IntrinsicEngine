@@ -36,6 +36,7 @@ SCRIPT_TESTS = (
     "tools/repo/check_source_rules.py",
     "tests/regression/tooling/Test.PluginBuildId.py",
     "tests/regression/tooling/Test.CompilePool.py",
+    "tests/regression/tooling/Test.TsanHarness.py",
 )
 _PYTHON_LAUNCHER_RE = re.compile(r"python(?:3(?:\.[0-9]+)?)?")
 _GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
