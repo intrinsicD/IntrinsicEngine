@@ -3305,3 +3305,26 @@ python3 tools/docs/check_doc_links.py --root . --strict
   path time now includes the label decode, and one `ScopedMicros` replaces the four hand-written timers. Open for the
   operator (MM1): the harness's cloud is not renderable, so the render refresh after the accept is not measured;
   Layer B states the exclusion.
+- 2026-11-03, S3c-3 pre-flight rounds 3 and 4: both REVISE on revision 2 (`090db30e…`: exit records, frame
+  consistency, cadence, per-stage worst frame; the GPU sampler polling during the measured frames), both PASS on
+  revision 3 (`7219b147…`, commit 3fb976384, no code change); record in
+  `tasks/evidence/ARCH-022/preflight-s3c3/reviews/README.md`. Ponytail review of 3fb976384: "Verdict: Ship."
+- 2026-11-03, S3c-3 run (`tasks/evidence/ARCH-022/s3c3/`, audit `s3c3-audit.md`, report
+  `docs/reports/2026-11-03-arch-022-r7-kmeans-stall.md`): GPU k-means under a slider, Release, one host: **not met**
+  at both sizes, U 5.13 ms / L 4.47 ms at 100 000 points and U 62.0 ms / L 61.3 ms at 1 048 576, 3 of 3 processes
+  each; the longest stall is the Accept's publication (4.5 to 4.8 ms, 59.8 to 61.5 ms); almost every frame of the
+  every-frame stream starts a run (598 held starts plus the first direct start in 599 of the stage's 601 frames),
+  each such frame paying a full capture and start (median 1.4 ms, 16.5 ms); at 1 048 576 points the renderer's execute takes up to 30 ms in hold frames (cause not traced).
+  Predictions wrong on the starts, the accept (100 000) and the cause of the 100 000 verdict (the accept, not the
+  cold start, which stays at 3.4 to 3.5 ms). The first start attempt exited 127 at once (cause not traced; the run
+  script also had no execute bit; lesson in `docs/lessons/engineering.md`). Claude's PASS asked for the operator's
+  MM1 decision before the start; it was not made, and the run measured the reviewed scope. R7's row names the result
+  and the open scope (MM1, the render refresh after the accept). Claims review of these texts: below.
+- 2026-11-03, claims review of the S3c-3 result texts (report, R7 row, lesson, the entry above; fresh Codex,
+  `codex exec` read-only, xhigh, thread `01a1a25d-2107-7c52-b4f8-a926e37ca50e`, recursion protection
+  instruction-only): round 1 "revise required" (the renderer's execute stated as a GPU wait, "every frame" for 599 of
+  601, 3.4 instead of 3.4 to 3.5 ms, the exit 127 blamed on the execute bit although a non-executable script gives
+  126, the MM1 prerequisite of Claude's PASS undisclosed), round 2 "revise required" (the count's window, an audit
+  sentence), round 3 verbatim "**Verdict: approve.** Both remaining substantive findings are resolved." The
+  instrumentation and harness (ebba1b9bf, 3fb976384) were read for correctness by both pre-flight reviewers over four
+  rounds (Codex round 3: no correctness defect in `ScopedMicros`; Claude round 3: "The code change is correct.").

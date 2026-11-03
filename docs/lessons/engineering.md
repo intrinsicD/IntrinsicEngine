@@ -157,3 +157,13 @@ ASan peaks at about 3.4 GB, which outgrew 62 GB of RAM with 1 GB of swap. Safegu
 `intrinsic_compile`, one per 4 GiB of RAM (`cmake/CompilePool.cmake`, `Test.CompilePool.py`); before configuring an
 existing tree with a preset, compare its `BUILD_SHARED_LIBS` with the preset's, and keep a static tree in its own
 directory.
+
+## A frozen run command is tested as written
+
+ARCH-022 S3c-3's first start ended at once, before anything ran: the frozen command
+`tasks/evidence/ARCH-022/kmeans_stall_run.sh <out>` exited 127 ("No such file or directory", cause not traced), and the
+run script had no execute bit (which alone gives exit 126, "Permission denied"); after `chmod +x` the identical command
+ran. The technical tests had started the harness binary directly, and the packet's manifest hashes content, not file
+modes, so neither would have caught a non-executable script. Safeguard: the start gate checks `test -x` on a run
+script it calls without an interpreter (or the command names the interpreter), and at least one technical test goes
+through the run script itself.
