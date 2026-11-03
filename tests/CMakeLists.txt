@@ -1381,8 +1381,10 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeCameraControllers.cpp
         Test.PluginHost.cpp
         Test.PointCloudEditing.cpp
+        Test.StepRuns.cpp
         Test.BilateralFilterPlugin.cpp
         Test.DescriptorAnalysisPlugin.cpp
+        Test.JobFormSpikePlugin.cpp
         Test.RuntimeConfigControl.cpp
         Test.RuntimeEngineConfigBoot.cpp
         Test.RuntimeInputActions.cpp
@@ -1447,7 +1449,7 @@ if(TARGET ExtrinsicRuntime)
     target_compile_definitions(RuntimeContractTestObjs PRIVATE INTRINSIC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     # ARCH-022: the plugin tests link the plugins' objects (in-process plugins).
     target_link_libraries(RuntimeContractTestObjs PRIVATE IntrinsicBilateralFilterPluginObjects
-        IntrinsicDescriptorAnalysisPluginObjects)
+        IntrinsicDescriptorAnalysisPluginObjects IntrinsicJobFormSpikePluginObjects)
 
     intrinsic_resolve_test_sources(_runtime_contract_slow_test_sources
         SEARCH_DIRS contract/runtime
@@ -1917,15 +1919,17 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.GpuTransactionCancelSmoke.cpp
                 integration/graphics/Test.BilateralFilterPluginGpuSmoke.cpp
                 integration/graphics/Test.DescriptorAnalysisPluginGpuSmoke.cpp
+                integration/graphics/Test.JobFormSpikePluginGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
              IntrinsicBilateralFilterPluginObjects IntrinsicDescriptorAnalysisPluginObjects
+             IntrinsicJobFormSpikePluginObjects
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
     target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners)
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
         OBJECTS PointLBVHGpuTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicBilateralFilterPluginObjects
-                  IntrinsicDescriptorAnalysisPluginObjects
+                  IntrinsicDescriptorAnalysisPluginObjects IntrinsicJobFormSpikePluginObjects
         LABELS integration graphics gpu vulkan
     )
     intrinsic_add_glsl_shaders(IntrinsicPointLBVHGpuTests)
@@ -2410,7 +2414,7 @@ if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
         OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference IntrinsicBilateralFilterPluginObjects
-            IntrinsicDescriptorAnalysisPluginObjects
+            IntrinsicDescriptorAnalysisPluginObjects IntrinsicJobFormSpikePluginObjects
         LABELS contract runtime
     )
 endif()
@@ -3057,6 +3061,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.KeypointVulkanComputePublishesAcrossDomains PointLBVHGpuSmoke.KeypointVulkanComputeRejectsStaleCancellationAndIgnoresHybridCapacity PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(DescriptorAnalysisPluginGpuSmoke.EightDomainsAgreeWithTheCpuKdTreeColdWarmAndAutomatic DescriptorAnalysisPluginGpuSmoke.StaleInputsACancelBetweenStagesAndRadiusOverflowWriteNothing DescriptorAnalysisPluginGpuSmoke.ALowestIdCapServesADenseRadius DescriptorAnalysisPluginGpuSmoke.AnUnloadDuringAChainEndsTheRunOnceAndAReloadRunsAgain PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(JobFormSpikePluginGpuSmoke.APausedRunShowsItsPreviewAndOnlyAcceptWritesIt PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
         "if(DEFINED IntrinsicRuntimePointCloudConsolidationGpuParityTests_TESTS)\n"

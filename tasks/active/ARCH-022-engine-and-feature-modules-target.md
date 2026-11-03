@@ -2625,3 +2625,218 @@ python3 tools/docs/check_doc_links.py --root . --strict
     alignment removed, the log on a vector; a leftover include. Also the core README and the module inventory.
     Verification: the TSan CTest passes (160445 polled reads of 200000 publications); its three mutations each give a
     TSan data race through CTest; disabled when the probe is 0; unit tests 4/4, descriptor tests 13/13.
+- 2026-11-03, S3b implementation plan (within plan revision 3; Q71 "Ja, bitte S3."). Two blocks, one code review each.
+  Facts it rests on: a plugin job parked by its readiness gate stays `AwaitingApply`, which the editor's admission
+  (`IsActiveEditorJobState`) and the host's admission count as active, the Jobs window lists and a run cancel or an
+  unload drain cancels (its `Completion(false)` then runs once); the gate runs on the main thread entered in the
+  plugin (so contract calls from it resolve the plugin), once per drain within the gate budget; jobs joined to a run
+  skip admission and are cancelled with it; the host's drain waits for every job of the plugin.
+  - **S3b-1, the run driver** (`Extrinsic.Runtime.StepRuns`, `src/runtime/Services`, no plugin host change):
+    - A run's state is host data (created by engine code, so a plugin may hold it past its unload): phase, end
+      reason, step count, controls, `AppendLog<StepRunMetric>` (sized to the iteration cap; a metric is the step
+      number and four named doubles), `TripleBuffer<StepPreview>` (generation, step, `std::vector<float>`), copy
+      counters, an injectable monotonic clock.
+    - The run is carried by jobs of its owner (`Submit`/`Cancel` callables; a plugin passes the contract's
+      `SubmitPluginJob`/`CancelPluginJob`, S3c the clustering module's): a **holder job** (the run's first job, with
+      the output) finishes its work at once and stays parked by its gate until the run ends, so a paused run holds
+      its output, has a Jobs row and is cancelled by the Jobs window and the unload drain; its gate is the run's
+      main-thread pump (shows a newer preview, applies a pending restart, submits the next segment, starts Accept);
+      its `Completion(true)` is Accept (`Commit` once), `Completion(false)` is the end of a run that does not commit
+      (cancelled, discarded or failed: `Discard` once). **Segment jobs** (joined to the run) are the worker loop: steps
+      until a pause, the step budget, the end, the cancel or a pending restart, checking the controls between
+      `Step()` calls; a metric per step; an intermediate preview copy only when the reader took the previous one
+      (`Unread` false) and the minimum interval passed (30/s by default), one copy at a segment's end.
+    - Transitions (one table in code and report): ready -> running (run, step n) -> paused (pause, budget spent) or
+      paused with an end reason (converged, iteration cap, stopped) -> committed (Accept, or at once when converged
+      with accept-on-convergence) or discarded (Discard, cancel at any time, also during a step: the late segment
+      completion changes nothing); failed when a step fails. Accept and Resume refused after a terminal phase.
+      Controls (window, MCP) only set requests the pump acts on, so every action runs in the owner's context.
+    - Latest wins: `Restart(init)` keeps one pending newest request (main thread); the pump applies it once no segment
+      is in flight (asking the running one to stop after its step), calling `init` (the plugin re-captures or
+      re-parameterises) and starting a new generation (new log; previews of older generations are not shown).
+    - The module registers MCP `run_control {run, action, count}` (run, pause, step, stop, accept, discard) and
+      `run_observe {run, metrics}` (phase, end, owner, step count, last or all metrics, preview generation and step,
+      copies); runs are listed by id while their state lives.
+    - Tests with a deterministic fake step, the real `JobService` and a test owner, each failing without its
+      mechanism: run equals step(1)*N, step(7)+run and run with pauses, bitwise (state and metric log); preview on
+      equals off, copy counts off/on/stalled reader with a controlled clock; the exact count after step(n), none
+      while paused, advancing after resume; cancel then a late completion then Accept and Resume refused, nothing
+      committed; Accept once (a second refused); converged commits only with accept-on-convergence, cap and Stop
+      never; A running, restart B then C: C runs, B's init never called, nothing of A shown after C; MCP controls and
+      observation.
+  - **S3b-2, the CPD case** (`plugins/job_form_spike`, `intrinsic_add_feature_plugin`): Init captures source and
+    target through the point-cloud editing service and initialises `Geometry::CoherentPointDrift::Solver` (reference
+    E-step); Step is one `Solver::Step`, its metrics from the observer's trace; Preview copies the transformed source;
+    Show uploads it into the source positions' residency ring (new editing-service calls `PreviewPositions` and
+    `DiscardPreview`: back slot, transfer upload, publish; released by Discard and before Commit's canonical
+    publication); Commit checks both captures (`Current`) and publishes the source positions (one undo entry), stale
+    when either changed. A spike window (Run, Pause, Step, Stop, Accept, Discard, a metric plot). Tests through the
+    plugin harness: run equals the solver's own step sequence bitwise (positions and trace); a target changed or
+    deleted after convergence makes Accept fail stale (output and history unchanged); a paused run holds its output
+    (a competing run refused); unload during a paused run ends it discarded once; MCP controls end to end.
+  - Codex plan review (fresh session, `codex-plan-s3b`): "Verdict: REVISE", five blocking, one optional. Revision 2:
+    1. **Terminal at once, retirement after the last segment.** A run's phase becomes terminal at once (cancel,
+       discard, failed Accept); `Discard` (the owner's cleanup) and dropping every owner callable (step, preview,
+       show, commit, a pending restart) happen only once no segment is in flight: at once when none is, else in that
+       segment's completion (also a late or cancelled one), exactly once. Test: a step blocked inside the owner's code,
+       the run cancelled and the holder finalised first, then the step released: cleanup once, after the step returned,
+       no callable left; S3b-2 also unloads only afterwards.
+    2. **One world.** The run records the active world at Start; the pump checks the owner's `Valid` (for the CPD
+       plugin: `Current` of both captures) before Show, a restart, a segment and Commit, and ends the run discarded
+       ("stale") when it fails. The point-cloud editing service's `Current` (and so `Publish`) also requires the
+       capture's world to be the active one (`EditorProcessingContextWorldCurrent`; today it checks only the captured
+       properties). Tests: the world switched while paused and while a segment runs: no preview shown, nothing
+       published, no restart into the other world.
+    3. **A failed Accept ends the run.** In the holder's true completion a refused `Commit` (stale) makes the run
+       terminal (failed, "stale") and retires it there (the host suppresses a later false completion). Test: the
+       target changed after convergence: Accept fails stale, the run is terminal and retired, a second Accept and a
+       Resume are refused, and a new run on the output is admitted.
+    4. **Copies are limited across segments.** A preview copy, wherever made, needs preview on, the reader to have taken
+       the previous copy and the interval passed. The worker checks after each step; when a run stops computing (pause,
+       end) with its newest step not copied, the pump makes that copy on the main thread (no segment in flight, so the
+       owner's state is idle) once the same three conditions hold, so the paused or ended state still shows. Commit
+       reads the owner's state, never a preview. Tests: repeated step(1) with preview off (zero copies), with a stalled
+       reader (one copy) and with a frozen clock (one copy).
+    5. **The viewport path is tested.** S3b-2's preview: `PreviewPositions` acquires a back slot of the source
+       positions' ring, uploads with the transfer queue, records the upload as the slot's completion
+       (`AddCompletion`) and publishes; the run keeps the ring's generation and releases only that ring
+       (`Discard(key, generation)`), at retirement and before Commit's canonical publication. A Vulkan smoke (the
+       plugin GPU smoke harness): while paused the ring front reads back as the preview positions while the canonical
+       positions and the history are unchanged; after Discard the ring is gone (the canonical slot shows); a run
+       discarded and a successor started on the same positions: the late cleanup of the first leaves the successor's
+       ring. Also the window test (Run, Pause, Step, Stop, Accept, Discard pressed through ImGui's
+       `ActivateItemByID`) and a competing editor publication on the held output refused.
+    6. (optional, taken) S3b-1's tests also run with an apply and gate budget of one and an unrelated parked job:
+       progress, no duplicate segment, controls kept. The 4 ms measurement stays in S3c.
+  - Codex round 2 on the S3b plan: "Verdict: REVISE"; 1, 2, 4 and 6 closed; 3 and 5 open, 7 new. Revision 3:
+    3. **Commit refused with valid captures.** S3b-1 test with the fake owner: `Valid` true, `Commit` returns false:
+       Commit called once, the run failed and retired (Discard once, no callable left), Run, Step and Accept refused, a
+       new run on the output admitted.
+    5. **The renderer-facing positions and a pending upload.** The Vulkan smoke asserts what the renderer draws, as
+       `Test.GpuPositionsAcceptSmoke` does: `RenderExtractionCache::ShowsUncommittedPositions` for the source and the
+       drawn pixels moved while paused (canonical positions and history unchanged), and both back after Discard.
+       `PreviewPositions` takes the residency and the transfer queue, so a contract test with `MockDevice` holds the
+       upload incomplete (`TransferQueue.AlwaysComplete = false`): the slot is not handed out again and not freed by a
+       Discard until the transfer completes; without `AddCompletion` this test fails.
+    7. **No ring handed to a successor while its predecessor still holds it.** The run's `Discard` (it releases only
+       what the run shows: the preview ring) runs once in the owner's context as soon as the run is terminal (in the
+       pump or a completion, before the holder's run is cancelled), not at retirement: the preview is touched only by
+       main-thread code (Show, Discard), never by a segment, so it need not wait for one. Retirement (after the last
+       segment) drops the callables. So the output is admissible only after the predecessor's ring is released. Test
+       (S3b-2): A cancelled while its step is blocked, B started on the same positions and previewing, A's step
+       released: B's ring and preview stay.
+  - Codex round 3 on the S3b plan: "Verdict: APPROVE. Findings 3, 5 and 7 are closed at plan level. No new blocking
+    or optional findings." (S3b-1's fake owner has no output admission; the admitted successor of 3 is tested in S3b-2
+    through the plugin host.)
+- 2026-11-03, S3b-1 implemented: `Extrinsic.Runtime.StepRuns` (`src/runtime/Services/Runtime.StepRuns.{cppm,cpp}`;
+  the Sandbox adds the module and registers `run_control` and `run_observe` beside the plugin host's tools). One
+  deviation from revision 1, found while checking the mechanisms: the previews' generation filter could never act (the
+  pump takes the older computation's last copy before it applies a restart), so `Show` drops every copy while a
+  restart is pending instead; the generation stays as a counter. Tests `tests/contract/runtime/Test.StepRuns.cpp` (11,
+  the real job service and scheduler, a test owner carrying the jobs as the plugin host does; 15 repetitions clean):
+  run equals step(1)*N, step(7)+run and run with four or more pauses requested while a step is held (bitwise trace,
+  one step at a time); step counts exact, none while paused; copies with preview off (0), a frozen clock (1), a moving
+  clock (at most one per 33 ms) and a stalled reader (1, the writer never waits); cancel with a step held inside the
+  owner's code (Discard at once, the owner's code kept until the late completion, then dropped; Accept and Run
+  refused); Accept once; only convergence commits by itself and only when asked (not the cap, not Stop); a refused
+  Commit with valid captures ends failed and retired; a restart replacing a pending one (never called) and nothing of
+  the older computation shown after the request; invalid captures while paused and while computing; drains with apply
+  and gate budgets of one and another parked job; MCP control and observation. Mutation checks (15, each one mechanism
+  removed): all killed (one more step per segment, no pause between steps, a copy while the reader holds the last, no
+  interval, copies with preview off, callables dropped while a step runs (sanitizer), Discard waiting for the segment,
+  old previews after a restart, the cap committing, a refused commit counted as committed, no validity check, a second
+  segment while one runs, a restart keeping the older pending, Accept twice, resuming after the end).
+  - Reviews of S3b-1 (diff sha256 307303db…): ponytail (fresh agent): "fix 1 and 2 first (both are small); 3 and 4 are
+    optional", all taken: a retired run frees its previews; the three flags that changed nothing (`ShownReleased`,
+    `CancelRequested`, `HolderFinished`) are gone; `PreviewEnabled` is gone (no `Preview` callable is preview off);
+    `Trim` shorter. Codex (fresh, `codex-review-s3b1`, after two capacity retries): "Verdict: REVISE", five findings,
+    and "S3a finding: closed". Fixed: (1) an older generation's convergence no longer accepts the restart replacing it
+    (no accept request while a restart is pending; test with the converging step held and a restart requested); (2)
+    the owner's clock is dropped at retirement with its other callables (the cancel test checks it); (3) the callback
+    contract states that Valid, Show and Discard may run while a step does; (4) `run_control` refuses a count beyond
+    32 bits instead of narrowing it (test); (5) retired runs beyond the newest 32 go at every service call, not only at
+    Start (test with 40 runs ended together). Not tested: that a retired run's preview memory is freed (nothing
+    observes it). Mutation checks rerun (19, the 15 before plus the four fixes): all killed.
+  - CI on 357977bd2 (S3a) failed: its CPU test selection maps a selected CTest test to a test binary or to a script of
+    `SCRIPT_TESTS`, and the ponytail-proposed `ctest --build-and-test` command is neither. Fixed in 0a6fc4380 (pushed at
+    once so main turns green): `tests/regression/tooling/Test.TsanHarness.py` runs the harness again and is
+    allowlisted; the configure-time probe still disables the test without a TSan runtime. Goes into the next review.
+- 2026-11-03, S3b-2 implemented: the spike plugin `plugins/job_form_spike` (`intrinsic_add_feature_plugin`; tool
+  `job_form_spike_start`, a window following the run started last with Run, Pause, Step, Stop, Accept, Discard and an
+  objective plot; rigid CPD with the reference E-step). Two shortcuts, commented: both clouds in their own object space,
+  and the positions stand in for the editing service's always-required normal input. One finding while testing: the
+  solver detects convergence in the next call's E-step, which ends without an iteration; that last step's metric holds
+  that E-step's values. The point-cloud editing service: `Current` and `Publish` require the capture's world to be the
+  active one (`PublishScalars`' shared publisher already did; a check added there was redundant, a mutation showed it,
+  removed); `PreviewPositions` (a CPU front of the positions' ring through `UploadGpuPropertyFront` in
+  `Runtime.GpuPropertyBinding`, which reuses `Graphics::SubmitBufferUpload` and records the upload as the slot's
+  completion) and `DiscardPreview` (only the capture's ring generation; also before `Publish`). The plugin harness
+  composes the step-run module and optional extra modules. Tests: `Test.JobFormSpikePlugin.cpp` (5: the run equals the
+  solver's own calls bit for bit, metrics and written positions, Accept once with one undo entry; a changed target
+  and another world end it discarded, stale, without a write, and the output is free again; a paused run holds its
+  output (a second run refused, a Jobs row); an unload ends it discarded; the window's buttons through
+  `ActivateItemByID`), `Test.PointCloudEditing.cpp` (the world case; a preview front with a pending upload neither
+  reused nor freed, `MockDevice`), the Vulkan smoke `Test.JobFormSpikePluginGpuSmoke.cpp` (paused: the render block
+  shows the front and the pixels move right while the canonical positions and the history stay, an editor GPU position
+  run on the same positions refused; Discard: the ring gone and the CPU frame back; a successor previews in its own
+  ring with the same frame; Accept: written once, the ring released, the accepted frame equals the preview). Full
+  runtime contract suite 1960 passed (exit 1 from LeakSanitizer on Vulkan driver allocations in `vkCreateInstance`, as
+  before). Mutation checks (8): 7 killed, the redundant `PublishScalars` world check survived and was removed. Not
+  tested: `PreviewPositions` refusing a ring another result holds (the reverse, an editor run refused, is).
+  - Reviews of S3b-2 (diff sha256 of review-s3b2.diff in the scratchpad; with the S3b-1 fixes and the CI fix):
+    ponytail (fresh agent): "fix 1 first (small). 2 to 6 are optional"; taken 1 to 5: the tools' re-checks of what
+    the dispatcher's schema already validates are gone and the MCP tests call through `InvokeAgentOperation`
+    (`invalid_params`); a preview writes into the publication's scratch instead of a fresh copy; the one-use helper
+    inlined; the ring generation a plain integer (0: none); a dead guard. Not taken: 6 (one pixel helper for four
+    smokes), an unrelated clean-up unless the plugin stays. Codex (fresh, `codex-review-s3b2`): "Verdict: REVISE",
+    three findings, and "The five previous S3b-1 findings are closed" and the CI fix "fits both
+    cpu_test_selection.py and collect_test_timing.py". Fixed: (1) a copy `Show` refuses is offered again until shown
+    or replaced, `ShownStep` counts only shown ones (`Show` returns whether it showed; `PreviewPositions` returns
+    Shown, Busy or Unavailable and the plugin retries only Busy; test with three refusals); (2) the start tool bounds
+    the entity ids to 32 bits (test through the dispatcher); (3) the late-completion order on a device:
+    `ALateCompletionLeavesItsSuccessorsRing` (A held 1.5 s per step through the plugin's test hook `hold_step_ms`,
+    discarded while a step is held: its ring goes at once, B is admitted and previews while A's step still runs,
+    asserted, and A's late completion leaves B's ring generation). Also the window test presses Discard. Verification:
+    28 focused contract tests, both Vulkan smokes.
+- 2026-11-03, S3c implementation plan (within plan revision 3, S3c: "GPU k-means with resident buffers as a step run,
+  inside the clustering module ... through the same StepRun"; Q71). Facts (Explore, 2026-11-03): the resident k-means
+  (`Runtime.ClusteringGpuState.cpp`) advances only on the main thread, in frame maintenance (its GPU queue
+  participant's `DrainCompletedTransfers` calls `Advance`, which consumes a finished page and records the next with
+  `QueueGpuCompute(Immediate)`, at most one submission a frame); an iteration ends at the Update boundary (32-byte
+  diagnostics, convergence, cap, Stop latch; a FinalAssignment pass when centroids moved); previews are its own label
+  ring publications every `GpuPreviewInterval` iterations; Accept is an asynchronous front readback job; the run has
+  no Jobs row and no job while it iterates; no step budget; MCP only `run_kmeans`/`preview_kmeans` (auto-accept). So
+  S3b's worker step form does not fit: a worker `Step` would block for frames.
+  - **S3c-1, the driver's second step form** (`StepRuns`): `StepRunCallbacks::Advance` (main thread, in the pump, while
+    computing and no worker step form is given): the owner moves its GPU work on and reports nothing yet, a completed
+    step (with its metric) or an end (converged, failed); the driver gives it `mayContinue` (false once paused, the
+    step budget is spent or a restart waits), and the owner stops at its next iteration boundary. `Commit` may answer
+    pending: the run stays `accepting` (the holder's gate keeps it parked and polls `Commit` each pump) until it
+    answers committed or refused; discard and cancel during accepting end it discarded (the owner's `Discard` abandons
+    the readback, as the transaction core does). Owner previews (the label ring) stay the owner's; `Preview`/`Show`
+    unused. Tests with a fake main-thread owner: step counts and pauses at boundaries, no step after pause, the
+    accepting phase (refused controls, discard during it, a late answer ignored), run equals step sequence.
+  - **S3c-2, k-means as a step run** (clustering module, no plugin: R2): a step budget at the iteration boundary of
+    the paged state machine (`mayContinue` false: stop there, Ready, resumable); the module owns a step run per GPU run
+    (holder and its Jobs row through the editor job surface; its MCP control through `run_control`/`run_observe`; the
+    panel's Stop/Accept/Discard map onto it), the label ring stays its preview (latest wins as today), Accept reads the
+    labels once. Tests (contract, the fake compute device, plus the Vulkan smoke): run equals step sequence (labels
+    exact, centroids bitwise) for step(1)*N, step(3)+run and run with pauses; zero full-array bytes per step after Init
+    (the readback counters split: init, per step (32 B diagnostics), terminal centroids, accept); cancel and previews
+    commit nothing; Accept once; accept-on-convergence only when converged.
+  - **S3c-3, the stall measurement** (full pre-flight: two fresh reviewers, a frozen packet, an HTML report from raw
+    output): the main-thread time of every path a run uses (completion drain, GPU transfer drain, capture and init,
+    preview upload) as frame-pacing fields, under a slider preview (a parameter change restarting the preview run every
+    frame), with counts of accepted replacements and completed steps; against the proposed 4 ms. Planned after S3c-2.
+  Not in S3c: the editor's k-means panel beyond mapping its buttons, other GPU methods, the CPD editor session.
+  - Codex plan review (fresh, `codex-plan-s3c`): "Verdict: REVISE"; it confirms the shape ("A main-thread `Advance`
+    callback plus pending/committed/refused Commit is the smallest reasonable extension") and names six blocking
+    gaps: (1) an iteration boundary is not an acceptable result (centroids moved at Update before FinalAssignment; a
+    non-terminal preview is fused with the next Assign), so pause, resume and Accept from a pause need their own rules;
+    (2) an asynchronous Commit needs a latched outcome before the pump's capture check (a successful publication
+    changes the watched outputs); (3) batch auto-accept (`run_kmeans`, the one-iteration smoke case) must stay distinct
+    from accept-on-convergence, and `preview_kmeans` only checks readiness; (4) Stop stays irreversible against a late
+    convergence; (5) latest wins needs a real replacement path in clustering (it refuses a second run today) and owner
+    previews do not get the driver's suppression or rate limit; (6) the Jobs row and cancel must go through the editor
+    surface (today's clustering job adapter drops the identity). Scope: well beyond revision 3's "a step is one
+    iteration of the existing paged state machine"; asked the operator before going on (AGENTS drift budget).

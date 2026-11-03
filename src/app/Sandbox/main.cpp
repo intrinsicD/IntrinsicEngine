@@ -35,6 +35,7 @@ import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.PluginHost;
 import Extrinsic.Runtime.PointCloudEditing;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -512,11 +513,16 @@ int main(int argc, char** argv)
         .TestHooks = cli.PluginTestHooks,
         .RequestExit = [&engine] { engine.RequestExit(); },
         .Startup = std::move(startup)});
+    auto stepRuns = std::make_unique<Extrinsic::Runtime::StepRunsModule>();
     if (cli.Agent)
     {
         auto agentOptions = *cli.Agent;
-        agentOptions.RegisterExtraOperations = [host = pluginHost.get()](Extrinsic::Runtime::AgentOperationRegistry& registry)
-        { host->RegisterOperations(registry); };
+        agentOptions.RegisterExtraOperations = [host = pluginHost.get(), runs = &stepRuns->Service()](
+                                                   Extrinsic::Runtime::AgentOperationRegistry& registry)
+        {
+            host->RegisterOperations(registry);
+            runs->RegisterOperations(registry);
+        };
         engine.AddModule(std::make_unique<Extrinsic::Runtime::AgentServerModule>(std::move(agentOptions)));
     }
     engine.AddModule(std::move(configControl));
@@ -534,6 +540,7 @@ int main(int argc, char** argv)
     engine.EmplaceModule<Extrinsic::Runtime::AssetWorkflowModule>();
     engine.EmplaceModule<Extrinsic::Runtime::TextureBakeModule>();
     engine.EmplaceModule<Extrinsic::Runtime::PointCloudEditingModule>();
+    engine.AddModule(std::move(stepRuns));
     // Its name sorts last, so it shuts down first, while the services its plugin registered with are alive.
     engine.AddModule(std::move(pluginHost));
     engine.Initialize();

@@ -25,6 +25,7 @@ import Geometry.Properties;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
+import Extrinsic.RHI.Device;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
@@ -37,6 +38,7 @@ import Extrinsic.Runtime.EditorWorkspaceSlot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -75,16 +77,19 @@ namespace Extrinsic::Runtime
         Detail::GpuRowPages Pages{};
         bool Moved{false};
         PointGpuRowStats Stats{};
+        std::uint64_t PreviewRing{0u}; // the generation of the positions' ring PreviewPositions made; 0: none
     };
 
     struct PointCloudEditingService::Impl
     {
         EditorWorkspaceSlot Workspace{};
 
+        // The capture's world is still the active one and its inputs and outputs are unchanged.
         static bool InputsCurrent(const PointEdit& edit)
         {
             const std::array outputs{edit.OutputWatch};
-            return Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, edit.Capture.Inputs) &&
+            return Detail::EditorProcessingContextWorldCurrent(edit.Context) &&
+                Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, edit.Capture.Inputs) &&
                 (!edit.Request.ScalarOutputs.empty() ||
                  Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, outputs)) &&
                 Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, edit.ScalarWatches);
@@ -355,9 +360,50 @@ namespace Extrinsic::Runtime
         return PointRowsState::Ready;
     }
 
+    PointPreviewStatus PointCloudEditingService::PreviewPositions(PointEdit& edit, const std::span<const glm::vec3> live,
+                                                                  std::string& diagnostic)
+    {
+        const auto fail = [&](const PointPreviewStatus status, std::string why)
+        {
+            diagnostic = std::move(why);
+            return status;
+        };
+        constexpr auto kUnavailable = PointPreviewStatus::Unavailable;
+        const auto& r = edit.Request;
+        if (live.size() != edit.Capture.Slots.size()) return fail(kUnavailable, "One position per captured point is needed.");
+        if (r.Output.Domain != r.Positions.Domain || r.Output.Name != r.Positions.Name)
+            return fail(kUnavailable, "Only an in-place output (the positions) shows a preview.");
+        if (!Impl::InputsCurrent(edit)) return fail(kUnavailable, "The inputs changed.");
+        const auto& context = edit.Context;
+        auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
+        if (residency == nullptr || context.Device == nullptr || !context.Device->IsOperational())
+            return fail(kUnavailable, "No operational GPU device shows previews.");
+        const auto key = MakeGpuPropertyKey(context.World, edit.Entity, r.Output);
+        if (residency->HasRing(key) && residency->RingGeneration(key) != edit.PreviewRing)
+            return fail(PointPreviewStatus::Busy, "Another result holds these positions' GPU ring.");
+        // The publication's scratch: deleted slots keep their positions, and Publish writes the same live slots.
+        auto& values = edit.AfterOutput;
+        for (std::size_t i = 0; i < live.size(); ++i) values[edit.Capture.Slots[i]] = live[i];
+        const auto layout = MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, static_cast<std::uint32_t>(values.size()));
+        if (!layout) return fail(kUnavailable, "The positions have no GPU layout.");
+        if (!UploadGpuPropertyFront(*residency, *context.Device, key, *layout, 2u, std::as_bytes(std::span(values))))
+            return fail(PointPreviewStatus::Busy, "No free preview slot this frame.");
+        edit.PreviewRing = residency->RingGeneration(key);
+        return PointPreviewStatus::Shown;
+    }
+
+    void PointCloudEditingService::DiscardPreview(PointEdit& edit)
+    {
+        const auto ring = std::exchange(edit.PreviewRing, 0u);
+        auto* residency = edit.Context.SpatialIndices ? edit.Context.SpatialIndices->PropertyResidency() : nullptr;
+        if (ring != 0u && residency != nullptr)
+            (void)residency->Discard(MakeGpuPropertyKey(edit.Context.World, edit.Entity, edit.Request.Output), ring);
+    }
+
     PointPublishStatus PointCloudEditingService::Publish(PointEdit& edit, const std::span<const glm::vec3> live,
                                                          std::string label)
     {
+        DiscardPreview(edit); // the canonical publication shows next
         // Staleness: checked here (the capture's revisions), then by the history entry on every redo and undo.
         const auto& slots = edit.Capture.Slots;
         if (live.size() != slots.size()) return PointPublishStatus::Rejected;
@@ -374,7 +420,8 @@ namespace Extrinsic::Runtime
         std::erase_if(inputs, [&](const auto& input) { return input.Domain == r.Output.Domain && input.Name == r.Output.Name; });
         // The output's guard is the history slot every author of that property shares, so successive edits (and
         // other commands writing it, such as a GPU position accept) undo in turn; each write stamps it.
-        if (!Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, inputs) ||
+        if (!Detail::EditorProcessingContextWorldCurrent(edit.Context) ||
+            !Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, inputs) ||
             !Detail::GeometryPropertiesCurrent(edit.Context, edit.Entity, std::span(&edit.OutputWatch, 1)))
             return PointPublishStatus::Stale;
         auto outputWatches = Detail::CapturePointPropertyHistory(edit.Context, edit.Entity, std::span(&r.Output, 1));

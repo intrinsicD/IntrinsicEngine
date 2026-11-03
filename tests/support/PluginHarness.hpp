@@ -3,6 +3,7 @@
 // workspace, so plugin runs are rows of its Jobs window. A plugin's own harness adds its helpers.
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -22,6 +23,7 @@ import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.PluginHost;
 import Extrinsic.Runtime.PluginSections;
+import Extrinsic.Runtime.StepRuns;
 
 namespace Intrinsic::Tests::Plugins
 {
@@ -55,12 +57,14 @@ namespace Intrinsic::Tests::Plugins
     {
         R::AgentOperationContext Context{};
 
+        // `moreModules` composes what a scenario needs besides (a camera for pixel checks).
         Harness(const R::PluginRegisterFn registerFn, const R::PluginShutdownFn shutdownFn,
                 Config::EngineConfig config = HeadlessConfig(),
-                std::unique_ptr<RuntimeTestModule> application = std::make_unique<OneFrameApplication>())
+                std::unique_ptr<RuntimeTestModule> application = std::make_unique<OneFrameApplication>(),
+                const std::function<void(RuntimeTestKernel&)>& moreModules = {})
             : Boot(registerFn, shutdownFn, std::move(config)),
               PointCloudEditing::Harness(std::move(Booted), std::move(application), std::move(Sections),
-                                         [this, registerFn, shutdownFn](RuntimeTestKernel& engine)
+                                         [this, registerFn, shutdownFn, &moreModules](RuntimeTestKernel& engine)
                                          {
                                              // A load of any path opens the plugin in-process again, as a shared
                                              // build would load its library: unload and reload work in every build.
@@ -71,6 +75,10 @@ namespace Intrinsic::Tests::Plugins
                                                  .Startup = std::move(Startup)});
                                              host->RegisterOperations(Registry); // as the agent server does
                                              engine.AddModule(std::move(host));
+                                             auto runs = std::make_unique<R::StepRunsModule>();
+                                             runs->Service().RegisterOperations(Registry);
+                                             engine.AddModule(std::move(runs));
+                                             if (moreModules) moreModules(engine);
                                          })
         {
             Engine.Services().Find<R::PluginHostModule>()->UseEditorWorkspace(Shell);

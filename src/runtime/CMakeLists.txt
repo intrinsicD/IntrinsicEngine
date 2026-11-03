@@ -82,6 +82,7 @@ target_sources(${target_name}
         Services/Runtime.PluginHost.cppm
         Services/Runtime.PluginSections.cppm
         Services/Runtime.PointCloudEditing.cppm
+        Services/Runtime.StepRuns.cppm
         Kernel/Runtime.Engine.cppm
         Config/Runtime.EngineConfigBoot.cppm
         Config/Runtime.EngineConfigControl.cppm
@@ -279,6 +280,7 @@ target_sources(${target_name}
         Services/Runtime.EditorWorkspaceSlot.cpp
         Services/Runtime.PluginHost.cpp
         Services/Runtime.PointCloudEditing.cpp
+        Services/Runtime.StepRuns.cpp
         Kernel/Runtime.InputActions.cpp
         Kernel/Runtime.KernelEvents.cpp
         Kernel/Runtime.Module.cpp

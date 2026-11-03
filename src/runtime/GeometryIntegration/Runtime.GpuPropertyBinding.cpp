@@ -7,6 +7,8 @@ module;
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 module Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.Graphics.GpuTransfer;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.ECS.Scene.Registry;
@@ -130,6 +132,19 @@ namespace Extrinsic::Runtime
     std::uint64_t GpuPropertyObservationStamp(const Graphics::GpuPropertyView& front) noexcept
     {
         return front.Publication;
+    }
+
+    bool UploadGpuPropertyFront(Graphics::GpuPropertyResidency& residency, RHI::IDevice& device,
+                                const Graphics::GpuPropertyKey& key, const Graphics::GpuPropertyLayout& layout,
+                                const std::uint32_t depth, const std::span<const std::byte> bytes)
+    {
+        if (bytes.size() != layout.Bytes()) return false;
+        const auto back = residency.AcquireBack(key, layout, depth);
+        if (!back) return false;
+        const auto upload = Graphics::SubmitBufferUpload(device, back->Buffer, bytes);
+        if (!upload.Accepted()) return false; // the back stays unpublished; the next acquire hands it out again
+        if (upload.IsAsynchronous()) residency.AddCompletion(back->Buffer, upload.Token);
+        return residency.Publish(key);
     }
 
     std::optional<Graphics::GpuPropertyView> AcquireGpuPropertyOutput(

@@ -73,6 +73,8 @@ export namespace Extrinsic::Runtime
 
     // Unrepresentable: a value does not fit a scalar output's storage exactly (nothing is written).
     enum class PointPublishStatus : std::uint8_t { Applied, Stale, Rejected, Unrepresentable };
+    // Busy: not now (no free ring slot, or another result holds the ring); a later call may show it.
+    enum class PointPreviewStatus : std::uint8_t { Shown, Busy, Unavailable };
 
     // A plugin window's picker over an InputCatalog (ImGui, the host's context): true when the choice changed `ref`;
     // a `ref` the catalog does not list stays as it is.
@@ -115,6 +117,14 @@ export namespace Extrinsic::Runtime
         // Main thread: writes `live` (one position per captured point) into the output for the live slots, records
         // one undo entry named `label` and marks the entity dirty. Stale when an input or the output changed.
         [[nodiscard]] PointPublishStatus Publish(PointEdit& edit, std::span<const glm::vec3> live, std::string label);
+        // Main thread, an in-place output (the positions): shows `live` (one position per captured point) as the
+        // positions' ring front, which the renderer draws, without changing the positions or the history. Busy or
+        // Unavailable (no operational device, not in place, inputs changed) with the reason otherwise. The capture
+        // keeps its ring until DiscardPreview or Publish (which releases it first).
+        [[nodiscard]] PointPreviewStatus PreviewPositions(PointEdit& edit, std::span<const glm::vec3> live,
+                                                          std::string& diagnostic);
+        // Main thread: releases the capture's preview ring (only that ring; nothing without one).
+        void DiscardPreview(PointEdit& edit);
         // Main thread: writes one column per scalar output (one value per captured point) for the live slots, all or
         // none, as one undo entry named `label`. Deleted slots keep their values.
         [[nodiscard]] PointPublishStatus PublishScalars(PointEdit& edit, std::span<const std::vector<float>> columns,

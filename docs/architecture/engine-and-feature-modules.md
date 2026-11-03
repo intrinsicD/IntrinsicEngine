@@ -223,7 +223,8 @@ Off means no intermediate copies at all; the result is identical.
 - **The hand-over** from the computing thread to its readers is a lock-free **triple buffer**. The
   writer never waits, and a reader can read at any time and always gets the newest complete state.
   The worker copies only when the last state was taken, and at most about 30 times per second.
-- **Metrics** per step go to a ring that is kept in full, so the curves have no gaps.
+- **Metrics** per step go to a preallocated log sized to the iteration cap (`Core.AppendLog`), kept in full,
+  so the curves have no gaps.
 - **The UI:**
   - the preview in the viewport, drawn from the buffers;
   - metric curves in the panel;
@@ -234,6 +235,22 @@ Off means no intermediate copies at all; the result is identical.
   - a status with the phase, the iteration, the latest metrics and their history;
   - pause, n steps, resume, stop and accept, and cancel;
   - waiting until a condition holds (an iteration, a metric threshold).
+
+**Current state (ARCH-022 S3b-1).** `Extrinsic.Runtime.StepRuns` (`src/runtime/Services/Runtime.StepRuns.cppm`)
+is the run driver: the owner gives `Step` (a worker, one iteration), `Preview`, `Show`, `Valid`, `Commit` and
+`Discard`, and its job submission (a plugin passes `PluginStepRunJobs()`). A run is carried by the owner's jobs: a
+holder job that stays parked by its readiness gate until the run ends, so a paused run keeps its output, has its Jobs
+row and is cancelled by the Jobs window and an unload drain, and whose gate is the run's main-thread pump; and segment
+jobs joined to it, the worker loop that checks the controls between `Step` calls. The transition table is at the top
+of the module. MCP: `run_control` (run, pause, step n, stop, accept, discard) and `run_observe`; waiting for a
+condition is not there yet. Its contract tests are `tests/contract/runtime/Test.StepRuns.cpp`.
+The CPU case (S3b-2) is the spike plugin `plugins/job_form_spike`: coherent point drift (the CPU reference solver)
+moves a source cloud onto a target one step per `Step`, shows the moving source through the point-cloud editing
+service's `PreviewPositions` (a CPU-made front of the positions' residency ring, which the renderer draws; released by
+`DiscardPreview` and before `Publish`), and Accept publishes the positions with one undo entry. The editing service's
+`Current` and publications also require the capture's world to be the active one. Tests:
+`tests/contract/runtime/Test.JobFormSpikePlugin.cpp` and the Vulkan smoke
+`tests/integration/graphics/Test.JobFormSpikePluginGpuSmoke.cpp`. The plugin is kept or deleted per the S3 report.
 
 **Scope (operator, 2026-10-30):** this applies to **every GPU algorithm**, and to every iterative
 algorithm. Existing ones are brought into this form (inventoried in `ARCH-022`'s plan); new ones are

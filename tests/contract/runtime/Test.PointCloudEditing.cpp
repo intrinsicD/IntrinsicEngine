@@ -10,9 +10,12 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include "MockRHI.hpp"
 #include "PointCloudEditingHarness.hpp"
 
+import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
 
 namespace
 {
@@ -87,7 +90,7 @@ TEST(PointCloudEditing, AReleasedWorkspaceFallsBackToTheServicesOwn)
 
 TEST(PointCloudEditing, AChangedInputOrOutputMakesTheCaptureStaleAndNothingIsPublished)
 {
-    for (unsigned change = 0; change < 3; ++change)
+    for (unsigned change = 0; change < 4; ++change)
     {
         SCOPED_TRACE(change);
         Harness harness{};
@@ -97,17 +100,35 @@ TEST(PointCloudEditing, AChangedInputOrOutputMakesTheCaptureStaleAndNothingIsPub
         std::string diagnostic;
         const auto edit = harness.Editing().Capture(Request(entity, D::MeshVertex), diagnostic);
         ASSERT_TRUE(edit) << diagnostic;
+        auto scalarRequest = Request(entity, D::MeshVertex);
+        scalarRequest.ScalarOutputs = {{.Domain = D::MeshVertex, .Name = "s", .ValueKind = Geometry::PropertyValueKind::Float}};
+        const auto scalars = harness.Editing().Capture(scalarRequest, diagnostic);
+        ASSERT_TRUE(scalars) << diagnostic;
         std::vector<glm::vec3> points(harness.Editing().View(*edit).Points.begin(), harness.Editing().View(*edit).Points.end());
         switch (change)
         {
         case 0: props.Get<float>("keep")[0] = 99; break; // unrelated: still current
         case 1: props.Get<glm::vec3>("samples")[0].x += 1; break;
         case 2: props.GetOrAdd<glm::vec3>("filtered")[0] = glm::vec3(77); break;
+        case 3: // another world becomes active; the captured one is untouched
+        {
+            auto& worlds = harness.Engine.Worlds();
+            ASSERT_TRUE(worlds.RequestSetActiveWorld(worlds.CreateWorld("other")).has_value());
+            (void)worlds.ApplyMaintenance(harness.Engine.Events(), harness.Engine.Jobs());
+            ASSERT_NE(&harness.Scene(), &scene);
+            break;
+        }
         }
         EXPECT_EQ(harness.Editing().Current(*edit), change == 0);
         EXPECT_EQ(harness.Editing().Publish(*edit, points, "Copy"),
                   change == 0 ? R::PointPublishStatus::Applied : R::PointPublishStatus::Stale);
         EXPECT_EQ(harness.History().CanUndo(), change == 0);
+        if (change == 3)
+        {
+            const std::vector<std::vector<float>> column{std::vector<float>(points.size(), 1.f)};
+            EXPECT_EQ(harness.Editing().PublishScalars(*scalars, column, "Scalars"), R::PointPublishStatus::Stale);
+            EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshVertex).Exists("s"));
+        }
     }
 }
 
@@ -213,4 +234,42 @@ TEST(PointCloudEditing, AnInputCatalogOfOneDomainListsOnlyThatDomain)
     const auto faces = harness.Editing().InputCatalog(stable, 1u, D::MeshFace);
     ASSERT_FALSE(faces.Entries.empty());
     EXPECT_TRUE(std::ranges::all_of(faces.Entries, [](const auto& e) { return e.Ref.Domain == D::MeshFace; }));
+}
+
+// ARCH-022 S3b: a CPU-made front (a step run's position preview). With its upload pending, a slot is neither handed
+// out again nor freed by a Discard.
+TEST(PointCloudEditing, APreviewFrontWithAPendingUploadIsNeitherReusedNorFreed)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.TransferQueue.AcceptBufferUploads = true;
+    device.TransferQueue.AlwaysComplete = false;
+    const auto advance = [&] { device.GlobalFrameNumber += device.FramesInFlight + 1u; }; // frame uses complete
+    Extrinsic::Graphics::GpuPropertyResidency residency(device);
+    const R::GeometryPropertyRef positions{.Domain = D::PointCloudPoint, .Name = "p", .ValueKind = Geometry::PropertyValueKind::Vec3};
+    const auto key = R::MakeGpuPropertyKey(R::DefaultWorldHandle, entt::entity{7}, positions);
+    const auto layout = R::MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, 4u);
+    ASSERT_TRUE(layout);
+    const std::vector<std::byte> bytes(layout->Bytes(), std::byte{1});
+    const auto upload = [&] { return R::UploadGpuPropertyFront(residency, device, key, *layout, 2u, bytes); };
+
+    ASSERT_TRUE(upload()) << "A";
+    ASSERT_TRUE(upload()) << "B, while A's upload is pending";
+    EXPECT_EQ(device.TransferQueue.BufferUploads.size(), 2u);
+    advance();
+    EXPECT_FALSE(upload()) << "A is no longer the front, but its upload is pending";
+    device.TransferQueue.AlwaysComplete = true;
+    ASSERT_TRUE(upload()) << "A again once its upload completed";
+
+    // Another run's ring, discarded while its upload is pending.
+    const auto other = R::MakeGpuPropertyKey(R::DefaultWorldHandle, entt::entity{8}, positions);
+    device.TransferQueue.AlwaysComplete = false;
+    ASSERT_TRUE(R::UploadGpuPropertyFront(residency, device, other, *layout, 2u, bytes));
+    const int destroyed = device.DestroyBufferCount;
+    residency.Discard(other, residency.RingGeneration(other));
+    advance();
+    residency.Tick();
+    EXPECT_EQ(device.DestroyBufferCount, destroyed) << "a discarded ring keeps a slot whose upload is pending";
+    device.TransferQueue.AlwaysComplete = true;
+    residency.Tick();
+    EXPECT_EQ(device.DestroyBufferCount, destroyed + 1) << "freed once complete";
 }

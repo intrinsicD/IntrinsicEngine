@@ -7,6 +7,7 @@ module;
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <entt/entity/entity.hpp>
 export module Extrinsic.Runtime.GpuPropertyBinding;
 export import Extrinsic.Graphics.GpuPropertyResidency;
@@ -15,6 +16,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.WorldHandle;
 
 extern "C++" { namespace Extrinsic::Runtime { class WorldRegistry; } }
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 export namespace Extrinsic::Runtime
@@ -39,6 +41,14 @@ export namespace Extrinsic::Runtime
     // typed ring (the renderer reads float scalars). The observation keys the property by name
     // and domain with ValueKind Float, which is why a presentation ring uses that key.
     [[nodiscard]] GeometryPropertyRef GpuPropertyPresentationRef(const GeometryPropertyRef& ref);
+    // A CPU-made front of `key`'s ring (a preview): a write slot (the ring created with `depth`), `bytes` uploaded
+    // (Graphics::SubmitBufferUpload: the transfer queue submits at once, so a frame recorded later reads it, and the
+    // renderer's copy of a front waits on transfer writes), the upload recorded as the slot's completion (it is not
+    // handed out again, or freed by a Discard, before the transfer finished), then published. False, writing
+    // nothing, when the ring has no free slot or the upload is refused. Device-owner thread only.
+    [[nodiscard]] bool UploadGpuPropertyFront(Graphics::GpuPropertyResidency& residency, RHI::IDevice& device,
+                                              const Graphics::GpuPropertyKey& key, const Graphics::GpuPropertyLayout& layout,
+                                              std::uint32_t depth, std::span<const std::byte> bytes);
     struct GpuPropertyObservation
     {
         RHI::BufferHandle Buffer{};
