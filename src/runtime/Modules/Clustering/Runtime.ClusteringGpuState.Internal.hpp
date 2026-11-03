@@ -1,5 +1,5 @@
 // Include-only implementation detail for Runtime.ClusteringModule. Include
-// after the module's RHI, runtime, and Geometry.KMeans imports.
+// after the module's RHI, runtime, step-run and Geometry.KMeans imports.
 #pragma once
 
 namespace Extrinsic::Runtime
@@ -50,8 +50,9 @@ namespace Extrinsic::Runtime
 
         // Reads the snapshot during admission; the caller retains the publication
         // before-state on acceptance or can run the CPU fallback on rejection.
+        // The run is a step run of `steps` (started running); its holder and Accept are jobs of the context's surface.
         [[nodiscard]] ClusteringGpuSubmission Start(KMeansSnapshot& snapshot,
-            const EditorProcessingContext&, std::function<bool()> current,
+            const EditorProcessingContext&, StepRunsService& steps, std::function<bool()> current,
             std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish);
         [[nodiscard]] KMeansGpuObservation GpuRun(CommandCorrelationId, KMeansGpuAction);
         void RecordFrameCommands(RHI::ICommandContext& commandContext);

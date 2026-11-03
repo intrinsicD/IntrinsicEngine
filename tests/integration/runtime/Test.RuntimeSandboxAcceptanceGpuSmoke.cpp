@@ -104,6 +104,7 @@ import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -1070,6 +1071,7 @@ BootstrapDefaultSandboxAppEngineWithApp(std::unique_ptr<Intrinsic::Tests::Runtim
     enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::ClusteringModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::StepRunsModule>(); // a GPU K-Means run is a step run
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::SceneDocumentModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::SceneInteractionModule>();

@@ -52,6 +52,7 @@ import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.PluginHost;
 import Extrinsic.Runtime.PointCloudEditing;
+import Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -2232,6 +2233,7 @@ namespace Extrinsic::Sandbox::Editor
             // ARCH-022: plugin runs and their edits go through this workspace, so they are rows of its Jobs window.
             Runtime::PluginHostModule* PluginHost{nullptr};
             Runtime::PointCloudEditingService* PointCloudEditing{nullptr};
+            Runtime::ClusteringService* Clustering{nullptr};
             Runtime::EditorUiHost* Host{nullptr};
             Runtime::ViewCaptureModule* ViewCapture{nullptr};
             const Runtime::SelectionController* Selection{nullptr};
@@ -2967,8 +2969,10 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 PluginHost = services.Find<Runtime::PluginHostModule>();
                 PointCloudEditing = services.Find<Runtime::PointCloudEditingService>();
+                Clustering = services.Find<Runtime::ClusteringService>();
                 if (PluginHost != nullptr) PluginHost->UseEditorWorkspace(Attachment);
                 if (PointCloudEditing != nullptr) PointCloudEditing->UseEditorWorkspace(Attachment);
+                if (Clustering != nullptr) Clustering->UseEditorWorkspace(Attachment);
                 FrameContribution = Host->RegisterFrameContribution(
                     [this]
                     {
@@ -3008,8 +3012,10 @@ namespace Extrinsic::Sandbox::Editor
                 UserCaptureTicket = 0u;
                 if (PluginHost != nullptr) PluginHost->ReleaseEditorWorkspace(Attachment);
                 if (PointCloudEditing != nullptr) PointCloudEditing->ReleaseEditorWorkspace(Attachment);
+                if (Clustering != nullptr) Clustering->ReleaseEditorWorkspace(Attachment);
                 PluginHost = nullptr;
                 PointCloudEditing = nullptr;
+                Clustering = nullptr;
                 Attachment.Detach();
             }
         };

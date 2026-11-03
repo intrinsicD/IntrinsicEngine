@@ -12,6 +12,7 @@ export module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.EditorWorkspaceSlot; // the seam a service lends a workspace through (its attachment type)
 export import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.WorldHandle;
 export namespace Extrinsic::Runtime
@@ -86,10 +87,13 @@ export namespace Extrinsic::Runtime
         KMeansRunStatus status) noexcept;
 
     enum class KMeansGpuAction : std::uint8_t { Observe, Stop, Accept, Discard };
+    // A resident GPU run, also a step run (`StepRun`: its id for run_control and run_observe). ReadyToAccept: ended,
+    // or paused at an iteration boundary (Accept then prepares the labels of that iteration's centroids).
     struct KMeansGpuObservation
     {
         bool Running{}, ReadyToAccept{}, Accepting{}, CanAccept{};
         std::string Message{};
+        std::uint64_t StepRun{};
         std::uint32_t Iterations{}, Submissions{}, Previews{};
         std::uint64_t InputUploadBytes{}, InputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
     };
@@ -194,6 +198,10 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] KMeansGpuObservation GpuRun(CommandCorrelationId, KMeansGpuAction = KMeansGpuAction::Observe);
         // Read-only admission reason shared with GPU submission; empty preserves CPU fallback paths.
         [[nodiscard]] std::string GpuReadinessDiagnostic(const Runtime::RunKMeans&, const EditorProcessingContext&) const;
+        // The app's editor workspace (the Sandbox shell's) while it lends one: a GPU run and its Accept are rows of
+        // its Jobs window. Release before the workspace detaches; the module's own workspace is used otherwise.
+        void UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept;
+        void ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept;
 
     private:
         friend class ClusteringModule;
@@ -204,6 +212,7 @@ export namespace Extrinsic::Runtime
 
         std::function<KMeansGpuObservation(CommandCorrelationId, KMeansGpuAction)> m_GpuRun{};
         std::function<std::string(const Runtime::RunKMeans&, const EditorProcessingContext&)> m_GpuReadinessDiagnostic{};
+        std::function<void(EditorWorkspaceAttachment* use, const EditorWorkspaceAttachment* release)> m_LendWorkspace{};
         CommandBus* m_Commands{};
         KernelEventBus* m_Events{};
         const ClusteringModuleStats* m_Stats{};

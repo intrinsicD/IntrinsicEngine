@@ -527,7 +527,7 @@ namespace Extrinsic::Runtime
             }
         }
     }
-    extern "C++" void GeometryProcessingDetail::JoinPointScalarRun(
+    void JoinEditorPointScalarRun(
         const EditorPointScalarTransactionHandle& run, EditorJobIdentity identity)
     {
         if (run)

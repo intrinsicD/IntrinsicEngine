@@ -639,7 +639,7 @@ namespace Extrinsic::Runtime
             return refuse(GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Keypoint analysis"));
         }
         runIdentity.Run = token; // the publication's Accept stage joins this run
-        GeometryProcessingDetail::JoinPointScalarRun(transaction, std::move(runIdentity));
+        JoinEditorPointScalarRun(transaction, std::move(runIdentity));
         w->Admitted = true;
         result = w->Result;
         return transaction;

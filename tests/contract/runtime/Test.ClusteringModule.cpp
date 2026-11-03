@@ -42,6 +42,7 @@ import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.Renderer;
@@ -1420,6 +1421,7 @@ namespace
         Runtime::KernelEventBus Events;
         Runtime::ServiceRegistry Services;
         Runtime::SpatialIndexCache Cache;
+        Runtime::StepRunsService Steps; // a GPU run is a step run; the module's own workspace carries its jobs
         Runtime::ClusteringModule Module;
         Runtime::EditorCommandHistory History;
         Runtime::WorldHandle World;
@@ -1432,7 +1434,7 @@ namespace
         std::vector<std::function<void()>> Completions;
         std::optional<Extrinsic::RHI::ReadbackSink> Held;
         std::vector<std::byte> HeldData;
-        bool Hold{}, Attached{true}, Converged{};
+        bool Hold{}, Attached{true}, Converged{}, Moved{};
         std::uint32_t MaximumDispatches{};
         Runtime::KMeansPagingLimits SavedLimits{Runtime::KMeansPagingForTesting};
         auto& Scene(){return *Worlds.Get(World);}
@@ -1447,6 +1449,8 @@ namespace
             ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device,"test"));
             ASSERT_TRUE(Services.Provide<Extrinsic::Graphics::IRenderer>(*Renderer,"test"));
             ASSERT_TRUE(Services.Provide<Runtime::EditorCommandHistory>(History,"test"));
+            ASSERT_TRUE(Services.Provide<Runtime::JobService>(Jobs.Jobs(),"test"));
+            ASSERT_TRUE(Services.Provide<Runtime::StepRunsService>(Steps,"test"));
             Runtime::EngineSetup setup{Commands,Events,Jobs.Jobs(),Worlds,Services,[](Runtime::FramePhase,Runtime::RuntimeFrameHook){}};
             ASSERT_TRUE(Cache.OnRegister(setup));ASSERT_TRUE(Module.OnRegister(setup));
             Services.BeginResolution();ASSERT_TRUE(Cache.OnResolve(setup));ASSERT_TRUE(Module.OnResolve(setup));Services.Lock();
@@ -1480,7 +1484,7 @@ namespace
                 std::vector<std::byte> data(bytes);
                 if(bytes==32){
                     std::array<std::uint32_t,6> diagnostics{};
-                    diagnostics[2]=std::bit_cast<std::uint32_t>(1.0f);diagnostics[4]=!Converged;
+                    diagnostics[2]=std::bit_cast<std::uint32_t>(1.0f);diagnostics[4]=(Converged?0u:1u)|(Moved?2u:0u);
                     std::memcpy(data.data(),diagnostics.data(),24);
                 }
                 if(Hold){Held=std::move(sink);HeldData=std::move(data);return Extrinsic::RHI::ReadbackToken{2};}
@@ -1494,6 +1498,7 @@ namespace
         }
         void Tick()
         {
+            if(Shell)(void)Runtime::PrepareEditorWorkspaceSnapshotFrame(*Shell);
             auto completions=std::exchange(Completions,{});for(auto& complete:completions)complete();
             Commands.Drain(Scene(),{.Events=&Events,.Jobs=&Jobs.Jobs(),.Worlds=&Worlds});
             (void)Jobs.Jobs().DrainCompletions(Events);(void)Events.Pump();
@@ -1506,8 +1511,33 @@ namespace
             while(!predicate()&&std::chrono::steady_clock::now()<end){Tick();std::this_thread::yield();}
             return predicate();
         }
-        auto Observation(){return Service->GpuRun(Correlation);}
-        void Start(){Correlation=Service->RunKMeans(Request);}
+        // The run's step run (known once the command drained), remembered so it stays observable after the run.
+        std::uint64_t RunId{};
+        auto Observation(){auto run=Service->GpuRun(Correlation);if(!RunId)RunId=run.StepRun;return run;}
+        void Start(){Correlation=Service->RunKMeans(Request);RunId=0;}
+        std::uint64_t StepRunId(){return RunId?RunId:Observation().StepRun;}
+        Runtime::StepRunObservation StepRun(){auto run=Steps.Observe(StepRunId());EXPECT_TRUE(run);return run?*run:Runtime::StepRunObservation{};}
+        bool Control(Runtime::StepRunAction action,std::uint32_t count=1){std::string refusal;return Steps.Control(StepRunId(),action,count,refusal);}
+        // The app's editor workspace (the Sandbox shell's), lent as the shell does: the run's jobs are its rows.
+        std::unique_ptr<Runtime::EditorWorkspaceAttachment> Shell{};
+        void LendShell()
+        {
+            Shell=std::make_unique<Runtime::EditorWorkspaceAttachment>();Shell->Attach(Worlds,Services);
+            (void)Runtime::PrepareEditorWorkspaceSnapshotFrame(*Shell); // the shell prepares one every frame (Tick)
+            Service->UseEditorWorkspace(*Shell);
+        }
+        std::vector<Runtime::EditorJobRecord> Rows(){return Runtime::GetEditorJobs(Runtime::PrepareEditorProcessingCommands(*Shell));}
+        // The phases of the pages recorded from now on (push constant 104), one entry per change.
+        std::vector<std::uint32_t> PhasesSince(std::size_t firstPush)
+        {
+            std::vector<std::uint32_t> phases;
+            for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
+                const auto& push=Device.CommandContext.PushConstantPayloads[i];if(push.size()!=128u)continue;
+                std::uint32_t phase{};std::memcpy(&phase,push.data()+104,4);
+                if(phases.empty()||phases.back()!=phase)phases.push_back(phase);
+            }
+            return phases;
+        }
     public:
         void DiscardDuringPublication(entt::registry&, entt::entity)
         { (void)Service->GpuRun(Correlation, Runtime::KMeansGpuAction::Discard); }
@@ -1517,6 +1547,7 @@ namespace
             if(Held){Held->Deliver(HeldData);Held.reset();}
             if(Service){(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);Service->Unsubscribe(Subscription);}
             for(int i=0;i<5;++i)Tick();
+            if(Shell){Service->ReleaseEditorWorkspace(*Shell);Shell->Detach();}
             Jobs.Jobs().CancelAndDrain();(void)Jobs.Jobs().ShutdownGpuQueueParticipants([this]{Device.WaitIdle();});
             Runtime::RuntimeModuleShutdownContext shutdown{Commands,Events,Jobs.Jobs(),Worlds,Services};
             Module.OnShutdown(shutdown);Cache.OnShutdown(shutdown);Services.Reset();Renderer->Shutdown();
@@ -1673,6 +1704,8 @@ TEST_F(ClusteringModuleResident, ReentrantDiscardDuringAcceptKeepsOneAppliedComp
     Scene().Raw().on_construct<Dirty::DirtyVertexAttributes>().disconnect<&ClusteringModuleResident::DiscardDuringPublication>(*this);
     EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
     for(int i=0;i<10;++i)Tick();EXPECT_EQ(Results.size(),1u);
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Committed)<<"the publication under way decided";
+    EXPECT_EQ(History.UndoCount(),1u);
     EXPECT_TRUE(Properties().Exists("p:kmeans_label"));ASSERT_TRUE(History.Undo().Succeeded());
 }
 TEST_F(ClusteringModuleResident, DiscardPendingAcceptDeliversOnce)
@@ -1684,6 +1717,8 @@ TEST_F(ClusteringModuleResident, DiscardPendingAcceptDeliversOnce)
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
     Hold=false;std::vector<std::byte> bytes(12*4);Held->Deliver(bytes);Held.reset();
     for(int i=0;i<10;++i)Tick();EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"discarded before its publication";
 }
 TEST(ClusteringModule, AgentRunAutoAcceptsAndReportsBackendAndIo)
 {
@@ -1819,7 +1854,7 @@ TEST_F(ClusteringModuleResident, AutoAcceptRefusalCompletesStaleAndAllowsNextRun
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::StaleSource);
     EXPECT_EQ(Service->Stats().GpuCompletions,0u);
     arm=false;Request.AttachmentActive={};Start();
-    ASSERT_TRUE(Until([&]{return Results.size()==2;}));EXPECT_TRUE(Results[1].Succeeded());
+    ASSERT_TRUE(Until([&]{return Results.size()==2;}));EXPECT_TRUE(Results[1].Succeeded())<<Results[1].Message;
     EXPECT_EQ(Service->Stats().GpuCompletions,1u);
 }
 TEST_F(ClusteringModuleResident, StaleDuringAcceptReadbackReportsStaleSource)
@@ -1829,6 +1864,8 @@ TEST_F(ClusteringModuleResident, StaleDuringAcceptReadbackReportsStaleSource)
     Properties().Get<glm::vec3>("v:position")[0].x=7;
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::StaleSource);
+    ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Failed);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
 }
 TEST_F(ClusteringModuleResident, AdmissionReservesTypedAndPresentationAgainstScalarOwners)
 {
@@ -1882,4 +1919,170 @@ TEST_F(ClusteringModuleResident, MillionRowsRespectPairAndSerialBudgets)
     // Fused phases still split at the serial-depth budget and host boundary.
     EXPECT_EQ(Observation().Submissions,4u);
     EXPECT_LE(MaximumDispatches,Runtime::KMeansSubmissionSerialDepth);
+}
+
+TEST_F(ClusteringModuleResident, AGpuRunIsAStepRunCountingItsIterations)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    ASSERT_NE(StepRunId(),0u);
+    auto run=StepRun();
+    EXPECT_EQ(run.Owner,"Runtime.ClusteringModule");
+    EXPECT_EQ(run.Steps,4u);EXPECT_EQ(run.End,Runtime::StepRunEnd::IterationCap);
+    EXPECT_EQ(run.Phase,Runtime::StepRunPhase::Paused)<<"an interactive run waits at its cap for Accept or Discard";
+    ASSERT_EQ(run.Metrics->Records().size(),4u);
+    EXPECT_EQ(run.Metrics->Records().back().Values[1],1.0)<<"the iteration's squared maximum centroid shift";
+    // One 32-byte diagnostics readback per iteration after Init, then the terminal preview's centroids.
+    EXPECT_EQ(Observation().CpuStageReadbackBytes,4u*32u+3u*12u);
+    for(int i=0;i<10;++i)Tick();
+    EXPECT_TRUE(Results.empty());EXPECT_FALSE(Properties().Exists("p:kmeans_label"));EXPECT_FALSE(History.CanUndo());
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+    ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Committed;}));
+    EXPECT_EQ(History.UndoCount(),1u);
+}
+TEST_F(ClusteringModuleResident, ARunRestsAtItsBoundaryAndAcceptPreparesTheCurrentCentroidsLabels)
+{
+    Moved=true;Request.Parameters.MaxIterations=10;Request.Parameters.GpuPreviewInterval=100;
+    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Pause)); // the first page is in flight: it counts, then the run rests
+    ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused;}));
+    EXPECT_EQ(Observation().Iterations,1u);EXPECT_EQ(StepRun().Steps,1u);
+    EXPECT_TRUE(Observation().ReadyToAccept)<<Observation().Message;EXPECT_TRUE(Observation().CanAccept);
+    EXPECT_EQ(Observation().Previews,1u)<<"its boundary's preview, recorded alone";
+    const auto submissions=Observation().Submissions;
+    for(int i=0;i<10;++i)Tick();
+    EXPECT_EQ(Observation().Submissions,submissions)<<"nothing is recorded while it rests";
+    EXPECT_EQ(Observation().Iterations,1u);
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Step,1));
+    ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused&&Observation().Iterations==2u;}));
+    for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(Observation().Iterations,2u)<<"one step, one iteration";
+    const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+    EXPECT_EQ(Results[0].Iterations,2u)<<"Accept counts no iteration";
+    // The update moved centroids: a final assignment (Assign, Reduce), then the terminal preview.
+    EXPECT_EQ(PhasesSince(firstPush),(std::vector<std::uint32_t>{1u,3u,4u,5u}));
+    ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Committed;}));
+    EXPECT_EQ(StepRun().Steps,2u);
+}
+TEST_F(ClusteringModuleResident, ACappedBatchPublishesAndACappedInteractiveRunWaits)
+{
+    Request.AutoAccept=true;Request.Parameters.MaxIterations=2;Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+    ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Committed;}));
+    EXPECT_EQ(StepRun().End,Runtime::StepRunEnd::IterationCap);
+    ASSERT_EQ(History.UndoCount(),1u);ASSERT_TRUE(History.Undo().Succeeded());
+    Request.AutoAccept=false;Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    for(int i=0;i<10;++i)Tick();
+    EXPECT_EQ(Results.size(),1u);EXPECT_EQ(StepRun().End,Runtime::StepRunEnd::IterationCap);
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Paused);
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));EXPECT_EQ(History.UndoCount(),0u);
+}
+TEST_F(ClusteringModuleResident, AStoppedBatchNeverAcceptsALateConvergence)
+{
+    Request.AutoAccept=true;Converged=true;Hold=true;Start();
+    ASSERT_TRUE(Until([&]{return Held.has_value();})); // the first page, reporting convergence, is held
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Stop);
+    Hold=false;Held->Deliver(HeldData);Held.reset();
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    for(int i=0;i<10;++i)Tick();
+    EXPECT_TRUE(Results.empty())<<"a stopped run waits for Accept or Discard";
+    EXPECT_EQ(StepRun().End,Runtime::StepRunEnd::Stopped);
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+}
+TEST_F(ClusteringModuleResident, APausedRunWithAHeldPageRefusesAcceptAndDiscardsOnceItIsConsumed)
+{
+    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Pause));
+    EXPECT_FALSE(Control(Runtime::StepRunAction::Accept))<<"not while its page is in flight";
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    EXPECT_FALSE(Observation().Accepting);
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Discard));
+    for(int i=0;i<3;++i)Tick();
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"terminal at once";
+    EXPECT_TRUE(StepRun().SegmentInFlight)<<"its page is still recorded";
+    EXPECT_TRUE(Results.empty());
+    Hold=false;Held->Deliver(HeldData);Held.reset();
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
+    EXPECT_FALSE(StepRun().SegmentInFlight);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+}
+TEST_F(ClusteringModuleResident, TheRunIsAJobsRowWhileRunningRestingAndAcceptingAndCancelledThroughEither)
+{
+    LendShell();
+    Request.Properties.OutputLabels.Name="p:cluster_id"; // a custom output names the row
+    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    const auto find=[&](auto predicate){auto rows=Rows();const auto row=std::ranges::find_if(rows,predicate);
+        return row==rows.end()?std::optional<Runtime::EditorJobRecord>{}:std::optional{*row};};
+    const auto holder=find([](const auto& row){return row.Identity.OutputName=="p:cluster_id";});
+    ASSERT_TRUE(holder)<<"the running run is a row of the lent workspace";
+    EXPECT_FALSE(holder->Identity.Run.IsValid())<<"the run's first job";
+    EXPECT_EQ(holder->Identity.RequestedDomain,Runtime::EditorJobDomain::GpuCompute);
+    EXPECT_TRUE(Runtime::IsActiveEditorJobState(holder->State));
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Pause));
+    Hold=false;Held->Deliver(HeldData);Held.reset();
+    ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused;}));
+    const auto resting=find([&](const auto& row){return row.Token==holder->Token;});
+    ASSERT_TRUE(resting);EXPECT_TRUE(Runtime::IsActiveEditorJobState(resting->State))<<"a resting run stays a row";
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Run));
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept&&!Observation().Running&&Observation().Iterations==4u;}));
+    Hold=true;(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Held.has_value();})); // its label readback
+    const auto stage=find([&](const auto& row){return row.Identity.Run==holder->Token;});
+    ASSERT_TRUE(stage)<<"the Accept stage joins the run";
+    EXPECT_EQ(stage->Identity.OutputName,"p:cluster_id");
+    EXPECT_EQ(Runtime::CancelEditorJobRun(Runtime::PrepareEditorProcessingCommands(*Shell),*stage),
+        Runtime::EditorJobCancelStatus::Requested);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
+    ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded);
+    Hold=false;Held->Deliver(std::vector<std::byte>(12*4));Held.reset();
+    for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:cluster_id"));
+    // Cancelling the holder's row ends a running run.
+    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    const auto second=find([&](const auto& row){return row.Identity.OutputName=="p:cluster_id"&&row.Token!=holder->Token&&
+        !row.Identity.Run.IsValid()&&Runtime::IsActiveEditorJobState(row.State);});
+    ASSERT_TRUE(second);
+    EXPECT_EQ(Runtime::CancelEditorJobRun(Runtime::PrepareEditorProcessingCommands(*Shell),*second),
+        Runtime::EditorJobCancelStatus::Requested);
+    ASSERT_TRUE(Until([&]{return Results.size()==2;}));
+    EXPECT_EQ(Results[1].Status,Runtime::KMeansRunStatus::Cancelled);
+    ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded);
+}
+TEST_F(ClusteringModuleResident, ACancelOfTheAcceptStageAloneDiscardsTheRun)
+{
+    LendShell();
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    Hold=true;(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Held.has_value();})); // its label readback
+    const auto rows=Rows();
+    const auto stage=std::ranges::find_if(rows,[](const auto& row){return row.Identity.Run.IsValid();});
+    ASSERT_NE(stage,rows.end());
+    // The agent's jobs_cancel {token}: this job only, not its run.
+    EXPECT_EQ(Runtime::CancelEditorJob(Runtime::PrepareEditorProcessingCommands(*Shell),stage->Token),
+        Runtime::EditorJobCancelStatus::Requested);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
+    ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"a cancel before the publication discards the run";
+    Hold=false;Held->Deliver(std::vector<std::byte>(12*4));Held.reset();
+    for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+}
+TEST_F(ClusteringModuleResident, ADiscardedRunLeavesNoActiveRow)
+{
+    LendShell();
+    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    const auto active=[&]{return std::ranges::any_of(Rows(),[](const auto& row){return Runtime::IsActiveEditorJobState(row.State);});};
+    EXPECT_TRUE(active());
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
+    EXPECT_TRUE(Until([&]{return !active();}))<<"the discarded run's holder is cancelled with it";
 }

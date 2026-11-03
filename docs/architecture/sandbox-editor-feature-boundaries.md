@@ -95,13 +95,14 @@ reaps a job a frame after it ends; it drops them with the scene epoch. Each acti
 `CancelEditorJobRun`: it cancels the row's whole run like `notifications/cancelled` (a stage cancelled alone would leave
 later stages to run), except an auxiliary helper job, which cancels only itself. A disabled Cancel shows
 `ResolveEditorJobCancelReadiness`'s reason (already ended, not an editor job, cancel already requested, no attachment).
-Job-service counters (`GetEditorJobStats`, whole service) sit in a collapsed header. K-Means and consolidation runs are not
-listed (not editor-identity jobs); the backend columns show what the job record carries (`EditorJobDomain`, CPU until a
+Job-service counters (`GetEditorJobStats`, whole service) sit in a collapsed header. CPU K-Means and consolidation runs
+are not listed (not editor-identity jobs); a GPU K-Means run is (ARCH-022 S3c: its step run's holder and its Accept
+stage are editor jobs of the workspace the Sandbox shell lends the clustering service); the backend columns show what the job record carries (`EditorJobDomain`, CPU until a
 producer fills them).
 Panels answer a duplicate refusal through `OperationRunSlot::WatchDuplicate`: the slot
 follows the output's active run and shows the refusal, and the panel's last result is untouched.
-K-Means and consolidation jobs belong to their services, so neither the surface nor
-the agent's `jobs_cancel` cancels them. `FindEditorOperationRun(records, key)` is the
+CPU K-Means and consolidation jobs belong to their services, so neither the surface nor
+the agent's `jobs_cancel` cancels them (a GPU K-Means run's jobs are editor jobs: cancelling one discards the run). `FindEditorOperationRun(records, key)` is the
 record `ResolveEditorOperationProgress` projects.
 
 Property-binding targets and presentation slots own vectors of the canonical

@@ -69,10 +69,24 @@ the float front under the label property's name; Show selects that property.
 Accept lifecycle. The existing clustering publication writes labels, colors,
 and optional scalar labels in one undoable entry. Accept refuses stale inputs
 or outputs. Stop finishes the current iteration; Discard and detach leave CPU
-outputs unchanged. Batch requests and `run_kmeans` agent commands auto-accept; refused stale Accept
+outputs unchanged. Batch requests and `run_kmeans` agent commands auto-accept at
+convergence or the iteration cap, never after Stop; refused stale Accept
 finishes with StaleSource. A terminal preview fails with a reason after 600
 busy-ring retries. Failed recordings retain resources until device-idle shutdown.
 The panel exposes Stop, Accept, Discard, backend identity and IO counters.
+
+A GPU run is a step run (ARCH-022 S3c; `Runtime.StepRuns`, owner-driven): it counts
+each iteration at its Update boundary, where it may continue, pause (`run_control`
+pause or step n), stop or be accepted. A paused run rests at that boundary, with
+that boundary's preview recorded alone and nothing else recorded; it resumes
+from the same state, so any step sequence gives the uninterrupted run's labels and
+bitwise centroids (Vulkan smoke). Accept from a rest counts no iteration: it
+assigns labels for the current centroids (when the last update moved one), records
+the terminal preview and reads the labels back. Its holder and its Accept stage are
+editor jobs of the workspace the Sandbox shell lends (rows of the Jobs window; a
+cancel discards the run). A composition needs `StepRunsModule` and a `JobService`
+service (`AsyncWorkModule`); without them the request falls back to the CPU with that
+diagnostic.
 
 CPU centroid sums also accumulate in double before conversion to float.
 Exact CPU/GPU bit parity is not guaranteed: summation grouping, division

@@ -81,8 +81,9 @@ export namespace Extrinsic::Runtime
     {
         JobToken Token{};
         EditorJobIdentity Identity{};
-        // `JobDesc::CorrelationId` of a service run (K-Means, consolidation);
-        // 0 for jobs submitted through `EditorJobCommandSurface::Submit`.
+        // `JobDesc::CorrelationId` of a service run (K-Means, consolidation; a
+        // GPU K-Means run's editor jobs carry it too); 0 for other jobs submitted
+        // through `EditorJobCommandSurface::Submit`.
         std::uint64_t CorrelationId{0u};
         std::string Name{};
         JobState State{JobState::Invalid};
@@ -201,7 +202,7 @@ export namespace Extrinsic::Runtime
         // An editor job that already ended or whose cancel was already requested.
         NotActive,
         // Unknown or reaped token, or a job the editor did not submit through
-        // `Submit` (asset decode, scene files, K-Means and consolidation runs).
+        // `Submit` (asset decode, scene files, CPU K-Means and consolidation runs).
         NotEditorJob,
         // Detached attachment (stale epoch) or no job service.
         Unavailable,

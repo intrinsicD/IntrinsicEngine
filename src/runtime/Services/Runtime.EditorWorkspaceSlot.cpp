@@ -1,7 +1,21 @@
+module;
+
+#include <concepts>
+#include <functional>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <type_traits>
+
 module Extrinsic.Runtime.EditorWorkspaceSlot;
 
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -30,5 +44,10 @@ namespace Extrinsic::Runtime
         if (m_Current == nullptr) return {};
         if (m_Current == &m_Own && m_Own.IsAttached()) (void)PrepareEditorWorkspaceSnapshotFrame(m_Own);
         return PrepareEditorProcessingCommands(*m_Current);
+    }
+
+    EditorJobCommandSurface EditorWorkspaceSlot::JobCommands()
+    {
+        return EditorProcessingCommandsAccess::Resolve(Commands()).JobCommands;
     }
 }

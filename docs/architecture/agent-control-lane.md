@@ -180,7 +180,8 @@ stack ends the requested batch successfully; it does not mask a failed command.
   cap until its continuation completes (that delivery ends it), then it is dropped silently, so
   call-and-cancel cannot grow the queue. A cancelled `jobs_wait` ends at the next poll (its hook
   ends the wait; the job is not affected). Calls with no editor job keep running to their end:
-  K-Means and consolidation runs (their jobs belong to the services, not the editor surface),
+  K-Means and consolidation runs (their call's hook cancels nothing; a GPU K-Means run's jobs are editor jobs, which
+  `jobs_cancel` reaches),
   scene save/load, imports and captures. A run whose job was cancelled some other way
   (`jobs_cancel`, or any other caller of the editor surface's `Cancel`; the panels do not cancel
   through it yet) answers with the error code `cancelled`. Only a requested cancel relabels a run,
@@ -244,7 +245,7 @@ stack ends the requested batch successfully; it does not mask a failed command.
   message, null until reported; RUNTIME-317), and `cancellable: true` while active. `jobs_wait`
   answers carry the same row. Those rows, and only those, are what `jobs_cancel {token}`
   accepts (it calls `EditorJobCommandSurface::Cancel`): asset decode and imports, scene files and
-  K-Means and consolidation runs (service jobs found by correlation id) answer `not_editor_job`,
+  CPU K-Means and consolidation runs (service jobs found by correlation id) answer `not_editor_job`,
   an ended job `job_not_active`. A cancel on a queued or running job, or one parked for apply,
   never publishes: the job service checks the cancel flag before every apply, so a GPU result is
   discarded by its job's finalizer instead of half accepted. `jobs_wait {token | entity + output,

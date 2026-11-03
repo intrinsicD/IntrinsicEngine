@@ -25,6 +25,7 @@ import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.StepRuns;
 
 import Extrinsic.Runtime.Module;
 import Extrinsic.Core.Error;
@@ -1002,6 +1003,7 @@ namespace Extrinsic::Runtime
             const RunKMeans& command,
             ClusteringGpuState* gpuState,
             SpatialIndexCache* spatialIndices, RHI::IDevice* device, EditorCommandHistory* history,
+            StepRunsService* steps, EditorWorkspaceSlot& workspace,
             ClusteringModuleStats& stats)
         {
             stats.CommandsHandled += 1u;
@@ -1049,10 +1051,13 @@ namespace Extrinsic::Runtime
                 processing.AttachmentActive = [worlds=context.Worlds,world,scene=processing.Scene,attached=command.AttachmentActive] {
                     return worlds && worlds->ActiveWorld()==world && worlds->Get(world)==scene && (!attached || attached());
                 };
-                processing.JobCommands.Submit = [jobs=context.Jobs,history,prefix=command.LabelPrefix,correlation=context.Correlation.Value](JobDesc desc, EditorJobIdentity) {
+                // The run's holder and its Accept are editor jobs of the workspace: rows of its Jobs window.
+                const EditorJobCommandSurface editorJobs = workspace.JobCommands();
+                processing.JobCommands = editorJobs;
+                processing.JobCommands.Submit = [submit=editorJobs.Submit,history,prefix=command.LabelPrefix,correlation=context.Correlation.Value](JobDesc desc, EditorJobIdentity identity) {
                     CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
                     desc.CorrelationId = correlation;
-                    return jobs->Submit(std::move(desc));};
+                    return submit ? submit(std::move(desc), std::move(identity)) : JobToken{};};
                 const auto captured = std::make_shared<KMeansSnapshot>();
                 const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);
                 const auto availability = BuildGeometryAvailability(processing.Scene->Raw(), entity);
@@ -1069,16 +1074,16 @@ namespace Extrinsic::Runtime
                 const auto current = [processing, entity, watches=std::move(watches)] {
                     return processing.AttachmentActive() && GeometryProcessingDetail::GeometryPropertiesCurrent(processing, entity, watches);
                 };
-                const ClusteringGpuSubmission submission = gpuState != nullptr
-                    ? gpuState->Start(*snapshot, processing, current,
+                const ClusteringGpuSubmission submission = gpuState != nullptr && steps != nullptr && editorJobs.Available()
+                    ? gpuState->Start(*snapshot, processing, *steps, current,
                         [captured,processing](const GK::KMeansResult& clustered) {
                             const auto status=CommitKMeansOutputs(processing.Scene,processing.World,processing.CommandHistory,*captured,clustered);
                             return status==EditorCommandHistoryStatus::Applied?EditorCommandStatus::Applied:
                                 status==EditorCommandHistoryStatus::StaleEntity?EditorCommandStatus::StaleEntity:EditorCommandStatus::GeometryProcessingFailed;
                         })
                     : ClusteringGpuSubmission{
-                          .Diagnostic =
-                              "Clustering Vulkan state is unavailable.",
+                          .Diagnostic = gpuState == nullptr ? "Clustering Vulkan state is unavailable."
+                              : "K-Means step runs or editor jobs are unavailable.",
                       };
                 if (submission.Accepted)
                 {
@@ -1129,6 +1134,10 @@ namespace Extrinsic::Runtime
         };
         m_Service.m_GpuReadinessDiagnostic = [this](const RunKMeans& request, const EditorProcessingContext& context) {
             return m_GpuState ? m_GpuState->ReadinessDiagnostic(request, context) : std::string{};
+        };
+        m_Service.m_LendWorkspace = [this](EditorWorkspaceAttachment* use, const EditorWorkspaceAttachment* release) {
+            if (use != nullptr) m_Workspace.Use(*use);
+            else if (release != nullptr) m_Workspace.Release(*release);
         };
 
         if (Core::Result provided =
@@ -1193,6 +1202,7 @@ namespace Extrinsic::Runtime
                     context,
                     command,
                     m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
+                    m_Steps, m_Workspace,
                     m_Stats);
             });
 
@@ -1226,6 +1236,8 @@ namespace Extrinsic::Runtime
         m_History =
             setup.Services().Find<EditorCommandHistory>();
         m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
+        m_Steps = setup.Services().Find<StepRunsService>();
+        m_Workspace.AttachOwn(setup.Worlds(), setup.Services());
         return Core::Ok();
     }
 
@@ -1233,6 +1245,7 @@ namespace Extrinsic::Runtime
     {
         m_Service.m_GpuRun = {};
         m_Service.m_GpuReadinessDiagnostic = {};
+        m_Service.m_LendWorkspace = {};
         if (m_Jobs != nullptr && m_Device != nullptr &&
             m_GpuParticipant.IsValid())
         {
@@ -1242,6 +1255,8 @@ namespace Extrinsic::Runtime
         }
         m_GpuParticipant = {};
         m_GpuState.reset();
+        m_Workspace.DetachOwn(); // after the GPU state's last transaction used its jobs
+        m_Steps = nullptr;
         if (m_JobCompletedSubscription.IsValid())
             context.Events.Unsubscribe(m_JobCompletedSubscription);
         if (m_ClusterLabelsChangedSubscription.IsValid())

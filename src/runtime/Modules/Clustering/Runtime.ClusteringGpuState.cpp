@@ -2,6 +2,7 @@ module;
 
 #include <array>
 #include <algorithm>
+#include <chrono>
 #include <bit>
 #include <cmath>
 #include <cstring>
@@ -22,7 +23,10 @@ import Geometry.Validation;
 import :GpuBackend;
 import Geometry.KMeans;
 import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PointScalarTransaction;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.SelectionController;
@@ -34,6 +38,46 @@ import Extrinsic.RHI.Types;
 #include "Modules/Clustering/Runtime.ClusteringGpuState.Internal.hpp"
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        // A step run's jobs as editor jobs of `surface` under `identity`: rows of its Jobs window, a cancel cancelling
+        // the whole run. `holder` gets the first job. (One GPU run at a time and its transaction's reservation of
+        // the output admit it; a finished run's holder can still be listed for a frame.)
+        StepRunJobs EditorStepRunJobs(EditorJobCommandSurface surface, EditorJobIdentity identity,
+                                      std::shared_ptr<JobToken> holder)
+        {
+            return {.Submit = [surface, identity, holder](PluginJob job, std::string*) -> PluginJobHandle
+                    {
+                        auto id = identity;
+                        id.Run = job.Run.Token;
+                        auto held = std::make_shared<PluginJob>(std::move(job));
+                        auto finalized = std::make_shared<bool>(false);
+                        JobDesc desc{};
+                        desc.DebugName = held->Label;
+                        desc.Work = [held](const JobCancellation& cancellation)
+                        {
+                            held->Work([&cancellation] { return cancellation.IsCancelled(); });
+                            return JobResultEnvelope::Make(true);
+                        };
+                        if (held->IsReadyToApply) desc.IsReadyToApply = [held] { return held->IsReadyToApply(); };
+                        desc.PublishCompletion = [held, finalized](KernelEventBus&, const JobResultEnvelope&)
+                        {
+                            *finalized = true;
+                            return held->Completion(true);
+                        };
+                        desc.FinalizeUnpublishedOnMainThread = [held, finalized]
+                        {
+                            if (!std::exchange(*finalized, true)) (void)held->Completion(false);
+                        };
+                        const JobToken token = surface.Submit ? surface.Submit(std::move(desc), std::move(id)) : JobToken{};
+                        if (!id.Run.IsValid()) *holder = token;
+                        return {token};
+                    },
+                    .Cancel = [surface](const PluginJobHandle job)
+                    { return CancelEditorRuns(surface, std::span<const JobToken>{&job.Token, 1u}).Requested > 0u; }};
+        }
+    }
+
     struct ClusteringGpuState::Impl
     {
         struct Operation
@@ -53,8 +97,16 @@ namespace Extrinsic::Runtime
             KMeansGpuPhase Phase{KMeansGpuPhase::Initialize};
             KMeansPagingLimits Limits{KMeansPagingForTesting};
             std::uint32_t Row{}, Inner{}, Count{}, Clusters{}, PreviewDeferrals{};
-            bool Boundary{}, Presented{}, Terminal{}, FinalAssignment{}, Ready{}, Accepting{}, Stop{}, Discard{},
-                Recorded{};
+            bool Boundary{}, Presented{}, Terminal{}, FinalAssignment{}, Ready{}, Accepting{}, Discard{}, Recorded{};
+            // The step run: its controls decide each next iteration. A run rests (no page) at an iteration boundary
+            // until it may continue, is stopped or accepted; `Moved`: the last update moved a centroid, so labels for
+            // those centroids need a final assignment. `RestPreview`: the page recorded before resting is its
+            // boundary's preview alone. `CommitRequested`: Accept (the run's Commit) is preparing and reading labels.
+            StepRunsService* Steps{};
+            std::uint64_t Run{};
+            StepRunDriver Driver{};
+            JobToken Holder{}; // the step run's first editor job: its run's token
+            bool Resting{true}, Moved{}, RestPreview{}, CommitRequested{};
         };
         RHI::IDevice& Device;
         std::shared_ptr<bool> Alive{std::make_shared<bool>(true)};
@@ -62,6 +114,9 @@ namespace Extrinsic::Runtime
         // Recorder failures can follow recorded commands. Retain their workspaces and
         // leases until the participant's device-idle shutdown.
         std::vector<std::shared_ptr<Operation>> Retired{};
+        // Finished runs whose last page is still in flight: their workspace returns (and their step run retires)
+        // once it completed.
+        std::vector<std::shared_ptr<Operation>> Settling{};
         // One run at a time: the last run's buffers and pipelines, kept only
         // when no submission recorded with them can still execute.
         std::shared_ptr<KMeansGpuWorkspace> Idle{};
@@ -82,14 +137,53 @@ namespace Extrinsic::Runtime
             a->Result.Message = std::move(why);
             a->Result.Error =
                 status == KMeansRunStatus::Applied ? Core::ErrorCode::Success : Core::ErrorCode::InvalidState;
-            const bool settled =
-                !a->Page || a->Page->State == SpatialQueryState::Ready || a->Page->State == SpatialQueryState::Failed;
+            DiscardEditorPointScalar(a->Commands, a->Transaction);
+            Tell(*a, status);
+            if (!Settle(a))
+                Settling.push_back(a);
+            Completed = ClusteringGpuResult{.Published = std::move(a->Result)};
+        }
+        // A finished run's last page completed (or none was in flight): its workspace is free again, a failed
+        // recorded one stays retired, and its step run may retire. False while the page is in flight.
+        bool Settle(const std::shared_ptr<Operation>& a)
+        {
+            if (a->Page && a->Page->State != SpatialQueryState::Ready && a->Page->State != SpatialQueryState::Failed)
+                return false;
             if (a->Recorded && a->Page && a->Page->State == SpatialQueryState::Failed)
                 Retired.push_back(a);
-            else if (settled && a->Workspace && !Idle)
+            else if (a->Workspace && !Idle)
                 Idle = std::move(a->Workspace);
-            DiscardEditorPointScalar(a->Commands, a->Transaction);
-            Completed = ClusteringGpuResult{.Published = std::move(a->Result)};
+            a->Driver.Recording(false);
+            return true;
+        }
+        // The run's end as its step run sees it: a publication answers its pending Commit; a cancel or a stale source
+        // discards it; a failure fails its Commit or its iteration. Ignored by a step run that ended already.
+        void Tell(Operation& a, const KMeansRunStatus status)
+        {
+            std::string refusal;
+            if (status == KMeansRunStatus::Applied)
+                a.Driver.CommitFinished(true);
+            else if (a.CommitRequested && status != KMeansRunStatus::Cancelled)
+                a.Driver.CommitFinished(false, a.Result.Message);
+            else if (status == KMeansRunStatus::GeometryProcessingFailed)
+                (void)a.Driver.Stepped({}, StepOutcome::Failed);
+            else if (a.Steps)
+                (void)a.Steps->Control(a.Run, StepRunAction::Discard, 1u, refusal);
+        }
+        // Stop, the iteration cap or convergence ended the step run (it is not discarded).
+        [[nodiscard]] static bool Ended(const Operation& a)
+        {
+            const auto run = a.Steps ? a.Steps->Observe(a.Run) : std::nullopt;
+            return run && run->End != StepRunEnd::None && !IsTerminal(run->Phase);
+        }
+        // The labels of the current centroids: a final assignment when the last update moved one, then the terminal
+        // preview, which reads the centroids back and makes the run ready.
+        static void BeginFinal(Operation& a)
+        {
+            a.Terminal = true;
+            a.FinalAssignment = a.Moved;
+            a.Phase = a.Moved ? KMeansGpuPhase::Assign : KMeansGpuPhase::Preview;
+            a.Row = a.Inner = 0;
         }
         std::string ReadinessDiagnostic(const RunKMeans& request, const EditorProcessingContext& context) const
         {
@@ -106,6 +200,7 @@ namespace Extrinsic::Runtime
         }
         ClusteringGpuSubmission Start(KMeansSnapshot& snapshot,
             const EditorProcessingContext& context,
+            StepRunsService& steps,
             std::function<bool()> current,
             std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish)
         {
@@ -179,6 +274,7 @@ namespace Extrinsic::Runtime
                         auto op = weak.lock();
                         if (!op)
                             return EditorCommandStatus::StaleEntity;
+                        op->Driver.Publishing(); // from here the publication decides the step run's end
                         op->Geometry.Labels.resize(op->Count);
                         for (std::uint32_t i = 0; i < op->Count; ++i)
                         {
@@ -197,8 +293,14 @@ namespace Extrinsic::Runtime
                     if (!*alive || !op || Active != op)
                         return;
                     op->Result.CpuStageReadbackBytes += result.CpuStageReadbackBytes;
-                    Finish(result.Status == EditorCommandStatus::StaleEntity       ? KMeansRunStatus::StaleSource
-                            : result.Phase == EditorGpuTransactionPhase::Discarded ? KMeansRunStatus::Cancelled
+                    // An unpublished end is "cancelled or stale"; a cancel accepted for one of the run's jobs (its
+                    // Accept stage alone, say) makes it a cancel, as the agent lane relabels runs.
+                    const auto& jobs = op->Context.JobCommands;
+                    const bool cancelled = result.Phase == EditorGpuTransactionPhase::Discarded &&
+                        (result.Status != EditorCommandStatus::StaleEntity ||
+                            (jobs.RunCancelRequested && jobs.RunCancelRequested(op->Holder)));
+                    Finish(cancelled                                               ? KMeansRunStatus::Cancelled
+                            : result.Status == EditorCommandStatus::StaleEntity    ? KMeansRunStatus::StaleSource
                             : result.Status == EditorCommandStatus::Applied ||
                                 result.Status == EditorCommandStatus::NoChange
                             ? KMeansRunStatus::Applied
@@ -207,6 +309,63 @@ namespace Extrinsic::Runtime
                 });
             if (!a->Transaction)
                 return refuse(admission.Message);
+            // The step run: its holder is the run's first editor job, the Accept stage joins it.
+            const auto& command = snapshot.Command;
+            EditorJobIdentity jobIdentity{.EntityId = command.StableEntityId,
+                .Scope = ToEditorJobScope(command.Properties.OutputLabels.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+                .OutputName = command.Properties.OutputLabels.Name,
+                .RequestedDomain = EditorJobDomain::GpuCompute};
+            const auto holder = std::make_shared<JobToken>();
+            std::string refusal;
+            a->Steps = &steps;
+            a->Run = steps.Start(
+                {.Label = "K-Means",
+                    .Owner = "Runtime.ClusteringModule",
+                    .Output = {.StableEntityId = command.StableEntityId, .Property = command.Properties.OutputLabels},
+                    .IterationCap = snapshot.Params.MaxIterations,
+                    .AcceptOnEnd = command.AutoAccept,
+                    // Pages limit the rate: one submission a frame, previews GpuPreviewInterval iterations apart.
+                    .PreviewInterval = std::chrono::nanoseconds{0},
+                    .MetricNames = {"inertia", "max_shift_squared", "", ""}},
+                {.Commit =
+                        [this, alive = Alive, weak](std::string& diagnostic)
+                    {
+                        const auto op = weak.lock();
+                        if (!*alive || !op || Active != op)
+                        {
+                            diagnostic = "The K-Means run ended.";
+                            return StepRunCommit::Refused;
+                        }
+                        op->CommitRequested = true; // Advance prepares the labels, then reads them back
+                        return StepRunCommit::Pending;
+                    },
+                    .Discard =
+                        [this, alive = Alive, weak]
+                    {
+                        const auto op = weak.lock();
+                        if (!*alive || !op || Active != op)
+                            return;
+                        if (op->Accepting)
+                            DiscardEditorPointScalar(op->Commands, op->Transaction);
+                        else
+                        {
+                            op->Discard = true;
+                            Advance();
+                        }
+                    }},
+                EditorStepRunJobs(context.JobCommands, jobIdentity, holder),
+                refusal);
+            if (a->Run == 0u)
+            {
+                DiscardEditorPointScalar(a->Commands, a->Transaction);
+                return refuse(refusal);
+            }
+            a->Driver = steps.Driver(a->Run);
+            a->Holder = *holder;
+            jobIdentity.Run = *holder;
+            JoinEditorPointScalarRun(a->Transaction, std::move(jobIdentity));
+            (void)steps.Control(a->Run, StepRunAction::Run, 0u, refusal);
             // The caller moves the full before-state into the publication callback
             // only after admission. Iteration retains just its live-slot map/config.
             a->Snapshot.Command = snapshot.Command;
@@ -216,7 +375,6 @@ namespace Extrinsic::Runtime
             a->Snapshot.SlotCount = snapshot.SlotCount;
             a->Snapshot.Params = snapshot.Params;
             auto& result = a->Result;
-            const auto& command = a->Snapshot.Command;
             result.Correlation = a->Snapshot.Correlation;
             result.World = a->Snapshot.World;
             result.StableEntityId = command.StableEntityId;
@@ -231,6 +389,7 @@ namespace Extrinsic::Runtime
             Active = std::move(a);
             return {.Accepted = true};
         }
+        // The step run's Commit, once the labels are ready: reads them back and publishes (its transaction).
         void Accept()
         {
             const auto a = Active;
@@ -239,8 +398,7 @@ namespace Extrinsic::Runtime
             const auto snapshot = SnapshotEditorPointScalar(a->Commands, a->Transaction);
             if (!snapshot.CanAccept)
             {
-                if (a->Snapshot.Command.AutoAccept)
-                    Finish(KMeansRunStatus::StaleSource, snapshot.AcceptRefusalReason);
+                Finish(KMeansRunStatus::StaleSource, snapshot.AcceptRefusalReason);
                 return;
             }
             a->Accepting = true;
@@ -255,31 +413,34 @@ namespace Extrinsic::Runtime
             auto a = Active;
             if (!a || a->Snapshot.Correlation != id)
                 return {};
-            if (action == KMeansGpuAction::Stop)
-                a->Stop = true;
-            if (action == KMeansGpuAction::Discard)
+            // The panel's buttons are the step run's controls; Accept only while it can publish now.
+            const auto canAccept = [&]
             {
-                if (a->Accepting)
-                    DiscardEditorPointScalar(a->Commands, a->Transaction);
-                else
-                {
-                    a->Discard = true;
-                    Advance();
-                }
-            }
-            if (action == KMeansGpuAction::Accept)
-                Accept();
-            a = Active;
-            if (!a)
-                return {};
+                const bool resting = a->Resting && !a->Ready && a->Result.Iterations > 0u;
+                return (a->Ready || resting) && !a->CommitRequested &&
+                    (a->Ready ? SnapshotEditorPointScalar(a->Commands, a->Transaction).CanAccept : a->Current());
+            };
+            std::string refusal;
+            if (action == KMeansGpuAction::Stop)
+                (void)a->Steps->Control(a->Run, StepRunAction::Stop, 1u, refusal);
+            if (action == KMeansGpuAction::Discard)
+                (void)a->Steps->Control(a->Run, StepRunAction::Discard, 1u, refusal); // its pump discards the run
+            if (action == KMeansGpuAction::Accept && canAccept())
+                (void)a->Steps->Control(a->Run, StepRunAction::Accept, 1u, refusal);
+            const bool resting = a->Resting && !a->Ready && a->Result.Iterations > 0u;
+            const bool accepting = a->Accepting || a->CommitRequested;
+            const bool ready = a->Ready || resting;
             const auto scalar = SnapshotEditorPointScalar(a->Commands, a->Transaction);
-            return {.Running = !a->Ready,
-                .ReadyToAccept = a->Ready,
-                .Accepting = a->Accepting,
-                .CanAccept = a->Ready && !a->Accepting && scalar.CanAccept,
-                .Message = (!a->Ready || scalar.AcceptRefusalReason.empty())
-                    ? (a->Ready ? "GPU labels await Accept or Discard." : "GPU K-Means pages running.")
+            return {.Running = !ready && !accepting,
+                .ReadyToAccept = ready,
+                .Accepting = accepting,
+                .CanAccept = canAccept(),
+                .Message = a->Resting && a->Result.Iterations == 0u ? "Paused before its first iteration."
+                    : !ready ? "GPU K-Means pages running."
+                    : resting ? "Paused at an iteration boundary; Accept prepares its labels."
+                    : scalar.AcceptRefusalReason.empty() ? "GPU labels await Accept or Discard."
                     : scalar.AcceptRefusalReason,
+                .StepRun = a->Run,
                 .Iterations = a->Result.Iterations,
                 .Submissions = a->Result.GpuSubmissions,
                 .Previews = a->Result.GpuPreviews,
@@ -342,7 +503,7 @@ namespace Extrinsic::Runtime
                     if (a->Phase == KMeansGpuPhase::Presentation)
                     {
                         a->Presented = true;
-                        if (a->Terminal)
+                        if (a->Terminal || a->RestPreview)
                             break;
                     }
                     a->Phase = a->Phase == KMeansGpuPhase::Initialize ? KMeansGpuPhase::Assign
@@ -392,7 +553,16 @@ namespace Extrinsic::Runtime
             }
             return terminalPreview ? a->Workspace->Centroids() : a->Workspace->Diagnostics();
         }
+        // Main thread, frame maintenance (and a discard): settles finished runs, moves the active one on, and tells
+        // its step run whether a page is in flight.
         void Advance()
+        {
+            std::erase_if(Settling, [this](const auto& settling) { return Settle(settling); });
+            AdvanceActive();
+            if (const auto a = Active)
+                a->Driver.Recording(bool(a->Page));
+        }
+        void AdvanceActive()
         {
             const auto a = Active;
             if (!a)
@@ -406,7 +576,7 @@ namespace Extrinsic::Runtime
             }
             if (a->Ready)
             {
-                if (a->Snapshot.Command.AutoAccept && !a->Accepting)
+                if (a->CommitRequested && !a->Accepting)
                     Accept();
                 return; // Manual stale results remain inspectable with Accept disabled.
             }
@@ -436,6 +606,13 @@ namespace Extrinsic::Runtime
                         return;
                     }
                     ++a->Result.GpuPreviews;
+                    if (a->RestPreview)
+                    {
+                        a->RestPreview = false;
+                        a->Resting = true;
+                        a->Phase = KMeansGpuPhase::Assign;
+                        a->Row = a->Inner = 0;
+                    }
                     if (a->Terminal)
                     {
                         if (a->Page->Data.size() != std::size_t(a->Clusters) * 12)
@@ -456,7 +633,7 @@ namespace Extrinsic::Runtime
                         a->Result.Centroids = a->Geometry.Centroids;
                         a->Ready = true;
                         a->Page.reset();
-                        if (a->Snapshot.Command.AutoAccept)
+                        if (a->CommitRequested)
                             Accept();
                         return;
                     }
@@ -496,17 +673,46 @@ namespace Extrinsic::Runtime
                                 a->Snapshot.Params.ConvergenceTolerance * a->Snapshot.Params.ConvergenceTolerance;
                         a->Geometry.Iterations = a->Result.Iterations;
                         a->Geometry.Converged = a->Result.Converged;
-                        a->Terminal =
-                            a->Stop || a->Result.Converged || a->Result.Iterations == a->Snapshot.Params.MaxIterations;
-                        a->FinalAssignment = a->Terminal && (d.Changed & 2u) != 0;
-                        a->Phase = a->FinalAssignment ? KMeansGpuPhase::Assign
-                            : a->Terminal ||
-                                a->Result.Iterations % a->Snapshot.Command.Parameters.GpuPreviewInterval == 0
-                            ? KMeansGpuPhase::Preview
-                            : KMeansGpuPhase::Assign;
+                        a->Moved = (d.Changed & 2u) != 0;
+                        // The step run counts the iteration and says whether the next one may be recorded now.
+                        const bool more = a->Driver.Stepped(
+                            {.Values = {double(d.Inertia), double(d.MaxShift), 0.0, 0.0}},
+                            a->Result.Converged ? StepOutcome::Converged : StepOutcome::Continue);
+                        if (more)
+                            a->Phase = a->Result.Iterations % a->Snapshot.Command.Parameters.GpuPreviewInterval == 0 &&
+                                    a->Driver.MayPreview()
+                                ? KMeansGpuPhase::Preview
+                                : KMeansGpuPhase::Assign;
+                        else if (Ended(*a))
+                            BeginFinal(*a);
+                        else
+                        {
+                            // Rests at this boundary: its preview alone (not fused with the next Assign), then nothing
+                            // until the run continues, stops or is accepted.
+                            a->Phase = KMeansGpuPhase::Assign;
+                            a->RestPreview = a->Driver.MayPreview();
+                            a->Resting = !a->RestPreview;
+                            if (a->RestPreview)
+                                a->Phase = KMeansGpuPhase::Preview;
+                        }
                     }
                 }
                 a->Page.reset();
+            }
+            if (a->Resting)
+            {
+                if (a->CommitRequested || Ended(*a))
+                {
+                    if (a->Result.Iterations == 0u)
+                    {
+                        Finish(KMeansRunStatus::Cancelled, "K-Means stopped before its first iteration.");
+                        return;
+                    }
+                    BeginFinal(*a); // Accept from a rest, or Stop while resting: labels of the current centroids
+                }
+                else if (!a->Driver.MayStart())
+                    return;
+                a->Resting = false;
             }
             if (a->Phase == KMeansGpuPhase::Preview && !a->Back)
             {
@@ -521,6 +727,11 @@ namespace Extrinsic::Runtime
                         return;
                     }
                     a->Phase = KMeansGpuPhase::Assign; // Skip a busy interval preview without idling a frame.
+                    if (std::exchange(a->RestPreview, false))
+                    {
+                        a->Resting = true; // a busy rest preview: rest without it
+                        return;
+                    }
                 }
             }
             a->PreviewDeferrals = 0;
@@ -551,10 +762,11 @@ namespace Extrinsic::Runtime
     ClusteringGpuState::~ClusteringGpuState() = default;
     ClusteringGpuSubmission ClusteringGpuState::Start(KMeansSnapshot& s,
         const EditorProcessingContext& c,
+        StepRunsService& steps,
         std::function<bool()> current,
         std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish)
     {
-        return m_Impl->Start(s, c, std::move(current), std::move(publish));
+        return m_Impl->Start(s, c, steps, std::move(current), std::move(publish));
     }
     KMeansGpuObservation ClusteringGpuState::GpuRun(CommandCorrelationId id, KMeansGpuAction action)
     {
@@ -571,7 +783,8 @@ namespace Extrinsic::Runtime
     }
     bool ClusteringGpuState::HasInFlightWork() const noexcept
     {
-        return bool(m_Impl->Active) || bool(m_Impl->Completed) || !m_Impl->Retired.empty();
+        return bool(m_Impl->Active) || bool(m_Impl->Completed) || !m_Impl->Retired.empty() ||
+            !m_Impl->Settling.empty();
     }
     std::string ClusteringGpuState::ReadinessDiagnostic(
         const RunKMeans& request, const EditorProcessingContext& context) const

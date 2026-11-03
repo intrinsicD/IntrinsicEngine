@@ -3049,3 +3049,55 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - Codex delta review of the fixes (full diff sha256 f80d1960…846d8cc): "APPROVE — ... All three round-1 findings
     are closed." ... "No new correctness finding." The CPD Vulkan smoke (2/2) and the Sandbox CPD and panel
     integration tests (90/90) pass with the worker Commit back in the holder's completion.
+- 2026-11-03, S3c-2 split in two blocks: S3c-2a (k-means as an owner-driven step run, its rests, Accept, Jobs rows)
+  and S3c-2b (replacement of a running request, revision 3 item 5 and revision 4 item 9). S3c-2a implemented
+  (`Runtime.ClusteringGpuState.cpp`, `Runtime.ClusteringModule.{cppm,cpp}`, `Runtime.ClusteringTypes.{cppm,cpp}`):
+  - Each GPU run starts a step run (`StepRunsService`, owner-driven; cap = `MaxIterations`, `AcceptOnEnd` = the
+    request's `AutoAccept`) and sets it running. At each Update boundary the state machine calls
+    `Stepped(inertia, squared max shift; converged or not)`: more → the next iteration (an interval preview only
+    with `MayPreview`); ended (cap, convergence, Stop) → final assignment when a centroid moved, terminal preview,
+    ready; otherwise it rests: that boundary's preview recorded alone, then nothing until `MayStart`, a Stop
+    (then the terminal path) or Accept. `Recording` follows whether a page is in flight; a finished run whose last
+    page is in flight keeps its workspace (and its step run stays unretired) until the page completed (`Settling`).
+  - Commit (Accept) is Pending: from a rest it prepares the current centroids' labels (final assignment, terminal
+    preview), then the transaction's label readback; the publish callback calls `Publishing()`; the transaction's
+    end answers it (`CommitFinished`), a cancel before the publication discards the step run. The owner reports
+    its own ends: a stale source or a cancel discards the step run, a failure fails its iteration or Commit.
+  - The holder and the Accept stage are editor jobs (`EditorStepRunJobs`): of the workspace the Sandbox shell now
+    lends `ClusteringService` (`UseEditorWorkspace`), else the module's own; identity = entity, the requested
+    output's domain and name, `ScalarField`, requested GPU; the Accept stage joins the holder's token
+    (`JoinEditorPointScalarRun`, now exported from `Runtime.PointScalarTransaction` for both callers). The panel's
+    Stop, Accept and Discard are the step run's controls; `KMeansGpuObservation::StepRun` names it for
+    `run_control`/`run_observe`.
+  - Decisions within the plan, for review: a rest always records its boundary's preview (subject to `MayPreview`),
+    not only on the interval cadence, since a rest is where the run is inspected; `PreviewInterval` 0 (one page a
+    frame and `GpuPreviewInterval` already bound the rate, and the existing interval tests need every due preview);
+    no `FindActive` admission for the holder (one GPU run at a time and the transaction's ring reservation admit it;
+    a finished run's holder is listed until its next gate, which refused the next run for a frame); the panel's
+    Accept on a ready run still requires `CanAccept` first, so a stale manual result stays inspectable (old
+    behavior); the step run has no `Valid` callable (the owner checks its captures per page and reports).
+  - The module takes the workspace's job surface through a new `EditorWorkspaceSlot::JobCommands()` (Services), not
+    the editor's internal access header, and `ClusteringTypes` names the lent attachment through the slot's module:
+    the R2 ratchet (`editor_internals` 5 for Clustering) and the pinned `#include "Editor/` count stay as they were.
+  - A composition needs `StepRunsModule` and a `JobService` service (`AsyncWorkModule`); otherwise a GPU request
+    falls back to the CPU with that diagnostic. The Vulkan smoke, the Sandbox acceptance smoke, the agent-server
+    and processing-panel fixtures compose them.
+  - Tests: the 23 `ClusteringModuleResident` tests (the existing 17, three of them now asserting the step run's end:
+    committed with one undo entry for the reentrant discard, failed for a stale readback, discarded before the
+    publication), new: the run as a step run (owner, 4 logged iterations, 32 B per iteration + the terminal
+    centroids read back, waits at its cap), rest at a boundary (one preview, nothing recorded while resting, one
+    step one iteration, Accept from the rest: phases Assign, Reduce, Preview, Presentation and no counted
+    iteration), a capped batch publishes and a capped interactive run waits (no history entry), a stopped batch
+    never accepts a late convergence, a paused run with a held page refuses Accept and discards once the page is
+    consumed, the Jobs rows (running, resting, the joined Accept stage; a custom output name; cancel through the
+    Accept stage's row and through the holder's row discard the run). Vulkan smoke: run, steps of one, step 3 then
+    run, run with pauses give the same labels, bitwise centroids and inertia; Accept from the first rest on
+    {0,1,6,7,10} publishes labels {0,0,0,1,1} and centroids {3.5,10} after one iteration (the existing four cases
+    pass). Two more tests after the mutation checks: cancelling the Accept stage alone (the agent's `jobs_cancel`)
+    discards the run, and a discarded run leaves no active row. For the first, the transaction reports an unpublished
+    end as "cancelled or stale" (`StaleEntity`); as the agent lane does, a cancel the surface accepted for one of the
+    run's jobs (`RunCancelRequested` of the holder's token) makes it a cancel.
+  - Verification: clustering contract tests 41/41 (3 repetitions of the resident suite stable), all contract tests
+    1985/1985, Sandbox editor integration 292/292, Sandbox Vulkan acceptance smoke 48/48, clustering Vulkan smoke 6/6.
+    Mutations (15): all killed, the two that survived the first round (a cancelled Accept failing the run; the run's
+    jobs bypassing the workspace's Cancel and Snapshot) after the two tests above.

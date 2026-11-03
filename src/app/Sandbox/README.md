@@ -637,7 +637,8 @@ Null backend the controls are disabled with the reason.
 **View > Jobs** lists the running and recent editor jobs (name, entity, output, state, progress bar,
 elapsed, requested/resolved backend, diagnostic), newest first, with a **Cancel** on every active row
 that cancels the job's whole run; a disabled Cancel explains why on hover. A collapsed header shows the
-job-service counters. K-Means and consolidation runs are stopped from their own panels.
+job-service counters. A GPU K-Means run is a row too (its step run's holder and its Accept stage, so Cancel discards
+it); CPU K-Means and consolidation runs are stopped from their own panels.
 
 ## Frame-Pacing Diagnostics
 

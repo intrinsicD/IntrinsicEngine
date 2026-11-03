@@ -50,6 +50,9 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&, EditorPointScalarPublication,
         EditorPointScalarTransactionSnapshot&,
         std::function<void(EditorPointScalarTransactionSnapshot)> sink = {});
+    // A publication transaction's Accept stage joins the run that computes its front: it is
+    // submitted under `identity` (the output, with `Run` set to that run's first job).
+    void JoinEditorPointScalarRun(const EditorPointScalarTransactionHandle&, EditorJobIdentity identity);
     struct EditorPointScalarBack
     {
         Graphics::GpuPropertyView Typed{}, Presentation{}, Companion{};

@@ -21,8 +21,5 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const EditorPointScalarTransactionSnapshot& testResult = {},
         // Called before the sink at the terminal delivery and kept when Accept replaces the sink.
         std::function<void(EditorPointScalarTransactionSnapshot)> retain = {});
-    // A publication transaction's Accept stage joins the run that computes its front: it is
-    // submitted under `identity` (the output, with `Run` set to that run's first job).
-    void JoinPointScalarRun(const EditorPointScalarTransactionHandle&, EditorJobIdentity identity);
 }
 }

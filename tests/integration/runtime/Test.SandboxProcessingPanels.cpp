@@ -40,6 +40,7 @@ import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -142,7 +143,11 @@ namespace
             if (camera) Engine->EmplaceModule<R::CameraModule>();
             Engine->EmplaceModule<R::SceneInteractionModule>();
             Engine->EmplaceModule<R::AsyncWorkModule>();
-            if (clustering) Engine->EmplaceModule<R::ClusteringModule>();
+            if (clustering)
+            {
+                Engine->EmplaceModule<R::ClusteringModule>();
+                Engine->EmplaceModule<R::StepRunsModule>(); // a GPU K-Means run is a step run
+            }
             if (consolidation)
             {
                 Engine->EmplaceModule<R::SpatialIndexCache>();

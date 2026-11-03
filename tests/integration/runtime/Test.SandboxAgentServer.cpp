@@ -39,6 +39,7 @@ import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -199,6 +200,7 @@ namespace
             if (withCamera) Engine->EmplaceModule<R::CameraModule>();
             Engine->EmplaceModule<R::SpatialIndexCache>();
             Engine->EmplaceModule<R::ClusteringModule>();
+            Engine->EmplaceModule<R::StepRunsModule>(); // a GPU K-Means run is a step run
             Engine->EmplaceModule<R::PointCloudConsolidationModule>();
             Engine->EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
             Server = &Engine->EmplaceModule<R::AgentServerModule>(
