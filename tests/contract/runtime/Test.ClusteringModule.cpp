@@ -2001,9 +2001,9 @@ TEST_F(ClusteringModuleResident, APausedRunWithAHeldPageRefusesAcceptAndDiscards
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
     EXPECT_FALSE(Observation().Accepting);
     ASSERT_TRUE(Control(Runtime::StepRunAction::Discard));
-    for(int i=0;i<3;++i)Tick();
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"terminal at once";
-    ASSERT_EQ(Results.size(),1u)<<"the discarded run completes at once";
+    // Its pump (once the holder's work ran on a worker) discards it; it completes without waiting for its page.
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}))<<"the discarded run completes while its page is held";
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     EXPECT_TRUE(StepRun().SegmentInFlight)<<"its page is still recorded";
     Hold=false;Held->Deliver(HeldData);Held.reset();
@@ -2093,10 +2093,9 @@ TEST_F(ClusteringModuleResident, AReplacingRequestDiscardsTheRunAndStartsOnceIts
     auto replacing=Request;replacing.ReplaceRunning=true;
     replacing.Parameters.ClusterCount=5;replacing.Parameters.MaxIterations=2; // a new capacity and its own cap
     const auto second=Service->RunKMeans(replacing);
-    for(int i=0;i<5;++i)Tick();
-    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"the running run is discarded at once";
+    ASSERT_TRUE(Until([&]{return Results.size()==1;})); // the replaced run's completion, its page still held
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"the running run is discarded";
     EXPECT_EQ(Service->GpuRun(second).StepRun,0u)<<"the replacement waits until the held page completed";
-    ASSERT_EQ(Results.size(),1u);
     EXPECT_EQ(Results[0].Correlation,first);EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     Hold=false;Held->Deliver(HeldData);Held.reset();
     Correlation=second;RunId=0;
@@ -2164,8 +2163,7 @@ TEST_F(ClusteringModuleResident, AReplacedRunsPreviewGoesAtOnce)
     ASSERT_TRUE(residency->Front(key))<<"a preview is shown";
     auto replacing=Request;replacing.ReplaceRunning=true;
     const auto second=Service->RunKMeans(replacing);
-    for(int i=0;i<3;++i)Tick();
-    EXPECT_FALSE(residency->Front(key))<<"the replaced run's preview went at once, its page still in flight";
+    EXPECT_TRUE(Until([&]{return !residency->Front(key);}))<<"the replaced run's preview goes, its page still in flight";
     EXPECT_EQ(Service->GpuRun(second).StepRun,0u);
     Held->Deliver(HeldData);Held.reset();
     Correlation=second;RunId=0;
