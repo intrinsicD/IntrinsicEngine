@@ -3378,3 +3378,12 @@ python3 tools/docs/check_doc_links.py --root . --strict
   never drawn first each fail their tests; an N-sized shuffle is caught only by the run's 15-minute timeout (the
   test's own 2 s bound fires after the shuffle). Runtime contract 1994 of 1994, geometry 1621 of 1621, the
   clustering GPU smokes 6 of 6, `ctest -L build` green.
+- 2026-11-03, Q75 code reviews (b62867335..c2a2c29c5 plus a one-line fix). Ponytail (fresh general-purpose agent,
+  read-only, instruction-only): "Verdict: Ship." with two simplifications applied (the colors' duplicate pre-check
+  gone, the same-type path reusing the shared nonfinite policy) and one skipped (a palette sized from
+  `Centroids`: not every publish path is shown to fill them). Codex (fresh, `codex exec` read-only, xhigh, thread
+  `01a1a38b-99d4-7e82-b375-7aafd31df9e3`, instruction-only; answers `tasks/evidence/ARCH-022/q75-code-review-*`):
+  round 1 "revise required" (an Apply-level test of the preflight; optional: production seeding tied to the sampler,
+  input reuse after Accept and undo/redo), round 2 verbatim "**Verdict: approve** for `b62867335..c2a2c29c5`." (the
+  preflight is unreachable through every public path, option (a) accepted; optional: `Size()` instead of the
+  revision-marking `Vector().size()`), round 3 on that fix verbatim "**Verdict: approve**".

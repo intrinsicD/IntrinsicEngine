@@ -275,7 +275,7 @@ namespace Extrinsic::Runtime
                 return false;
             auto property =
                 properties.GetOrAdd<T>(std::string{name}, defaultValue);
-            if (!property || property.Vector().size() != values.size())
+            if (!property || property.Size() != values.size())
                 return false;
             property.Vector() = values;
             return true;
