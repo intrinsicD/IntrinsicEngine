@@ -3160,3 +3160,136 @@ python3 tools/docs/check_doc_links.py --root . --strict
     three round-1 findings are closed. No new correctness findings." Verification on db94c7020: all contract tests
     1993/1993, Sandbox editor integration 292/292, Sandbox Vulkan acceptance 48/48, clustering Vulkan smoke 6/6,
     `build`-label script tests 97/97, docs CI replay clean.
+- 2026-11-03, S3c-3 plan (the stall measurement; revision 1). Questions: Q71 "Ja, bitte S3. Und was ist mit ponytail
+  Vorschlag?", Q73 item 2 ("ja bitte, 1 - 3. ...": S3c, k-means as a step run and the stall measurement) and Q46
+  (R7's target, "under 4 ms": the longest main-thread stall caused by an algorithm run). Serves R7 for the GPU
+  k-means row; the plan's step "the main-thread stall during a slider preview is measured against the proposed 4 ms".
+  - **Instrumentation (code, reviewed as code).** The engine's `RuntimeFramePacingDiagnostics` gains three general
+    fields: `CommandDrainMicros`, `JobCompletionDrainMicros` (the frame's `DrainCompletions`, step-run pumps
+    included) and `GpuTransferDrainMicros` (`DrainGpuQueueCompletedTransfers`, every participant). The clustering
+    module adds cumulative main-thread microseconds by path to `ClusteringModuleStats`: capture and init (a GPU
+    request's snapshot and `Start`: workspace `Prepare`, transaction, step run), advance (the participant's drain:
+    page consumption and recording), preview publication, a held request's start; and counts: replacements held,
+    superseded and started, iterations completed. A test hook in the existing test-support header
+    (`KMeansPagingForTesting`'s) delays the capture path by a set time, for the positive control.
+  - **Harness.** An opt-in Vulkan test executable (label `gpu;vulkan;benchmark`, skipped unless its output path is
+    given): an app module that, on a cloud of N points, issues one `ReplaceRunning` GPU `RunKMeans` per frame for F
+    frames with a parameter that changes every frame (the seed), then lets the last run finish and accepts it; every
+    frame it writes the previous frame's three drain fields, the frame total, the module's per-path deltas and the
+    counts as one JSON line, with the stage (warmup, slider, settle) and the commit and build identity.
+  - **Report.** A script reads only the raw lines: per path and per stage the maximum, p99 and median in ms, the
+    per-frame sum of the run's paths, time series of every path with the stages marked, the counts, and the verdict
+    against 4 ms beside the numbers (HTML). A self-test with synthetic lines checks its summaries and its verdict
+    rule (each mechanism removed fails it).
+  - **Controls.** Null arm: the same frames with no request (the drains' floor; the run's paths 0). Positive control:
+    the delay hook at 5 ms must read as over 4 ms in the capture path. A run in which replacements are refused or
+    iterations do not advance is invalid (the counts gate it).
+  - **Build and run plan (frozen in the packet).** The `ci-vulkan-release` preset (Release, no sanitizers), one host,
+    display on; N in {100 000, 1 048 576}, k = 8, preview interval 5; 60 warmup frames, 600 slider frames, settle up
+    to 300; 3 repetitions per cell in separate processes, interleaved with the null arm; the positive control once
+    per N. The verdict uses the maximum of the per-frame sum over the slider and settle stages of every repetition
+    (R7 is the longest stall); p99 is reported beside it.
+  - **Pre-flight:** full tier (the R7 verdict rests on it): Layer A and Layer B, manifest, two fresh reviewers
+    (Claude and Codex) on the same digest, technical tests (pass/fail only) before any timed run; the report from raw
+    output and an audit after it.
+  - Codex plan review (`codex-plan-s3c3`): "REVISE." with eight findings (complete non-overlapping timing boundaries;
+    the every-frame stream need not progress; the seed is ignored by hierarchical seeding; sample alignment and no
+    logging in the measured loop; controls across the whole verdict; cold start; the build is a Release baseline;
+    the validity contract). Revision 2:
+    1. **Accounting map, disjoint outer intervals** (engine fields, general, each one timer around one call in
+       `RunFrame`): `CommandDrainMicros` (the command drain: a request's capture and init, a replacement's hold),
+       `JobCompletionDrainMicros` (`DrainCompletions`: holder pumps, Commit's start, the Accept stage's completion
+       with its publication `CommitKMeansOutputs`), `TransferCollectMicros` (`CollectCompleted`: readback
+       deliveries, the Accept's full-array copy), `GpuTransferDrainMicros` (`DrainGpuQueueCompletedTransfers`: the
+       participant's advance, preview publication, a held request's start) and `GpuQueueRecordMicros` (the
+       renderer's runtime command hook: the participant's page recording). The run's frame cost is their sum; the
+       longest single interval is reported beside it. Nested module fields (`ClusteringModuleStats`, cumulative
+       microseconds: capture and init, held start, advance, preview publication, Accept publication) only explain
+       the intervals and are never added to them. Stalls displaced out of them show in the existing
+       `RenderBeginFrameMicros` (fence wait) and the frame total, reported beside the run's cost.
+    2. **Two slider stages, counted per stage:** a continuous stage (a replacement every frame, 600 frames) and a
+       change-and-hold stage (a replacement every 15th frame, 20 changes); per stage: replacements admitted, held,
+       superseded (Cancelled) and started, admission refusals, iterations completed, previews published. The
+       continuous stage may starve progress (each run discarded before its first iteration ends); the report states
+       what happened, and the settle stage's progress never counts for a slider stage.
+    3. **The varied parameter reaches the computation:** random initialization with seed = 1000 + change index; a
+       contract test shows two seeds give different initial centroids (`BuildInitialCentroids`), so consecutive
+       requests differ.
+    4. **Alignment and no I/O in the loop:** a harness module hook at `FramePhase::Maintenance` (after the transfer
+       drain, the last run work of a frame) snapshots the module counters for frame f into a preallocated array; at
+       frame f+1 the engine's `GetLastFramePacingDiagnostics()` is frame f, stored beside it with its `FrameIndex`
+       (pairs checked consecutive); JSON is written after the measured frames. Test: a stall injected at one tagged
+       frame (below) appears in that frame's sample only.
+    5. **Controls over the whole verdict:** test hooks in the existing test-support header delay, busy-waiting, the
+       capture path, the advance path or the Accept publication at a chosen frame; a technical check per hook (pass
+       or fail only) confirms the evaluator finds each injected 5 ms once, in the right interval, and flags the
+       verdict. Report validity rules (else UNEVALUATED): every frame present once and finite; Vulkan operational
+       and every admitted request on the GPU backend (no CPU fallback); the change-and-hold stage has completed
+       iterations and published previews; the final run accepted (one applied completion); superseded completions
+       Cancelled, no admission refusal; the null arm with zero requests, iterations and module time.
+    6. **Cold start in the verdict:** engine warmup frames without any k-means request (60); the first request's
+       frames (workspace buffers and pipelines created, positions uploaded: from its completion's counters) are in
+       the verdict and reported apart from the reuse frames.
+    7. **Scope of the verdict:** a Release baseline (`ci-vulkan-release`: optimized, no sanitizers), standalone
+       harness without the Sandbox UI, stated as such; composition `SpatialIndexCache`, `AsyncWorkModule`,
+       `ClusteringModule`, `StepRunsModule` and an `EditorCommandHistory` service (the publication with history, as in
+       the Sandbox); no renderer reads the preview (its draw cost is the renderer's, not the run's).
+    8. **Validity contract frozen in the packet:** cloud from a fixed LCG (the smoke's generator, N in {100 000,
+       1 048 576}, the identity hash recorded), k = 8, random init, iteration cap 50, preview interval 5, production
+       paging limits, window 1280x720, VSync off, validation off; 3 processes per cell interleaved with the null arm;
+       settle up to 300 frames, and a wall-clock timeout per process (timeout or incomplete coverage: UNEVALUATED);
+       verdict `< 4 ms` (strict) on the observed maximum of the run's frame cost over all slider and settle frames of
+       every process, with per-process maxima and p99 reported; a technical test with the frozen configuration
+       reaching the final publication (pass/fail).
+  - Codex plan review round 2: "REVISE. Findings 1, 2 and 5 remain open; the other five are closed at plan level
+    within the stated baseline scope." Revision 3:
+    1. **Displaced waits count:** the run's frame cost is the five intervals plus the frame's
+       `RenderBeginFrameMicros` (the fence wait), conservatively counted as the run's; the null arm's maximum of that
+       wait must stay under 1 ms for the cell, else the cell is UNEVALUATED (the host cannot attribute).
+    2. **Change-and-hold waits for a preview:** each of the 20 changes is held until the current run published a
+       preview (module counter) or ended, at most 240 frames (else UNEVALUATED); the technical check requires this
+       coverage for both sizes, apart from the settle stage.
+    5. **Controls are the harness's own, one per interval, no hook in the run's code:** a dummy command whose handler
+       busy-waits (command drain), a dummy job whose completion busy-waits (completion drain), a dummy readback whose
+       delivery busy-waits (transfer collection, where the Accept's copy is delivered), a dummy GPU queue participant
+       busy-waiting in its transfer drain and in its frame recording (the participant drain; the recording hook for
+       the queued path; k-means records synchronously inside its advance through `SubmitImmediate`). Each at a
+       tagged frame: 5 ms must appear once, in its interval and frame (alignment), and fail the verdict; two
+       2.5 ms waits in two intervals of one frame must fail it too. The report script's self-test removes each
+       included term in turn and shows the verdict change. The accounting map in Layer A names, for every run path,
+       the one interval it runs in (read from the code). The module's nested per-path microseconds stay as
+       explanation and the counters as validity gates.
+  - Codex plan review round 3: "REVISE — findings 1 and 2 are closed; finding 5 remains partly open" (no live control
+    for `RenderBeginFrameMicros`). Revision 4: the dummy GPU participant also records, at a tagged frame, GPU work long
+    enough to block a later frame's fence (repeated fills of a 256 MiB buffer, sized in the technical test to at
+    least 10 ms of GPU time). The wait must appear in `RenderBeginFrameMicros` of exactly one of the frames within
+    the frames in flight after the tagged frame, at least 4 ms, and fail the verdict; nothing inside that interval
+    runs CPU code of the harness (it is the window's event drain and the renderer's fence wait), so the GPU is the
+    only way to exercise it.
+  - Codex plan review round 4: "APPROVE" ("Finding 5 is closed at plan level").
+- 2026-11-03, CI on 4219e9084 (S3c-2b on main) failed `AReplacingRequestDiscardsTheRunAndStartsOnceItsPageCompleted`:
+  it expected the discarded run's completion after five frames, but that comes from the step run's pump, which runs
+  only after the holder job's work ran on a worker (slow on the two-worker runner). Fixed in ae513f0bb with two more
+  tests of the same kind: they wait for the effect itself; 8 parallel runs of the resident suite on one core pass.
+  Lesson for later tests: an effect of a step run's pump is waited for, never counted in frames.
+- 2026-11-03, S3c-3 implemented (plan revisions 1 to 4): the five frame-pacing intervals, the clustering module's
+  nested path times and counters, the opt-in harness `tests/benchmark/Test.ClusteringStallMeasurement.cpp` (target
+  `IntrinsicClusteringStallMeasurement`), the seed check `GaussianMixture.KMeansRandomInitializationFollowsTheSeed`,
+  and in `tasks/evidence/ARCH-022/` (untracked evidence) `kmeans_stall_report.py`, `kmeans_stall_selftest.py`,
+  `kmeans_stall_technical.py`, `kmeans_stall_run.sh`; the packet is `tasks/evidence/ARCH-022/preflight-s3c3/`.
+  - Technical tests (pass or fail only, Release tree `build/ci-vulkan-release`): all arms at both sizes pass the
+    validity, hold-coverage and control checks. One finding changed the evaluation before the freeze: the GPU-work
+    control's wait did not land in `RenderBeginFrameMicros` but in the next frame's `RenderExecuteMicros` (550 ms with
+    2000 fills, about 11 ms with the frozen 40), so the verdict counts the renderer's execute beside the begin-frame
+    wait (both conservatively as the run's), and the participants' recording, which runs inside the execute, is only
+    a nested explanation; the null arm's guard uses both.
+  - Report self-test: 44 checks; 23 mutations of the report's mechanisms each fail it. A first mutation round read a
+    stale `.pyc` (a mutant of the same size written within the same second), so mutation runs use `python3 -B` without
+    a bytecode cache.
+  - Ponytail review of the code: "Verdict: fix 1 and 2 first." 1. the evaluation scripts are untracked and ignored
+    (`/tasks/evidence/*/`), so neither the run script's `git status` check nor the manifest covered them; fixed: the
+    manifest command passes all four scripts as extra paths (as R6 did) and the dead status path is gone; 2. the hold
+    stage rebuilt a per-run preview count the observation already gives (`KMeansGpuObservation::Previews`); fixed.
+    Also applied: control terms as tuples through `cost()` (no special interval name), the technical check fails
+    instead of crashing on unusable frames, the GPU-fills environment knob removed (40 fixed), the seed test reduced
+    to what the plan needs, and the HTML report plots the module's path times and counters over the frames too.

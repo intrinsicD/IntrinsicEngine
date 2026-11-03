@@ -176,6 +176,20 @@ export namespace Extrinsic::Runtime
         std::uint64_t CommitsDropped{0};
         std::uint64_t ClusterLabelsChangedEvents{0};
         std::uint64_t VisualizationRefreshReactions{0};
+        // ARCH-022 R7, GPU runs, cumulative on the main thread. The microseconds are nested in the engine's
+        // frame-pacing intervals (they explain them, never add to them): a GPU request's capture and start (in the
+        // command drain, or in the advance for a held request), the GPU participant's drain (advance: pages,
+        // previews, completions, a held request's start), preview publications (inside the advance) and the Accept's
+        // publication (inside the job completion drain). The counts gate a stall measurement on progress.
+        std::uint64_t GpuCaptureInitMicros{0};
+        std::uint64_t GpuAdvanceMicros{0};
+        std::uint64_t GpuPreviewPublishMicros{0};
+        std::uint64_t GpuAcceptPublishMicros{0};
+        std::uint64_t GpuReplacementsHeld{0};
+        std::uint64_t GpuReplacementsSuperseded{0};
+        std::uint64_t GpuReplacementsStarted{0};
+        std::uint64_t GpuIterations{0};
+        std::uint64_t GpuPreviews{0};
     };
 
     // Only the lifecycle owner may bind the service. C++ linkage lets its

@@ -2065,6 +2065,20 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
     )
 endif()
 
+# ARCH-022 S3c-3 — opt-in GPU K-Means main-thread stall measurement (R7); skipped unless
+# INTRINSIC_KMEANS_STALL_OUT names its output, run by tasks/evidence/ARCH-022/kmeans_stall_run.sh.
+if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    intrinsic_resolve_test_sources(_clustering_stall_measurement_sources
+        SEARCH_DIRS benchmark
+        FILES Test.ClusteringStallMeasurement.cpp
+    )
+    intrinsic_test_object_lib(ClusteringStallMeasurementTestObjs
+        SOURCES
+            ${_clustering_stall_measurement_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry glm::glm nlohmann_json::nlohmann_json
+    )
+endif()
+
 # METHOD-020 — opt-in actual-Vulkan LOP/isotropic-WLOP parity against the
 # frozen CPU-reference fixtures. Kept separate so backend evidence cannot be
 # confused with the CPU fallback contracts in RuntimeContractTestObjs.
@@ -2716,6 +2730,15 @@ if(TARGET RuntimeClusteringServiceGpuSmokeTestObjs)
         LABELS gpu vulkan integration runtime geometry
     )
     intrinsic_add_glsl_shaders(IntrinsicRuntimeClusteringServiceGpuSmokeTests)
+endif()
+
+if(TARGET ClusteringStallMeasurementTestObjs)
+    intrinsic_test_executable(IntrinsicClusteringStallMeasurement
+        OBJECTS ClusteringStallMeasurementTestObjs RuntimeTestModuleSupportObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry
+        LABELS gpu vulkan benchmark runtime
+    )
+    intrinsic_add_glsl_shaders(IntrinsicClusteringStallMeasurement)
 endif()
 
 if(TARGET RuntimePointCloudConsolidationGpuParityTestObjs)

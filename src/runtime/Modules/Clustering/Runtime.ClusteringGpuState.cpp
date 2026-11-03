@@ -122,7 +122,8 @@ namespace Extrinsic::Runtime
         // when no submission recorded with them can still execute.
         std::shared_ptr<KMeansGpuWorkspace> Idle{};
         std::optional<ClusteringGpuResult> Completed{};
-        explicit Impl(RHI::IDevice& d) : Device(d) {}
+        ClusteringModuleStats& Stats;
+        Impl(RHI::IDevice& d, ClusteringModuleStats& stats) : Device(d), Stats(stats) {}
         ~Impl()
         {
             *Alive = false;
@@ -287,7 +288,7 @@ namespace Extrinsic::Runtime
                     .Label = "Run K-Means clustering",
                     .Current = a->Current,
                     .Publish =
-                        [weak](std::span<const std::byte> bytes)
+                        [weak, stats = &Stats](std::span<const std::byte> bytes)
                     {
                         auto op = weak.lock();
                         if (!op)
@@ -302,7 +303,11 @@ namespace Extrinsic::Runtime
                                 return EditorCommandStatus::GeometryProcessingFailed;
                             op->Geometry.Labels[i] = label;
                         }
-                        return op->Publish(op->Geometry);
+                        const auto publishBegin = std::chrono::steady_clock::now();
+                        const auto status = op->Publish(op->Geometry);
+                        stats->GpuAcceptPublishMicros += std::uint64_t(std::chrono::duration_cast<
+                            std::chrono::microseconds>(std::chrono::steady_clock::now() - publishBegin).count());
+                        return status;
                     }},
                 admission,
                 [this, alive = Alive, weak](EditorPointScalarTransactionSnapshot result)
@@ -610,13 +615,18 @@ namespace Extrinsic::Runtime
                 {
                     a->Presented = false;
                     a->Back.reset();
-                    if (!PublishEditorPointScalarBack(
-                            a->Transaction, a->Terminal, std::array{0.f, float(std::max(1u, a->Clusters - 1u))}))
+                    const auto publishBegin = std::chrono::steady_clock::now();
+                    const bool published = PublishEditorPointScalarBack(
+                        a->Transaction, a->Terminal, std::array{0.f, float(std::max(1u, a->Clusters - 1u))});
+                    Stats.GpuPreviewPublishMicros += std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now() - publishBegin).count());
+                    if (!published)
                     {
                         Finish(KMeansRunStatus::GeometryProcessingFailed, "K-Means preview publication refused.");
                         return;
                     }
                     ++a->Result.GpuPreviews;
+                    ++Stats.GpuPreviews;
                     if (a->RestPreview)
                     {
                         a->RestPreview = false;
@@ -685,6 +695,7 @@ namespace Extrinsic::Runtime
                         a->Geometry.Iterations = a->Result.Iterations;
                         a->Geometry.Converged = a->Result.Converged;
                         a->Moved = (d.Changed & 2u) != 0;
+                        ++Stats.GpuIterations;
                         // The step run counts the iteration and says whether the next one may be recorded now.
                         const bool more = a->Driver.Stepped(
                             {.Values = {double(d.Inertia), double(d.MaxShift), 0.0, 0.0}},
@@ -764,8 +775,9 @@ namespace Extrinsic::Runtime
             ++a->Result.GpuSubmissions;
         }
     };
-    ClusteringGpuState::ClusteringGpuState(RHI::IDevice& d, RHI::BufferManager&, RHI::ITransferQueue&)
-        : m_Impl(std::make_unique<Impl>(d))
+    ClusteringGpuState::ClusteringGpuState(
+        RHI::IDevice& d, RHI::BufferManager&, RHI::ITransferQueue&, ClusteringModuleStats& stats)
+        : m_Impl(std::make_unique<Impl>(d, stats))
     {
     }
     ClusteringGpuState::~ClusteringGpuState() = default;

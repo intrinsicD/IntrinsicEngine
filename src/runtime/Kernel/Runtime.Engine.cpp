@@ -133,6 +133,7 @@ namespace Extrinsic::Runtime
         bool m_WindowCloseLogged{false};
         RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};
         Graphics::RuntimeFrameCommandHookHandle m_JobServiceGpuQueueHook{};
+        std::uint64_t m_GpuQueueRecordMicros{0u}; // this frame's participant recording, read into its pacing sample
     };
 
     // ── Construction / destruction ────────────────────────────────────────
@@ -576,8 +577,10 @@ namespace Extrinsic::Runtime
                 m_Impl->m_Renderer->RegisterRuntimeFrameCommandHook(
                     [this](RHI::ICommandContext& commandContext)
                     {
+                        const auto recordBegin = std::chrono::steady_clock::now();
                         m_Impl->m_JobService.RecordGpuQueueFrameCommands(
                             commandContext);
+                        m_Impl->m_GpuQueueRecordMicros += ElapsedMicros(recordBegin);
                     });
         }
         if (!m_Impl->m_Config.Render.DefaultRecipeConfigPath.empty())
@@ -750,6 +753,7 @@ namespace Extrinsic::Runtime
                 pacing.RenderGraphCompileMicros = stats.Compile.TimeMicros;
                 pacing.RenderGraphExecuteMicros = stats.Execute.TimeMicros;
             }
+            pacing.GpuQueueRecordMicros = std::exchange(m_Impl->m_GpuQueueRecordMicros, 0u);
             pacing.TotalMicros = ElapsedMicros(framePacingBegin);
             m_Impl->m_LastFramePacingDiagnostics = pacing;
         };
@@ -826,12 +830,14 @@ namespace Extrinsic::Runtime
         // fixed-step ticks and the render snapshot observe this frame is
         // post-command, pre-tick. Commands enqueued during the drain (by
         // handlers) or later in the frame execute at the next frame's drain.
+        const auto commandDrainBegin = std::chrono::steady_clock::now();
         m_Impl->m_CommandBus.Drain(*m_Impl->m_Scene,
                            CommandDrainServices{
                                .Events = &m_Impl->m_KernelEvents,
                                .Jobs = &m_Impl->m_JobService,
                                .Worlds = &m_Impl->m_WorldRegistry,
                            });
+        pacing.CommandDrainMicros = ElapsedMicros(commandDrainBegin);
 
         // ── Event pump A (post-drain; ARCH-008 / ADR-0024 D7) ─────────────
         // Command-published events become visible before simulation. Events
@@ -868,10 +874,12 @@ namespace Extrinsic::Runtime
         // Workers deposit opaque results into JobService. The main thread
         // checks token/world cancellation here and publishes completion events
         // only for survivors, so pump B owns all completion commits.
+        const auto completionDrainBegin = std::chrono::steady_clock::now();
         (void)m_Impl->m_JobService.DrainCompletions(
             m_Impl->m_KernelEvents,
             kJobCompletionApplyBudgetPerFrame,
             kJobCompletionGateCheckBudgetPerFrame);
+        pacing.JobCompletionDrainMicros = ElapsedMicros(completionDrainBegin);
 
         // ── Event pump B (post-sim; ARCH-008 / ADR-0024 D7) ───────────────
         // Simulation/job events reach runtime modules before UI/extraction.
@@ -1125,7 +1133,9 @@ namespace Extrinsic::Runtime
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         const auto maintenanceBegin = std::chrono::steady_clock::now();
         // GPU-side resource retirement, staging GC, readback processing.
+        const auto transferCollectBegin = std::chrono::steady_clock::now();
         m_Impl->m_Device->GetTransferQueue().CollectCompleted();
+        pacing.TransferCollectMicros = ElapsedMicros(transferCollectBegin);
         if (AssetWorkflowModule* const assetWorkflow =
                 m_Impl->m_ServiceRegistry.Find<AssetWorkflowModule>();
             assetWorkflow != nullptr)
@@ -1142,7 +1152,9 @@ namespace Extrinsic::Runtime
         // ARCH-009 — drop terminal job records after the frame has observed
         // their completion/cancellation state. Does not wait on workers.
         (void)m_Impl->m_JobService.ReapCompleted();
+        const auto gpuTransferDrainBegin = std::chrono::steady_clock::now();
         (void)m_Impl->m_JobService.DrainGpuQueueCompletedTransfers();
+        pacing.GpuTransferDrainMicros = ElapsedMicros(gpuTransferDrainBegin);
         RunRuntimeModuleFrameHooks(
             FramePhase::Maintenance,
             frameDt,

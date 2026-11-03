@@ -55,6 +55,14 @@ namespace Extrinsic::Runtime
         std::uint64_t RenderGraphExecuteMicros{0u};
         std::uint64_t PresentMicros{0u};
         std::uint64_t MaintenanceMicros{0u};
+        // ARCH-022 R7: the main-thread intervals where algorithm runs do their frame work, each one call of the
+        // frame: the command drain, the job completion drain (step-run pumps and job publications), the transfer
+        // queue's readback deliveries, the GPU queue participants' transfer drain, and their frame recording.
+        std::uint64_t CommandDrainMicros{0u};
+        std::uint64_t JobCompletionDrainMicros{0u};
+        std::uint64_t TransferCollectMicros{0u};
+        std::uint64_t GpuTransferDrainMicros{0u};
+        std::uint64_t GpuQueueRecordMicros{0u};
         std::uint64_t SelectionReadbackMicros{0u};
         std::uint64_t ReleaseRenderWorldMicros{0u};
     };

@@ -1008,6 +1008,19 @@ namespace Extrinsic::Runtime
             ClusteringModuleStats& stats)
         {
             stats.CommandsHandled += 1u;
+            // A GPU request's capture and start, whichever way it ends (started, refused, or the CPU fallback queued).
+            struct CaptureTimer
+            {
+                ClusteringModuleStats& Stats;
+                bool Gpu;
+                std::chrono::steady_clock::time_point Begin{std::chrono::steady_clock::now()};
+                ~CaptureTimer()
+                {
+                    if (Gpu)
+                        Stats.GpuCaptureInitMicros += std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
+                            std::chrono::steady_clock::now() - Begin).count());
+                }
+            } const timer{stats, command.Backend == ClusteringBackend::VulkanCompute};
             if (context.Jobs == nullptr ||
                 context.Worlds == nullptr ||
                 context.Events == nullptr)
@@ -1154,7 +1167,8 @@ namespace Extrinsic::Runtime
             m_GpuState = std::make_unique<ClusteringGpuState>(
                 *m_Device,
                 renderer->GetBufferManager(),
-                m_Device->GetTransferQueue());
+                m_Device->GetTransferQueue(),
+                m_Stats);
             m_GpuParticipant = m_Jobs->RegisterGpuQueueParticipant(
                 GpuQueueParticipantDesc{
                     .DebugName = "Runtime.Clustering.KMeans",
@@ -1169,6 +1183,7 @@ namespace Extrinsic::Runtime
                     {
                         if (m_GpuState == nullptr)
                             return;
+                        const auto advanceBegin = std::chrono::steady_clock::now();
                         m_GpuState->DrainCompletedTransfers();
                         while (std::optional<ClusteringGpuResult> result =
                                    m_GpuState->ConsumeCompleted())
@@ -1177,6 +1192,8 @@ namespace Extrinsic::Runtime
                                 std::move(*result), m_Events, m_Stats);
                         }
                         StartHeld();
+                        m_Stats.GpuAdvanceMicros += std::uint64_t(std::chrono::duration_cast<
+                            std::chrono::microseconds>(std::chrono::steady_clock::now() - advanceBegin).count());
                     },
                     .HasInFlightWork = [this]() -> bool
                     {
@@ -1203,8 +1220,11 @@ namespace Extrinsic::Runtime
                     m_GpuState != nullptr && !ValidateKMeansRequest(&context.ActiveWorld.Raw(), command) &&
                     m_GpuState->Supersede(command, world))
                 {
+                    if (m_Held)
+                        ++m_Stats.GpuReplacementsSuperseded;
                     CancelHeld(KMeansRunStatus::Cancelled, "K-Means request replaced by a newer one before it started.");
                     m_Held = HeldRequest{.Command = command, .Correlation = context.Correlation, .World = world};
+                    ++m_Stats.GpuReplacementsHeld;
                     return CommandOutcome::Ok();
                 }
                 return HandleRunKMeansCommand(
@@ -1275,6 +1295,7 @@ namespace Extrinsic::Runtime
         }
         HeldRequest held = std::move(*m_Held);
         m_Held.reset();
+        ++m_Stats.GpuReplacementsStarted;
         CommandContext context{.ActiveWorld = *scene, .Commands = *m_Service.m_Commands, .Events = m_Events,
             .Jobs = m_Jobs, .Worlds = m_Worlds, .Correlation = held.Correlation};
         (void)HandleRunKMeansCommand(context, held.Command, m_GpuState.get(), m_SpatialIndices, m_Device, m_History,

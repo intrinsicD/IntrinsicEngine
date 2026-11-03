@@ -256,6 +256,21 @@ TEST(GaussianMixture, KMeansPlusPlusInitializationIsSeedDeterministic)
     EXPECT_EQ(first, second);
 }
 
+// ARCH-022 S3c-3: a slider varying the seed changes a random-seeded k-means run (hierarchical seeding ignores it).
+TEST(GaussianMixture, KMeansRandomInitializationFollowsTheSeed)
+{
+    const std::vector<glm::vec3> points = TwoClusterFixture();
+    Geometry::KMeans::KMeansParams params{};
+    params.ClusterCount = 4u;
+    params.Init = Geometry::KMeans::Initialization::Random;
+    params.Seed = 1000u;
+    const auto first = Geometry::KMeans::BuildInitialCentroids(points, {}, params, params.ClusterCount);
+    params.Seed = 1001u;
+    const auto second = Geometry::KMeans::BuildInitialCentroids(points, {}, params, params.ClusterCount);
+    ASSERT_EQ(first.size(), params.ClusterCount);
+    EXPECT_NE(first, second);
+}
+
 TEST(GaussianMixture, IdentityLogPdfAndSeededSampleAreDeterministic)
 {
     const Gmm::MultivariateGaussian gaussian{

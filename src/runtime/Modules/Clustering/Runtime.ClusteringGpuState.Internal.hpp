@@ -40,9 +40,11 @@ namespace Extrinsic::Runtime
     class ClusteringGpuState
     {
     public:
+        // `stats` (the module's) receives the iteration and preview counts and the publication times.
         ClusteringGpuState(RHI::IDevice& device,
                            RHI::BufferManager& buffers,
-                           RHI::ITransferQueue& transferQueue);
+                           RHI::ITransferQueue& transferQueue,
+                           ClusteringModuleStats& stats);
         ~ClusteringGpuState();
 
         ClusteringGpuState(const ClusteringGpuState&) = delete;
