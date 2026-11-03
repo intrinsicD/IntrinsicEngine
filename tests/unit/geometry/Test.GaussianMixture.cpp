@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -269,6 +271,46 @@ TEST(GaussianMixture, KMeansRandomInitializationFollowsTheSeed)
     const auto second = Geometry::KMeans::BuildInitialCentroids(points, {}, params, params.ClusterCount);
     ASSERT_EQ(first.size(), params.ClusterCount);
     EXPECT_NE(first, second);
+}
+
+// ARCH-022 Q75: random seeding draws K of N indices without touching N (a slider restarts k-means every frame).
+TEST(GaussianMixture, KMeansSeedSamplingIsDistinctUniformAndIndependentOfN)
+{
+    using Geometry::KMeans::SampleDistinctIndices;
+    const auto distinct = [](std::vector<std::uint32_t> v) {
+        std::ranges::sort(v);
+        return std::ranges::adjacent_find(v) == v.end();
+    };
+    // n = 2^32 - 1: a sampler that allocates or shuffles n indices (16 GiB) takes many seconds here, O(K) microseconds.
+    const auto begin = std::chrono::steady_clock::now();
+    const auto huge = SampleDistinctIndices(0xffffffffu, 8u, 1000u);
+    EXPECT_LT(std::chrono::steady_clock::now() - begin, std::chrono::seconds{2});
+    ASSERT_EQ(huge.size(), 8u);
+    EXPECT_TRUE(distinct(huge));
+    EXPECT_EQ(huge, SampleDistinctIndices(0xffffffffu, 8u, 1000u));
+    EXPECT_NE(huge, SampleDistinctIndices(0xffffffffu, 8u, 1001u));
+    const auto one = SampleDistinctIndices(5u, 1u, 3u);
+    ASSERT_EQ(one.size(), 1u);
+    EXPECT_LT(one[0], 5u);
+    auto all = SampleDistinctIndices(6u, 6u, 3u); // K = N: a permutation of 0..N-1
+    std::ranges::sort(all);
+    EXPECT_EQ(all, (std::vector<std::uint32_t>{0u, 1u, 2u, 3u, 4u, 5u}));
+    // Uniform: 10 000 draws of 3 of 10 pick each index 3 000 times in expectation (binomial sd about 46).
+    std::array<std::uint32_t, 10> picked{};
+    for (std::uint32_t seed = 0; seed < 10'000u; ++seed)
+        for (const auto index : SampleDistinctIndices(10u, 3u, seed))
+            ++picked[index];
+    for (const auto count : picked)
+    {
+        EXPECT_GT(count, 2'800u);
+        EXPECT_LT(count, 3'200u);
+    }
+    // The first draw is uniform over all of [0, n) too (a range that skips the last index fails here).
+    std::array<std::uint32_t, 4> first{};
+    for (std::uint32_t seed = 0; seed < 8'000u; ++seed)
+        ++first[SampleDistinctIndices(4u, 1u, seed)[0]];
+    for (const auto count : first)
+        EXPECT_GT(count, 1'800u);
 }
 
 TEST(GaussianMixture, IdentityLogPdfAndSeededSampleAreDeterministic)

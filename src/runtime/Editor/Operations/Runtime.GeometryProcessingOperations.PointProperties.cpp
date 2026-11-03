@@ -353,6 +353,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const auto [deletionDomain, deletionName, divisor] = ResolvePointDeletionSource(positions.Domain);
         const auto deleted = ResolveGeometryPropertySet(a, deletionDomain)->Get<bool>(deletionName);
         const auto points = props->Get<glm::vec3>(positions.Name);
+        if (copyValues)
+        {
+            w.Points.reserve(props->Size());
+            w.Slots.reserve(props->Size());
+        }
         for (std::uint32_t i = 0; i < props->Size(); ++i)
         {
             if (deleted && deleted[i / divisor]) continue;

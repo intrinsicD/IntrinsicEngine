@@ -106,6 +106,10 @@ export namespace Geometry::KMeans
         CpuScratch* cpuScratch,
         const IterationObserver& onIteration = {});
 
+    // `count` distinct indices of [0, n), drawn uniformly in order (a partial Fisher-Yates over a sparse swap map):
+    // O(count) time and memory, whatever n. Requires count <= n. Random initialization takes its seeds from it.
+    [[nodiscard]] std::vector<uint32_t> SampleDistinctIndices(uint32_t n, uint32_t count, uint32_t seed);
+
     // Build an initial centroid set from either persistent ECS-provided seeds
     // or the algorithm's configured seeding policy. KMeansPlusPlus uses the
     // seeded D² distribution and is deterministic for identical inputs/seed.

@@ -10,6 +10,7 @@ module;
 #include <optional>
 #include <random>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/geometric.hpp>
@@ -22,6 +23,27 @@ import Geometry.KDTree;
 
 namespace Geometry::KMeans
 {
+    std::vector<uint32_t> SampleDistinctIndices(const uint32_t n, const uint32_t count, const uint32_t seed)
+    {
+        // Position i of the virtual array 0..n-1 holds swapped[i] if present, else i; slots below i are never read.
+        std::unordered_map<uint32_t, uint32_t> swapped;
+        swapped.reserve(count);
+        const auto at = [&](const uint32_t i) {
+            const auto found = swapped.find(i);
+            return found == swapped.end() ? i : found->second;
+        };
+        std::mt19937 rng(seed);
+        std::vector<uint32_t> picked;
+        picked.reserve(count);
+        for (uint32_t i = 0; i < count && i < n; ++i)
+        {
+            const uint32_t j = std::uniform_int_distribution<uint32_t>(i, n - 1u)(rng);
+            picked.push_back(at(j));
+            swapped[j] = at(i);
+        }
+        return picked;
+    }
+
     namespace
     {
         [[nodiscard]] float SquaredDistance(const glm::vec3& a, const glm::vec3& b)
@@ -35,16 +57,10 @@ namespace Geometry::KMeans
             uint32_t k,
             uint32_t seed)
         {
-            std::vector<uint32_t> indices(points.size());
-            std::iota(indices.begin(), indices.end(), 0u);
-
-            std::mt19937 rng(seed);
-            std::shuffle(indices.begin(), indices.end(), rng);
-
             std::vector<glm::vec3> centroids;
             centroids.reserve(k);
-            for (uint32_t i = 0; i < k; ++i)
-                centroids.push_back(points[indices[i]]);
+            for (const uint32_t index : SampleDistinctIndices(static_cast<uint32_t>(points.size()), k, seed))
+                centroids.push_back(points[index]);
             return centroids;
         }
 
