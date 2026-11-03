@@ -31,6 +31,21 @@ set_tests_properties(PluginBuildId.Script PROPERTIES LABELS "contract;build;runt
 add_test(NAME CompilePool.Script
         COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.CompilePool.py)
 set_tests_properties(CompilePool.Script PROPERTIES LABELS "contract;build" TIMEOUT 120)
+# ARCH-022 S3: the triple buffer and the append log under ThreadSanitizer, built apart from this tree (configured,
+# built and run by CTest); "Not Run (Disabled)" without a TSan runtime.
+add_test(NAME Core.TripleBufferThreadSanitizer
+        COMMAND ${CMAKE_CTEST_COMMAND} --build-and-test
+            ${CMAKE_SOURCE_DIR}/tests/unit/core/tsan ${CMAKE_BINARY_DIR}/tsan-harness
+            --build-generator Ninja --build-makeprogram ${CMAKE_MAKE_PROGRAM} --build-noclean
+            --build-options -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}
+                -DINTRINSIC_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DCMAKE_BUILD_TYPE=Debug
+            --test-command tsan_harness)
+set_tests_properties(Core.TripleBufferThreadSanitizer PROPERTIES LABELS "unit;build;core" TIMEOUT 600
+        ENVIRONMENT "TSAN_OPTIONS=halt_on_error=1 second_deadlock_stack=1")
+if(NOT INTRINSIC_TSAN_AVAILABLE)
+    set_tests_properties(Core.TripleBufferThreadSanitizer PROPERTIES DISABLED TRUE)
+endif()
 # CurvatureSegmentationConfig.cpp validates geometry algorithm parameters; only
 # its authoring interface, not that algorithm adapter, belongs to this boundary.
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyTypes
@@ -1835,6 +1850,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.Base64.cpp
     Test.CoreHash.cpp
     Test.Core.LockFreeQueue.cpp
+    Test.Core.TripleBuffer.cpp
     Test.Core.Logging.cpp
     Test.CoreMemory.cpp
     Test.CoreProfiling.cpp

@@ -130,6 +130,8 @@ contract_review: tracker only; each slice declares its own contracts
     shutdown hooks?" (answered: every successful Register gets exactly one shutdown hook before the image closes,
     committed or not; a Register that returns false cleans up itself)
 70. (2026-11-03) "Die Regel finde ich gut. Dann fixe auch den Spike Treiber. Setze den Template Schritt so um."
+71. (2026-11-03) "Ja, bitte S3. Und was ist mit ponytail Vorschlag?" (the open ponytail item: the picker test's
+    ImGui setup through the repository's frame scope; done first, then S3)
 
 ## Goal
 - Reach the target in
@@ -2497,3 +2499,129 @@ python3 tools/docs/check_doc_links.py --root . --strict
     (bilateral filter, with a refused second load and a clean sanitizer exit); static `build/ci` 76 filtered tests,
     `build/ci-vulkan` static Sandbox and Vulkan tests built; jscpd: no clone touching the changed files. S2 and R4
     still wait for the display.
+- 2026-11-03, plan of S3, the job form (Q71; Q52's order "S3 before the GPU-heavy features"; Q67: kernel density and
+  point spacing come after S3). Goal: one run protocol that plugins use for iterative and preview/accept work, on
+  CPU and GPU, proven by the S3 assertions (definition above, "S3, the job form on CPU and GPU"), so the
+  kernel-density, spacing, density-weight and outlier family can move into plugins on it. Done: the assertions as
+  tests, the stall measured (preflight), a spike report with yes or no per question, the numbers and a recommended
+  boundary for the operator; the code stays as the start of that migration or is deleted.
+  Inventory (Explore, 2026-11-03): no generic Init/Step/Preview/Finish; reusable: the CPD solver (deterministic
+  `Initialize`/`Step`/`Current`, a unit test that step mode equals the full run), the CPD session's control logic,
+  the GPU transaction core and residency rings (preview = ring front, Accept once, Discard), the resident k-means
+  state machine (no full array per step already, byte counters, Stop/Accept/Discard, workspace reuse), JobService
+  (`CoroutineWork`, gates, run joining), frame pacing diagnostics. Missing: a step loop with pause and single step,
+  a lock-free snapshot hand-over and a metric ring (CPD keeps a mutex snapshot with a growing trace), latest-wins
+  previews (editor and host refuse a second run on an output), MCP controls (every GPU run over MCP auto-accepts),
+  accept-on-convergence as its own option, a TSan build, per-callback main-thread timing.
+  Blocks (one code review each):
+  - **S3a, two core primitives** (`src/core`, no dependencies): `TripleBuffer<T>` (one writer, one reader, latest
+    wins, never blocks either side, a reader never sees a torn value) and `AppendLog<T>` (revision 2/3: a
+    preallocated append-only log, one writer, readers read any published prefix without blocking it; it replaces
+    the metric ring). Tests: unit (latest wins, no torn value under a deterministic
+    interleaving) and a separate TSan harness: a standalone CMake project (`tests/tsan/`) that compiles the two
+    headers and a stress test with `-fsanitize=thread` and asserts progress (the writer completes K publications
+    while a reader is stalled; every observed value is one the writer wrote, never half), run by a CTest of label
+    `build` (the main tree keeps its sanitizer modes).
+  - **S3b, the step run and the CPU case.** `Extrinsic.Runtime.StepRun` in the services ring, used through the
+    plugin contract: a run is `Init` (main thread: capture), `Step` (one iteration: a worker job on CPU), optional
+    `Preview` (writes the latest snapshot into the triple buffer), `Metrics` (one record per step into the ring),
+    `Commit` (main thread, one undo entry) and `Discard`. States: ready, running, paused, converged, failed,
+    cancelled, committed. Controls: run, pause (after the step in flight), step(n), stop (= pause and end),
+    accept (commit exactly once from paused, converged or stopped), discard; option accept-on-convergence. One
+    step per job, the next submitted from the previous completion while running or while a step budget remains,
+    so batching cannot change the sequence. Latest wins: a new run on the same output supersedes a ready, paused or
+    converged one (its preview is dropped, it ends discarded) and is refused only while a step is in flight. MCP:
+    `run_control {run, action}` and `run_observe {run, metrics}` (phase, step count, last metrics, preview
+    revision); the UI: a spike window with Run, Pause, Step, Stop, Accept, Discard and a metric plot. CPU case: CPD
+    (reference E-step, `Geometry::CoherentPointDrift::Solver`) in a spike plugin `plugins/job_form_spike` (kept or
+    deleted per the report): Init captures source and target through the point-cloud editing service, Step is one
+    solver step, Preview the transformed source, Commit publishes it into a vec3 output (one undo entry). Tests (each fails without its
+    mechanism): a run equals its step sequence bit for bit (positions and trace) for step(1)*N, step(7)+run, run
+    with pauses; preview on equals off; pause and resume equals uninterrupted; cancel and previews commit nothing
+    (no undo entry, outputs unchanged); accept commits exactly once (a second accept refused); converged commits
+    only with accept-on-convergence; latest wins (an older preview never shows after a newer one: revisions
+    monotonic at the reader; a superseded run ends discarded once).
+  - **S3c, the GPU case and the measurement.** GPU k-means with resident buffers as a step run, inside the
+    clustering module (a plugin may not import it: R2), through the same StepRun: a step is one iteration of the
+    existing paged state machine (a step budget at the iteration boundary), preview through the
+    residency ring (latest wins as today), accept reads the labels once. Tests (Vulkan smoke): run equals step
+    sequence (labels exact, centroids bitwise), pause/resume equals uninterrupted, zero full-array bytes per step
+    after Init (the existing byte counters), cancel and previews commit nothing, accept once, accept on
+    convergence. The main-thread stall during a slider preview (a parameter change that restarts the preview run
+    every frame) measured against 4 ms: a frame-pacing field for the job completion drain, a pilot packet under the
+    experiment pre-flight (light tier unless the report's recommendation rests on it, then full).
+  Not in S3: moving CPD or k-means out of the editor; the kernel-density family; changing the shipping CPD or
+  k-means panels and MCP tools (the spike runs beside them).
+  - Codex plan review (fresh session, `codex-plans3`): "Verdict: REVISE", seven blocking. Revision 2:
+    1. **Latest wins without loss.** A run keeps one pending newest request (a new parameter set or a new run on its
+       output); it replaces the current computation at the next safe boundary (after the step in flight, never
+       writing buffers in use), older pending requests are dropped. Test: A running, B then C requested, the slider
+       released: C previews, and neither A nor B shows or commits afterwards.
+    2. **One transition table** (in the code and the report): states ready, running, paused, accepting (GPU
+       readback in flight), and the terminal states committed, discarded, failed; a run that stops computing records
+       its end reason (converged, iteration cap, stopped, cancelled) and waits paused for Accept or Discard. Accept
+       on convergence commits only for "converged" (never cap or stop). Precedence: cancel and discard over a
+       pending accept; a replacement during accepting waits for it. Tests: cap, Stop, cancel during the last step,
+       discard and replacement during the accept readback.
+    3. **The run outlives its jobs.** A step-run service (`Extrinsic.Runtime.StepRuns`) owns each run until it is
+       terminal: its output (admission asks it, so a paused run still holds its output), its controls, its owner
+       (a plugin name or a runtime module), its callbacks; cancel reaches a paused run; a plugin's unload drains
+       its runs (each ends discarded, once). The service takes an explicit owner; the plugin contract wraps it with
+       the caller resolution, and the clustering module calls the service directly. Tests: paused cancel, a
+       competing editor publication refused, unload during a paused run.
+    4. **The CPU preview reaches the viewport and Commit checks every input.** The point-cloud editing service gains
+       a position preview through the residency ring (as the GPU position transactions do): the latest snapshot is
+       uploaded into the output's ring and shown, Discard releases it, Commit publishes canonically. A capture of
+       several entities (CPD: source and target) is checked as a whole at Commit. Test: target changed or deleted
+       after convergence: Accept fails stale, output and history unchanged.
+    5. **Complete metrics, counted copies.** Metrics go into a preallocated append-only log sized to the run's
+       iteration cap (one writer, an atomic count, readers read any prefix without blocking), not a last-N ring;
+       the triple buffer carries only the latest preview. Preview off makes zero intermediate copies; preview on
+       copies only after the reader took the previous one and at most every k steps. Tests: a stalled observer
+       still reads the whole curve; copy counts with preview off, on, and with a stalled reader.
+    6. **Tests that see the mechanism:** the exact step count after step(n), no advancement while paused,
+       advancement after resume, through the window and over MCP; on GPU also preview on/off, latest wins, the
+       fence-held buffers' lifetime and reuse, and byte counters split into init, per step, terminal centroids and
+       accept.
+    7. **The measurement:** frame-pacing fields for every main-thread path a run uses (completion drain, GPU
+       transfer drain, capture and init, preview upload), with counts of accepted replacements and completed steps
+       (a stream of refusals cannot pass); the R7 verdict and the recommendation rest on it, so full pre-flight
+       (two fresh reviewers, a frozen packet: workload, controls, limits, command, HTML report from raw output).
+    Optional taken: bitwise comparisons over the mathematical fields with executable, device, inputs, seeds and
+    paging fixed (timings excluded); a worker loop that checks the controls between identical `Step()` calls
+    (ordering kept, not limited to one step per frame) instead of one job per step; the standalone TSan project
+    holds a reader across many publications and wraps, with a timeout and progress asserted in every build.
+  - Codex round 2 on the plan: "Verdict: REVISE"; findings 1, 3, 4, 6 and 7 closed, two open. Revision 3:
+    1. **Cancel ends the run.** Cancelled is terminal (discarded), not a paused end reason: Accept and Resume are
+       refused after it, also after a late worker or GPU completion; its resources retire when safe. Paused for
+       Accept or Discard remain only converged, iteration cap and stopped. Test: cancel, then a late completion,
+       then Accept and Resume refused, nothing committed.
+    2. **The preview rate is a time limit.** An intermediate preview copy needs both the reader to have taken the
+       previous one (`TripleBuffer::Unread` false) and a minimum interval on a monotonic clock (about 30 per second,
+       as the target states), injectable for tests. Test with a controlled clock: many cheap steps with a reader
+       that always consumes give at most the clock's allowance of copies.
+    3. (optional) S3a's metric storage is the preallocated append log (`Core.AppendLog`), which replaces the S3
+       definition's metric ring (complete curves); the TSan project compiles the production modules
+       (`Core.TripleBuffer`, `Core.AppendLog`) and has no ring-wrap expectation.
+  - Codex round 3 on the plan: "Verdict: APPROVE", no findings open.
+- 2026-11-03, S3a implemented: `Extrinsic.Core.TripleBuffer` (three slots, a fresh bit in the middle index; the
+  writer's `Unread` tells whether the reader took the last value) and `Extrinsic.Core.AppendLog` (preallocated,
+  release-published count). Tests: `Test.Core.TripleBuffer.cpp` (newest once, unread, a held value untouched while the
+  writer publishes on, the log's prefixes and a full log) in IntrinsicCoreWrapperUnitTests; the standalone TSan
+  project `tests/unit/core/tsan` (CTest `Core.TripleBufferThreadSanitizer`): a reader
+  holding its value while the writer completes 200000 publications, a poller seeing whole and monotonic values, two
+  log readers seeing complete records. Mutation checks: TSan reports a race for a relaxed publish, for a reader
+  sharing the middle slot and for a relaxed log count; the unit tests fail for a publish without the fresh bit, for a
+  reader taking the writer's slot, and for a log without its capacity check. Also (Q71): the descriptor picker test
+  uses `TestSupport::ImGuiFrameScope` (both of its mutations still killed).
+  - Reviews: Codex (fresh, `codex-review-s3a`, diff sha256 ea996906…): "Verdict: REVISE", one finding: the stress
+    harness could pass without concurrent publication (a writer done before the readers ran skips their checks, and
+    the poller's final read is ordered by the done flag). Fixed: the poller writer publishes until the poller took
+    1000 values (counted through `Unread`) and the poller counts only reads made while the writer runs; the log writer
+    starts once both readers run and waits halfway until each checked records (a signal from the readers to the
+    writer, ordering none of the records). Ponytail (fresh agent): "fix 1 first; 2 and 3 are optional", all taken:
+    the Python runner replaced by `ctest --build-and-test` with a configure-time TSan probe (`INTRINSIC_TSAN_AVAILABLE`,
+    "Not Run (Disabled)" without it); the initial-value constructor, `Capacity()`, the deleted copies and the
+    alignment removed, the log on a vector; a leftover include. Also the core README and the module inventory.
+    Verification: the TSan CTest passes (160445 polled reads of 200000 publications); its three mutations each give a
+    TSan data race through CTest; disabled when the probe is 0; unit tests 4/4, descriptor tests 13/13.

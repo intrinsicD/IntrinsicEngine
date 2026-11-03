@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 7 |
 | `assets` | 11 |
-| `core` | 38 |
+| `core` | 40 |
 | `ecs` | 25 |
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
@@ -44,6 +44,7 @@ Root scanned: `src`
 | `Extrinsic.Asset.Registry` | `src/assets/Asset.Registry.cppm` | `assets` |
 | `Extrinsic.Asset.Service` | `src/assets/Asset.Service.cppm` | `assets` |
 | `Extrinsic.Asset.TypePool` | `src/assets/Asset.TypePool.cppm` | `assets` |
+| `Extrinsic.Core.AppendLog` | `src/core/Core.AppendLog.cppm` | `core` |
 | `Extrinsic.Core.Base64` | `src/core/Core.Base64.cppm` | `core` |
 | `Extrinsic.Core.BoundedHeap` | `src/core/Core.BoundedHeap.cppm` | `core` |
 | `Extrinsic.Core.CallbackRegistry` | `src/core/Core.CallbackRegistry.cppm` | `core` |
@@ -82,6 +83,7 @@ Root scanned: `src`
 | `Extrinsic.Core.Tasks:LocalTask` | `src/core/Core.Tasks.LocalTask.cppm` | `core` |
 | `Extrinsic.Core.Tasks` | `src/core/Core.Tasks.cppm` | `core` |
 | `Extrinsic.Core.Telemetry` | `src/core/Core.Telemetry.cppm` | `core` |
+| `Extrinsic.Core.TripleBuffer` | `src/core/Core.TripleBuffer.cppm` | `core` |
 | `Extrinsic.ECS.Components.AssetInstance` | `src/ecs/Components/ECS.Component.AssetInstance.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Collider` | `src/ecs/Components/ECS.Component.Collider.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Culling.Local` | `src/ecs/Components/ECS.Component.Culling.Local.cppm` | `ecs` |
@@ -485,4 +487,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **458**
+Total modules: **460**

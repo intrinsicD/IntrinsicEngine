@@ -14,7 +14,6 @@
 #include <span>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -25,6 +24,7 @@
 #include <imgui_internal.h>
 
 #include "DescriptorAnalysisHarness.hpp"
+#include "TestImGuiFrameScope.hpp"
 #include "PointDomainFixture.hpp"
 
 import Extrinsic.ECS.Components.GeometrySources;
@@ -534,17 +534,6 @@ TEST(DescriptorAnalysisPlugin, AnUnloadAndAReloadKeepTheHistoryAndTheToolRunsAga
     EXPECT_EQ(Column(props, config.Outputs[7].Name), written);
 }
 
-namespace
-{
-    // The combo popup open in the last frame (ImGui names them "##Combo_NN").
-    ImGuiWindow* OpenComboPopup()
-    {
-        for (ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
-            if (window->WasActive && std::string_view{window->Name}.starts_with("##Combo_")) return window;
-        return nullptr;
-    }
-}
-
 TEST(DescriptorAnalysisPlugin, ThePositionsPickerMovesTheOutputsToItsDomainAndKeepsAnUnlistedChoice)
 {
     Harness harness{};
@@ -560,19 +549,12 @@ TEST(DescriptorAnalysisPlugin, ThePositionsPickerMovesTheOutputsToItsDomainAndKe
     ASSERT_TRUE(ui->SetWindowOpen("view.descriptor_analysis", true));
     const std::string face = "face_samples (" + std::string{R::ToString(D::MeshFace)} + ")";
 
-    IMGUI_CHECKVERSION();
-    ImGuiContext* context = ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(1280, 1600);
-    io.IniFilename = nullptr;
-    unsigned char* pixels = nullptr;
-    int width = 0, height = 0;
-    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+    TestSupport::ImGuiFrameScope gui; // its first frame is open
+    ImGui::GetIO().DisplaySize = ImVec2(1280, 1600);
     std::optional<DA::Config> afterOpenAndClose{}, afterChoice{};
     for (int frame = 0; frame < 40; ++frame)
     {
-        io.DeltaTime = 1.f / 60.f;
-        ImGui::NewFrame();
+        if (frame > 0) gui.NextFrame();
         if (auto* window = ImGui::FindWindowByName("FPFH Descriptor Analysis###view.descriptor_analysis"))
         {
             if (frame == 1) ImGui::FocusWindow(window); // once: focusing closes open popups
@@ -581,15 +563,14 @@ TEST(DescriptorAnalysisPlugin, ThePositionsPickerMovesTheOutputsToItsDomainAndKe
             if (frame == 8 || frame == 18) ImGui::ActivateItemByID(window->GetID("Apply settings"));
             // Open it again and choose the face property, then apply.
             if (frame == 14)
-                if (auto* popup = OpenComboPopup()) ImGui::ActivateItemByID(popup->GetID(face.c_str()));
+                if (auto* popup = ImGui::FindWindowByName("##Combo_00"); popup != nullptr && popup->WasActive)
+                    ImGui::ActivateItemByID(popup->GetID(face.c_str()));
         }
         (void)ui->Windows().DrawOpenWindows();
-        ImGui::Render();
         harness.Frame();
         if (frame == 10) afterOpenAndClose = R::ActivePluginSection<DA::kSection>();
         if (frame == 20) afterChoice = R::ActivePluginSection<DA::kSection>();
     }
-    ImGui::DestroyContext(context);
     ASSERT_TRUE(afterOpenAndClose);
     EXPECT_EQ(afterOpenAndClose->Positions.Name, "unlisted") << "a choice the catalog does not list is kept";
     ASSERT_TRUE(afterChoice);

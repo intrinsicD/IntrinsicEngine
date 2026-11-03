@@ -31,6 +31,8 @@ target_sources(${target_name}
         Core.IntegerMath.cppm
         Core.HandleLease.cppm
         Core.LockFreeQueue.cppm
+        Core.TripleBuffer.cppm
+        Core.AppendLog.cppm
         Core.Logging.cppm
         Core.Memory.cppm
         Core.Memory.Common.cppm

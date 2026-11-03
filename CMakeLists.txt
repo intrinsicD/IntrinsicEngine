@@ -205,6 +205,8 @@ set(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
 check_cxx_source_compiles("int main(){return 0;}" INTRINSIC_ASAN_AVAILABLE)
 set(CMAKE_REQUIRED_FLAGS "-fsanitize=undefined")
 check_cxx_source_compiles("int main(){return 0;}" INTRINSIC_UBSAN_AVAILABLE)
+set(CMAKE_REQUIRED_FLAGS "-fsanitize=thread") # tests/unit/core/tsan only; the tree has no thread mode
+check_cxx_source_compiles("int main(){return 0;}" INTRINSIC_TSAN_AVAILABLE)
 set(CMAKE_REQUIRED_FLAGS "${_SAVED_CMAKE_REQUIRED_FLAGS}")
 
 option(INTRINSIC_ENABLE_SANITIZERS

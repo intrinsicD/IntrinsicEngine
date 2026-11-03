@@ -12,6 +12,7 @@ engine subsystems.
 - `Extrinsic.Core.Config.EngineLoad`
 - `Extrinsic.Core.BoundedHeap`
 - `Extrinsic.Core.IndexedHeap`
+- `Extrinsic.Core.AppendLog`
 - `Extrinsic.Core.Base64`
 - `Extrinsic.Core.CallbackRegistry`
 - `Extrinsic.Core.Dag.Scheduler`
@@ -32,6 +33,7 @@ engine subsystems.
 - `Extrinsic.Core.StrongHandle`
 - `Extrinsic.Core.Tasks`
 - `Extrinsic.Core.Telemetry`
+- `Extrinsic.Core.TripleBuffer`
 
 ## Graph APIs and ownership contract
 
