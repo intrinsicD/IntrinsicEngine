@@ -503,6 +503,7 @@ add_subdirectory(${INTRINSIC_GRAPHICS_RENDERERGRAPH_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_PLATFORM_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_RUNTIME_SOURCE_ROOT})
 # ARCH-022: feature plugins; their objects also link into static Sandboxes and into tests.
+include(cmake/IntrinsicFeaturePlugin.cmake)
 add_subdirectory(plugins/bilateral_filter)
 add_subdirectory(plugins/descriptor_analysis)
 if(NOT INTRINSIC_HEADLESS_NO_GLFW OR INTRINSIC_BUILD_TESTS)

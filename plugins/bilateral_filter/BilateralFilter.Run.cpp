@@ -178,18 +178,11 @@ namespace Intrinsic::Plugins::BilateralFilter
         {
             job.Output = R::PluginJobOutput{.StableEntityId = w->Cfg.StableEntityId,
                                             .Property = w->Service->View(*w->Edit).Output};
-            const bool first = !w->Shared->Handle.IsValid();
-            if (!first) job.Run = w->Shared->Handle;
-            std::string label = job.Label;
+            const std::string label = job.Label;
             std::string refusal;
-            const auto handle = R::SubmitPluginJob({}, std::move(job), &refusal);
-            if (!handle.IsValid())
-            {
-                Finish(*w, "failed", refusal.empty() ? "The bilateral stage '" + label + "' was not queued." : refusal);
-                return false;
-            }
-            if (first) w->Shared->Handle = handle;
-            return true;
+            if (R::SubmitPluginRunStage(*w->Shared, std::move(job), refusal)) return true;
+            Finish(*w, "failed", refusal.empty() ? "The bilateral stage '" + label + "' was not queued." : refusal);
+            return false;
         }
 
         bool SubmitNeighborhoods(const std::shared_ptr<Work>& w);
@@ -355,6 +348,4 @@ namespace Intrinsic::Plugins::BilateralFilter
                          }});
         return run;
     }
-
-    bool Cancel(const Run& run) { return run.Handle.IsValid() && R::CancelPluginJob(run.Handle); }
 }

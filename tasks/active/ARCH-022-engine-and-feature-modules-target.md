@@ -126,6 +126,10 @@ contract_review: tracker only; each slice declares its own contracts
     the second plugin it must hold several; how to go on?) "Erst Multi-Plugin-Host (Recommended)" (a step of its
     own before FPFH: several plugins by name, load, unload, reload and list; drain, jobs and deferred results per
     plugin; several startup plugins; tools take a plugin name and need none while one is loaded; then FPFH)
+69. (2026-11-03) "Bildschirm kann ich erst später wieder anschalten. Beim Template, was empfiehlst du wegen des
+    shutdown hooks?" (answered: every successful Register gets exactly one shutdown hook before the image closes,
+    committed or not; a Register that returns false cleans up itself)
+70. (2026-11-03) "Die Regel finde ich gut. Dann fixe auch den Spike Treiber. Setze den Template Schritt so um."
 
 ## Goal
 - Reach the target in
@@ -2409,3 +2413,87 @@ python3 tools/docs/check_doc_links.py --root . --strict
     leaks (LSan: the window state, 256 bytes). Fixed in the plugins (window state made on the first draw) and
     documented in the target doc; open for the plugin template step: whether the host should call the shutdown
     hook for a candidate it discards after a successful Register (it changes the spike drivers' event order).
+- 2026-11-03, plan of the plugin template step (Q69, Q70; the deferred ponytail findings of 2d-0 (4) and 2d (1, 6)).
+  Goal: a third plugin is a folder with its module, Register/Shutdown and its own code, with no copied host
+  protocol; the host pairs every successful Register with one shutdown hook. Done when both plugins use the shared
+  pieces, the host's discard paths are one, the rule has a host test, and S1 passes with its updated lifecycle.
+  1. **The shutdown rule.** Every successful Register is followed by exactly one shutdown hook before the image
+     closes (or stays mapped): at unload and at the exit as today, and now also for a candidate the host discards
+     (empty or taken name, failed commit, reload name mismatch, a pending load dropped before its commit, a startup
+     plugin dropped at staging or not committed). A Register that returns false gets none (it cleans up itself). One
+     discard path does it: shutdown hook (entered), staged callables destroyed, forwarders cleared, close.
+     `Candidate` becomes `StagedPlugin` (one type for an uncommitted plugin). Test: the fixture logs shutdown and
+     close; each discard path gives "shutdown", "close" in that order, a failed Register only "close"; tests that
+     expected no shutdown on a failed commit are updated. S1's expected lifecycle gains "shutdown" after "register"
+     for the commit failures (Q70); S2 checks only relative orders (unchanged, rerun when the display is on).
+  2. **The run protocol in the contract.** `PluginRun<Result>` {Pending, Final, Handle}; `SubmitPluginRunStage(run,
+     job, refusal)` (the first stage's handle is the run's, later stages join it); `CancelPluginRun(run)`;
+     `WaitForPluginRun(run, pendingText, answer)` (the waiting tool's outcome: pending text, a continuation that
+     answers once Final is set, the cancel hook). Both plugins use them; their Run, Submit, Cancel and tool bodies
+     shrink. The vec3 property combo over `InputCatalog` moves into the editing service (`PointPropertyCombo`, ImGui
+     compiled in the runtime, as the host's identity probe already is). Test: a host contract test of two stages
+     joining one run through `SubmitPluginRunStage` and `CancelPluginRun` ending both; the plugin tests keep their
+     coverage.
+  3. **One CMake function.** `intrinsic_add_feature_plugin(<Name> SOURCES ...)` in `cmake/` creates
+     `Intrinsic<Name>PluginObjects` (module `<Name>.cppm`), with shared libraries the MODULE
+     `Intrinsic<Name>Plugin` from an entry file generated from one template (the three v1 symbols forwarding to
+     `Intrinsic::Plugins::<Name>::Register/Shutdown`), and appends `<Name>` to `INTRINSIC_STARTUP_PLUGINS`. Each
+     plugin's CMakeLists is one call; their `*.Entry.cpp` go. The spike keeps its own CMake (a fixture, not a
+     startup plugin).
+  Not in this step: S3, a host test hook to force refusals, changing the window state back to Register.
+  Verification: dev-shared and static (`ci`, `ci-vulkan` Sandbox) builds, the three test binaries, the plugin GPU
+  smokes, S1, both plugin live drivers, mutation checks, jscpd, ci-docs replay; S2 and R4 when the display is on.
+  - Codex plan review (fresh session, `codex-plantpl`): "Verdict: REVISE", three blocking. Revision 2:
+    1. Startup plugins: one discard for every uncommitted startup plugin, also without config control (hook entered,
+       staged callables destroyed, forwarders cleared, so the boot sections' callbacks call nothing; the image stays
+       mapped only there, as today) and when the host goes before `OnResolve` (its destructor and `OnShutdown`
+       discard what is still staged). Test: one hook, no plugin callback afterwards.
+    2. Tests prove the order and attribution: the fixture's staged callables log their destruction, so each discard
+       path gives "shutdown", the callables' destruction, then "close" (a failed commit's rollback destroys its
+       tools' copies before the hook; the hook still runs once, before the close); a discarded candidate's hook submitting work
+       is refused as "the calling plugin is not loaded" with another plugin loaded; zero hooks for a failed Register
+       and for failures before Register; one hook when the close guard keeps the image mapped.
+    3. The combo returns whether the selection changed (the descriptor window moves its 33 outputs to the positions'
+       domain on it); a window test selects a face property and checks the applied domains, and an unlisted
+       selection is kept.
+    Optional taken: `WaitForPluginRun` gets its own checks (already final, pending text and polling, the final
+    answer, the cancel hook).
+- 2026-11-03, the plugin template step implemented (plan revision 2):
+  - The shutdown rule: one `Discard` in the host (hook entered, staged callables, forwarders, close; or the image
+    kept mapped for a startup plugin without config control and for startup plugins of a host that never resolved,
+    `DiscardStartup` in the destructor and `OnShutdown`); `Candidate` is gone (`StagedPlugin`). A failed Register
+    gets no hook. Tests: every discard path (taken name, failed commit, reload to another name, a dropped pending
+    load) gives shutdown, the callables' death, close (a failed commit's rollback destroys its tools' copies first);
+    a failed Register only the close; a discard the close guard keeps mapped runs the hook once; startup plugins of
+    an unresolved host run the hook once and their section validator calls nothing afterwards; a discarded
+    candidate's hook is refused as not loaded with another plugin loaded. S1's lifecycle expects the hook after a
+    failed commit's Register (60/60).
+  - The run protocol in the contract: `PluginRun`, `SubmitPluginRunStage`, `CancelPluginRun`, `WaitForPluginRun`;
+    `PointPropertyCombo` in the editing service (true when the choice changed `ref`). Both plugins use them (their
+    `Run` is `PluginRun<Result>`, their `Cancel` is gone). Tests: stages join the first stage's run and the waiting
+    tool's cancel hook ends them; the waiting tool answers at once or when the run ends; the descriptor window's
+    positions picker moves the 33 outputs and the normals to the face domain and keeps an unlisted choice.
+  - `intrinsic_add_feature_plugin` (cmake/IntrinsicFeaturePlugin.cmake) with the entry template
+    `IntrinsicFeaturePluginEntry.cpp.in`; both plugins' CMakeLists are one call; their `*.Entry.cpp` are gone.
+  - Codex code review (fresh session, diff sha256 95bf9ab8…): "Verdict: REVISE", three blocking: a hook run from the
+    destructor could reach destroyed services; the hook did not always precede the death of the plugin's callables
+    (a startup drop unregistered sections first, a failed commit's rollback dropped its tools); two doc statements
+    contradicted the new rule. Fixed: the destructor clears the services and the current host before its hooks
+    (module failures terminate the process, so only an exception reaches that path; no test can build a
+    registered-but-unresolved host); the slot holds each plugin callable strongly until `ClearCallables`, so every
+    discard path is hook, callables, close (the failed-commit test expects it; mutation of the strong reference
+    killed); docs updated (the deferred-result line was stale since 2c).
+  - Ponytail review (fresh Claude subagent, same diff): "Verdict: fix 1 and 3 first", "Lean: -40 lines possible".
+    Done: (1) docs and two stale comments; (2) `RegisterInto` closes after a failed Register (one place);
+    (3) the startup drop and cannot-commit tests check their hooks (mutations killed); (4) `WaitForPluginRun(run,
+    text)` owns the answer (applied succeeds, any other status is the error code); (5) `Discard(StagedPlugin&)`
+    and `ShutdownInto`; (6) `SubmitPluginRunStage` shorter; (7) the CMake function takes its sources directly and
+    finds its template by `CMAKE_CURRENT_FUNCTION_LIST_DIR`; (8) leftovers removed. Skipped: (9) the picker test's
+    ImGui setup (a third copy; the frame scope's docking flag was not checked against it).
+  - Codex round 2 (diff sha256 d4fd0216…): "Verdict: APPROVE", no remaining findings. Verification on the final
+    source: IntrinsicRuntimeContractTests 1941/1941 (exit 1 from the Vulkan ICD's LeakSanitizer report at process
+    exit), IntrinsicRuntimeIntegrationTests 80/80, IntrinsicSandboxEditorIntegrationTests 291/291; Vulkan smokes 6/6;
+    S1 60/60 (the hook after a failed commit's Register); live drivers 39/39 (descriptor analysis) and 62/62
+    (bilateral filter, with a refused second load and a clean sanitizer exit); static `build/ci` 76 filtered tests,
+    `build/ci-vulkan` static Sandbox and Vulkan tests built; jscpd: no clone touching the changed files. S2 and R4
+    still wait for the display.

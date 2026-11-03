@@ -273,7 +273,7 @@ TEST(DescriptorAnalysisPluginGpuSmoke, StaleInputsACancelBetweenStagesAndRadiusO
                     return job.Name == "Descriptor radius support (Vulkan)" &&
                         job.Identity.Run == cancelled->Handle.Token && R::IsActiveEditorJobState(job.State);
                 }))
-                cancelRequested = DA::Cancel(*cancelled);
+                cancelRequested = R::CancelPluginRun(*cancelled);
         }
         if (!cancelled || !cancelled->Final) return false;
         if (!overflow)

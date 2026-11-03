@@ -183,18 +183,11 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
         {
             job.Output = R::PluginJobOutput{.StableEntityId = w->Cfg.StableEntityId,
                                             .Property = w->Service->View(*w->Edit).ScalarOutputs.front()};
-            const bool first = !w->Shared->Handle.IsValid();
-            if (!first) job.Run = w->Shared->Handle;
             const std::string label = job.Label;
             std::string refusal;
-            const auto handle = R::SubmitPluginJob({}, std::move(job), &refusal);
-            if (!handle.IsValid())
-            {
-                Finish(*w, "failed", refusal.empty() ? "The descriptor stage '" + label + "' was not queued." : refusal);
-                return false;
-            }
-            if (first) w->Shared->Handle = handle;
-            return true;
+            if (R::SubmitPluginRunStage(*w->Shared, std::move(job), refusal)) return true;
+            Finish(*w, "failed", refusal.empty() ? "The descriptor stage '" + label + "' was not queued." : refusal);
+            return false;
         }
 
         // The CPU backends' one stage, and Vulkan's last: the histograms (over the GPU's rows for Vulkan).
@@ -352,6 +345,4 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
                          }});
         return run;
     }
-
-    bool Cancel(const Run& run) { return run.Handle.IsValid() && R::CancelPluginJob(run.Handle); }
 }

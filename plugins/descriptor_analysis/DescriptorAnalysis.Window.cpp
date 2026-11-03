@@ -36,25 +36,6 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
         };
         WindowState* g_Window{nullptr};
 
-        // A combo over the entity's vec3 point properties; keeps `ref` when the catalog does not list it.
-        bool PropertyCombo(const char* label, R::GeometryPropertyRef& ref, const R::GeometryPropertyCatalogSnapshot& catalog)
-        {
-            const std::string current = ref.Name + " (" + std::string{R::ToString(ref.Domain)} + ")";
-            if (!ImGui::BeginCombo(label, current.c_str())) return false;
-            bool changed = false;
-            for (const auto& entry : catalog.Entries)
-            {
-                const std::string name = entry.Ref.Name + " (" + std::string{R::ToString(entry.Ref.Domain)} + ")";
-                if (ImGui::Selectable(name.c_str(), entry.Ref.Name == ref.Name && entry.Ref.Domain == ref.Domain))
-                {
-                    ref = entry.Ref;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-            return changed;
-        }
-
         bool NameField(const char* label, R::GeometryPropertyRef& ref)
         {
             char name[128]{};
@@ -88,8 +69,7 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
 
         void Draw(bool& open)
         {
-            // Made on the first draw, not in Register: a load the host refuses after Register calls no shutdown hook.
-            if (g_Window == nullptr) g_Window = new WindowState();
+            if (g_Window == nullptr) g_Window = new WindowState(); // freed by Shutdown
             auto& state = *g_Window;
             ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
             if (!ImGui::Begin("FPFH Descriptor Analysis###view.descriptor_analysis", &open))
@@ -114,9 +94,9 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
             if (draft.StableEntityId != entity) state.FollowDisplayBin = false;
             if (auto* editing = R::PluginService<R::PointCloudEditingService>())
             {
-                if (PropertyCombo("Positions", draft.Positions, editing->InputCatalog(draft.StableEntityId, 2u)))
+                if (R::PointPropertyCombo("Positions", draft.Positions, editing->InputCatalog(draft.StableEntityId, 2u)))
                     for (auto& output : draft.Outputs) output.Domain = draft.Positions.Domain;
-                (void)PropertyCombo("Normals", draft.Normals,
+                R::PointPropertyCombo("Normals", draft.Normals,
                                     editing->InputCatalog(draft.StableEntityId, 2u, draft.Positions.Domain));
             }
             draft.Normals.Domain = draft.Positions.Domain;
@@ -178,7 +158,7 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
                 ImGui::PushID(int(i));
                 ImGui::Text("Running into '%s' and 32 more", state.Running[i]->Pending.Outputs.front().Name.c_str());
                 ImGui::SameLine();
-                if (ImGui::Button("Cancel")) (void)Cancel(*state.Running[i]);
+                if (ImGui::Button("Cancel")) (void)R::CancelPluginRun(*state.Running[i]);
                 ImGui::PopID();
             }
             ImGui::TextWrapped("Writes 33 named float histogram properties in one undoable operation. Each nonempty "

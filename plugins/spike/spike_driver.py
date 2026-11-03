@@ -284,14 +284,16 @@ def main() -> int:
     spike = [r for r in leak_records(log) if any(m in r for m in SPIKE_FRAMES)]
     checks.check("exit: no leak record has a frame in the plugin or the plugin host code", not spike, spike[:2])
     # Each failed attempt that opened an image is closed with no live callable and leaves the process: static
-    # construction, Register when it reached the commit, static destruction at the close.
+    # construction, Register and its shutdown hook when it reached the commit (every successful Register gets one),
+    # static destruction at the close.
     opened = [stage for stage in FAIL_STAGES if stage != "dlopen"]
     clean = [c for c in closes if clean_close(c)]
     checks.check("lifecycle: every failed image closed with no live callable and unmapped",
                  len(closes) == len(clean) == len(opened), closes)
     expected = []
     for stage in opened:
-        expected += ["static_construct"] + (["register"] if FAIL_STAGES[stage] == "commit_failed" else []) + ["static_destruct"]
+        expected += ["static_construct"] + (["register", "shutdown"] if FAIL_STAGES[stage] == "commit_failed" else []) \
+            + ["static_destruct"]
     # app_quit requests the exit; the plugin host runs the plugin's shutdown hook during the engine's shutdown and
     # leaves the image mapped, whose static destruction runs as the process ends.
     expected += ["static_construct", "register", "commit", "first_draw", "config_changed", "shutdown", "host_shutdown",

@@ -33,21 +33,6 @@ namespace Intrinsic::Plugins::BilateralFilter
         };
         WindowState* g_Window{nullptr};
 
-
-        // A combo over the entity's vec3 point properties; keeps `ref` when the catalog does not list it.
-        void PropertyCombo(const char* label, R::GeometryPropertyRef& ref, const R::GeometryPropertyCatalogSnapshot& catalog)
-        {
-            const std::string current = ref.Name + " (" + std::string{R::ToString(ref.Domain)} + ")";
-            if (!ImGui::BeginCombo(label, current.c_str())) return;
-            for (const auto& entry : catalog.Entries)
-            {
-                const std::string name = entry.Ref.Name + " (" + std::string{R::ToString(entry.Ref.Domain)} + ")";
-                if (ImGui::Selectable(name.c_str(), entry.Ref.Name == ref.Name && entry.Ref.Domain == ref.Domain))
-                    ref = entry.Ref;
-            }
-            ImGui::EndCombo();
-        }
-
         void ShowResult(const Result& r)
         {
             ImGui::Text("Last run: %s", r.Status.c_str());
@@ -61,8 +46,7 @@ namespace Intrinsic::Plugins::BilateralFilter
 
         void Draw(bool& open)
         {
-            // Made on the first draw, not in Register: a load the host refuses after Register calls no shutdown hook.
-            if (g_Window == nullptr) g_Window = new WindowState();
+            if (g_Window == nullptr) g_Window = new WindowState(); // freed by Shutdown
             auto& state = *g_Window;
             if (!ImGui::Begin("Bilateral Point Filter###view.bilateral_filter", &open))
             {
@@ -84,8 +68,8 @@ namespace Intrinsic::Plugins::BilateralFilter
                 draft.StableEntityId = selection->SelectedStableIds().front();
             if (auto* editing = R::PluginService<R::PointCloudEditingService>())
             {
-                PropertyCombo("Positions", draft.Positions, editing->InputCatalog(draft.StableEntityId, 2u));
-                PropertyCombo("Normals", draft.Normals,
+                R::PointPropertyCombo("Positions", draft.Positions, editing->InputCatalog(draft.StableEntityId, 2u));
+                R::PointPropertyCombo("Normals", draft.Normals,
                               editing->InputCatalog(draft.StableEntityId, 2u, draft.Positions.Domain));
             }
             char output[128]{};
@@ -132,7 +116,7 @@ namespace Intrinsic::Plugins::BilateralFilter
                 ImGui::PushID(int(i));
                 ImGui::Text("Running into '%s'", state.Running[i]->Pending.Output.Name.c_str());
                 ImGui::SameLine();
-                if (ImGui::Button("Cancel")) (void)Cancel(*state.Running[i]);
+                if (ImGui::Button("Cancel")) (void)R::CancelPluginRun(*state.Running[i]);
                 ImGui::PopID();
             }
             if (state.Last && state.Last->Final) ShowResult(*state.Last->Final);

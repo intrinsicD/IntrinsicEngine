@@ -206,7 +206,7 @@ TEST(BilateralFilterPlugin, AChangedInputOrOutputOrACancelEndsTheRunWithoutAWrit
         case 1: props.Get<glm::vec3>("samples")[0].x += 1; break;
         case 2: props.GetOrAdd<bool>("v:deleted")[0] = true; break;
         case 3: props.GetOrAdd<glm::vec3>("filtered")[0] = glm::vec3(77); break;
-        case 4: EXPECT_TRUE(BF::Cancel(*run)); break;
+        case 4: EXPECT_TRUE(R::CancelPluginRun(*run)); break;
         case 5: props.Get<glm::vec3>("directions")[0].x = 1; break;
         }
         const auto result = harness.Wait(*run);

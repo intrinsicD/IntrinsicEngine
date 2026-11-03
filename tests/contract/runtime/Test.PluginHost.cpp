@@ -344,7 +344,7 @@ TEST(PluginHost, AFailedCommitRollsEveryRegistrationBackAndClosesTheImage)
     const auto reply = harness.Call("plugin_load", {{"path", "fixture"}, {"fail_at", "windows"}});
     EXPECT_EQ(reply.ErrorCode, "commit_failed");
     EXPECT_TRUE(harness.NothingRegistered());
-    EXPECT_EQ(harness.Events, (Log{"close"}));
+    EXPECT_EQ(harness.Events, (Log{"shutdown", "close"})); // its Register succeeded: one shutdown hook
     ASSERT_TRUE(harness.Loaded(102)); // nothing left behind blocks a later load
 }
 
@@ -819,6 +819,7 @@ TEST(PluginHost, AStartupPluginThatCannotCommitLeavesNoBootSectionBehind)
     Harness harness{{.Startup = std::move(staged), .BootSections = std::move(sections), .Config = std::move(config),
                      .Ui = false}};
     EXPECT_FALSE(harness.SectionRegistered()); // no UI host: the commit failed, and the boot section went too
+    EXPECT_EQ(startupLog, (Log{"shutdown"})) << "its Register succeeded: one shutdown hook";
 }
 
 TEST(PluginHost, AStartupPluginUnloadsAndReloadsLikeALoadedOne)
@@ -1284,6 +1285,8 @@ TEST(PluginHost, AStartupPluginWithATakenNameOrSectionIsDroppedAndTheOthersStay)
     EXPECT_EQ(errors.size(), 2u);
     EXPECT_NE(sections.Find("alpha"), nullptr);
     EXPECT_NE(sections.Find("gamma"), nullptr);
+    EXPECT_EQ(std::count(log.begin(), log.end(), "shutdown"), 2) << "each dropped plugin's Register succeeded";
+    EXPECT_EQ(std::count(log.begin(), log.end(), "close"), 2);
     Harness harness{{.Startup = std::move(staged), .BootSections = std::move(sections)}};
     const Json listed = Reply(harness.Call("plugin_list"));
     ASSERT_EQ(listed["loaded"].size(), 2u);
@@ -1442,9 +1445,184 @@ TEST(PluginHost, APluginsRegisterAndShutdownHookCannotSubmitWorkAsAnotherPlugin)
     ASSERT_FALSE(harness.Call("plugin_load", {{"path", "a"}}).IsError);
     ASSERT_FALSE(harness.Call("plugin_unload", {{"plugin", "alpha"}}).IsError);
     ASSERT_FALSE(harness.Call("plugin_load", {{"path", "a"}}).IsError);
+    // A second alpha is discarded after its Register: its shutdown hook runs entered, as a plugin not loaded.
+    EXPECT_EQ(harness.Call("plugin_load", {{"path", "a"}}).ErrorCode, "already_loaded");
     harness.Engine.Shutdown(); // the ordinary exit: alpha, loaded last, shuts down first
     const std::string refused = "the calling plugin is not loaded";
     EXPECT_EQ(seen, (std::vector<std::string>{"register: " + refused, "shutdown: " + refused, "register: " + refused,
-                                              "shutdown: " + refused}));
+                                              "register: " + refused, "shutdown: " + refused, "shutdown: " + refused}));
     beta.Release = true;
+}
+
+// ARCH-022 template step (Q69, Q70): every successful Register gets exactly one shutdown hook before the image closes,
+// committed or not; then the plugin's callables die, then the close. A Register that fails gets none.
+namespace
+{
+    // Logs when the last copy of the plugin's callables it is captured in dies.
+    struct Sentinel
+    {
+        Log& Events;
+        ~Sentinel() { Events.push_back("callables_died"); }
+    };
+
+    std::function<bool(Runtime::PluginRegistrations&)> Sentinelled(std::function<bool(Runtime::PluginRegistrations&)> build,
+                                                                   Log& log)
+    {
+        return [build = std::move(build), &log](Runtime::PluginRegistrations& staged)
+        {
+            if (!build(staged)) return false;
+            auto& invoke = staged.Operations.front().Invoke;
+            invoke = [inner = std::move(invoke), sentinel = std::make_shared<Sentinel>(log)](
+                         const Runtime::AgentOperationContext& context, const std::string_view arguments)
+            { return inner(context, arguments); };
+            return true;
+        };
+    }
+}
+
+TEST(PluginHost, EveryDiscardedCandidateGetsOneShutdownHookBeforeItsCallablesDieAndTheClose)
+{
+    const Log discarded{"shutdown", "callables_died", "close"};
+    {
+        SCOPED_TRACE("a taken name");
+        Harness harness{};
+        harness.Builds["a"] = Fixture(310, harness.Events, "alpha");
+        harness.Builds["a2"] = Sentinelled(Fixture(311, harness.Events, "alpha"), harness.Events);
+        ASSERT_FALSE(harness.Call("plugin_load", {{"path", "a"}}).IsError);
+        harness.Events.clear();
+        EXPECT_EQ(harness.Call("plugin_load", {{"path", "a2"}}).ErrorCode, "already_loaded");
+        EXPECT_EQ(harness.Events, discarded);
+    }
+    {
+        SCOPED_TRACE("a failed commit");
+        Harness harness{};
+        harness.Builds["a"] = Sentinelled(Fixture(312, harness.Events, "alpha"), harness.Events);
+        EXPECT_EQ(harness.Call("plugin_load", {{"path", "a"}, {"fail_at", "windows"}}).ErrorCode, "commit_failed");
+        EXPECT_EQ(harness.Events, discarded);
+    }
+    {
+        SCOPED_TRACE("a reload to another name");
+        Harness harness{};
+        harness.Builds["a"] = Fixture(313, harness.Events, "alpha");
+        harness.Builds["b"] = Sentinelled(Fixture(314, harness.Events, "beta"), harness.Events);
+        ASSERT_FALSE(harness.Call("plugin_load", {{"path", "a"}}).IsError);
+        harness.Events.clear();
+        EXPECT_EQ(harness.Call("plugin_reload", {{"plugin", "alpha"}, {"path", "b"}}).ErrorCode, "name_mismatch");
+        EXPECT_EQ(harness.Events, (Log{"shutdown", "close", "shutdown", "callables_died", "close"})); // alpha, then beta
+    }
+    {
+        SCOPED_TRACE("a pending load dropped before its commit");
+        Harness harness{};
+        harness.Builds["a"] = Sentinelled(Fixture(315, harness.Events, "alpha"), harness.Events);
+        EXPECT_FALSE(harness.Call("plugin_load", {{"path", "a"}, {"simulate_drop", true}}).IsError);
+        EXPECT_EQ(harness.Events, discarded);
+    }
+    {
+        SCOPED_TRACE("a failed Register");
+        Harness harness{};
+        harness.Builds["a"] = [](Runtime::PluginRegistrations&) { return false; };
+        EXPECT_EQ(harness.Call("plugin_load", {{"path", "a"}}).ErrorCode, "register_failed");
+        EXPECT_EQ(harness.Events, (Log{"close"})) << "a Register that fails cleans up itself: no hook";
+    }
+}
+
+TEST(PluginHost, ADiscardTheCloseGuardKeepsMappedStillRunsItsShutdownHookOnce)
+{
+    // Alpha's live callable of the shared generation keeps the discarded beta's image mapped (the documented
+    // generation limitation): its hook ran, its image was not closed.
+    Harness harness{};
+    harness.Builds["a"] = Fixture(320, harness.Events, "alpha");
+    harness.Builds["b"] = Fixture(320, harness.Events, "beta");
+    ASSERT_FALSE(harness.Call("plugin_load", {{"path", "a"}}).IsError);
+    harness.Events.clear();
+    EXPECT_EQ(harness.Call("plugin_load", {{"path", "b"}, {"fail_at", "windows"}}).ErrorCode, "commit_failed");
+    EXPECT_EQ(harness.Events, (Log{"shutdown"}));
+    EXPECT_EQ(Json::parse(harness.Call("plugin_host_identity").Text)["closes"].back()["closed"], false);
+}
+
+TEST(PluginHost, StartupPluginsTheHostNeverCommittedGetTheirHookAndCallNothingAfterwards)
+{
+    // The host goes before OnResolve: each staged plugin's hook runs once, its forwarders call nothing, and the image
+    // stays mapped (the boot registry outlives the host and still holds the sections).
+    Log log;
+    Config::EngineConfigSectionRegistry sections;
+    std::vector<std::string> errors;
+    std::vector<std::unique_ptr<Runtime::PluginImage>> images;
+    images.push_back(std::make_unique<FixtureImage>([&log](Runtime::PluginRegistrations& staged)
+    {
+        if (!Fixture(330, log, "alpha")(staged)) return false;
+        staged.ConfigSections.front().Validate = [&log](const std::string_view document, std::string_view, std::string_view)
+        {
+            log.push_back("validated");
+            return Validate(document);
+        };
+        return true;
+    }, log));
+    auto staged = Runtime::StageStartupPlugins(std::move(images), sections, errors);
+    ASSERT_EQ(staged.size(), 1u);
+    log.clear(); // the boot registry validated the default payload at staging
+    {
+        Runtime::PluginHostModule host{{.Startup = std::move(staged)}};
+    }
+    EXPECT_EQ(log, (Log{"shutdown"}));
+    const auto* section = sections.Find("alpha");
+    ASSERT_NE(section, nullptr);
+    (void)section->Validate(R"({"value":1})", "test", "alpha");
+    EXPECT_EQ(log, (Log{"shutdown"})) << "the section's validator calls nothing after the discard";
+}
+
+// The contract's run protocol: stages join the first stage's run, the waiting tool's outcome, its cancel hook.
+namespace
+{
+    struct RunResult
+    {
+        std::string Status{};
+    };
+
+    std::string RunText(const RunResult& result) { return result.Status; }
+}
+
+TEST(PluginHost, RunStagesJoinTheFirstStagesRunAndTheWaitingToolsCancelEndsThem)
+{
+    WorkerState state{};
+    Harness harness{};
+    ASSERT_TRUE(harness.Loaded(340));
+    const auto run = std::make_shared<Runtime::PluginRun<RunResult>>();
+    std::string refusal;
+    ASSERT_TRUE(Runtime::SubmitPluginRunStage(*run, LoopingJob("first", state), refusal)) << refusal;
+    const auto first = run->Handle;
+    ASSERT_TRUE(Runtime::SubmitPluginRunStage(*run, LoopingJob("second", state), refusal)) << refusal;
+    EXPECT_EQ(run->Handle.Token, first.Token) << "the run keeps its first stage's handle";
+    const auto jobs = harness.Jobs();
+    const auto second = std::ranges::find_if(jobs, [](const auto& job) { return job.Name == "second"; });
+    ASSERT_NE(second, jobs.end());
+    EXPECT_EQ(second->Identity.Run, first.Token) << "a later stage joins the first stage's run";
+    auto outcome = Runtime::WaitForPluginRun(run, &RunText);
+    ASSERT_TRUE(outcome.Cancel);
+    EXPECT_EQ(outcome.Cancel(harness.Context), "cancel requested");
+    harness.Drain();
+    for (const auto& job : harness.Jobs()) EXPECT_EQ(job.State, Runtime::JobState::Cancelled) << job.Name;
+    EXPECT_EQ(outcome.Cancel(harness.Context), "the run is not active");
+}
+
+TEST(PluginHost, TheWaitingToolAnswersAtOnceOrWhenTheRunEnds)
+{
+    const auto ended = std::make_shared<Runtime::PluginRun<RunResult>>();
+    ended->Final = RunResult{"applied"};
+    const auto immediate = Runtime::WaitForPluginRun(ended, &RunText);
+    EXPECT_EQ(immediate.Text, "applied");
+    EXPECT_FALSE(immediate.IsError);
+    EXPECT_FALSE(immediate.Continuation);
+    const auto running = std::make_shared<Runtime::PluginRun<RunResult>>(Runtime::PluginRun<RunResult>{.Pending = {"pending"}});
+    auto waiting = Runtime::WaitForPluginRun(running, &RunText);
+    EXPECT_EQ(waiting.Text, "pending");
+    ASSERT_TRUE(waiting.Continuation);
+    Runtime::AgentOperationOutcome result{};
+    EXPECT_FALSE(waiting.Continuation({}, result));
+    running->Final = RunResult{"stale"};
+    EXPECT_TRUE(waiting.Continuation({}, result));
+    EXPECT_EQ(result.Text, "stale");
+    EXPECT_TRUE(result.IsError) << "any status but applied is an error";
+    EXPECT_EQ(result.ErrorCode, "stale");
+    EXPECT_EQ(waiting.Cancel({}), "the run is not active") << "a run without a job";
 }

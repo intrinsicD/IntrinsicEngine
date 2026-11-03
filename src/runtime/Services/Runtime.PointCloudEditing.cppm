@@ -74,6 +74,10 @@ export namespace Extrinsic::Runtime
     // Unrepresentable: a value does not fit a scalar output's storage exactly (nothing is written).
     enum class PointPublishStatus : std::uint8_t { Applied, Stale, Rejected, Unrepresentable };
 
+    // A plugin window's picker over an InputCatalog (ImGui, the host's context): true when the choice changed `ref`;
+    // a `ref` the catalog does not list stays as it is.
+    bool PointPropertyCombo(const char* label, GeometryPropertyRef& ref, const GeometryPropertyCatalogSnapshot& catalog);
+
     class PointCloudEditingService
     {
     public:

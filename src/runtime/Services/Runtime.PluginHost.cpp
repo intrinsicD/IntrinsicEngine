@@ -350,13 +350,6 @@ namespace Extrinsic::Runtime
             GpuQueueParticipantHandle Handle{};
         };
 
-        // An opened image whose Register succeeded; committed on a later frame.
-        struct Candidate
-        {
-            std::shared_ptr<PluginSlot> Slot{};
-            PluginRegistrations Staged{};
-        };
-
         constexpr std::chrono::milliseconds kDrainDeadline{5000};
         enum class DrainState : std::uint8_t { Pending, Drained, TimedOut };
 
@@ -446,10 +439,8 @@ namespace Extrinsic::Runtime
         {
             if (!fn) return {};
             auto held = std::make_shared<std::function<R(Args...)>>(std::move(fn));
-            slot->Clearers.push_back([weak = std::weak_ptr(held)]
-            {
-                if (const auto entry = weak.lock()) *entry = {};
-            });
+            // Strong: the plugin's callable lives until ClearCallables, whichever registry drops its forwarder first.
+            slot->Clearers.push_back([held] { *held = {}; });
             if (retain != nullptr)
                 *retain = [weak = std::weak_ptr(held)]
                 {
@@ -476,11 +467,39 @@ namespace Extrinsic::Runtime
             section.OnChanged = Forward(slot, std::move(section.OnChanged));
         }
 
-        // Open's Register, entered (a call into the plugin while it is not loaded, so it cannot submit work).
+        // Open's Register, entered (a call into the plugin while it is not loaded, so it cannot submit work). A Register
+        // that fails cleaned up itself: its staged callables die and the image closes, with no shutdown hook.
         bool RegisterInto(PluginSlot& slot, PluginRegistrations& staged, std::string& error)
         {
+            bool registered = false;
+            {
+                const Entered entered(slot);
+                registered = slot.Image->Register(staged, error);
+            }
+            if (registered) return true;
+            const int generation = staged.Generation;
+            staged = {};
+            (void)Close(std::move(slot.Image), generation);
+            return false;
+        }
+
+        // The plugin's shutdown hook, entered: its calls are refused (it is not loaded, or no longer).
+        void ShutdownInto(PluginSlot& slot)
+        {
             const Entered entered(slot);
-            return slot.Image->Register(staged, error);
+            slot.Image->Shutdown();
+        }
+
+        // A plugin whose Register succeeded and that is not committed: every such Register gets one shutdown hook, then
+        // its staged callables and its forwarders' die, then the close. `keepMapped`: something may still hold its
+        // boot sections (inert now).
+        void Discard(StagedPlugin& plugin, const bool keepMapped = false)
+        {
+            auto& slot = *plugin.Slot;
+            ShutdownInto(slot);
+            plugin.Registrations = {};
+            slot.ClearCallables();
+            if (!keepMapped) (void)Close(std::move(slot.Image), slot.Generation);
         }
     }
 
@@ -498,15 +517,12 @@ namespace Extrinsic::Runtime
             const auto drop = [&](std::string why)
             {
                 for (const auto& name : plugin.SectionNames) (void)boot.Unregister(name);
-                const int generation = plugin.Registrations.Generation;
-                plugin.Registrations = {};
-                slot->ClearCallables();
-                (void)Close(std::move(slot->Image), generation);
+                Discard(plugin);
                 errors.push_back(std::move(why));
             };
             if (!RegisterInto(*slot, plugin.Registrations, error))
             {
-                drop("register failed: " + error);
+                errors.push_back("register failed: " + error);
                 continue;
             }
             slot->Name = plugin.Registrations.Name;
@@ -636,6 +652,15 @@ namespace Extrinsic::Runtime
             for (const auto& entry : slot.Jobs) (void)Jobs->Cancel(entry->Token);
         }
 
+        // Startup plugins never committed (the host goes before OnResolve): their hooks run and their callables die; the
+        // images stay mapped, as the boot sections may outlive the host.
+        void DiscardStartup()
+        {
+            for (auto& staged : Options.Startup)
+                if (staged.Slot && staged.Slot->Image) Discard(staged, true);
+            Options.Startup.clear();
+        }
+
         // Commits the staged startup plugins in order; their config sections are already registered (the boot
         // registry). One that fails is logged and closed, its own sections removed; the others are unaffected.
         void CommitStartup()
@@ -652,18 +677,17 @@ namespace Extrinsic::Runtime
                 const auto failure = config && ui && history
                     ? Commit(staged.Registrations, slot, *config, *ui, *history, {})
                     : std::optional<std::string>{"editor UI host, config control or history missing"};
-                staged.Registrations = {};
                 if (failure)
                 {
                     Core::Log::Error("[PluginHost] the startup plugin '{}' was not committed: {}", slot->Name, *failure);
-                    // Its boot sections (a commit's rollback already removed them) must go before the close; without
-                    // config control they cannot, so the image stays mapped.
-                    if (config == nullptr) continue;
-                    for (const auto& name : slot->Sections) (void)config->UnregisterSection(name);
-                    slot->ClearCallables();
-                    (void)Close(std::move(slot->Image), slot->Generation);
+                    // Its boot sections must go before the close; without config control they cannot, so the image
+                    // stays mapped (their callbacks call nothing after the discard).
+                    if (config != nullptr)
+                        for (const auto& name : slot->Sections) (void)config->UnregisterSection(name);
+                    Discard(staged, config == nullptr);
                     continue;
                 }
+                staged.Registrations = {};
                 Plugins.push_back(slot);
                 intrinsic_plugin_event("commit");
             }
@@ -676,38 +700,31 @@ namespace Extrinsic::Runtime
         }
 
         // Open and Register; on failure the image is closed again and `failure` says why.
-        std::optional<Candidate> Stage(const std::string& path, const std::string_view failAt,
+        std::optional<StagedPlugin> Stage(const std::string& path, const std::string_view failAt,
                                        AgentOperationOutcome& failure) const
         {
             auto image = Open(path, failAt, failure);
             if (!image) return std::nullopt;
-            Candidate candidate{.Slot = std::make_shared<PluginSlot>()};
+            StagedPlugin candidate{.Slot = std::make_shared<PluginSlot>()};
             candidate.Slot->Image = std::move(image);
             std::string error{};
-            if (!RegisterInto(*candidate.Slot, candidate.Staged, error))
+            if (!RegisterInto(*candidate.Slot, candidate.Registrations, error))
             {
-                const int generation = candidate.Staged.Generation;
-                candidate.Staged = {}; // the staged callables die while their code is still mapped
-                (void)Close(std::move(candidate.Slot->Image), generation);
                 failure = Fail("register_failed", error);
                 return std::nullopt;
             }
-            candidate.Slot->Name = candidate.Staged.Name;
-            candidate.Slot->Generation = candidate.Staged.Generation;
+            candidate.Slot->Name = candidate.Registrations.Name;
+            candidate.Slot->Generation = candidate.Registrations.Generation;
             return candidate;
         }
 
         // Owns a pending candidate's image: a load whose continuation is dropped (the caller disconnected) or
         // cannot run closes the image here. Finish takes the candidate out, and with it the ownership.
-        static std::shared_ptr<Candidate> Own(Candidate candidate)
+        static std::shared_ptr<StagedPlugin> Own(StagedPlugin candidate)
         {
-            return {new Candidate(std::move(candidate)), [](Candidate* pending)
+            return {new StagedPlugin(std::move(candidate)), [](StagedPlugin* pending)
                     {
-                        if (pending->Slot && pending->Slot->Image)
-                        {
-                            pending->Staged = {};
-                            (void)Close(std::move(pending->Slot->Image), pending->Slot->Generation);
-                        }
+                        if (pending->Slot && pending->Slot->Image) Discard(*pending);
                         delete pending;
                     }};
         }
@@ -812,14 +829,7 @@ namespace Extrinsic::Runtime
             return report;
         }
 
-        // Closes a candidate that will not be committed (its callables die first).
-        static void Discard(Candidate& candidate)
-        {
-            candidate.Staged = {};
-            (void)Close(std::move(candidate.Slot->Image), candidate.Slot->Generation);
-        }
-
-        AgentOperationOutcome Finish(Candidate candidate, EngineConfigControl& config, EditorUiHost& ui,
+        AgentOperationOutcome Finish(StagedPlugin candidate, EngineConfigControl& config, EditorUiHost& ui,
                                      EditorCommandHistory& history, const std::string_view failAt)
         {
             const auto slot = candidate.Slot;
@@ -833,14 +843,13 @@ namespace Extrinsic::Runtime
                 Discard(candidate);
                 return Fail("already_loaded", "a plugin named '" + slot->Name + "' is already loaded");
             }
-            const auto failure = Commit(candidate.Staged, slot, config, ui, history, failAt);
-            candidate.Staged = {}; // leftover staged callables die before any close
+            const auto failure = Commit(candidate.Registrations, slot, config, ui, history, failAt);
             if (failure)
             {
-                slot->ClearCallables();
-                (void)Close(std::move(slot->Image), slot->Generation);
+                Discard(candidate);
                 return Fail("commit_failed", *failure);
             }
+            candidate.Registrations = {}; // leftover staged callables die
             Plugins.push_back(slot);
             intrinsic_plugin_event("commit");
             const Json restored = Restore(*slot, config);
@@ -873,10 +882,7 @@ namespace Extrinsic::Runtime
                                           EditorUiHost& ui, EditorCommandHistory& history)
         {
             std::erase(Plugins, slot); // its calls are refused from here: the caller is not loaded
-            {
-                const Entered entered(*slot);
-                slot->Image->Shutdown();
-            }
+            ShutdownInto(*slot);
             Unregister(*slot, config, ui, history, true);
             slot->ClearCallables();
             intrinsic_plugin_event("unload");
@@ -996,7 +1002,7 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 if (AnyRunning()) return false; // polled from plugin code: commit once it returned
-                result = Finish(std::exchange(*opened, Candidate{}), hosts->Config, hosts->Ui, hosts->History, failAt);
+                result = Finish(std::exchange(*opened, StagedPlugin{}), hosts->Config, hosts->Ui, hosts->History, failAt);
                 if (!result.IsError && !second.empty())
                 {
                     Json reply = Json::parse(result.Text);
@@ -1182,7 +1188,10 @@ namespace Extrinsic::Runtime
 
     PluginHostModule::~PluginHostModule()
     {
+        // The services may be gone (an engine that failed before OnResolve): hooks run here find none.
         if (g_Current == this) g_Current = nullptr;
+        m_Impl->Services = nullptr;
+        m_Impl->DiscardStartup();
     }
 
     PluginHostModule* PluginHostModule::Current() noexcept { return g_Current; }
@@ -1217,6 +1226,7 @@ namespace Extrinsic::Runtime
     void PluginHostModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
         auto& impl = *m_Impl;
+        impl.DiscardStartup(); // an engine that never resolved
         auto* config = context.Services.Find<EngineConfigControl>();
         auto* ui = context.Services.Find<EditorUiHost>();
         auto* history = context.Services.Find<EditorCommandHistory>();
@@ -1238,10 +1248,7 @@ namespace Extrinsic::Runtime
             // The job service drained before the modules shut down, so every job is finalized; one that is not
             // stays (its image stays mapped too).
             std::erase_if(slot.Jobs, [](const std::unique_ptr<JobEntry>& entry) { return entry->Finalized; });
-            {
-                const Entered entered(slot);
-                slot.Image->Shutdown();
-            }
+            ShutdownInto(slot);
             if (config != nullptr && ui != nullptr && history != nullptr)
                 impl.Unregister(slot, *config, *ui, *history, false);
             slot.ClearCallables();

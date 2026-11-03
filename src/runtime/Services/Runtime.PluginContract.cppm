@@ -5,6 +5,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -115,6 +116,60 @@ export namespace Extrinsic::Runtime
     {
         auto* services = PluginServices();
         return services != nullptr ? services->Find<T>() : nullptr;
+    }
+
+    // A plugin's run of one or more stages, shared by its window and a waiting MCP call: `Final` is its one terminal
+    // result, set on the main thread. `Handle` is the first stage's job; later stages join its run.
+    template <class Result>
+    struct PluginRun
+    {
+        Result Pending{};
+        std::optional<Result> Final{};
+        PluginJobHandle Handle{};
+    };
+
+    // Submits a stage of `run` (main thread): the first becomes the run's handle, a later one joins its run. False with
+    // the host's reason in `refusal` (possibly empty) when it was refused.
+    template <class Result>
+    [[nodiscard]] bool SubmitPluginRunStage(PluginRun<Result>& run, PluginJob job, std::string& refusal)
+    {
+        job.Run = run.Handle; // invalid for the first stage
+        const auto handle = SubmitPluginJob({}, std::move(job), &refusal);
+        if (!run.Handle.IsValid()) run.Handle = handle;
+        return handle.IsValid();
+    }
+
+    // Cancels the run's jobs, as the Jobs window does; false when nothing is active.
+    template <class Result>
+    bool CancelPluginRun(const PluginRun<Result>& run)
+    {
+        return run.Handle.IsValid() && CancelPluginJob(run.Handle);
+    }
+
+    // An MCP tool's outcome for a started run, whose texts are `text(result)`: the answer when it already ended, else
+    // the pending result's text now, a continuation that answers once `Final` is set, and a cancel hook (MCP
+    // notifications/cancelled). The answer succeeds when the result's Status is "applied"; any other status is the
+    // error code.
+    template <class Result, class Text>
+    [[nodiscard]] AgentOperationOutcome WaitForPluginRun(const std::shared_ptr<PluginRun<Result>>& run, Text text)
+    {
+        const auto answer = [text](const Result& result)
+        {
+            const bool applied = result.Status == "applied";
+            return AgentOperationOutcome{.IsError = !applied, .Text = text(result),
+                                         .ErrorCode = applied ? std::string{} : result.Status};
+        };
+        if (run->Final) return answer(*run->Final);
+        AgentOperationOutcome outcome{.Text = text(run->Pending)};
+        outcome.Continuation = [run, answer](const AgentOperationContext&, AgentOperationOutcome& result)
+        {
+            if (!run->Final) return false;
+            result = answer(*run->Final);
+            return true;
+        };
+        outcome.Cancel = [run](const AgentOperationContext&)
+        { return std::string{CancelPluginRun(*run) ? "cancel requested" : "the run is not active"}; };
+        return outcome;
     }
 }
 

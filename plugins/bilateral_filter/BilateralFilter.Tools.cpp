@@ -41,12 +41,6 @@ namespace Intrinsic::Plugins::BilateralFilter
                     {"gpu_neighborhood_ms", r.GpuNeighborhoodMilliseconds}};
         }
 
-        R::AgentOperationOutcome Answer(const Result& r)
-        {
-            const bool applied = r.Status == "applied";
-            return {.IsError = !applied, .Text = ResultJson(r).dump(), .ErrorCode = applied ? std::string{} : r.Status};
-        }
-
         R::AgentOperationOutcome NoConfig()
         {
             return {.IsError = true, .Text = "The bilateral filter section is missing or invalid.", .ErrorCode = "invalid"};
@@ -68,17 +62,7 @@ namespace Intrinsic::Plugins::BilateralFilter
                 const auto config = R::ActivePluginSection<kSection>();
                 if (!config) return NoConfig();
                 const auto run = Start(*config);
-                if (run->Final) return Answer(*run->Final);
-                R::AgentOperationOutcome outcome{.Text = ResultJson(run->Pending).dump()};
-                outcome.Continuation = [run](const R::AgentOperationContext&, R::AgentOperationOutcome& result)
-                {
-                    if (!run->Final) return false;
-                    result = Answer(*run->Final);
-                    return true;
-                };
-                outcome.Cancel = [run](const R::AgentOperationContext&)
-                { return std::string{Cancel(*run) ? "cancel requested" : "the run is not active"}; };
-                return outcome;
+                return R::WaitForPluginRun(run, [](const Result& r) { return ResultJson(r).dump(); });
             },
         });
         staged.Operations.push_back({

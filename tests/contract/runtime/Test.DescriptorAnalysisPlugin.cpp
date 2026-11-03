@@ -10,9 +10,11 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -235,12 +237,12 @@ TEST(DescriptorAnalysisPlugin, AChangedInputOrOutputOrACancelEndsTheRunWithoutAW
         case 1: props.Get<glm::vec3>("samples")[0].x += 1; break;
         case 2: props.GetOrAdd<bool>("v:deleted")[0] = true; break;
         case 3: props.GetOrAdd<float>(config.Outputs[0].Name)[0] = 77; break;
-        case 4: EXPECT_TRUE(DA::Cancel(*run)); break;
+        case 4: EXPECT_TRUE(R::CancelPluginRun(*run)); break;
         case 5: props.Get<glm::vec3>("directions")[0].x += 1; break;
         case 6: props.GetOrAdd<float>(config.Outputs[32].Name)[0] = 77; break;
         case 7:
             props.Get<glm::vec3>("samples")[0].x += 1;
-            EXPECT_TRUE(DA::Cancel(*run));
+            EXPECT_TRUE(R::CancelPluginRun(*run));
             break;
         }
         const auto result = harness.Wait(*run);
@@ -530,4 +532,69 @@ TEST(DescriptorAnalysisPlugin, AnUnloadAndAReloadKeepTheHistoryAndTheToolRunsAga
     const auto again = harness.Call("descriptor_analysis");
     ASSERT_FALSE(again.IsError) << again.Text;
     EXPECT_EQ(Column(props, config.Outputs[7].Name), written);
+}
+
+namespace
+{
+    // The combo popup open in the last frame (ImGui names them "##Combo_NN").
+    ImGuiWindow* OpenComboPopup()
+    {
+        for (ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
+            if (window->WasActive && std::string_view{window->Name}.starts_with("##Combo_")) return window;
+        return nullptr;
+    }
+}
+
+TEST(DescriptorAnalysisPlugin, ThePositionsPickerMovesTheOutputsToItsDomainAndKeepsAnUnlistedChoice)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& faces = PointDomainProperties(scene, entity, D::MeshFace);
+    faces.GetOrAdd<glm::vec3>("face_samples").Vector().assign(faces.Size(), glm::vec3(1, 2, 3));
+    auto config = Settings(entity, D::MeshVertex);
+    config.Positions.Name = "unlisted"; // not in the entity's catalog
+    ASSERT_TRUE(harness.Apply(config));
+    auto* ui = harness.Engine.Services().Find<R::EditorUiHost>();
+    ASSERT_NE(ui, nullptr);
+    ASSERT_TRUE(ui->SetWindowOpen("view.descriptor_analysis", true));
+    const std::string face = "face_samples (" + std::string{R::ToString(D::MeshFace)} + ")";
+
+    IMGUI_CHECKVERSION();
+    ImGuiContext* context = ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(1280, 1600);
+    io.IniFilename = nullptr;
+    unsigned char* pixels = nullptr;
+    int width = 0, height = 0;
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+    std::optional<DA::Config> afterOpenAndClose{}, afterChoice{};
+    for (int frame = 0; frame < 40; ++frame)
+    {
+        io.DeltaTime = 1.f / 60.f;
+        ImGui::NewFrame();
+        if (auto* window = ImGui::FindWindowByName("FPFH Descriptor Analysis###view.descriptor_analysis"))
+        {
+            if (frame == 1) ImGui::FocusWindow(window); // once: focusing closes open popups
+            // Open the picker and close it without a choice, then apply: the unlisted positions stay.
+            if (frame == 2 || frame == 4 || frame == 12) ImGui::ActivateItemByID(window->GetID("Positions")); // 4 closes
+            if (frame == 8 || frame == 18) ImGui::ActivateItemByID(window->GetID("Apply settings"));
+            // Open it again and choose the face property, then apply.
+            if (frame == 14)
+                if (auto* popup = OpenComboPopup()) ImGui::ActivateItemByID(popup->GetID(face.c_str()));
+        }
+        (void)ui->Windows().DrawOpenWindows();
+        ImGui::Render();
+        harness.Frame();
+        if (frame == 10) afterOpenAndClose = R::ActivePluginSection<DA::kSection>();
+        if (frame == 20) afterChoice = R::ActivePluginSection<DA::kSection>();
+    }
+    ImGui::DestroyContext(context);
+    ASSERT_TRUE(afterOpenAndClose);
+    EXPECT_EQ(afterOpenAndClose->Positions.Name, "unlisted") << "a choice the catalog does not list is kept";
+    ASSERT_TRUE(afterChoice);
+    EXPECT_EQ(afterChoice->Positions.Name, "face_samples");
+    EXPECT_EQ(afterChoice->Positions.Domain, D::MeshFace);
+    for (const auto& output : afterChoice->Outputs) EXPECT_EQ(output.Domain, D::MeshFace) << output.Name;
+    EXPECT_EQ(afterChoice->Normals.Domain, D::MeshFace) << "the normals follow the positions' domain";
 }

@@ -95,13 +95,16 @@ is allowed.
 
 ```
 plugins/marching_cubes/
-  CMakeLists.txt               add_library(... MODULE ...), links ExtrinsicRuntime (shared engine builds only)
-  MarchingCubes.Plugin.cpp     the v1 entry points; Register adds everything through PluginRegistrations
-  MarchingCubes.Commands.cpp   "marching_cubes.extract" with its argument schema (also an MCP tool)
-  MarchingCubes.Panel.cpp      its window; buttons call the command
-  MarchingCubes.Config.cppm    config rows; the section is registered
-  tests/
+  CMakeLists.txt               intrinsic_add_feature_plugin(MarchingCubes <sources>): the objects, the MODULE with
+                               generated v1 entry points (shared builds), a startup plugin of the Sandbox
+  MarchingCubes.cppm           module Intrinsic.Plugin.MarchingCubes: config rows, the section, Register, Shutdown
+  MarchingCubes.Plugin.cpp     Register adds everything through PluginRegistrations
+  MarchingCubes.Run.cpp        its runs (PluginRun, SubmitPluginRunStage), on the module services
+  MarchingCubes.Tools.cpp      its MCP tools (a waiting tool: WaitForPluginRun)
+  MarchingCubes.Window.cpp     its window; buttons start runs as the tools do
 ```
+(the two feature plugins, `plugins/bilateral_filter` and `plugins/descriptor_analysis`, have this shape; their
+tests share `tests/support/PluginHarness.hpp`)
 
 - **The contract** is `Extrinsic.Runtime.PluginContract` (`src/runtime/Services/`), the only module a plugin needs
   to reach the host:
@@ -112,17 +115,19 @@ plugins/marching_cubes/
     engine's services;
   - a plugin hands callables to the host through these APIs only, so the host holds every one of them and
     removes them all before it closes the image;
-  - operations answer at once: a deferred result (a continuation, progress or cancel) is refused with
-    `deferred_unsupported`, because the agent server keeps those beyond the reach of an unload.
+  - a deferred result (a continuation, progress or cancel) is held by the host, so an unload drains it; the
+    contract's run protocol (`PluginRun`, `SubmitPluginRunStage`, `CancelPluginRun`, `WaitForPluginRun`) gives a
+    plugin's multi-stage runs and its waiting MCP tools;
 - **v1 means the same build:** the build id is a sha256 over the toolchain, standard library, compile flags and
   definitions, build type, sanitizers, shared-engine setting and every engine module interface (`src/**/*.cppm`). The host refuses another
   id (`abi_mismatch`) and a missing entry point (`dlsym_failed`). There is no compatibility layer beyond that; a
   plugin is rebuilt with the engine.
 - **The host** is `Extrinsic.Runtime.PluginHost`, a runtime module the Sandbox composes. Its MCP tools are
   `plugin_load`, `plugin_unload`, `plugin_reload`, `plugin_list` and `app_quit`.
-  - A load opens a private copy, calls Register and commits everything atomically on the next frame. A load refused
-    after Register (a taken name, a failed commit) closes the image without the shutdown hook, so Register allocates
-    nothing the plugin would have to free (the plugins make their window state on the first draw).
+  - A load opens a private copy, calls Register and commits everything atomically on the next frame. Every
+    successful Register gets exactly one shutdown hook before the image closes, committed or not (a taken name, a
+    failed commit, a reload to another name, a dropped pending load, a startup plugin dropped or not committed);
+    a Register that returns false gets none and cleans up itself.
   - An unload drains first: the plugin's jobs are cancelled and reaped and its GPU work retired, within 5 s
     (else `drain_timeout`, and the plugin stays). Then the shutdown hook runs and every registration goes, with
     the config payloads saved. The image is closed only when none of its callables is alive.

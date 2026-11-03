@@ -17,6 +17,7 @@ module;
 
 #include <entt/entity/registry.hpp>
 #include <glm/vec3.hpp>
+#include <imgui.h>
 
 module Extrinsic.Runtime.PointCloudEditing;
 
@@ -458,6 +459,24 @@ namespace Extrinsic::Runtime
                                                       minimumLiveCount);
         if (domain) std::erase_if(catalog.Entries, [&](const auto& entry) { return entry.Ref.Domain != *domain; });
         return catalog;
+    }
+
+    bool PointPropertyCombo(const char* label, GeometryPropertyRef& ref, const GeometryPropertyCatalogSnapshot& catalog)
+    {
+        const std::string current = ref.Name + " (" + std::string{ToString(ref.Domain)} + ")";
+        if (!ImGui::BeginCombo(label, current.c_str())) return false;
+        bool changed = false;
+        for (const auto& entry : catalog.Entries)
+        {
+            const std::string name = entry.Ref.Name + " (" + std::string{ToString(entry.Ref.Domain)} + ")";
+            if (ImGui::Selectable(name.c_str(), entry.Ref.Name == ref.Name && entry.Ref.Domain == ref.Domain))
+            {
+                changed = changed || !(entry.Ref == ref);
+                ref = entry.Ref;
+            }
+        }
+        ImGui::EndCombo();
+        return changed;
     }
 
     PointCloudEditingModule::PointCloudEditingModule() = default;

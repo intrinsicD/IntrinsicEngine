@@ -8,7 +8,6 @@ module;
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <optional>
 #include <string>
 #include <string_view>
 
@@ -131,20 +130,13 @@ export namespace Intrinsic::Plugins::BilateralFilter
         double CpuComputeMilliseconds{}, GpuNeighborhoodMilliseconds{};
     };
 
-    // A run, shared by the window and a waiting MCP call: `Final` is set exactly once, on the main thread.
-    struct Run
-    {
-        Result Pending{};
-        std::optional<Result> Final{};
-        R::PluginJobHandle Handle{};
-    };
+    // A run, shared by the window and a waiting MCP call (the contract's run protocol).
+    using Run = R::PluginRun<Result>;
 
     // Readiness: empty when a run can start, else why not (copies no values).
     [[nodiscard]] std::string Preview(const Config& config);
     // Starts a run (main thread). An immediate failure sets `Final` at once.
     [[nodiscard]] std::shared_ptr<Run> Start(const Config& config);
-    // Cancels the run's jobs; false when nothing is active.
-    bool Cancel(const Run& run);
 
     // The plugin's entry points (the v1 symbols forward to them; static builds call them in-process).
     [[nodiscard]] bool Register(R::PluginRegistrations& staged, std::string& error) noexcept;

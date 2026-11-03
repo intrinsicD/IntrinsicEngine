@@ -120,7 +120,7 @@ TEST(BilateralFilterPluginGpuSmoke, StaleInputsAndACancelBetweenStagesWriteNothi
                     return job.Name == "Bilateral neighborhoods (Vulkan)" && job.Identity.Run == cancelled->Handle.Token &&
                         R::IsActiveEditorJobState(job.State);
                 }))
-                cancelRequested = BF::Cancel(*cancelled);
+                cancelRequested = R::CancelPluginRun(*cancelled);
         }
         return cancelled && cancelled->Final;
     })) << "the frames ran out";
