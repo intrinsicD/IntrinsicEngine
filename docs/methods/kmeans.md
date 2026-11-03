@@ -86,7 +86,11 @@ the terminal preview and reads the labels back. Its holder and its Accept stage 
 editor jobs of the workspace the Sandbox shell lends (rows of the Jobs window; a
 cancel discards the run). A composition needs `StepRunsModule` and a `JobService`
 service (`AsyncWorkModule`); without them the request falls back to the CPU with that
-diagnostic.
+diagnostic. A request with `ReplaceRunning` (a preview's newest parameters) replaces the
+GPU run on the same output instead of being refused: that run is discarded (one being
+accepted finishes first), the newest waiting request starts once it finished, with fresh
+captures and its own configuration, and a waiting request superseded by a newer one
+completes Cancelled.
 
 CPU centroid sums also accumulate in double before conversion to float.
 Exact CPU/GPU bit parity is not guaranteed: summation grouping, division

@@ -48,7 +48,19 @@ namespace Extrinsic::Runtime
         }
 
     private:
+        // A replacing GPU request waits here, newest only, until the run it replaces settled.
+        struct HeldRequest
+        {
+            RunKMeans Command{};
+            CommandCorrelationId Correlation{};
+        };
+        void HoldReplacement(RunKMeans command, CommandCorrelationId correlation);
+        void StartHeld();
+        void CancelHeld(std::string why);
+
         ClusteringService m_Service{};
+        std::optional<HeldRequest> m_Held{};
+        CommandBus* m_Commands{};
         KernelEventSubscription m_JobCompletedSubscription{};
         KernelEventSubscription m_ClusterLabelsChangedSubscription{};
         KernelEventBus* m_Events{};

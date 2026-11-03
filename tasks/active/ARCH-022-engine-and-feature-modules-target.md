@@ -3112,3 +3112,19 @@ python3 tools/docs/check_doc_links.py --root . --strict
     `VulkanReady`); they go into S3c-2b's review. Verification after them: clustering and step-run contract 65/65,
     Sandbox integration 292/292, clustering Vulkan smoke 6/6, the five mutations at changed lines killed (one new:
     the lent workspace unused). Before them, on d18eb9fac: all contract 1987/1987, Sandbox Vulkan acceptance 48/48.
+- 2026-11-03, S3c-2b implemented (revision 3 item 5, revision 4 item 9): `RunKMeans::ReplaceRunning` (a preview's
+  newest parameters, opt-in, so a plain second request on a result awaiting Accept is still refused as busy, as
+  `BusyAdmissionHasOneRefusedCompletionAndPreservesPendingRun` asserts). A replacing GPU request on the output of the
+  active run (`ClusteringGpuState::Supersede`) discards that run unless it is being accepted, and is held by the
+  module (newest only: an older held request completes Cancelled with its own correlation, as does a held one at
+  shutdown); once the GPU state is settled (nothing active or unconsumed) it starts like a drained command, with
+  fresh captures and its whole configuration (`StartHeld`, after the frame's completions). A replacing request for
+  another output's run is refused as busy. Also: the `Settling` list of S3c-2a is dead (`Finish` runs only while no
+  page is in flight: `AdvanceActive` returns first, Accept and the transaction start only after the run's pages),
+  so it is removed and `Finish` sets `Recording(false)` itself (the old `settled` guard on returning the workspace
+  stays). Tests: a replacement with a new cluster count and cap waits for the held page of the run it discards, then
+  runs as a new step run with its cap and reuses the workspace's pipelines; with A's label readback held, B then C:
+  B completes Cancelled once, C waits for A's acceptance (which commits), then runs with its cap, B never has a step
+  run; a replacing request for another output is refused and leaves the run alone. Clustering and step-run contract
+  68/68, clustering Vulkan smoke 6/6; mutations (7, incl. the recording reset now in `Finish`): all killed. Not
+  tested: the held request's completion at module shutdown.

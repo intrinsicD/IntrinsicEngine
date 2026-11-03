@@ -104,6 +104,11 @@ export namespace Extrinsic::Runtime
         KMeansParameters Parameters{};
         ClusteringBackend Backend{ClusteringBackend::CpuReference};
         bool AutoAccept{true};
+        // A preview's newest parameters (a slider): a GPU request that replaces the GPU run on the same output instead
+        // of being refused while it runs. That run is discarded (while it is being accepted it finishes first) and
+        // this request starts once it settled, with fresh captures; a newer replacing request that arrives first
+        // supersedes it, and it then completes Cancelled.
+        bool ReplaceRunning{false};
         std::function<bool()> AttachmentActive{};
         // History label prefix active when the run was queued (an agent call's "Agent: "); the
         // commit on a later frame applies it again.

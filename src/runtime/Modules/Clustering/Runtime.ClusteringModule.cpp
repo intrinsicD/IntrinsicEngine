@@ -1127,6 +1127,7 @@ namespace Extrinsic::Runtime
     Core::Result ClusteringModule::OnRegister(EngineSetup& setup)
     {
         m_Events = &setup.Events();
+        m_Commands = &setup.Commands();
         m_Jobs = &setup.Jobs();
         m_Worlds = &setup.Worlds();
         m_Service.Bind(&setup.Commands(), m_Events, &m_Stats);
@@ -1175,6 +1176,7 @@ namespace Extrinsic::Runtime
                             HandleGpuResult(
                                 std::move(*result), m_Events, m_Stats);
                         }
+                        StartHeld();
                     },
                     .HasInFlightWork = [this]() -> bool
                     {
@@ -1195,6 +1197,12 @@ namespace Extrinsic::Runtime
             [this](CommandContext& context,
                    const RunKMeans& command) -> CommandOutcome
             {
+                if (command.ReplaceRunning && command.Backend == ClusteringBackend::VulkanCompute &&
+                    m_GpuState != nullptr && m_GpuState->Supersede(command))
+                {
+                    HoldReplacement(command, context.Correlation);
+                    return CommandOutcome::Ok();
+                }
                 return HandleRunKMeansCommand(
                     context,
                     command,
@@ -1238,8 +1246,46 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
+    void ClusteringModule::HoldReplacement(RunKMeans command, const CommandCorrelationId correlation)
+    {
+        CancelHeld("K-Means request replaced by a newer one before it started.");
+        m_Held = HeldRequest{.Command = std::move(command), .Correlation = correlation};
+    }
+
+    // Its caller (an agent's AwaitServiceRun, say) gets its one completion.
+    void ClusteringModule::CancelHeld(std::string why)
+    {
+        if (!m_Held)
+            return;
+        PublishCompletion(m_Events, MakeCompletion(m_Held->Command, m_Worlds->ActiveWorld(), m_Held->Correlation,
+            KMeansRunStatus::Cancelled, Core::ErrorCode::InvalidState, std::move(why)));
+        m_Held.reset();
+    }
+
+    // Once the replaced run settled: the waiting request starts as a new run, with captures and a configuration of
+    // its own, as if its command had just drained.
+    void ClusteringModule::StartHeld()
+    {
+        if (!m_Held || m_GpuState == nullptr || !m_GpuState->Settled())
+            return;
+        HeldRequest held = std::move(*m_Held);
+        m_Held.reset();
+        auto* const scene = m_Worlds->Get(m_Worlds->ActiveWorld());
+        if (scene == nullptr)
+        {
+            PublishCompletion(m_Events, MakeCompletion(held.Command, m_Worlds->ActiveWorld(), held.Correlation,
+                KMeansRunStatus::MissingScene, Core::ErrorCode::InvalidState, "Active world is unavailable for K-Means."));
+            return;
+        }
+        CommandContext context{.ActiveWorld = *scene, .Commands = *m_Commands, .Events = m_Events, .Jobs = m_Jobs,
+            .Worlds = m_Worlds, .Correlation = held.Correlation};
+        (void)HandleRunKMeansCommand(context, held.Command, m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
+            m_Steps, m_Service.m_Workspace, m_Stats);
+    }
+
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
+        CancelHeld("K-Means request cancelled: the clustering module shut down.");
         m_Service.m_GpuRun = {};
         m_Service.m_GpuReadinessDiagnostic = {};
         if (m_Jobs != nullptr && m_Device != nullptr &&
@@ -1262,6 +1308,7 @@ namespace Extrinsic::Runtime
         m_Service.Bind(nullptr, nullptr, nullptr);
         m_Events = nullptr;
         m_Jobs = nullptr;
+        m_Commands = nullptr;
         m_Worlds = nullptr;
         m_History = nullptr;
         m_Device = nullptr;

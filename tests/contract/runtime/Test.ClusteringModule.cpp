@@ -2086,3 +2086,64 @@ TEST_F(ClusteringModuleResident, ADiscardedRunLeavesNoActiveRow)
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     EXPECT_TRUE(Until([&]{return !active();}))<<"the discarded run's holder is cancelled with it";
 }
+TEST_F(ClusteringModuleResident, AReplacingRequestDiscardsTheRunAndStartsOnceItsPageCompleted)
+{
+    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();})); // A's first page is held
+    const auto first=Correlation;const auto firstRun=StepRunId();
+    auto replacing=Request;replacing.ReplaceRunning=true;
+    replacing.Parameters.ClusterCount=5;replacing.Parameters.MaxIterations=2; // a new capacity and its own cap
+    const auto second=Service->RunKMeans(replacing);
+    for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"the running run is discarded at once";
+    EXPECT_EQ(Service->GpuRun(second).StepRun,0u)<<"the replacement waits until the held page completed";
+    EXPECT_TRUE(Results.empty());
+    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Correlation=second;RunId=0;
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept&&StepRunId()!=0u&&StepRun().End!=Runtime::StepRunEnd::None;}));
+    EXPECT_NE(StepRunId(),firstRun)<<"a new step run";
+    EXPECT_EQ(StepRun().Steps,2u)<<"with its own cap";
+    (void)Service->GpuRun(second,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Results.size()==2;}));
+    EXPECT_EQ(Results[0].Correlation,first);EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
+    EXPECT_EQ(Results[1].Correlation,second);EXPECT_TRUE(Results[1].Succeeded())<<Results[1].Message;
+    EXPECT_EQ(Results[1].ClusterCount,5u);EXPECT_EQ(Results[1].Iterations,2u);
+    EXPECT_EQ(Results[1].GpuWorkspacePipelinesCreated,0u)<<"the replaced run's workspace, free once its page completed";
+}
+TEST_F(ClusteringModuleResident, ASupersededRequestCompletesCancelledAndOnlyTheNewestStartsAfterAnAccept)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    const auto a=Correlation;(void)StepRunId();
+    Hold=true;(void)Service->GpuRun(a,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Held.has_value();})); // A's label readback is held
+    auto replacing=Request;replacing.ReplaceRunning=true;
+    replacing.Parameters.MaxIterations=3;const auto b=Service->RunKMeans(replacing);
+    replacing.Parameters.MaxIterations=2;const auto c=Service->RunKMeans(replacing);
+    const auto of=[&](const Runtime::CommandCorrelationId id){
+        return std::ranges::count_if(Results,[&](const auto& result){return result.Correlation==id;});};
+    ASSERT_TRUE(Until([&]{return of(b)==1;}));
+    EXPECT_EQ(std::ranges::find_if(Results,[&](const auto& r){return r.Correlation==b;})->Status,
+        Runtime::KMeansRunStatus::Cancelled)<<"superseded before it started";
+    for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(Service->GpuRun(c).StepRun,0u)<<"C waits for A's acceptance";EXPECT_EQ(of(a),0);
+    Hold=false;Held->Deliver(std::vector<std::byte>(12*4));Held.reset();
+    ASSERT_TRUE(Until([&]{return of(a)==1;}));
+    EXPECT_TRUE(std::ranges::find_if(Results,[&](const auto& r){return r.Correlation==a;})->Succeeded())
+        <<"A's acceptance settled";
+    Correlation=c;RunId=0;
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept&&StepRunId()!=0u&&StepRun().End!=Runtime::StepRunEnd::None;}));
+    EXPECT_EQ(StepRun().Steps,2u)<<"C's cap";
+    for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(of(b),1)<<"B completed once";
+    EXPECT_EQ(Steps.Runs().size(),2u)<<"B never had a run";
+}
+TEST_F(ClusteringModuleResident, AReplacingRequestForAnotherOutputIsRefusedAsBusy)
+{
+    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    auto other=Request;other.ReplaceRunning=true;
+    other.Properties.OutputLabels.Name="other_labels";other.Properties.OutputColors.Name="other_colors";
+    other.Properties.OutputScalarLabels.reset();
+    const auto refused=Service->RunKMeans(other);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_EQ(Results[0].Correlation,refused);EXPECT_FALSE(Results[0].Succeeded());
+    EXPECT_NE(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"another output's run is not replaced";
+}

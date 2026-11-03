@@ -59,6 +59,12 @@ namespace Extrinsic::Runtime
         void DrainCompletedTransfers();
         [[nodiscard]] std::optional<ClusteringGpuResult> ConsumeCompleted();
         [[nodiscard]] bool HasInFlightWork() const noexcept;
+        // A replacing request: discards the active run on its output unless that run is being accepted. True while
+        // that run is in the way (it finishes only once its page in flight completed), so the request waits; false
+        // when nothing is, or when another output's run is (it is refused as busy then).
+        [[nodiscard]] bool Supersede(const RunKMeans& request);
+        // Nothing active or unconsumed: a waiting request may start (reusing the workspace).
+        [[nodiscard]] bool Settled() const noexcept;
         [[nodiscard]] std::string ReadinessDiagnostic(const RunKMeans&, const EditorProcessingContext&) const;
 
     private:
