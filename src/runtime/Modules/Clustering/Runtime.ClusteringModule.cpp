@@ -1004,7 +1004,7 @@ namespace Extrinsic::Runtime
             const RunKMeans& command,
             ClusteringGpuState* gpuState,
             SpatialIndexCache* spatialIndices, RHI::IDevice* device, EditorCommandHistory* history,
-            StepRunsService* steps, EditorWorkspaceSlot& workspace,
+            EditorWorkspaceSlot& workspace,
             ClusteringModuleStats& stats)
         {
             stats.CommandsHandled += 1u;
@@ -1075,8 +1075,8 @@ namespace Extrinsic::Runtime
                 const auto current = [processing, entity, watches=std::move(watches)] {
                     return processing.AttachmentActive() && GeometryProcessingDetail::GeometryPropertiesCurrent(processing, entity, watches);
                 };
-                const ClusteringGpuSubmission submission = gpuState != nullptr && steps != nullptr && editorJobs.Available()
-                    ? gpuState->Start(*snapshot, processing, *steps, current,
+                const ClusteringGpuSubmission submission = gpuState != nullptr && editorJobs.Available()
+                    ? gpuState->Start(*snapshot, processing, current,
                         [captured,processing](const GK::KMeansResult& clustered) {
                             const auto status=CommitKMeansOutputs(processing.Scene,processing.World,processing.CommandHistory,*captured,clustered);
                             return status==EditorCommandHistoryStatus::Applied?EditorCommandStatus::Applied:
@@ -1084,7 +1084,7 @@ namespace Extrinsic::Runtime
                         })
                     : ClusteringGpuSubmission{
                           .Diagnostic = gpuState == nullptr ? "Clustering Vulkan state is unavailable."
-                              : "K-Means step runs or editor jobs are unavailable.",
+                              : "K-Means editor jobs are unavailable.",
                       };
                 if (submission.Accepted)
                 {
@@ -1116,7 +1116,7 @@ namespace Extrinsic::Runtime
 
     extern "C++"
     {
-    ClusteringModule::ClusteringModule() = default;
+    ClusteringModule::ClusteringModule() : m_Workspace(std::make_unique<EditorWorkspaceSlot>()) {}
     ClusteringModule::~ClusteringModule() = default;
 
     std::string_view ClusteringModule::Name() const noexcept
@@ -1127,10 +1127,10 @@ namespace Extrinsic::Runtime
     Core::Result ClusteringModule::OnRegister(EngineSetup& setup)
     {
         m_Events = &setup.Events();
-        m_Commands = &setup.Commands();
         m_Jobs = &setup.Jobs();
         m_Worlds = &setup.Worlds();
         m_Service.Bind(&setup.Commands(), m_Events, &m_Stats);
+        m_Service.m_Workspace = m_Workspace.get();
         m_Service.m_GpuRun = [this](CommandCorrelationId id, KMeansGpuAction action) {
             return m_GpuState ? m_GpuState->GpuRun(id,action) : KMeansGpuObservation{};
         };
@@ -1197,17 +1197,21 @@ namespace Extrinsic::Runtime
             [this](CommandContext& context,
                    const RunKMeans& command) -> CommandOutcome
             {
+                // Only an admissible request may discard the run it replaces and the request it supersedes.
+                const WorldHandle world = context.Worlds != nullptr ? context.Worlds->ActiveWorld() : WorldHandle{};
                 if (command.ReplaceRunning && command.Backend == ClusteringBackend::VulkanCompute &&
-                    m_GpuState != nullptr && m_GpuState->Supersede(command))
+                    m_GpuState != nullptr && !ValidateKMeansRequest(&context.ActiveWorld.Raw(), command) &&
+                    m_GpuState->Supersede(command, world))
                 {
-                    HoldReplacement(command, context.Correlation);
+                    CancelHeld(KMeansRunStatus::Cancelled, "K-Means request replaced by a newer one before it started.");
+                    m_Held = HeldRequest{.Command = command, .Correlation = context.Correlation, .World = world};
                     return CommandOutcome::Ok();
                 }
                 return HandleRunKMeansCommand(
                     context,
                     command,
                     m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-                    m_Steps, m_Service.m_Workspace,
+                    *m_Workspace,
                     m_Stats);
             });
 
@@ -1241,24 +1245,19 @@ namespace Extrinsic::Runtime
         m_History =
             setup.Services().Find<EditorCommandHistory>();
         m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
-        m_Steps = setup.Services().Find<StepRunsService>();
-        m_Service.m_Workspace.AttachOwn(setup.Worlds(), setup.Services());
+        if (m_GpuState != nullptr)
+            m_GpuState->UseStepRuns(setup.Services().Find<StepRunsService>());
+        m_Workspace->AttachOwn(setup.Worlds(), setup.Services());
         return Core::Ok();
     }
 
-    void ClusteringModule::HoldReplacement(RunKMeans command, const CommandCorrelationId correlation)
-    {
-        CancelHeld("K-Means request replaced by a newer one before it started.");
-        m_Held = HeldRequest{.Command = std::move(command), .Correlation = correlation};
-    }
-
     // Its caller (an agent's AwaitServiceRun, say) gets its one completion.
-    void ClusteringModule::CancelHeld(std::string why)
+    void ClusteringModule::CancelHeld(const KMeansRunStatus status, std::string why)
     {
         if (!m_Held)
             return;
-        PublishCompletion(m_Events, MakeCompletion(m_Held->Command, m_Worlds->ActiveWorld(), m_Held->Correlation,
-            KMeansRunStatus::Cancelled, Core::ErrorCode::InvalidState, std::move(why)));
+        PublishCompletion(m_Events, MakeCompletion(m_Held->Command, m_Held->World, m_Held->Correlation, status,
+            Core::ErrorCode::InvalidState, std::move(why)));
         m_Held.reset();
     }
 
@@ -1268,24 +1267,23 @@ namespace Extrinsic::Runtime
     {
         if (!m_Held || m_GpuState == nullptr || !m_GpuState->Settled())
             return;
-        HeldRequest held = std::move(*m_Held);
-        m_Held.reset();
-        auto* const scene = m_Worlds->Get(m_Worlds->ActiveWorld());
-        if (scene == nullptr)
+        auto* const scene = m_Worlds->Get(m_Held->World);
+        if (scene == nullptr || m_Worlds->ActiveWorld() != m_Held->World)
         {
-            PublishCompletion(m_Events, MakeCompletion(held.Command, m_Worlds->ActiveWorld(), held.Correlation,
-                KMeansRunStatus::MissingScene, Core::ErrorCode::InvalidState, "Active world is unavailable for K-Means."));
+            CancelHeld(KMeansRunStatus::StaleWorld, "The active world changed before the K-Means request started.");
             return;
         }
-        CommandContext context{.ActiveWorld = *scene, .Commands = *m_Commands, .Events = m_Events, .Jobs = m_Jobs,
-            .Worlds = m_Worlds, .Correlation = held.Correlation};
+        HeldRequest held = std::move(*m_Held);
+        m_Held.reset();
+        CommandContext context{.ActiveWorld = *scene, .Commands = *m_Service.m_Commands, .Events = m_Events,
+            .Jobs = m_Jobs, .Worlds = m_Worlds, .Correlation = held.Correlation};
         (void)HandleRunKMeansCommand(context, held.Command, m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-            m_Steps, m_Service.m_Workspace, m_Stats);
+            *m_Workspace, m_Stats);
     }
 
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
-        CancelHeld("K-Means request cancelled: the clustering module shut down.");
+        CancelHeld(KMeansRunStatus::Cancelled, "K-Means request cancelled: the clustering module shut down.");
         m_Service.m_GpuRun = {};
         m_Service.m_GpuReadinessDiagnostic = {};
         if (m_Jobs != nullptr && m_Device != nullptr &&
@@ -1297,8 +1295,8 @@ namespace Extrinsic::Runtime
         }
         m_GpuParticipant = {};
         m_GpuState.reset();
-        m_Service.m_Workspace.DetachOwn(); // after the GPU state's last transaction used its jobs
-        m_Steps = nullptr;
+        m_Workspace->DetachOwn(); // after the GPU state's last transaction used its jobs
+        m_Service.m_Workspace = nullptr;
         if (m_JobCompletedSubscription.IsValid())
             context.Events.Unsubscribe(m_JobCompletedSubscription);
         if (m_ClusterLabelsChangedSubscription.IsValid())
@@ -1308,7 +1306,6 @@ namespace Extrinsic::Runtime
         m_Service.Bind(nullptr, nullptr, nullptr);
         m_Events = nullptr;
         m_Jobs = nullptr;
-        m_Commands = nullptr;
         m_Worlds = nullptr;
         m_History = nullptr;
         m_Device = nullptr;

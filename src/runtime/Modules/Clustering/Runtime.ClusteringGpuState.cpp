@@ -109,11 +109,15 @@ namespace Extrinsic::Runtime
             bool Resting{true}, Moved{}, RestPreview{}, CommitRequested{};
         };
         RHI::IDevice& Device;
+        StepRunsService* StepRuns{};
         std::shared_ptr<bool> Alive{std::make_shared<bool>(true)};
         std::shared_ptr<Operation> Active{};
         // Recorder failures can follow recorded commands. Retain their workspaces and
         // leases until the participant's device-idle shutdown.
         std::vector<std::shared_ptr<Operation>> Retired{};
+        // Finished runs whose last page is still in flight (a discard releases what a run shows at once): their
+        // workspace returns, and their step run retires, once the page completed.
+        std::vector<std::shared_ptr<Operation>> Settling{};
         // One run at a time: the last run's buffers and pipelines, kept only
         // when no submission recorded with them can still execute.
         std::shared_ptr<KMeansGpuWorkspace> Idle{};
@@ -125,7 +129,6 @@ namespace Extrinsic::Runtime
             if (Active)
                 DiscardEditorPointScalar(Active->Commands, Active->Transaction);
         }
-        // Called while no page of the run is in flight (Advance waits for it first): its step run may retire.
         void Finish(KMeansRunStatus status, std::string why)
         {
             auto a = std::move(Active);
@@ -135,16 +138,24 @@ namespace Extrinsic::Runtime
             a->Result.Message = std::move(why);
             a->Result.Error =
                 status == KMeansRunStatus::Applied ? Core::ErrorCode::Success : Core::ErrorCode::InvalidState;
-            const bool settled =
-                !a->Page || a->Page->State == SpatialQueryState::Ready || a->Page->State == SpatialQueryState::Failed;
-            if (a->Recorded && a->Page && a->Page->State == SpatialQueryState::Failed)
-                Retired.push_back(a);
-            else if (settled && a->Workspace && !Idle)
-                Idle = std::move(a->Workspace);
             DiscardEditorPointScalar(a->Commands, a->Transaction);
             Tell(*a, status);
-            a->Driver.Recording(false); // its step run may retire now
+            if (!Settle(a))
+                Settling.push_back(a);
             Completed = ClusteringGpuResult{.Published = std::move(a->Result)};
+        }
+        // A finished run's last page completed (or none was in flight): its workspace is free again, a failed
+        // recorded one stays retired, and its step run may retire. False while the page is in flight.
+        bool Settle(const std::shared_ptr<Operation>& a)
+        {
+            if (a->Page && a->Page->State != SpatialQueryState::Ready && a->Page->State != SpatialQueryState::Failed)
+                return false;
+            if (a->Recorded && a->Page && a->Page->State == SpatialQueryState::Failed)
+                Retired.push_back(a);
+            else if (a->Workspace && !Idle)
+                Idle = std::move(a->Workspace);
+            a->Driver.Recording(false);
+            return true;
         }
         // The run's end as its step run sees it: a publication answers its pending Commit; a cancel or a stale source
         // discards it; a failure fails its Commit or its iteration. Ignored by a step run that ended already.
@@ -175,14 +186,14 @@ namespace Extrinsic::Runtime
             a.Phase = a.Moved ? KMeansGpuPhase::Assign : KMeansGpuPhase::Preview;
             a.Row = a.Inner = 0;
         }
-        bool Settled() const noexcept { return !Active && !Completed; }
-        bool Supersede(const RunKMeans& request)
+        bool Settled() const noexcept { return !Active && !Completed && Settling.empty(); }
+        bool Supersede(const RunKMeans& request, const WorldHandle world)
         {
             const auto a = Active;
             if (!a)
                 return !Settled();
             const auto& output = a->Snapshot.Command.Properties.OutputLabels;
-            if (a->Snapshot.Command.StableEntityId != request.StableEntityId ||
+            if (a->Snapshot.World != world || a->Snapshot.Command.StableEntityId != request.StableEntityId ||
                 output.Domain != request.Properties.OutputLabels.Domain || output.Name != request.Properties.OutputLabels.Name)
                 return false;
             std::string refusal;
@@ -205,7 +216,6 @@ namespace Extrinsic::Runtime
         }
         ClusteringGpuSubmission Start(KMeansSnapshot& snapshot,
             const EditorProcessingContext& context,
-            StepRunsService& steps,
             std::function<bool()> current,
             std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish)
         {
@@ -219,6 +229,9 @@ namespace Extrinsic::Runtime
                 return {
                     .Diagnostic =
                         "GPU K-Means requires UInt32 label storage; the CPU reference preserves the configured scalar type."};
+            if (StepRuns == nullptr)
+                return {.Diagnostic = "K-Means step runs are unavailable."};
+            auto& steps = *StepRuns;
             if (snapshot.Points.empty() || snapshot.Points.size() > std::numeric_limits<std::uint32_t>::max() ||
                 snapshot.SlotCount > std::numeric_limits<std::uint32_t>::max())
                 return {.Refused = true, .Diagnostic = "K-Means row count is not representable by the device."};
@@ -350,13 +363,11 @@ namespace Extrinsic::Runtime
                         const auto op = weak.lock();
                         if (!*alive || !op || Active != op)
                             return;
-                        if (op->Accepting)
-                            DiscardEditorPointScalar(op->Commands, op->Transaction);
-                        else
-                        {
-                            op->Discard = true;
-                            Advance();
-                        }
+                        // What the run shows goes at once (its rings are freed fence-safely), also with a page in
+                        // flight; the run finishes now or once that page completed.
+                        DiscardEditorPointScalar(op->Commands, op->Transaction);
+                        op->Discard = true;
+                        Advance();
                     }},
                 EditorStepRunJobs(context.JobCommands, jobIdentity, holder),
                 refusal);
@@ -553,10 +564,11 @@ namespace Extrinsic::Runtime
             }
             return terminalPreview ? a->Workspace->Centroids() : a->Workspace->Diagnostics();
         }
-        // Main thread, frame maintenance (and a discard): moves the active run on and tells its step run whether a page
-        // is in flight.
+        // Main thread, frame maintenance (and a discard): settles finished runs, moves the active one on, and tells
+        // its step run whether a page is in flight.
         void Advance()
         {
+            std::erase_if(Settling, [this](const auto& settling) { return Settle(settling); });
             AdvanceActive();
             if (const auto a = Active)
                 a->Driver.Recording(bool(a->Page));
@@ -757,13 +769,16 @@ namespace Extrinsic::Runtime
     {
     }
     ClusteringGpuState::~ClusteringGpuState() = default;
+    void ClusteringGpuState::UseStepRuns(StepRunsService* steps) noexcept
+    {
+        m_Impl->StepRuns = steps;
+    }
     ClusteringGpuSubmission ClusteringGpuState::Start(KMeansSnapshot& s,
         const EditorProcessingContext& c,
-        StepRunsService& steps,
         std::function<bool()> current,
         std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish)
     {
-        return m_Impl->Start(s, c, steps, std::move(current), std::move(publish));
+        return m_Impl->Start(s, c, std::move(current), std::move(publish));
     }
     KMeansGpuObservation ClusteringGpuState::GpuRun(CommandCorrelationId id, KMeansGpuAction action)
     {
@@ -780,11 +795,12 @@ namespace Extrinsic::Runtime
     }
     bool ClusteringGpuState::HasInFlightWork() const noexcept
     {
-        return bool(m_Impl->Active) || bool(m_Impl->Completed) || !m_Impl->Retired.empty();
+        return bool(m_Impl->Active) || bool(m_Impl->Completed) || !m_Impl->Retired.empty() ||
+            !m_Impl->Settling.empty();
     }
-    bool ClusteringGpuState::Supersede(const RunKMeans& request)
+    bool ClusteringGpuState::Supersede(const RunKMeans& request, const WorldHandle world)
     {
-        return m_Impl->Supersede(request);
+        return m_Impl->Supersede(request, world);
     }
     bool ClusteringGpuState::Settled() const noexcept
     {

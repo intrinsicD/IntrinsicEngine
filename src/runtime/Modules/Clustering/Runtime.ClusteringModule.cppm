@@ -17,14 +17,13 @@ export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ModuleLifecycle;
-import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.WorldHandle;
 
 // Borrowed services retain their owners' C++ linkage without importing implementations.
 extern "C++"
 {
     namespace Extrinsic::RHI { class IDevice; }
-    namespace Extrinsic::Runtime { class WorldRegistry; class SpatialIndexCache; }
+    namespace Extrinsic::Runtime { class WorldRegistry; class SpatialIndexCache; class EditorWorkspaceSlot; }
 }
 
 namespace Extrinsic::Runtime
@@ -53,14 +52,13 @@ namespace Extrinsic::Runtime
         {
             RunKMeans Command{};
             CommandCorrelationId Correlation{};
+            WorldHandle World{}; // the world it was admitted in; it starts only there
         };
-        void HoldReplacement(RunKMeans command, CommandCorrelationId correlation);
         void StartHeld();
-        void CancelHeld(std::string why);
+        void CancelHeld(KMeansRunStatus status, std::string why);
 
         ClusteringService m_Service{};
         std::optional<HeldRequest> m_Held{};
-        CommandBus* m_Commands{};
         KernelEventSubscription m_JobCompletedSubscription{};
         KernelEventSubscription m_ClusterLabelsChangedSubscription{};
         KernelEventBus* m_Events{};
@@ -69,9 +67,9 @@ namespace Extrinsic::Runtime
         EditorCommandHistory* m_History{};
         RHI::IDevice* m_Device{};
         SpatialIndexCache* m_SpatialIndices{};
-        // A GPU run is a step run (its controls and observation) whose holder and Accept are editor jobs of the
-        // service's workspace: the app's while it lends one, else the module's own.
-        StepRunsService* m_Steps{};
+        // A GPU run's holder and Accept are editor jobs of this workspace: the app's while it lends one (through the
+        // service), else the module's own.
+        std::unique_ptr<EditorWorkspaceSlot> m_Workspace;
         std::unique_ptr<ClusteringGpuState> m_GpuState{};
         GpuQueueParticipantHandle m_GpuParticipant{};
         ClusteringModuleStats m_Stats{};

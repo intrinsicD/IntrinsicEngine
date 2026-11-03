@@ -2003,12 +2003,12 @@ TEST_F(ClusteringModuleResident, APausedRunWithAHeldPageRefusesAcceptAndDiscards
     ASSERT_TRUE(Control(Runtime::StepRunAction::Discard));
     for(int i=0;i<3;++i)Tick();
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"terminal at once";
-    EXPECT_TRUE(StepRun().SegmentInFlight)<<"its page is still recorded";
-    EXPECT_TRUE(Results.empty());
-    Hold=false;Held->Deliver(HeldData);Held.reset();
-    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    ASSERT_EQ(Results.size(),1u)<<"the discarded run completes at once";
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
-    EXPECT_FALSE(StepRun().SegmentInFlight);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+    EXPECT_TRUE(StepRun().SegmentInFlight)<<"its page is still recorded";
+    Hold=false;Held->Deliver(HeldData);Held.reset();
+    ASSERT_TRUE(Until([&]{return !StepRun().SegmentInFlight;}))<<"and it retires once the page completed";
+    EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
 }
 TEST_F(ClusteringModuleResident, TheRunIsAJobsRowWhileRunningRestingAndAcceptingAndCancelledThroughEither)
 {
@@ -2096,7 +2096,8 @@ TEST_F(ClusteringModuleResident, AReplacingRequestDiscardsTheRunAndStartsOnceIts
     for(int i=0;i<5;++i)Tick();
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"the running run is discarded at once";
     EXPECT_EQ(Service->GpuRun(second).StepRun,0u)<<"the replacement waits until the held page completed";
-    EXPECT_TRUE(Results.empty());
+    ASSERT_EQ(Results.size(),1u);
+    EXPECT_EQ(Results[0].Correlation,first);EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     Hold=false;Held->Deliver(HeldData);Held.reset();
     Correlation=second;RunId=0;
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept&&StepRunId()!=0u&&StepRun().End!=Runtime::StepRunEnd::None;}));
@@ -2104,7 +2105,6 @@ TEST_F(ClusteringModuleResident, AReplacingRequestDiscardsTheRunAndStartsOnceIts
     EXPECT_EQ(StepRun().Steps,2u)<<"with its own cap";
     (void)Service->GpuRun(second,Runtime::KMeansGpuAction::Accept);
     ASSERT_TRUE(Until([&]{return Results.size()==2;}));
-    EXPECT_EQ(Results[0].Correlation,first);EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     EXPECT_EQ(Results[1].Correlation,second);EXPECT_TRUE(Results[1].Succeeded())<<Results[1].Message;
     EXPECT_EQ(Results[1].ClusterCount,5u);EXPECT_EQ(Results[1].Iterations,2u);
     EXPECT_EQ(Results[1].GpuWorkspacePipelinesCreated,0u)<<"the replaced run's workspace, free once its page completed";
@@ -2112,7 +2112,7 @@ TEST_F(ClusteringModuleResident, AReplacingRequestDiscardsTheRunAndStartsOnceIts
 TEST_F(ClusteringModuleResident, ASupersededRequestCompletesCancelledAndOnlyTheNewestStartsAfterAnAccept)
 {
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
-    const auto a=Correlation;(void)StepRunId();
+    const auto a=Correlation;
     Hold=true;(void)Service->GpuRun(a,Runtime::KMeansGpuAction::Accept);
     ASSERT_TRUE(Until([&]{return Held.has_value();})); // A's label readback is held
     auto replacing=Request;replacing.ReplaceRunning=true;
@@ -2146,4 +2146,65 @@ TEST_F(ClusteringModuleResident, AReplacingRequestForAnotherOutputIsRefusedAsBus
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
     EXPECT_EQ(Results[0].Correlation,refused);EXPECT_FALSE(Results[0].Succeeded());
     EXPECT_NE(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"another output's run is not replaced";
+}
+TEST_F(ClusteringModuleResident, AReplacedRunsPreviewGoesAtOnce)
+{
+    const auto key=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
+    auto* residency=Cache.PropertyResidency();ASSERT_NE(residency,nullptr);
+    Request.Parameters.GpuPreviewInterval=1;Request.Parameters.MaxIterations=10;
+    const auto submit=Device.ComputeReadback;
+    bool heldOnce=false;
+    Device.ComputeReadback=[&](auto record,auto bytes,auto sink){
+        Hold=!heldOnce&&Observation().Previews>=1; // the page after the first shown preview is held
+        heldOnce|=Hold;
+        const auto token=submit(std::move(record),bytes,std::move(sink));
+        Hold=false;return token;
+    };
+    Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    ASSERT_TRUE(residency->Front(key))<<"a preview is shown";
+    auto replacing=Request;replacing.ReplaceRunning=true;
+    const auto second=Service->RunKMeans(replacing);
+    for(int i=0;i<3;++i)Tick();
+    EXPECT_FALSE(residency->Front(key))<<"the replaced run's preview went at once, its page still in flight";
+    EXPECT_EQ(Service->GpuRun(second).StepRun,0u);
+    Held->Deliver(HeldData);Held.reset();
+    Correlation=second;RunId=0;
+    ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}))<<"the replacement starts once the page completed";
+}
+TEST_F(ClusteringModuleResident, AHeldRequestStartsOnlyInTheWorldItWasAdmittedIn)
+{
+    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    auto replacing=Request;replacing.ReplaceRunning=true;
+    const auto second=Service->RunKMeans(replacing);
+    for(int i=0;i<3;++i)Tick(); // admitted and held
+    const auto other=Worlds.CreateWorld("other");
+    ASSERT_TRUE(Worlds.RequestSetActiveWorld(other));(void)Worlds.ApplyMaintenance(Events,Jobs.Jobs());
+    ASSERT_EQ(Worlds.ActiveWorld(),other);
+    Hold=false;Held->Deliver(HeldData);Held.reset();
+    const auto find=[&]{return std::ranges::find_if(Results,[&](const auto& r){return r.Correlation==second;});};
+    ASSERT_TRUE(Until([&]{return find()!=Results.end();}));
+    EXPECT_EQ(find()->Status,Runtime::KMeansRunStatus::StaleWorld);
+    EXPECT_EQ(find()->World,World)<<"reported in the world it was admitted in";
+    for(int i=0;i<5;++i)Tick();
+    EXPECT_EQ(Steps.Runs().size(),1u)<<"it never ran";
+}
+TEST_F(ClusteringModuleResident, AnInadmissibleReplacementDiscardsNeitherTheRunNorAHeldRequest)
+{
+    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    auto replacing=Request;replacing.ReplaceRunning=true;
+    auto invalid=replacing;invalid.Parameters.ClusterCount=0;
+    const auto of=[&](const Runtime::CommandCorrelationId id){
+        return std::ranges::count_if(Results,[&](const auto& result){return result.Correlation==id;});};
+    const auto bad=Service->RunKMeans(invalid);
+    ASSERT_TRUE(Until([&]{return of(bad)==1;}));
+    EXPECT_FALSE(Results.back().Succeeded());
+    EXPECT_NE(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"the running run stays";
+    const auto held=Service->RunKMeans(replacing); // a valid one replaces it and waits
+    ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Discarded;}));
+    const auto worse=Service->RunKMeans(invalid);
+    ASSERT_TRUE(Until([&]{return of(worse)==1;}));
+    EXPECT_EQ(of(held),0)<<"the held request is not superseded by an inadmissible one";
+    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Correlation=held;RunId=0;
+    ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}))<<"the held request starts";
 }

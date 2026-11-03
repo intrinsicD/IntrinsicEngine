@@ -9,7 +9,8 @@ import Extrinsic.Runtime.WorldRegistry;
 
 export namespace Extrinsic::Runtime
 {
-    class EditorWorkspaceSlot
+    // C++ language linkage: a service that owns one names it without importing this module.
+    extern "C++" class EditorWorkspaceSlot
     {
     public:
         // At resolve: attaches the own workspace unless the app lent one already.

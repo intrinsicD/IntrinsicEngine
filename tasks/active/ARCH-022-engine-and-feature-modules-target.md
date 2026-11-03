@@ -3128,3 +3128,35 @@ python3 tools/docs/check_doc_links.py --root . --strict
   run; a replacing request for another output is refused and leaves the run alone. Clustering and step-run contract
   68/68, clustering Vulkan smoke 6/6; mutations (7, incl. the recording reset now in `Finish`): all killed. Not
   tested: the held request's completion at module shutdown.
+  - Reviews of S3c-2b with the S3c-2a fixes (`d18eb9fac..98976d798`, diff sha256 8ebe0ac7…40ad6). Ponytail: "Verdict:
+    Ship." (nice to have: a second copy of the command-bus pointer, a two-line function called once, a no-op call in
+    a test: all three applied). Codex: "Verdict: REVISE": "P1 — A held request can run against another world"
+    (`HeldRequest` kept no world; `StartHeld` used whichever world was active later); "P2 — Replacement leaves the
+    superseded preview visible while a page is outstanding" (the discard waited for the page before releasing the
+    transaction, against item 5's immediate release and the step run's own `Discard` contract); "P2 — Invalid
+    replacement parameters cancel valid work before validation". Fixes: the held request keeps its world (its
+    completions report it; it starts only while that world is active, else completes `StaleWorld`), and a replacement
+    discards only a run of its own world, entity and output; the step run's `Discard` releases the transaction at
+    once (its rings are freed fence-safely once their uses completed), so a run can now finish with a page in flight,
+    and the `Settling` list (removed above as dead) is back: such a run returns its workspace and lets its step run
+    retire once the page completed, and a held request waits for it (`Settled`); a replacement supersedes only after
+    `ValidateKMeansRequest` admitted it. Visible consequence: a discarded run's completion now arrives at once, its
+    step run stays in flight until its page completed (the two affected tests assert that). Tests added: a replaced
+    run's shown preview goes at once while its page is held; a held request whose world was switched away completes
+    `StaleWorld` in its own world and never runs; an inadmissible replacement discards neither the running run nor a
+    held request. Clustering and step-run contract 71/71; mutations (6: each fix and the settling list): all killed.
+  - CI on fee735e2a (S3c-2a on main) failed: `ProcessingCompilationLocality.ConfigPropertyTypes` (`ClusteringTypes.cppm`
+    reached `Geometry.Properties` and `GeometryAvailability` through `EditorWorkspaceSlot`) and
+    `EditorCompilationLocality.ClusteringLifecycle` (`ClusteringModule.cppm` reached `WorldRegistry` and `RHI.Device`
+    through `StepRuns`). These are ctest script tests (label `build`), which I had not run locally; the gtest suites
+    and the docs replay passed. Fix, in the repository's pattern for borrowed services: `EditorWorkspaceAttachment`
+    and `EditorWorkspaceSlot` get C++ language linkage, so `ClusteringTypes` and `ClusteringModule` declare them
+    without importing their modules; the service holds a pointer to the module's slot (forwarding Use and Release in
+    one line each), the module owns the slot (`std::unique_ptr`); the step-run service is held by the GPU state
+    (`UseStepRuns`, implementation units only), so `ClusteringModule.cppm` imports no `StepRuns`. Locally after it:
+    both locality checks pass, all 97 `build`-label script tests pass, the R2 count for Clustering stays 5.
+    Safeguard for later blocks: run `ctest -L build` before pushing a change to a module interface.
+  - Codex delta review of the S3c-2b fixes (98976d798..db94c7020, diff sha256 ce00e4c9…): "Verdict: APPROVE — ... All
+    three round-1 findings are closed. No new correctness findings." Verification on db94c7020: all contract tests
+    1993/1993, Sandbox editor integration 292/292, Sandbox Vulkan acceptance 48/48, clustering Vulkan smoke 6/6,
+    `build`-label script tests 97/97, docs CI replay clean.

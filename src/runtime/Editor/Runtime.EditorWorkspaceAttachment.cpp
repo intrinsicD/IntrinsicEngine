@@ -8,6 +8,8 @@ import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
 namespace Extrinsic::Runtime
 {
+    extern "C++"
+    {
     struct EditorWorkspaceAttachment::Impl final
     {
         std::shared_ptr<EditorFeatureDetail::EditorWorkspaceAttachmentState>
@@ -51,5 +53,6 @@ namespace Extrinsic::Runtime
         return m_Impl != nullptr
             ? std::static_pointer_cast<void>(m_Impl->State)
             : std::shared_ptr<void>{};
+    }
     }
 }

@@ -19,6 +19,8 @@ import Extrinsic.Runtime.GeometryProcessingOperations;
 
 namespace Extrinsic::Runtime
 {
+    extern "C++"
+    {
     void EditorWorkspaceSlot::AttachOwn(WorldRegistry& worlds, ServiceRegistry& services)
     {
         if (m_Current != nullptr) return;
@@ -49,5 +51,6 @@ namespace Extrinsic::Runtime
     EditorJobCommandSurface EditorWorkspaceSlot::JobCommands()
     {
         return EditorProcessingCommandsAccess::Resolve(Commands()).JobCommands;
+    }
     }
 }

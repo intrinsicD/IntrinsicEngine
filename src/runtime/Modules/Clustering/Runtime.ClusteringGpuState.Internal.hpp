@@ -50,20 +50,23 @@ namespace Extrinsic::Runtime
 
         // Reads the snapshot during admission; the caller retains the publication
         // before-state on acceptance or can run the CPU fallback on rejection.
-        // The run is a step run of `steps` (started running); its holder and Accept are jobs of the context's surface.
+        // A run is a step run (started running) of the service UseStepRuns gave; without one a request falls back to
+        // the CPU. Its holder and Accept are jobs of the context's surface.
+        void UseStepRuns(StepRunsService* steps) noexcept;
         [[nodiscard]] ClusteringGpuSubmission Start(KMeansSnapshot& snapshot,
-            const EditorProcessingContext&, StepRunsService& steps, std::function<bool()> current,
+            const EditorProcessingContext&, std::function<bool()> current,
             std::function<EditorCommandStatus(const Geometry::KMeans::KMeansResult&)> publish);
         [[nodiscard]] KMeansGpuObservation GpuRun(CommandCorrelationId, KMeansGpuAction);
         void RecordFrameCommands(RHI::ICommandContext& commandContext);
         void DrainCompletedTransfers();
         [[nodiscard]] std::optional<ClusteringGpuResult> ConsumeCompleted();
         [[nodiscard]] bool HasInFlightWork() const noexcept;
-        // A replacing request: discards the active run on its output unless that run is being accepted. True while
-        // that run is in the way (it finishes only once its page in flight completed), so the request waits; false
-        // when nothing is, or when another output's run is (it is refused as busy then).
-        [[nodiscard]] bool Supersede(const RunKMeans& request);
-        // Nothing active or unconsumed: a waiting request may start (reusing the workspace).
+        // A replacing request admitted in `world`: discards the active run on its output (that world, entity and
+        // output) unless that run is being accepted. True while a run is in the way, so the request waits: that one,
+        // or any finished run not yet settled; false when none is, or when another output's run is active (it is
+        // refused as busy then).
+        [[nodiscard]] bool Supersede(const RunKMeans& request, WorldHandle world);
+        // Nothing active, unconsumed or with a page in flight: a waiting request may start (reusing the workspace).
         [[nodiscard]] bool Settled() const noexcept;
         [[nodiscard]] std::string ReadinessDiagnostic(const RunKMeans&, const EditorProcessingContext&) const;
 

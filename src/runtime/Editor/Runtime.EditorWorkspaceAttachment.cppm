@@ -12,7 +12,8 @@ export namespace Extrinsic::Runtime
     // Shared runtime lifecycle only. Feature owners consume the opaque state
     // token in their implementation units and publish their own prepared
     // capabilities; the app composes those feature records explicitly.
-    class EditorWorkspaceAttachment final
+    // C++ language linkage: a service that borrows one names it without importing this module.
+    extern "C++" class EditorWorkspaceAttachment final
     {
     public:
         EditorWorkspaceAttachment();

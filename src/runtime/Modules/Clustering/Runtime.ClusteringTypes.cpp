@@ -8,6 +8,7 @@ module;
 #include <glm/vec3.hpp>
 module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.EditorWorkspaceSlot;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.ECS.Components.GeometrySources;
 namespace Extrinsic::Runtime
@@ -81,10 +82,10 @@ namespace Extrinsic::Runtime
     { return m_GpuReadinessDiagnostic ? m_GpuReadinessDiagnostic(request, context) : std::string{}; }
 
     void ClusteringService::UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept
-    { m_Workspace.Use(workspace); }
+    { if (m_Workspace != nullptr) m_Workspace->Use(workspace); }
 
     void ClusteringService::ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept
-    { m_Workspace.Release(workspace); }
+    { if (m_Workspace != nullptr) m_Workspace->Release(workspace); }
 
     bool IsValidKMeansPropertyBindings(const KMeansPropertyRefs& properties) noexcept
     {

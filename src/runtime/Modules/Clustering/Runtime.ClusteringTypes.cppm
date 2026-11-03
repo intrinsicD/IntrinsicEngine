@@ -12,7 +12,6 @@ export module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
-import Extrinsic.Runtime.EditorWorkspaceSlot;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.WorldHandle;
 export namespace Extrinsic::Runtime
@@ -181,7 +180,13 @@ export namespace Extrinsic::Runtime
 
     // Only the lifecycle owner may bind the service. C++ linkage lets its
     // definition stay in the lifecycle module without importing that module here.
-    extern "C++" { class ClusteringModule; struct EditorProcessingContext; }
+    extern "C++"
+    {
+        class ClusteringModule;
+        struct EditorProcessingContext;
+        class EditorWorkspaceAttachment;
+        class EditorWorkspaceSlot;
+    }
 
     class ClusteringService
     {
@@ -217,8 +222,8 @@ export namespace Extrinsic::Runtime
 
         std::function<KMeansGpuObservation(CommandCorrelationId, KMeansGpuAction)> m_GpuRun{};
         std::function<std::string(const Runtime::RunKMeans&, const EditorProcessingContext&)> m_GpuReadinessDiagnostic{};
-        // The workspace the module's GPU runs queue their editor jobs in (the lent one, else the module's own).
-        EditorWorkspaceSlot m_Workspace{};
+        // The module's slot of the workspace its GPU runs queue their editor jobs in (the lent one, else its own).
+        EditorWorkspaceSlot* m_Workspace{};
         CommandBus* m_Commands{};
         KernelEventBus* m_Events{};
         const ClusteringModuleStats* m_Stats{};
