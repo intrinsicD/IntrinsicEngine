@@ -2939,3 +2939,6 @@ python3 tools/docs/check_doc_links.py --root . --strict
     or Never, and only Shown counts (`StepRunShow`; a copy that cannot be shown, e.g. without a device, is neither
     retried nor counted; tests in StepRuns and the plugin); (3) the Vulkan smoke checks a non-finite preview refused on
     a real device (no ring) and the target moved while a run is paused (discarded, ring gone, no write).
+- 2026-11-03, nightly-deep on b980e76f9 failed: `StepRuns.OnlyTheNewest32RetiredRunsStayObservable` kept 40 runs (it
+  pumped ten frames without waiting, before a two-worker runner had run the 40 holder jobs' work, so none had
+  retired). Fixed: it waits until all 40 Discards ran; 60 of 60 repetitions in six parallel processes.

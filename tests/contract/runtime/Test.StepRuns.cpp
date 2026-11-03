@@ -687,7 +687,8 @@ TEST(StepRuns, OnlyTheNewest32RetiredRunsStayObservable)
         ids.push_back(f.Start(problems.back(), probe));
     }
     for (const auto id : ids) ASSERT_TRUE(f.Control(id, R::StepRunAction::Discard));
-    for (int i = 0; i < 10; ++i) f.Jobs.Frame(); // every run retires; no further start
+    // Every run retires once its holder job's gate runs (after a worker ran its work); no further start.
+    ASSERT_TRUE(f.Jobs.FramesUntil([&] { return probe.Discards == 40; }));
     const auto kept = f.Runs.Runs();
     ASSERT_EQ(kept.size(), 32u);
     EXPECT_EQ(kept.front(), ids[8]) << "the oldest go first";
