@@ -2942,3 +2942,110 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - 2026-11-03, nightly-deep on b980e76f9 failed: `StepRuns.OnlyTheNewest32RetiredRunsStayObservable` kept 40 runs (it
   pumped ten frames without waiting, before a two-worker runner had run the 40 holder jobs' work, so none had
   retired). Fixed: it waits until all 40 Discards ran; 60 of 60 repetitions in six parallel processes.
+  - S3c plan, revision 2 (Q73 item 2; answers `codex-plan-s3c`'s six findings; no spike: an ordinary block).
+    - **The owner-driven step form (S3c-1, `StepRuns`).** The resident k-means advances in its own frame maintenance,
+      so the owner drives and the run is told: `StepRunsService::Start` with no `Step` callable gives the owner a
+      handle (`StepRunDriver`, main thread) with `MayStart()` (computing is asked for, the run is not terminal, no
+      restart waits), `Stepped(metric) -> bool` at each completed iteration (the count, the log, the cap and the step
+      budget; true: the next iteration may be recorded), `Ended(reason)` (converged, failed; Stop and the cap are the
+      driver's) and `MayPreview()` (the same time limit for the owner's previews, false while a restart waits). Stop
+      stays irreversible: an end reason once latched is never replaced, so a convergence arriving after Stop leaves it
+      stopped and never accepts it (finding 4). `Commit` may answer Pending: the run stays accepting, the pump asks
+      again each frame, the first final answer is latched, and the pump then checks the latched outcome before the
+      captures (a committed run is never discarded as stale afterwards; finding 2); Discard and cancel during accepting
+      reach the owner's `Discard` once, and a late answer after them is ignored. Tests with a fake owner: step counts
+      with `Stepped` refusing at the budget, no `MayStart` while paused, Stop then a late convergence, Commit pending
+      for frames then committed (not discarded by a changed capture afterwards), Commit pending then Discard then a
+      late answer, the time limit through `MayPreview`.
+    - **k-means at its boundaries (S3c-2, clustering module).** At the Update boundary the module calls `Stepped`;
+      when it answers false (paused, budget spent, a restart waits) the module records no further iteration: the
+      boundary's preview is recorded alone (not fused with the next Assign), the submitted work is still consumed,
+      and the run rests resumable (finding 1). Accept from a rest prepares current labels without counting an
+      iteration: the FinalAssignment pass (when centroids moved), the terminal preview, then the label readback, all
+      inside the pending Commit. A restart (new parameters on the same input) waits for the boundary, then reuses the
+      workspace with a new generation; the module publishes a label preview only when `MayPreview()` holds and for the
+      current generation, so a superseded page never shows (finding 5). Batch runs (`run_kmeans`, the panel's Run)
+      keep their auto-accept at any end (converged or the cap) through a separate option `AcceptOnEnd`, distinct from
+      accept-on-convergence; `preview_kmeans` stays a readiness check (finding 3). The run's holder and the Accept
+      stage are editor jobs of the module's workspace (identity: entity, `p:kmeans_label`, GPU domain, the run's
+      correlation), so the run is a Jobs row while running, resting and accepting and the Jobs window's cancel ends it
+      (finding 6); the panel's Stop, Accept and Discard and MCP `run_control` map onto the run.
+    - **Tests (S3c-2):** the existing `ClusteringModuleResident` contract tests and the Vulkan smoke keep passing;
+      new: step(1), idle pumps, resume, and Accept from a rest on the boundary-crossing dataset `{0,1,6,7,10}` (labels
+      exact, iterations counted once), step(1)*N, step(3)+run and run with pauses equal an uninterrupted run (labels
+      exact, centroids bitwise), the readback bytes per step (32 B diagnostics) after Init, a capped batch with
+      `AcceptOnEnd`, a capped interactive run waiting, Stop with a held page and a late convergence, restart A then B
+      then C with a held completion (only C shows and commits), the Jobs row while running, resting and accepting and
+      its cancel through the editor surface (removing the editor-surface submission fails it), fixtures that compose
+      clustering also compose the step-run module.
+    - **The measurement (S3c-3)** stays as in revision 1, its own full pre-flight after S3c-2.
+  - Codex round 2 on the S3c plan: "Verdict: REVISE"; 1 and 4 closed, 2, 3, 5 and 6 open, 7 and 8 new. Revision 3:
+    2. **The publication boundary.** In the owner-driven form Accept is `BeginCommit` (the owner starts its readback)
+       and the owner reports `Publishing()` once publication is under way and `CommitFinished(ok, diagnostic)` when it
+       ended. Before `Publishing`, a cancel or discard wins (the owner's Discard abandons the readback; no later answer
+       counts). From `Publishing` on, the publication decides: a cancel, a discard or the holder's finalisation then
+       leave the run accepting until `CommitFinished`, which makes it committed or failed (the run settles there, without
+       its pump). Tests extend the existing reentrant-Discard, stale-during-readback and discard-pending-readback cases
+       with the run's phase: one applied clustering completion, one undo entry and the run committed; stale: failed and
+       no write; discarded before publication: discarded and no completion applied.
+    3. **AcceptOnEnd follows the request's AutoAccept** (MCP `run_kmeans` true, the panel false): a capped MCP batch
+       publishes; a capped panel run keeps its preview and waits for Accept or Discard (canonical properties and
+       history unchanged; test). Stop never accepts, also with AcceptOnEnd.
+    5. **Replacement starts a new run.** A new request on the same output (the slider) is held by the module, newest
+       only (an older held one is dropped); the current run is discarded (its preview released at once, its GPU work
+       retired as today's retired operations are, fence-safe) and the held request starts as a new step run with
+       fresh captures and its whole configuration (its own iteration cap and log) once the current run has settled;
+       during accepting it waits for that acceptance to settle. No `Restart` with a changed cap. Tests: A's label
+       readback held, B then C requested: A settles, only C starts, with C's cap; a changed cluster count with a held
+       preview submission: the workspace is prepared only after the old GPU users finished.
+    6. **The identity:** the requested output property and its domain (not a literal name), the GPU domain, and the
+       holder's job token as the Accept stage's `EditorJobIdentity::Run` (joined as `JoinPointScalarRun` does for
+       keypoints). Tests: a custom output name, cancel through the holder's row and through the Accept stage's row.
+    7. **In flight is the owner's to say.** The handle's `Recording(bool)`: true while a page of the run is submitted
+       and not yet consumed. A Pause settles (paused) only once nothing is recording; Accept, a replacement and a
+       finalisation wait for it; Discard and cancel end the run at once but its retirement waits for it, as a worker
+       segment's does. Handle calls after retirement are ignored. Tests: Pause, then at once Accept, a replacement and
+       Discard while a page is held.
+    8. **One completed-step transition:** `Stepped(metric, outcome)` carries the iteration's outcome (continue,
+       converged, failed), and convergence wins over a simultaneous cap, as in the worker form; Stop latched earlier
+       still wins over both. Tests: convergence exactly at the cap (accepted only with accept-on-convergence or
+       AcceptOnEnd), Stop before a converging page.
+  - Codex round 3 on the S3c plan: "Verdict: REVISE. The eight previous findings are closed at plan level; one new
+    completion-lifecycle gap remains." Revision 4:
+    9. **A superseded request completes.** Every admitted request the module drops because a newer one replaced it
+       before it started emits exactly one `KMeansRunCompleted` with its own correlation and status Cancelled,
+       through the existing completion path, so a waiting caller (`AwaitServiceRun`) answers and its subscription
+       ends. Test: A's readback held, B admitted and waiting, C replacing B: B completes Cancelled once (its caller
+       answered, nothing of B published), A settles, only C starts.
+  - Codex round 4 on the S3c plan: "Verdict: APPROVE." ("Finding 9 — CLOSED at plan level", "No new findings across
+    revisions 2–4").
+- 2026-11-03, S3c-1 implemented (`StepRuns`): `StepRunCommit` (Committed, Refused, Pending), `AcceptOnEnd`, and the
+  owner-driven form: no `Step` callable, the owner tells the run through `StepRunsService::Driver` (`MayStart`,
+  `Recording`, `Stepped(metric, outcome)`, `MayPreview`, `Publishing`, `CommitFinished`); "in flight" is a worker
+  segment or the owner's recording; Accept's outcome is latched before any capture check; before `Publishing` a
+  discard or cancel wins, after it the publication decides (a cancelled holder leaves the run accepting until
+  `CommitFinished` settles it); a Commit answer outside an Accept is ignored. Tests (`Test.StepRuns.cpp`, 22): step
+  counts and a pause only at a boundary (Accept refused while a page is held), Stop against a late convergence and
+  convergence at the cap, AcceptOnEnd only for a capped batch, a pending Commit through changed captures, a discard
+  before and after `Publishing` and a holder cancel while publishing, a discard with a page held (retired once it is
+  consumed), the owner's preview time limit, a stray Commit answer. Mutation checks (12): all killed (one after a
+  test with a pending Commit was added for it).
+  - Reviews of S3c-1 (diff sha256 1ffa1a4674aefa26…, against 25aef6b6a). Ponytail: "Verdict: fix 1 first (a 7-line
+    delete)": 1. the owner-driven branch in the pump is dead (`OwnerDriven` only copies `!Callbacks.Step`), 2. a stale
+    comment on `HolderDone`, 3. ten redundant `Solve` lines and a copied `Control` in the test fixture; and, for the
+    correctness review, a holder cancelled after `CommitFinished(true)` but before its next gate ends the run
+    discarded. Codex: "Verdict: REVISE": "P1 — A finished publication can become discarded" (the same case, also for
+    a refused answer); "P1 — Worker Commit now bypasses final apply validation" (S3c-1 moved the worker form's Commit
+    into the holder's gate, before the job service's cancel, world and `ValidateBeforeApply` checks); "P2 — Some
+    driver mechanisms can disappear without failing these tests" (an owner's logged metrics, a waiting restart, the
+    retired handle). Fixes: an answered Commit decides in `HolderDone` whatever the holder's verdict; a worker run
+    commits in the holder's completion again (as in S3b), an owner-driven run's Commit starts in the gate (its
+    publication has its own checks); the dead branch, the field and the stale comment removed; the fixture lines
+    removed. Tests added: cancel after a committed and after a refused answer (failed before the fix: discarded),
+    a worker run whose holder the job service refuses after its gate commits nothing, the owner-driven metrics, a
+    restart waiting for a held page (the held page the older computation's last; no `MayStart`/`MayPreview` while it
+    waits) and handle calls after retirement. StepRuns and CPD plugin tests 34/34; mutations 19/19 killed (one after
+    the restart test asserted the restart right after the held page).
+  - Codex delta review of the fixes (full diff sha256 f80d1960…846d8cc): "APPROVE — ... All three round-1 findings
+    are closed." ... "No new correctness finding." The CPD Vulkan smoke (2/2) and the Sandbox CPD and panel
+    integration tests (90/90) pass with the worker Commit back in the holder's completion.

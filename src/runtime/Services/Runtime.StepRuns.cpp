@@ -84,8 +84,13 @@ namespace Extrinsic::Runtime
         bool Computing{false};                    // run or step n requested and not yet done
         std::optional<std::uint32_t> Remaining{}; // steps left of a step n (none: until paused or ended)
         bool SegmentInFlight{false};
+        bool OwnerRecording{false}; // the owner's work of this run is submitted and not consumed
         bool AcceptRequested{false};
-        bool Retired{false}; // terminal and no segment left: the owner's callables and the previews are gone
+        bool Publishing{false};     // a pending Commit's publication is under way
+        std::optional<bool> CommitOutcome{}; // latched once Commit answered (committed or refused)
+        std::string CommitDiagnostic{};
+        bool HolderFinished{false};
+        bool Retired{false}; // terminal and nothing in flight: the owner's callables and the previews are gone
         std::function<bool(std::string&)> PendingRestart{};
         std::uint64_t Generation{0u};
         std::optional<std::uint32_t> ShownStep{};
@@ -106,6 +111,17 @@ namespace Extrinsic::Runtime
         std::optional<Clock::time_point> LastCopy{};
 
         [[nodiscard]] Clock::time_point Now() const { return Options.Clock ? Options.Clock() : Clock::now(); }
+        [[nodiscard]] bool InFlight() const { return SegmentInFlight || OwnerRecording; }
+
+        // Accept on its own: convergence with accept-on-convergence, convergence or the cap with accept-on-end (a
+        // Stop never), and never an older computation's while a restart waits.
+        void AutoAccept()
+        {
+            const bool converged = End == StepRunEnd::Converged;
+            if (!PendingRestart && ((converged && Options.AcceptOnConvergence) ||
+                                    (Options.AcceptOnEnd && (converged || End == StepRunEnd::IterationCap))))
+                AcceptRequested = true;
+        }
 
         // A copy needs a Preview callable, a newer step, the reader to have taken the previous copy and the interval passed.
         void MaybeCopy()
@@ -165,7 +181,7 @@ namespace Extrinsic::Runtime
             if (auto discard = std::exchange(Callbacks.Discard, {}); discard && Phase != StepRunPhase::Committed)
                 discard();
             Callbacks.Show = {};
-            if (SegmentInFlight || Retired) return;
+            if (InFlight() || Retired) return;
             Retired = true;
             Callbacks = {};
             PendingRestart = {};
@@ -236,8 +252,7 @@ namespace Extrinsic::Runtime
             if (SegmentEnd != StepRunEnd::None && End == StepRunEnd::None) End = SegmentEnd;
             if (End != StepRunEnd::None || (Remaining && *Remaining == 0u)) Computing = false;
             if (!Computing) Phase = StepRunPhase::Paused;
-            // An older computation's convergence never accepts the restart that replaces it.
-            if (End == StepRunEnd::Converged && Options.AcceptOnConvergence && !PendingRestart) AcceptRequested = true;
+            AutoAccept();
             return true;
         }
 
@@ -250,13 +265,15 @@ namespace Extrinsic::Runtime
                 (void)Jobs.Cancel(Holder); // once it took, the gate is not asked again
                 return false;
             }
+            // Accepting: the latched outcome decides, before any capture check (a publication changes the captures).
+            if (Phase == StepRunPhase::Accepting) return CommitOutcome.has_value();
             if (!Valid())
             {
                 Terminate(StepRunPhase::Discarded, "stale: the captured inputs or the world changed");
                 return false;
             }
             Show();
-            if (SegmentInFlight) return false;
+            if (InFlight()) return false;
             if (PendingRestart)
             {
                 auto init = std::exchange(PendingRestart, {});
@@ -280,37 +297,124 @@ namespace Extrinsic::Runtime
             if (AcceptRequested)
             {
                 Phase = StepRunPhase::Accepting;
+                // A worker run commits in the holder's completion, after the job service's final checks; an owner's
+                // Commit starts here (its publication has its own) and may answer later.
+                if (Callbacks.Step) return true;
+                std::string diagnostic;
+                const StepRunCommit result = Callbacks.Commit(diagnostic);
+                if (result == StepRunCommit::Pending) return false; // answered through the driver
+                CommitOutcome = result == StepRunCommit::Committed;
+                CommitDiagnostic = std::move(diagnostic);
                 return true;
             }
             if (Computing && End == StepRunEnd::None)
             {
                 Phase = StepRunPhase::Running;
-                SubmitSegment(self);
+                if (Callbacks.Step) SubmitSegment(self); // no Step: the owner asks MayStart
                 return false;
             }
             MaybeCopy(); // idle: the paused or ended state still shows, at the same limits
             return false;
         }
 
-        // Main thread, the holder's completion: Accept when applied, else the run was cancelled.
+        // Main thread, the holder's completion: Accept's latched outcome when applied, else the run was cancelled (but
+        // a publication under way or answered decides: an unanswered one settles in CommitFinished).
         bool HolderDone(const bool applied)
         {
-            bool committed = false;
-            if (!applied)
-                Terminate(StepRunPhase::Discarded, "cancelled");
-            else
+            HolderFinished = true;
+            Jobs = {}; // only the holder's pump used them
+            if (applied && Phase == StepRunPhase::Accepting && Callbacks.Step && !CommitOutcome)
             {
                 std::string diagnostic;
-                committed = Phase == StepRunPhase::Accepting && Valid() && Callbacks.Commit(diagnostic);
-                if (committed)
-                    Terminate(StepRunPhase::Committed);
-                else
-                    Terminate(StepRunPhase::Failed, diagnostic.empty() ? "stale: the captured inputs changed" : diagnostic);
+                CommitOutcome = Valid() && Callbacks.Commit(diagnostic) == StepRunCommit::Committed;
+                CommitDiagnostic = std::move(diagnostic);
             }
-            Jobs = {}; // only the holder's pump used them
-            return committed;
+            if (CommitOutcome) FinishCommit();
+            else if (!Publishing) Terminate(StepRunPhase::Discarded, "cancelled");
+            return applied && CommitOutcome.value_or(false);
+        }
+
+        // The latched Commit outcome made terminal.
+        void FinishCommit()
+        {
+            if (CommitOutcome.value_or(false))
+                Terminate(StepRunPhase::Committed);
+            else
+                Terminate(StepRunPhase::Failed,
+                          CommitDiagnostic.empty() ? "stale: the captured inputs changed" : CommitDiagnostic);
         }
     };
+
+    bool StepRunDriver::MayStart() const
+    {
+        const auto run = m_Run.lock();
+        return run && !run->Retired && !IsTerminal(run->Phase) && run->Phase != StepRunPhase::Accepting && run->Computing &&
+               run->End == StepRunEnd::None && !run->AcceptRequested && !run->PendingRestart;
+    }
+
+    void StepRunDriver::Recording(const bool inFlight)
+    {
+        const auto run = m_Run.lock();
+        if (!run || run->Retired) return;
+        run->OwnerRecording = inFlight;
+        if (inFlight) return;
+        if (IsTerminal(run->Phase))
+            run->Settle(); // a retirement waited for this
+        else if (!run->Computing && run->Phase == StepRunPhase::Running)
+            run->Phase = StepRunPhase::Paused;
+    }
+
+    bool StepRunDriver::Stepped(StepRunMetric metric, const StepOutcome outcome)
+    {
+        const auto run = m_Run.lock();
+        if (!run || run->Retired || IsTerminal(run->Phase) || run->Phase == StepRunPhase::Accepting) return false;
+        auto& r = *run;
+        if (outcome == StepOutcome::Failed)
+        {
+            r.Terminate(StepRunPhase::Failed, "a step failed");
+            return false;
+        }
+        metric.Step = r.Steps.load(std::memory_order_relaxed) + 1u;
+        (void)r.Log->Append(metric);
+        r.Steps.store(metric.Step, std::memory_order_relaxed);
+        if (r.End == StepRunEnd::None) // an earlier Stop stays; convergence wins over a simultaneous cap
+        {
+            if (outcome == StepOutcome::Converged) r.End = StepRunEnd::Converged;
+            else if (metric.Step >= r.Options.IterationCap) r.End = StepRunEnd::IterationCap;
+        }
+        if (r.Remaining && *r.Remaining > 0u) --*r.Remaining;
+        if (r.End != StepRunEnd::None || (r.Remaining && *r.Remaining == 0u)) r.Computing = false;
+        if (!r.Computing && !r.OwnerRecording) r.Phase = StepRunPhase::Paused;
+        r.AutoAccept();
+        return r.Computing && r.End == StepRunEnd::None && !r.PendingRestart;
+    }
+
+    bool StepRunDriver::MayPreview()
+    {
+        const auto run = m_Run.lock();
+        if (!run || run->Retired || IsTerminal(run->Phase) || run->PendingRestart) return false;
+        const auto now = run->Now();
+        if (run->LastCopy && now - *run->LastCopy < run->Options.PreviewInterval) return false;
+        run->LastCopy = now;
+        run->Copies.fetch_add(1u, std::memory_order_relaxed);
+        return true;
+    }
+
+    void StepRunDriver::Publishing()
+    {
+        const auto run = m_Run.lock();
+        if (run && run->Phase == StepRunPhase::Accepting) run->Publishing = true;
+    }
+
+    void StepRunDriver::CommitFinished(const bool committed, std::string diagnostic)
+    {
+        const auto run = m_Run.lock();
+        // Late after a discard (terminal already) or a second answer: ignored.
+        if (!run || run->Retired || run->Phase != StepRunPhase::Accepting || run->CommitOutcome) return;
+        run->CommitOutcome = committed;
+        run->CommitDiagnostic = std::move(diagnostic);
+        if (run->HolderFinished) run->FinishCommit(); // no pump left: settle here
+    }
 
     StepRunsService::StepRunsService() = default;
     StepRunsService::~StepRunsService() = default;
@@ -318,9 +422,9 @@ namespace Extrinsic::Runtime
     std::uint64_t StepRunsService::Start(StepRunOptions options, StepRunCallbacks callbacks, StepRunJobs jobs,
                                          std::string& refusal)
     {
-        if (!callbacks.Step || !callbacks.Commit || !jobs.Submit || !jobs.Cancel || options.IterationCap == 0u)
+        if (!callbacks.Commit || !jobs.Submit || !jobs.Cancel || options.IterationCap == 0u)
         {
-            refusal = "a step run needs Step, Commit, the owner's Submit and Cancel and an iteration cap";
+            refusal = "a step run needs Commit, the owner's Submit and Cancel and an iteration cap";
             return 0u;
         }
         auto run = std::make_shared<StepRun>();
@@ -376,14 +480,20 @@ namespace Extrinsic::Runtime
             return false;
         };
         if (IsTerminal(run.Phase)) return refuse("the run is " + std::string{ToString(run.Phase)});
-        if (run.Phase == StepRunPhase::Accepting) return refuse("the run is being accepted");
+        if (run.Phase == StepRunPhase::Accepting)
+        {
+            // Before a pending Commit's publication a discard still wins; from then on the publication decides.
+            if (action != StepRunAction::Discard || run.Publishing) return refuse("the run is being accepted");
+            run.MarkTerminal(StepRunPhase::Discarded, "discarded");
+            return true;
+        }
         switch (action)
         {
         case StepRunAction::Run:
         case StepRunAction::Step:
             if (run.End != StepRunEnd::None) return refuse("the run ended (" + std::string{ToString(run.End)} + "); Accept or Discard");
             if (action == StepRunAction::Step && count == 0u) return refuse("step needs a count of at least 1");
-            if (action == StepRunAction::Step && run.SegmentInFlight) return refuse("the run is computing; pause first");
+            if (action == StepRunAction::Step && run.InFlight()) return refuse("the run is computing; pause first");
             run.Computing = true;
             run.Remaining = action == StepRunAction::Step ? std::optional{count} : std::nullopt;
             run.Phase = StepRunPhase::Running;
@@ -392,16 +502,16 @@ namespace Extrinsic::Runtime
             if (!run.Computing) return refuse("the run is not computing");
             run.Computing = false;
             run.Yield.store(true, std::memory_order_release);
-            if (!run.SegmentInFlight) run.Phase = StepRunPhase::Paused;
+            if (!run.InFlight()) run.Phase = StepRunPhase::Paused;
             return true;
         case StepRunAction::Stop:
             if (run.End == StepRunEnd::None) run.End = StepRunEnd::Stopped;
             run.Computing = false;
             run.Yield.store(true, std::memory_order_release);
-            if (!run.SegmentInFlight) run.Phase = StepRunPhase::Paused;
+            if (!run.InFlight()) run.Phase = StepRunPhase::Paused;
             return true;
         case StepRunAction::Accept:
-            if (run.Computing || run.SegmentInFlight || run.PendingRestart) return refuse("pause or stop the run first");
+            if (run.Computing || run.InFlight() || run.PendingRestart) return refuse("pause or stop the run first");
             if (run.Steps.load(std::memory_order_relaxed) == 0u) return refuse("the run has no step yet");
             if (run.AcceptRequested) return refuse("Accept is already requested");
             run.AcceptRequested = true;
@@ -411,6 +521,12 @@ namespace Extrinsic::Runtime
             return true;
         }
         return refuse("unknown action");
+    }
+
+    StepRunDriver StepRunsService::Driver(const std::uint64_t id)
+    {
+        const auto found = m_Runs.find(id);
+        return found == m_Runs.end() ? StepRunDriver{} : StepRunDriver{found->second};
     }
 
     bool StepRunsService::Restart(const std::uint64_t id, std::function<bool(std::string&)> init, std::string& refusal)
@@ -449,7 +565,7 @@ namespace Extrinsic::Runtime
                                   .End = run.End,
                                   .Generation = run.Generation,
                                   .Steps = run.Steps.load(std::memory_order_relaxed),
-                                  .SegmentInFlight = run.SegmentInFlight,
+                                  .SegmentInFlight = run.InFlight(),
                                   .PreviewCopies = run.Copies.load(std::memory_order_relaxed),
                                   .ShownStep = run.ShownStep,
                                   .Metrics = run.Log};

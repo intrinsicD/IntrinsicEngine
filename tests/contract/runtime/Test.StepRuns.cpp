@@ -56,6 +56,7 @@ namespace
         std::map<R::JobToken, std::vector<R::JobToken>> RunJobs{};
         std::uint64_t ApplyBudget{0u}, GateBudget{0u};
         int Submitted{0};
+        std::function<R::JobApplyValidation()> Validate{}; // the job service's final check after a job's gate
 
         R::StepRunJobs Bind()
         {
@@ -79,6 +80,7 @@ namespace
                 return R::JobResultEnvelope::Make(true);
             };
             if (held->Job.IsReadyToApply) desc.IsReadyToApply = [held] { return held->Job.IsReadyToApply(); };
+            if (Validate) desc.ValidateBeforeApply = [validate = Validate] { return validate(); };
             desc.PublishCompletion = [held](R::KernelEventBus&, const R::JobResultEnvelope&)
             {
                 held->Finalized = true;
@@ -105,7 +107,13 @@ namespace
             return any;
         }
 
-        void Frame() { (void)Jobs.DrainCompletions(Events, ApplyBudget, GateBudget); }
+        std::function<void()> BeforeFrame{}; // an owner-driven run's owner, ticking in its own maintenance
+
+        void Frame()
+        {
+            if (BeforeFrame) BeforeFrame();
+            (void)Jobs.DrainCompletions(Events, ApplyBudget, GateBudget);
+        }
 
         // Frames until `done` holds (a worker finishes a segment in between); false on the deadline.
         bool FramesUntil(const std::function<bool()>& done, const std::chrono::milliseconds limit = 10s)
@@ -179,7 +187,7 @@ namespace
             {
                 ++probe.Commits;
                 if (!probe.CommitResult) diagnostic = "stale: refused by the owner";
-                return probe.CommitResult;
+                return probe.CommitResult ? R::StepRunCommit::Committed : R::StepRunCommit::Refused;
             },
             .Discard = [&probe] { ++probe.Discards; },
         };
@@ -485,6 +493,23 @@ TEST(StepRuns, OnlyAConvergedRunCommitsByItselfAndOnlyWhenAsked)
     EXPECT_EQ(commits, 0) << "Stop is not convergence";
 }
 
+TEST(StepRuns, AWorkerRunCommitsOnlyAfterTheHoldersFinalChecks)
+{
+    auto problem = std::make_shared<Problem>();
+    Probe probe;
+    Fixture f;
+    bool stale = false;
+    f.Jobs.Validate = [&stale] { return stale ? R::JobApplyValidation::StaleWorld : R::JobApplyValidation::Current; };
+    const auto id = f.Start(problem, probe);
+    ASSERT_TRUE(f.Control(id, R::StepRunAction::Step, 2u));
+    ASSERT_TRUE(f.Settle(id));
+    stale = true; // the world changed: the job service refuses the holder after its gate
+    ASSERT_TRUE(f.Control(id, R::StepRunAction::Accept));
+    ASSERT_TRUE(f.Jobs.FramesUntil([&] { return R::IsTerminal(f.Observe(id).Phase); }));
+    EXPECT_EQ(probe.Commits, 0) << "nothing was written";
+    EXPECT_EQ(f.Observe(id).Phase, R::StepRunPhase::Discarded);
+}
+
 TEST(StepRuns, ARefusedCommitWithValidCapturesEndsTheRunFailed)
 {
     auto problem = std::make_shared<Problem>();
@@ -729,4 +754,312 @@ TEST(StepRuns, ACopyThatCannotBeShownIsNeitherRetriedNorCountedAsShown)
     for (int i = 0; i < 10; ++i) f.Jobs.Frame();
     EXPECT_EQ(probe.ShowAttempts, 1) << "offered once, not again";
     EXPECT_FALSE(f.Observe(id).ShownStep) << "nothing was shown";
+}
+
+namespace
+{
+    // An owner-driven run's owner, as a resident GPU method: each frame it consumes its submitted page (one iteration
+    // of the fixed point), reports it, and records the next one at once while the run allows it; a test holds a page
+    // or forces an iteration's outcome. Its callables count what the run asked of it.
+    struct GpuOwner
+    {
+        R::StepRunDriver Driver{};
+        std::shared_ptr<Problem> Solve{std::make_shared<Problem>()};
+        bool InFlight{false}, Hold{false};
+        std::optional<R::StepOutcome> Force{};
+        int Commits{0}, Discards{0};
+        R::StepRunCommit Answer{R::StepRunCommit::Committed};
+        bool Valid{true};
+        std::shared_ptr<int> Token{std::make_shared<int>(0)}; // held by the run's callables only (after Start)
+        std::weak_ptr<int> Alive{};
+
+        void Frame()
+        {
+            if (InFlight)
+            {
+                if (Hold) return;
+                const double next = Solve->X * 0.5 + 1.0, change = std::abs(next - Solve->X);
+                Solve->X = next;
+                const auto outcome = Force.value_or(change < Solve->Tolerance ? R::StepOutcome::Converged : R::StepOutcome::Continue);
+                const bool more = Driver.Stepped({.Values = {next, change, 0.0, 0.0}}, outcome);
+                InFlight = more; // the next page is recorded at once
+                if (!more) Driver.Recording(false);
+                return;
+            }
+            if (Driver.MayStart())
+            {
+                InFlight = true;
+                Driver.Recording(true);
+            }
+        }
+
+        R::StepRunCallbacks Callbacks()
+        {
+            Alive = Token;
+            return {.Valid = [this] { return Valid; },
+                    .Commit = [this, keep = Token](std::string&) { ++Commits; return Answer; },
+                    .Discard = [this] { ++Discards; }};
+        }
+    };
+
+    struct GpuFixture
+    {
+        GpuOwner Gpu{};
+        Fixture F{};
+
+        std::uint64_t Start(R::StepRunOptions options = {})
+        {
+            options.Label = "resident";
+            options.Owner = "test";
+            std::string refusal;
+            const auto id = F.Runs.Start(std::move(options), Gpu.Callbacks(), F.Jobs.Bind(), refusal);
+            EXPECT_NE(id, 0u) << refusal;
+            Gpu.Driver = F.Runs.Driver(id);
+            Gpu.Token.reset(); // the run's Commit callable holds it now
+            F.Jobs.BeforeFrame = [this] { Gpu.Frame(); };
+            return id;
+        }
+        R::StepRunObservation Observe(const std::uint64_t id) { return *F.Runs.Observe(id); }
+        bool Control(const std::uint64_t id, const R::StepRunAction action, const std::uint32_t count = 1u)
+        {
+            return F.Control(id, action, count);
+        }
+        bool Until(const std::function<bool()>& done) { return F.Jobs.FramesUntil(done); }
+        void Frames(const int n) { for (int i = 0; i < n; ++i) F.Jobs.Frame(); }
+    };
+}
+
+TEST(StepRuns, AnOwnerDrivenRunCountsItsIterationsAndPausesOnlyAtABoundary)
+{
+    GpuFixture t;
+    auto& gpu = t.Gpu;
+    const auto id = t.Start();
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Step, 3u));
+    ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+    EXPECT_EQ(t.Observe(id).Steps, 3u);
+    const auto records = t.Observe(id).Metrics->Records();
+    ASSERT_EQ(records.size(), 3u) << "every iteration is logged";
+    EXPECT_EQ(records[2].Step, 3u);
+    EXPECT_EQ(records[2].Values[0], 1.75) << "x after three iterations of x/2 + 1 from 0";
+    EXPECT_FALSE(gpu.Driver.MayStart()) << "paused";
+    t.Frames(10);
+    EXPECT_EQ(t.Observe(id).Steps, 3u) << "nothing recorded while paused";
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Run));
+    ASSERT_TRUE(t.Until([&] { return t.Observe(id).Steps >= 5u; }));
+    gpu.Hold = true; // a page is held
+    ASSERT_TRUE(t.Until([&] { return gpu.InFlight; }));
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Pause));
+    t.Frames(5);
+    EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Running) << "a pause settles only once the page is consumed";
+    EXPECT_TRUE(t.Observe(id).SegmentInFlight);
+    std::string refusal;
+    EXPECT_FALSE(t.F.Runs.Control(id, R::StepRunAction::Accept, 1u, refusal)) << "not while a page is held";
+    const auto held = t.Observe(id).Steps;
+    gpu.Hold = false;
+    ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+    EXPECT_EQ(t.Observe(id).Steps, held + 1u) << "the held page counts, no further one";
+    EXPECT_TRUE(t.Control(id, R::StepRunAction::Accept));
+    ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Committed; }));
+    EXPECT_EQ(gpu.Commits, 1);
+}
+
+TEST(StepRuns, StopStaysAgainstALateConvergenceAndConvergenceWinsOverTheCap)
+{
+    {   // Stop while a converging page is held
+        GpuFixture t;
+        const auto id = t.Start({.AcceptOnConvergence = true, .AcceptOnEnd = true});
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Run));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Steps >= 2u; }));
+        t.Gpu.Hold = true;
+        ASSERT_TRUE(t.Until([&] { return t.Gpu.InFlight; }));
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Stop));
+        t.Gpu.Force = R::StepOutcome::Converged;
+        t.Gpu.Hold = false;
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+        t.Frames(5);
+        EXPECT_EQ(t.Observe(id).End, R::StepRunEnd::Stopped) << "the earlier Stop stays";
+        EXPECT_EQ(t.Gpu.Commits, 0) << "a stopped run is never accepted on its own";
+    }
+    for (const bool onEnd : {false, true})
+    {   // convergence on the iteration that also reaches the cap
+        GpuFixture t;
+        t.Gpu.Force = R::StepOutcome::Converged;
+        const auto id = t.Start({.IterationCap = 1u, .AcceptOnConvergence = !onEnd, .AcceptOnEnd = onEnd});
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Run));
+        ASSERT_TRUE(t.Until([&] { return R::IsTerminal(t.Observe(id).Phase); }));
+        EXPECT_EQ(t.Observe(id).End, R::StepRunEnd::Converged) << "convergence wins over the simultaneous cap";
+        EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Committed);
+    }
+}
+
+TEST(StepRuns, AcceptOnEndAcceptsACappedBatchAndOnlyThat)
+{
+    for (const bool onEnd : {false, true})
+    {
+        GpuFixture t;
+        t.Gpu.Solve->Tolerance = 0.0; // never converges
+        const auto id = t.Start({.IterationCap = 4u, .AcceptOnEnd = onEnd});
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Run));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).End != R::StepRunEnd::None && !t.Observe(id).SegmentInFlight; }));
+        t.Frames(5);
+        EXPECT_EQ(t.Observe(id).End, R::StepRunEnd::IterationCap);
+        EXPECT_EQ(t.Observe(id).Phase, onEnd ? R::StepRunPhase::Committed : R::StepRunPhase::Paused);
+        EXPECT_EQ(t.Gpu.Commits, onEnd ? 1 : 0);
+    }
+}
+
+TEST(StepRuns, APendingCommitDecidesAfterItsPublicationStartedAndNotBefore)
+{
+    {   // pending, the captures change meanwhile, then committed: not discarded as stale
+        GpuFixture t;
+        t.Gpu.Answer = R::StepRunCommit::Pending;
+        const auto id = t.Start();
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Step, 2u));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Accept));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Accepting; }));
+        t.Gpu.Valid = false; // the publication changes what was captured
+        t.Frames(5);
+        EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Accepting);
+        t.Gpu.Driver.Publishing();
+        t.Gpu.Driver.CommitFinished(true);
+        ASSERT_TRUE(t.Until([&] { return R::IsTerminal(t.Observe(id).Phase); }));
+        EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Committed);
+        EXPECT_EQ(t.Gpu.Commits, 1);
+        EXPECT_EQ(t.Gpu.Discards, 0);
+    }
+    {   // pending, discarded before its publication: the discard wins, a late answer counts for nothing
+        GpuFixture t;
+        t.Gpu.Answer = R::StepRunCommit::Pending;
+        const auto id = t.Start();
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Step, 2u));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Accept));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Accepting; }));
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Discard));
+        ASSERT_TRUE(t.Until([&] { return t.Gpu.Discards == 1; })) << "the owner abandons its readback";
+        t.Gpu.Driver.CommitFinished(true);
+        t.Frames(5);
+        EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Discarded);
+        EXPECT_EQ(t.Gpu.Discards, 1);
+    }
+    {   // publishing: a discard is refused and a cancel of the holder waits for the publication's end
+        GpuFixture t;
+        t.Gpu.Answer = R::StepRunCommit::Pending;
+        const auto id = t.Start();
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Step, 2u));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Accept));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Accepting; }));
+        t.Gpu.Driver.Publishing();
+        std::string refusal;
+        EXPECT_FALSE(t.F.Runs.Control(id, R::StepRunAction::Discard, 1u, refusal)) << "the publication decides";
+        ASSERT_TRUE(t.F.Jobs.Cancel({t.F.Jobs.RunJobs.begin()->second.front()}));
+        t.Frames(5);
+        EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Accepting) << "the holder finished, the publication goes on";
+        t.Gpu.Driver.CommitFinished(true);
+        EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Committed) << "settled by the answer itself";
+        EXPECT_EQ(t.Gpu.Discards, 0);
+    }
+    for (const bool committed : {true, false})
+    {   // answered, then the holder is cancelled before its gate is asked again: the answer stands
+        GpuFixture t;
+        t.Gpu.Answer = R::StepRunCommit::Pending;
+        const auto id = t.Start();
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Step, 2u));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+        ASSERT_TRUE(t.Control(id, R::StepRunAction::Accept));
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Accepting; }));
+        t.Gpu.Driver.Publishing();
+        t.Gpu.Driver.CommitFinished(committed, committed ? "" : "stale: the output changed");
+        ASSERT_TRUE(t.F.Jobs.Cancel({t.F.Jobs.RunJobs.begin()->second.front()}));
+        ASSERT_TRUE(t.Until([&] { return R::IsTerminal(t.Observe(id).Phase); }));
+        EXPECT_EQ(t.Observe(id).Phase, committed ? R::StepRunPhase::Committed : R::StepRunPhase::Failed)
+            << "the publication decided";
+        if (!committed) EXPECT_EQ(t.Observe(id).Diagnostic, "stale: the output changed");
+    }
+}
+
+TEST(StepRuns, AnOwnerDrivenRunDiscardedWithAPageHeldRetiresOnlyOnceItIsConsumed)
+{
+    GpuFixture t;
+    const auto id = t.Start();
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Run));
+    ASSERT_TRUE(t.Until([&] { return t.Observe(id).Steps >= 2u; }));
+    t.Gpu.Hold = true;
+    ASSERT_TRUE(t.Until([&] { return t.Gpu.InFlight; }));
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Discard));
+    t.Frames(5);
+    EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Discarded) << "terminal at once";
+    EXPECT_EQ(t.Gpu.Discards, 1) << "what it shows goes at once";
+    EXPECT_FALSE(t.Gpu.Alive.expired()) << "its callables wait for the held page";
+    t.Gpu.Hold = false;
+    ASSERT_TRUE(t.Until([&] { return t.Gpu.Alive.expired(); }));
+    EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Discarded);
+    EXPECT_EQ(t.Gpu.Discards, 1);
+}
+
+TEST(StepRuns, AnOwnersPreviewsFollowTheRunsTimeLimit)
+{
+    auto now = std::make_shared<std::atomic<std::int64_t>>(0);
+    GpuFixture t;
+    const auto id = t.Start({.Clock = [now] { return std::chrono::steady_clock::time_point{std::chrono::milliseconds{now->load()}}; }});
+    EXPECT_TRUE(t.Gpu.Driver.MayPreview());
+    EXPECT_FALSE(t.Gpu.Driver.MayPreview()) << "within 33 ms";
+    now->fetch_add(40);
+    EXPECT_TRUE(t.Gpu.Driver.MayPreview());
+    EXPECT_EQ(t.Observe(id).PreviewCopies, 2u);
+}
+
+TEST(StepRuns, ACommitAnswerOutsideAnAcceptIsIgnored)
+{
+    GpuFixture t;
+    t.Gpu.Answer = R::StepRunCommit::Pending;
+    const auto id = t.Start();
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Step, 2u));
+    ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Paused; }));
+    t.Gpu.Driver.CommitFinished(true); // not accepting: no Commit started
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Accept));
+    ASSERT_TRUE(t.Until([&] { return t.Gpu.Commits == 1; }));
+    t.Frames(5);
+    EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Accepting) << "the stray answer does not decide the pending Commit";
+    t.Gpu.Driver.CommitFinished(true);
+    ASSERT_TRUE(t.Until([&] { return R::IsTerminal(t.Observe(id).Phase); }));
+    EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Committed);
+}
+
+TEST(StepRuns, AnOwnerWaitsForARestartAndARetiredRunIgnoresItsHandle)
+{
+    GpuFixture t;
+    const auto id = t.Start();
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Run));
+    ASSERT_TRUE(t.Until([&] { return t.Observe(id).Steps >= 2u; }));
+    t.Gpu.Hold = true;
+    ASSERT_TRUE(t.Until([&] { return t.Gpu.InFlight; }));
+    int inits = 0;
+    std::string refusal;
+    ASSERT_TRUE(t.F.Runs.Restart(id, [&](std::string&) { ++inits; t.Gpu.Solve->X = 0.0; return true; }, refusal));
+    EXPECT_FALSE(t.Gpu.Driver.MayStart()) << "a restart waits";
+    EXPECT_FALSE(t.Gpu.Driver.MayPreview()) << "nothing of the older computation shows";
+    t.Frames(5);
+    EXPECT_EQ(inits, 0) << "not while a page is held";
+    t.Gpu.Hold = false;
+    t.Frames(3);
+    EXPECT_EQ(inits, 1) << "the held page was the older computation's last";
+    ASSERT_TRUE(t.Until([&] { return inits == 1 && t.Observe(id).Steps >= 1u; }));
+    EXPECT_EQ(t.Observe(id).Generation, 1u);
+    EXPECT_EQ(t.Observe(id).Metrics->Records().front().Values[0], 1.0) << "the new generation starts from x = 0";
+    ASSERT_TRUE(t.Control(id, R::StepRunAction::Discard));
+    ASSERT_TRUE(t.Until([&] { return t.Gpu.Alive.expired(); })) << "retired";
+    const auto retired = t.Observe(id);
+    t.Gpu.Driver.Recording(true);
+    EXPECT_FALSE(t.Gpu.Driver.Stepped({.Values = {9.0, 0.0, 0.0, 0.0}}, R::StepOutcome::Continue));
+    EXPECT_FALSE(t.Gpu.Driver.MayPreview());
+    t.Gpu.Driver.Publishing();
+    t.Gpu.Driver.CommitFinished(true);
+    const auto after = t.Observe(id);
+    EXPECT_EQ(after.Phase, R::StepRunPhase::Discarded);
+    EXPECT_EQ(after.Steps, retired.Steps);
+    EXPECT_FALSE(after.SegmentInFlight);
+    EXPECT_EQ(after.PreviewCopies, retired.PreviewCopies);
 }

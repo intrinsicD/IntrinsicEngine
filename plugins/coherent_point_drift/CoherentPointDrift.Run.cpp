@@ -152,10 +152,10 @@ namespace Intrinsic::Plugins::CoherentPointDrift
                 const auto status = state->Editing->Publish(
                     *state->Source, Mapped(state->SourceFromWorld, state->Solver.Current().TransformedSource),
                     "Coherent point drift (steps)");
-                if (status == R::PointPublishStatus::Applied) return true;
+                if (status == R::PointPublishStatus::Applied) return R::StepRunCommit::Committed;
                 diagnostic = status == R::PointPublishStatus::Stale ? "stale: the captured inputs changed"
                                                                     : "the positions were refused";
-                return false;
+                return R::StepRunCommit::Refused;
             },
             .Discard = [state] { state->Editing->DiscardPreview(*state->Source); },
         };
