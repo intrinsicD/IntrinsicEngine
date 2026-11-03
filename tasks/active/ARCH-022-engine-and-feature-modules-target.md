@@ -3101,3 +3101,14 @@ python3 tools/docs/check_doc_links.py --root . --strict
     1985/1985, Sandbox editor integration 292/292, Sandbox Vulkan acceptance smoke 48/48, clustering Vulkan smoke 6/6.
     Mutations (15): all killed, the two that survived the first round (a cancelled Accept failing the run; the run's
     jobs bypassing the workspace's Cancel and Snapshot) after the two tests above.
+  - Reviews of S3c-2a (d18eb9fac, diff sha256 6bcd8407…49245b1). Codex: "APPROVE — ... No correctness findings."
+    ("The listed decisions are acceptable for S3c-2a"; "I inspected 15 distinct mutation definitions"). Ponytail:
+    "Verdict: fix 1 first." 1. the workspace was lent through a two-pointer callback, unlike the two sibling
+    services (an `EditorWorkspaceSlot` member forwarding in one line); 2. null checks that cannot be true; 3.
+    `IsEditorRunCancelRequested` already is the cancel check; 4. `Observe` computed `resting` and the Accept check
+    twice and took three snapshots; 5. the rest setup wrote `Phase` twice; 6. a test field equal to another's size;
+    7. the Vulkan engine setup copied in the smoke file. All seven applied in a follow-up commit (the slot is now
+    `ClusteringService::m_Workspace`; the smoke shares `KMeansSmokeConfig`, `EmplaceKMeansModules`,
+    `VulkanReady`); they go into S3c-2b's review. Verification after them: clustering and step-run contract 65/65,
+    Sandbox integration 292/292, clustering Vulkan smoke 6/6, the five mutations at changed lines killed (one new:
+    the lent workspace unused). Before them, on d18eb9fac: all contract 1987/1987, Sandbox Vulkan acceptance 48/48.

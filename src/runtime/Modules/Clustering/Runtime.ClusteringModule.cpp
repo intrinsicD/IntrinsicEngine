@@ -26,6 +26,7 @@ import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.StepRuns;
+import Extrinsic.Runtime.EditorWorkspaceSlot;
 
 import Extrinsic.Runtime.Module;
 import Extrinsic.Core.Error;
@@ -1057,7 +1058,7 @@ namespace Extrinsic::Runtime
                 processing.JobCommands.Submit = [submit=editorJobs.Submit,history,prefix=command.LabelPrefix,correlation=context.Correlation.Value](JobDesc desc, EditorJobIdentity identity) {
                     CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
                     desc.CorrelationId = correlation;
-                    return submit ? submit(std::move(desc), std::move(identity)) : JobToken{};};
+                    return submit(std::move(desc), std::move(identity));};
                 const auto captured = std::make_shared<KMeansSnapshot>();
                 const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);
                 const auto availability = BuildGeometryAvailability(processing.Scene->Raw(), entity);
@@ -1135,10 +1136,6 @@ namespace Extrinsic::Runtime
         m_Service.m_GpuReadinessDiagnostic = [this](const RunKMeans& request, const EditorProcessingContext& context) {
             return m_GpuState ? m_GpuState->ReadinessDiagnostic(request, context) : std::string{};
         };
-        m_Service.m_LendWorkspace = [this](EditorWorkspaceAttachment* use, const EditorWorkspaceAttachment* release) {
-            if (use != nullptr) m_Workspace.Use(*use);
-            else if (release != nullptr) m_Workspace.Release(*release);
-        };
 
         if (Core::Result provided =
                 setup.Services().Provide<ClusteringService>(
@@ -1202,7 +1199,7 @@ namespace Extrinsic::Runtime
                     context,
                     command,
                     m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-                    m_Steps, m_Workspace,
+                    m_Steps, m_Service.m_Workspace,
                     m_Stats);
             });
 
@@ -1237,7 +1234,7 @@ namespace Extrinsic::Runtime
             setup.Services().Find<EditorCommandHistory>();
         m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
         m_Steps = setup.Services().Find<StepRunsService>();
-        m_Workspace.AttachOwn(setup.Worlds(), setup.Services());
+        m_Service.m_Workspace.AttachOwn(setup.Worlds(), setup.Services());
         return Core::Ok();
     }
 
@@ -1245,7 +1242,6 @@ namespace Extrinsic::Runtime
     {
         m_Service.m_GpuRun = {};
         m_Service.m_GpuReadinessDiagnostic = {};
-        m_Service.m_LendWorkspace = {};
         if (m_Jobs != nullptr && m_Device != nullptr &&
             m_GpuParticipant.IsValid())
         {
@@ -1255,7 +1251,7 @@ namespace Extrinsic::Runtime
         }
         m_GpuParticipant = {};
         m_GpuState.reset();
-        m_Workspace.DetachOwn(); // after the GPU state's last transaction used its jobs
+        m_Service.m_Workspace.DetachOwn(); // after the GPU state's last transaction used its jobs
         m_Steps = nullptr;
         if (m_JobCompletedSubscription.IsValid())
             context.Events.Unsubscribe(m_JobCompletedSubscription);

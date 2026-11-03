@@ -13,7 +13,6 @@ export import Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorWorkspaceSlot;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -58,10 +57,9 @@ namespace Extrinsic::Runtime
         EditorCommandHistory* m_History{};
         RHI::IDevice* m_Device{};
         SpatialIndexCache* m_SpatialIndices{};
-        // A GPU run is a step run (its controls and observation) whose holder and Accept are editor jobs of this
-        // workspace: the app's while it lends one, else the module's own.
+        // A GPU run is a step run (its controls and observation) whose holder and Accept are editor jobs of the
+        // service's workspace: the app's while it lends one, else the module's own.
         StepRunsService* m_Steps{};
-        EditorWorkspaceSlot m_Workspace{};
         std::unique_ptr<ClusteringGpuState> m_GpuState{};
         GpuQueueParticipantHandle m_GpuParticipant{};
         ClusteringModuleStats m_Stats{};

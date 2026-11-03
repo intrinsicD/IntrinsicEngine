@@ -248,6 +248,38 @@ namespace
         std::vector<glm::vec3> FirstCentroids{};
         std::vector<float> PreviewLabels{};
     };
+
+    // A 64x64 window without validation or vsync.
+    Extrinsic::Core::Config::EngineConfig KMeansSmokeConfig(const char* title)
+    {
+        auto config = Runtime::CreateReferenceEngineConfig();
+        config.Window.Title = title;
+        config.Window.Width = 64;
+        config.Window.Height = 64;
+        config.Window.Resizable = false;
+        config.Render.EnableValidation = false;
+        config.Render.EnableVSync = false;
+        config.ReferenceScene.Enabled = false;
+        return config;
+    }
+
+    // What a GPU K-Means run needs: residency, the JobService its editor jobs submit to, and step runs.
+    void EmplaceKMeansModules(Intrinsic::Tests::RuntimeTestKernel& engine)
+    {
+        engine.EmplaceModule<Runtime::SpatialIndexCache>();
+        engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.EmplaceModule<Runtime::ClusteringModule>();
+        engine.EmplaceModule<Runtime::StepRunsModule>();
+    }
+
+    // IsOperational() stays false until the first clean frame; gate on bootstrap readiness (shut down otherwise).
+    bool VulkanReady(Intrinsic::Tests::RuntimeTestKernel& engine)
+    {
+        const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+        if (ready.LogicalDeviceReady && ready.SwapchainReady && ready.CommandSyncReady) return true;
+        engine.Shutdown();
+        return false;
+    }
 }
 
 class ClusteringServiceGpuSmoke : public ::testing::TestWithParam<int> {};
@@ -261,14 +293,7 @@ TEST_P(ClusteringServiceGpuSmoke,
             << "GLFW could not initialize; gpu;vulkan clustering smoke is opt-in.";
     }
 
-    auto config = Runtime::CreateReferenceEngineConfig();
-    config.Window.Title = "Intrinsic ClusteringService gpu;vulkan parity smoke";
-    config.Window.Width = 64;
-    config.Window.Height = 64;
-    config.Window.Resizable = false;
-    config.Render.EnableValidation = false;
-    config.Render.EnableVSync = false;
-    config.ReferenceScene.Enabled = false;
+    const auto config = KMeansSmokeConfig("Intrinsic ClusteringService gpu;vulkan parity smoke");
 
     struct RestorePaging { Runtime::KMeansPagingLimits Before{Runtime::KMeansPagingForTesting};
         ~RestorePaging(){Runtime::KMeansPagingForTesting=Before;} } restore;
@@ -298,20 +323,9 @@ TEST_P(ClusteringServiceGpuSmoke,
     ClusteringServiceGpuApp* appPtr = app.get();
     auto livePoints=appPtr->Points;if(appPtr->Deleted)livePoints.erase(livePoints.begin()+1);
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
-    engine.EmplaceModule<Runtime::SpatialIndexCache>();
-    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // the JobService its editor jobs (the step run's) submit to
-    engine.EmplaceModule<Runtime::ClusteringModule>();
-    engine.EmplaceModule<Runtime::StepRunsModule>(); // a GPU run is a step run
+    EmplaceKMeansModules(engine);
     engine.Initialize();
-
-    // IsOperational() stays false until the first clean frame; gate on bootstrap readiness.
-    const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
-    if (!ready.LogicalDeviceReady || !ready.SwapchainReady || !ready.CommandSyncReady)
-    {
-        engine.Shutdown();
-        GTEST_SKIP()
-            << "Promoted Vulkan did not reach device/swapchain/command readiness.";
-    }
+    if (!VulkanReady(engine)) GTEST_SKIP() << "Promoted Vulkan did not reach device/swapchain/command readiness.";
 
     engine.Run();
 
@@ -419,8 +433,7 @@ namespace
         {
             Runtime::KMeansRunCompleted Completion{};
             std::vector<std::uint32_t> Labels{};
-            std::uint32_t Rests{}; // frames the run was seen paused before it ended
-            std::vector<std::uint32_t> RestSteps{};
+            std::vector<std::uint32_t> RestSteps{}; // the step count of each frame the run was seen paused, before it ended
         };
         std::vector<Drive> Drives{};
         std::vector<glm::vec3> Points{};
@@ -489,11 +502,7 @@ namespace
                 if (resting && gpu.ReadyToAccept && !gpu.Running) accept();
                 return;
             }
-            if (resting)
-            {
-                ++Current.Rests;
-                Current.RestSteps.push_back(run.Steps);
-            }
+            if (resting) Current.RestSteps.push_back(run.Steps);
             switch (Drives[Outcomes.size()])
             {
             case Drive::Run: break;
@@ -542,27 +551,12 @@ namespace
     // Runs `app` in a Vulkan engine (which owns it); nullopt (skipped) without a device.
     std::optional<StepDriveResults> RunStepDrives(std::unique_ptr<ClusteringStepDrivesApp> app)
     {
-        auto config = Runtime::CreateReferenceEngineConfig();
-        config.Window.Title = "Intrinsic K-Means step drives gpu;vulkan smoke";
-        config.Window.Width = 64;
-        config.Window.Height = 64;
-        config.Window.Resizable = false;
-        config.Render.EnableValidation = false;
-        config.Render.EnableVSync = false;
-        config.ReferenceScene.Enabled = false;
         auto* appPtr = app.get();
-        Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
-        engine.EmplaceModule<Runtime::SpatialIndexCache>();
-        engine.EmplaceModule<Runtime::AsyncWorkModule>();
-        engine.EmplaceModule<Runtime::ClusteringModule>();
-        engine.EmplaceModule<Runtime::StepRunsModule>();
+        Intrinsic::Tests::RuntimeTestKernel engine(KMeansSmokeConfig("Intrinsic K-Means step drives gpu;vulkan smoke"),
+                                                   std::move(app));
+        EmplaceKMeansModules(engine);
         engine.Initialize();
-        const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
-        if (!ready.LogicalDeviceReady || !ready.SwapchainReady || !ready.CommandSyncReady)
-        {
-            engine.Shutdown();
-            return std::nullopt;
-        }
+        if (!VulkanReady(engine)) return std::nullopt;
         engine.Run();
         StepDriveResults results{.Outcomes = appPtr->Outcomes, .TimedOut = appPtr->TimedOut};
         engine.Shutdown();
@@ -603,7 +597,7 @@ TEST(ClusteringStepRunGpuSmoke, EveryStepSequenceEqualsTheUninterruptedRun)
         const auto& driven = appPtr->Outcomes[i];
         SCOPED_TRACE(i);
         ASSERT_TRUE(driven.Completion.Succeeded()) << driven.Completion.Message;
-        EXPECT_GT(driven.Rests, 0u) << "the drive paused the run";
+        EXPECT_FALSE(driven.RestSteps.empty()) << "the drive paused the run";
         EXPECT_EQ(driven.Completion.Iterations, uninterrupted.Completion.Iterations);
         EXPECT_EQ(driven.Labels, uninterrupted.Labels) << "labels exact";
         EXPECT_EQ(driven.Completion.Centroids, uninterrupted.Completion.Centroids) << "centroids bitwise";

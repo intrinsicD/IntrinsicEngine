@@ -12,7 +12,7 @@ export module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
-import Extrinsic.Runtime.EditorWorkspaceSlot; // the seam a service lends a workspace through (its attachment type)
+import Extrinsic.Runtime.EditorWorkspaceSlot;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.WorldHandle;
 export namespace Extrinsic::Runtime
@@ -212,7 +212,8 @@ export namespace Extrinsic::Runtime
 
         std::function<KMeansGpuObservation(CommandCorrelationId, KMeansGpuAction)> m_GpuRun{};
         std::function<std::string(const Runtime::RunKMeans&, const EditorProcessingContext&)> m_GpuReadinessDiagnostic{};
-        std::function<void(EditorWorkspaceAttachment* use, const EditorWorkspaceAttachment* release)> m_LendWorkspace{};
+        // The workspace the module's GPU runs queue their editor jobs in (the lent one, else the module's own).
+        EditorWorkspaceSlot m_Workspace{};
         CommandBus* m_Commands{};
         KernelEventBus* m_Events{};
         const ClusteringModuleStats* m_Stats{};

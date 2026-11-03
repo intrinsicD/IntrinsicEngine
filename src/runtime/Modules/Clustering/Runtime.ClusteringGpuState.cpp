@@ -69,7 +69,7 @@ namespace Extrinsic::Runtime
                         {
                             if (!std::exchange(*finalized, true)) (void)held->Completion(false);
                         };
-                        const JobToken token = surface.Submit ? surface.Submit(std::move(desc), std::move(id)) : JobToken{};
+                        const JobToken token = surface.Submit(std::move(desc), std::move(id));
                         if (!id.Run.IsValid()) *holder = token;
                         return {token};
                     },
@@ -167,13 +167,13 @@ namespace Extrinsic::Runtime
                 a.Driver.CommitFinished(false, a.Result.Message);
             else if (status == KMeansRunStatus::GeometryProcessingFailed)
                 (void)a.Driver.Stepped({}, StepOutcome::Failed);
-            else if (a.Steps)
+            else
                 (void)a.Steps->Control(a.Run, StepRunAction::Discard, 1u, refusal);
         }
         // Stop, the iteration cap or convergence ended the step run (it is not discarded).
         [[nodiscard]] static bool Ended(const Operation& a)
         {
-            const auto run = a.Steps ? a.Steps->Observe(a.Run) : std::nullopt;
+            const auto run = a.Steps->Observe(a.Run);
             return run && run->End != StepRunEnd::None && !IsTerminal(run->Phase);
         }
         // The labels of the current centroids: a final assignment when the last update moved one, then the terminal
@@ -295,10 +295,9 @@ namespace Extrinsic::Runtime
                     op->Result.CpuStageReadbackBytes += result.CpuStageReadbackBytes;
                     // An unpublished end is "cancelled or stale"; a cancel accepted for one of the run's jobs (its
                     // Accept stage alone, say) makes it a cancel, as the agent lane relabels runs.
-                    const auto& jobs = op->Context.JobCommands;
                     const bool cancelled = result.Phase == EditorGpuTransactionPhase::Discarded &&
                         (result.Status != EditorCommandStatus::StaleEntity ||
-                            (jobs.RunCancelRequested && jobs.RunCancelRequested(op->Holder)));
+                            IsEditorRunCancelRequested(op->Commands, op->Holder));
                     Finish(cancelled                                               ? KMeansRunStatus::Cancelled
                             : result.Status == EditorCommandStatus::StaleEntity    ? KMeansRunStatus::StaleSource
                             : result.Status == EditorCommandStatus::Applied ||
@@ -413,28 +412,24 @@ namespace Extrinsic::Runtime
             auto a = Active;
             if (!a || a->Snapshot.Correlation != id)
                 return {};
-            // The panel's buttons are the step run's controls; Accept only while it can publish now.
-            const auto canAccept = [&]
-            {
-                const bool resting = a->Resting && !a->Ready && a->Result.Iterations > 0u;
-                return (a->Ready || resting) && !a->CommitRequested &&
-                    (a->Ready ? SnapshotEditorPointScalar(a->Commands, a->Transaction).CanAccept : a->Current());
-            };
+            // The panel's buttons are the step run's controls (they change only the step run's state here); Accept
+            // only while it can publish now.
+            const bool resting = a->Resting && !a->Ready && a->Result.Iterations > 0u;
+            const bool accepting = a->Accepting || a->CommitRequested;
+            const bool ready = a->Ready || resting;
+            const auto scalar = SnapshotEditorPointScalar(a->Commands, a->Transaction);
+            const bool canAccept = ready && !a->CommitRequested && (a->Ready ? scalar.CanAccept : a->Current());
             std::string refusal;
             if (action == KMeansGpuAction::Stop)
                 (void)a->Steps->Control(a->Run, StepRunAction::Stop, 1u, refusal);
             if (action == KMeansGpuAction::Discard)
                 (void)a->Steps->Control(a->Run, StepRunAction::Discard, 1u, refusal); // its pump discards the run
-            if (action == KMeansGpuAction::Accept && canAccept())
+            if (action == KMeansGpuAction::Accept && canAccept)
                 (void)a->Steps->Control(a->Run, StepRunAction::Accept, 1u, refusal);
-            const bool resting = a->Resting && !a->Ready && a->Result.Iterations > 0u;
-            const bool accepting = a->Accepting || a->CommitRequested;
-            const bool ready = a->Ready || resting;
-            const auto scalar = SnapshotEditorPointScalar(a->Commands, a->Transaction);
             return {.Running = !ready && !accepting,
                 .ReadyToAccept = ready,
                 .Accepting = accepting,
-                .CanAccept = canAccept(),
+                .CanAccept = canAccept,
                 .Message = a->Resting && a->Result.Iterations == 0u ? "Paused before its first iteration."
                     : !ready ? "GPU K-Means pages running."
                     : resting ? "Paused at an iteration boundary; Accept prepares its labels."
@@ -689,11 +684,9 @@ namespace Extrinsic::Runtime
                         {
                             // Rests at this boundary: its preview alone (not fused with the next Assign), then nothing
                             // until the run continues, stops or is accepted.
-                            a->Phase = KMeansGpuPhase::Assign;
                             a->RestPreview = a->Driver.MayPreview();
                             a->Resting = !a->RestPreview;
-                            if (a->RestPreview)
-                                a->Phase = KMeansGpuPhase::Preview;
+                            a->Phase = a->RestPreview ? KMeansGpuPhase::Preview : KMeansGpuPhase::Assign;
                         }
                     }
                 }

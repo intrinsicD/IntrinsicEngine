@@ -81,10 +81,10 @@ namespace Extrinsic::Runtime
     { return m_GpuReadinessDiagnostic ? m_GpuReadinessDiagnostic(request, context) : std::string{}; }
 
     void ClusteringService::UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept
-    { if (m_LendWorkspace) m_LendWorkspace(&workspace, nullptr); }
+    { m_Workspace.Use(workspace); }
 
     void ClusteringService::ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept
-    { if (m_LendWorkspace) m_LendWorkspace(nullptr, &workspace); }
+    { m_Workspace.Release(workspace); }
 
     bool IsValidKMeansPropertyBindings(const KMeansPropertyRefs& properties) noexcept
     {
