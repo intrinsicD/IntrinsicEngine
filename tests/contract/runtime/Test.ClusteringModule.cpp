@@ -1612,6 +1612,23 @@ TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUplo
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     EXPECT_EQ(Observation().InputUploadBytes,0u);EXPECT_GT(Observation().InputCacheHits,0u);
 }
+// ARCH-022 Q75: an Accept and its undo and redo write only the outputs, so the positions keep their revision and the
+// next run reuses the resident input instead of uploading it again.
+TEST_F(ClusteringModuleResident, AnAcceptAndItsUndoKeepTheResidentInput)
+{
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_GT(Observation().InputUploadBytes,0u);
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));ASSERT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+    ASSERT_TRUE(Properties().Exists("p:kmeans_label"));
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_EQ(Observation().InputUploadBytes,0u);
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+    ASSERT_TRUE(Until([&]{return Results.size()==2;}));
+    ASSERT_TRUE(History.Undo().Succeeded());ASSERT_TRUE(History.Redo().Succeeded());
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_EQ(Observation().InputUploadBytes,0u);
+}
 TEST_F(ClusteringModuleResident, RetainedWorkspaceReusesCapacityAndUnbindsSlots)
 {
     const auto run=[&](std::size_t results){

@@ -251,22 +251,6 @@ namespace Extrinsic::Runtime
         }
 
         template <typename T>
-        [[nodiscard]] bool CanApplyOutputProperty(
-            const Geometry::PropertySet& properties,
-            const std::string_view name,
-            const bool hasProperty,
-            const std::vector<T>& values)
-        {
-            if (properties.Exists(name))
-            {
-                const auto property = properties.Get<T>(name);
-                if (!property || property.Size() != properties.Size())
-                    return false;
-            }
-            return hasProperty ? values.size() == properties.Size() : values.empty();
-        }
-
-        template <typename T>
         [[nodiscard]] bool ApplyOutputProperty(
             Geometry::PropertySet& properties,
             const std::string_view name,
@@ -302,17 +286,17 @@ namespace Extrinsic::Runtime
             const KMeansPropertyRefs& refs,
             const KMeansOutputPropertyState& state)
         {
-            // All checks before the first write (the output names are distinct, HasDistinctPropertyNames), so the
-            // writes cannot fail and nothing is applied partly; untouched properties keep their revisions.
+            // Written in place, so untouched properties keep their revisions. Nothing is applied partly: the scalar
+            // outputs are checked first, the colors' write fails before it changes anything, and the output names are
+            // distinct (HasDistinctPropertyNames), so no write can invalidate a later one.
             if (!CanApplyGeometryScalarProperty(properties, refs.OutputLabels, state.Labels) ||
-                !CanApplyOutputProperty<glm::vec4>(properties, refs.OutputColors.Name, state.HadColors, state.Colors) ||
                 (refs.OutputScalarLabels
                      ? !CanApplyGeometryScalarProperty(properties, *refs.OutputScalarLabels, state.ScalarLabels)
                      : state.ScalarLabels.Exists))
                 return false;
-            return ApplyGeometryScalarProperty(properties, refs.OutputLabels, state.Labels) &&
-                   ApplyOutputProperty<glm::vec4>(properties, refs.OutputColors.Name,
+            return ApplyOutputProperty<glm::vec4>(properties, refs.OutputColors.Name,
                        state.HadColors, state.Colors, glm::vec4{1.0f}) &&
+                   ApplyGeometryScalarProperty(properties, refs.OutputLabels, state.Labels) &&
                    (!refs.OutputScalarLabels ||
                        ApplyGeometryScalarProperty(properties, *refs.OutputScalarLabels, state.ScalarLabels));
         }

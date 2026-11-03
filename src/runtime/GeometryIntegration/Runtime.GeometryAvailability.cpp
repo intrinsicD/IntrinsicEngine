@@ -55,20 +55,6 @@ namespace Extrinsic::Runtime
                     for (const auto slot : slots)
                     {
                         if (slot >= count || slot >= values.size()) return false;
-                        // Same type: the conversion below is the identity (every value of T is exact in long double
-                        // here), so only the nonfinite policy can reject.
-                        if constexpr (std::is_same_v<T, Input> &&
-                                      std::numeric_limits<T>::digits <= std::numeric_limits<long double>::digits)
-                        {
-                            if constexpr (std::is_floating_point_v<T>)
-                            {
-                                if (!std::isfinite(values[slot]) &&
-                                    !(nonfinite == GeometryScalarNonfinitePolicy::AllowInfinity &&
-                                        std::isinf(values[slot]))) return false;
-                            }
-                            output[slot] = values[slot];
-                            continue;
-                        }
                         const long double value = values[slot];
                         if (!std::isfinite(value))
                         {
@@ -78,6 +64,12 @@ namespace Extrinsic::Runtime
                                 { output[slot] = static_cast<T>(value); continue; }
                             }
                             return false;
+                        }
+                        // Same type (finite here): the checks below hold for every value, the conversion is the identity.
+                        if constexpr (std::is_same_v<T, Input>)
+                        {
+                            output[slot] = values[slot];
+                            continue;
                         }
                         if constexpr (std::is_integral_v<T>)
                         {

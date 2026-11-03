@@ -271,6 +271,11 @@ TEST(GaussianMixture, KMeansRandomInitializationFollowsTheSeed)
     const auto second = Geometry::KMeans::BuildInitialCentroids(points, {}, params, params.ClusterCount);
     ASSERT_EQ(first.size(), params.ClusterCount);
     EXPECT_NE(first, second);
+    // Production seeding takes exactly the sampled points (ARCH-022 Q75: O(K), not a shuffle of all N).
+    const auto indices = Geometry::KMeans::SampleDistinctIndices(static_cast<std::uint32_t>(points.size()), 4u, 1001u);
+    ASSERT_EQ(indices.size(), second.size());
+    for (std::size_t i = 0; i < indices.size(); ++i)
+        EXPECT_EQ(second[i], points[indices[i]]) << i;
 }
 
 // ARCH-022 Q75: random seeding draws K of N indices without touching N (a slider restarts k-means every frame).
