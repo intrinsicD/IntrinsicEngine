@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -719,6 +721,39 @@ TEST(GeometryScalarPublication, RejectsInexactNonfiniteAndOutOfRangeBeforePublic
         ASSERT_TRUE(Runtime::ApplyGeometryScalarProperty(properties,ref,state));
         EXPECT_EQ(Runtime::DetectGeometryPropertyValueKind(properties,ref.Name),kind);
     }
+}
+
+// ARCH-022 Q75: a same-type publication (K-Means labels, uint32 to uint32) skips the long double conversion; only the
+// nonfinite policy may reject it, and a converting one keeps its exactness checks.
+TEST(GeometryScalarPublication, SameTypeIsTheIdentityUnderTheNonfinitePolicy)
+{
+    using K = Geometry::PropertyValueKind;
+    const std::vector<std::uint32_t> slots{0, 1};
+    const auto prepare = [&](K kind, const auto& values, auto policy) {
+        Runtime::GeometryScalarPropertySnapshot state;
+        const bool ok = Runtime::PrepareGeometryScalarProperty(state, kind, 2, slots, std::span{values}, policy);
+        return std::pair{ok, state};
+    };
+    constexpr auto reject = Runtime::GeometryScalarNonfinitePolicy::Reject;
+    constexpr auto allowInfinity = Runtime::GeometryScalarNonfinitePolicy::AllowInfinity;
+    const std::vector<std::uint32_t> labels{0u, UINT32_MAX};
+    const auto [labelsOk, labelsState] = prepare(K::UInt32, labels, reject);
+    ASSERT_TRUE(labelsOk);
+    EXPECT_EQ(std::get<std::vector<std::uint32_t>>(labelsState.Values), labels);
+    EXPECT_FALSE(prepare(K::Float, std::vector<std::uint32_t>{16777217u, 0u}, reject).first); // 2^24 + 1
+    EXPECT_TRUE(prepare(K::Float, std::vector<std::uint32_t>{16777216u, 16777218u}, reject).first);
+    const double inf = std::numeric_limits<double>::infinity();
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    EXPECT_FALSE(prepare(K::Double, std::vector<double>{1.0, inf}, reject).first);
+    EXPECT_TRUE(prepare(K::Double, std::vector<double>{1.0, inf}, allowInfinity).first);
+    EXPECT_FALSE(prepare(K::Double, std::vector<double>{1.0, nan}, allowInfinity).first);
+    EXPECT_FALSE(prepare(K::Float, std::vector<float>{std::numeric_limits<float>::quiet_NaN(), 0.0f}, allowInfinity).first);
+    const std::vector<double> exact{-0.0, std::numeric_limits<double>::denorm_min()};
+    const auto [exactOk, exactState] = prepare(K::Double, exact, reject);
+    ASSERT_TRUE(exactOk);
+    const auto& stored = std::get<std::vector<double>>(exactState.Values);
+    EXPECT_TRUE(std::signbit(stored[0]));
+    EXPECT_EQ(stored[1], exact[1]);
 }
 
 TEST(GeometryScalarPublication, SentinelPolicyAndSnapshotEqualityAreExplicit)

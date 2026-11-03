@@ -141,6 +141,14 @@ contract_review: tracker only; each slice declares its own contracts
     verschwinden, von mir aus plugins/fixture" (1: the CPD plugin without spike, world-space capture, an optional
     normal input; 2: S3c, k-means as a step run and the stall measurement; 3: kernel density and point spacing as
     plugins, then density weight and outliers; the S1 test plugin becomes plugins/fixture; S2 and R4 can run now)
+74. (2026-11-03, after the S3c-3 result: GPU k-means not met, the Accept's publication 5.1 / 62 ms, a full capture and
+    start on almost every slider frame, the renderer's execute up to 30 ms at 1 048 576 points, and the open MM1
+    question on the render refresh after the accept) "Kannst du das bitte herausfinden was da genau los ist und welche
+    Möglichkeiten wir haben damit es Sau schnell bleibt/ist?"
+75. (2026-11-03, on the Q74 options table: 1 the cull bucket table written only on change, 2 the Accept applied
+    without the deep clone and with untouched revisions kept, 3 the Accept's copies and conversions cut, 4 the Accept
+    on a worker, 5 O(K) seeds and `reserve`, 6 a shared capture or a restarted run, 7 the async compute queue or wider
+    kernels) "Ok bitte mach die kleinen Punkte 1,2,3,5. Danach schauen wir und 6 und 7 an"
 
 ## Goal
 - Reach the target in
@@ -3328,3 +3336,45 @@ python3 tools/docs/check_doc_links.py --root . --strict
   sentence), round 3 verbatim "**Verdict: approve.** Both remaining substantive findings are resolved." The
   instrumentation and harness (ebba1b9bf, 3fb976384) were read for correctness by both pre-flight reviewers over four
   rounds (Codex round 3: no correctness defect in `ScopedMicros`; Claude round 3: "The code change is correct.").
+- 2026-11-03, Q74 diagnosis (code reading only, three Explore agents plus own checks of the key lines; no run, the
+  per-step ns splits are estimates): (1) Accept: `ApplyKMeansOutputPropertyState` deep-clones the whole vertex
+  `PropertySet` (`Runtime.ClusteringModule.cpp:276`) and its move assignment rebases every property's revision
+  (`Geometry.Properties.cpp:67-77, 92-105`), so render extraction re-packs and re-uploads unchanged positions and
+  normals (the MM1 refresh is largely self-inflicted); labels and colors are copied about eight times, scalar
+  labels convert through `long double` per point (`Runtime.GeometryAvailability.cpp`), colors via `fmodf` per point,
+  undo copies points, slots and outputs. (2) Slider: no upload and no GPU wait per start, but `InitializeRandom`
+  shuffles all N indices to take K seeds (`Geometry.KMeans.cpp:33-48`), the capture `push_back`s without `reserve`
+  (`...PointProperties.cpp:376`), and the before-outputs and slots are copied per request. (3) Renderer at 1M:
+  `CullingSystem::DispatchCull` writes a device-local buffer every frame (`Graphics.CullingSystem.cpp:337, 528`),
+  whose `WriteBuffer` slow path ends in `vkQueueWaitIdle(m_GraphicsQueue)` (`Backends.Vulkan.Device.cpp:4463-4519,
+  5747`), so the frame waits for the K-Means page on the graphics queue; at 1M a page is about 255 serialized,
+  nearly empty dispatches (Reduce 1 workgroup, Update 8) with full barriers (inference from the paging code). Side
+  finding: `EndOneShot` submits to the graphics queue without `m_QueueMutex`. Options and the proposed order went to
+  the operator.
+- 2026-11-03, Q75 plan (cull table on change, Accept without the clone, Accept copies and conversions, O(K) seeds and
+  `reserve`) reviewed by a fresh Codex (`codex exec` read-only, xhigh, thread `01a1a354-169c-7f31-8cf8-869396a3fd02`,
+  recursion protection instruction-only; packet and answer in `tasks/evidence/ARCH-022/q75-plan-review-*`): verdict
+  "**Verdict: revise.**" Blocking: (1) dropping the per-frame `vkQueueWaitIdle` removes the serialization the shared
+  culling counters, arguments and diagnostics rely on across frames (`Graphics.CullingSystem.cpp:417`,
+  `Graphics.FrameRecipe.cpp:1603`), so step 1 needs cross-frame barriers and overlapping-frame coverage; (2)
+  `MarkVertexAttributesDirty` still uploads normals, texcoords and colors whatever the revisions
+  (`Runtime.RenderExtraction.cpp:652`), so the three K-Means stamps narrow to the color-dirty helper; (3) the single
+  label buffer and labels-only undo were in the approved option 3 and cannot be dropped silently; (4) the tests must
+  show O(K) (a huge N), K = 1 and K = N, the float boundary 2^24 + 1, an Apply-level no-partial-mutation case and the
+  missing-optional-scalar rejection. Ponytail: a needs-upload flag instead of a cached table, a same-type fast path
+  instead of `double` arithmetic for all conversions. Step 1 and the two option-3 sub-items went back to the operator
+  (drift budget); 5, 2 and the rest of 3 proceed.
+- 2026-11-03, Q75 steps 5, 2 and 3 implemented (step 1 and option 3's single label buffer and labels-only undo wait
+  for the operator): O(K) `SampleDistinctIndices` for random seeds and `reserve` in `ScanPointInputRows`; the Accept
+  and undo/redo check all three outputs first and write them in place (no clone, untouched revisions kept), the three
+  K-Means stamps are `MarkVertexColorsDirty`; a palette entry per cluster; `PrepareScalar`'s same-type identity path
+  (the nonfinite policy alone rejects); `CommitKMeansOutputs` consumes its snapshot and moves points, slots and the
+  before-state into the undo records (the CPU path copies its event's snapshot once). Tests: the seed sampler
+  (n = 2^32 - 1 under 2 s, K = 1, K = N, uniform counts; the expected count per index was first written as 9 000;
+  the first run read about 3 000, which is right for 10 000 draws of 3 of 10, so the prediction had an arithmetic
+  slip and was corrected to 3 000 with this reason), positions' revision and the color tag after accept, undo
+  and redo, the palette values, same-type conversions. Mutations (`build/dev-shared`): the clone back, the attribute
+  tag back, the palette off by one, the same-type nonfinite check removed, samples not swapped out, the last index
+  never drawn first each fail their tests; an N-sized shuffle is caught only by the run's 15-minute timeout (the
+  test's own 2 s bound fires after the shuffle). Runtime contract 1994 of 1994, geometry 1621 of 1621, the
+  clustering GPU smokes 6 of 6, `ctest -L build` green.

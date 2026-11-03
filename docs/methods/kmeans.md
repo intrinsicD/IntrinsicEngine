@@ -44,7 +44,9 @@ combine pages in dispatch order, without floating-point atomics. The device
 must support shaderFloat64.
 
 The existing cluster-count contract is [1, 1024] in config, validation and UI;
-CPU seeding remains synchronous. There is no point-count cap beyond 32-bit row
+CPU seeding remains synchronous. Random seeding draws K distinct points in O(K)
+(`SampleDistinctIndices`, a partial Fisher-Yates over a sparse map; since
+2026-11-03 a given `Seed` picks other points than the former full shuffle). There is no point-count cap beyond 32-bit row
 representability and successful storage allocation. Every submission completes
 before the next one. Internal test knobs force smaller pair budgets.
 
@@ -67,8 +69,9 @@ the float front under the label property's name; Show selects that property.
 
 `Runtime.PointScalarTransaction` owns the typed front readback and guarded
 Accept lifecycle. The existing clustering publication writes labels, colors,
-and optional scalar labels in one undoable entry. Accept refuses stale inputs
-or outputs. Stop finishes the current iteration; Discard and detach leave CPU
+and optional scalar labels in one undoable entry, in place after all checks: other
+properties keep their revisions, and the renderer is told only that the colors
+changed (`DirtyVertexColors`). Accept refuses stale inputs or outputs. Stop finishes the current iteration; Discard and detach leave CPU
 outputs unchanged. Batch requests and `run_kmeans` agent commands auto-accept at
 convergence or the iteration cap, never after Stop; refused stale Accept
 finishes with StaleSource. A terminal preview fails with a reason after 600

@@ -184,6 +184,8 @@ namespace
                 });
             StableEntityId =
                 Runtime::SelectionController::ToStableEntityId(Entity);
+            PositionsRevision = engine.Worlds().Get(engine.ActiveWorld())->Raw().get<GS::Vertices>(Entity)
+                                    .Properties.Get<glm::vec3>(PN::kPosition).Revision();
 
             CompletionSub = service->SubscribeRunCompleted(
                 [this](const Runtime::KMeansRunCompleted& completed)
@@ -212,7 +214,7 @@ namespace
                 HasPointLabels(*engine.Worlds().Get(engine.ActiveWorld()), Entity);
             const bool dirty =
                 Entity != ECS::InvalidEntityHandle &&
-                engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<Dirty::DirtyVertexAttributes>(
+                engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<Dirty::DirtyVertexColors>(
                     Entity);
             if (Completion.has_value() &&
                 LabelsChanged.has_value() &&
@@ -242,6 +244,7 @@ namespace
         std::optional<Runtime::KMeansRunCompleted> Completion{};
         std::optional<Runtime::ClusterLabelsChanged> LabelsChanged{};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        Geometry::PropertyRevision PositionsRevision{};
         std::uint32_t StableEntityId{0u};
         std::thread::id MainThread{};
         std::thread::id CompletionThread{};
@@ -781,8 +784,12 @@ TEST(ClusteringModule, EngineRunCommitsLabelsAndPublishesChangeEvent)
     EXPECT_EQ(appPtr->LabelsChanged->LabelCount, 4u);
     EXPECT_EQ(appPtr->LabelsChangedThread, appPtr->MainThread);
     EXPECT_EQ(PointLabelCount(*engine.Worlds().Get(engine.ActiveWorld()), appPtr->Entity), 4u);
-    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<Dirty::DirtyVertexAttributes>(
-        appPtr->Entity));
+    // Only the colors changed for the renderer, and the positions kept their revision (ARCH-022 Q75).
+    const auto& published = engine.Worlds().Get(engine.ActiveWorld())->Raw();
+    EXPECT_TRUE(published.all_of<Dirty::DirtyVertexColors>(appPtr->Entity));
+    EXPECT_FALSE(published.all_of<Dirty::DirtyVertexAttributes>(appPtr->Entity));
+    EXPECT_EQ(published.get<GS::Vertices>(appPtr->Entity).Properties.Get<glm::vec3>(PN::kPosition).Revision(),
+              appPtr->PositionsRevision);
     EXPECT_EQ(appPtr->Stats.LabelsCommitted, 1u);
     EXPECT_EQ(appPtr->Stats.VisualizationRefreshReactions, 1u);
 
@@ -825,17 +832,31 @@ TEST(ClusteringModule, DocumentHistoryOwnsQueuedOutputUndoRedo)
         labels.Vector();
     const std::vector<glm::vec4> publishedColors =
         colors.Vector();
+    // Each point's color is its cluster's palette entry (ARCH-022 Q75: one entry per cluster, looked up per point).
+    const std::array<glm::vec4, 2> palette{glm::vec4{0.95f, 0.3325f, 0.3325f, 1.0f},
+                                           glm::vec4{0.3325f, 0.51268f, 0.95f, 1.0f}};
+    ASSERT_EQ(publishedColors.size(), publishedLabels.size());
+    for (std::size_t i = 0; i < publishedLabels.size(); ++i)
+    {
+        ASSERT_LT(publishedLabels[i], palette.size());
+        for (int c = 0; c < 4; ++c)
+            EXPECT_NEAR(publishedColors[i][c], palette[publishedLabels[i]][c], 1.0e-4f) << i;
+    }
+    const auto positionsRevision = properties.Get<glm::vec3>(PN::kPosition).Revision();
+    EXPECT_EQ(positionsRevision, appPtr->PositionsRevision);
 
-    scene->Raw().remove<Dirty::DirtyVertexAttributes>(
+    scene->Raw().remove<Dirty::DirtyVertexColors>(
         appPtr->Entity);
     EXPECT_EQ(history->Undo().Status,
               Runtime::EditorCommandHistoryStatus::Undone);
     EXPECT_FALSE(properties.Exists("p:kmeans_label"));
     EXPECT_FALSE(properties.Exists("p:kmeans_color"));
-    EXPECT_TRUE(scene->Raw().all_of<Dirty::DirtyVertexAttributes>(
+    EXPECT_TRUE(scene->Raw().all_of<Dirty::DirtyVertexColors>(
         appPtr->Entity));
+    EXPECT_FALSE(scene->Raw().all_of<Dirty::DirtyVertexAttributes>(appPtr->Entity));
+    EXPECT_EQ(properties.Get<glm::vec3>(PN::kPosition).Revision(), positionsRevision);
 
-    scene->Raw().remove<Dirty::DirtyVertexAttributes>(
+    scene->Raw().remove<Dirty::DirtyVertexColors>(
         appPtr->Entity);
     EXPECT_EQ(history->Redo().Status,
               Runtime::EditorCommandHistoryStatus::Redone);
@@ -847,8 +868,10 @@ TEST(ClusteringModule, DocumentHistoryOwnsQueuedOutputUndoRedo)
     ASSERT_TRUE(redoneColors);
     EXPECT_EQ(redoneLabels.Vector(), publishedLabels);
     EXPECT_EQ(redoneColors.Vector(), publishedColors);
-    EXPECT_TRUE(scene->Raw().all_of<Dirty::DirtyVertexAttributes>(
+    EXPECT_TRUE(scene->Raw().all_of<Dirty::DirtyVertexColors>(
         appPtr->Entity));
+    EXPECT_FALSE(scene->Raw().all_of<Dirty::DirtyVertexAttributes>(appPtr->Entity));
+    EXPECT_EQ(properties.Get<glm::vec3>(PN::kPosition).Revision(), positionsRevision);
 
     redoneLabels.Vector()[0] += 1u;
     const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
@@ -1698,10 +1721,10 @@ TEST_F(ClusteringModuleResident, PreviewCopiesOnlyAtCadenceAndPublishesAfterComp
 TEST_F(ClusteringModuleResident, ReentrantDiscardDuringAcceptKeepsOneAppliedCompletion)
 {
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
-    Scene().Raw().on_construct<Dirty::DirtyVertexAttributes>().connect<&ClusteringModuleResident::DiscardDuringPublication>(*this);
+    Scene().Raw().on_construct<Dirty::DirtyVertexColors>().connect<&ClusteringModuleResident::DiscardDuringPublication>(*this);
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
-    Scene().Raw().on_construct<Dirty::DirtyVertexAttributes>().disconnect<&ClusteringModuleResident::DiscardDuringPublication>(*this);
+    Scene().Raw().on_construct<Dirty::DirtyVertexColors>().disconnect<&ClusteringModuleResident::DiscardDuringPublication>(*this);
     EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
     for(int i=0;i<10;++i)Tick();EXPECT_EQ(Results.size(),1u);
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Committed)<<"the publication under way decided";

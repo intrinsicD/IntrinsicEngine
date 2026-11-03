@@ -232,9 +232,38 @@ namespace Extrinsic::Runtime
                     properties.Size(), slots, labels)) return std::nullopt;
             state.HadColors = true;
             state.Colors.resize(properties.Size(), glm::vec4(1.0f));
+            // One LabelColor per cluster, looked up per point (labels are cluster indices).
+            constexpr std::uint32_t kPaletteLimit = 1u << 16u;
+            std::vector<glm::vec4> palette;
             for (std::size_t i = 0; i < slots.size(); ++i)
-                state.Colors[slots[i]] = LabelColor(result.Labels[i]);
+            {
+                const std::uint32_t label = result.Labels[i];
+                if (label >= kPaletteLimit)
+                {
+                    state.Colors[slots[i]] = LabelColor(label);
+                    continue;
+                }
+                while (palette.size() <= label)
+                    palette.push_back(LabelColor(static_cast<std::uint32_t>(palette.size())));
+                state.Colors[slots[i]] = palette[label];
+            }
             return state;
+        }
+
+        template <typename T>
+        [[nodiscard]] bool CanApplyOutputProperty(
+            const Geometry::PropertySet& properties,
+            const std::string_view name,
+            const bool hasProperty,
+            const std::vector<T>& values)
+        {
+            if (properties.Exists(name))
+            {
+                const auto property = properties.Get<T>(name);
+                if (!property || property.Size() != properties.Size())
+                    return false;
+            }
+            return hasProperty ? values.size() == properties.Size() : values.empty();
         }
 
         template <typename T>
@@ -273,18 +302,19 @@ namespace Extrinsic::Runtime
             const KMeansPropertyRefs& refs,
             const KMeansOutputPropertyState& state)
         {
-            Geometry::PropertySet staged = properties;
-            if (!ApplyGeometryScalarProperty(staged, refs.OutputLabels, state.Labels)) return false;
-            if (!ApplyOutputProperty<glm::vec4>(staged, refs.OutputColors.Name,
-                    state.HadColors, state.Colors, glm::vec4{1.0f})) return false;
-            if (refs.OutputScalarLabels)
-            {
-                if (!ApplyGeometryScalarProperty(staged, *refs.OutputScalarLabels, state.ScalarLabels)) return false;
-            }
-            else if (state.ScalarLabels.Exists) return false;
-
-            properties = std::move(staged);
-            return true;
+            // All checks before the first write (the output names are distinct, HasDistinctPropertyNames), so the
+            // writes cannot fail and nothing is applied partly; untouched properties keep their revisions.
+            if (!CanApplyGeometryScalarProperty(properties, refs.OutputLabels, state.Labels) ||
+                !CanApplyOutputProperty<glm::vec4>(properties, refs.OutputColors.Name, state.HadColors, state.Colors) ||
+                (refs.OutputScalarLabels
+                     ? !CanApplyGeometryScalarProperty(properties, *refs.OutputScalarLabels, state.ScalarLabels)
+                     : state.ScalarLabels.Exists))
+                return false;
+            return ApplyGeometryScalarProperty(properties, refs.OutputLabels, state.Labels) &&
+                   ApplyOutputProperty<glm::vec4>(properties, refs.OutputColors.Name,
+                       state.HadColors, state.Colors, glm::vec4{1.0f}) &&
+                   (!refs.OutputScalarLabels ||
+                       ApplyGeometryScalarProperty(properties, *refs.OutputScalarLabels, state.ScalarLabels));
         }
 
         [[nodiscard]] std::string BuildSuccessMessage(
@@ -548,7 +578,7 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry* scene,
             const WorldHandle world,
             EditorCommandHistory* history,
-            const KMeansSnapshot& snapshot,
+            KMeansSnapshot snapshot,
             const GK::KMeansResult& clustered)
         {
             if (scene == nullptr)
@@ -585,10 +615,11 @@ namespace Extrinsic::Runtime
             {
                 const KMeansPointSnapshot points =
                     std::make_shared<PointInputCapture>(PointInputCapture{
-                        .Points = snapshot.Points, .Slots = snapshot.Slots, .SlotCount = snapshot.SlotCount});
+                        .Points = std::move(snapshot.Points), .Slots = std::move(snapshot.Slots),
+                        .SlotCount = snapshot.SlotCount});
                 const KMeansOutputPropertySnapshot beforeState =
                     std::make_shared<KMeansOutputPropertyState>(
-                        snapshot.BeforeOutputs);
+                        std::move(snapshot.BeforeOutputs));
                 const KMeansOutputPropertySnapshot afterState =
                     std::make_shared<KMeansOutputPropertyState>(
                         std::move(*after));
@@ -715,7 +746,7 @@ namespace Extrinsic::Runtime
                                if (currentEntity !=
                                    ECS::InvalidEntityHandle)
                                {
-                                   Dirty::MarkVertexAttributesDirty(
+                                   Dirty::MarkVertexColorsDirty(
                                        currentRaw,
                                        currentEntity);
                                }
@@ -730,7 +761,7 @@ namespace Extrinsic::Runtime
             const EditorCommandHistoryStatus applied =
                 ApplyKMeansOutputState(identity, *after);
             if (applied == EditorCommandHistoryStatus::Applied)
-                Dirty::MarkVertexAttributesDirty(raw, entity);
+                Dirty::MarkVertexColorsDirty(raw, entity);
             return applied;
         }
 
@@ -926,7 +957,7 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return;
 
-            Dirty::MarkVertexAttributesDirty(raw, entity);
+            Dirty::MarkVertexColorsDirty(raw, entity);
             stats.VisualizationRefreshReactions += 1u;
         }
 
@@ -1081,7 +1112,8 @@ namespace Extrinsic::Runtime
                 const ClusteringGpuSubmission submission = gpuState != nullptr && editorJobs.Available()
                     ? gpuState->Start(*snapshot, processing, current,
                         [captured,processing](const GK::KMeansResult& clustered) {
-                            const auto status=CommitKMeansOutputs(processing.Scene,processing.World,processing.CommandHistory,*captured,clustered);
+                            // Publication is terminal for the run: the captured snapshot is consumed here.
+                            const auto status=CommitKMeansOutputs(processing.Scene,processing.World,processing.CommandHistory,std::move(*captured),clustered);
                             return status==EditorCommandHistoryStatus::Applied?EditorCommandStatus::Applied:
                                 status==EditorCommandHistoryStatus::StaleEntity?EditorCommandStatus::StaleEntity:EditorCommandStatus::GeometryProcessingFailed;
                         })
