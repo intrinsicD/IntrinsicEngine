@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -435,10 +436,12 @@ namespace
             Runtime::KMeansRunCompleted Completion{};
             std::vector<std::uint32_t> Labels{};
             std::vector<std::uint32_t> RestSteps{}; // the step count of each frame the run was seen paused, before it ended
+            std::vector<Runtime::StepRunMetric> Metrics{}; // the run's per-step metrics (inertia, max shift)
         };
         std::vector<Drive> Drives{};
         std::vector<glm::vec3> Points{};
         std::vector<glm::vec3> MovedPoints{}; // when set, written as the positions before the last drive
+        std::vector<Runtime::KMeansPagingLimits> Limits{}; // when set, the paging budgets of each drive
         Runtime::KMeansParameters Parameters{};
         std::vector<Outcome> Outcomes{};
         bool TimedOut{};
@@ -470,6 +473,8 @@ namespace
             {
                 if (!MovedPoints.empty() && Outcomes.size() + 1u == Drives.size())
                     SetPositions(engine.Worlds().Get(engine.ActiveWorld())->Raw().get<GS::Vertices>(Entity), MovedPoints);
+                if (Outcomes.size() < Limits.size())
+                    Runtime::KMeansPagingForTesting = Limits[Outcomes.size()]; // copied when the run is admitted
                 Correlation = Service->RunKMeans({.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entity),
                     .Properties = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint),
                     .Parameters = Parameters, .Backend = Runtime::ClusteringBackend::VulkanCompute, .AutoAccept = false});
@@ -492,6 +497,8 @@ namespace
             const auto observed = gpu.StepRun != 0u ? Steps->Observe(gpu.StepRun) : std::nullopt;
             if (!observed || Accepted) return;
             const auto& run = *observed;
+            if (run.Metrics)
+                Current.Metrics.assign(run.Metrics->Records().begin(), run.Metrics->Records().end());
             const bool resting = run.Phase == Runtime::StepRunPhase::Paused && !run.SegmentInFlight;
             const auto control = [&](const Runtime::StepRunAction action, const std::uint32_t count = 1u)
             {
@@ -692,4 +699,187 @@ TEST(ClusteringStepRunGpuSmoke, AReusedCaptureEqualsTheFreshRunAndAPositionWrite
             delta = std::max(delta, std::abs(recaptured.Completion.Centroids[i][axis] - after->Centroids[i][axis]));
     EXPECT_LE(delta, 1e-5f);
     EXPECT_EQ(recaptured.Completion.Iterations, after->Iterations);
+}
+
+namespace
+{
+    // FNV-1a over the bit patterns of a run's outputs: equal hashes mean equal bits.
+    [[nodiscard]] std::uint64_t BitHash(std::span<const std::uint32_t> words)
+    {
+        std::uint64_t hash = 1469598103934665603ull;
+        for (const std::uint32_t word : words)
+            for (int byte = 0; byte < 4; ++byte)
+                hash = (hash ^ ((word >> (8 * byte)) & 0xffu)) * 1099511628211ull;
+        return hash;
+    }
+
+    struct OracleBits
+    {
+        std::uint64_t Centroids{}, Labels{}, StepMetrics{};
+        std::uint32_t Inertia{}, MaxDistanceIndex{}, Iterations{};
+        bool Converged{};
+        std::uint64_t Submissions{};
+        bool operator==(const OracleBits&) const = default;
+    };
+
+    [[nodiscard]] OracleBits BitsOf(const ClusteringStepDrivesApp::Outcome& outcome)
+    {
+        std::vector<std::uint32_t> centroids, metrics;
+        for (const glm::vec3& c : outcome.Completion.Centroids)
+            for (int axis = 0; axis < 3; ++axis) centroids.push_back(std::bit_cast<std::uint32_t>(c[axis]));
+        for (const auto& metric : outcome.Metrics) // each step's inertia and max shift, as the floats they were
+            for (int value = 0; value < 2; ++value)
+                metrics.push_back(std::bit_cast<std::uint32_t>(float(metric.Values[value])));
+        return {.Centroids = BitHash(centroids), .Labels = BitHash(outcome.Labels), .StepMetrics = BitHash(metrics),
+            .Inertia = std::bit_cast<std::uint32_t>(outcome.Completion.Inertia),
+            .MaxDistanceIndex = outcome.Completion.MaxDistanceIndex, .Iterations = outcome.Completion.Iterations,
+            .Converged = outcome.Completion.Converged, .Submissions = outcome.Completion.GpuSubmissions};
+    }
+
+    [[nodiscard]] std::string Initializer(const OracleBits& b)
+    {
+        return std::format("{{.Centroids = {:#x}ull, .Labels = {:#x}ull, .StepMetrics = {:#x}ull, .Inertia = {:#x}u, "
+            ".MaxDistanceIndex = {}u, .Iterations = {}u, .Converged = {}, .Submissions = {}u}}",
+            b.Centroids, b.Labels, b.StepMetrics, b.Inertia, b.MaxDistanceIndex, b.Iterations, b.Converged,
+            b.Submissions);
+    }
+
+    [[nodiscard]] std::vector<glm::vec3> Jittered(const unsigned count, std::uint32_t random,
+                                                  const auto& center, const float jitter)
+    {
+        std::vector<glm::vec3> points;
+        for (unsigned i = 0; i < count; ++i)
+        {
+            glm::vec3 point = center(i);
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                random = random * 1664525u + 1013904223u;
+                point[axis] += jitter * float(random >> 8) / float(1u << 24);
+            }
+            points.push_back(point);
+        }
+        return points;
+    }
+
+    struct OracleCase
+    {
+        const char* Name{};
+        std::vector<glm::vec3> Points{};
+        Runtime::KMeansParameters Parameters{};
+        std::vector<Runtime::KMeansPagingLimits> Limits{};
+        std::vector<OracleBits> Expected{}; // one per entry of Limits, from the path before ARCH-022 Q79 step 7b
+    };
+
+    [[nodiscard]] std::vector<OracleCase> OracleCases()
+    {
+        constexpr Runtime::KMeansPagingLimits tiny{.PagePairs = 2u, .SubmissionPairs = 8u};
+        constexpr Runtime::KMeansPagingLimits small{.PagePairs = 256u, .SubmissionPairs = 1u << 18u};
+        constexpr Runtime::KMeansPagingLimits standard{};
+        const auto hierarchical = [](std::uint32_t k, std::uint32_t iterations) {
+            return Runtime::KMeansParameters{.ClusterCount = k, .MaxIterations = iterations, .Seed = 7u,
+                .Initialization = Runtime::KMeansInitialization::Hierarchical};
+        };
+        std::vector<OracleCase> cases;
+        // Equal farthest distances on every Reduce page: the earliest page's (and lowest index's) point wins.
+        std::vector<glm::vec3> ties;
+        for (unsigned i = 0; i < 24u; ++i)
+            ties.push_back({float(i % 2 == 0 ? -1 : 1) + (i % 4 < 2 ? 0.0f : 50.0f), 0, 0});
+        cases.push_back({"farthest_ties_across_pages", ties, hierarchical(2u, 6u), {tiny, small, standard}, {
+            {.Centroids = 0x41d0053979edefa1ull, .Labels = 0xeac2ddc24676aea3ull, .StepMetrics = 0x16bf3c1e43c9b6bcull,
+             .Inertia = 0x41c00000u, .MaxDistanceIndex = 0u, .Iterations = 2u, .Converged = true, .Submissions = 39u},
+            {.Centroids = 0x41d0053979edefa1ull, .Labels = 0xeac2ddc24676aea3ull, .StepMetrics = 0x16bf3c1e43c9b6bcull,
+             .Inertia = 0x41c00000u, .MaxDistanceIndex = 0u, .Iterations = 2u, .Converged = true, .Submissions = 3u},
+            {.Centroids = 0x41d0053979edefa1ull, .Labels = 0xeac2ddc24676aea3ull, .StepMetrics = 0x16bf3c1e43c9b6bcull,
+             .Inertia = 0x41c00000u, .MaxDistanceIndex = 0u, .Iterations = 2u, .Converged = true, .Submissions = 3u}
+        }});
+        // Two locations for four clusters: empty clusters take the farthest point.
+        std::vector<glm::vec3> empty;
+        for (unsigned i = 0; i < 12u; ++i) empty.push_back({i % 2 == 0 ? 0.0f : 5.0f, 0, 0});
+        cases.push_back({"empty_clusters", empty, hierarchical(4u, 6u), {tiny, small, standard}, {
+            {.Centroids = 0x440bca625ef310a3ull, .Labels = 0xfaa8e4c44796f503ull, .StepMetrics = 0x3463390b9e47557bull,
+             .Inertia = 0x0u, .MaxDistanceIndex = 0u, .Iterations = 2u, .Converged = true, .Submissions = 32u},
+            {.Centroids = 0x440bca625ef310a3ull, .Labels = 0xfaa8e4c44796f503ull, .StepMetrics = 0x3463390b9e47557bull,
+             .Inertia = 0x0u, .MaxDistanceIndex = 0u, .Iterations = 2u, .Converged = true, .Submissions = 3u},
+            {.Centroids = 0x440bca625ef310a3ull, .Labels = 0xfaa8e4c44796f503ull, .StepMetrics = 0x3463390b9e47557bull,
+             .Inertia = 0x0u, .MaxDistanceIndex = 0u, .Iterations = 2u, .Converged = true, .Submissions = 3u}
+        }});
+        // Large and small coordinates over several Reduce pages and Update chunks, the last one short.
+        cases.push_back({"cancellation_sensitive_sums",
+            Jittered(10000u, 11u,
+                [](unsigned i) { return i % 2 == 0 ? glm::vec3{1.0e7f, 0, 0} : glm::vec3{1.0e-3f, 0, 0}; }, 0.5f),
+            hierarchical(3u, 8u), {small, standard}, {
+            {.Centroids = 0x579a122440ea7bb5ull, .Labels = 0x42982e62570029e1ull, .StepMetrics = 0x1597093b69d324aeull,
+             .Inertia = 0x43e2dccdu, .MaxDistanceIndex = 389u, .Iterations = 8u, .Converged = false,
+             .Submissions = 10u},
+            {.Centroids = 0x579a122440ea7bb5ull, .Labels = 0x42982e62570029e1ull, .StepMetrics = 0x1597093b69d324aeull,
+             .Inertia = 0x43e2dccdu, .MaxDistanceIndex = 389u, .Iterations = 8u, .Converged = false,
+             .Submissions = 10u}
+            }});
+        // 65 clusters: the centroid block boundary.
+        cases.push_back({"sixty_five_clusters",
+            Jittered(300u, 13u, [](unsigned i) { return glm::vec3{float(i % 65) * 10.0f, 0, 0}; }, 1.0f),
+            hierarchical(65u, 6u), {small, standard}, {
+            {.Centroids = 0xac0ff55f65707622ull, .Labels = 0x311ca15b9b879b14ull, .StepMetrics = 0x4fee56042e517da2ull,
+             .Inertia = 0x42799591u, .MaxDistanceIndex = 222u, .Iterations = 2u, .Converged = true, .Submissions = 3u},
+            {.Centroids = 0xac0ff55f65707622ull, .Labels = 0x311ca15b9b879b14ull, .StepMetrics = 0x4fee56042e517da2ull,
+             .Inertia = 0x42799591u, .MaxDistanceIndex = 222u, .Iterations = 2u, .Converged = true, .Submissions = 3u}
+            }});
+        // As many clusters as points (128): more centroids than one tile of 64.
+        cases.push_back({"one_point_per_cluster",
+            Jittered(128u, 17u, [](unsigned i) { return glm::vec3{float(i) * 3.0f, 0, 0}; }, 1.0f),
+            hierarchical(128u, 4u), {standard}, {
+            {.Centroids = 0x5958a5d81b652d44ull, .Labels = 0x75a715cc7ef3b753ull, .StepMetrics = 0x367aac658a69b173ull,
+             .Inertia = 0x0u, .MaxDistanceIndex = 0u, .Iterations = 2u, .Converged = true, .Submissions = 3u}
+            }});
+        // One cluster of two points one ulp apart near 1e-20: the mean rounds to the even one, so a seed at the odd
+        // one moves the centroid by an ulp whose square underflows to 0 (Moved without shift); the run then records
+        // a final assignment, which a lost movement flag would skip.
+        const float a = 1.0e-20f;
+        const std::vector<glm::vec3> ulp{{a, 0, 0}, {std::nextafter(a, 1.0f), 0, 0}};
+        // Seed 3 starts at the odd point (moved: a final assignment, three submissions), seed 1 at the even one.
+        for (const auto& [seed, expected] : {std::pair{3u, OracleBits
+            {.Centroids = 0xf30faae3c178b53aull, .Labels = 0x47fe0d7eaf8e51e3ull, .StepMetrics = 0x47fe0d7eaf8e51e3ull,
+             .Inertia = 0x0u, .MaxDistanceIndex = 0u, .Iterations = 1u, .Converged = true, .Submissions = 3u}
+        }, std::pair{1u, OracleBits
+            {.Centroids = 0xf30faae3c178b53aull, .Labels = 0x47fe0d7eaf8e51e3ull, .StepMetrics = 0x47fe0d7eaf8e51e3ull,
+             .Inertia = 0x0u, .MaxDistanceIndex = 0u, .Iterations = 1u, .Converged = true, .Submissions = 2u}
+        }})
+            cases.push_back({"moved_without_shift", ulp,
+                {.ClusterCount = 1u, .MaxIterations = 1u, .Seed = seed,
+                    .Initialization = Runtime::KMeansInitialization::Random},
+                {standard}, {expected}});
+        return cases;
+    }
+}
+
+// ARCH-022 Q79 step 7b: the batched Reduce and Update keep every page partial and its combine order, so a run's
+// centroids, labels, inertia, farthest point, per-step inertia and max shift, iterations and convergence are the bits
+// of the path before the change (stored below), for every paging budget.
+TEST(ClusteringStepRunGpuSmoke, ReductionsKeepTheirBitsForEveryPagingBudget)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW could not initialize.";
+    struct RestorePaging { Runtime::KMeansPagingLimits Before{Runtime::KMeansPagingForTesting};
+        ~RestorePaging(){Runtime::KMeansPagingForTesting=Before;} } restore;
+    for (const OracleCase& oracle : OracleCases())
+    {
+        SCOPED_TRACE(oracle.Name);
+        auto app = std::make_unique<ClusteringStepDrivesApp>();
+        app->Drives.assign(oracle.Limits.size(), ClusteringStepDrivesApp::Drive::Run);
+        app->Limits = oracle.Limits;
+        app->Points = oracle.Points;
+        app->Parameters = oracle.Parameters;
+        const auto results = RunStepDrives(std::move(app));
+        if (!results) GTEST_SKIP() << "Promoted Vulkan did not reach readiness.";
+        ASSERT_FALSE(results->TimedOut);
+        ASSERT_EQ(results->Outcomes.size(), oracle.Limits.size());
+        for (std::size_t i = 0; i < results->Outcomes.size(); ++i)
+        {
+            const auto& outcome = results->Outcomes[i];
+            ASSERT_TRUE(outcome.Completion.Succeeded()) << outcome.Completion.Message;
+            EXPECT_EQ(outcome.Completion.ActualBackend, Runtime::ClusteringBackend::VulkanCompute);
+            const OracleBits actual = BitsOf(outcome);
+            if (i >= oracle.Expected.size() || actual != oracle.Expected[i])
+                ADD_FAILURE() << oracle.Name << " budget " << i << ": actual " << Initializer(actual);
+        }
+    }
 }

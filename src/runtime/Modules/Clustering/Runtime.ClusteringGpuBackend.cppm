@@ -11,7 +11,13 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.GpuPropertyResidency;
 namespace Extrinsic::Runtime
 {
-    enum class KMeansGpuPhase : std::uint32_t { Initialize, Assign, Update, Reduce, Preview, Presentation };
+    // ReduceCombine and UpdateCombine add a batch's page partials in page order (shader phases 6 and 7).
+    enum class KMeansGpuPhase : std::uint32_t
+    {
+        Initialize, Assign, Update, Reduce, Preview, Presentation, ReduceCombine, UpdateCombine
+    };
+    // A batch holds at most this many pages, and an Update tile at most this many centroids (one combine lane each).
+    inline constexpr std::uint32_t KMeansBatchPages = 64u;
     struct KMeansGpuDiagnostics
     {
         float Inertia{}, MaxDistance{-1}, MaxShift{};
@@ -23,6 +29,7 @@ namespace Extrinsic::Runtime
     {
         KMeansGpuPhase Phase{};
         std::uint32_t First{}, Count{}, InnerFirst{}, InnerCount{};
+        std::uint32_t Pages{1}; // Reduce and Update: the batch's pages, each of today's page shape
     };
     class KMeansGpuWorkspace
     {

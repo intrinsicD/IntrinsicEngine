@@ -8,9 +8,20 @@ shared uint indices[64];
 void main(){
     uint lane=gl_LocalInvocationID.x;
     uint row=pc.first+gl_GlobalInvocationID.x;
-    if(pc.phase==3){
+    if(pc.phase==6){ // the batch's page partials, in page order, as each page's lane 0 combined them
+        if(lane!=0)return;
+        Stats s=Stats(pc.stats);ReducePartials parts=ReducePartials(pc.sums);
+        for(uint page=0;page<pc.innerCount;++page){ReducePartial p=parts.v[page];
+            if(pc.first+page*pc.count==0){s.inertiaSum=0;s.maxDistance=-1;s.maxDistanceIndex=0;}
+            precise double sum=s.inertiaSum+p.inertia; // one addition per page, in page order, as before
+            s.inertiaSum=sum;s.inertia=float(sum);
+            if(p.farthest>s.maxDistance){s.maxDistance=p.farthest;s.maxDistanceIndex=p.index;}}
+        return;
+    }
+    if(pc.phase==3){ // one workgroup per page of the batch
+        uint first=pc.first+gl_WorkGroupID.x*pc.count;uint rows=min(pc.count,pc.points-first);
         precise double sum=0;float best=-1;uint index=0;
-        for(uint j=lane;j<pc.count;j+=64){uint i=pc.first+j;float d=Floats(pc.distances).v[i];
+        for(uint j=lane;j<rows;j+=64){uint i=first+j;float d=Floats(pc.distances).v[i];
             sum+=double(d);if(d>best){best=d;index=i;}}
         inertia[lane]=sum;farthest[lane]=best;indices[lane]=index;barrier();
         for(uint stride=32;stride>0;stride>>=1){
@@ -21,10 +32,7 @@ void main(){
                     farthest[lane]=other;indices[lane]=oi;}}
             barrier();
         }
-        if(lane==0){Stats s=Stats(pc.stats);
-            if(pc.first==0){s.inertiaSum=0;s.maxDistance=-1;s.maxDistanceIndex=0;}
-            s.inertiaSum+=inertia[0];s.inertia=float(s.inertiaSum);
-            if(farthest[0]>s.maxDistance){s.maxDistance=farthest[0];s.maxDistanceIndex=indices[0];}}
+        if(lane==0)ReducePartials(pc.sums).v[gl_WorkGroupID.x]=ReducePartial(inertia[0],farthest[0],indices[0]);
         return;
     }
     if(gl_GlobalInvocationID.x>=pc.count)return;

@@ -529,20 +529,53 @@ namespace Extrinsic::Runtime
                     continue;
                 }
                 const auto scan = std::min({inner, a->Limits.PagePairs, KMeansPageScanRows});
+                // An Update tile holds at most 64 centroids (one combine lane each); a smaller tile keeps
+                // `PagePairs / rows >= scan`, so its point chunks are today's.
                 const auto rows = std::min({outer - a->Row,
                     std::max(1u, a->Limits.PagePairs / scan),
-                    a->Phase == KMeansGpuPhase::Update ? 65535u : 65535u * 64u,
+                    a->Phase == KMeansGpuPhase::Update ? KMeansBatchPages : 65535u * 64u,
                     a->Phase == KMeansGpuPhase::Reduce ? KMeansPageScanRows
                                                        : std::numeric_limits<std::uint32_t>::max()});
                 // Page shape never depends on the remaining budget, so ordered
                 // double combines group identically however phases share submissions.
                 const auto columns = std::min({inner - a->Inner, scan, a->Limits.PagePairs / rows});
+                if (a->Phase == KMeansGpuPhase::Reduce || a->Phase == KMeansGpuPhase::Update)
+                {
+                    // A batch: up to 64 consecutive pages of that shape (Reduce: row pages; Update: the tile's point
+                    // chunks), their partials (pass A) added in page order by the combine (pass B), both recorded
+                    // together or not at all so no partial crosses a submission.
+                    const bool reduce = a->Phase == KMeansGpuPhase::Reduce;
+                    const auto span = reduce
+                        ? std::min({std::max(1u, a->Limits.PagePairs / scan), 65535u * 64u, KMeansPageScanRows})
+                        : std::min(scan, a->Limits.PagePairs / rows);
+                    const auto left = reduce ? outer - a->Row : inner - a->Inner;
+                    const std::uint64_t pagePairs = reduce ? span : std::uint64_t(rows) * span;
+                    const auto pageSerial = (span + 63) / 64 + 7;
+                    const auto pages = std::uint32_t(std::min<std::uint64_t>({KMeansBatchPages,
+                        (std::uint64_t(left) + span - 1) / span,
+                        budget / pagePairs,
+                        depth > pageSerial + 7 ? depth - pageSerial - 7 : 0u}));
+                    if (pages == 0)
+                        break;
+                    const auto covered = std::uint32_t(std::min<std::uint64_t>(std::uint64_t(pages) * span, left));
+                    depth -= pageSerial + pages + 7;
+                    budget -= reduce ? covered : std::uint64_t(rows) * covered;
+                    KMeansGpuPage page{a->Phase, a->Row, reduce ? span : rows, a->Inner, reduce ? 1u : span, pages};
+                    (void)a->Workspace->Record(cmd, *a->Input, page);
+                    page.Phase = reduce ? KMeansGpuPhase::ReduceCombine : KMeansGpuPhase::UpdateCombine;
+                    (void)a->Workspace->Record(cmd, *a->Input, page);
+                    if (reduce)
+                        a->Row += covered;
+                    else if ((a->Inner += covered) == inner)
+                    {
+                        a->Inner = 0;
+                        a->Row += rows;
+                    }
+                    continue;
+                }
                 // Conservatively sum the longest lane path of every dispatch,
                 // even though workgroups can overlap on the device.
-                const auto serial = a->Phase == KMeansGpuPhase::Assign ? columns + 1
-                    : a->Phase == KMeansGpuPhase::Update               ? (columns + 63) / 64 + 7
-                    : a->Phase == KMeansGpuPhase::Reduce               ? (rows + 63) / 64 + 7
-                                                                       : 1u;
+                const auto serial = a->Phase == KMeansGpuPhase::Assign ? columns + 1 : 1u;
                 if (std::uint64_t(rows) * columns > budget || serial > depth)
                     break;
                 depth -= serial;

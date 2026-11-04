@@ -3478,3 +3478,15 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - 2026-11-04, CI flake: `AssetService.CompleteCpuLoadAndFlushEventIgnoresUnrelatedSchedulerWork` failed on
   6a9f53378 (`Test.AssetService.cpp:305`: the load must finish before a 250 ms blocker; timing on a loaded runner);
   the change touched no asset code; job rerun.
+- 2026-11-04, Q79 step 7b (block 7b): Reduce and Update record batches of up to 64 pages of today's shape (Update
+  tiles of at most 64 centroids, chunk boundaries unchanged): pass A writes page partials to a 128 KiB scratch, pass B
+  (phases 6, 7) adds them in page order as one page's lane 0 did; both admitted together against the pair and depth
+  budgets; `PagePairs` caps a page. Bit oracle `ClusteringStepRunGpuSmoke.ReductionsKeepTheirBitsForEveryPagingBudget`
+  generated from the path before (first run printed, stored) and passing after: centroids, labels, per-step inertia
+  and max shift, inertia, farthest point, iterations, convergence and submissions for ties, empty clusters,
+  cancellation-sensitive sums, 65 and 128 clusters and an underflowing move, under three budgets. Mutations (GPU,
+  restored): reversed combine order, no `changed |= 2`, no tile limit → the oracle fails; Update grid Y = 1 → the
+  mock grid test fails. Predictions held: 1M rows 4 → 3 submissions, phase sequences with the combines. Plan review
+  (thread `01a1a6c6-…`) "**Verdict: approve**" after two deltas; code review fresh Codex (thread
+  `01a1a7da-f3e1-7ae0-b27d-8c13190fb3b0`, revise: `precise` combine addition, finalize overflow, grid test) verbatim
+  "**Whole block: approve**" on diff sha256 `131bbd1b…`.

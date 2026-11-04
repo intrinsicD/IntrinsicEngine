@@ -38,10 +38,16 @@ gather/scatter/presentation cost 1. The seven reduction steps are six tree
 levels and one ordered page combine. Update's inner pages and Reduce's row
 pages contain at most 4096 entries, so their longest lane scan is 64 entries
 and their accounted dispatch depth is at most 71. The remaining depth and pair
-budgets gate every dispatch. All workgroups use 64 lanes; Update dispatches one
-workgroup per centroid, Reduce one per page. Double sums use a fixed tree and
-combine pages in dispatch order, without floating-point atomics. The device
-must support shaderFloat64.
+budgets gate every dispatch. All workgroups use 64 lanes. Reduce and Update record
+batches of up to 64 consecutive pages of that shape (Reduce: row pages; Update: the
+point chunks of one tile of at most 64 centroids): pass A runs one workgroup per page
+(Update: per centroid and page) and writes each page's partial to a 128 KiB scratch
+buffer, pass B adds the partials in page order exactly as one page's lane 0 did, so
+the sums, the farthest point and the finalize are bitwise those of one dispatch per
+page. A batch is charged its covered pairs and `serial(page) + pages + 7` depth and is
+recorded whole (both passes) or not at all; `PagePairs` caps each page, not a dispatch.
+Double sums use a fixed tree and combine pages in page order, without floating-point
+atomics. The device must support shaderFloat64.
 
 The existing cluster-count contract is [1, 1024] in config, validation and UI;
 CPU seeding remains synchronous. Random seeding draws K distinct points in O(K)
@@ -113,7 +119,12 @@ terminal preview publication. Each case discards the first run,
 and checks zero input upload and zero workspace buffer/pipeline creation on the
 repeat run with forced multi-page budgets. When budgets fit a whole iteration
 (the 2049-row case), the repeat run uses exactly one submission per iteration
-plus the terminal preview; tighter budgets still split iterations.
+plus the terminal preview; tighter budgets still split iterations. A bit oracle
+(`ClusteringStepRunGpuSmoke.ReductionsKeepTheirBitsForEveryPagingBudget`) stores the
+centroids, labels, per-step inertia and max shift, inertia, farthest point, iterations,
+convergence and submission count of the path before batching for ties across pages,
+empty clusters, cancellation-sensitive sums, 65 and 128 clusters and a move whose
+squared shift underflows, under three paging budgets.
 
 Measured delta (RTX 3050 under Xephyr, 2026-10-01): all three
 `ClusteringServiceGpuSmoke` cases, including 2,049 points with k=8 and a deleted slot,

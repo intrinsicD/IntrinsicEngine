@@ -5,7 +5,10 @@
 #include <chrono>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <memory>
+#include <numeric>
+#include <tuple>
 #include <optional>
 #include <string>
 #include <thread>
@@ -1518,12 +1521,24 @@ namespace
                     const auto& payload=Device.CommandContext.PushConstantPayloads[i];
                     EXPECT_EQ(payload.size(),128u);
                     if(payload.size()!=128u)continue;
-                    std::uint32_t rows{},columns{},phase{};
-                    std::memcpy(&phase,payload.data()+104,4);
-                    std::memcpy(&rows,payload.data()+112,4);std::memcpy(&columns,payload.data()+120,4);
-                    const auto pagePairs=std::uint64_t(rows)*columns;
-                    EXPECT_LE(pagePairs,Runtime::KMeansPagingForTesting.PagePairs);pairs+=pagePairs;
-                    serialDepth+=phase==1?columns+1:phase==2?(columns+63)/64+7:phase==3?(rows+63)/64+7:1;
+                    std::uint32_t points{},clusters{},phase{},first{},rows{},innerFirst{},columns{};
+                    std::memcpy(&points,payload.data()+96,4);std::memcpy(&clusters,payload.data()+100,4);
+                    std::memcpy(&phase,payload.data()+104,4);std::memcpy(&first,payload.data()+108,4);
+                    std::memcpy(&rows,payload.data()+112,4);std::memcpy(&innerFirst,payload.data()+116,4);
+                    std::memcpy(&columns,payload.data()+120,4);
+                    // ARCH-022 Q79 step 7b: a Reduce (3) or Update (2) dispatch holds a batch of pages (their count in
+                    // InnerCount or Clusters) and its combine (6, 7) adds their partials; PagePairs caps each page,
+                    // the batch's covered pairs count against the submission, the combine's serial path is its pages.
+                    const std::uint32_t pages=phase==3||phase==6?columns:phase==2||phase==7?clusters:1u;
+                    const std::uint64_t pagePairs=phase==3?rows:std::uint64_t(rows)*columns;
+                    const std::uint64_t dispatchPairs=phase==3?std::min<std::uint64_t>(std::uint64_t(pages)*rows,points-first)
+                        :phase==2?rows*std::min<std::uint64_t>(std::uint64_t(pages)*columns,points-innerFirst)
+                        :phase==6||phase==7?0u:pagePairs;
+                    if(phase!=6&&phase!=7)EXPECT_LE(pagePairs,Runtime::KMeansPagingForTesting.PagePairs);
+                    if(phase==2||phase==7)EXPECT_LE(rows,64u)<<"an Update tile holds at most 64 centroids";
+                    EXPECT_LE(pages,64u);pairs+=dispatchPairs;
+                    serialDepth+=phase==1?columns+1:phase==2?(columns+63)/64+7:phase==3?(rows+63)/64+7
+                        :phase==6||phase==7?pages+7:1;
                 }
                 EXPECT_LE(pairs,Runtime::KMeansPagingForTesting.SubmissionPairs);
                 EXPECT_LE(serialDepth,Runtime::KMeansSubmissionSerialDepth);
@@ -1750,8 +1765,8 @@ TEST_F(ClusteringModuleResident, PreviewCopiesOnlyAtCadenceAndPublishesAfterComp
     };
     Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));ASSERT_NE(copiedBack,0u);
     // Preview scatter and presentation share the submission with iteration 3:
-    // Assign(1), Reduce(3), Update(2), stopping at its diagnostics boundary.
-    EXPECT_EQ(phases,(std::vector<std::uint32_t>{4u,5u,1u,3u,2u}));
+    // Assign(1), Reduce(3) and its combine (6), Update(2) and its combine (7), stopping at its diagnostics boundary.
+    EXPECT_EQ(phases,(std::vector<std::uint32_t>{4u,5u,1u,3u,6u,2u,7u}));
     EXPECT_EQ(Observation().Previews,0u);for(int i=0;i<5;++i)Tick();EXPECT_FALSE(residency->Front(key));
     Held->Deliver(HeldData);Held.reset();
     ASSERT_TRUE(Until([&]{return Observation().Previews==1;}));
@@ -1981,7 +1996,10 @@ TEST_F(ClusteringModuleResident, MillionRowsRespectPairAndSerialBudgets)
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     // Fixture checks every recorded submission's pair and lane-depth totals.
     // Fused phases still split at the serial-depth budget and host boundary.
-    EXPECT_EQ(Observation().Submissions,4u);
+    // ARCH-022 Q79 step 7b: batched Reduce and Update fit one submission's depth (4 Reduce batches and 4 Update
+    // batches of 64 pages, about 1 136 instead of 36 352), so the iteration takes two submissions (split by pairs,
+    // then the boundary) and the terminal preview a third, instead of 4.
+    EXPECT_EQ(Observation().Submissions,3u);
     EXPECT_LE(MaximumDispatches,Runtime::KMeansSubmissionSerialDepth);
 }
 
@@ -2026,8 +2044,8 @@ TEST_F(ClusteringModuleResident, ARunRestsAtItsBoundaryAndAcceptPreparesTheCurre
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
     EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
     EXPECT_EQ(Results[0].Iterations,2u)<<"Accept counts no iteration";
-    // The update moved centroids: a final assignment (Assign, Reduce), then the terminal preview.
-    EXPECT_EQ(PhasesSince(firstPush),(std::vector<std::uint32_t>{1u,3u,4u,5u}));
+    // The update moved centroids: a final assignment (Assign, Reduce and its combine), then the terminal preview.
+    EXPECT_EQ(PhasesSince(firstPush),(std::vector<std::uint32_t>{1u,3u,6u,4u,5u}));
     ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Committed;}));
     EXPECT_EQ(StepRun().Steps,2u);
 }
@@ -2407,4 +2425,85 @@ TEST_F(ClusteringModuleResident, CpuRunsOnAReusedCaptureEqualTheReferenceAndSeeA
     EXPECT_EQ(std::bit_cast<std::uint32_t>(third.Inertia),std::bit_cast<std::uint32_t>(moved.Inertia));
     ASSERT_TRUE(History.Undo().Succeeded());EXPECT_EQ(labels(),secondLabels);
     EXPECT_FALSE(History.Undo().Succeeded())<<"the second run's capture holds the old positions";
+}
+// ARCH-022 Q79 step 7b: Update tiles hold at most 64 centroids (one combine lane each) and together cover every
+// centroid once per point chunk, also when K exceeds 64 at a small N (128 points, 128 clusters: two tiles).
+TEST_F(ClusteringModuleResident, UpdateTilesHoldAtMost64CentroidsAndCoverEveryCentroid)
+{
+    std::vector<glm::vec3> points;
+    for(int i=0;i<128;++i)points.push_back(glm::vec3(float(i),0,0));
+    SetPositions(Scene().Raw().get<GS::Vertices>(Entity),points);
+    Request.Parameters.ClusterCount=128;Request.Parameters.MaxIterations=1;
+    const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    std::map<std::uint32_t,std::vector<std::uint32_t>> covered; // point chunk -> centroids, from Update pass A
+    for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
+        const auto& push=Device.CommandContext.PushConstantPayloads[i];if(push.size()!=128u)continue;
+        std::uint32_t phase{},first{},rows{},innerFirst{};
+        std::memcpy(&phase,push.data()+104,4);std::memcpy(&first,push.data()+108,4);
+        std::memcpy(&rows,push.data()+112,4);std::memcpy(&innerFirst,push.data()+116,4);
+        if(phase!=2)continue;
+        EXPECT_LE(rows,64u);
+        for(std::uint32_t c=first;c<first+rows;++c)covered[innerFirst].push_back(c);
+    }
+    ASSERT_FALSE(covered.empty());
+    std::vector<std::uint32_t> every(128);std::iota(every.begin(),every.end(),0u);
+    for(auto& [chunk,centroids]:covered){std::ranges::sort(centroids);EXPECT_EQ(centroids,every)<<"chunk "<<chunk;}
+}
+// ARCH-022 Q79 step 7b: a submission budget of one page still advances (every batch then holds one page), and
+// K = 1024 records within the batch scratch (pages and tile rows at most 64, checked by the fixture).
+TEST_F(ClusteringModuleResident, OnePageSubmissionsAndAThousandClustersRecordWithinTheBatchBounds)
+{
+    Runtime::KMeansPagingForTesting={.PagePairs=4,.SubmissionPairs=4};
+    const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    std::size_t batches=0;
+    for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
+        const auto& push=Device.CommandContext.PushConstantPayloads[i];if(push.size()!=128u)continue;
+        std::uint32_t phase{},pages{},clusters{};
+        std::memcpy(&phase,push.data()+104,4);std::memcpy(&pages,push.data()+120,4);std::memcpy(&clusters,push.data()+100,4);
+        if(phase==3){EXPECT_EQ(pages,1u);++batches;}
+        if(phase==2){EXPECT_EQ(clusters,1u);++batches;}
+    }
+    EXPECT_GT(batches,0u);
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+
+    Runtime::KMeansPagingForTesting={};
+    std::vector<glm::vec3> points;
+    for(int i=0;i<2048;++i)points.push_back(glm::vec3(float(i%1024),float(i/1024),0));
+    SetPositions(Scene().Raw().get<GS::Vertices>(Entity),points);
+    Request.Parameters.ClusterCount=1024;Request.Parameters.MaxIterations=1;
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}))<<Observation().Message;
+}
+// ARCH-022 Q79 step 7b: a batch's pass A runs one workgroup per page (Update: per tile centroid and page) and its
+// combine a single workgroup; the dispatch grids match the pushed page counts, with several pages per batch.
+TEST_F(ClusteringModuleResident, BatchedDispatchesRunOneWorkgroupPerPage)
+{
+    Runtime::KMeansPagingForTesting={.PagePairs=16,.SubmissionPairs=1u<<24};
+    std::vector<glm::vec3> points;
+    for(int i=0;i<128;++i)points.push_back(glm::vec3(float(i%4)*10.0f,float(i),0));
+    SetPositions(Scene().Raw().get<GS::Vertices>(Entity),points);
+    Request.Parameters.ClusterCount=4;Request.Parameters.MaxIterations=1;
+    const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
+    const auto firstDispatch=Device.CommandContext.DispatchRecords.size();
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    // Every k-means Record pushes 128 bytes and then dispatches once, so the two logs pair up in order.
+    std::vector<std::vector<std::byte>> pushes;
+    for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i)
+        if(Device.CommandContext.PushConstantPayloads[i].size()==128u)pushes.push_back(Device.CommandContext.PushConstantPayloads[i]);
+    const auto& dispatches=Device.CommandContext.DispatchRecords;
+    ASSERT_EQ(dispatches.size()-firstDispatch,pushes.size());
+    std::uint32_t largestReduce=0,largestUpdate=0;
+    for(std::size_t i=0;i<pushes.size();++i){
+        std::uint32_t clusters{},phase{},rows{},columns{};
+        std::memcpy(&clusters,pushes[i].data()+100,4);std::memcpy(&phase,pushes[i].data()+104,4);
+        std::memcpy(&rows,pushes[i].data()+112,4);std::memcpy(&columns,pushes[i].data()+120,4);
+        const auto& d=dispatches[firstDispatch+i];
+        SCOPED_TRACE(i);
+        if(phase==3){EXPECT_EQ(std::tuple(d.X,d.Y,d.Z),std::tuple(columns,1u,1u));largestReduce=std::max(largestReduce,columns);}
+        if(phase==2){EXPECT_EQ(std::tuple(d.X,d.Y,d.Z),std::tuple(rows,clusters,1u));largestUpdate=std::max(largestUpdate,clusters);}
+        if(phase==6||phase==7)EXPECT_EQ(std::tuple(d.X,d.Y,d.Z),std::tuple(1u,1u,1u));
+    }
+    EXPECT_GT(largestReduce,1u)<<"a Reduce batch of several pages";
+    EXPECT_GT(largestUpdate,1u)<<"an Update batch of several point chunks";
 }

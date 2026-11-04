@@ -23,4 +23,11 @@ vec3 load3(uint64_t address,uint row){Floats a=Floats(address);return vec3(a.v[r
 void store3(uint64_t address,uint row,vec3 value){Floats a=Floats(address);a.v[row*3]=value.x;a.v[row*3+1]=value.y;a.v[row*3+2]=value.z;}
 float distance2(vec3 a,vec3 b){precise vec3 d=a-b;precise vec3 sq=d*d;precise float result=(sq.x+sq.y)+sq.z;return result;}
 uint slot(uint row){return pc.slots==uint64_t(0)?row:UInts(pc.slots).v[row];}
+// ARCH-022 Q79 step 7b: a batch of pages writes one partial per page (pass A) that the combine (pass B) adds in
+// page order. Reduce: scratch in `sums`, page count in `innerCount`; Update: scratch in `previous`, page count in
+// `clusters`, partial (page, tile lane) at page*64+lane.
+struct ReducePartial { double inertia; float farthest; uint index; };
+layout(buffer_reference, scalar) buffer ReducePartials { ReducePartial v[]; };
+struct UpdatePartial { dvec3 sum; uint count; uint pad; };
+layout(buffer_reference, scalar) buffer UpdatePartials { UpdatePartial v[]; };
 #endif

@@ -27,8 +27,9 @@ namespace Extrinsic::Runtime
     struct KMeansGpuWorkspace::Impl
     {
         RHI::IDevice& Device;
-        std::array<RHI::BufferHandle, 9> Buffers{};
-        std::array<std::uint64_t, 9> Capacity{}, Addresses{};
+        // Positions, slots, centroids, labels, previous labels, distances, sums, counts, diagnostics, batch partials.
+        std::array<RHI::BufferHandle, 10> Buffers{};
+        std::array<std::uint64_t, 10> Capacity{}, Addresses{};
         std::array<RHI::PipelineHandle, 3> Pipelines{};
         std::uint32_t Count{}, Clusters{}, BuffersCreated{}, PipelinesCreated{};
         std::uint64_t Uploaded{};
@@ -57,7 +58,7 @@ namespace Extrinsic::Runtime
         s.Uploaded = 0;
         if (!count || seeds.empty() || !s.Device.IsOperational())
             return false;
-        const std::array<std::uint64_t, 9> sizes{std::uint64_t(count) * 12,
+        const std::array<std::uint64_t, 10> sizes{std::uint64_t(count) * 12,
             slots.size_bytes(),
             seeds.size_bytes(),
             std::uint64_t(count) * 4,
@@ -65,7 +66,9 @@ namespace Extrinsic::Runtime
             std::uint64_t(count) * 4,
             seeds.size() * 24,
             seeds.size() * 4,
-            sizeof(KMeansGpuDiagnostics)};
+            sizeof(KMeansGpuDiagnostics),
+            // A batch's partials, independent of N and K: Update 64 pages × 64 centroids × 32 B (Reduce uses 64 × 16 B).
+            std::uint64_t(KMeansBatchPages) * KMeansBatchPages * 32};
         // Shaders bound every access by Count/Clusters, so larger retained
         // buffers serve smaller runs; only an undersized buffer is replaced.
         for (std::size_t i = 0; i < sizes.size(); ++i)
@@ -145,6 +148,17 @@ namespace Extrinsic::Runtime
             page.Count,
             page.InnerFirst,
             page.InnerCount};
+        // Batches: the partials' address and the page count go into fields the phase does not read.
+        if (page.Phase == KMeansGpuPhase::Reduce || page.Phase == KMeansGpuPhase::ReduceCombine)
+        {
+            p.Sums = s.Addresses[9];
+            p.InnerCount = page.Pages;
+        }
+        if (page.Phase == KMeansGpuPhase::Update || page.Phase == KMeansGpuPhase::UpdateCombine)
+        {
+            p.Previous = s.Addresses[9];
+            p.Clusters = page.Pages;
+        }
         if (page.Phase == KMeansGpuPhase::Assign && page.First == 0 && page.InnerFirst == 0)
         {
             cmd.FillBuffer(s.Buffers[8], 0, sizeof(KMeansGpuDiagnostics), 0);
@@ -153,14 +167,18 @@ namespace Extrinsic::Runtime
         for (auto view : {labels, presentation})
             if (view.Valid())
                 cmd.BufferBarrier(view.Buffer, shader | RHI::MemoryAccess::TransferRead, shader);
-        const auto pipeline = page.Phase == KMeansGpuPhase::Assign ? 1 : page.Phase == KMeansGpuPhase::Update ? 2 : 0;
+        const bool update = page.Phase == KMeansGpuPhase::Update || page.Phase == KMeansGpuPhase::UpdateCombine;
+        const auto pipeline = page.Phase == KMeansGpuPhase::Assign ? 1 : update ? 2 : 0;
         cmd.BindPipeline(s.Pipelines[pipeline]);
         cmd.PushConstants(&p, sizeof(p), 0);
-        cmd.Dispatch(page.Phase == KMeansGpuPhase::Reduce ? 1
-                : page.Phase == KMeansGpuPhase::Update    ? page.Count
-                                                          : (page.Count + 63) / 64,
-            1,
-            1);
+        if (page.Phase == KMeansGpuPhase::Reduce)
+            cmd.Dispatch(page.Pages, 1, 1);
+        else if (page.Phase == KMeansGpuPhase::Update)
+            cmd.Dispatch(page.Count, page.Pages, 1);
+        else if (page.Phase == KMeansGpuPhase::ReduceCombine || page.Phase == KMeansGpuPhase::UpdateCombine)
+            cmd.Dispatch(1, 1, 1);
+        else
+            cmd.Dispatch((page.Count + 63) / 64, 1, 1);
         for (auto b : s.Buffers)
             if (b.IsValid())
                 cmd.BufferBarrier(b, shader, shader | RHI::MemoryAccess::TransferRead);
