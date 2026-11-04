@@ -167,3 +167,11 @@ ran. The technical tests had started the harness binary directly, and the packet
 modes, so neither would have caught a non-executable script. Safeguard: the start gate checks `test -x` on a run
 script it calls without an interpreter (or the command names the interpreter), and at least one technical test goes
 through the run script itself.
+
+## A content digest over a file list sorts in the C locale
+
+ARCH-022 Q79's packet pinned the baseline's shader directory by the SHA-256 of `find shaders -type f | sort | xargs
+sha256sum`. A reviewer recomputing it got another digest for the same 100 files: `sort` orders by the shell's
+locale, so the digest depended on who ran it, and the packet's file count (81) had been read from `ls` (top-level
+entries only). Safeguard: a digest over a file list sorts with `LC_ALL=C`, counts files with the same `find` that
+hashes them, and a reviewer's independent recomputation is part of the review.

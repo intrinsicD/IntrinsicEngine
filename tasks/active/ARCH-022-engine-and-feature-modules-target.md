@@ -3490,3 +3490,19 @@ python3 tools/docs/check_doc_links.py --root . --strict
   (thread `01a1a6c6-…`) "**Verdict: approve**" after two deltas; code review fresh Codex (thread
   `01a1a7da-f3e1-7ae0-b27d-8c13190fb3b0`, revise: `precise` combine addition, finalize overflow, grid test) verbatim
   "**Whole block: approve**" on diff sha256 `131bbd1b…`.
+- 2026-11-04, Q79 measurement (packet `tasks/evidence/ARCH-022/preflight-q79/`, revision 4, digest `124a34f6…`;
+  Claude session `82b60aea-…` and Codex thread `01a1a7fd-…`, both PASS after four rounds; technical runs 1–4 kept,
+  run1's exposure recorded: the candidate's 1 048 576 U/L line and both verdict-pair lines): baseline c34bd13d2 (the Q75 candidate's binary with its shaders),
+  candidate d5383d3cc. Start 1.02 → 0.062 ms (100 000) and 10.4–10.8 → 0.062 ms (1 048 576), hold frame 2.1 → 0.3–0.4
+  and 30–31 → 0.4–0.6 ms, the renderer's execute in them 0.55 → 0.1 and 26–28 → 0.1–0.3 ms, all faster in every
+  process; the final runs' counts equal in both commits. R7 frozen verdict: 100 000 met (3.0 ms, the cold first start),
+  1 048 576 not met (the Accept's frame 32.6–32.7 ms, its publication 31.8–31.9 ms, slower in every process than
+  before, +3 %, unexplained; the frame before it 16.6–16.8 ms with transfer collection, 10.9–16.6 ms before; the cold
+  first start 21.3–21.5 ms). Report
+  [`docs/reports/2026-11-04-arch-022-r7-kmeans-q79.md`](../../docs/reports/2026-11-04-arch-022-r7-kmeans-q79.md),
+  audit `tasks/evidence/ARCH-022/q79-audit.md`, lesson "A content digest over a file list sorts in the C locale".
+- 2026-11-04, CI flake: `ImGuiAdapterEngineWiring.FramePacingDiagnosticsPopulateOnNullBackend` failed on d5383d3cc
+  (`Test.ImGuiAdapterEngineWiring.cpp:668`, `ImGuiEndMicros` 44 < `ImGuiEditorCallbackMicros` 46): the editor callback
+  is timed in `ImGuiAdapter::BuildEditorFrame`, `ImGuiEndMicros` around `EndFrame` only, so the two are independent
+  durations and the assertion can fail by chance; not touched by Q79's blocks; job rerun. A fix (drop or restate the
+  assertion) is outside this task.
