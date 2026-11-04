@@ -176,6 +176,8 @@ export namespace Extrinsic::Runtime
         std::uint64_t CommitsDropped{0};
         std::uint64_t ClusterLabelsChangedEvents{0};
         std::uint64_t VisualizationRefreshReactions{0};
+        std::uint64_t CaptureReuses{0}; // requests that reused the previous request's unchanged point capture
+        std::uint64_t CachedCapturePoints{0}; // points of the capture kept for the next request (0: none)
         // ARCH-022 R7, GPU runs, cumulative on the main thread. The microseconds are nested in the engine's
         // frame-pacing intervals (they explain them, never add to them): a GPU request's capture and start (in the
         // command drain, or in the advance for a held request), the GPU participant's drain (advance: pages,

@@ -91,9 +91,12 @@ cancel discards the run). A composition needs `StepRunsModule` and a `JobService
 service (`AsyncWorkModule`); without them the request falls back to the CPU with that
 diagnostic. A request with `ReplaceRunning` (a preview's newest parameters) replaces the
 GPU run on the same output instead of being refused: that run is discarded (one being
-accepted finishes first), the newest waiting request starts once it finished, with fresh
-captures and its own configuration, and a waiting request superseded by a newer one
-completes Cancelled.
+accepted finishes first), the newest waiting request starts once it finished, with its
+own configuration, and a waiting request superseded by a newer one completes Cancelled.
+Every request (CPU or GPU) reuses the previous request's point capture while it names
+the same positions and they and the deletion mask keep their revisions; the module keeps
+that one capture until another request, an active-world change, a scene-document
+replacement (new, load, close) or shutdown.
 
 CPU centroid sums also accumulate in double before conversion to float.
 Exact CPU/GPU bit parity is not guaranteed: summation grouping, division

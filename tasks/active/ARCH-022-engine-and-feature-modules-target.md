@@ -3442,3 +3442,15 @@ python3 tools/docs/check_doc_links.py --root . --strict
   probe fails the old probe ("the probe's pump delivered 2 events") and passes the new; a duplicate of the run's
   result fails the new test. The CI occurrence's cause stays unconfirmed (not reproduced). Review: fresh Codex
   (thread `01a1a6ba-ea01-73a3-8779-ee52f98237e9`) verbatim "**Verdict: approve**" (comment wording narrowed after it).
+- 2026-11-04, Q79 step 6 (block 6): a request reuses the previous request's point capture while it names the same
+  positions and they and the deletion mask keep their revisions (`KMeansCaptureCache` in
+  `Runtime.ClusteringModule.cpp`; the snapshot, the GPU operation and the undo record share one immutable
+  `KMeansCapture`). Released on another request, an active-world change, a scene-document replacement and shutdown;
+  stats `CaptureReuses`, `CachedCapturePoints`. Tests: resident reuse/invalidation (replacing request, position
+  write, new and written deletion mask, resize, another positions property, recreated positions, another entity and
+  world), world-change and document-close release, CPU runs against `GK::Cluster` incl. exact undo of a shared
+  capture, GPU smoke (reused run bitwise equal, recaptured run equal to the CPU reference; parity smoke reuses).
+  Mutations (restored): never/always reuse, any-of watches, no watches, no positions ref, emptied release hooks — each
+  fails a new test; scene/world/entity identity was dropped from the key (no test failed without it: revisions are
+  from one counter). Review: fresh Codex (thread `01a1a6e5-1cd7-7463-8fc9-27cf7ae87e6d`, two deltas) verbatim
+  "**Finding: approve — resolved. Whole block: approve.**" on diff sha256 `782ceb11…`.

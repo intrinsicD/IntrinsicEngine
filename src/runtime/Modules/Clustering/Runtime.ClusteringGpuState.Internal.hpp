@@ -25,14 +25,21 @@ namespace Extrinsic::Runtime
         GeometryScalarPropertySnapshot ScalarLabels{};
     };
 
+    // A request's live points and their slots in the property set; immutable once built, so the runs of one cloud
+    // revision share it (and its undo record keeps it).
+    struct KMeansCapture
+    {
+        std::vector<glm::vec3> Points{};
+        std::vector<std::uint32_t> Slots{};
+        std::size_t SlotCount{};
+    };
+
     struct KMeansSnapshot
     {
         RunKMeans Command{};
         WorldHandle World{};
         CommandCorrelationId Correlation{};
-        std::vector<glm::vec3> Points{};
-        std::vector<std::uint32_t> Slots{};
-        std::size_t SlotCount{};
+        std::shared_ptr<const KMeansCapture> Input{};
         KMeansOutputPropertyState BeforeOutputs{};
         Geometry::KMeans::KMeansParams Params{};
         std::string BackendDiagnostic{};

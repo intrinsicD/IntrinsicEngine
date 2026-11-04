@@ -233,15 +233,16 @@ namespace Extrinsic::Runtime
             if (StepRuns == nullptr)
                 return {.Diagnostic = "K-Means step runs are unavailable."};
             auto& steps = *StepRuns;
-            if (snapshot.Points.empty() || snapshot.Points.size() > std::numeric_limits<std::uint32_t>::max() ||
-                snapshot.SlotCount > std::numeric_limits<std::uint32_t>::max())
+            if (!snapshot.Input || snapshot.Input->Points.empty() ||
+                snapshot.Input->Points.size() > std::numeric_limits<std::uint32_t>::max() ||
+                snapshot.Input->SlotCount > std::numeric_limits<std::uint32_t>::max())
                 return {.Refused = true, .Diagnostic = "K-Means row count is not representable by the device."};
             auto a = std::make_shared<Operation>();
             a->Context = context;
             a->Commands = BindEditorProcessingCommands(context);
             a->Current = std::move(current);
             a->Publish = std::move(publish);
-            a->Count = std::uint32_t(snapshot.Points.size());
+            a->Count = std::uint32_t(snapshot.Input->Points.size());
             a->Clusters = std::min(a->Count, snapshot.Params.ClusterCount);
             a->Limits.SubmissionPairs = std::max(1u, a->Limits.SubmissionPairs);
             a->Limits.PagePairs = std::clamp(a->Limits.PagePairs, 1u, a->Limits.SubmissionPairs);
@@ -252,13 +253,13 @@ namespace Extrinsic::Runtime
                 r, *context.Scene, context.World, entity, snapshot.Command.Properties.InputPositions);
             if (!a->Input)
                 return {.Refused = true, .Diagnostic = "K-Means resident input is busy or unavailable."};
-            auto seeds = Geometry::KMeans::BuildInitialCentroids(snapshot.Points, {}, snapshot.Params, a->Clusters);
+            auto seeds = Geometry::KMeans::BuildInitialCentroids(snapshot.Input->Points, {}, snapshot.Params, a->Clusters);
             if (seeds.size() != a->Clusters)
                 return {.Diagnostic = "K-Means GPU workspace or seed preparation failed."};
             // A failed Prepare may leave partial state; that workspace is dropped.
             a->Workspace = Idle ? std::move(Idle) : std::make_shared<KMeansGpuWorkspace>(Device);
-            const bool identity = snapshot.SlotCount == a->Count;
-            if (!a->Workspace->Prepare(a->Count, seeds, identity ? std::span<const std::uint32_t>{} : snapshot.Slots))
+            const bool identity = snapshot.Input->SlotCount == a->Count;
+            if (!a->Workspace->Prepare(a->Count, seeds, identity ? std::span<const std::uint32_t>{} : snapshot.Input->Slots))
                 return {.Diagnostic = "K-Means GPU workspace or seed preparation failed."};
             const auto refuse = [&](std::string why) -> ClusteringGpuSubmission
             {
@@ -283,7 +284,7 @@ namespace Extrinsic::Runtime
             std::weak_ptr<Operation> weak = a;
             a->Transaction = BeginEditorPointScalarPublication(a->Commands,
                 {.EntityId = snapshot.Command.StableEntityId,
-                    .Count = std::uint32_t(snapshot.SlotCount),
+                    .Count = std::uint32_t(snapshot.Input->SlotCount),
                     .Output = typed,
                     .Label = "Run K-Means clustering",
                     .Current = a->Current,
@@ -300,7 +301,7 @@ namespace Extrinsic::Runtime
                         for (std::uint32_t i = 0; i < op->Count; ++i)
                         {
                             std::uint32_t label{};
-                            std::memcpy(&label, bytes.data() + std::size_t(op->Snapshot.Slots[i]) * 4, 4);
+                            std::memcpy(&label, bytes.data() + std::size_t(op->Snapshot.Input->Slots[i]) * 4, 4);
                             if (label >= op->Clusters)
                                 return EditorCommandStatus::GeometryProcessingFailed;
                             op->Geometry.Labels[i] = label;
@@ -389,8 +390,7 @@ namespace Extrinsic::Runtime
             a->Snapshot.Command = snapshot.Command;
             a->Snapshot.World = snapshot.World;
             a->Snapshot.Correlation = snapshot.Correlation;
-            a->Snapshot.Slots = snapshot.Slots;
-            a->Snapshot.SlotCount = snapshot.SlotCount;
+            a->Snapshot.Input = snapshot.Input; // shared, not copied
             a->Snapshot.Params = snapshot.Params;
             auto& result = a->Result;
             result.Correlation = a->Snapshot.Correlation;
@@ -478,7 +478,7 @@ namespace Extrinsic::Runtime
                 const auto shader = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite;
                 cmd.BufferBarrier(
                     a->Back->Typed.Buffer, shader | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::TransferWrite);
-                if (a->Snapshot.SlotCount != a->Count)
+                if (a->Snapshot.Input->SlotCount != a->Count)
                 {
                     if (a->Base)
                     {
@@ -501,7 +501,7 @@ namespace Extrinsic::Runtime
             for (;;)
             {
                 const auto outer = a->Phase == KMeansGpuPhase::Update ? a->Clusters
-                    : a->Phase == KMeansGpuPhase::Presentation        ? std::uint32_t(a->Snapshot.SlotCount)
+                    : a->Phase == KMeansGpuPhase::Presentation        ? std::uint32_t(a->Snapshot.Input->SlotCount)
                                                                       : a->Count;
                 const auto inner = a->Phase == KMeansGpuPhase::Assign ? a->Clusters
                     : a->Phase == KMeansGpuPhase::Update              ? a->Count

@@ -59,6 +59,7 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Properties;
+import Geometry.KMeans;
 
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
@@ -889,6 +890,29 @@ TEST(ClusteringModule, DocumentHistoryOwnsQueuedOutputUndoRedo)
     EXPECT_FALSE(properties.Exists("p:kmeans_label"));
     EXPECT_FALSE(properties.Exists("p:kmeans_color"));
 
+    engine.Shutdown();
+}
+
+// ARCH-022 Q79 step 6: closing the scene document (it clears the registry in the same world) releases the capture the
+// module keeps for the next request.
+TEST(ClusteringModule, ClosingTheSceneDocumentReleasesTheKeptCapture)
+{
+    auto app = std::make_unique<KMeansSuccessApp>();
+    KMeansSuccessApp* appPtr = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::ClusteringModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    engine.Run();
+    ASSERT_TRUE(appPtr->Completion.has_value());
+    ASSERT_TRUE(appPtr->Completion->Succeeded()) << appPtr->Completion->Message;
+    const auto* clustering = engine.Services().Find<Runtime::ClusteringService>();
+    auto* documents = engine.Services().Find<Runtime::SceneDocumentModule>();
+    ASSERT_NE(clustering, nullptr);
+    ASSERT_NE(documents, nullptr);
+    EXPECT_EQ(clustering->Stats().CachedCapturePoints, appPtr->Completion->LabelCount) << "kept for the next request";
+    ASSERT_TRUE(documents->CloseSceneDocument().has_value());
+    EXPECT_EQ(clustering->Stats().CachedCapturePoints, 0u) << "released with the document";
     engine.Shutdown();
 }
 
@@ -2245,4 +2269,142 @@ TEST_F(ClusteringModuleResident, AnInadmissibleReplacementDiscardsNeitherTheRunN
     Hold=false;Held->Deliver(HeldData);Held.reset();
     Correlation=held;RunId=0;
     ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}))<<"the held request starts";
+}
+// ARCH-022 Q79 step 6: a request on the cloud the previous request captured, while its positions and deletion mask
+// keep their revisions, reuses that capture (no scan, no copy), also when it replaces the running run; a write to
+// either, a resize, another positions property, the positions' recreation, another entity or another world captures
+// afresh.
+TEST_F(ClusteringModuleResident, ARequestOnAnUnchangedCloudReusesTheCaptureAndEveryInputChangeCapturesAfresh)
+{
+    const auto reuses=[&]{return Module.Stats().CaptureReuses;};
+    const auto run=[&](Runtime::KMeansGpuAction end){
+        const auto before=Results.size();Start();
+        EXPECT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+        (void)Service->GpuRun(Correlation,end);
+        EXPECT_TRUE(Until([&]{return Results.size()==before+1;}));
+        return Results.back();
+    };
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_EQ(reuses(),0u);
+    auto replacing=Request;replacing.ReplaceRunning=true;
+    Correlation=Service->RunKMeans(replacing);RunId=0;
+    ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    EXPECT_EQ(reuses(),1u)<<"the replacing request reuses the replaced run's capture";
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+    ASSERT_TRUE(Until([&]{return Results.size()==2;}));
+    const auto fresh=[&](const char* change,std::uint32_t live){
+        SCOPED_TRACE(change);
+        const auto before=reuses();
+        const auto completed=run(Runtime::KMeansGpuAction::Accept);
+        EXPECT_TRUE(completed.Succeeded())<<completed.Message;
+        EXPECT_EQ(completed.LabelCount,live)<<"the capture's live rows";
+        EXPECT_EQ(reuses(),before)<<"captured afresh";
+        (void)run(Runtime::KMeansGpuAction::Discard);
+        EXPECT_EQ(reuses(),before+1)<<"and that capture is kept for the next request";
+    };
+    Properties().Get<glm::vec3>(std::string{PN::kPosition}).Vector()[3]=glm::vec3(5,5,5);
+    fresh("a position write",12);
+    {
+        auto other=Request;other.Properties.InputPositions.Name="p:other_input";
+        Properties().GetOrAdd<glm::vec3>("p:other_input",glm::vec3(4,5,6));
+        std::swap(Request,other);fresh("another positions property",12);std::swap(Request,other);
+        fresh("back to the first positions",12);
+    }
+    Properties().GetOrAdd<bool>("v:deleted",false)[4]=true;
+    fresh("a new deletion mask",11);
+    Properties().Get<bool>("v:deleted")[5]=true;
+    fresh("a deletion-mask write",10);
+    Properties().Resize(13);
+    fresh("a resize",11);
+    {
+        const auto positions=Properties().Get<glm::vec3>(std::string{PN::kPosition}).Vector();
+        auto old=Properties().Get<glm::vec3>(std::string{PN::kPosition});Properties().Remove(old);
+        Properties().GetOrAdd<glm::vec3>(std::string{PN::kPosition},glm::vec3{0}).Vector()=positions;
+    }
+    fresh("the positions removed and added again with the same values",11);
+    const auto values=Properties().Get<glm::vec3>(std::string{PN::kPosition}).Vector();
+    Scene().Raw().destroy(Entity);Entity=Scene().Create();
+    SetPositions(Scene().Raw().emplace<GS::Vertices>(Entity),values);
+    Request.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entity);
+    fresh("another entity",13);
+    World=Worlds.CreateWorld("other");ASSERT_TRUE(Worlds.RequestSetActiveWorld(World));
+    (void)Worlds.ApplyMaintenance(Events,Jobs.Jobs());ASSERT_EQ(Worlds.ActiveWorld(),World);
+    Tick(); // the world change is delivered (it releases the capture) before the next request
+    Entity=Scene().Create();SetPositions(Scene().Raw().emplace<GS::Vertices>(Entity),values);
+    Request.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entity);
+    fresh("another world",13);
+}
+// ARCH-022 Q79 step 6: a capture is made only in the active world, so a change of the active world (a document switched
+// or closed) releases it; coming back captures afresh although the cloud kept its revisions.
+TEST_F(ClusteringModuleResident, AnActiveWorldChangeReleasesTheCapture)
+{
+    const auto run=[&]{
+        const auto before=Results.size();Start();
+        EXPECT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+        (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
+        EXPECT_TRUE(Until([&]{return Results.size()==before+1;}));
+        return Module.Stats().CaptureReuses;
+    };
+    (void)run();ASSERT_EQ(run(),1u)<<"kept while the world stays active";
+    EXPECT_EQ(Module.Stats().CachedCapturePoints,12u);
+    const auto switchTo=[&](Runtime::WorldHandle world){
+        ASSERT_TRUE(Worlds.RequestSetActiveWorld(world));(void)Worlds.ApplyMaintenance(Events,Jobs.Jobs());
+        ASSERT_EQ(Worlds.ActiveWorld(),world);Tick();
+    };
+    const auto first=World;
+    switchTo(Worlds.CreateWorld("other"));
+    EXPECT_EQ(Module.Stats().CachedCapturePoints,0u)<<"released";
+    switchTo(first);
+    EXPECT_EQ(run(),1u)<<"released by the world change, so captured afresh";
+    EXPECT_EQ(run(),2u);
+}
+// ARCH-022 Q79 step 6 on the CPU reference path (it consumes the same snapshot): a run on a reused capture gives the
+// fresh run's result bit for bit, a run after a position write the reference result of the new positions, and the
+// undo of a run whose capture was shared still validates exactly against its own capture.
+TEST_F(ClusteringModuleResident, CpuRunsOnAReusedCaptureEqualTheReferenceAndSeeAPositionWrite)
+{
+    namespace GK = Geometry::KMeans;
+    std::vector<glm::vec3> points;
+    for(int i=0;i<12;++i)
+        points.push_back(glm::vec3(i/4==1?10.f:0.f,i/4==2?10.f:0.f,0.f)+0.25f*float(i%4)*glm::vec3(1,1,1));
+    Properties().Get<glm::vec3>(std::string{PN::kPosition}).Vector()=points;
+    Request.Backend=Runtime::ClusteringBackend::CpuReference;
+    const auto reference=[&]{
+        GK::KMeansParams params{};params.ClusterCount=Request.Parameters.ClusterCount;
+        params.MaxIterations=Request.Parameters.MaxIterations;params.Seed=Request.Parameters.Seed;
+        params.Init=Request.Parameters.Initialization==Runtime::KMeansInitialization::Hierarchical
+            ?GK::Initialization::Hierarchical:GK::Initialization::Random;
+        auto result=GK::Cluster(std::span<const glm::vec3>{points},params);
+        EXPECT_TRUE(result.has_value());return result?*result:GK::KMeansResult{};
+    };
+    const auto labels=[&]{
+        const auto property=Properties().Get<std::uint32_t>("p:kmeans_label");
+        return property?property.Vector():std::vector<std::uint32_t>{};
+    };
+    const auto run=[&]{
+        const auto before=Results.size();Start();
+        EXPECT_TRUE(Until([&]{return Results.size()==before+1;}));
+        EXPECT_TRUE(Results.back().Succeeded())<<Results.back().Message;
+        return std::pair{Results.back(),labels()};
+    };
+    const auto expected=reference();
+    const auto [first,firstLabels]=run();
+    EXPECT_EQ(Module.Stats().CaptureReuses,0u);
+    EXPECT_EQ(firstLabels,expected.Labels);EXPECT_EQ(first.Centroids,expected.Centroids);
+    const auto [second,secondLabels]=run();
+    EXPECT_EQ(Module.Stats().CaptureReuses,1u)<<"the unchanged cloud's capture";
+    EXPECT_EQ(secondLabels,firstLabels);EXPECT_EQ(second.Centroids,first.Centroids);
+    EXPECT_EQ(std::bit_cast<std::uint32_t>(second.Inertia),std::bit_cast<std::uint32_t>(first.Inertia));
+    ASSERT_TRUE(History.Undo().Succeeded());EXPECT_EQ(labels(),firstLabels);
+    ASSERT_TRUE(History.Redo().Succeeded());EXPECT_EQ(labels(),secondLabels);
+    std::swap(points[0],points[4]);
+    Properties().Get<glm::vec3>(std::string{PN::kPosition}).Vector()=points;
+    const auto moved=reference();
+    ASSERT_NE(moved.Labels,expected.Labels)<<"the write changes the result, so a stale capture would show";
+    const auto [third,thirdLabels]=run();
+    EXPECT_EQ(Module.Stats().CaptureReuses,1u)<<"captured afresh";
+    EXPECT_EQ(thirdLabels,moved.Labels);EXPECT_EQ(third.Centroids,moved.Centroids);
+    EXPECT_EQ(std::bit_cast<std::uint32_t>(third.Inertia),std::bit_cast<std::uint32_t>(moved.Inertia));
+    ASSERT_TRUE(History.Undo().Succeeded());EXPECT_EQ(labels(),secondLabels);
+    EXPECT_FALSE(History.Undo().Succeeded())<<"the second run's capture holds the old positions";
 }

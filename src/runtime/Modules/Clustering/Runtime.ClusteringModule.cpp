@@ -43,6 +43,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Geometry.KMeans;
 import Geometry.Properties;
 
@@ -52,6 +53,28 @@ import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
+    // The last request's capture, reused for a request naming the same positions while they and the deletion mask
+    // keep their revisions. Revisions come from one process-wide counter and observing one closes its edit epoch, so a
+    // later write, another entity or world, or a recreated property never matches what the capture observed; the
+    // positions ref is compared too, because the properties of one set can share a revision. shortcut: one entry,
+    // keeping about 16 B per point alive until another request, an active-world change or shutdown (a cloud deleted
+    // in the active world stays until then); a writer through a retained mutable borrow must call MarkModified(), as
+    // every revision watch assumes.
+    struct KMeansCapturedInput
+    {
+        GeometryPropertyRef Positions{};
+        std::vector<GeometryProcessingDetail::PointPropertyWatch> Inputs{};
+        std::shared_ptr<const KMeansCapture> Capture{};
+    };
+
+    // The kept capture and the scene-document registration that releases it when the document is replaced.
+    struct KMeansCaptureCache
+    {
+        KMeansCapturedInput Last{};
+        SceneDocumentModule* Documents{};
+        SceneReplacementParticipantHandle Participant{};
+    };
+
     namespace
     {
         namespace Dirty = ECS::Components::DirtyTags;
@@ -326,7 +349,9 @@ namespace Extrinsic::Runtime
             const WorldHandle world,
             const CommandCorrelationId correlation,
             const RunKMeans& command,
-            KMeansRunCompleted& failure)
+            KMeansRunCompleted& failure,
+            KMeansCapturedInput& captures,
+            ClusteringModuleStats& stats)
         {
             if (auto rejected = ValidateKMeansRequest(&scene.Raw(), command))
             {
@@ -340,15 +365,33 @@ namespace Extrinsic::Runtime
                 scene.Raw(), SelectionController::ToEntityHandle(command.StableEntityId));
             const auto* properties = ResolveGeometryPropertySet(
                 availability, command.Properties.InputPositions.Domain);
-            PointInputCapture input;
-            auto positionRef = command.Properties.InputPositions;
-            std::string diagnostic;
-            if (!CapturePointInput(availability, positionRef, true, input, diagnostic) || input.Points.empty())
+            // The same cloud at the same revisions: its capture again, without a scan or a copy.
+            const bool reuse = captures.Capture && captures.Positions == command.Properties.InputPositions &&
+                std::ranges::all_of(captures.Inputs, [&](const auto& watch) {
+                    return GeometryProcessingDetail::ObserveGeometryProperty(availability, watch.Domain, watch.Name) ==
+                        watch;
+                });
+            if (reuse)
+                ++stats.CaptureReuses;
+            else
             {
-                failure = MakeCompletion(command, world, correlation,
-                    KMeansRunStatus::UnsupportedGeometryDomain, Core::ErrorCode::InvalidArgument,
-                    "K-Means input: " + diagnostic);
-                return std::nullopt;
+                PointInputCapture input;
+                auto positionRef = command.Properties.InputPositions;
+                std::string diagnostic;
+                if (!CapturePointInput(availability, positionRef, true, input, diagnostic) || input.Points.empty())
+                {
+                    captures = {};
+                    stats.CachedCapturePoints = 0u;
+                    failure = MakeCompletion(command, world, correlation,
+                        KMeansRunStatus::UnsupportedGeometryDomain, Core::ErrorCode::InvalidArgument,
+                        "K-Means input: " + diagnostic);
+                    return std::nullopt;
+                }
+                captures = {.Positions = command.Properties.InputPositions, .Inputs = std::move(input.Inputs),
+                    .Capture = std::make_shared<const KMeansCapture>(KMeansCapture{
+                        .Points = std::move(input.Points), .Slots = std::move(input.Slots),
+                        .SlotCount = input.SlotCount})};
+                stats.CachedCapturePoints = captures.Capture->Points.size();
             }
 
             KMeansOutputPropertyState beforeOutputs{};
@@ -381,9 +424,7 @@ namespace Extrinsic::Runtime
                 .Command = command,
                 .World = world,
                 .Correlation = correlation,
-                .Points = std::move(input.Points),
-                .Slots = std::move(input.Slots),
-                .SlotCount = input.SlotCount,
+                .Input = captures.Capture,
                 .BeforeOutputs = std::move(beforeOutputs),
                 .Params = params,
             };
@@ -458,8 +499,7 @@ namespace Extrinsic::Runtime
             }
 
             std::optional<GK::KMeansResult> clustered = GK::Cluster(
-                std::span<const glm::vec3>{
-                    snapshot.Points.data(), snapshot.Points.size()},
+                std::span<const glm::vec3>{snapshot.Input->Points},
                 {},
                 snapshot.Params,
                 nullptr,
@@ -505,8 +545,7 @@ namespace Extrinsic::Runtime
             return ECS::InvalidEntityHandle;
         }
 
-        using KMeansPointSnapshot =
-            std::shared_ptr<const PointInputCapture>;
+        using KMeansPointSnapshot = std::shared_ptr<const KMeansCapture>;
         using KMeansOutputPropertySnapshot =
             std::shared_ptr<const KMeansOutputPropertyState>;
 
@@ -585,7 +624,7 @@ namespace Extrinsic::Runtime
                 BuildKMeansOutputPropertyState(
                     *properties,
                     snapshot.Command.Properties,
-                    clustered, snapshot.Slots);
+                    clustered, snapshot.Input->Slots);
             if (!after.has_value())
                 return EditorCommandHistoryStatus::CommandFailed;
 
@@ -597,10 +636,7 @@ namespace Extrinsic::Runtime
             };
             if (history != nullptr)
             {
-                const KMeansPointSnapshot points =
-                    std::make_shared<PointInputCapture>(PointInputCapture{
-                        .Points = std::move(snapshot.Points), .Slots = std::move(snapshot.Slots),
-                        .SlotCount = snapshot.SlotCount});
+                const KMeansPointSnapshot points = snapshot.Input; // shared with the run, immutable
                 const KMeansOutputPropertySnapshot beforeState =
                     std::make_shared<KMeansOutputPropertyState>(
                         std::move(snapshot.BeforeOutputs));
@@ -842,8 +878,8 @@ namespace Extrinsic::Runtime
             auto positionRef = job.Snapshot.Command.Properties.InputPositions;
             std::string diagnostic;
             if (!CapturePointInput(BuildGeometryAvailability(raw, entity), positionRef, true, current, diagnostic) ||
-                current.SlotCount != job.Snapshot.SlotCount || current.Slots != job.Snapshot.Slots ||
-                !BitEqual(current.Points, job.Snapshot.Points))
+                current.SlotCount != job.Snapshot.Input->SlotCount || current.Slots != job.Snapshot.Input->Slots ||
+                !BitEqual(current.Points, job.Snapshot.Input->Points))
             {
                 stats.CommitsDropped += 1u;
                 KMeansRunCompleted dropped = job.Completion;
@@ -1020,6 +1056,7 @@ namespace Extrinsic::Runtime
             ClusteringGpuState* gpuState,
             SpatialIndexCache* spatialIndices, RHI::IDevice* device, EditorCommandHistory* history,
             EditorWorkspaceSlot& workspace,
+            KMeansCapturedInput& captures,
             ClusteringModuleStats& stats)
         {
             stats.CommandsHandled += 1u;
@@ -1055,7 +1092,9 @@ namespace Extrinsic::Runtime
                 world,
                 context.Correlation,
                 command,
-                failure);
+                failure,
+                captures,
+                stats);
             if (!snapshot.has_value())
             {
                 PublishCompletion(context.Events, failure);
@@ -1135,7 +1174,8 @@ namespace Extrinsic::Runtime
 
     extern "C++"
     {
-    ClusteringModule::ClusteringModule() : m_Workspace(std::make_unique<EditorWorkspaceSlot>()) {}
+    ClusteringModule::ClusteringModule()
+        : m_Workspace(std::make_unique<EditorWorkspaceSlot>()), m_Captures(std::make_unique<KMeansCaptureCache>()) {}
     ClusteringModule::~ClusteringModule() = default;
 
     std::string_view ClusteringModule::Name() const noexcept
@@ -1235,7 +1275,7 @@ namespace Extrinsic::Runtime
                     context,
                     command,
                     m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-                    *m_Workspace,
+                    *m_Workspace, m_Captures->Last,
                     m_Stats);
             });
 
@@ -1260,6 +1300,9 @@ namespace Extrinsic::Runtime
                         m_Worlds,
                         m_Stats);
                 });
+        // A capture is made only in the active world, so a switched world releases it.
+        m_ActiveWorldChangedSubscription =
+            setup.Subscribe<ActiveWorldChanged>([this](const ActiveWorldChanged&) { ReleaseCapture(); });
 
         return Core::Ok();
     }
@@ -1271,6 +1314,19 @@ namespace Extrinsic::Runtime
         m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
         if (m_GpuState != nullptr)
             m_GpuState->UseStepRuns(setup.Services().Find<StepRunsService>());
+        // A new, loaded or closed document replaces the registry in the same world; its capture goes with it.
+        if (auto* documents = setup.Services().Find<SceneDocumentModule>();
+            documents != nullptr && !m_Captures->Participant.IsValid())
+        {
+            if (auto participant = documents->RegisterReplacementParticipant({
+                    .Name = "Runtime.ClusteringModule",
+                    .BeforeReplace = [this](const SceneReplacementContext&) { ReleaseCapture(); },
+                }))
+            {
+                m_Captures->Documents = documents;
+                m_Captures->Participant = *participant;
+            }
+        }
         m_Workspace->AttachOwn(setup.Worlds(), setup.Services());
         return Core::Ok();
     }
@@ -1303,7 +1359,13 @@ namespace Extrinsic::Runtime
         CommandContext context{.ActiveWorld = *scene, .Commands = *m_Service.m_Commands, .Events = m_Events,
             .Jobs = m_Jobs, .Worlds = m_Worlds, .Correlation = held.Correlation};
         (void)HandleRunKMeansCommand(context, held.Command, m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-            *m_Workspace, m_Stats);
+            *m_Workspace, m_Captures->Last, m_Stats);
+    }
+
+    void ClusteringModule::ReleaseCapture() noexcept
+    {
+        m_Captures->Last = {};
+        m_Stats.CachedCapturePoints = 0u;
     }
 
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
@@ -1320,14 +1382,22 @@ namespace Extrinsic::Runtime
         }
         m_GpuParticipant = {};
         m_GpuState.reset();
+        if (m_Captures->Participant.IsValid())
+            (void)m_Captures->Documents->UnregisterReplacementParticipant(m_Captures->Participant);
+        m_Captures->Documents = nullptr;
+        m_Captures->Participant = {};
+        ReleaseCapture();
         m_Workspace->DetachOwn(); // after the GPU state's last transaction used its jobs
         m_Service.m_Workspace = nullptr;
         if (m_JobCompletedSubscription.IsValid())
             context.Events.Unsubscribe(m_JobCompletedSubscription);
         if (m_ClusterLabelsChangedSubscription.IsValid())
             context.Events.Unsubscribe(m_ClusterLabelsChangedSubscription);
+        if (m_ActiveWorldChangedSubscription.IsValid())
+            context.Events.Unsubscribe(m_ActiveWorldChangedSubscription);
         m_JobCompletedSubscription = {};
         m_ClusterLabelsChangedSubscription = {};
+        m_ActiveWorldChangedSubscription = {};
         m_Service.Bind(nullptr, nullptr, nullptr);
         m_Events = nullptr;
         m_Jobs = nullptr;

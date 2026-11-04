@@ -29,6 +29,7 @@ extern "C++"
 namespace Extrinsic::Runtime
 {
     class ClusteringGpuState;
+    struct KMeansCaptureCache;
 
     export extern "C++" class ClusteringModule final : public IRuntimeModule
     {
@@ -56,11 +57,13 @@ namespace Extrinsic::Runtime
         };
         void StartHeld();
         void CancelHeld(KMeansRunStatus status, std::string why);
+        void ReleaseCapture() noexcept;
 
         ClusteringService m_Service{};
         std::optional<HeldRequest> m_Held{};
         KernelEventSubscription m_JobCompletedSubscription{};
         KernelEventSubscription m_ClusterLabelsChangedSubscription{};
+        KernelEventSubscription m_ActiveWorldChangedSubscription{};
         KernelEventBus* m_Events{};
         JobService* m_Jobs{};
         WorldRegistry* m_Worlds{};
@@ -71,6 +74,7 @@ namespace Extrinsic::Runtime
         // service), else the module's own.
         std::unique_ptr<EditorWorkspaceSlot> m_Workspace;
         std::unique_ptr<ClusteringGpuState> m_GpuState{};
+        std::unique_ptr<KMeansCaptureCache> m_Captures; // the last request's capture, shared by its cloud revision
         GpuQueueParticipantHandle m_GpuParticipant{};
         ClusteringModuleStats m_Stats{};
     };

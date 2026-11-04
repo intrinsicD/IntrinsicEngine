@@ -413,6 +413,7 @@ TEST_P(ClusteringServiceGpuSmoke,
     EXPECT_EQ(appPtr->Stats.GpuRequestsAccepted, 2u);
     EXPECT_EQ(appPtr->Stats.GpuFallbacks, 0u);
     EXPECT_EQ(appPtr->Stats.GpuCompletions, 1u);
+    EXPECT_EQ(appPtr->Stats.CaptureReuses, 1u) << "the run compared above reused the discarded run's capture";
     EXPECT_EQ(appPtr->Stats.LabelsCommitted, 1u);
     EXPECT_EQ(appPtr->Stats.VisualizationRefreshReactions, 1u);
 
@@ -437,9 +438,11 @@ namespace
         };
         std::vector<Drive> Drives{};
         std::vector<glm::vec3> Points{};
+        std::vector<glm::vec3> MovedPoints{}; // when set, written as the positions before the last drive
         Runtime::KMeansParameters Parameters{};
         std::vector<Outcome> Outcomes{};
         bool TimedOut{};
+        std::uint64_t CaptureReuses{};
 
         void Resolve() override
         {
@@ -458,12 +461,15 @@ namespace
             if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(60)) TimedOut = true;
             if (TimedOut || Outcomes.size() == Drives.size() || Service == nullptr || Steps == nullptr)
             {
+                if (Service != nullptr) CaptureReuses = Service->Stats().CaptureReuses;
                 engine.RequestExit();
                 return;
             }
             if (!engine.GetDevice().IsOperational()) return;
             if (!Submitted)
             {
+                if (!MovedPoints.empty() && Outcomes.size() + 1u == Drives.size())
+                    SetPositions(engine.Worlds().Get(engine.ActiveWorld())->Raw().get<GS::Vertices>(Entity), MovedPoints);
                 Correlation = Service->RunKMeans({.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entity),
                     .Properties = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint),
                     .Parameters = Parameters, .Backend = Runtime::ClusteringBackend::VulkanCompute, .AutoAccept = false});
@@ -546,6 +552,7 @@ namespace
     {
         std::vector<ClusteringStepDrivesApp::Outcome> Outcomes{};
         bool TimedOut{};
+        std::uint64_t CaptureReuses{};
     };
 
     // Runs `app` in a Vulkan engine (which owns it); nullopt (skipped) without a device.
@@ -558,7 +565,8 @@ namespace
         engine.Initialize();
         if (!VulkanReady(engine)) return std::nullopt;
         engine.Run();
-        StepDriveResults results{.Outcomes = appPtr->Outcomes, .TimedOut = appPtr->TimedOut};
+        StepDriveResults results{
+            .Outcomes = appPtr->Outcomes, .TimedOut = appPtr->TimedOut, .CaptureReuses = appPtr->CaptureReuses};
         engine.Shutdown();
         return results;
     }
@@ -627,4 +635,61 @@ TEST(ClusteringStepRunGpuSmoke, AcceptFromARestPublishesTheLabelsOfTheMovedCentr
     ASSERT_EQ(outcome.Completion.Centroids.size(), 2u);
     EXPECT_EQ(outcome.Completion.Centroids[0], glm::vec3(3.5f, 0, 0));
     EXPECT_EQ(outcome.Completion.Centroids[1], glm::vec3(10, 0, 0));
+}
+
+// ARCH-022 Q79 step 6: the second run reuses the first run's capture and equals it exactly; the third, after a
+// position write, captures afresh and equals the CPU reference of the moved points.
+TEST(ClusteringStepRunGpuSmoke, AReusedCaptureEqualsTheFreshRunAndAPositionWriteIsCapturedAgain)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW could not initialize.";
+    auto app = std::make_unique<ClusteringStepDrivesApp>();
+    app->Drives = {ClusteringStepDrivesApp::Drive::Run, ClusteringStepDrivesApp::Drive::Run,
+        ClusteringStepDrivesApp::Drive::Run};
+    std::uint32_t random = 41u;
+    for (unsigned i = 0; i < 512u; ++i)
+    {
+        glm::vec3 point{float(i % 8) * 10.0f, 0.0f, 0.0f};
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            random = random * 1664525u + 1013904223u;
+            point[axis] += float(random >> 8) / float(1u << 24);
+        }
+        app->Points.push_back(point);
+    }
+    app->MovedPoints = app->Points;
+    for (unsigned i = 0; i < 96u; ++i) app->MovedPoints[i].x += 10.0f; // a sixth of the rows to the next cluster
+    app->Parameters = {.ClusterCount = 8u, .MaxIterations = 20u, .Seed = 3u,
+        .Initialization = Runtime::KMeansInitialization::Hierarchical};
+    const auto points = app->Points;
+    const auto moved = app->MovedPoints;
+    const auto parameters = app->Parameters;
+    const auto results = RunStepDrives(std::move(app));
+    if (!results) GTEST_SKIP() << "Promoted Vulkan did not reach readiness.";
+    ASSERT_FALSE(results->TimedOut);
+    ASSERT_EQ(results->Outcomes.size(), 3u);
+    for (const auto& outcome : results->Outcomes)
+    {
+        ASSERT_TRUE(outcome.Completion.Succeeded()) << outcome.Completion.Message;
+        EXPECT_EQ(outcome.Completion.ActualBackend, Runtime::ClusteringBackend::VulkanCompute);
+    }
+    EXPECT_EQ(results->CaptureReuses, 1u) << "the second run reused; the third captured the moved points";
+    const auto& fresh = results->Outcomes[0];
+    const auto& reused = results->Outcomes[1];
+    EXPECT_EQ(reused.Labels, fresh.Labels) << "labels exact";
+    EXPECT_EQ(reused.Completion.Centroids, fresh.Completion.Centroids) << "centroids bitwise";
+    EXPECT_EQ(reused.Completion.Inertia, fresh.Completion.Inertia);
+    const auto before = GK::Cluster(std::span<const glm::vec3>{points}, MakeCpuParameters(parameters));
+    const auto after = GK::Cluster(std::span<const glm::vec3>{moved}, MakeCpuParameters(parameters));
+    ASSERT_TRUE(before && after);
+    EXPECT_EQ(fresh.Labels, before->Labels);
+    ASSERT_NE(after->Labels, before->Labels) << "the write changes the result, so a stale capture would show";
+    const auto& recaptured = results->Outcomes[2];
+    EXPECT_EQ(CountLabelMismatches(recaptured.Labels, after->Labels), 0u);
+    ASSERT_EQ(recaptured.Completion.Centroids.size(), after->Centroids.size());
+    float delta = 0.0f;
+    for (std::size_t i = 0; i < after->Centroids.size(); ++i)
+        for (int axis = 0; axis < 3; ++axis)
+            delta = std::max(delta, std::abs(recaptured.Completion.Centroids[i][axis] - after->Centroids[i][axis]));
+    EXPECT_LE(delta, 1e-5f);
+    EXPECT_EQ(recaptured.Completion.Iterations, after->Iterations);
 }
