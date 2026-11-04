@@ -899,7 +899,7 @@ TEST(ClusteringModule, ClosingTheSceneDocumentReleasesTheKeptCapture)
 {
     auto app = std::make_unique<KMeansSuccessApp>();
     KMeansSuccessApp* appPtr = app.get();
-    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(1u), std::move(app));
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();

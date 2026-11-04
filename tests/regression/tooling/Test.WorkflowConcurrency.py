@@ -301,7 +301,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             1,
         )
         self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 8)
-        self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 3)
+        self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 4)
 
     def test_exact_multiworker_ctest_budgets_match_cpu_sources(self) -> None:
         cmake = (REPO_ROOT / "tests/CMakeLists.txt").read_text(encoding="utf-8")
