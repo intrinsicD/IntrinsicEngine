@@ -154,6 +154,8 @@ contract_review: tracker only; each slice declares its own contracts
     nochmal genau"
 77. (2026-11-04, on the recommendations: step 1 with step 7, the single label buffer and labels-only undo dropped,
     the before/after measurement now) "ok, deine empfehlungen sind gut. bitte setze die um."
+78. (2026-11-04, on (a) look at the `PointCloudConsolidationModule` CI flake as its own small item, reproduce first,
+    or (b) leave it; recommended (a); then steps 6 and 7) "Ja ok"
 
 ## Goal
 - Reach the target in
@@ -3420,3 +3422,14 @@ python3 tools/docs/check_doc_links.py --root . --strict
   stress (8 processes on one core, 3 rounds) the old file failed 3 of 24, the new 0 of 24, the whole suite 0 of 24.
   Review: fresh Codex (thread `01a1a656-428f-7bb3-b66e-dcbbb10f7467`), round 1 "revise required" (a fourth wait at
   line 997), round 2 verbatim "**Verdict: approve**".
+- 2026-11-04, Q78 `PointCloudConsolidationModule.AgentCompletionListenerReleasedOnDetachCancellationAndCompletion`
+  (CI bee778ac2 attempt 1: two listener invocations instead of one at `Test.PointCloudConsolidationModule.cpp:2792`
+  after the "complete" mode). Ledger (`build/dev-shared`, ASan, 2 workers as in CI): 8 processes on one core × 4
+  rounds: 0 of 32 failed; 8 on two cores × 20 repeats: 0 of 160; 16 on one core × 10 repeats: 0 of 160. Code
+  reading: the agent continuation unsubscribes synchronously before it returns done (`ServiceRun::Release`), the
+  workspace session's listener is balanced (`Attach` starts with `Detach`), the module's two completion publishes
+  are exclusive (each returns); `KernelEventBus::Pump` delivers only the batch present at entry, so an event
+  published by a listener or a worker during the last pump is counted by the test's next probe
+  (`listenerCalls()` counts every invocation of its pump, not only the probe's listeners). Not reproduced, so no
+  fix yet; the candidate fix (flush the inbox before the probe, and count the run's results by correlation so a
+  duplicate publication still fails) went to the operator with a diagnostic option.
