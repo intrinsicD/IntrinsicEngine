@@ -149,6 +149,11 @@ contract_review: tracker only; each slice declares its own contracts
     without the deep clone and with untouched revisions kept, 3 the Accept's copies and conversions cut, 4 the Accept
     on a worker, 5 O(K) seeds and `reserve`, 6 a shared capture or a restarted run, 7 the async compute queue or wider
     kernels) "Ok bitte mach die kleinen Punkte 1,2,3,5. Danach schauen wir und 6 und 7 an"
+76. (2026-11-04, on the three open decisions after steps 5, 2 and 3: step 1 now or with 7; option 3's single label
+    buffer and labels-only undo; the before/after measurement now or after 6 and 7) "Bitte erkläre mir diese Punkte
+    nochmal genau"
+77. (2026-11-04, on the recommendations: step 1 with step 7, the single label buffer and labels-only undo dropped,
+    the before/after measurement now) "ok, deine empfehlungen sind gut. bitte setze die um."
 
 ## Goal
 - Reach the target in
