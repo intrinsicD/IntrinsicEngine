@@ -163,6 +163,11 @@ contract_review: tracker only; each slice declares its own contracts
     per-frame queue idle was gone: layer by layer (readback copies, then the parallel-recording fills; 7a lands only
     with a clean smoke), park 7a and do 7b, or land with documented hazards; recommended the first; chosen option)
     "Ebene für Ebene (Empfohlen)"
+81. (2026-11-05, on the Q79 result: at 1 048 576 points the Accept's frame 32.6 ms, the frame before it 16.6 ms, the
+    cold first start 21.5 ms, the Accept about 3 % slower) "Also was genau ist da jetzt los? Außerdem gibt es noch den
+    Punkt dass wenn ich k means auf dem armadillo mesh machen (als Beispiel) dauert es für meinen Geschmack nach dem
+    Klick auf den run k means Button erstaunlich lange bis die Methode startet. Ich frage mich was da intern alles erst
+    passiert bevor es los geht?"
 
 ## Goal
 - Reach the target in
@@ -3506,3 +3511,16 @@ python3 tools/docs/check_doc_links.py --root . --strict
   is timed in `ImGuiAdapter::BuildEditorFrame`, `ImGuiEndMicros` around `EndFrame` only, so the two are independent
   durations and the assertion can fail by chance; not touched by Q79's blocks; job rerun. A fix (drop or restate the
   assertion) is outside this task.
+- 2026-11-05, Q81 diagnosis (code reading only, no run; Armadillo numbers not measured): (1) the frame before the
+  Accept: `DrainCompletedReadbacks` copies the 4 MB label readback on the main thread from a slot allocated with
+  `VMA_MEMORY_USAGE_CPU_ONLY` (`Backends.Vulkan.Transfer.cpp:340`); VMA 3.4 maps it to HOST_VISIBLE|HOST_COHERENT
+  and reads `HOST_ACCESS_RANDOM` only for `AUTO*` usages, and on this host's RTX 4090 the uncached type 2 precedes
+  the cached type 3, so the copy plausibly reads write-combined memory (4 MB in 16.3 ms ≈ 260 MB/s; the chosen type
+  is not checked). (2) The Accept (`CommitKMeansOutputs`): label decode, new labels and 16 MB colors, two output
+  captures, the undo validation's full `CapturePointInput` + `BitEqual` of the positions, the write; about a dozen
+  O(N) passes on the main thread, split not measured; the +3 % not explained. (3) Click to start: the click only
+  queues `RunKMeans`; the next frame captures and starts; the editor default backend is `CpuReference`
+  (`Runtime.ClusteringConfig.cppm:26`: one worker job, no previews until the end); on Vulkan, Hierarchical seeding
+  (editor default, K−1 passes over N) runs on the main thread in `Start`, the first run per process creates three
+  compute pipelines (no `VkPipelineCache`), and each iteration ends at a host readback, so the first preview comes
+  after `GpuPreviewInterval` = 5 iterations at one or more frames each (inference). Options went to the operator.
