@@ -156,6 +156,9 @@ contract_review: tracker only; each slice declares its own contracts
     the before/after measurement now) "ok, deine empfehlungen sind gut. bitte setze die um."
 78. (2026-11-04, on (a) look at the `PointCloudConsolidationModule` CI flake as its own small item, reproduce first,
     or (b) leave it; recommended (a); then steps 6 and 7) "Ja ok"
+79. (2026-11-04, on the consolidation flake not reproduced in 352 runs: (a) flush the inbox before the probe and count
+    the run's results by correlation, shown on an injected stray event, (b) a diagnostic only; recommended (a) with
+    (b)'s diagnostic) "ja ok, deine empfehlung. danach mach punkt 6 und 7."
 
 ## Goal
 - Reach the target in
@@ -3433,3 +3436,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
   (`listenerCalls()` counts every invocation of its pump, not only the probe's listeners). Not reproduced, so no
   fix yet; the candidate fix (flush the inbox before the probe, and count the run's results by correlation so a
   duplicate publication still fails) went to the operator with a diagnostic option.
+- 2026-11-04, Q79 consolidation probe: `listenerCalls()` now pumps until nothing is delivered (at most 8) before its
+  probe and reports the probe pump's batch on failure; a counting listener checks that the completed run's result
+  arrives once and that no observed run published twice. Temporary injections (reverted): a stray event before the
+  probe fails the old probe ("the probe's pump delivered 2 events") and passes the new; a duplicate of the run's
+  result fails the new test. The CI occurrence's cause stays unconfirmed (not reproduced). Review: fresh Codex
+  (thread `01a1a6ba-ea01-73a3-8779-ee52f98237e9`) verbatim "**Verdict: approve**" (comment wording narrowed after it).

@@ -1,4 +1,5 @@
 #include "Modules/PointCloudConsolidation/Runtime.LopPaging.TestSupport.hpp"
+#include <map>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -2745,10 +2746,22 @@ TEST(PointCloudConsolidationModule, AgentCompletionListenerReleasedOnDetachCance
     Runtime::RegisterEditorAgentOperations(registry);
     Runtime::EditorWorkspaceAttachment attachment;
     const Runtime::AgentOperationContext context{.Attachment = &attachment};
+    // Every observed result, by correlation: a run completes once (a second publication seen here is counted too).
+    std::map<std::uint64_t, int> results;
+    const auto counter = engine.Events().Subscribe<Runtime::PointCloudConsolidationResult>(
+        [&](const Runtime::PointCloudConsolidationResult& result) {
+            if (result.Correlation.Value != 0) ++results[result.Correlation.Value];
+        });
+    // The listeners of one probe event. A pump delivers only what was queued at its entry, so what listeners or
+    // workers published during the last one is delivered first (results reach the bus through the main thread's
+    // completion drain, which the probe does not run), so the probe's pump holds the probe alone.
+    std::uint64_t probeBatch = 0;
     const auto listenerCalls = [&] {
+        for (int i = 0; i < 8 && engine.Events().Pump() != 0; ++i) {}
         const auto before = engine.Events().Stats().ListenerInvocations;
         engine.Events().Publish(Runtime::PointCloudConsolidationResult{});
         (void)engine.Events().Pump();
+        probeBatch = engine.Events().Stats().LastPumpEvents;
         return engine.Events().Stats().ListenerInvocations - before;
     };
     const auto detachedListeners = listenerCalls();
@@ -2762,19 +2775,19 @@ TEST(PointCloudConsolidationModule, AgentCompletionListenerReleasedOnDetachCance
             "{\"entity\":" + std::to_string(Runtime::SelectionController::ToStableEntityId(entity)) +
             ",\"domain\":\"PointCloudPoint\"}", false);
         ASSERT_TRUE(outcome.Continuation) << outcome.Text;
-        EXPECT_EQ(listenerCalls(), attachedListeners + 1u);
+        EXPECT_EQ(listenerCalls(), attachedListeners + 1u) << "the probe's pump delivered " << probeBatch << " events";
         Runtime::AgentOperationOutcome completed;
         if (std::string_view(mode) == "detach")
         {
             attachment.Detach();
             EXPECT_TRUE(outcome.Continuation(context, completed));
             EXPECT_TRUE(completed.IsError);
-            EXPECT_EQ(listenerCalls(), detachedListeners);
+            EXPECT_EQ(listenerCalls(), detachedListeners) << "the probe's pump delivered " << probeBatch << " events";
         }
         else if (std::string_view(mode) == "cancel")
         {
             outcome.Continuation = {};
-            EXPECT_EQ(listenerCalls(), attachedListeners);
+            EXPECT_EQ(listenerCalls(), attachedListeners) << "the probe's pump delivered " << probeBatch << " events";
         }
         else
         {
@@ -2789,10 +2802,16 @@ TEST(PointCloudConsolidationModule, AgentCompletionListenerReleasedOnDetachCance
                 std::this_thread::yield();
             }
             EXPECT_TRUE(done);
-            EXPECT_EQ(listenerCalls(), attachedListeners);
+            EXPECT_EQ(listenerCalls(), attachedListeners) << "the probe's pump delivered " << probeBatch << " events";
+            ASSERT_FALSE(results.empty());
+            EXPECT_EQ(results.rbegin()->second, 1) << "the completed run's result arrives once";
         }
         outcome.Continuation = {};
         attachment.Detach();
     }
+    (void)listenerCalls(); // deliver what is still queued
+    for (const auto& [correlation, count] : results)
+        EXPECT_EQ(count, 1) << "run " << correlation << " was seen published more than once";
+    engine.Events().Unsubscribe(counter);
     engine.Shutdown();
 }
