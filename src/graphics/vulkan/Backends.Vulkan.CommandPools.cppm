@@ -147,6 +147,7 @@ namespace Extrinsic::Backends::Vulkan
         VkPipelineBindPoint m_BindPoint  = VK_PIPELINE_BIND_POINT_GRAPHICS;
         bool             m_Recording     = false;
         bool             m_CommandBufferExecutable = false;
+        bool             m_SecondariesOrdered = false; // a primary's barrier before its first secondary
         bool             m_RecordingAttempted = false;
         VulkanCommandBufferLevel m_CommandBufferLevel = VulkanCommandBufferLevel::Primary;
 

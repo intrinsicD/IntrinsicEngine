@@ -14,6 +14,9 @@
 #include <glm/glm.hpp>
 
 #include <gtest/gtest.h>
+#include <cstring>
+#include <chrono>
+#include <bit>
 
 #include "MinimalTriangleReadback.hpp"
 #include "OperationalCounterStability.hpp"
@@ -27,6 +30,12 @@ import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.ShadowSystem;
+import Extrinsic.Graphics.CullingSystem;
+import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.TransferQueue;
+import Extrinsic.RHI.Types;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -1067,6 +1076,116 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
 
+    engine.Shutdown();
+}
+
+// ARCH-022 Q80: the cull table is written only when the buckets are allocated, so frames in flight overlap on the GPU.
+// A shadow caster (no extraction sets GpuRender_CastShadow yet, so the test adds one) fills the shadow cull bucket,
+// which the shadow pass draws from (not one of the graph's imports), in every frame; synchronization validation
+// reports no hazard across those frames, and the last frame's shadow count is read back non-zero.
+TEST(DefaultRecipeSurfaceGpuSmoke, ShadowFramesInFlightRunWithoutSynchronizationHazards)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        4u, "Intrinsic Default-recipe gpu;vulkan shadow synchronization smoke", true);
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    Engine& engine = *bootstrap.EnginePtr;
+    const auto bootstrapDiagnostics = GetVulkanBootstrapDiagnosticsSnapshot();
+    if (!bootstrapDiagnostics.ValidationEnabled || !bootstrapDiagnostics.DebugUtilsEnabled)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; the shadow synchronization smoke is opt-in.";
+    }
+    engine.Run(); // the warm-up frames promote the device
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    ASSERT_TRUE(device.IsOperational());
+    renderer.GetShadowSystem().SetParams(Extrinsic::Graphics::ShadowParams{
+        .Enabled = true,
+        .CascadeCount = 2u,
+        .AtlasResolution = 256u,
+    });
+
+    // One opaque triangle at the origin (inside the identity camera's frustum) that casts a shadow.
+    auto& gpuWorld = renderer.GetGpuWorld();
+    // Interleaved position and texcoord per vertex, as GpuWorld::UploadGeometry takes packed vertices.
+    static constexpr std::array<float, 15> kVertices{-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+                                                     0.0f,  0.5f,  0.0f, 0.5f, 1.0f};
+    const std::array<std::uint32_t, 3> indices{0u, 1u, 2u};
+    Extrinsic::Graphics::GpuWorld::GeometryUploadDesc upload{};
+    upload.PackedVertexBytes = std::as_bytes(std::span{kVertices});
+    upload.SurfaceIndices = indices;
+    upload.VertexCount = 3u;
+    upload.LocalBounds.LocalSphere = {0.0f, 0.0f, 0.0f, 1.0f};
+    upload.DebugName = "shadow-caster";
+    const auto geometry = gpuWorld.UploadGeometry(upload);
+    const auto instance = gpuWorld.AllocateInstance(0x5ad0u);
+    ASSERT_TRUE(geometry.IsValid() && instance.IsValid());
+    gpuWorld.SetInstanceGeometry(instance, geometry);
+    gpuWorld.SetInstanceMaterialSlot(instance, 0u);
+    gpuWorld.SetInstanceRenderFlags(instance, Extrinsic::RHI::GpuRender_Visible | Extrinsic::RHI::GpuRender_Opaque |
+                                                  Extrinsic::RHI::GpuRender_Surface |
+                                                  Extrinsic::RHI::GpuRender_CastShadow);
+    gpuWorld.SetInstanceTransform(instance, glm::mat4{1.0f}, glm::mat4{1.0f});
+    gpuWorld.SetBounds(instance, Extrinsic::RHI::GpuBounds{.LocalSphere = {0.0f, 0.0f, 0.0f, 1.0f},
+                                                           .WorldSphere = {0.0f, 0.0f, 0.0f, 1.0f}});
+
+    const Counters::Snapshot before = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    std::uint32_t shadowFrames = 0u;
+    constexpr std::uint32_t kFrames = 6u;
+    for (std::uint32_t i = 0; i < kFrames; ++i)
+    {
+        Extrinsic::RHI::FrameHandle frame{};
+        ASSERT_TRUE(renderer.BeginFrame(frame));
+        const Extrinsic::Graphics::RenderFrameInput input{
+            .Viewport = {.Width = Readback::kFramebufferWidth, .Height = Readback::kFramebufferHeight},
+        };
+        Extrinsic::Graphics::RenderWorld world = renderer.ExtractRenderWorld(input);
+        // ExtractRenderWorld leaves Shadows to the runtime, which publishes it separately.
+        world.Shadows.Enabled = true;
+        world.Shadows.CascadeCount = 2u;
+        world.Shadows.AtlasResolution = 256u;
+        renderer.PrepareFrame(world);
+        renderer.ExecuteFrame(frame, world);
+        (void)renderer.EndFrame(frame);
+        device.Present(frame);
+        const auto& stats = renderer.GetLastRenderGraphStats();
+        ASSERT_TRUE(ContainsPass(stats, "ShadowPass")) << "frame " << i;
+        if (FindPassStatus(stats, "ShadowPass") == RenderCommandPassStatus::Recorded)
+            ++shadowFrames;
+    }
+
+    // The last frame's shadow draw count, read after every submitted frame.
+    const Extrinsic::RHI::BufferHandle count =
+        renderer.GetCullingSystem().GetBucket(Extrinsic::RHI::GpuDrawBucketKind::ShadowOpaque).CountBuffer;
+    std::optional<std::uint32_t> shadowDraws{};
+    const auto token = device.SubmitComputeReadback(
+        [count](Extrinsic::RHI::ICommandContext& commands) {
+            commands.BufferBarrier(count,
+                Extrinsic::RHI::MemoryAccess::IndirectRead | Extrinsic::RHI::MemoryAccess::ShaderRead |
+                    Extrinsic::RHI::MemoryAccess::ShaderWrite,
+                Extrinsic::RHI::MemoryAccess::TransferRead);
+            return count;
+        },
+        sizeof(std::uint32_t),
+        Extrinsic::RHI::ReadbackSink::Invoke([&](std::span<const std::byte> data) {
+            if (data.size() == sizeof(std::uint32_t))
+                shadowDraws = std::bit_cast<std::uint32_t>(std::array{data[0], data[1], data[2], data[3]});
+        }));
+    ASSERT_TRUE(token.IsValid());
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (!shadowDraws && std::chrono::steady_clock::now() < deadline)
+        (void)device.GetTransferQueue().CollectCompleted();
+    device.WaitIdle();
+    const Counters::Snapshot after = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    gpuWorld.FreeInstance(instance);
+    gpuWorld.FreeGeometry(geometry);
+
+    EXPECT_EQ(shadowFrames, kFrames) << "the shadow pass recorded in every frame";
+    ASSERT_TRUE(shadowDraws.has_value()) << "the shadow count was read back";
+    EXPECT_GE(*shadowDraws, 1u) << "the caster reached the shadow bucket";
+    EXPECT_EQ(after.ValidationError, before.ValidationError)
+        << "validation errors (core or synchronization) across the shadow frames";
     engine.Shutdown();
 }
 

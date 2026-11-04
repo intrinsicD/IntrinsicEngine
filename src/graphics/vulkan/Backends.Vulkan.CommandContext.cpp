@@ -204,6 +204,7 @@ void VulkanCommandContext::Begin()
         return;
     }
     m_Recording = true;
+    m_SecondariesOrdered = false;
 }
 
 void VulkanCommandContext::End()
@@ -241,6 +242,25 @@ void VulkanCommandContext::ExecuteSecondary(VulkanCommandContext& secondary)
         return;
     }
 
+    if (!m_SecondariesOrdered)
+    {
+        // A secondary's own barriers order its first accesses against earlier submissions, but synchronization
+        // validation (layer 1.3.296) reported those first accesses of parallel-recorded secondaries as hazards
+        // (every fill was guarded; serial recording of the same passes is clean). One barrier in the primary before
+        // its first secondary orders everything submitted earlier on this queue, so validation stays meaningful.
+        VkMemoryBarrier2 earlier{};
+        earlier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+        earlier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        earlier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        earlier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        earlier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+        VkDependencyInfo dependency{};
+        dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &earlier;
+        vkCmdPipelineBarrier2(m_Cmd, &dependency);
+        m_SecondariesOrdered = true;
+    }
     VkCommandBuffer commandBuffer = secondary.m_Cmd;
     vkCmdExecuteCommands(m_Cmd, 1u, &commandBuffer);
     secondary.m_CommandBufferExecutable = false;

@@ -159,6 +159,10 @@ contract_review: tracker only; each slice declares its own contracts
 79. (2026-11-04, on the consolidation flake not reproduced in 352 runs: (a) flush the inbox before the probe and count
     the run's results by correlation, shown on an injected stray event, (b) a diagnostic only; recommended (a) with
     (b)'s diagnostic) "ja ok, deine empfehlung. danach mach punkt 6 und 7."
+80. (2026-11-04, on step 7a exposing 8 synchronization hazards in the parallel-recording validation smoke once the
+    per-frame queue idle was gone: layer by layer (readback copies, then the parallel-recording fills; 7a lands only
+    with a clean smoke), park 7a and do 7b, or land with documented hazards; recommended the first; chosen option)
+    "Ebene für Ebene (Empfohlen)"
 
 ## Goal
 - Reach the target in
@@ -3454,3 +3458,23 @@ python3 tools/docs/check_doc_links.py --root . --strict
   fails a new test; scene/world/entity identity was dropped from the key (no test failed without it: revisions are
   from one counter). Review: fresh Codex (thread `01a1a6e5-1cd7-7463-8fc9-27cf7ae87e6d`, two deltas) verbatim
   "**Finding: approve — resolved. Whole block: approve.**" on diff sha256 `782ceb11…`.
+- 2026-11-04, Q79 step 7a (block 7a, Q80 layer by layer): `CullingSystem` writes `CullBucketTable` once per bucket
+  allocation (all buckets and the table replaced together or not at all; a failed growth keeps the old set), not per
+  frame through `WriteBuffer`'s queue-idle path; explicit cross-frame barriers on every count, diagnostics and args
+  buffer; the counter clears made visible to the atomics' reads. Removing the per-frame `vkQueueWaitIdle` exposed in
+  `ParallelRecordingMatchesSerialReadbackWithValidation` (HEAD: 0 hazards in 2 runs): layer 1, 5 WAW of the
+  backbuffer readback copies into one buffer → a `TransferWrite → TransferWrite` barrier before the copy
+  (`Graphics.Renderer.cpp`); layer 2, 3 fills of parallel-recorded secondaries flagged although every one of 324 fills
+  had its barrier (tagged-log probe; a wider source mask changed nothing) → one barrier in a primary before its first
+  secondary (`VulkanCommandContext::ExecuteSecondary`). Not shown to be a validation false positive. New tests:
+  ordered barrier/handle contracts incl. growth and a failed growth (mock `FailBufferCreateCall`), readback barrier
+  order (mock `Order`), `ShadowFramesInFlightRunWithoutSynchronizationHazards` (a test caster; shadow count read back
+  ≥ 1; fails without `CastShadow`). GPU mutations: no pre-fill barrier → 135 hazards in the parallel smoke (the serial
+  smokes do not catch it), no secondary barrier → 3. `ctest -L vulkan` 178/182 (4 unrelated: k-means benchmark
+  composition lacks editor jobs since 4219e9084, LSan contract needs `VK_DRIVER_FILES`, the other session's point
+  sampling test and its dependent). Review: fresh Codex (thread `01a1a7ac-ab19-7df1-8d78-a442b5688a72`, revise; the
+  first delta ran in a new thread `01a1a7c1-7d78-7d73-939f-5a076953cf38` because the id was lost, which re-reviewed
+  the block) verbatim "**Finding 4: approve — resolved. Whole block: approve.**" on diff sha256 `b0e5a8a8…`.
+- 2026-11-04, CI flake: `AssetService.CompleteCpuLoadAndFlushEventIgnoresUnrelatedSchedulerWork` failed on
+  6a9f53378 (`Test.AssetService.cpp:305`: the load must finish before a 250 ms blocker; timing on a loaded runner);
+  the change touched no asset code; job rerun.

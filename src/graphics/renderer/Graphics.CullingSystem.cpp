@@ -2,7 +2,6 @@ module;
 
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -247,10 +246,8 @@ namespace Extrinsic::Graphics
 
         std::uint32_t Capacity  = 0;
 
-        bool AllocateBucket(RHI::GpuDrawBucketKind kind, const bool indexed, const std::uint32_t capacity)
+        bool AllocateBucket(BucketStorage& bucket, const bool indexed, const std::uint32_t capacity)
         {
-            auto& bucket = Buckets[ToIndex(kind)];
-
             const std::uint64_t indexedArgsBytes = capacity * sizeof(RHI::GpuDrawIndexedCommand);
             const std::uint64_t pointArgsBytes   = capacity * sizeof(RHI::GpuDrawCommand);
             const std::uint64_t countBytes       = sizeof(std::uint32_t);
@@ -266,7 +263,9 @@ namespace Extrinsic::Graphics
 
                 auto countOr = BufferMgr->Create({
                     .SizeBytes   = countBytes,
-                    .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::Indirect | RHI::BufferUsage::TransferDst,
+                    // TransferSrc: a count can be read back (the shadow synchronization smoke does).
+                    .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::Indirect | RHI::BufferUsage::TransferDst |
+                                   RHI::BufferUsage::TransferSrc,
                     .HostVisible = false,
                     .DebugName   = "CullBucketCount.Phase",
                 });
@@ -314,22 +313,14 @@ namespace Extrinsic::Graphics
             return true;
         }
 
+        // All or nothing: the new buckets and their table replace the old ones together, so a failed growth keeps
+        // a consistent set (the table is written only here).
         bool AllocateGpuBuffers(const std::uint32_t capacity)
         {
-            const bool surfaceOk = AllocateBucket(RHI::GpuDrawBucketKind::SurfaceOpaque, true, capacity);
-            const bool alphaOk   = AllocateBucket(RHI::GpuDrawBucketKind::SurfaceAlphaMask, true, capacity);
-            const bool lineOk    = AllocateBucket(RHI::GpuDrawBucketKind::Lines, true, capacity);
-            const bool lineQuadOk = AllocateBucket(RHI::GpuDrawBucketKind::LineQuads, false, capacity);
-            const bool pointOk   = AllocateBucket(RHI::GpuDrawBucketKind::Points, false, capacity);
-            const bool shadowOk  = AllocateBucket(RHI::GpuDrawBucketKind::ShadowOpaque, true, capacity);
-            const bool selectionSurfaceOk = AllocateBucket(RHI::GpuDrawBucketKind::SelectionSurface, true, capacity);
-            const bool selectionLinesOk   = AllocateBucket(RHI::GpuDrawBucketKind::SelectionLines, true, capacity);
-            const bool selectionPointsOk  = AllocateBucket(RHI::GpuDrawBucketKind::SelectionPoints, false, capacity);
-            if (!(surfaceOk && alphaOk && lineOk && lineQuadOk && pointOk && shadowOk &&
-                  selectionSurfaceOk && selectionLinesOk && selectionPointsOk))
-            {
-                return false;
-            }
+            std::array<BucketStorage, static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count)> next{};
+            for (std::size_t i = 0; i < next.size(); ++i)
+                if (!AllocateBucket(next[i], RHI::IsIndexedDrawBucket(static_cast<RHI::GpuDrawBucketKind>(i)), capacity))
+                    return false;
 
             auto bucketTableOr = BufferMgr->Create({
                 .SizeBytes   = sizeof(RHI::GpuCullBucketTable),
@@ -342,9 +333,35 @@ namespace Extrinsic::Graphics
                 return false;
             }
 
+            Buckets = std::move(next);
             CullBucketTableLease = std::move(*bucketTableOr);
             CullBucketTableBDA = Device->GetBufferDeviceAddress(CullBucketTableLease.GetHandle());
             Capacity = capacity;
+            // The table holds only these buffers' addresses and capacities, so it is written here, once per
+            // allocation, not per frame (a device-local write waits for the graphics queue to go idle).
+            const auto phases = [](const BucketStorage& bucket) -> RHI::GpuCullBucketPhases
+            {
+                const auto& phase1 = bucket.Phases[ToIndex(CullingPhase::Phase1)];
+                const auto& phase2 = bucket.Phases[ToIndex(CullingPhase::Phase2)];
+                return RHI::GpuCullBucketPhases{
+                    .Phase1 = MakeShaderPhase(phase1.ArgsBDA, phase1.CountBDA, bucket.Capacity),
+                    .Phase2 = MakeShaderPhase(phase2.ArgsBDA, phase2.CountBDA, bucket.Capacity),
+                    .Diagnostics = RHI::GpuCullBucketDiagnosticsOutput{.CountersBDA = bucket.DiagnosticsBDA},
+                };
+            };
+            const auto bucket = [&](const RHI::GpuDrawBucketKind kind) { return phases(Buckets[ToIndex(kind)]); };
+            const RHI::GpuCullBucketTable table{
+                .SurfaceOpaque = bucket(RHI::GpuDrawBucketKind::SurfaceOpaque),
+                .SurfaceAlphaMask = bucket(RHI::GpuDrawBucketKind::SurfaceAlphaMask),
+                .Lines = bucket(RHI::GpuDrawBucketKind::Lines),
+                .LineQuads = bucket(RHI::GpuDrawBucketKind::LineQuads),
+                .Points = bucket(RHI::GpuDrawBucketKind::Points),
+                .ShadowOpaque = bucket(RHI::GpuDrawBucketKind::ShadowOpaque),
+                .SelectionSurface = bucket(RHI::GpuDrawBucketKind::SelectionSurface),
+                .SelectionLines = bucket(RHI::GpuDrawBucketKind::SelectionLines),
+                .SelectionPoints = bucket(RHI::GpuDrawBucketKind::SelectionPoints),
+            };
+            Device->WriteBuffer(CullBucketTableLease.GetHandle(), &table, sizeof(table), 0);
             return true;
         }
 
@@ -416,21 +433,24 @@ namespace Extrinsic::Graphics
 
     void CullingSystem::ResetCounters(RHI::ICommandContext& cmd)
     {
+        // The frames in flight share these buffers: a clear waits for the earlier frames' indirect reads and cull
+        // atomics, and the cull's atomicAdd reads and writes the cleared value.
+        const auto clear = [&](const RHI::BufferHandle buffer, const std::uint64_t bytes)
+        {
+            cmd.BufferBarrier(buffer,
+                              RHI::MemoryAccess::IndirectRead | RHI::MemoryAccess::ShaderRead |
+                                  RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::TransferWrite);
+            cmd.FillBuffer(buffer, 0, bytes, 0);
+            cmd.BufferBarrier(buffer,
+                              RHI::MemoryAccess::TransferWrite,
+                              RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+        };
         for (auto& bucket : m_Impl->Buckets)
         {
             for (const auto& phase : bucket.Phases)
-            {
-                const RHI::BufferHandle count = phase.CountLease.GetHandle();
-                cmd.FillBuffer(count, 0, sizeof(std::uint32_t), 0);
-                cmd.BufferBarrier(count,
-                                  RHI::MemoryAccess::TransferWrite,
-                                  RHI::MemoryAccess::ShaderWrite);
-            }
-            const RHI::BufferHandle diagnostics = bucket.DiagnosticsLease.GetHandle();
-            cmd.FillBuffer(diagnostics, 0, sizeof(RHI::GpuCullBucketDiagnosticsCounters), 0);
-            cmd.BufferBarrier(diagnostics,
-                              RHI::MemoryAccess::TransferWrite,
-                              RHI::MemoryAccess::ShaderWrite);
+                clear(phase.CountLease.GetHandle(), sizeof(std::uint32_t));
+            clear(bucket.DiagnosticsLease.GetHandle(), sizeof(RHI::GpuCullBucketDiagnosticsCounters));
         }
     }
 
@@ -446,10 +466,10 @@ namespace Extrinsic::Graphics
         bool resizedBuckets = false;
         if (gpuWorld.GetInstanceCapacity() > m_Impl->Capacity)
         {
-            [[maybe_unused]] const bool resized = m_Impl->AllocateGpuBuffers(gpuWorld.GetInstanceCapacity());
-            assert(resized && "CullingSystem: failed to resize cull buckets to instance capacity");
-            if (!resized)
+            if (!m_Impl->AllocateGpuBuffers(gpuWorld.GetInstanceCapacity()))
             {
+                Core::Log::Warn("[Graphics] CullingSystem could not grow its buckets to the instance capacity; "
+                                "culling skipped this frame");
                 return;
             }
             resizedBuckets = true;
@@ -486,27 +506,6 @@ namespace Extrinsic::Graphics
             ++m_Impl->Diagnostics.HzbStaleSkipCount;
         }
 
-        const auto makeBucketPhases = [](const BucketStorage& bucket) -> RHI::GpuCullBucketPhases
-        {
-            const auto& phase1 = bucket.Phases[ToIndex(CullingPhase::Phase1)];
-            const auto& phase2 = bucket.Phases[ToIndex(CullingPhase::Phase2)];
-            return RHI::GpuCullBucketPhases{
-                .Phase1 = MakeShaderPhase(phase1.ArgsBDA, phase1.CountBDA, bucket.Capacity),
-                .Phase2 = MakeShaderPhase(phase2.ArgsBDA, phase2.CountBDA, bucket.Capacity),
-                .Diagnostics = RHI::GpuCullBucketDiagnosticsOutput{.CountersBDA = bucket.DiagnosticsBDA},
-            };
-        };
-
-        const auto& surface = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceOpaque)];
-        const auto& alpha   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceAlphaMask)];
-        const auto& lines   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Lines)];
-        const auto& lineQuads = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::LineQuads)];
-        const auto& points  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Points)];
-        const auto& shadow  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::ShadowOpaque)];
-        const auto& selectionSurface = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionSurface)];
-        const auto& selectionLines   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionLines)];
-        const auto& selectionPoints  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionPoints)];
-
         pc.InstanceCapacity = gpuWorld.GetInstanceCapacity();
         pc.CullPhase = static_cast<std::uint32_t>(RHI::GpuCullPhase::Phase1);
         pc.CullingFlags = RHI::GpuCullFlag_SelectionBucketOcclusionExempt;
@@ -515,20 +514,15 @@ namespace Extrinsic::Graphics
             pc.CullingFlags |= RHI::GpuCullFlag_HZBStaleSkip;
         }
 
-        RHI::GpuCullBucketTable bucketTable{};
-        bucketTable.SurfaceOpaque = makeBucketPhases(surface);
-        bucketTable.SurfaceAlphaMask = makeBucketPhases(alpha);
-        bucketTable.Lines = makeBucketPhases(lines);
-        bucketTable.LineQuads = makeBucketPhases(lineQuads);
-        bucketTable.Points = makeBucketPhases(points);
-        bucketTable.ShadowOpaque = makeBucketPhases(shadow);
-        bucketTable.SelectionSurface = makeBucketPhases(selectionSurface);
-        bucketTable.SelectionLines = makeBucketPhases(selectionLines);
-        bucketTable.SelectionPoints = makeBucketPhases(selectionPoints);
-        m_Impl->Device->WriteBuffer(m_Impl->CullBucketTableLease.GetHandle(), &bucketTable, sizeof(bucketTable), 0);
         cmd.BufferBarrier(m_Impl->CullBucketTableLease.GetHandle(),
                           RHI::MemoryAccess::TransferWrite,
                           RHI::MemoryAccess::ShaderRead);
+        // The earlier frames' draws still read these arguments (the render graph imports only some of them).
+        for (const auto& bucket : m_Impl->Buckets)
+            for (const auto& phase : bucket.Phases)
+                cmd.BufferBarrier(phase.ArgsLease.GetHandle(),
+                                  RHI::MemoryAccess::IndirectRead,
+                                  RHI::MemoryAccess::ShaderWrite);
 
         cmd.BindPipeline(pipe);
         cmd.PushConstants(&pc, sizeof(pc));

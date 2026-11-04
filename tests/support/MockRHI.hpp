@@ -194,6 +194,7 @@ namespace Extrinsic::Tests
             std::uint64_t DestinationOffset = 0u;
             std::uint32_t X = 0u;
             std::uint32_t Y = 0u;
+            std::uint64_t Order = 0u; // position among the recorded barriers and copies
         };
 
         struct TextureBarrierRecord
@@ -216,6 +217,7 @@ namespace Extrinsic::Tests
             RHI::BufferHandle Buffer{};
             RHI::MemoryAccess Before = RHI::MemoryAccess::None;
             RHI::MemoryAccess After = RHI::MemoryAccess::None;
+            std::uint64_t Order = 0u; // position among the recorded barriers and copies
         };
 
         struct MemoryBarrierRecord
@@ -303,7 +305,7 @@ namespace Extrinsic::Tests
             std::uint32_t,
             std::uint32_t) override
         {
-            CopyTextureToBufferRecords.push_back({src, srcLayout, dst, dstOffset, srcOffsetX, srcOffsetY});
+            CopyTextureToBufferRecords.push_back({src, srcLayout, dst, dstOffset, srcOffsetX, srcOffsetY, ++RecordedOrder});
         }
 
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
@@ -311,6 +313,7 @@ namespace Extrinsic::Tests
         std::vector<RHI::DepthAttachment> RenderPassDepths{};
         std::vector<SampledTextureBindingRecord> SampledTextureBindings{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
+        std::uint64_t RecordedOrder = 0u;
         std::vector<MemoryBarrierRecord>  MemoryBarrierCalls{};
         std::vector<DispatchRecord> DispatchRecords{};
         std::vector<DispatchIndirectRecord> DispatchIndirectRecords{};
@@ -408,6 +411,7 @@ namespace Extrinsic::Tests
         bool FailNextPlacedBufferCreate = false;
         bool FailNextPlacedTextureCreate = false;
         int  FailPipelineCreateCall = 0;
+        int  FailBufferCreateCall = 0; // fails the buffer create whose 1-based CreateBufferCount equals it
         bool BeginFrameResult       = true;
         bool AsyncComputeQueueAvailable = false;
         bool TransferQueueAvailable = false;

@@ -3,6 +3,7 @@
 // Test.DefaultRecipeSurfaceGpuSmoke.cpp drives the four-sample pixel assertion;
 // this file locks the CPU-observable API and diagnostic counter.
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 
@@ -102,6 +103,14 @@ TEST(DefaultRecipeBackbufferReadbackContract, ConfiguredHandleRecordsReadbackTri
         << "Present -> TransferSrc transition must precede the copy.";
     EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present))
         << "TransferSrc -> Present transition must restore the layout the device's Present() expects.";
+    // ARCH-022 Q80: the frames in flight copy into the same buffer, so each copy waits for the previous frame's.
+    const auto& copies = device.CommandContext.CopyTextureToBufferRecords;
+    const auto copy = std::ranges::find_if(copies, [&](const auto& record) { return record.Destination == readback; });
+    ASSERT_NE(copy, copies.end());
+    EXPECT_TRUE(std::ranges::any_of(device.CommandContext.BufferBarrierCalls, [&](const auto& barrier) {
+        return barrier.Buffer == readback && barrier.Before == RHI::MemoryAccess::TransferWrite &&
+               barrier.After == RHI::MemoryAccess::TransferWrite && barrier.Order < copy->Order;
+    })) << "the readback buffer's write-after-write barrier must precede the copy";
 
     renderer->Shutdown();
 }

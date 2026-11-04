@@ -115,6 +115,109 @@ namespace
         RHI::GpuDrawBucketKind::LineQuads,
     };
 
+    constexpr std::size_t kBucketCount = static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count);
+    using Access = RHI::MemoryAccess;
+
+    // Every bucket's per-phase args and count buffers and its diagnostics buffer, in the culling system's order.
+    struct CullHandles
+    {
+        std::array<std::array<RHI::BufferHandle, 2>, kBucketCount> Args{};
+        std::array<std::array<RHI::BufferHandle, 2>, kBucketCount> Counts{};
+        std::array<RHI::BufferHandle, kBucketCount> Diagnostics{};
+    };
+
+    CullHandles HandlesOf(const Graphics::CullingSystem& culling)
+    {
+        CullHandles handles{};
+        for (std::size_t i = 0; i < kBucketCount; ++i)
+        {
+            const auto kind = static_cast<RHI::GpuDrawBucketKind>(i);
+            for (std::size_t phase = 0; phase < 2u; ++phase)
+            {
+                const auto output = culling.GetBucketPhase(
+                    kind, phase == 0u ? Graphics::CullingPhase::Phase1 : Graphics::CullingPhase::Phase2);
+                handles.Args[i][phase] = RHI::IsIndexedDrawBucket(kind) ? output.IndexedArgsBuffer : output.NonIndexedArgsBuffer;
+                handles.Counts[i][phase] = output.CountBuffer;
+            }
+            handles.Diagnostics[i] = culling.GetBucket(kind).DiagnosticsBuffer;
+        }
+        return handles;
+    }
+
+    void ExpectBarrier(const std::vector<Event>& events, std::size_t& at, const RHI::BufferHandle buffer,
+                       const Access before, const Access after)
+    {
+        ASSERT_LT(at, events.size());
+        const Event& event = events[at];
+        EXPECT_EQ(event.Kind, EventKind::BufferBarrier) << "event " << at;
+        EXPECT_EQ(event.Buffer, buffer) << "event " << at;
+        EXPECT_EQ(event.Before, before) << "event " << at;
+        EXPECT_EQ(event.After, after) << "event " << at;
+        ++at;
+    }
+
+    // ResetCounters: every count and diagnostics buffer waits for the earlier frames' indirect reads and cull
+    // atomics (the frames in flight share these buffers), is cleared, and is made visible to this frame's atomics.
+    void ExpectReset(const std::vector<Event>& events, std::size_t& at, const CullHandles& handles)
+    {
+        const auto cleared = [&](const RHI::BufferHandle buffer)
+        {
+            ExpectBarrier(events, at, buffer, Access::IndirectRead | Access::ShaderRead | Access::ShaderWrite,
+                          Access::TransferWrite);
+            ASSERT_LT(at, events.size());
+            EXPECT_EQ(events[at].Kind, EventKind::FillBuffer) << "event " << at;
+            EXPECT_EQ(events[at].Buffer, buffer) << "event " << at;
+            ++at;
+            ExpectBarrier(events, at, buffer, Access::TransferWrite, Access::ShaderRead | Access::ShaderWrite);
+        };
+        for (std::size_t i = 0; i < kBucketCount; ++i)
+        {
+            cleared(handles.Counts[i][0]);
+            cleared(handles.Counts[i][1]);
+            cleared(handles.Diagnostics[i]);
+        }
+    }
+
+    // DispatchCull: the table's barrier, every args buffer after the earlier frames' indirect reads, the dispatch,
+    // and every output made visible to its readers.
+    void ExpectDispatch(const std::vector<Event>& events, std::size_t& at, const CullHandles& handles,
+                        const RHI::BufferHandle table)
+    {
+        ExpectBarrier(events, at, table, Access::TransferWrite, Access::ShaderRead);
+        for (std::size_t i = 0; i < kBucketCount; ++i)
+            for (std::size_t phase = 0; phase < 2u; ++phase)
+                ExpectBarrier(events, at, handles.Args[i][phase], Access::IndirectRead, Access::ShaderWrite);
+        ASSERT_LE(at + 3u, events.size());
+        EXPECT_EQ(events[at++].Kind, EventKind::BindPipeline);
+        EXPECT_EQ(events[at++].Kind, EventKind::PushConstants);
+        EXPECT_EQ(events[at++].Kind, EventKind::Dispatch);
+        for (std::size_t i = 0; i < kBucketCount; ++i)
+        {
+            for (std::size_t phase = 0; phase < 2u; ++phase)
+            {
+                ExpectBarrier(events, at, handles.Args[i][phase], Access::ShaderWrite, Access::IndirectRead);
+                ExpectBarrier(events, at, handles.Counts[i][phase], Access::ShaderWrite, Access::IndirectRead);
+            }
+            ExpectBarrier(events, at, handles.Diagnostics[i], Access::ShaderWrite, Access::ShaderRead);
+        }
+    }
+
+    const MockDevice::BufferWriteRecord* FindWrite(const MockDevice& device, const std::uint64_t bda)
+    {
+        for (auto write = device.BufferWrites.rbegin(); write != device.BufferWrites.rend(); ++write) // the latest
+            if (device.GetBufferDeviceAddress(write->Handle) == bda)
+                return &*write;
+        return nullptr;
+    }
+
+    std::size_t BucketTableWrites(const MockDevice& device)
+    {
+        std::size_t writes = 0;
+        for (const auto& write : device.BufferWrites)
+            writes += write.Data.size() == sizeof(RHI::GpuCullBucketTable) ? 1u : 0u;
+        return writes;
+    }
+
     Graphics::GpuWorld::InitDesc TinyWorldDesc()
     {
         Graphics::GpuWorld::InitDesc init{};
@@ -217,6 +320,7 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
 
     Graphics::CullingSystem culling;
     ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
+    const std::size_t writesAtInitialize = device.BufferWrites.size();
 
     RecordingCommandContext cmd;
     RHI::CameraUBO camera{};
@@ -225,43 +329,6 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
     Graphics::CullingPass pass{culling};
     pass.Execute(cmd, camera, world);
 
-    constexpr std::size_t bucketCount = static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count);
-    const std::size_t expectedEvents = (bucketCount * 6u) + 1u + 3u + (bucketCount * 5u);
-    ASSERT_EQ(cmd.Events.size(), expectedEvents);
-
-    std::size_t event = 0;
-    for (std::size_t i = 0; i < bucketCount; ++i)
-    {
-        for (std::size_t phase = 0; phase < 2u; ++phase)
-        {
-            EXPECT_EQ(cmd.Events[event].Kind, EventKind::FillBuffer);
-            EXPECT_TRUE(cmd.Events[event].Buffer.IsValid());
-            ++event;
-
-            EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
-            EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::TransferWrite);
-            EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::ShaderWrite);
-            ++event;
-        }
-
-        EXPECT_EQ(cmd.Events[event].Kind, EventKind::FillBuffer);
-        EXPECT_TRUE(cmd.Events[event].Buffer.IsValid());
-        ++event;
-
-        EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
-        EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::TransferWrite);
-        EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::ShaderWrite);
-        ++event;
-    }
-
-    EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
-    EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::TransferWrite);
-    EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::ShaderRead);
-    ++event;
-
-    EXPECT_EQ(cmd.Events[event++].Kind, EventKind::BindPipeline);
-    EXPECT_EQ(cmd.Events[event++].Kind, EventKind::PushConstants);
-    EXPECT_EQ(cmd.Events[event++].Kind, EventKind::Dispatch);
     ASSERT_TRUE(cmd.LastCullPushConstants.has_value());
     EXPECT_EQ(cmd.LastCullPushConstants->CullPhase,
               static_cast<std::uint32_t>(RHI::GpuCullPhase::Phase1));
@@ -271,59 +338,165 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
     EXPECT_EQ(cmd.LastCullPushConstants->CullingFlags &
                   RHI::GpuCullFlag_HZBStaleSkip,
               0u);
+    const auto* table = FindWrite(device, cmd.LastCullPushConstants->CullBucketTableBDA);
+    ASSERT_NE(table, nullptr) << "the table is written when the buckets are allocated";
+    EXPECT_EQ(device.BufferWrites.size(), writesAtInitialize) << "a frame writes no table";
 
-    for (std::size_t i = 0; i < bucketCount; ++i)
-    {
-        for (std::size_t phase = 0; phase < 2u; ++phase)
-        {
-            EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
-            EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::ShaderWrite);
-            EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::IndirectRead);
-            ++event;
-
-            EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
-            EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::ShaderWrite);
-            EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::IndirectRead);
-            ++event;
-        }
-
-        EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
-        EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::ShaderWrite);
-        EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::ShaderRead);
-        ++event;
-    }
+    std::size_t event = 0;
+    const CullHandles handles = HandlesOf(culling);
+    ExpectReset(cmd.Events, event, handles);
+    ExpectDispatch(cmd.Events, event, handles, table->Handle);
     EXPECT_EQ(event, cmd.Events.size());
 
-    bool sawBucketTableWrite = false;
-    const std::uint64_t expectedBucketTableBda = cmd.LastCullPushConstants->CullBucketTableBDA;
-    ASSERT_NE(expectedBucketTableBda, 0u);
-    for (const auto& write : device.BufferWrites)
-    {
-        if (device.GetBufferDeviceAddress(write.Handle) != expectedBucketTableBda)
-        {
-            continue;
-        }
-        ASSERT_EQ(write.Offset, 0u);
-        ASSERT_EQ(write.Data.size(), sizeof(RHI::GpuCullBucketTable));
-
-        RHI::GpuCullBucketTable table{};
-        std::memcpy(&table, write.Data.data(), sizeof(table));
-        EXPECT_GT(table.SurfaceOpaque.Phase1.Capacity, 0u);
-        EXPECT_GT(table.SurfaceOpaque.Phase2.Capacity, 0u);
-        EXPECT_GT(table.SurfaceAlphaMask.Phase1.Capacity, 0u);
-        EXPECT_GT(table.Lines.Phase1.Capacity, 0u);
-        EXPECT_GT(table.Points.Phase1.Capacity, 0u);
-        EXPECT_GT(table.ShadowOpaque.Phase1.Capacity, 0u);
-        EXPECT_GT(table.SelectionSurface.Phase1.Capacity, 0u);
-        EXPECT_GT(table.SelectionLines.Phase1.Capacity, 0u);
-        EXPECT_GT(table.SelectionPoints.Phase1.Capacity, 0u);
-        sawBucketTableWrite = true;
-        break;
-    }
-    EXPECT_TRUE(sawBucketTableWrite);
+    ASSERT_EQ(table->Offset, 0u);
+    ASSERT_EQ(table->Data.size(), sizeof(RHI::GpuCullBucketTable));
+    RHI::GpuCullBucketTable content{};
+    std::memcpy(&content, table->Data.data(), sizeof(content));
+    EXPECT_GT(content.SurfaceOpaque.Phase1.Capacity, 0u);
+    EXPECT_GT(content.SurfaceOpaque.Phase2.Capacity, 0u);
+    EXPECT_GT(content.SurfaceAlphaMask.Phase1.Capacity, 0u);
+    EXPECT_GT(content.Lines.Phase1.Capacity, 0u);
+    EXPECT_GT(content.Points.Phase1.Capacity, 0u);
+    EXPECT_GT(content.ShadowOpaque.Phase1.Capacity, 0u);
+    EXPECT_GT(content.SelectionSurface.Phase1.Capacity, 0u);
+    EXPECT_GT(content.SelectionLines.Phase1.Capacity, 0u);
+    EXPECT_GT(content.SelectionPoints.Phase1.Capacity, 0u);
+    EXPECT_EQ(content.SurfaceOpaque.Phase1.ArgsBDA, device.GetBufferDeviceAddress(handles.Args[0][0]));
+    EXPECT_EQ(content.SelectionPoints.Phase2.CountBDA,
+              device.GetBufferDeviceAddress(
+                  handles.Counts[static_cast<std::size_t>(RHI::GpuDrawBucketKind::SelectionPoints)][1]));
 
     culling.Shutdown();
     world.Shutdown();
+}
+
+// ARCH-022 Q79 step 7a: the bucket table holds only buffer addresses and capacities, so it is written when the buckets
+// are allocated (initialization and a capacity growth), never per frame (each write waited for the graphics queue to
+// go idle); a growth frame clears the new counts as well and its barriers name the new buffers.
+TEST(GraphicsCullingContracts, TheBucketTableIsWrittenOncePerAllocation)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    RHI::PipelineManager pipelineMgr{device};
+
+    Graphics::GpuWorld small;
+    ASSERT_TRUE(small.Initialize(device, bufferMgr, TinyWorldDesc()));
+    small.SyncFrame();
+    Graphics::CullingSystem culling;
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
+    EXPECT_EQ(BucketTableWrites(device), 1u);
+
+    RHI::CameraUBO camera{};
+    camera.ViewProj = glm::mat4{1.0f};
+    Graphics::CullingPass pass{culling};
+    RecordingCommandContext first;
+    pass.Execute(first, camera, small);
+    pass.Execute(first, camera, small);
+    EXPECT_EQ(BucketTableWrites(device), 1u) << "two frames write no table";
+    ASSERT_TRUE(first.LastCullPushConstants.has_value());
+    const std::uint64_t firstTable = first.LastCullPushConstants->CullBucketTableBDA;
+
+    auto desc = TinyWorldDesc();
+    desc.MaxInstances = 2048u;
+    Graphics::GpuWorld large;
+    ASSERT_TRUE(large.Initialize(device, bufferMgr, desc));
+    large.SyncFrame();
+    const CullHandles before = HandlesOf(culling);
+    RecordingCommandContext grown;
+    pass.Execute(grown, camera, large);
+    EXPECT_EQ(BucketTableWrites(device), 2u) << "the growth writes its new table";
+    ASSERT_TRUE(grown.LastCullPushConstants.has_value());
+    EXPECT_NE(grown.LastCullPushConstants->CullBucketTableBDA, firstTable);
+    const auto* table = FindWrite(device, grown.LastCullPushConstants->CullBucketTableBDA);
+    ASSERT_NE(table, nullptr);
+    RHI::GpuCullBucketTable content{};
+    ASSERT_EQ(table->Data.size(), sizeof(content));
+    std::memcpy(&content, table->Data.data(), sizeof(content));
+    EXPECT_EQ(content.SurfaceOpaque.Phase1.Capacity, 2048u);
+    const CullHandles after = HandlesOf(culling);
+    EXPECT_NE(after.Args[0][0], before.Args[0][0]) << "new buckets";
+    EXPECT_EQ(content.SurfaceOpaque.Phase1.ArgsBDA, device.GetBufferDeviceAddress(after.Args[0][0]));
+    std::size_t event = 0;
+    ExpectReset(grown.Events, event, before); // the pass's reset, before the growth
+    ExpectReset(grown.Events, event, after);  // the grown buckets cleared
+    ExpectDispatch(grown.Events, event, after, table->Handle);
+    EXPECT_EQ(event, grown.Events.size());
+
+    RecordingCommandContext next;
+    pass.Execute(next, camera, large);
+    EXPECT_EQ(BucketTableWrites(device), 2u);
+    event = 0;
+    ExpectReset(next.Events, event, after);
+    ExpectDispatch(next.Events, event, after, table->Handle);
+    EXPECT_EQ(event, next.Events.size());
+
+    culling.Shutdown();
+    large.Shutdown();
+    small.Shutdown();
+}
+
+// ARCH-022 Q79 step 7a: a growth that fails partway keeps the old buckets and their table together (the table is no
+// longer rewritten per frame, so a half-replaced set would stay out of step with it); a later growth still succeeds.
+TEST(GraphicsCullingContracts, AFailedGrowthKeepsTheBucketsAndTheirTable)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    RHI::PipelineManager pipelineMgr{device};
+    Graphics::GpuWorld small;
+    ASSERT_TRUE(small.Initialize(device, bufferMgr, TinyWorldDesc()));
+    small.SyncFrame();
+    auto desc = TinyWorldDesc();
+    desc.MaxInstances = 2048u;
+    Graphics::GpuWorld large;
+    ASSERT_TRUE(large.Initialize(device, bufferMgr, desc));
+    large.SyncFrame();
+    Graphics::CullingSystem culling;
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
+
+    RHI::CameraUBO camera{};
+    camera.ViewProj = glm::mat4{1.0f};
+    Graphics::CullingPass pass{culling};
+    RecordingCommandContext first;
+    pass.Execute(first, camera, small);
+    ASSERT_TRUE(first.LastCullPushConstants.has_value());
+    const std::uint64_t table = first.LastCullPushConstants->CullBucketTableBDA;
+    const CullHandles before = HandlesOf(culling);
+
+    device.FailBufferCreateCall = device.CreateBufferCount + 30; // the sixth bucket's diagnostics buffer
+    RecordingCommandContext failed;
+    pass.Execute(failed, camera, large);
+    EXPECT_FALSE(failed.LastCullPushConstants.has_value()) << "no cull without buckets for every instance";
+    const CullHandles kept = HandlesOf(culling);
+    EXPECT_EQ(kept.Args, before.Args);
+    EXPECT_EQ(kept.Counts, before.Counts);
+    EXPECT_EQ(kept.Diagnostics, before.Diagnostics);
+
+    device.FailBufferCreateCall = 0;
+    RecordingCommandContext next;
+    pass.Execute(next, camera, small);
+    ASSERT_TRUE(next.LastCullPushConstants.has_value());
+    EXPECT_EQ(next.LastCullPushConstants->CullBucketTableBDA, table);
+    const auto* write = FindWrite(device, table);
+    ASSERT_NE(write, nullptr);
+    RHI::GpuCullBucketTable content{};
+    ASSERT_EQ(write->Data.size(), sizeof(content));
+    std::memcpy(&content, write->Data.data(), sizeof(content));
+    EXPECT_EQ(content.SurfaceOpaque.Phase1.ArgsBDA, device.GetBufferDeviceAddress(before.Args[0][0]));
+    const auto shadow = static_cast<std::size_t>(RHI::GpuDrawBucketKind::ShadowOpaque);
+    EXPECT_EQ(content.ShadowOpaque.Phase2.CountBDA, device.GetBufferDeviceAddress(before.Counts[shadow][1]));
+    std::size_t event = 0;
+    ExpectReset(next.Events, event, before);
+    ExpectDispatch(next.Events, event, before, write->Handle);
+    EXPECT_EQ(event, next.Events.size());
+
+    RecordingCommandContext grown;
+    pass.Execute(grown, camera, large);
+    ASSERT_TRUE(grown.LastCullPushConstants.has_value()) << "a later growth succeeds";
+    EXPECT_NE(grown.LastCullPushConstants->CullBucketTableBDA, table);
+
+    culling.Shutdown();
+    large.Shutdown();
+    small.Shutdown();
 }
 
 TEST(GraphicsCullingContracts, TwoPhasePartitionIsDeterministicAndConservative)

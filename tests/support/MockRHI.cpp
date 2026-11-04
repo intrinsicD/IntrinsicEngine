@@ -227,7 +227,7 @@ namespace Extrinsic::Tests
 
     void MockCommandContext::BufferBarrier(RHI::BufferHandle buffer, RHI::MemoryAccess before, RHI::MemoryAccess after)
     {
-        BufferBarrierCalls.push_back({buffer, before, after});
+        BufferBarrierCalls.push_back({buffer, before, after, ++RecordedOrder});
     }
 
     void MockCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
@@ -433,6 +433,7 @@ namespace Extrinsic::Tests
     {
         ++CreateBufferCount;
         if (FailNextBufferCreate) { FailNextBufferCreate = false; return {}; }
+        if (FailBufferCreateCall > 0 && CreateBufferCount == FailBufferCreateCall) return {};
         return RHI::BufferHandle{m_NextBuffer++, 1u};
     }
 

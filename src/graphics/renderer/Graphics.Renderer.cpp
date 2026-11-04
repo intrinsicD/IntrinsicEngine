@@ -3619,6 +3619,10 @@ namespace Extrinsic::Graphics
                         {
                             const auto copyBackbuffer = [&](const RHI::BufferHandle readbackBuffer)
                             {
+                                // The frames in flight copy into this one buffer: wait for the previous copy.
+                                graphicsContext.BufferBarrier(readbackBuffer,
+                                                              RHI::MemoryAccess::TransferWrite,
+                                                              RHI::MemoryAccess::TransferWrite);
                                 graphicsContext.TextureBarrier(backbuffer,
                                                                 RHI::TextureLayout::Present,
                                                                 RHI::TextureLayout::TransferSrc);
