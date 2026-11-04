@@ -901,9 +901,11 @@ TEST(StepRuns, AcceptOnEndAcceptsACappedBatchAndOnlyThat)
         const auto id = t.Start({.IterationCap = 4u, .AcceptOnEnd = onEnd});
         ASSERT_TRUE(t.Control(id, R::StepRunAction::Run));
         ASSERT_TRUE(t.Until([&] { return t.Observe(id).End != R::StepRunEnd::None && !t.Observe(id).SegmentInFlight; }));
+        const auto settled = onEnd ? R::StepRunPhase::Committed : R::StepRunPhase::Paused;
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == settled; })) << "the pump's effect, not a frame count";
         t.Frames(5);
         EXPECT_EQ(t.Observe(id).End, R::StepRunEnd::IterationCap);
-        EXPECT_EQ(t.Observe(id).Phase, onEnd ? R::StepRunPhase::Committed : R::StepRunPhase::Paused);
+        EXPECT_EQ(t.Observe(id).Phase, settled);
         EXPECT_EQ(t.Gpu.Commits, onEnd ? 1 : 0);
     }
 }
@@ -939,6 +941,7 @@ TEST(StepRuns, APendingCommitDecidesAfterItsPublicationStartedAndNotBefore)
         ASSERT_TRUE(t.Control(id, R::StepRunAction::Discard));
         ASSERT_TRUE(t.Until([&] { return t.Gpu.Discards == 1; })) << "the owner abandons its readback";
         t.Gpu.Driver.CommitFinished(true);
+        ASSERT_TRUE(t.Until([&] { return t.Observe(id).Phase == R::StepRunPhase::Discarded; }));
         t.Frames(5);
         EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Discarded);
         EXPECT_EQ(t.Gpu.Discards, 1);
@@ -989,9 +992,11 @@ TEST(StepRuns, AnOwnerDrivenRunDiscardedWithAPageHeldRetiresOnlyOnceItIsConsumed
     t.Gpu.Hold = true;
     ASSERT_TRUE(t.Until([&] { return t.Gpu.InFlight; }));
     ASSERT_TRUE(t.Control(id, R::StepRunAction::Discard));
-    t.Frames(5);
     EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Discarded) << "terminal at once";
-    EXPECT_EQ(t.Gpu.Discards, 1) << "what it shows goes at once";
+    ASSERT_TRUE(t.Until([&] { return t.Gpu.Discards == 1; })) << "what it shows goes with the next pump";
+    t.Frames(5);
+    EXPECT_EQ(t.Observe(id).Phase, R::StepRunPhase::Discarded);
+    EXPECT_EQ(t.Gpu.Discards, 1) << "exactly once";
     EXPECT_FALSE(t.Gpu.Alive.expired()) << "its callables wait for the held page";
     t.Gpu.Hold = false;
     ASSERT_TRUE(t.Until([&] { return t.Gpu.Alive.expired(); }));
@@ -1044,8 +1049,9 @@ TEST(StepRuns, AnOwnerWaitsForARestartAndARetiredRunIgnoresItsHandle)
     t.Frames(5);
     EXPECT_EQ(inits, 0) << "not while a page is held";
     t.Gpu.Hold = false;
+    ASSERT_TRUE(t.Until([&] { return inits == 1; })) << "the held page was the older computation's last";
     t.Frames(3);
-    EXPECT_EQ(inits, 1) << "the held page was the older computation's last";
+    EXPECT_EQ(inits, 1) << "restarted once";
     ASSERT_TRUE(t.Until([&] { return inits == 1 && t.Observe(id).Steps >= 1u; }));
     EXPECT_EQ(t.Observe(id).Generation, 1u);
     EXPECT_EQ(t.Observe(id).Metrics->Records().front().Values[0], 1.0) << "the new generation starts from x = 0";

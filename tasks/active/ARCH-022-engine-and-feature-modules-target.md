@@ -3410,3 +3410,13 @@ python3 tools/docs/check_doc_links.py --root . --strict
   frame, cause read from where the time accumulated, a missed prediction counted as held, "no difference" for a null
   result, the start's aggregation, two audit counts, the review history), round 2 "revise required" (one hold-frame
   breakdown), round 3 verbatim "**Verdict: approve.**". Steps 6 and 7 next, sized by the audit's "what remains".
+- 2026-11-04, CI on bee778ac2 (docs and the task note only) red twice with two different flakes on the 2-worker
+  runner: attempt 1 `PointCloudConsolidationModule.AgentCompletionListenerReleasedOnDetachCancellationAndCompletion`
+  (`Test.PointCloudConsolidationModule.cpp:2792`, two listener calls instead of one after completion; not ARCH-022
+  code, open for the operator), attempt 2 `StepRuns.AcceptOnEndAcceptsACappedBatchAndOnlyThat` (`Test.StepRuns.cpp:906`,
+  the Accept-on-end commit expected five frames after the end). Fixed in the step-run tests: four positive
+  expectations of a pump effect after a frame count now wait for the effect (the pump runs on the main thread in
+  the completion drain once the holder's worker job finished), the frame counts stay as stability checks; under
+  stress (8 processes on one core, 3 rounds) the old file failed 3 of 24, the new 0 of 24, the whole suite 0 of 24.
+  Review: fresh Codex (thread `01a1a656-428f-7bb3-b66e-dcbbb10f7467`), round 1 "revise required" (a fourth wait at
+  line 997), round 2 verbatim "**Verdict: approve**".
