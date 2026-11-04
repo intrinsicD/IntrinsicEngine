@@ -3392,3 +3392,21 @@ python3 tools/docs/check_doc_links.py --root . --strict
   input reuse after Accept and undo/redo), round 2 verbatim "**Verdict: approve** for `b62867335..c2a2c29c5`." (the
   preflight is unreachable through every public path, option (a) accepted; optional: `Size()` instead of the
   revision-marking `Vector().size()`), round 3 on that fix verbatim "**Verdict: approve**".
+- 2026-11-04, Q77 measurement (packet `tasks/evidence/ARCH-022/preflight-q75/`, four rounds: both REVISE on
+  `d351cbc2…` for work equivalence under the changed seeding, the missing-data contract, two-sided readings, the null
+  control, identity checks; on `1141545d…` Claude PASS, Codex REVISE; both PASS on `22c825d8…`; record in
+  `reviews/README.md`). Run `tasks/evidence/ARCH-022/q75/` (baseline 3fb976384's S3c-3 binary against 1ceeae223,
+  interleaved), audit `q75-audit.md`, report `docs/reports/2026-11-04-arch-022-r7-kmeans-q75.md`: the Accept's
+  publication 4.5–4.7 → 2.1 ms and 52.7–60.4 → 30.5–31.4 ms, one start 1.38–1.40 → 1.02 ms and 16.4–17.0 → 10.6–10.8
+  ms (process medians), each faster in every process; the frozen verdicts stay not met at both sizes for both
+  commits, their U maxima set by single untraced frames in `platform_begin` (up to 130 ms) or `present` (16 ms), five
+  in the run processes of both commits, none in the null processes or in S3c-3; without those frames (exploratory)
+  only the candidate's 100 000-point verdict changes (U 2.9 ms, met). Predictions wrong: the start at 100 000 (1.02
+  ms, range up to 1.0), the continuous frames' median at 100 000 (1.301 ms, range up to 1.3), the renderer's hold
+  execute at 1 048 576 (23–26 against 29–32 ms, predicted unchanged), the candidate's 100 000 verdict (the stall
+  frame). Claims review of the report, the R7 row, this entry and the audit (fresh Codex, `codex exec` read-only,
+  xhigh, thread `01a1a607-2c4b-7f61-9484-543e743ced9d`, instruction-only; answers
+  `tasks/evidence/ARCH-022/q75-claims-review-*`): round 1 "**Verdict: revise required.**" (medians stated as every
+  frame, cause read from where the time accumulated, a missed prediction counted as held, "no difference" for a null
+  result, the start's aggregation, two audit counts, the review history), round 2 "revise required" (one hold-frame
+  breakdown), round 3 verbatim "**Verdict: approve.**". Steps 6 and 7 next, sized by the audit's "what remains".
