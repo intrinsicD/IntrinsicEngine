@@ -43,6 +43,7 @@ import Extrinsic.Runtime.ViewCapture;
 
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
+import Extrinsic.Sandbox.KMeansTrace;
 // Generated: the startup plugins (each plugin's CMake adds itself), imported when linked into a static Sandbox.
 #include "SandboxStartupPlugins.hpp"
 
@@ -58,6 +59,10 @@ namespace
     struct ParsedCli
     {
         FramePacingCaptureOptions Capture{};
+        // ARCH-022 Q83: the opt-in per-frame K-Means trace (Sandbox.KMeansTrace); 0 frames: no exit request.
+        std::filesystem::path KMeansTracePath{};
+        std::uint32_t KMeansTraceFrames = 0u;
+        std::uint32_t KMeansTraceExitAfterRuns = 0u;
         // Opt-in agent control lane (MCP over an owner-only Unix socket).
         std::optional<Extrinsic::Runtime::AgentServerOptions> Agent{};
         // ARCH-022: the plugin host's fault injection and probes, for the fixture plugin's drivers.
@@ -136,6 +141,23 @@ namespace
                 if (arg.size() > 15u) agent.SocketPath = std::string{arg.substr(15u)};
                 else if (index + 1u < args.size() && !args[index + 1u].starts_with("--"))
                     agent.SocketPath = std::string{args[++index]};
+            }
+            else if (arg == "--kmeans-trace" || arg == "--kmeans-trace-frames" || arg == "--kmeans-trace-exit-after-runs")
+            {
+                if (index + 1u >= args.size() ||
+                    (arg == "--kmeans-trace" ? args[index + 1u].empty() || args[index + 1u].starts_with("--")
+                                             : !ParsePositiveUInt(args[index + 1u],
+                                                   arg == "--kmeans-trace-frames" ? parsed.KMeansTraceFrames
+                                                                                  : parsed.KMeansTraceExitAfterRuns)))
+                {
+                    parsed.Valid = false;
+                    parsed.Error = std::string{arg} + " requires a " +
+                        (arg == "--kmeans-trace" ? "path" : "positive integer");
+                    return parsed;
+                }
+                if (arg == "--kmeans-trace")
+                    parsed.KMeansTracePath = std::filesystem::path{std::string{args[index + 1u]}};
+                ++index;
             }
             else if (arg == "--plugin-test-hooks")
             {
@@ -508,6 +530,16 @@ int main(int argc, char** argv)
         capture = captureModule.get();
         engine.AddModule(std::move(captureModule));
     }
+    std::vector<Extrinsic::Sandbox::KMeansTraceSample> kmeansTrace;
+    Extrinsic::Sandbox::KMeansTraceModule* kmeansTraceModule = nullptr;
+    if (!cli.KMeansTracePath.empty())
+    {
+        auto traceModule = std::make_unique<Extrinsic::Sandbox::KMeansTraceModule>(kmeansTrace, cli.KMeansTraceFrames,
+            [&engine] { return engine.GetLastFramePacingDiagnostics(); }, [&engine] { engine.RequestExit(); },
+            cli.KMeansTraceExitAfterRuns);
+        kmeansTraceModule = traceModule.get();
+        engine.AddModule(std::move(traceModule));
+    }
 
     auto pluginHost = std::make_unique<Extrinsic::Runtime::PluginHostModule>(Extrinsic::Runtime::PluginHostOptions{
         .TestHooks = cli.PluginTestHooks,
@@ -552,8 +584,16 @@ int main(int argc, char** argv)
     {
         capture->CaptureLatest();
     }
+    if (kmeansTraceModule != nullptr)
+        kmeansTraceModule->AttachCompletedPacing();
     sandbox.Shutdown();
     engine.Shutdown();
+
+    if (kmeansTraceModule != nullptr && !Extrinsic::Sandbox::WriteKMeansTrace(cli.KMeansTracePath, kmeansTrace))
+    {
+        std::cerr << "failed to write the K-Means trace: " << cli.KMeansTracePath << '\n';
+        return 3;
+    }
 
     if (cli.Capture.Enabled)
     {

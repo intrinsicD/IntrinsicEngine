@@ -249,17 +249,30 @@ namespace Extrinsic::Runtime
             auto& r = *context.SpatialIndices->PropertyResidency();
             const auto before = r.Stats();
             const auto entity = SelectionController::ToEntityHandle(snapshot.Command.StableEntityId);
-            a->Input = ResolveGpuPropertyInput(
-                r, *context.Scene, context.World, entity, snapshot.Command.Properties.InputPositions);
+            {
+                const ScopedMicros timer{&Stats.GpuInputResolveMicros};
+                a->Input = ResolveGpuPropertyInput(
+                    r, *context.Scene, context.World, entity, snapshot.Command.Properties.InputPositions);
+            }
             if (!a->Input)
                 return {.Refused = true, .Diagnostic = "K-Means resident input is busy or unavailable."};
-            auto seeds = Geometry::KMeans::BuildInitialCentroids(snapshot.Input->Points, {}, snapshot.Params, a->Clusters);
+            std::vector<glm::vec3> seeds;
+            {
+                const ScopedMicros timer{&Stats.GpuSeedingMicros};
+                seeds = Geometry::KMeans::BuildInitialCentroids(snapshot.Input->Points, {}, snapshot.Params, a->Clusters);
+            }
             if (seeds.size() != a->Clusters)
                 return {.Diagnostic = "K-Means GPU workspace or seed preparation failed."};
             // A failed Prepare may leave partial state; that workspace is dropped.
-            a->Workspace = Idle ? std::move(Idle) : std::make_shared<KMeansGpuWorkspace>(Device);
             const bool identity = snapshot.Input->SlotCount == a->Count;
-            if (!a->Workspace->Prepare(a->Count, seeds, identity ? std::span<const std::uint32_t>{} : snapshot.Input->Slots))
+            bool prepared = false;
+            {
+                const ScopedMicros timer{&Stats.GpuWorkspacePrepareMicros};
+                a->Workspace = Idle ? std::move(Idle) : std::make_shared<KMeansGpuWorkspace>(Device);
+                prepared = a->Workspace->Prepare(
+                    a->Count, seeds, identity ? std::span<const std::uint32_t>{} : snapshot.Input->Slots);
+            }
+            if (!prepared)
                 return {.Diagnostic = "K-Means GPU workspace or seed preparation failed."};
             const auto refuse = [&](std::string why) -> ClusteringGpuSubmission
             {
@@ -274,7 +287,10 @@ namespace Extrinsic::Runtime
             // Existing integer bytes preserve deleted slots in every preview and Accept.
             if (!identity && snapshot.BeforeOutputs.Labels.Exists)
             {
-                a->Base = ResolveGpuPropertyInput(r, *context.Scene, context.World, entity, typed);
+                {
+                    const ScopedMicros timer{&Stats.GpuInputResolveMicros};
+                    a->Base = ResolveGpuPropertyInput(r, *context.Scene, context.World, entity, typed);
+                }
                 if (!a->Base)
                     return refuse("Prior K-Means labels are busy or unavailable for deleted-slot preservation.");
             }
@@ -805,6 +821,7 @@ namespace Extrinsic::Runtime
                 return;
             }
             ++a->Result.GpuSubmissions;
+            ++Stats.GpuSubmissions;
         }
     };
     ClusteringGpuState::ClusteringGpuState(

@@ -1479,6 +1479,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.EngineConfigSectionSchemas.cpp
             Test.SandboxParameterizationPanel.cpp
             Test.SandboxPointCloudConsolidationPanel.cpp
+            Test.SandboxKMeansTrace.cpp
     )
     intrinsic_test_object_lib(SandboxEditorIntegrationTestObjs
         SOURCES

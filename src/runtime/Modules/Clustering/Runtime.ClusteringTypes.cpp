@@ -1,4 +1,5 @@
 module;
+#include <chrono>
 #include <functional>
 #include <utility>
 #include <string_view>
@@ -228,6 +229,9 @@ namespace Extrinsic::Runtime
     {
         if (m_Commands == nullptr)
             return {};
+        ++m_RequestsSubmitted;
+        m_LastRequestSteadyMicros = std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
         return m_Commands->Enqueue(std::move(command));
     }
 
@@ -255,7 +259,10 @@ namespace Extrinsic::Runtime
 
     ClusteringModuleStats ClusteringService::Stats() const noexcept
     {
-        return m_Stats != nullptr ? *m_Stats : ClusteringModuleStats{};
+        auto stats = m_Stats != nullptr ? *m_Stats : ClusteringModuleStats{};
+        stats.RequestsSubmitted = m_RequestsSubmitted;
+        stats.LastRequestSteadyMicros = m_LastRequestSteadyMicros;
+        return stats;
     }
 
     void ClusteringService::Bind(CommandBus* commands,

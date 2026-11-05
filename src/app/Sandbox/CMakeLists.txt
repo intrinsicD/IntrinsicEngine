@@ -9,6 +9,7 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Editor/Sandbox.MethodPanels.cppm
             Editor/Sandbox.MeshProcessingPanels.cppm
             Sandbox.ConfigSections.cppm
+            Sandbox.KMeansTrace.cppm
             Sandbox.cppm
             PRIVATE
             Editor/Sandbox.EditorController.cpp
@@ -24,6 +25,7 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Editor/Sandbox.MethodPanels.cpp
             Editor/Sandbox.MeshProcessingPanels.cpp
             Sandbox.ConfigSections.cpp
+            Sandbox.KMeansTrace.cpp
             Sandbox.cpp
     )
     target_link_libraries(ExtrinsicSandboxEditor
@@ -33,6 +35,7 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             imgui_core_lib
             imguizmo_lib
             implot::implot
+            nlohmann_json::nlohmann_json
     )
 endif()
 

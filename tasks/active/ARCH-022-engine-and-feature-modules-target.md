@@ -171,6 +171,14 @@ contract_review: tracker only; each slice declares its own contracts
 82. (2026-11-05, on the Q81 answer: options A readback memory type test and fix, B Armadillo click-to-preview
     measurement, C faster start, D leaner Accept) "Backend war gpu. Bitte mach A. Die Punkte b-d überlegen wir uns nach
     dem nächsten Test"
+83. (2026-11-05, on the Q82 result and the two proposed next tests: 1 the Q79 setup at 1M before/after the readback
+    fix, 2 option B, click to first preview on the Armadillo with the GPU backend split by frames, recommended)
+    "Ja, dann 2."
+84. (2026-11-05, multiple-choice answers, verbatim) Setup: which Armadillo file "Dropbox obj, 173k Vertices"; build
+    "build/dev (Debug)"; validation/VSync "Standard (beides an)"; when the click comes "Etwas später". Then, on the
+    display being off (VSync frames ~1 s) and what "it starts" means: "Du darfst xset benutzen (Empfohlen)" (turn the
+    displays on with `xset dpms force on` / `xset -dpms` for the measurement and restore afterwards) and
+    "Fortschritt im Panel".
 
 ## Goal
 - Reach the target in
@@ -3555,3 +3563,29 @@ python3 tools/docs/check_doc_links.py --root . --strict
   operator: the readback copies record no transfer-to-host barrier (pre-existing; the spec asks for one before host
   reads), `VulkanDevice::ReadBuffer`'s staging (`Backends.Vulkan.Device.cpp:4575`) has the same CPU_ONLY pattern,
   and the GRAPHICS150 and local SandboxAgentServer failures.
+- 2026-11-05, Q83/Q84 measurement instrumentation (block): an opt-in per-frame K-Means trace in the real Sandbox
+  (`--kmeans-trace`, module `Extrinsic.Sandbox.KMeansTrace`, schema `arch022.kmeans_trace.v1`: each frame's clustering
+  counters and render-extraction GPU-front observations sampled at Maintenance, the frame's full pacing attached one
+  frame later by the pacing record's frame index; exit at a frame cap or 120 frames after N committed runs);
+  `ClusteringModuleStats` gains the request count and in-process enqueue time, a GPU start's parts (snapshot, input
+  resolve, seeding, workspace prepare; nested in `GpuCaptureInitMicros`) and the GPU pages submitted. Driver, analysis
+  and run scripts in `tasks/evidence/ARCH-022/q83_*` (agent lane: import as File > Import, quiescence of every
+  unfinished job, the panel's defaults with the GPU backend, `run_kmeans` = the button's `SubmitKMeansRun`).
+  Tests: `SandboxKMeansTrace.EachFrameCarriesItsOwnCountersAndPacing` (a request and a 20 ms command in one frame; it
+  first failed: the hook context's FrameIndex counts render extractions and is one ahead by Maintenance, keyed by the
+  pacing's index it passes — that failing variant is the mutation check); the clustering GPU smoke asserts the new
+  counters (fails with the two increments and the prepare timer removed); `q83_report_selftest.py` and
+  `q83_drive_selftest.py` (rules removed make them fail). The operator's "it starts" (Q84 "Fortschritt im Panel") is the
+  panel's "Iterations: N" line; the K-Means job's bar is indeterminate (its progress is never determinate in the
+  shakedowns), and the agent lane binds no panel, so the report gives that line's frame as a proxy. Technical
+  shakedowns (pass/fail only; process wall times read for the budget: Debug about 440 s): the display was off (DPMS,
+  VSync frames about 1 s, BUG-228), so q83_run.sh forces the displays on for the run (Q84) and restores the DPMS state.
+  Plan review (Codex, fresh thread `01a1aac0-b6a1-7de0-9a97-d59dc11eac12`, gpt-6-astra xhigh, read-only, recursion
+  protection instruction-only) verbatim "**Verdict: revise.**" (proxy fidelity, frame attribution, publication is
+  not first visible colour, the missing drains, shrink the cells, timing-semantics tests); taken into the plan. Code
+  review (Codex, fresh thread `01a1aaed-38a9-7063-99aa-080f9ddb5f32`, same settings): round 1 on `cd08ea9f…` "**Correctness
+  verdict: revise required.**" (phase stacking, proxy, invalid runs in ranges, missing processes, deadlines,
+  quiescence states, identity, display restore, CLI), round 2 on `3ea0109a…` "**Verdict: revise required.**" (process
+  validity in ranges, running proxy offset, HTML notes, agent init deadline, cleanup, cadence as display gate, DPMS
+  level), round 3 on `72b52c07…` "**Verdict: revise required.**" (display probes outside the cleanup), round 4 on
+  `a1fa67d4…` verbatim "**Verdict: approve.**".

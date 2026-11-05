@@ -417,6 +417,15 @@ TEST_P(ClusteringServiceGpuSmoke,
     EXPECT_EQ(appPtr->Stats.CaptureReuses, 1u) << "the run compared above reused the discarded run's capture";
     EXPECT_EQ(appPtr->Stats.LabelsCommitted, 1u);
     EXPECT_EQ(appPtr->Stats.VisualizationRefreshReactions, 1u);
+    // ARCH-022 Q83: the start's parts and the pages, as the K-Means trace reads them.
+    EXPECT_EQ(appPtr->Stats.RequestsSubmitted, 2u);
+    EXPECT_GT(appPtr->Stats.GpuSubmissions, 0u);
+    EXPECT_GT(appPtr->Stats.GpuSnapshotMicros, 0u);
+    EXPECT_GT(appPtr->Stats.GpuInputResolveMicros, 0u);
+    EXPECT_GT(appPtr->Stats.GpuWorkspacePrepareMicros, 0u) << "the first run creates its buffers and pipelines";
+    EXPECT_LE(appPtr->Stats.GpuSnapshotMicros + appPtr->Stats.GpuInputResolveMicros + appPtr->Stats.GpuSeedingMicros +
+                  appPtr->Stats.GpuWorkspacePrepareMicros,
+        appPtr->Stats.GpuCaptureInitMicros) << "the parts are nested in the capture and start";
 
     engine.Shutdown();
 }

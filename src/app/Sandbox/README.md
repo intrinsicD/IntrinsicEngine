@@ -664,6 +664,22 @@ native display. Vulkan device/extension limitations remain capability
 diagnostics handled by the validator; a missing display must not collapse the
 capture to zero samples.
 
+## K-Means Trace
+
+`ARCH-022` (Q83) adds an opt-in per-frame trace of K-Means work, `Sandbox.KMeansTrace`:
+
+```bash
+build/ci-vulkan/bin/ExtrinsicSandbox --kmeans-trace /tmp/kmeans-trace.json \
+  --kmeans-trace-frames 60000 --kmeans-trace-exit-after-runs 2
+```
+
+Each frame's clustering counters (`ClusteringModuleStats`: requests and their enqueue time, commands handled, a GPU
+start's parts, pages, iterations, previews, commits) and its render extraction's GPU scalar-front observations are
+sampled at the frame's Maintenance hook; the frame's pacing (every interval, the drains included) is attached one
+frame later, matched by the pacing record's frame index. The JSON (`arch022.kmeans_trace.v1`) is written at exit; the
+app exits at the frame cap or 120 frames after the given number of committed runs. Driven through the agent socket by
+`tasks/evidence/ARCH-022/q83_drive.py`; `Test.SandboxKMeansTrace` checks the frame attribution.
+
 ## Contents
 
 - `CMakeLists.txt`
@@ -675,6 +691,8 @@ capture to zero samples.
 - `Editor/Sandbox.MethodPanels.cpp`
 - `Sandbox.ConfigSections.cppm`
 - `Sandbox.ConfigSections.cpp`
+- `Sandbox.KMeansTrace.cppm`
+- `Sandbox.KMeansTrace.cpp`
 - `Sandbox.cpp`
 - `Sandbox.cppm`
 - `main.cpp`

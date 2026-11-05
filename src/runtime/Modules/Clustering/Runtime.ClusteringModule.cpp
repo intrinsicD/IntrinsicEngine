@@ -1087,14 +1087,13 @@ namespace Extrinsic::Runtime
             }
 
             KMeansRunCompleted failure{};
-            std::optional<KMeansSnapshot> snapshot = TryBuildSnapshot(
-                context.ActiveWorld,
-                world,
-                context.Correlation,
-                command,
-                failure,
-                captures,
-                stats);
+            std::optional<KMeansSnapshot> snapshot;
+            {
+                const ScopedMicros snapshotTimer{
+                    command.Backend == ClusteringBackend::VulkanCompute ? &stats.GpuSnapshotMicros : nullptr};
+                snapshot = TryBuildSnapshot(context.ActiveWorld, world, context.Correlation, command, failure,
+                    captures, stats);
+            }
             if (!snapshot.has_value())
             {
                 PublishCompletion(context.Events, failure);

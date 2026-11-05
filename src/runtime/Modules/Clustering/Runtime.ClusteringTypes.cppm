@@ -192,6 +192,16 @@ export namespace Extrinsic::Runtime
         std::uint64_t GpuReplacementsStarted{0};
         std::uint64_t GpuIterations{0};
         std::uint64_t GpuPreviews{0};
+        // ARCH-022 Q83: requests enqueued through the service (their frame is the submit's), the parts of a GPU
+        // request's capture and start (nested in GpuCaptureInitMicros; the rest is validation, the publication's
+        // admission and the step run), and the GPU pages submitted.
+        std::uint64_t RequestsSubmitted{0};
+        std::uint64_t LastRequestSteadyMicros{0}; // steady_clock at the latest request's enqueue
+        std::uint64_t GpuSnapshotMicros{0};
+        std::uint64_t GpuInputResolveMicros{0};
+        std::uint64_t GpuSeedingMicros{0};
+        std::uint64_t GpuWorkspacePrepareMicros{0};
+        std::uint64_t GpuSubmissions{0};
     };
 
     // Only the lifecycle owner may bind the service. C++ linkage lets its
@@ -243,6 +253,8 @@ export namespace Extrinsic::Runtime
         CommandBus* m_Commands{};
         KernelEventBus* m_Events{};
         const ClusteringModuleStats* m_Stats{};
+        std::uint64_t m_RequestsSubmitted{0};
+        std::uint64_t m_LastRequestSteadyMicros{0};
     };
 
 }
