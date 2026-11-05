@@ -1,11 +1,12 @@
 # Point spacing and splat radii
 
-**View → Processing → Sampling & Density → Point Spacing and Radii** (also in
-the mesh, graph and point-cloud Processing menus) estimates a named float radius on any canonical float3 sample
-domain. Choose the entity, positions, output, neighbor backend, k and scale.
-**Estimate radii** uses validated config and publishes an undoable property;
-**Show radii** colors samples through the shared scalar visualization recipe.
-The result also reports nearest-other spacing, bounds and centroid.
+**View → Processing → Sampling & Density → Point Spacing and Radii** estimates a named radius on any canonical float3
+sample domain. It is the plugin `plugins/point_spacing` (ARCH-022), which owns its config section, its MCP tools and
+its window; the point-cloud editing service does the capture, the GPU run and the publication. Choose the entity,
+positions, output (any scalar storage on the CPU), neighbor backend, k and scale, and apply the settings.
+**Estimate radii** runs the applied settings and publishes an undoable property (a Vulkan run first shows its
+preview, published by **Accept** and released by **Discard**); **Show radii** colors samples through the shared
+scalar visualization recipe. The result also reports nearest-other spacing, bounds and centroid.
 
 ## Formulation and units
 
@@ -88,21 +89,24 @@ version 1:
 Unknown domain resolves to the entity's primary point domain. Input/output
 references must be distinct and on the same domain. Existing output types and
 cardinality must match; topology/deletion names are protected.
-`ApplyEditorPointSpacingConfig` and `ApplyEditorConfiguredPointSpacing` are the
-shared UI/config/agent path. `PreviewEditorPointSpacingCommand` and
-`GetEditorPointSpacingInputCatalog` share execution preflight. Results include
-requested/actual backend, live/slot/written counts, radius and spacing ranges,
-cache reuse, GPU batch count and CPU/GPU elapsed times.
+The window's Apply and `config_apply` set the section; the window's **Estimate radii** and the MCP tool
+`point_spacing` run it (the tool waits for the end, is cancellable, and a `vulkan_lbvh` run accepts at once), and
+`point_spacing_preview` answers the readiness the window shows (the operation runtime's capture checks and GPU
+admission, with its texts, through `PointCloudEditingService::ScalarAnalysisReadiness`). Results have a status
+(applied, invalid, busy, failed, stale, discarded, cancelled) and include requested/actual backend,
+live/slot/written counts, radius and spacing ranges, cache reuse, GPU batch and transfer counts and CPU elapsed time.
+The plugin keeps the newest run, whoever started it, for its window while the editor session lasts; a start refused
+because another run owns the output does not replace it.
 
 ## Verification entry points
 
 `Test.PointSpacing.cpp` supplies analytical spacing/radius oracles, exhaustive
 candidate comparisons, sampled statistics, ties, malformed input and extreme k.
-`Test.PointSpacingOperations.cpp` exercises all domains, config, cache reuse,
-history, scalar visualization and stale/cancelled publication. The opt-in
-`PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy`
-compares actual Vulkan publication to CPU octree for cold/warm queries, scale 2
-at k=63, dense coincident peers, deletion, staleness, cancellation and history.
+`Test.PointSpacingPlugin.cpp` exercises the plugin: all domains, config, cache reuse,
+history, scalar storage, scalar visualization, stale/cancelled publication, the Vulkan admission texts, the latest
+result and the window. The opt-in `PointSpacingPluginGpuSmoke` cases compare actual Vulkan publication to CPU octree
+for cold/warm queries, scale 2 at k=63, dense coincident peers, deletion, tiny separations and scales, staleness,
+cancellation, Accept/Discard, an unload and history.
 
 `geometry.point_lbvh.spacing_runtime_smoke` records the bounded eight-domain
 fixture. Set `INTRINSIC_SPACING_BENCHMARK_OUTPUT` to a raw JSON path, then seal
@@ -128,9 +132,10 @@ publication and automatic batch/agent Accept. Deleted output rows retain their
 resident base values. Result/agent output includes upload bytes, residency hits
 and Accept readback bytes; no CPU neighborhood stage remains.
 
-`PointScalarTransaction` mock tests and
-`RUNTIME298PointScalarResidency.ParityResidentSecondRunAndDiscard` cover the port.
-The smoke records measured maximum absolute delta, with 2e-5 allowed for device
+`PointScalarTransaction` mock tests (with kernel density and density weights), the editing service's
+`PointCloudEditing` scalar analysis tests and `PointSpacingPluginGpuSmoke` cover the port; the plugin smoke also
+checks that a second run over unchanged inputs uploads nothing and that the result reports the resolved domain.
+`RUNTIME298PointScalarResidency` (kernel density and density weights) records measured maximum absolute delta, with 2e-5 allowed for device
 final float publication on its O(1) fixture; existing multi-domain
 spacing/statistics comparisons retain 1e-5. It checks deleted rows, zero input
 upload on a second run and Discard retaining CPU rows. GPU execution is pending;

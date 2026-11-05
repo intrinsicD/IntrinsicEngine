@@ -1275,7 +1275,10 @@ namespace Extrinsic::Runtime
         {
             identity.EntityId = job.Output->StableEntityId;
             identity.Scope = ToEditorJobScope(job.Output->Property.Domain);
-            identity.OutputSemantic = GeometryPresentationSlotSemantic::Displacement;
+            // A scalar output is a scalar field as the editor's own runs name it, so either sees the other's run.
+            identity.OutputSemantic = GeometryPropertyComponentCount(job.Output->Property.ValueKind) == 1u
+                ? GeometryPresentationSlotSemantic::ScalarField
+                : GeometryPresentationSlotSemantic::Displacement;
             identity.OutputName = job.Output->Property.Name;
             // A run's first job is admitted only while no other run (of any plugin) writes the same output.
             if (!job.Run.IsValid() && surface.FindActive && surface.FindActive(identity))

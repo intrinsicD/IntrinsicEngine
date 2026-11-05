@@ -226,8 +226,7 @@ namespace
 
     constexpr std::array kInputWindows{
         "view.normal_estimation", "view.outlier_analysis", "view.keypoint_analysis",
-        "view.kernel_density", "view.density_weights", "view.point_construction",
-        "view.point_spacing", "view.registration"};
+        "view.kernel_density", "view.density_weights", "view.point_construction", "view.registration"};
 
     void ExpectInputEntities(const Config::EngineConfig& config, std::uint32_t expected,
                              std::uint32_t target = 0u)
@@ -238,7 +237,6 @@ namespace
         EXPECT_EQ(R::GetDerivedSection<R::kKernelDensitySection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDensityWeightConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetPointConstructionConfig(config)->StableEntityId, expected);
-        EXPECT_EQ(R::GetDerivedSection<R::kPointSpacingSection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetRegistrationConfig(config)->SourceStableEntityId, expected);
         EXPECT_EQ(R::GetRegistrationConfig(config)->TargetStableEntityId, target);
     }
@@ -705,8 +703,7 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
             ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show mask", "keypoint_mask", true},
             ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show saliency", "keypoint_saliency", true},
             ShowAction{"view.kernel_density", "Kernel Density", "Show density", "density", true},
-            ShowAction{"view.density_weights", "Compact Density Weights", "Show weights", "density_weight", true},
-            ShowAction{"view.point_spacing", "Point Spacing and Radii", "Show radii", "radii", true}};
+            ShowAction{"view.density_weights", "Compact Density Weights", "Show weights", "density_weight", true}};
         ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(actions[0].Window, true));
         int frame = 0;
         std::size_t action = 0;
@@ -1506,34 +1503,6 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
             {
                 return int(R::GetPointConstructionConfig(c)->Backend);
             }},
-        Control{"view.point_spacing",
-            "Point Spacing and Radii",
-            "Backend",
-            "CPU LBVH (cached)",
-            [](const auto& c)
-            {
-                return int(R::GetDerivedSection<R::kPointSpacingSection>(c)->Backend);
-            },
-            1,
-            1},
-        Control{"view.point_spacing",
-            "Point Spacing and Radii",
-            "Backend",
-            "CPU octree",
-            [](const auto& c)
-            {
-                return int(R::GetDerivedSection<R::kPointSpacingSection>(c)->Backend);
-            },
-            0,
-            0},
-        Control{"view.point_spacing",
-            "Point Spacing and Radii",
-            "Backend",
-            "Vulkan LBVH",
-            [](const auto& c)
-            {
-                return int(R::GetDerivedSection<R::kPointSpacingSection>(c)->Backend);
-            }},
         Control{"view.registration",
             "ICP Registration",
             "Backend##ICP",
@@ -1771,11 +1740,10 @@ TEST(SandboxProcessingPanels, MeshOperationUsesChosenEntityWithoutChangingSceneS
     EXPECT_GE(step, 12);
 }
 
+// ARCH-022 Q89: point spacing's window (a plugin) has its own case in Test.PointSpacingPlugin.
 TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithoutRecomputing)
 {
-    for (const bool spacing : {false, true})
     {
-        SCOPED_TRACE(spacing ? "spacing" : "density");
         PanelHarness h;
         auto& scene = h.Scene();
         const auto entity = scene.Create();
@@ -1784,16 +1752,6 @@ TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithou
         auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
         const std::string output = "shared_test_scalar";
         R::EditorProcessingContext referenceContext{.Scene=&scene};
-        if (spacing)
-        {
-            auto c = *R::GetDerivedSection<R::kPointSpacingSection>(config);
-            c.KNeighbors = 3; c.ScaleFactor = 1.5f; c.Radii.Name = output;
-            R::SetDerivedSection<R::kPointSpacingSection>(config, c);
-            c.StableEntityId = R::SelectionController::ToStableEntityId(entity);
-            c.Radii.Name = "reference_scalar";
-            ASSERT_TRUE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
-        }
-        else
         {
             auto c = *R::GetDerivedSection<R::kKernelDensitySection>(config);
             c.KNeighbors = 3; c.Bandwidth = 0.5f; c.Density.Name = output;
@@ -1803,7 +1761,7 @@ TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithou
             ASSERT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
         }
         ASSERT_TRUE(h.Apply(config));
-        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(spacing ? "view.point_spacing" : "view.kernel_density", true));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
         auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
         std::optional<Geometry::PropertyRevision> revision;
         std::uint64_t submittedBeforeShow = 0;
@@ -1811,12 +1769,12 @@ TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithou
         h.Driver->OnFrame = [&](R::Engine& engine) {
             if (++frame > 400)
             { ADD_FAILURE() << "Scalar panel did not publish/show output"; engine.RequestExit(); return; }
-            auto* window = ImGui::FindWindowByName(spacing ? "Point Spacing and Radii" : "Kernel Density");
+            auto* window = ImGui::FindWindowByName("Kernel Density");
             if (!window) return;
             ImGui::SetWindowSize(window, {700, 1000});
             ImGui::SetWindowPos(window, {0, 0});
             if (++step == 3)
-                ImGui::ActivateItemByID(window->GetID(spacing ? "Estimate radii" : "Estimate density"));
+                ImGui::ActivateItemByID(window->GetID("Estimate density"));
             if (!properties.Exists(output)) return;
             if (!showFrame)
             {
@@ -1824,7 +1782,7 @@ TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithou
                           std::as_const(properties).Get<float>("reference_scalar").Vector());
                 revision = properties.FindPropertyRevision(output);
                 submittedBeforeShow = engine.Jobs().Stats().SubmittedJobs;
-                ImGui::ActivateItemByID(window->GetID(spacing ? "Show radii" : "Show density"));
+                ImGui::ActivateItemByID(window->GetID("Show density"));
                 showFrame = frame;
             }
             if (frame < showFrame + 3) return;
@@ -5185,7 +5143,8 @@ TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResu
 TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDiscards)
 {
     using Phase=R::EditorGpuTransactionPhase;
-    for(unsigned method=0;method<3;++method) for(bool applied:{false,true})
+    // ARCH-022 Q89: point spacing (1) is a plugin; its transaction cases are in Test.PointSpacingPlugin.
+    for(unsigned method : {0u, 2u}) for(bool applied:{false,true})
     {
         SCOPED_TRACE(method);
         SCOPED_TRACE(applied);PanelHarness h;
@@ -5197,18 +5156,17 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         const auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
         (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(scene.Raw(),entity,mesh);
         auto& rows=scene.Raw().get<GS::Vertices>(entity).Properties;
-        R::KernelDensityConfig density;R::PointSpacingConfig spacing;R::DensityWeightConfig weights;
-        density.StableEntityId=spacing.StableEntityId=weights.StableEntityId=R::SelectionController::ToStableEntityId(entity);
-        density.Positions.Domain=spacing.Positions.Domain=weights.Positions.Domain=R::GeometryElementDomain::MeshVertex;
-        density.Density.Domain=spacing.Radii.Domain=weights.Weights.Domain=R::GeometryElementDomain::MeshVertex;
-        density.Backend=R::KernelDensityBackend::VulkanLBVH;spacing.Backend=R::PointSpacingBackend::VulkanLBVH;weights.Backend=R::DensityWeightBackend::VulkanLBVH;
+        R::KernelDensityConfig density;R::DensityWeightConfig weights;
+        density.StableEntityId=weights.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+        density.Positions.Domain=weights.Positions.Domain=R::GeometryElementDomain::MeshVertex;
+        density.Density.Domain=weights.Weights.Domain=R::GeometryElementDomain::MeshVertex;
+        density.Backend=R::KernelDensityBackend::VulkanLBVH;weights.Backend=R::DensityWeightBackend::VulkanLBVH;
         auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
         R::SetDerivedSection<R::kKernelDensitySection>(config, density);
-        R::SetDerivedSection<R::kPointSpacingSection>(config, spacing);
         R::SetDensityWeightConfig(config, weights);
         ASSERT_TRUE(h.Apply(config));ASSERT_TRUE(h.Selection().SetSelectedEntity(scene,entity));
-        const char* ids[]={"view.kernel_density","view.point_spacing","view.density_weights"};
-        const char* titles[]={"Kernel Density","Point Spacing and Radii","Compact Density Weights"};
+        const char* ids[]={"view.kernel_density","","view.density_weights"};
+        const char* titles[]={"Kernel Density","","Compact Density Weights"};
         ASSERT_TRUE(h.Shell.SetEditorWindowOpen(ids[method],true));
         R::EditorProcessingContext context;context.Scene=&scene;
         context.JobCommands.Submit=[&](R::JobDesc job,const auto&)->R::JobToken {
@@ -5246,11 +5204,6 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
                     kept = true;
                     EXPECT_EQ(frame.PointFields.Results.Last<R::KernelDensityOperation>()->MeanDensity, 3);
                 }
-                if (method == 1 && check(frame.PointFields.Results.Last<R::PointSpacingOperation>()))
-                {
-                    kept = true;
-                    EXPECT_EQ(frame.PointFields.Results.Last<R::PointSpacingOperation>()->MeanRadius, 3);
-                }
                 if (method == 2 && check(frame.PointFields.Results.Last<R::DensityWeightOperation>()))
                 {
                     kept = true;
@@ -5261,7 +5214,6 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         const auto make=[&]{
             std::vector<float> values(rows.Size(),3);
             if(method==0)return R::MakeEditorKernelDensityTransactionForTest(commands,density,values,residency,diagnostics);
-            if(method==1)return R::MakeEditorPointSpacingTransactionForTest(commands,spacing,values,residency,diagnostics);
             return R::MakeEditorDensityWeightTransactionForTest(commands,weights,values,residency,diagnostics);};
         R::EditorPointScalarTransactionHandle run{};
         int frames = 0, terminalFrame = 0, started = 0;
@@ -5321,7 +5273,7 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         h.Shell.RemoveFrameObserver(observer);
         auto pending=make();ASSERT_TRUE(pending);h.Panels.InjectPointScalarTransactionForTest(method,pending);
         h.Panels.Unregister();EXPECT_EQ(R::SnapshotEditorPointScalar(commands,pending).Phase,Phase::Discarded);
-        EXPECT_EQ(rows.Exists(method==0?density.Density.Name:method==1?spacing.Radii.Name:weights.Weights.Name),applied);
+        EXPECT_EQ(rows.Exists(method==0?density.Density.Name:weights.Weights.Name),applied);
     }
 }
 
@@ -5330,7 +5282,8 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
 TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
 {
     using Phase = R::EditorGpuTransactionPhase;
-    for (unsigned method = 0; method < 2; ++method)
+    // ARCH-022 Q89: point spacing (1) is a plugin; its newest-run case is in Test.PointSpacingPlugin.
+    for (unsigned method = 0; method < 1; ++method)
     {
         SCOPED_TRACE(method);
         PanelHarness h;
@@ -5346,19 +5299,16 @@ TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
         GS::PopulateFromMesh(scene.Raw(), entity, mesh);
         auto& rows = scene.Raw().get<GS::Vertices>(entity).Properties;
         R::KernelDensityConfig density;
-        R::PointSpacingConfig spacing;
-        density.StableEntityId = spacing.StableEntityId = R::SelectionController::ToStableEntityId(entity);
-        density.Positions.Domain = spacing.Positions.Domain = R::GeometryElementDomain::MeshVertex;
-        density.Density.Domain = spacing.Radii.Domain = R::GeometryElementDomain::MeshVertex;
+        density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+        density.Positions.Domain = R::GeometryElementDomain::MeshVertex;
+        density.Density.Domain = R::GeometryElementDomain::MeshVertex;
         density.Backend = R::KernelDensityBackend::VulkanLBVH;
-        spacing.Backend = R::PointSpacingBackend::VulkanLBVH;
         auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
         R::SetDerivedSection<R::kKernelDensitySection>(config, density);
-        R::SetDerivedSection<R::kPointSpacingSection>(config, spacing);
         ASSERT_TRUE(h.Apply(config));
         ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
-        const char* title = method == 0 ? "Kernel Density" : "Point Spacing and Radii";
-        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(method == 0 ? "view.kernel_density" : "view.point_spacing", true));
+        const char* title = "Kernel Density";
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
         R::EditorProcessingCommands sessionCommands{};
         const auto observer = h.Shell.AddFrameObserver(
             [&](const Editor::SandboxEditorContext& frame)
@@ -5375,8 +5325,7 @@ TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
         };
         R::EditorProcessingCommands commands{};
         R::EditorPointScalarTransactionHandle run{};
-        const std::string newer =
-            method == 0 ? "Density target entity is stale or missing." : "Radii target entity is stale or missing.";
+        const std::string newer = "Density target entity is stale or missing.";
         int frames = 0, started = 0, terminalFrame = 0;
         bool checked = false;
         std::string terminalMessage;
@@ -5397,8 +5346,7 @@ TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
                 context.AttachmentActive = session.AttachmentActive;
                 commands = R::BindEditorProcessingCommands(context);
                 std::vector<float> values(rows.Size(), 3);
-                run = method == 0 ? R::MakeEditorKernelDensityTransactionForTest(commands, density, values, residency)
-                                  : R::MakeEditorPointSpacingTransactionForTest(commands, spacing, values, residency);
+                run = R::MakeEditorKernelDensityTransactionForTest(commands, density, values, residency);
                 if (!run)
                 {
                     ADD_FAILURE() << "no scalar transaction";
@@ -5418,11 +5366,8 @@ TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
             {
                 // Run B, started elsewhere after A: an immediate refusal, the newest stored result.
                 auto missing = density;
-                auto missingSpacing = spacing;
-                missing.StableEntityId = missingSpacing.StableEntityId = 0xFFFFFFF0u;
-                const auto refused = method == 0
-                    ? R::ApplyEditorKernelDensityCommand(sessionCommands, missing, {}).Message
-                    : R::ApplyEditorPointSpacingCommand(sessionCommands, missingSpacing, {}).Message;
+                missing.StableEntityId = 0xFFFFFFF0u;
+                const auto refused = R::ApplyEditorKernelDensityCommand(sessionCommands, missing, {}).Message;
                 EXPECT_EQ(refused, newer);
                 ImGui::GetCurrentContext()->LogBuffer.clear();
                 ImGui::LogToBuffer();

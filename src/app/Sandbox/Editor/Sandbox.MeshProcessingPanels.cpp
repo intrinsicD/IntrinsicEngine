@@ -188,7 +188,6 @@ namespace Extrinsic::Sandbox::Editor
         // counters but never folds a finished transaction into them: the stored result may be a newer run's.
         template <class Result>
         constexpr bool kStoredByOperationRuntime = std::same_as<Result, Runtime::EditorKernelDensityResult> ||
-            std::same_as<Result, Runtime::EditorPointSpacingResult> ||
             std::same_as<Result, Runtime::EditorDensityWeightResult>;
 
         template <class State>
@@ -330,7 +329,6 @@ namespace Extrinsic::Sandbox::Editor
             ProcessingDraftState<Runtime::DensityWeightConfig, Runtime::EditorDensityWeightResult>;
         using ConstructionState =
             ProcessingDraftState<Runtime::PointConstructionConfig, Runtime::EditorPointConstructionResult>;
-        using SpacingState = ProcessingDraftState<Runtime::PointSpacingConfig, Runtime::EditorPointSpacingResult>;
 
         struct RegistrationState
         {
@@ -423,13 +421,11 @@ namespace Extrinsic::Sandbox::Editor
             std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
         Runtime::EditorOutlierTransactionHandle OutlierTransaction{};
-        Runtime::EditorPointScalarTransactionHandle DensityTransaction{}, SpacingTransaction{}, WeightTransaction{},
-            KeypointTransaction{};
+        Runtime::EditorPointScalarTransactionHandle DensityTransaction{}, WeightTransaction{}, KeypointTransaction{};
         KeypointsState Keypoints{};
         DensityState Density{};
         DensityWeightsState DensityWeights{};
         ConstructionState Construction{};
-        SpacingState Spacing{};
 
         void Register(EditorShell& editorShell);
         void Unregister();
@@ -469,7 +465,6 @@ namespace Extrinsic::Sandbox::Editor
         void DrawDensityWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWeightsWindow(bool&, const SandboxEditorContext&);
         void DrawConstructionWindow(bool&, const SandboxEditorContext&);
-        void DrawSpacingWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
         void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
         void DrawPointSamplingWindow(bool&, const SandboxEditorContext&);
@@ -607,16 +602,6 @@ namespace Extrinsic::Sandbox::Editor
                 {domain, "Processing", "Reconstruction & Registration"},
                 "Construct from Points",
                 "view.point_construction");
-        RegisterWindow("view.point_spacing",
-            {"View", "Processing", "Sampling & Density"},
-            "Point Spacing and Radii",
-            &Impl::DrawSpacingWindow);
-        for (const auto& [id, domain] :
-            std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.point_spacing", "Mesh"},
-                {"graph.processing.point_spacing", "Graph"},
-                {"pointcloud.processing.point_spacing", "PointCloud"}}})
-            RegisterRedirectWindow(
-                id, {domain, "Processing", "Sampling & Density"}, "Point Spacing and Radii", "view.point_spacing");
         RegisterWindow(
             "view.normal_estimation", {"View", "Processing", "Normals"}, "Normal Estimation", &Impl::DrawNormalsWindow);
         for (const auto& [id, domain] :
@@ -713,7 +698,7 @@ namespace Extrinsic::Sandbox::Editor
         if (OutlierTransaction)
             Runtime::DiscardEditorOutlierAnalysis({}, OutlierTransaction);
         OutlierTransaction.reset();
-        for (auto* run : {&DensityTransaction, &SpacingTransaction, &WeightTransaction})
+        for (auto* run : {&DensityTransaction, &WeightTransaction})
         {
             Runtime::DiscardEditorPointScalar({}, *run);
             run->reset();
@@ -726,7 +711,6 @@ namespace Extrinsic::Sandbox::Editor
         Density = {};
         DensityWeights = {};
         Construction = {};
-        Spacing = {};
     }
 
     void MeshProcessingPanels::Impl::RegisterWindow(
@@ -2843,125 +2827,6 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::End();
     }
 
-    void MeshProcessingPanels::Impl::DrawSpacingWindow(bool& open, const SandboxEditorContext& context)
-    {
-        // RUNTIME-348: the operation runtime stores every run's result; the panel only reads it.
-        if (const auto stored = context.PointFields.Results.Last<Runtime::PointSpacingOperation>())
-            Spacing.LastResult = *stored;
-        const std::function<void(Runtime::EditorPointSpacingResult)> noSessionSink{};
-        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Point Spacing and Radii", &open))
-        {
-            ImGui::End();
-            return;
-        }
-        const auto active =
-            Runtime::GetEditorPointSpacingConfig(context.PointFields.Commands).value_or(Runtime::PointSpacingConfig{});
-        const auto serialized = Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>(active);
-        Spacing.Synchronize(active, serialized);
-        auto& config = Spacing.Draft;
-        bool changed = false;
-        changed |= DrawProcessingEntity("Entity##Spacing", context, config.StableEntityId, Spacing.LastSelectedEntity);
-        if (DrawProcessingPointInput(
-                "Positions##Spacing",
-                [&]
-                {
-                    return Runtime::GetEditorPointSpacingInputCatalog(
-                        context.PointFields.Commands, config.StableEntityId);
-                },
-                config.Positions))
-        {
-            config.Radii.Domain = config.Positions.Domain;
-            changed = true;
-        }
-        changed |= DrawProcessingScalarOutput("Radii property", config.Radii);
-        int backend = int(config.Backend);
-        if (ImGui::Combo("Backend",
-                &backend,
-                OwnerConfigEnumLabels<Runtime::PointSpacingBackend, 3>(
-                    std::span<const Runtime::ConfigFieldSpec>(Runtime::kPointSpacingFields), "backend")
-                    .data(),
-                3))
-        {
-            config.Backend = Runtime::PointSpacingBackend(backend);
-            changed = true;
-        }
-        changed |= ImGui::InputScalar("Neighbors k", ImGuiDataType_U32, &config.KNeighbors);
-        changed |= ImGui::InputFloat("Radius scale", &config.ScaleFactor);
-        ImGui::TextWrapped(
-            "Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
-        if (config.Backend == Runtime::PointSpacingBackend::VulkanLBVH)
-            changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-        const bool scalarActive = DrawPointScalarTransaction(context.PointFields.Commands, SpacingTransaction, Spacing);
-        DrawProcessingExecution(
-            context.PointFields.Commands,
-            Spacing,
-            changed,
-            [&](const auto& c)
-            {
-                return Runtime::PreviewEditorPointSpacingCommand(context.PointFields.Commands, c);
-            },
-            [&](const auto& c)
-            {
-                return Runtime::ApplyEditorPointSpacingConfig(context.PointFields.Commands, c);
-            },
-            [&]
-            {
-                if (config.Backend == Runtime::PointSpacingBackend::VulkanLBVH)
-                {
-                    Runtime::EditorPointSpacingResult result;
-                    SpacingTransaction =
-                        Runtime::StartEditorPointSpacingTransaction(context.PointFields.Commands, config, result);
-                    return result;
-                }
-                return Runtime::ApplyEditorConfiguredPointSpacing(context.PointFields.Commands, noSessionSink);
-            },
-            noSessionSink,
-            "Estimate radii",
-            "Controls were rejected by radii config validation.",
-            "Spacing config was rejected.",
-            [](const auto& c)
-            {
-                return std::pair{c.StableEntityId, c.Radii.Name};
-            },
-            scalarActive);
-        const Runtime::EditorOutputRef spacingDraft{config.StableEntityId, config.Radii.Name};
-        Spacing.Run.Draw(context.PointFields.Commands, config.StableEntityId, "spacing_progress", &spacingDraft);
-        ImGui::TextWrapped(
-            "Vulkan previews spacing and radii on the device. Accept publishes with Undo; Discard retains CPU rows. Show radii maps values to colors; point rendering currently expects pixel sizes.");
-        DrawProcessingPropertyShowButton(
-            context, config.StableEntityId, config.Radii, Spacing.VisualizationDiagnostic, "Show radii");
-        DrawProcessingDisplayDiagnostic(Spacing.VisualizationDiagnostic);
-        if (Spacing.LastResult)
-        {
-            const auto& result = *Spacing.LastResult;
-            ImGui::Separator();
-            ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
-            ImGui::Text(
-                "Requested: %s; ran: %s", Runtime::ToString(result.RequestedBackend), result.ActualBackend.c_str());
-            ImGui::Text("Live / total: %zu / %zu", result.LiveCount, result.SlotCount);
-            ImGui::Text("Radius min / mean / max: %.5g / %.5g / %.5g",
-                double(result.MinRadius),
-                double(result.MeanRadius),
-                double(result.MaxRadius));
-            ImGui::Text("Nearest spacing min / mean / max: %.5g / %.5g / %.5g",
-                double(result.MinSpacing),
-                double(result.AverageSpacing),
-                double(result.MaxSpacing));
-            ImGui::Text("Centroid: %.5g / %.5g / %.5g; bounds diagonal: %.5g",
-                double(result.Centroid.x),
-                double(result.Centroid.y),
-                double(result.Centroid.z),
-                double(result.BoundingBoxDiagonal));
-            ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Spacing",
-                Spacing.LastResult,
-                &Runtime::OperationResultKey<Runtime::PointSpacingOperation>::Tag,
-                context.PointFields.DismissResult);
-        }
-        ImGui::End();
-    }
-
     void MeshProcessingPanels::Impl::DrawRegistrationWindow(bool& open, const SandboxEditorContext& context)
     {
         if (context.Registration.Results.LastRegistrationResult.has_value())
@@ -3745,11 +3610,6 @@ namespace Extrinsic::Sandbox::Editor
         {
             m_Impl->DensityTransaction = std::move(transaction);
             m_Impl->Density.LastResult.emplace();
-        }
-        else if (method == 1)
-        {
-            m_Impl->SpacingTransaction = std::move(transaction);
-            m_Impl->Spacing.LastResult.emplace();
         }
         else if (method == 2)
         {

@@ -138,9 +138,6 @@ namespace
             check("Density estimation", [&](auto done) {
                 return R::ApplyEditorKernelDensityCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Density = Ref("density", Geometry::PropertyValueKind::Float), .KNeighbors = 2}, done); });
-            check("Radii estimation", [&](auto done) {
-                return R::ApplyEditorPointSpacingCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-                    .Radii = Ref("radii", Geometry::PropertyValueKind::Float)}, done); });
             check("Density weights", [&](auto done) {
                 return R::ApplyEditorDensityWeightCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Weights = Ref("weights", Geometry::PropertyValueKind::Float)}, done); });

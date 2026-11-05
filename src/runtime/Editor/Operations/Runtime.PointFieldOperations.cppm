@@ -13,7 +13,6 @@ export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.KernelDensityConfig;
-export import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;

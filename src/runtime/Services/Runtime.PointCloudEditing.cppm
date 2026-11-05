@@ -107,7 +107,8 @@ export namespace Extrinsic::Runtime
         bool Stale{false};    // it ended because an input or the output changed
         bool Detached{false}; // its workspace detached: discarded, nothing published
         bool IndexReused{false};
-        std::size_t LiveCount{0u};
+        std::size_t SlotCount{0u}, LiveCount{0u};
+        GeometryPropertyRef Output{}; // with its resolved domain
         std::uint64_t GpuInputUploadBytes{0u}, GpuInputCacheHits{0u}, CpuStageReadbackBytes{0u};
         std::uint32_t GpuQueryBatches{0u};
         Graphics::PointScalarGpuStats Statistics{};
@@ -157,6 +158,9 @@ export namespace Extrinsic::Runtime
     // A plugin window's picker over an InputCatalog (ImGui, the host's context): true when the choice changed `ref`;
     // a `ref` the catalog does not list stays as it is.
     bool PointPropertyCombo(const char* label, GeometryPropertyRef& ref, const GeometryPropertyCatalogSnapshot& catalog);
+    // A plugin window's scalar output (ImGui): its name and storage (bool, int32, uint32, uint64, float, double);
+    // true when either changed.
+    bool PointScalarOutputInput(const char* label, GeometryPropertyRef& ref);
 
     class PointCloudEditingService
     {
@@ -173,6 +177,9 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool Current(const PointEdit& edit);
         // The cached CPU LBVH over the captured points (with AcquireIndex), indices compact; any thread.
         [[nodiscard]] const Geometry::PointLBVH::Index* CpuIndex(const PointEdit& edit) const;
+        // Main thread: the cached spatial index of a capture made without AcquireIndex, as AcquireIndex would have
+        // acquired it, so a caller can check its own limits first; false with the reason.
+        [[nodiscard]] bool AcquireIndex(PointEdit& edit, std::string& diagnostic);
         // Main thread: GPU neighbourhood queries can run (framed spatial cache and job service).
         [[nodiscard]] bool GpuQueriesAvailable();
         // Main thread, once per frame until Ready or Failed: appends `width` compact neighbour indices (self

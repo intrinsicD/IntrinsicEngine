@@ -47,18 +47,17 @@ namespace
         Extrinsic::Tests::EditorJobHarness Jobs;
         R::EditorProcessingContext Context;
         R::KernelDensityConfig Density;
-        R::PointSpacingConfig Spacing;
         R::DensityWeightConfig Weight;
         entt::entity Entity;
         void SetUp() override
         {
             Entity=Intrinsic::Tests::MakePointDomainSource(Scene,R::GeometryElementDomain::PointCloudPoint);
             const auto id=R::SelectionController::ToStableEntityId(Entity);
-            Density.StableEntityId=Spacing.StableEntityId=Weight.StableEntityId=id;
-            Density.Positions.Domain=Spacing.Positions.Domain=Weight.Positions.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Density.Density.Domain=Spacing.Radii.Domain=Weight.Weights.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Density.Density.Name=Spacing.Radii.Name=Weight.Weights.Name="result";
-            Density.Backend=R::KernelDensityBackend::VulkanLBVH;Spacing.Backend=R::PointSpacingBackend::VulkanLBVH;Weight.Backend=R::DensityWeightBackend::VulkanLBVH;
+            Density.StableEntityId=Weight.StableEntityId=id;
+            Density.Positions.Domain=Weight.Positions.Domain=R::GeometryElementDomain::PointCloudPoint;
+            Density.Density.Domain=Weight.Weights.Domain=R::GeometryElementDomain::PointCloudPoint;
+            Density.Density.Name=Weight.Weights.Name="result";
+            Density.Backend=R::KernelDensityBackend::VulkanLBVH;Weight.Backend=R::DensityWeightBackend::VulkanLBVH;
             Weight.SupportRadius=1; // The coincident fixture has no automatic radius (RUNTIME-291).
             (void)Rows().GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
             Context.Scene=&Scene;Context.CommandHistory=&History;Context.Device=&Device;
@@ -71,7 +70,6 @@ namespace
         {
             std::vector<float> values(Rows().Size(),value);
             if(GetParam()==0)return R::MakeEditorKernelDensityTransactionForTest(Commands(),Density,values,Residency);
-            if(GetParam()==1)return R::MakeEditorPointSpacingTransactionForTest(Commands(),Spacing,values,Residency);
             return R::MakeEditorDensityWeightTransactionForTest(Commands(),Weight,values,Residency);
         }
     };
@@ -184,9 +182,9 @@ TEST_P(PointScalarTransaction, SuccessiveEditsReplayAndRejectForeignOutputChange
     // An independent mesh-field author creates a float mask before B edits it.
     History.ClearHistory();
     Entity = Intrinsic::Tests::MakePointDomainSource(Scene, R::GeometryElementDomain::MeshVertex);
-    Density.StableEntityId = Spacing.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
-    Density.Positions.Domain = Spacing.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::MeshVertex;
-    Density.Density.Domain = Spacing.Radii.Domain = Weight.Weights.Domain = R::GeometryElementDomain::MeshVertex;
+    Density.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
+    Density.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::MeshVertex;
+    Density.Density.Domain = Weight.Weights.Domain = R::GeometryElementDomain::MeshVertex;
     R::EditorGeodesicsCommand geodesics;
     geodesics.StableEntityId = Density.StableEntityId;
     geodesics.Config.SourceVertices = {0};
@@ -229,9 +227,9 @@ TEST_P(PointScalarTransaction, SuccessiveEditsReplayAndRejectForeignOutputChange
     // A scalar edit followed by outlier analysis retains the legal UndoB -> UndoA prefix.
     History.ClearHistory();
     Entity = Intrinsic::Tests::MakePointDomainSource(Scene, R::GeometryElementDomain::PointCloudPoint);
-    Density.StableEntityId = Spacing.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
-    Density.Positions.Domain = Spacing.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::PointCloudPoint;
-    Density.Density.Domain = Spacing.Radii.Domain = Weight.Weights.Domain = R::GeometryElementDomain::PointCloudPoint;
+    Density.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
+    Density.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::PointCloudPoint;
+    Density.Density.Domain = Weight.Weights.Domain = R::GeometryElementDomain::PointCloudPoint;
     Rows().GetOrAdd<glm::vec3>("v:position").Vector() = {{0, 0, 0}, {.01f, 0, 0}, {.02f, 0, 0}, {10, 0, 0}, {.03f, 0, 0}};
     const auto beforeOutliers = Ready(29.0f);
     ASSERT_TRUE(beforeOutliers);
@@ -283,7 +281,6 @@ TEST_P(PointScalarTransaction,MissingDeviceRefusesAdmission)
 {
     Context.Device=nullptr;
     if(GetParam()==0)EXPECT_FALSE(R::PreviewEditorKernelDensityCommand(Commands(),Density).Enabled);
-    if(GetParam()==1)EXPECT_FALSE(R::PreviewEditorPointSpacingCommand(Commands(),Spacing).Enabled);
     if(GetParam()==2)EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(Commands(),Weight).Enabled);
 }
 TEST_P(PointScalarTransaction,ConfigRoundTrip)
@@ -297,27 +294,19 @@ TEST_P(PointScalarTransaction,ConfigRoundTrip)
         EXPECT_EQ(R::SerializeDerivedSection<R::kKernelDensitySection>(*restored),
             R::SerializeDerivedSection<R::kKernelDensitySection>(Density));
     }
-    if (GetParam() == 1)
-    {
-        R::SetDerivedSection<R::kPointSpacingSection>(config, Spacing);
-        const auto restored = R::GetDerivedSection<R::kPointSpacingSection>(config);
-        ASSERT_TRUE(restored);
-        EXPECT_EQ(R::SerializeDerivedSection<R::kPointSpacingSection>(*restored),
-            R::SerializeDerivedSection<R::kPointSpacingSection>(Spacing));
-    }
     if(GetParam()==2){R::SetDensityWeightConfig(config,Weight);const auto restored=R::GetDensityWeightConfig(config);ASSERT_TRUE(restored);EXPECT_EQ(R::SerializeDensityWeightConfig(*restored),R::SerializeDensityWeightConfig(Weight));}
 }
-INSTANTIATE_TEST_SUITE_P(ThreeMethods,PointScalarTransaction,::testing::Values(0,1,2));
+// ARCH-022 Q89: point spacing (1) is a plugin; its transaction cases are the plugin's (Test.PointSpacingPlugin).
+INSTANTIATE_TEST_SUITE_P(ThreeMethods,PointScalarTransaction,::testing::Values(0,2));
 TEST_P(PointScalarTransaction,UnsupportedStorageAndSubnormalCoordinatesRefuseAdmission)
 {
     R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
     const auto preview=[&]{
         if(GetParam()==0)return R::PreviewEditorKernelDensityCommand(Commands(),Density);
-        if(GetParam()==1)return R::PreviewEditorPointSpacingCommand(Commands(),Spacing);
         return R::PreviewEditorDensityWeightCommand(Commands(),Weight);};
-    Density.Density.ValueKind=Spacing.Radii.ValueKind=Weight.Weights.ValueKind=Geometry::PropertyValueKind::Double;
+    Density.Density.ValueKind=Weight.Weights.ValueKind=Geometry::PropertyValueKind::Double;
     auto result=preview();EXPECT_FALSE(result.Enabled);EXPECT_NE(result.DisabledReason.find("float outputs"),std::string::npos);
-    Density.Density.ValueKind=Spacing.Radii.ValueKind=Weight.Weights.ValueKind=Geometry::PropertyValueKind::Float;
+    Density.Density.ValueKind=Weight.Weights.ValueKind=Geometry::PropertyValueKind::Float;
     Rows().Get<glm::vec3>("v:position")[0]={std::numeric_limits<float>::denorm_min(),0,0};
     result=preview();EXPECT_FALSE(result.Enabled);EXPECT_NE(result.DisabledReason.find("subnormal"),std::string::npos);
 }
@@ -337,14 +326,14 @@ TEST_P(PointScalarTransaction, InitialSubmissionRejectsWithoutCallback)
     Context.World=worlds.CreateWorld("initial-rejection");Context.Scene=worlds.Get(Context.World);
     const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
     (void)Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint).GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
-    Density.StableEntityId=Spacing.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+    Density.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);
     services.BeginRegistration();
     ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
     R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
     ASSERT_TRUE(cache.OnRegister(setup).has_value());
     unsigned callbacks=0,submissions=0;
     Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
-    const auto result=GetParam()==0 ? R::ApplyEditorKernelDensityCommand(Commands(),Density,[&](auto){++callbacks;}).Status : GetParam()==1 ? R::ApplyEditorPointSpacingCommand(Commands(),Spacing,[&](auto){++callbacks;}).Status : R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}).Status;
+    const auto result=GetParam()==0 ? R::ApplyEditorKernelDensityCommand(Commands(),Density,[&](auto){++callbacks;}).Status : R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}).Status;
     EXPECT_EQ(result,R::EditorCommandStatus::GeometryProcessingFailed);
     EXPECT_EQ(submissions,1u);EXPECT_EQ(callbacks,0u); // One terminal outcome, returned directly.
     R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
@@ -429,9 +418,6 @@ TEST_P(PointScalarTransaction, GpuResultsAreRetainedWithoutThePanel)
         if (GetParam() == 0)
             if (const auto r = copy.Last<R::KernelDensityOperation>())
                 return std::pair{r->Status, r->WrittenCount};
-        if (GetParam() == 1)
-            if (const auto r = copy.Last<R::PointSpacingOperation>())
-                return std::pair{r->Status, r->WrittenCount};
         if (GetParam() == 2)
             if (const auto r = copy.Last<R::DensityWeightOperation>())
                 return std::pair{r->Status, r->WrittenCount};
@@ -506,10 +492,9 @@ TEST_P(PointScalarTransaction, DestroyedWorldIsCheckedBeforeSceneAccess)
     Entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
     auto& rows=Intrinsic::Tests::PointDomainProperties(*Context.Scene,Entity,R::GeometryElementDomain::PointCloudPoint);
     (void)rows.GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
-    Density.StableEntityId=Spacing.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(Entity);
+    Density.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(Entity);
     const std::vector<float> values(rows.Size(),3);
     auto run=GetParam()==0?R::MakeEditorKernelDensityTransactionForTest(Commands(),Density,values,Residency):
-        GetParam()==1?R::MakeEditorPointSpacingTransactionForTest(Commands(),Spacing,values,Residency):
         R::MakeEditorDensityWeightTransactionForTest(Commands(),Weight,values,Residency);
     ASSERT_TRUE(run);
     worlds.Clear(); // Captured context deliberately retains the dead Scene address.
@@ -528,7 +513,7 @@ TEST_P(PointScalarTransaction, DuplicateStartIsPendingWithTheSharedMessage)
     Context.World=worlds.CreateWorld("duplicate");Context.Scene=worlds.Get(Context.World);
     const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
     (void)Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint).GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
-    Density.StableEntityId=Spacing.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+    Density.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);
     services.BeginRegistration();
     ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
     R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
@@ -538,12 +523,11 @@ TEST_P(PointScalarTransaction, DuplicateStartIsPendingWithTheSharedMessage)
     Context.JobCommands.FindActive=[](const R::EditorJobIdentity& identity){
         return std::optional{R::EditorJobRecord{.Token=R::JobToken{5,1},.Identity=identity,.State=R::JobState::Running}};};
     // The same label as the CPU run of each operation.
-    const std::string label=GetParam()==0?"Density estimation":GetParam()==1?"Radii estimation":"Density weights";
+    const std::string label=GetParam()==0?"Density estimation":"Density weights";
     const auto check=[&](const auto& result){
         EXPECT_EQ(result.Status,R::EditorCommandStatus::Pending)<<result.Message;
         EXPECT_EQ(result.Message,label+" already has an active running job (job 5:1).");};
     if(GetParam()==0)check(R::ApplyEditorKernelDensityCommand(Commands(),Density,[&](auto){++callbacks;}));
-    else if(GetParam()==1)check(R::ApplyEditorPointSpacingCommand(Commands(),Spacing,[&](auto){++callbacks;}));
     else check(R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}));
     EXPECT_EQ(submissions,0u);EXPECT_EQ(callbacks,0u);
     R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);

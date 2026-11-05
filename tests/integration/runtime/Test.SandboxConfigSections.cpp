@@ -35,7 +35,7 @@ import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Runtime.KernelDensityConfig;
-import Extrinsic.Runtime.PointSpacingConfig;
+import Intrinsic.Plugin.PointSpacing; // ARCH-022 Q89: its section, held to the same contracts
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
@@ -47,6 +47,7 @@ import Extrinsic.Runtime.SceneInteractionModule;
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
 namespace Sandbox = Extrinsic::Sandbox;
+namespace PS = Intrinsic::Plugins::PointSpacing;
 
 TEST(SandboxConfigSections, ActiveNormalRadiusRemainsPositiveInFloatStorage)
 {
@@ -1182,11 +1183,11 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
             {
                 return Runtime::GetDensityWeightConfig(c).has_value();
             }},
-        {Runtime::kPointSpacingConfigSectionName,
-            Runtime::kPointSpacingConfigSectionSchemaId,
+        {PS::kSectionName,
+            PS::kSectionSchemaId,
             [](const CoreConfig::EngineConfig& c)
             {
-                return Runtime::GetDerivedSection<Runtime::kPointSpacingSection>(c).has_value();
+                return Runtime::GetDerivedSection<PS::kSection>(c).has_value();
             }},
         {Runtime::kKeypointAnalysisConfigSectionName,
             Runtime::kKeypointAnalysisConfigSectionSchemaId,
@@ -1331,14 +1332,14 @@ TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContrac
         SetDerivedSection<kKernelDensitySection>,
         GetDerivedSection<kKernelDensitySection>,
         ZeroGpuQueryBatch<KernelDensityConfig>);
-    ExpectPointConfigSectionContract<PointSpacingConfig>(kPointSpacingConfigSectionName,
-        kPointSpacingConfigSectionSchemaId,
-        SerializeDerivedSection<kPointSpacingSection>,
-        ValidateDerivedSection<kPointSpacingSection>,
-        MakeDerivedSectionRegistration<kPointSpacingSection>,
-        SetDerivedSection<kPointSpacingSection>,
-        GetDerivedSection<kPointSpacingSection>,
-        ZeroGpuQueryBatch<PointSpacingConfig>);
+    ExpectPointConfigSectionContract<PS::Config>(PS::kSectionName,
+        PS::kSectionSchemaId,
+        SerializeDerivedSection<PS::kSection>,
+        ValidateDerivedSection<PS::kSection>,
+        MakeDerivedSectionRegistration<PS::kSection>,
+        SetDerivedSection<PS::kSection>,
+        GetDerivedSection<PS::kSection>,
+        ZeroGpuQueryBatch<PS::Config>);
     ExpectPointConfigSectionContract<DensityWeightConfig>(kDensityWeightConfigSectionName,
         kDensityWeightConfigSectionSchemaId, SerializeDensityWeightConfig, ValidateDensityWeightConfigSection,
         MakeDensityWeightConfigSectionRegistration, SetDensityWeightConfig, GetDensityWeightConfig,
@@ -1378,11 +1379,11 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         {"PointSpacing",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
-                Runtime::PointSpacingConfig config;
+                PS::Config config;
                 config.Positions = ref;
-                return Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>(config);
+                return Runtime::SerializeDerivedSection<PS::kSection>(config);
             },
-            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>},
+            Runtime::ValidateDerivedSection<PS::kSection>},
         {"OutlierAnalysis",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
@@ -1509,9 +1510,9 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
     check(Runtime::KernelDensityConfig{},
         &Runtime::KernelDensityConfig::Positions,
         Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>);
-    check(Runtime::PointSpacingConfig{},
-        &Runtime::PointSpacingConfig::Positions,
-        Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>);
+    check(PS::Config{},
+        &PS::Config::Positions,
+        Runtime::SerializeDerivedSection<PS::kSection>);
     check(Runtime::OutlierAnalysisConfig{},
         &Runtime::OutlierAnalysisConfig::Positions,
         Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>);
@@ -1561,15 +1562,15 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
                 return Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(c);
             }},
         Family{"PointSpacing",
-            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+            Runtime::ValidateDerivedSection<PS::kSection>,
             "Point spacing config must be an object.",
             "Unknown radii field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size"},
             [](std::uint32_t id)
             {
-                Runtime::PointSpacingConfig c;
+                PS::Config c;
                 c.StableEntityId = id;
-                return Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>(c);
+                return Runtime::SerializeDerivedSection<PS::kSection>(c);
             }},
         Family{"OutlierAnalysis",
             Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>,
@@ -1720,7 +1721,7 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
     };
     const std::array families{
         Family{"PointSpacing",
-            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+            Runtime::ValidateDerivedSection<PS::kSection>,
             {"scale_factor"},
             "Unknown radii backend."},
         Family{"KernelDensity",
@@ -1781,10 +1782,10 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
         }
     }
     for (const auto overflow : {R"({"scale_factor":1e400})", R"({"scale_factor":-1e400})"})
-        reject(Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+        reject(Runtime::ValidateDerivedSection<PS::kSection>,
             overflow,
             "Point spacing config must be an object.");
-    reject(Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+    reject(Runtime::ValidateDerivedSection<PS::kSection>,
         R"({"scale_factor":1e-50})",
         "Positive scale factor must remain positive in float storage.");
     reject(Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
@@ -1831,7 +1832,7 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
         "Position and weight bindings need distinct canonical vec3/float properties on the same domain.";
     const std::array families{
         Family{"KernelDensity", Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>, typed, domain},
-        Family{"PointSpacing", Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>, typed, domain},
+        Family{"PointSpacing", Runtime::ValidateDerivedSection<PS::kSection>, typed, domain},
         Family{"OutlierAnalysis", Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>, typed, domain},
         Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
         Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection, density, density},
@@ -1904,7 +1905,7 @@ TEST(SandboxConfigSections, PointPropertyFieldsPreserveKindsAndFirstErrorOrder)
             Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
             {{"positions", "vec3"}, {"density", "float"}}},
         Family{"PointSpacing",
-            Runtime::ValidateDerivedSection<Runtime::kPointSpacingSection>,
+            Runtime::ValidateDerivedSection<PS::kSection>,
             {{"positions", "vec3"}, {"radii", "float"}}},
         Family{"OutlierAnalysis",
             Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>,
@@ -1990,12 +1991,12 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
     }
     {
         SCOPED_TRACE("PointSpacing");
-        using C = Runtime::PointSpacingConfig;
+        using C = PS::Config;
         check(C{},
             {&C::Positions, &C::Radii},
-            Runtime::SetDerivedSection<Runtime::kPointSpacingSection>,
-            Runtime::GetDerivedSection<Runtime::kPointSpacingSection>,
-            Runtime::SerializeDerivedSection<Runtime::kPointSpacingSection>);
+            Runtime::SetDerivedSection<PS::kSection>,
+            Runtime::GetDerivedSection<PS::kSection>,
+            Runtime::SerializeDerivedSection<PS::kSection>);
     }
     {
         SCOPED_TRACE("OutlierAnalysis");

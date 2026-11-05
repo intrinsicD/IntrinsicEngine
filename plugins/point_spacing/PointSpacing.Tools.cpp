@@ -1,0 +1,87 @@
+module;
+
+#include <memory>
+#include <string>
+#include <string_view>
+
+#include <nlohmann/json.hpp>
+
+module Intrinsic.Plugin.PointSpacing;
+
+import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.PluginContract;
+import Extrinsic.Runtime.PluginSections;
+
+namespace Intrinsic::Plugins::PointSpacing
+{
+    namespace
+    {
+        using Json = nlohmann::json;
+
+        Json ResultJson(const Result& r)
+        {
+            return {{"status", r.Status},
+                    {"message", r.Message},
+                    {"requested_backend", ToString(r.RequestedBackend)},
+                    {"actual_backend", r.ActualBackend},
+                    {"radii", {{"domain", int(r.Radii.Domain)}, {"name", r.Radii.Name}}},
+                    {"slot_count", r.SlotCount},
+                    {"live_count", r.LiveCount},
+                    {"written_count", r.WrittenCount},
+                    {"mean_radius", r.MeanRadius},
+                    {"min_radius", r.MinRadius},
+                    {"max_radius", r.MaxRadius},
+                    {"average_spacing", r.AverageSpacing},
+                    {"min_spacing", r.MinSpacing},
+                    {"max_spacing", r.MaxSpacing},
+                    {"bounding_box_diagonal", r.BoundingBoxDiagonal},
+                    {"centroid", {r.Centroid.x, r.Centroid.y, r.Centroid.z}},
+                    {"gpu_query_batches", r.GpuQueryBatches},
+                    {"gpu_input_upload_bytes", r.GpuInputUploadBytes},
+                    {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                    {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                    {"index_reused", r.IndexReused},
+                    {"cpu_compute_ms", r.CpuComputeMilliseconds}};
+        }
+
+        R::AgentOperationOutcome NoConfig()
+        {
+            return {.IsError = true, .Text = "The point spacing section is missing or invalid.", .ErrorCode = "invalid"};
+        }
+    }
+
+    void AddTools(R::PluginRegistrations& staged)
+    {
+        staged.Operations.push_back({
+            .Name = "point_spacing",
+            .Title = "Point spacing and radii",
+            .Description = "Estimates point spacing and radii with the settings of the config section "
+                           "sandbox.point_spacing (set them with config_apply) and answers when the run ends: status "
+                           "applied, invalid, busy, failed, stale, discarded or cancelled, with the radius and spacing "
+                           "statistics. A vulkan_lbvh run accepts its result as soon as it is ready. Cancellable; the "
+                           "run is a row of the editor's Jobs window.",
+            .ReadOnly = false,
+            .Invoke = [](const R::AgentOperationContext&, std::string_view)
+            {
+                const auto config = R::ActivePluginSection<kSection>();
+                if (!config) return NoConfig();
+                const auto run = Start(*config, true);
+                return R::WaitForPluginRun(
+                    std::shared_ptr<R::PluginRun<Result>>(run), [](const Result& r) { return ResultJson(r).dump(); },
+                    [run] { Refresh(*run); }, [run] { return Cancel(*run); });
+            },
+        });
+        staged.Operations.push_back({
+            .Name = "point_spacing_preview",
+            .Title = "Point spacing readiness",
+            .Description = "Whether point_spacing can run with the section's settings, and why not.",
+            .Invoke = [](const R::AgentOperationContext&, std::string_view)
+            {
+                const auto config = R::ActivePluginSection<kSection>();
+                if (!config) return NoConfig();
+                const auto reason = Preview(*config);
+                return R::AgentOperationOutcome{.Text = Json{{"ready", reason.empty()}, {"reason", reason}}.dump()};
+            },
+        });
+    }
+}

@@ -222,17 +222,24 @@ namespace Extrinsic::Runtime
             edit->AfterOutput = edit->OutputWatch.Revision ? edit->BeforeOutput
                                                            : props->Get<glm::vec3>(r.Positions.Name).Vector();
         }
-        if (r.AcquireIndex)
-        {
-            if (context.SpatialIndices == nullptr) return fail("The spatial index cache is unavailable.");
-            const auto state = Detail::AcquirePointIndex(*context.SpatialIndices, context.World, *entity, r.Positions,
-                                                         edit->Capture.Slots, edit->Capture.Points, edit->GpuIndex,
-                                                         edit->Index, edit->IndexReused, diagnostic);
-            if (state == Detail::PointIndexState::Unavailable) return {};
-            if (state == Detail::PointIndexState::Mismatched)
-                return fail("The index snapshot does not match the selected samples.");
-        }
+        if (r.AcquireIndex && !AcquireIndex(*edit, diagnostic)) return {};
         return edit;
+    }
+
+    bool PointCloudEditingService::AcquireIndex(PointEdit& edit, std::string& diagnostic)
+    {
+        const auto& context = edit.Context;
+        if (context.SpatialIndices == nullptr)
+        {
+            diagnostic = "The spatial index cache is unavailable.";
+            return false;
+        }
+        const auto state = Detail::AcquirePointIndex(*context.SpatialIndices, context.World, edit.Entity,
+                                                     edit.Request.Positions, edit.Capture.Slots, edit.Capture.Points,
+                                                     edit.GpuIndex, edit.Index, edit.IndexReused, diagnostic);
+        if (state == Detail::PointIndexState::Mismatched)
+            diagnostic = "The index snapshot does not match the selected samples.";
+        return state == Detail::PointIndexState::Ready;
     }
 
     PointEditView PointCloudEditingService::View(const PointEdit& edit) const
@@ -566,6 +573,8 @@ namespace Extrinsic::Runtime
         EditorPointScalarTransactionHandle Transaction{};
         std::function<bool()> AttachmentActive{}; // the attachment the run was started in
         const void* Workspace{nullptr};           // the workspace the service used then
+        std::size_t SlotCount{0u};                // of the captured domain
+        GeometryPropertyRef Output{};             // with its resolved domain
         bool Released{false};                     // the service stopped using that workspace
     };
 
@@ -659,7 +668,8 @@ namespace Extrinsic::Runtime
                 refusal = {.Message = std::move(state.Message), .Busy = state.OutputBusy};
                 return {};
             }
-            auto run = std::make_shared<ScalarAnalysis::Run>(std::move(transaction), context.AttachmentActive, workspace);
+            auto run = std::make_shared<ScalarAnalysis::Run>(std::move(transaction), context.AttachmentActive, workspace,
+                                                             capture->SlotCount, capture->Output);
             std::erase_if(runs, [](const auto& weak) { return weak.expired(); });
             runs.push_back(run);
             return ScalarAnalysis{std::move(run)};
@@ -699,7 +709,9 @@ namespace Extrinsic::Runtime
                 .Stale = s.Status == EditorCommandStatus::StaleEntity,
                 .Detached = detached,
                 .IndexReused = s.IndexReused,
+                .SlotCount = m_Run->SlotCount,
                 .LiveCount = s.LiveCount,
+                .Output = m_Run->Output,
                 .GpuInputUploadBytes = s.GpuInputUploadBytes,
                 .GpuInputCacheHits = s.GpuInputCacheHits,
                 .CpuStageReadbackBytes = s.CpuStageReadbackBytes,
@@ -773,6 +785,31 @@ namespace Extrinsic::Runtime
             }
         }
         ImGui::EndCombo();
+        return changed;
+    }
+
+    bool PointScalarOutputInput(const char* label, GeometryPropertyRef& ref)
+    {
+        std::array<char, 256> name{};
+        ref.Name.copy(name.data(), name.size() - 1);
+        bool changed = false;
+        if (ImGui::InputText(label, name.data(), name.size()))
+        {
+            ref.Name = name.data();
+            changed = true;
+        }
+        using K = Geometry::PropertyValueKind;
+        constexpr std::array kinds{K::Bool, K::Int32, K::UInt32, K::UInt64, K::Float, K::Double};
+        int selected = -1;
+        for (std::size_t i = 0; i < kinds.size(); ++i)
+            if (ref.ValueKind == kinds[i]) selected = int(i);
+        ImGui::PushID(label);
+        if (ImGui::Combo("Storage", &selected, "Bool\0Int32\0UInt32\0UInt64\0Float\0Double\0") && selected >= 0)
+        {
+            ref.ValueKind = kinds[std::size_t(selected)];
+            changed = true;
+        }
+        ImGui::PopID();
         return changed;
     }
 

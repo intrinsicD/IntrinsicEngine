@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 123 |
+| `runtime` | 122 |
 
 ## Modules
 
@@ -462,7 +462,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PointConstructionConfig` | `src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSamplingConfig` | `src/runtime/Modules/PointSampling/Runtime.PointSamplingConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSamplingGpu` | `src/runtime/Modules/PointSampling/Runtime.PointSamplingGpu.cppm` | `runtime` |
-| `Extrinsic.Runtime.PointSpacingConfig` | `src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.CoherentPointDriftConfig` | `src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm` | `runtime` |
@@ -489,4 +488,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **462**
+Total modules: **461**

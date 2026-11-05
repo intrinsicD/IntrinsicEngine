@@ -42,7 +42,6 @@ namespace
         R::EditorProcessingContext Context{};
         R::EditorCommandHistory History{};
         R::KernelDensityConfig Density{};
-        R::PointSpacingConfig Spacing{};
         R::DensityWeightConfig Weight{};
         R::EditorPointScalarTransactionHandle Run{};
         entt::entity Entity{};
@@ -69,12 +68,12 @@ namespace
             for(std::size_t i=0;i<66;++i)Points.push_back(positions[i]);
             Rows().GetOrAdd<bool>("v:deleted",false)[66]=true;
             const auto id=R::SelectionController::ToStableEntityId(Entity);
-            Density.StableEntityId=Spacing.StableEntityId=Weight.StableEntityId=id;
-            Density.Backend=R::KernelDensityBackend::VulkanLBVH;Spacing.Backend=R::PointSpacingBackend::VulkanLBVH;Weight.Backend=R::DensityWeightBackend::VulkanLBVH;
-            Density.Positions.Domain=Spacing.Positions.Domain=Weight.Positions.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Density.Density.Domain=Spacing.Radii.Domain=Weight.Weights.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Density.Density.Name=Spacing.Radii.Name=Weight.Weights.Name="scalar";
-            Density.KNeighbors=Spacing.KNeighbors=8;Weight.SupportRadius=0.6;
+            Density.StableEntityId=Weight.StableEntityId=id;
+            Density.Backend=R::KernelDensityBackend::VulkanLBVH;Weight.Backend=R::DensityWeightBackend::VulkanLBVH;
+            Density.Positions.Domain=Weight.Positions.Domain=R::GeometryElementDomain::PointCloudPoint;
+            Density.Density.Domain=Weight.Weights.Domain=R::GeometryElementDomain::PointCloudPoint;
+            Density.Density.Name=Weight.Weights.Name="scalar";
+            Density.KNeighbors=8;Weight.SupportRadius=0.6;
             Rows().GetOrAdd<float>("scalar",0)[66]=123;
         }
         void Fail(const std::string& message){ADD_FAILURE()<<message;Kernel().RequestExit();}
@@ -82,7 +81,6 @@ namespace
         {
             std::string why;
             if(Method==0){R::EditorKernelDensityResult r;Run=R::StartEditorKernelDensityTransaction(Commands(),Density,r);why=r.Message;}
-            else if(Method==1){R::EditorPointSpacingResult r;Run=R::StartEditorPointSpacingTransaction(Commands(),Spacing,r);why=r.Message;}
             else {R::EditorDensityWeightResult r;Run=R::StartEditorDensityWeightTransaction(Commands(),Weight,r);why=r.Message;}
             if(!Run)Fail(why);else ++Starts;
         }
@@ -96,10 +94,9 @@ namespace
                     Points={{0,0,0},{separation,0,0}};
                     auto p=Rows().Get<glm::vec3>("v:position");p[0]=Points[0];p[1]=Points[1];
                     auto deleted=Rows().Get<bool>("v:deleted");for(unsigned j=2;j<67;++j)deleted[j]=true;
-                    Density.Bandwidth=1e-12f;Spacing.ScaleFactor=Boundary==2?1e-20f:1e20f;Weight.SupportRadius=2e-20;
+                    Density.Bandwidth=1e-12f;Weight.SupportRadius=2e-20;
                 }
                 if(Method==0){auto r=Geometry::PointCloud::EstimateKernelDensity(Points,{.KNeighbors=Density.KNeighbors,.Bandwidth=Density.Bandwidth});if(!r){Fail("CPU density failed");return;}Reference=r->Densities;}
-                else if(Method==1){auto r=Geometry::PointCloud::EstimateRadii(Points,{.KNeighbors=Spacing.KNeighbors,.ScaleFactor=Spacing.ScaleFactor});if(!r){Fail("CPU radii failed");return;}Reference=r->Radii;}
                 else {Weight.Kernel=Geometry::PointCloud::Kernels::KernelType((Method-2)/2);Weight.Mode=Geometry::PointCloud::Kernels::DensityWeightMode((Method-2)%2);
                     auto r=Geometry::PointCloud::Kernels::ComputeDensityWeights(Points,Weight.SupportRadius,Weight.Kernel,Weight.Mode);if(!r.Succeeded()){Fail("CPU weights failed");return;}Reference=r.Weights;}
                 Start();Step=1;return;
@@ -122,7 +119,7 @@ namespace
                 for(std::size_t i=0;i<Points.size();++i)
                     EXPECT_NEAR(Saved[i],Reference[i],std::abs(double(Reference[i]))*2e-6);
                 std::ostringstream measured;measured<<std::setprecision(17)<<delta;
-                const std::string name=(Boundary?"boundary_":"")+std::string(Method==0?"kernel_density":Method==1?"point_spacing":"density_weights_variant_"+std::to_string(Method-2));
+                const std::string name=(Boundary?"boundary_":"")+std::string(Method==0?"kernel_density":"density_weights_variant_"+std::to_string(Method-2));
                 ::testing::Test::RecordProperty(name+"_max_abs_delta",measured.str());
                 EXPECT_LE(delta,2e-5);EXPECT_EQ(Saved[66],123);EXPECT_EQ(snapshot.CpuStageReadbackBytes,67u*4u);
                 Start();Step=3;return;
@@ -132,9 +129,13 @@ namespace
                 EXPECT_EQ(snapshot.GpuInputUploadBytes,0u);
                 R::DiscardEditorPointScalar(Commands(),Run);EXPECT_EQ(std::as_const(Rows()).Get<float>("scalar").Vector(),Saved);
                 Run.reset();
-                if(Boundary==2){Done=true;Final=Context.SpatialIndices->Stats();Kernel().RequestExit();}
-                else if(++Method==8){++Boundary;Method=Boundary==2?1:0;Step=0;}
-                else Step=0;
+                // ARCH-022 Q89: method 1 (point spacing) is a plugin; its parity and boundary runs are in
+                // PointSpacingPluginGpuSmoke.
+                if(++Method==1)++Method;
+                if(Method==8){
+                    if(++Boundary==2){Done=true;Final=Context.SpatialIndices->Stats();Kernel().RequestExit();return;}
+                    Method=0;}
+                Step=0;
             }
         }
         void Shutdown() override {R::DiscardEditorPointScalar({},Run);Run.reset();Context={};}

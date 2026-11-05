@@ -389,6 +389,13 @@ learned radius rows and the publication of several scalar columns as one undo en
 into the services ring (`PluginService`, `Extrinsic.Runtime.PluginSections`), and their tests share one plugin
 harness (`tests/support/PluginHarness.hpp`).
 
+**State (2026-11-05, Q89):** point spacing is the plugin `plugins/point_spacing` ([feature](point-spacing.md)):
+CPU octree and CPU LBVH as plugin jobs, Vulkan through the editing service's GPU scalar analysis, with its section
+(`sandbox.point_spacing`, unchanged), its tools `point_spacing` and `point_spacing_preview`, its window and the newest
+run it keeps for that window. The engine's module, its `run_operation` row, its Sandbox panel and its domain menu
+redirects are gone. A plugin job on a scalar output is a scalar-field run in the Jobs window, so it and the editor's
+own scalar runs see each other on the same output. Kernel density follows the same way.
+
 **Open, for the first plan** (`ARCH-022`):
 1. **Numeric targets for R4 and R6**: set on 2026-10-31 (table above).
 2. **Order of steps.** The proposal starts with the riskiest assumption:

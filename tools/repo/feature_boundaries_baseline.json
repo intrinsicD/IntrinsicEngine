@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "r1_files": 29,
+  "r1_files": 28,
   "r2": {
     "plugins/bilateral_filter": {
       "editor_internals": 0,
@@ -15,6 +15,10 @@
       "other_plugins": 0
     },
     "plugins/fixture": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "plugins/point_spacing": {
       "editor_internals": 0,
       "other_plugins": 0
     },
@@ -72,10 +76,6 @@
     },
     "src/runtime/Modules/PointSampling": {
       "editor_internals": 0,
-      "other_plugins": 0
-    },
-    "src/runtime/Modules/PointSpacing": {
-      "editor_internals": 4,
       "other_plugins": 0
     },
     "src/runtime/Modules/ProgressivePoisson": {

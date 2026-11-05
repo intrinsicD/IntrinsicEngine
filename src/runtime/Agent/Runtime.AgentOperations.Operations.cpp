@@ -465,10 +465,6 @@ namespace Extrinsic::Runtime
                     "kernel_density", "point", "sandbox.kernel_density", &PrepareEditorPointFieldFrame,
                     &GetEditorKernelDensityConfig, &PreviewEditorKernelDensityCommand,
                     [](const auto& c, auto onComplete) { return ApplyEditorConfiguredKernelDensity(c, std::move(onComplete)); }));
-                ops.push_back(ConfigSourced<EditorPointSpacingResult>(
-                    "point_spacing", "point", "sandbox.point_spacing", &PrepareEditorPointFieldFrame,
-                    &GetEditorPointSpacingConfig, &PreviewEditorPointSpacingCommand,
-                    [](const auto& c, auto onComplete) { return ApplyEditorConfiguredPointSpacing(c, std::move(onComplete)); }));
                 ops.push_back(ConfigSourced<EditorOutlierAnalysisResult>(
                     "outlier_analysis", "point", "sandbox.outlier_analysis", &PrepareEditorPointAnalysisFrame,
                     &GetEditorOutlierAnalysisConfig, &PreviewEditorOutlierAnalysisCommand,

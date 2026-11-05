@@ -3674,3 +3674,24 @@ python3 tools/docs/check_doc_links.py --root . --strict
   gpt-6-astra xhigh, read-only sandbox, recursion protection instruction-only; fresh thread
   `01a1ac4e-c655-7b21-9687-25092befa045`): diff `58284325…` "**Verdict: revise required.**" (a release without a
   detach left a run publishable; move-assignment untested), diff `d133fdfa…` verbatim "**Verdict: approve.**".
+- 2026-11-05, Q89 part 2, step 2 (point spacing as a plugin): `plugins/point_spacing` (section `sandbox.point_spacing`
+  unchanged, tools `point_spacing`/`point_spacing_preview`, window `view.point_spacing`; CPU octree and CPU LBVH as a
+  plugin job, Vulkan through the step 1 scalar analysis; the plugin keeps the newest run for its window, a busy
+  refusal excepted, while the editor session lasts). Removed from the engine: `src/runtime/Modules/PointSpacing`, its
+  `run_operation` row, its section registration, its Sandbox panel and domain redirects. Host: a plugin job on a
+  single-component output is a ScalarField run (so it and the editor's GPU scalar transaction see each other).
+  Service: `AcquireIndex` split out of `Capture` (method checks before the index), the scalar analysis state carries
+  slot count and the resolved output, a shared scalar output widget. Tests: `Test.PointSpacingPlugin` (15 cases) and
+  `PointSpacingPluginGpuSmoke` (4) replace `Test.PointSpacingOperations` and `PointLBVHGpuSmoke.PointSpacing*`; the
+  section stays held to the codec golden and the Sandbox section contracts; the other tests migrated per the plan
+  (counts: window menu 91 to 87, Sandbox sections 24 to 23, R1 ceiling 29 to 28, R2 `plugins/point_spacing` 0).
+  Verification (build/ci-vulkan-release): full build; CPU suite 6250 with 8 failures, four count updates of this
+  change (fixed, their suites re-run 175/175) and four known (two PointSampling of the other session, two
+  SandboxAgentServer); after the review fixes 111 contract tests and 13 GPU smokes; 36 GPU smokes before them; eight
+  mutations each turn their test red. Code review (Codex, gpt-6-astra xhigh, read-only, recursion protection
+  instruction-only; fresh thread `01a1ac75-5687-7521-b310-a630aae45401`): diff `38249a60…` "**Verdict: revise
+  required.**" (a CPU run published after its session ended; Vulkan results lacked slot count and resolved domain;
+  CPU LBVH acquired the index before the method's checks; two regressions not migrated), diff `47a43d9f…` verbatim
+  "**Verdict: approve.**"; the two service-test assertions of fix 2 (`Test.PointCloudEditing.cpp`, slot count and
+  resolved domain on the test path) were outside that diff's file list and go to the step 3 review. Step 1's ci-docs run failed once in `Test.ConcurrentCTestDiscovery.py` (a barrier
+  timeout, tooling this change does not touch) and passed on rerun.

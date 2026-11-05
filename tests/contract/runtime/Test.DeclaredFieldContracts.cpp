@@ -31,7 +31,7 @@ import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
-import Extrinsic.Runtime.PointSpacingConfig;
+import Intrinsic.Plugin.PointSpacing; // ARCH-022 Q89: its section is held to the same golden
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.ConfigFieldSpec;
@@ -926,8 +926,9 @@ namespace
             .KNeighbors = 9,
             .GpuQueryBatchSize = 128,
             .Bandwidth = 0.25f};
-        const R::PointSpacingConfig spacing{.StableEntityId = 7,
-            .Backend = R::PointSpacingBackend::CpuLBVH,
+        namespace PS = Intrinsic::Plugins::PointSpacing;
+        const PS::Config spacing{.StableEntityId = 7,
+            .Backend = PS::SpacingBackend::CpuLBVH,
             .Positions = {.Domain = D::MeshVertex, .Name = "p", .ValueKind = K::Vec3},
             .Radii = {.Domain = D::MeshVertex, .Name = "r", .ValueKind = K::Float},
             .KNeighbors = 3,
@@ -964,15 +965,14 @@ namespace
             {"point_spacing",
                 "radii",
                 "scale_factor",
-                R::SerializeDerivedSection<R::kPointSpacingSection>({}),
-                R::SerializeDerivedSection<R::kPointSpacingSection>(spacing),
-                R::SerializeDerivedSection<R::kPointSpacingSection>(
-                    {.Backend = static_cast<R::PointSpacingBackend>(7)}),
+                R::SerializeDerivedSection<PS::kSection>({}),
+                R::SerializeDerivedSection<PS::kSection>(spacing),
+                R::SerializeDerivedSection<PS::kSection>({.Backend = static_cast<PS::SpacingBackend>(7)}),
                 [](const std::string_view payload)
                 {
-                    return R::ValidateDerivedSection<R::kPointSpacingSection>(payload, {}, "golden");
+                    return R::ValidateDerivedSection<PS::kSection>(payload, {}, "golden");
                 },
-                R::MakeDerivedSectionRegistration<R::kPointSpacingSection>()},
+                R::MakeDerivedSectionRegistration<PS::kSection>()},
             {"outlier_analysis",
                 "score",
                 "radius",
@@ -1113,7 +1113,8 @@ TEST(DeclaredFieldContracts, FloatFieldsConvertNumbersStraightToFloat)
     EXPECT_EQ(stored(R::ValidateDerivedSection<R::kKernelDensitySection>(R"({"bandwidth":)" + literal + "}", {}, "t"),
                   "bandwidth"),
         18014400656965632.0f);
-    EXPECT_EQ(stored(R::ValidateDerivedSection<R::kPointSpacingSection>(R"({"scale_factor":)" + literal + "}", {}, "t"),
+    EXPECT_EQ(stored(R::ValidateDerivedSection<Intrinsic::Plugins::PointSpacing::kSection>(
+                         R"({"scale_factor":)" + literal + "}", {}, "t"),
                   "scale_factor"),
         18014400656965632.0f);
 }
@@ -1156,7 +1157,7 @@ namespace
         return fields;
     }();
     static_assert(R::IsDerivable(R::kKernelDensitySection));
-    static_assert(R::IsDerivable(R::kPointSpacingSection));
+    static_assert(R::IsDerivable(Intrinsic::Plugins::PointSpacing::kSection));
     static_assert(R::IsDerivable(R::kOutlierAnalysisSection));
     static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
         .Rows = R::kKernelDensityRows, .Fields = kKernelDensityRenamed}));

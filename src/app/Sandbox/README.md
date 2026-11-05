@@ -705,7 +705,7 @@ Open **View → Processing → Sampling & Density → Kernel Density**, choose t
 **Estimate density**; **Show density** displays the named output. The same
 `sandbox.kernel_density` config drives UI and agent commands.
 
-[Point Spacing and Radii](../../../docs/architecture/point-spacing.md) exposes canonical positions, radius output, k, scale and CPU/Vulkan neighborhoods through View and geometry Processing menus. Show radii uses scalar colors; model-space radius rendering is tracked by RUNTIME-222.
+[Point Spacing and Radii](../../../docs/architecture/point-spacing.md) is the startup plugin `plugins/point_spacing`: it exposes canonical positions, radius output, k, scale and CPU/Vulkan neighborhoods through **View → Processing → Sampling & Density** (a Vulkan run waits for Accept or Discard), with the MCP tools `point_spacing` and `point_spacing_preview`. Show radii uses scalar colors; model-space radius rendering is tracked by RUNTIME-222.
 
 Property filtering is available through **View → Processing → Filtering & Smoothing → Smooth
 Property** and the same group of each geometry domain's Processing menu. Select a floating scalar/vector input and

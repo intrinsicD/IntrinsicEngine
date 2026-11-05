@@ -31,7 +31,6 @@ target_sources(${target_name}
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm
         Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
-        Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
         Modules/DensityWeight/Runtime.DensityWeightOperation.cppm
@@ -170,7 +169,6 @@ target_sources(${target_name}
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
         Editor/Operations/Runtime.PointScalarTransaction.cpp
         Modules/KernelDensity/Runtime.KernelDensityOperation.cpp
-        Modules/PointSpacing/Runtime.PointSpacingOperation.cpp
         Modules/DensityWeight/Runtime.DensityWeightOperation.cpp
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp

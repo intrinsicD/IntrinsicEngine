@@ -532,6 +532,8 @@ TEST(PointCloudEditing, AScalarAnalysisAcceptsOnceAndDiscardsWithoutATrace)
     ASSERT_TRUE(run) << refusal.Message;
     EXPECT_EQ(run.Poll().Phase, P::ReadyToAccept);
     EXPECT_TRUE(run.Poll().CanAccept);
+    EXPECT_EQ(run.Poll().SlotCount, props.Size());
+    EXPECT_EQ(run.Poll().Output.Domain, D::PointCloudPoint);
     EXPECT_TRUE(runs.HasRing(harness, entity, D::PointCloudPoint)) << "the preview is resident";
     auto second = runs.Start(harness, entity, D::PointCloudPoint, 5.f, refusal);
     EXPECT_FALSE(second);
