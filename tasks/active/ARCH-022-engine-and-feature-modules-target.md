@@ -183,6 +183,8 @@ contract_review: tracker only; each slice declares its own contracts
     request's in-process enqueue, the panel's progress is a proxy (the same iteration count, drawn by code one frame
     later), the button's work before the enqueue is estimated separately from the same agent calls' frames; or build an
     input simulation that presses the real button) "Ja, so messen (Empfohlen)"
+86. (2026-11-05, after the Q83 result) "Ok danke. Kannst du schauen welche lessons wir hier gelernt haben und für
+    andere Plugins und gpu backends gebrauchen können?"
 
 ## Goal
 - Reach the target in
@@ -3611,3 +3613,20 @@ python3 tools/docs/check_doc_links.py --root . --strict
   Lessons added (VMA CPU_ONLY, typed cache diff, hook FrameIndex). Open for the operator: options B–D (C: seeding off
   the main thread, fewer host round trips per iteration), the readback copies' missing host-read barrier,
   `VulkanDevice::ReadBuffer`'s CPU_ONLY staging, GRAPHICS150 and the local SandboxAgentServer failures.
+- 2026-11-05, Q86 (code reading only: two Explore sweeps plus own spot checks of the key lines; no run, costs at large
+  N inferred except K-Means): the K-Means patterns elsewhere. Host round trip per iteration: LOP resident (at least two
+  per iteration), consolidation VulkanLBVH (framed 4096-row radius batches, about 2·N/4096 per iteration, LBVH rebuilt
+  on the main gate per iteration), CPD E-step (one per EM iteration), FPS chunks, CG chunks, the bilateral plugin's
+  passes; framed radius/kNN batches never take the immediate path (`SubmitBatchImmediate` only for transformed
+  batches, `Runtime.SpatialIndexCache.cpp:585`); PCA normals page 4096 rows per framed submission. Main-thread start
+  work scaling with N: consolidation snapshot copies, smoothing Prepare/StartVulkan, point sampling's brute-force
+  prefix check and CPU fallback, normals' before/after copies. Capture reuse by revision exists only in K-Means.
+  Per-poll O(N) checks: consolidation `.Current` (full BitEqual) and its projection gate (`all_of`). Publication:
+  `PropertySet` copy then move-assign rebases every revision (`Geometry.Properties.cpp:67-77`) in consolidation's
+  ApplyPropertyState (`Runtime.PointCloudConsolidationModule.cpp:1741, 1767`) — the bug K-Means had (Q75) —, Progressive
+  Poisson replaces whole components; `PublishPointScalarField` (shared by every point-scalar operation and the
+  descriptor plugin's 33 columns) copies before/after and re-captures for a bitwise check. Graphics: CPU-read
+  host-visible buffers (picking, histogram, backbuffer capture) are `CPU_TO_GPU|SEQUENTIAL_WRITE`, read through
+  `ReadBuffer` (device idle); the material buffer's dirty ranges go through `WriteBuffer` into device-local memory
+  (queue idle); `RecordAndSubmitDownload` lacks the transfer-to-host barrier for every readback. Options went to the
+  operator.
