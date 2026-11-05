@@ -436,7 +436,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 87u); // ARCH-022 Q89: point spacing's window and its three redirects moved to its plugin
+    ASSERT_EQ(menu.size(), 83u); // ARCH-022 Q89: point spacing's and kernel density's windows and redirects are plugins'
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -458,7 +458,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
                       segmentation = "Segmentation & Clustering", fields = "Fields & Spectral",
                       sampling = "Sampling & Density", remeshing = "Remeshing & UV",
                       reconstruction = "Reconstruction & Registration";
-    const std::array<ExpectedWindow, 74> expected{{
+    const std::array<ExpectedWindow, 70> expected{{
         {"view.property_inspector", {"View"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -505,19 +505,15 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"graph.processing.vertices.normals", {"Graph", "Processing", normals}},
         {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", normals}},
         {"view.normal_estimation", {"View", "Processing", normals}},
-        {"view.kernel_density", {"View", "Processing", sampling}},
         {"view.keypoint_analysis", {"View", "Processing", features}},
         {"view.density_weights", {"View", "Processing", sampling}},
         {"view.point_construction", {"View", "Processing", reconstruction}},
-        {"mesh.processing.kernel_density", {"Mesh", "Processing", sampling}},
         {"mesh.processing.keypoints", {"Mesh", "Processing", features}},
         {"mesh.processing.density_weights", {"Mesh", "Processing", sampling}},
         {"mesh.processing.point_construction", {"Mesh", "Processing", reconstruction}},
-        {"graph.processing.kernel_density", {"Graph", "Processing", sampling}},
         {"graph.processing.keypoints", {"Graph", "Processing", features}},
         {"graph.processing.density_weights", {"Graph", "Processing", sampling}},
         {"graph.processing.point_construction", {"Graph", "Processing", reconstruction}},
-        {"pointcloud.processing.kernel_density", {"PointCloud", "Processing", sampling}},
         {"pointcloud.processing.keypoints", {"PointCloud", "Processing", features}},
         {"pointcloud.processing.density_weights", {"PointCloud", "Processing", sampling}},
         {"pointcloud.processing.point_construction", {"PointCloud", "Processing", reconstruction}},
@@ -972,7 +968,7 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
         "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
     ASSERT_FALSE(source.empty());
 
-    constexpr std::array<std::string_view, 9> commands{{
+    constexpr std::array<std::string_view, 8> commands{{
       "ApplyEditorMeshDenoiseCommand",
       "ApplyEditorMeshCurvatureCommand",
       "ApplyEditorMeshRemeshCommand",
@@ -980,13 +976,12 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
       "ApplyEditorMeshSimplifyCommand",
       "ApplyEditorConfiguredNormalEstimation",
       "ApplyEditorConfiguredOutlierAnalysis",
-      "ApplyEditorConfiguredKernelDensity",
       "ApplyEditorConfiguredRegistrationCommand",
     }};
-    // RUNTIME-348 (operator decision 28): kernel density publishes through the operation runtime's result
-    // store, which its panel reads instead of naming a session sink; outlier analysis too (RUNTIME-354).
-    // Point spacing is a plugin (ARCH-022 Q89) that keeps its own latest result.
-    constexpr std::array<std::string_view, 9> sinks{{
+    // RUNTIME-354: outlier analysis publishes through the operation runtime's result store, which its panel reads
+    // instead of naming a session sink. Kernel density and point spacing are plugins (ARCH-022 Q89) that keep their
+    // own latest results.
+    constexpr std::array<std::string_view, 8> sinks{{
         "context.MeshTopology.ResultSinks.MeshDenoise",
         "context.MeshFields.ResultSinks.MeshCurvature",
         "context.MeshTopology.ResultSinks.MeshRemesh",
@@ -994,7 +989,6 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
         "context.MeshTopology.ResultSinks.MeshSimplify",
         "context.Normals.ResultSinks.NormalEstimation",
         "context.PointFields.Results.Last<Runtime::OutlierOperation>()",
-        "context.PointFields.Results.Last<Runtime::KernelDensityOperation>()",
         "context.Registration.ResultSinks.Registration",
     }};
     for (const std::string_view required : commands)
@@ -1946,7 +1940,6 @@ TEST(SandboxEditorPresentation, DomainMenusOpenOneSharedWindow)
         {"view.registration", {"mesh.processing.registration", "graph.processing.registration", "pointcloud.processing.registration"}, false},
         {"view.normal_estimation", {"mesh.processing.vertices.normals", "graph.processing.vertices.normals", "pointcloud.processing.vertices.normals", "mesh.processing.faces.normals"}, true},
         {"view.outlier_analysis", {"mesh.processing.outliers", "graph.processing.outliers", "pointcloud.processing.remove_outliers"}, true},
-        {"view.kernel_density", {"mesh.processing.kernel_density", "graph.processing.kernel_density", "pointcloud.processing.kernel_density"}, true},
         {"view.keypoint_analysis", {"mesh.processing.keypoints", "graph.processing.keypoints", "pointcloud.processing.keypoints"}, true},
         {"view.density_weights", {"mesh.processing.density_weights", "graph.processing.density_weights", "pointcloud.processing.density_weights"}, true},
         {"view.point_construction", {"mesh.processing.point_construction", "graph.processing.point_construction", "pointcloud.processing.point_construction"}, true},

@@ -58,7 +58,7 @@ stronger evidence than the layer totals.
 
 ### F1 — Same scalar-property operation implemented twice: confirmed
 
-[Density](../../src/runtime/Modules/KernelDensity/Runtime.KernelDensityOperation.cpp)
+[Density](https://github.com/intrinsicD/IntrinsicEngine/blob/8b4403d0e/src/runtime/Modules/KernelDensity/Runtime.KernelDensityOperation.cpp)
 and spacing (`Runtime.GeometryProcessingOperations.Spacing.cpp`, later merged into the density unit)
 are each 449 lines. After trimming whitespace, 363 of their 448 nonblank lines
 match exactly in sequence. That includes braces and imports: it is textual

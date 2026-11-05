@@ -29,7 +29,7 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
-import Extrinsic.Runtime.KernelDensityConfig;
+import Intrinsic.Plugin.KernelDensity; // ARCH-022 Q89: its section is held to the same golden
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Intrinsic.Plugin.PointSpacing; // ARCH-022 Q89: its section is held to the same golden
 import Extrinsic.Runtime.MeshTopologyOperations;
@@ -919,8 +919,9 @@ namespace
     {
         using D = R::GeometryElementDomain;
         using K = Geometry::PropertyValueKind;
-        const R::KernelDensityConfig density{.StableEntityId = 7,
-            .Backend = R::KernelDensityBackend::VulkanLBVH,
+        namespace KD = Intrinsic::Plugins::KernelDensity;
+        const KD::Config density{.StableEntityId = 7,
+            .Backend = KD::DensityBackend::VulkanLBVH,
             .Positions = {.Domain = D::PointCloudPoint, .Name = "p", .ValueKind = K::Vec3},
             .Density = {.Domain = D::PointCloudPoint, .Name = "d", .ValueKind = K::Double},
             .KNeighbors = 9,
@@ -953,15 +954,14 @@ namespace
             {"kernel_density",
                 "density",
                 "bandwidth",
-                R::SerializeDerivedSection<R::kKernelDensitySection>({}),
-                R::SerializeDerivedSection<R::kKernelDensitySection>(density),
-                R::SerializeDerivedSection<R::kKernelDensitySection>(
-                    {.Backend = static_cast<R::KernelDensityBackend>(7)}),
+                R::SerializeDerivedSection<KD::kSection>({}),
+                R::SerializeDerivedSection<KD::kSection>(density),
+                R::SerializeDerivedSection<KD::kSection>({.Backend = static_cast<KD::DensityBackend>(7)}),
                 [](const std::string_view payload)
                 {
-                    return R::ValidateDerivedSection<R::kKernelDensitySection>(payload, {}, "golden");
+                    return R::ValidateDerivedSection<KD::kSection>(payload, {}, "golden");
                 },
-                R::MakeDerivedSectionRegistration<R::kKernelDensitySection>()},
+                R::MakeDerivedSectionRegistration<KD::kSection>()},
             {"point_spacing",
                 "radii",
                 "scale_factor",
@@ -1110,7 +1110,8 @@ TEST(DeclaredFieldContracts, FloatFieldsConvertNumbersStraightToFloat)
         EXPECT_TRUE(validation.Usable()) << validation.CanonicalPayloadJson;
         return Json::parse(validation.CanonicalPayloadJson)[field].template get<float>();
     };
-    EXPECT_EQ(stored(R::ValidateDerivedSection<R::kKernelDensitySection>(R"({"bandwidth":)" + literal + "}", {}, "t"),
+    EXPECT_EQ(stored(R::ValidateDerivedSection<Intrinsic::Plugins::KernelDensity::kSection>(
+                         R"({"bandwidth":)" + literal + "}", {}, "t"),
                   "bandwidth"),
         18014400656965632.0f);
     EXPECT_EQ(stored(R::ValidateDerivedSection<Intrinsic::Plugins::PointSpacing::kSection>(
@@ -1146,23 +1147,23 @@ namespace
 {
     constexpr auto kKernelDensityRenamed = []
     {
-        auto fields = R::kKernelDensityFields;
+        auto fields = Intrinsic::Plugins::KernelDensity::kFields;
         fields[1].Name = "other";
         return fields;
     }();
     constexpr auto kKernelDensityRetyped = []
     {
-        auto fields = R::kKernelDensityFields;
+        auto fields = Intrinsic::Plugins::KernelDensity::kFields;
         fields[1].Type = R::ConfigFieldType::Float;
         return fields;
     }();
-    static_assert(R::IsDerivable(R::kKernelDensitySection));
+    static_assert(R::IsDerivable(Intrinsic::Plugins::KernelDensity::kSection));
     static_assert(R::IsDerivable(Intrinsic::Plugins::PointSpacing::kSection));
     static_assert(R::IsDerivable(R::kOutlierAnalysisSection));
-    static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
-        .Rows = R::kKernelDensityRows, .Fields = kKernelDensityRenamed}));
-    static_assert(!R::IsDerivable(R::DerivedConfigSection<R::KernelDensityConfig>{
-        .Rows = R::kKernelDensityRows, .Fields = kKernelDensityRetyped}));
+    static_assert(!R::IsDerivable(R::DerivedConfigSection<Intrinsic::Plugins::KernelDensity::Config>{
+        .Rows = Intrinsic::Plugins::KernelDensity::kRows, .Fields = kKernelDensityRenamed}));
+    static_assert(!R::IsDerivable(R::DerivedConfigSection<Intrinsic::Plugins::KernelDensity::Config>{
+        .Rows = Intrinsic::Plugins::KernelDensity::kRows, .Fields = kKernelDensityRetyped}));
 }
 
 namespace

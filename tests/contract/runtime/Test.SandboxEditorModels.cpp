@@ -2025,10 +2025,10 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
     using Domain = Runtime::EditorGeometryProcessingDomain;
 
     // Executor coverage: NormalEstimation.EveryCanonicalDomain*, RegistrationDomains.EveryCanonicalPointDomain*,
-    // OutlierAnalysis.EveryDomain*, KernelDensityOperations,
-    // ClusteringModule.EveryPointDomain* and SandboxEditorUi.ProgressivePoissonBindsMeshFaceSamples*.
+    // OutlierAnalysis.EveryDomain*, ClusteringModule.EveryPointDomain* and
+    // SandboxEditorUi.ProgressivePoissonBindsMeshFaceSamples*. (Kernel density is a plugin, ARCH-022 Q89.)
     for (const auto algorithm : {Algorithm::KMeans, Algorithm::NormalEstimation, Algorithm::Registration,
-         Algorithm::OutlierEstimation, Algorithm::KernelDensity,
+         Algorithm::OutlierEstimation,
          Algorithm::ProgressivePoissonSampling, Algorithm::SurfaceReconstruction, Algorithm::KnnGraphConstruction})
     for (const auto domain : {Domain::MeshVertices, Domain::MeshEdges, Domain::MeshHalfedges,
          Domain::MeshFaces, Domain::GraphVertices, Domain::GraphEdges,
@@ -2154,7 +2154,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::ResolveEditorGeometryProcessingEntries(meshCaps);
     const auto expectedMesh = std::array{Algorithm::KMeans, Algorithm::NormalEstimation, Algorithm::MeshDenoise,
         Algorithm::Curvature, Algorithm::CurvatureSegmentation, Algorithm::Registration,
-        Algorithm::OutlierEstimation, Algorithm::KernelDensity, Algorithm::ProgressivePoissonSampling,
+        Algorithm::OutlierEstimation, Algorithm::ProgressivePoissonSampling,
         Algorithm::ShortestPath, Algorithm::VectorHeat, Algorithm::Parameterization, Algorithm::ConvexHull,
         Algorithm::SurfaceReconstruction, Algorithm::KnnGraphConstruction, Algorithm::BooleanCSG,
         Algorithm::Remeshing, Algorithm::Simplification, Algorithm::Smoothing, Algorithm::Subdivision,
@@ -2213,7 +2213,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     const std::vector<Runtime::EditorGeometryProcessingEntry> graphEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(registry, graph);
     const auto expectedGraph = std::array{Algorithm::KMeans, Algorithm::NormalEstimation, Algorithm::Registration,
-        Algorithm::OutlierEstimation, Algorithm::KernelDensity,
+        Algorithm::OutlierEstimation,
         Algorithm::ProgressivePoissonSampling, Algorithm::ShortestPath, Algorithm::SurfaceReconstruction,
         Algorithm::KnnGraphConstruction};
     ASSERT_EQ(graphEntries.size(), expectedGraph.size());
@@ -2252,13 +2252,13 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::EditorGeometryProcessingEntry> cloudEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(registry, cloud);
-    ASSERT_EQ(cloudEntries.size(), 11u);
+    ASSERT_EQ(cloudEntries.size(), 10u); // ARCH-022 Q89: kernel density's row is its plugin's
     EXPECT_EQ(cloudEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(cloudEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(cloudEntries[2].Algorithm, Algorithm::Registration);
-    EXPECT_EQ(cloudEntries[5].Algorithm, Algorithm::ProgressivePoissonSampling);
-    EXPECT_EQ(cloudEntries[9].Algorithm, Algorithm::SurfaceReconstruction);
-    EXPECT_EQ(cloudEntries[10].Algorithm, Algorithm::KnnGraphConstruction);
+    EXPECT_EQ(cloudEntries[4].Algorithm, Algorithm::ProgressivePoissonSampling);
+    EXPECT_EQ(cloudEntries[8].Algorithm, Algorithm::SurfaceReconstruction);
+    EXPECT_EQ(cloudEntries[9].Algorithm, Algorithm::KnnGraphConstruction);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
     const Runtime::EditorDomainWindowModel cloudModel =
         Runtime::BuildEditorDomainWindowModel(

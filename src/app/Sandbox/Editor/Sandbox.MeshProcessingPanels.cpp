@@ -187,7 +187,7 @@ namespace Extrinsic::Sandbox::Editor
         // RUNTIME-348: results the operation runtime stores itself. The panel shows their transfer
         // counters but never folds a finished transaction into them: the stored result may be a newer run's.
         template <class Result>
-        constexpr bool kStoredByOperationRuntime = std::same_as<Result, Runtime::EditorKernelDensityResult> ||
+        constexpr bool kStoredByOperationRuntime =
             std::same_as<Result, Runtime::EditorDensityWeightResult>;
 
         template <class State>
@@ -324,7 +324,6 @@ namespace Extrinsic::Sandbox::Editor
             ProcessingDraftState<Runtime::OutlierAnalysisConfig, Runtime::EditorOutlierAnalysisResult>;
         using KeypointsState =
             ProcessingDraftState<Runtime::KeypointAnalysisConfig, Runtime::EditorKeypointAnalysisResult>;
-        using DensityState = ProcessingDraftState<Runtime::KernelDensityConfig, Runtime::EditorKernelDensityResult>;
         using DensityWeightsState =
             ProcessingDraftState<Runtime::DensityWeightConfig, Runtime::EditorDensityWeightResult>;
         using ConstructionState =
@@ -421,9 +420,8 @@ namespace Extrinsic::Sandbox::Editor
             std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
         Runtime::EditorOutlierTransactionHandle OutlierTransaction{};
-        Runtime::EditorPointScalarTransactionHandle DensityTransaction{}, WeightTransaction{}, KeypointTransaction{};
+        Runtime::EditorPointScalarTransactionHandle WeightTransaction{}, KeypointTransaction{};
         KeypointsState Keypoints{};
-        DensityState Density{};
         DensityWeightsState DensityWeights{};
         ConstructionState Construction{};
 
@@ -462,7 +460,6 @@ namespace Extrinsic::Sandbox::Editor
         void DrawNormalTransaction(const SandboxEditorContext&);
         void DrawOutliersWindow(bool&, const SandboxEditorContext&);
         void DrawKeypointsWindow(bool&, const SandboxEditorContext&);
-        void DrawDensityWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWeightsWindow(bool&, const SandboxEditorContext&);
         void DrawConstructionWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
@@ -570,16 +567,6 @@ namespace Extrinsic::Sandbox::Editor
                 {domain, "Processing", "Features & Descriptors"},
                 "ISS Keypoint Analysis",
                 "view.keypoint_analysis");
-        RegisterWindow("view.kernel_density",
-            {"View", "Processing", "Sampling & Density"},
-            "Kernel Density",
-            &Impl::DrawDensityWindow);
-        for (const auto& [id, domain] :
-            std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.kernel_density", "Mesh"},
-                {"graph.processing.kernel_density", "Graph"},
-                {"pointcloud.processing.kernel_density", "PointCloud"}}})
-            RegisterRedirectWindow(
-                id, {domain, "Processing", "Sampling & Density"}, "Kernel Density", "view.kernel_density");
         RegisterWindow("view.density_weights",
             {"View", "Processing", "Sampling & Density"},
             "Compact Density Weights",
@@ -698,17 +685,13 @@ namespace Extrinsic::Sandbox::Editor
         if (OutlierTransaction)
             Runtime::DiscardEditorOutlierAnalysis({}, OutlierTransaction);
         OutlierTransaction.reset();
-        for (auto* run : {&DensityTransaction, &WeightTransaction})
-        {
-            Runtime::DiscardEditorPointScalar({}, *run);
-            run->reset();
-        }
+        Runtime::DiscardEditorPointScalar({}, WeightTransaction);
+        WeightTransaction.reset();
         Outliers = {};
         if (KeypointTransaction)
             Runtime::DiscardEditorPointScalar({}, KeypointTransaction);
         KeypointTransaction.reset();
         Keypoints = {};
-        Density = {};
         DensityWeights = {};
         Construction = {};
     }
@@ -2415,117 +2398,6 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::End();
     }
 
-    void MeshProcessingPanels::Impl::DrawDensityWindow(bool& open, const SandboxEditorContext& context)
-    {
-        // RUNTIME-348: the operation runtime stores every run's result; the panel only reads it.
-        if (const auto stored = context.PointFields.Results.Last<Runtime::KernelDensityOperation>())
-            Density.LastResult = *stored;
-        const std::function<void(Runtime::EditorKernelDensityResult)> noSessionSink{};
-        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Kernel Density", &open))
-        {
-            ImGui::End();
-            return;
-        }
-        const auto active = Runtime::GetEditorKernelDensityConfig(context.PointFields.Commands)
-                                .value_or(Runtime::KernelDensityConfig{});
-        const auto serialized = Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(active);
-        Density.Synchronize(active, serialized);
-        auto& config = Density.Draft;
-        bool changed = false;
-        changed |= DrawProcessingEntity("Entity##Density", context, config.StableEntityId, Density.LastSelectedEntity);
-        if (DrawProcessingPointInput(
-                "Positions##Density",
-                [&]
-                {
-                    return Runtime::GetEditorKernelDensityInputCatalog(
-                        context.PointFields.Commands, config.StableEntityId);
-                },
-                config.Positions))
-        {
-            config.Density.Domain = config.Positions.Domain;
-            changed = true;
-        }
-        changed |= DrawProcessingScalarOutput("Density property", config.Density);
-        int backend = int(config.Backend);
-        if (ImGui::Combo("Backend",
-                &backend,
-                OwnerConfigEnumLabels<Runtime::KernelDensityBackend, 3>(
-                    std::span<const Runtime::ConfigFieldSpec>(Runtime::kKernelDensityFields), "backend")
-                    .data(),
-                3))
-        {
-            config.Backend = Runtime::KernelDensityBackend(backend);
-            changed = true;
-        }
-        changed |= ImGui::InputScalar("Neighbors k", ImGuiDataType_U32, &config.KNeighbors);
-        changed |= ImGui::InputFloat("Bandwidth (0 = automatic)", &config.Bandwidth);
-        ImGui::TextWrapped(
-            "Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
-        if (config.Backend == Runtime::KernelDensityBackend::VulkanLBVH)
-            changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-        const bool scalarActive = DrawPointScalarTransaction(context.PointFields.Commands, DensityTransaction, Density);
-        DrawProcessingExecution(
-            context.PointFields.Commands,
-            Density,
-            changed,
-            [&](const auto& c)
-            {
-                return Runtime::PreviewEditorKernelDensityCommand(context.PointFields.Commands, c);
-            },
-            [&](const auto& c)
-            {
-                return Runtime::ApplyEditorKernelDensityConfig(context.PointFields.Commands, c);
-            },
-            [&]
-            {
-                if (config.Backend == Runtime::KernelDensityBackend::VulkanLBVH)
-                {
-                    Runtime::EditorKernelDensityResult result;
-                    DensityTransaction =
-                        Runtime::StartEditorKernelDensityTransaction(context.PointFields.Commands, config, result);
-                    return result;
-                }
-                return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands, noSessionSink);
-            },
-            noSessionSink,
-            "Estimate density",
-            "Controls were rejected by density config validation.",
-            "Density config was rejected.",
-            [](const auto& c)
-            {
-                return std::pair{c.StableEntityId, c.Density.Name};
-            },
-            scalarActive);
-        const Runtime::EditorOutputRef densityDraft{config.StableEntityId, config.Density.Name};
-        Density.Run.Draw(context.PointFields.Commands, config.StableEntityId, "density_progress", &densityDraft);
-        ImGui::TextWrapped(
-            "Vulkan previews density on the device. Accept publishes the scalar with Undo; Discard retains CPU rows.");
-        DrawProcessingPropertyShowButton(
-            context, config.StableEntityId, config.Density, Density.VisualizationDiagnostic, "Show density");
-        DrawProcessingDisplayDiagnostic(Density.VisualizationDiagnostic);
-        if (Density.LastResult)
-        {
-            const auto& result = *Density.LastResult;
-            ImGui::Separator();
-            ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
-            ImGui::Text(
-                "Requested: %s; ran: %s", Runtime::ToString(result.RequestedBackend), result.ActualBackend.c_str());
-            ImGui::Text("Live / total: %zu / %zu", result.LiveCount, result.SlotCount);
-            ImGui::Text("Bandwidth %.5g; density min / mean / max: %.5g / %.5g / %.5g",
-                double(result.UsedBandwidth),
-                double(result.MinDensity),
-                double(result.MeanDensity),
-                double(result.MaxDensity));
-            ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Density",
-                Density.LastResult,
-                &Runtime::OperationResultKey<Runtime::KernelDensityOperation>::Tag,
-                context.PointFields.DismissResult);
-        }
-        ImGui::End();
-    }
-
     void MeshProcessingPanels::Impl::DrawDensityWeightsWindow(bool& open, const SandboxEditorContext& context)
     {
         // RUNTIME-353: the operation runtime stores every run's result (the session store, which the point
@@ -3606,12 +3478,7 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::InjectPointScalarTransactionForTest(
         unsigned method, Runtime::EditorPointScalarTransactionHandle transaction)
     {
-        if (method == 0)
-        {
-            m_Impl->DensityTransaction = std::move(transaction);
-            m_Impl->Density.LastResult.emplace();
-        }
-        else if (method == 2)
+        if (method == 2)
         {
             m_Impl->WeightTransaction = std::move(transaction);
             m_Impl->DensityWeights.LastResult.emplace();

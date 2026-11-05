@@ -12,7 +12,6 @@ export module Extrinsic.Runtime.PointFieldOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorCommon;
-export import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;

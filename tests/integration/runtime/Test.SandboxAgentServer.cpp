@@ -1254,7 +1254,7 @@ TEST(SandboxAgentServer, RunOperationOutlierAnalysisPublishesAndUndoes)
         rig.Check(!isError && uvReadiness["enabled"] == false && !uvReadiness["reason"].get<std::string>().empty(),
             "parameterization preview: " + uvReadiness.dump());
         // Every Config row names a real section.
-        for (const char* op : {"mesh_curvature", "normal_estimation", "kernel_density", "outlier_analysis",
+        for (const char* op : {"mesh_curvature", "normal_estimation", "outlier_analysis",
                                "density_weight", "point_construction"})
         {
             const auto refusal = c.Tool("preview_operation", {{"operation", op}, {"entity", cloud}}, &isError);

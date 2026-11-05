@@ -394,7 +394,11 @@ CPU octree and CPU LBVH as plugin jobs, Vulkan through the editing service's GPU
 (`sandbox.point_spacing`, unchanged), its tools `point_spacing` and `point_spacing_preview`, its window and the newest
 run it keeps for that window. The engine's module, its `run_operation` row, its Sandbox panel and its domain menu
 redirects are gone. A plugin job on a scalar output is a scalar-field run in the Jobs window, so it and the editor's
-own scalar runs see each other on the same output. Kernel density follows the same way.
+own scalar runs see each other on the same output. Kernel density is the plugin `plugins/kernel_density`
+([feature](kernel-density.md)) in the same shape (section `sandbox.kernel_density` unchanged, tools `kernel_density`
+and `kernel_density_preview`); its engine module, `run_operation` row, panel, redirects and its row of the editor's
+geometry-processing catalog are gone. The two plugins copy their run bookkeeping (a `shortcut:` until a third scalar
+plugin, density weights or outliers, makes a host helper worth it).
 
 **Open, for the first plan** (`ARCH-022`):
 1. **Numeric targets for R4 and R6**: set on 2026-10-31 (table above).

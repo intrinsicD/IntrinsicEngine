@@ -123,7 +123,9 @@ run every `python3` command of that workflow on a clean worktree of the commit; 
 result before pushing the next. A replay that collects the commands from the workflow file must also take single-line
 `run: python3 ...` steps; ARCH-022 missed 14 of them once and broke `main` again (`01095d834`). `ci-linux-clang`
 runs repository checks before its build (`check_layering.py --root src --strict`, `check_compiler_hazards.py`);
-replay those too for a change under `src/`. Replay whole `run:` blocks with `bash -e`, not extracted `python3`
+replay those too for a change under `src/`. The strict ARA claim check (`check_ara_claims.py --strict`) fails on a
+claim whose proof path a change deleted; ARCH-022 Q89 removed a test claim C83 cited and broke ci-docs (`08c096d4a`):
+pin a removed proof to a commit where it exists (`<hash>:<path>`). Replay whole `run:` blocks with `bash -e`, not extracted `python3`
 lines: a generator followed by `git diff --exit-code` (the module inventory) only fails as a block. `ci-linux-clang`
 also captures the CPU test selection from the CTest inventory (`tools/ci/cpu_test_selection.py capture`): a new
 CTest test that is no GoogleTest binary must run an allowlisted script (`SCRIPT_TESTS`). ARCH-022 registered
@@ -138,6 +140,15 @@ following `git stash pop` applied an older, unrelated stash (`BUG-137 slice C WI
 conflict. No work was lost (a conflicted pop keeps the entry), but the tree had to be restored by hand. Safeguard:
 push without stashing; when a stash is really needed, check `git diff --quiet -- <path>` first and pop the exact
 entry it created (`git stash pop stash@{n}` after reading `git stash list`).
+
+## A commit takes the whole index, not the paths just added
+
+ARCH-022 Q89 committed a one-line claim fix (`ara/logic/claims.md`) while the index still held the `git rm` deletions
+of unfinished work (the kernel density module and its test): the commit and its push removed them from `main`
+(`30fef2e62`) while the build still named them, and `8b4403d0e` restored them. Listing the staged paths before the
+commit did not help, because the commit ran regardless. Safeguard: while other work is in progress, commit with
+`git commit -- <paths>` (only those paths), or stop when `git diff --cached --name-only` names any path beyond the
+intended ones; delete files of unfinished work without staging (`rm`, not `git rm`) until their own commit.
 
 ## A build tree a driver uses holds only what the driver measures
 

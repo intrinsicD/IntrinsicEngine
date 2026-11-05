@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 122 |
+| `runtime` | 121 |
 
 ## Modules
 
@@ -449,7 +449,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.DensityWeightConfig` | `src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.DensityWeightOperation` | `src/runtime/Modules/DensityWeight/Runtime.DensityWeightOperation.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeodesicsConfig` | `src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm` | `runtime` |
-| `Extrinsic.Runtime.KernelDensityConfig` | `src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.KeypointAnalysisConfig` | `src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.NormalEstimationConfig` | `src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.OutlierAnalysisConfig` | `src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm` | `runtime` |
@@ -488,4 +487,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **461**
+Total modules: **460**

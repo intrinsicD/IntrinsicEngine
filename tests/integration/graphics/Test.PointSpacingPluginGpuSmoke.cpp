@@ -304,7 +304,7 @@ TEST(PointSpacingPluginGpuSmoke, AcceptDiscardStaleCancelAndACoincidentCluster)
     Fill(props);
     const auto config = Settings(cloud, D::PointCloudPoint, PS::SpacingBackend::VulkanLBVH, 0);
     std::shared_ptr<PS::Run> discarded, accepted, stale, cancelled, coincident;
-    bool previewSeen = false, cancelRequested = false;
+    bool previewSeen = false, cancelRequested = false, staleKept = false, cancelKept = false;
     std::size_t undoBefore = 0;
     ASSERT_TRUE(gpu.Run([&]
     {
@@ -342,21 +342,27 @@ TEST(PointSpacingPluginGpuSmoke, AcceptDiscardStaleCancelAndACoincidentCluster)
         if (!stale->Final) return false;
         if (!cancelled)
         {
+            staleKept = std::as_const(props).Get<float>("radii")[0] == 77.f;
             props.Get<glm::vec3>("samples")[0].x -= .1f;
             cancelled = PS::Start(config, true);
         }
         if (!cancelRequested)
         {
+            // While the run's job is parked in AwaitingApply (waiting for residency or for the device result; this does
+            // not prove the GPU submission already happened).
+            PS::Refresh(*cancelled);
+            if (cancelled->Final) return true; // it ended before its cancel: reported below
             const auto jobs = gpu.H->Jobs();
             const auto row = std::ranges::find_if(jobs, [&](const auto& job)
-            { return job.Identity.OutputName == "radii" && R::IsActiveEditorJobState(job.State); });
-            if (row == jobs.end()) return cancelled->Final.has_value(); // already ended: reported below
+            { return job.Identity.OutputName == "radii" && job.State == R::JobState::AwaitingApply; });
+            if (row == jobs.end()) return false;
             const auto commands = R::PrepareEditorProcessingCommands(gpu.H->Shell);
             cancelRequested = R::CancelEditorJobRun(commands, *row) == R::EditorJobCancelStatus::Requested;
             return false;
         }
         PS::Refresh(*cancelled);
         if (!cancelled->Final) return false;
+        if (!coincident) cancelKept = std::as_const(props).Get<float>("radii")[0] == 77.f;
         if (!coincident)
         {
             props.Resize(1030);
@@ -380,8 +386,11 @@ TEST(PointSpacingPluginGpuSmoke, AcceptDiscardStaleCancelAndACoincidentCluster)
     EXPECT_EQ(accepted->Final->Radii.Domain, D::PointCloudPoint) << "the resolved domain";
     EXPECT_EQ(accepted->Final->GpuInputUploadBytes, 0u) << "a second run over unchanged inputs uploads nothing";
     EXPECT_EQ(stale->Final->Status, "stale") << stale->Final->Message;
-    EXPECT_TRUE(cancelRequested);
-    EXPECT_NE(cancelled->Final->Status, "applied") << cancelled->Final->Message;
+    EXPECT_TRUE(staleKept) << "the stale run wrote nothing";
+    ASSERT_TRUE(cancelRequested) << "the run ended before it was parked for its cancel";
+    EXPECT_EQ(cancelled->Final->Status, "stale") << cancelled->Final->Message;
+    EXPECT_NE(cancelled->Final->Message.find("cancelled"), std::string::npos) << cancelled->Final->Message;
+    EXPECT_TRUE(cancelKept) << "the cancelled run wrote nothing";
     EXPECT_EQ(gpu.H->History().UndoCount(), undoBefore + 2u) << "the accepted and the coincident runs only";
     ASSERT_EQ(coincident->Final->Status, "applied") << coincident->Final->Message;
     EXPECT_NEAR(std::as_const(props).Get<float>("radii")[0], 0.f, 1e-7);

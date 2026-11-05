@@ -28,6 +28,8 @@ import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.SelectionController;
+import Geometry.PointCloud.Utils;
+import Geometry.PointLBVH;
 
 namespace
 {
@@ -651,4 +653,96 @@ TEST(PointSpacingPlugin, TheWindowRunsTheAppliedSettingsAndShowsWithoutRecomputi
     ASSERT_NE(PS::Latest(), nullptr);
     ASSERT_TRUE(PS::Latest()->Final);
     EXPECT_EQ(PS::Latest()->Final->Status, "applied");
+}
+
+// The plan's acceptance: a CPU run publishes exactly what the geometry function returns for the live samples (octree:
+// EstimateRadii; LBVH: EstimateRadiiFromNeighbors over the k+1 nearest rows, self included).
+TEST(PointSpacingPlugin, CpuOutputsAreBitwiseTheGeometryFunctions)
+{
+    for (const auto backend : {PS::SpacingBackend::CpuOctree, PS::SpacingBackend::CpuLBVH})
+        for (const auto [scale, k] : {std::pair{1.f, 2u}, std::pair{2.f, 6u}})
+        {
+            SCOPED_TRACE(PS::ToString(backend));
+            SCOPED_TRACE(k);
+            Harness harness{};
+            auto& scene = harness.Scene();
+            const auto entity = Make(scene, D::PointCloudPoint);
+            auto config = Settings(entity, D::PointCloudPoint);
+            config.Backend = backend;
+            config.ScaleFactor = scale;
+            config.KNeighbors = k;
+            ASSERT_EQ(harness.Wait(*PS::Start(config, false)).Status, "applied");
+            const auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
+            const auto samples = std::as_const(props).Get<glm::vec3>("samples").Vector();
+            const auto deleted = std::as_const(props).Get<bool>("v:deleted").Vector();
+            std::vector<glm::vec3> live;
+            std::vector<std::size_t> slots;
+            for (std::size_t i = 0; i < samples.size(); ++i)
+                if (!deleted[i])
+                {
+                    live.push_back(samples[i]);
+                    slots.push_back(i);
+                }
+            const Geometry::PointCloud::RadiusEstimationParams params{.KNeighbors = k, .ScaleFactor = scale};
+            std::optional<Geometry::PointCloud::RadiusEstimationResult> expected;
+            if (backend == PS::SpacingBackend::CpuOctree) expected = Geometry::PointCloud::EstimateRadii(live, params);
+            else
+            {
+                Geometry::PointLBVH::Index index;
+                ASSERT_TRUE(index.Build(live));
+                const auto width = std::uint32_t(std::min<std::size_t>(live.size(), std::max<std::size_t>(k, 1) + 1));
+                std::vector<std::uint32_t> rows;
+                for (const auto& point : live)
+                    for (const auto& neighbor : index.KNearest(point, width, Geometry::PointLBVH::InvalidIndex, true))
+                        rows.push_back(neighbor.Index);
+                expected = Geometry::PointCloud::EstimateRadiiFromNeighbors(live, rows, params);
+            }
+            ASSERT_TRUE(expected);
+            const auto values = std::as_const(props).Get<float>("radii").Vector();
+            for (std::size_t i = 0; i < live.size(); ++i) EXPECT_EQ(values[slots[i]], expected->Radii[i]) << slots[i];
+        }
+}
+
+// The window's draft follows the section when it changes elsewhere (config_apply, an agent): its Apply then writes
+// those settings, never a stale draft.
+TEST(PointSpacingPlugin, TheWindowFollowsSettingsAppliedElsewhere)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::PointCloudPoint);
+    auto first = Settings(entity, D::PointCloudPoint);
+    first.Radii.Name = "window_first";
+    ASSERT_TRUE(harness.Apply(first));
+    auto* ui = harness.Engine.Services().Find<R::EditorUiHost>();
+    ASSERT_NE(ui, nullptr);
+    ASSERT_TRUE(ui->SetWindowOpen("view.point_spacing", true));
+    IMGUI_CHECKVERSION();
+    ImGuiContext* context = ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(1280, 1400);
+    io.IniFilename = nullptr;
+    unsigned char* pixels = nullptr;
+    int width = 0, height = 0;
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+    for (int frame = 0; frame < 14; ++frame)
+    {
+        io.DeltaTime = 1.f / 60.f;
+        ImGui::NewFrame();
+        if (frame == 4)
+        {
+            auto elsewhere = first;
+            elsewhere.Radii.Name = "window_elsewhere";
+            ASSERT_TRUE(harness.Apply(elsewhere));
+        }
+        if (frame == 8)
+            if (auto* window = ImGui::FindWindowByName("Point Spacing and Radii###view.point_spacing"))
+                ImGui::ActivateItemByID(window->GetID("Apply settings"));
+        (void)ui->Windows().DrawOpenWindows();
+        ImGui::Render();
+        harness.Frame();
+    }
+    ImGui::DestroyContext(context);
+    const auto active = R::ActivePluginSection<PS::kSection>();
+    ASSERT_TRUE(active);
+    EXPECT_EQ(active->Radii.Name, "window_elsewhere") << "the window applied a stale draft";
 }

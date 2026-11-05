@@ -34,7 +34,7 @@ import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Sandbox.ConfigSections;
-import Extrinsic.Runtime.KernelDensityConfig;
+import Intrinsic.Plugin.KernelDensity; // ARCH-022 Q89: its section, held to the same contracts
 import Intrinsic.Plugin.PointSpacing; // ARCH-022 Q89: its section, held to the same contracts
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
@@ -48,6 +48,7 @@ namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
 namespace Sandbox = Extrinsic::Sandbox;
 namespace PS = Intrinsic::Plugins::PointSpacing;
+namespace KD = Intrinsic::Plugins::KernelDensity;
 
 TEST(SandboxConfigSections, ActiveNormalRadiusRemainsPositiveInFloatStorage)
 {
@@ -1171,11 +1172,11 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
         bool (*Get)(const CoreConfig::EngineConfig&);
     };
     const Case cases[]{
-        {Runtime::kKernelDensityConfigSectionName,
-            Runtime::kKernelDensityConfigSectionSchemaId,
+        {KD::kSectionName,
+            KD::kSectionSchemaId,
             [](const CoreConfig::EngineConfig& c)
             {
-                return Runtime::GetDerivedSection<Runtime::kKernelDensitySection>(c).has_value();
+                return Runtime::GetDerivedSection<KD::kSection>(c).has_value();
             }},
         {Runtime::kDensityWeightConfigSectionName,
             Runtime::kDensityWeightConfigSectionSchemaId,
@@ -1324,14 +1325,14 @@ TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContrac
         SetDerivedSection<kOutlierAnalysisSection>,
         GetDerivedSection<kOutlierAnalysisSection>,
         ZeroGpuQueryBatch<OutlierAnalysisConfig>);
-    ExpectPointConfigSectionContract<KernelDensityConfig>(kKernelDensityConfigSectionName,
-        kKernelDensityConfigSectionSchemaId,
-        SerializeDerivedSection<kKernelDensitySection>,
-        ValidateDerivedSection<kKernelDensitySection>,
-        MakeDerivedSectionRegistration<kKernelDensitySection>,
-        SetDerivedSection<kKernelDensitySection>,
-        GetDerivedSection<kKernelDensitySection>,
-        ZeroGpuQueryBatch<KernelDensityConfig>);
+    ExpectPointConfigSectionContract<KD::Config>(KD::kSectionName,
+        KD::kSectionSchemaId,
+        SerializeDerivedSection<KD::kSection>,
+        ValidateDerivedSection<KD::kSection>,
+        MakeDerivedSectionRegistration<KD::kSection>,
+        SetDerivedSection<KD::kSection>,
+        GetDerivedSection<KD::kSection>,
+        ZeroGpuQueryBatch<KD::Config>);
     ExpectPointConfigSectionContract<PS::Config>(PS::kSectionName,
         PS::kSectionSchemaId,
         SerializeDerivedSection<PS::kSection>,
@@ -1371,11 +1372,11 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         {"KernelDensity",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
-                Runtime::KernelDensityConfig config;
+                KD::Config config;
                 config.Positions = ref;
-                return Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(config);
+                return Runtime::SerializeDerivedSection<KD::kSection>(config);
             },
-            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>},
+            Runtime::ValidateDerivedSection<KD::kSection>},
         {"PointSpacing",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
@@ -1507,9 +1508,9 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
                   std::string::npos) << payload;
         EXPECT_EQ(payload.find('\n'), std::string::npos);
     };
-    check(Runtime::KernelDensityConfig{},
-        &Runtime::KernelDensityConfig::Positions,
-        Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>);
+    check(KD::Config{},
+        &KD::Config::Positions,
+        Runtime::SerializeDerivedSection<KD::kSection>);
     check(PS::Config{},
         &PS::Config::Positions,
         Runtime::SerializeDerivedSection<PS::kSection>);
@@ -1529,10 +1530,10 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
     check(Runtime::MeshCurvatureConfig{}, &Runtime::MeshCurvatureConfig::Positions,
           Runtime::SerializeMeshCurvatureConfig);
 
-    Runtime::KernelDensityConfig invalid;
+    KD::Config invalid;
     invalid.Positions.Name = "v:\xff";
     // Runtime builds disable exceptions; the strict JSON policy aborts.
-    EXPECT_DEATH((void)Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(invalid), "");
+    EXPECT_DEATH((void)Runtime::SerializeDerivedSection<KD::kSection>(invalid), "");
 }
 
 TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValidation)
@@ -1551,15 +1552,15 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
     };
     const std::array families{
         Family{"KernelDensity",
-            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
+            Runtime::ValidateDerivedSection<KD::kSection>,
             "Kernel density config must be an object.",
             "Unknown density field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size"},
             [](std::uint32_t id)
             {
-                Runtime::KernelDensityConfig c;
+                KD::Config c;
                 c.StableEntityId = id;
-                return Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>(c);
+                return Runtime::SerializeDerivedSection<KD::kSection>(c);
             }},
         Family{"PointSpacing",
             Runtime::ValidateDerivedSection<PS::kSection>,
@@ -1725,7 +1726,7 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
             {"scale_factor"},
             "Unknown radii backend."},
         Family{"KernelDensity",
-            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
+            Runtime::ValidateDerivedSection<KD::kSection>,
             {"bandwidth"},
             "Unknown density backend."},
         Family{"OutlierAnalysis",
@@ -1788,7 +1789,7 @@ TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
     reject(Runtime::ValidateDerivedSection<PS::kSection>,
         R"({"scale_factor":1e-50})",
         "Positive scale factor must remain positive in float storage.");
-    reject(Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
+    reject(Runtime::ValidateDerivedSection<KD::kSection>,
         R"({"bandwidth":1e-50})",
         "Positive bandwidth must remain positive in float storage.");
     reject(Runtime::ValidatePointConstructionConfigSection, R"({"kernel_sigma_scale":0})",
@@ -1831,7 +1832,7 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
     constexpr std::string_view density =
         "Position and weight bindings need distinct canonical vec3/float properties on the same domain.";
     const std::array families{
-        Family{"KernelDensity", Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>, typed, domain},
+        Family{"KernelDensity", Runtime::ValidateDerivedSection<KD::kSection>, typed, domain},
         Family{"PointSpacing", Runtime::ValidateDerivedSection<PS::kSection>, typed, domain},
         Family{"OutlierAnalysis", Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>, typed, domain},
         Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
@@ -1902,7 +1903,7 @@ TEST(SandboxConfigSections, PointPropertyFieldsPreserveKindsAndFirstErrorOrder)
     };
     const std::array families{
         Family{"KernelDensity",
-            Runtime::ValidateDerivedSection<Runtime::kKernelDensitySection>,
+            Runtime::ValidateDerivedSection<KD::kSection>,
             {{"positions", "vec3"}, {"density", "float"}}},
         Family{"PointSpacing",
             Runtime::ValidateDerivedSection<PS::kSection>,
@@ -1982,12 +1983,12 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
     };
     {
         SCOPED_TRACE("KernelDensity");
-        using C = Runtime::KernelDensityConfig;
+        using C = KD::Config;
         check(C{},
             {&C::Positions, &C::Density},
-            Runtime::SetDerivedSection<Runtime::kKernelDensitySection>,
-            Runtime::GetDerivedSection<Runtime::kKernelDensitySection>,
-            Runtime::SerializeDerivedSection<Runtime::kKernelDensitySection>);
+            Runtime::SetDerivedSection<KD::kSection>,
+            Runtime::GetDerivedSection<KD::kSection>,
+            Runtime::SerializeDerivedSection<KD::kSection>);
     }
     {
         SCOPED_TRACE("PointSpacing");

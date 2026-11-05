@@ -12,7 +12,6 @@ import Extrinsic.Runtime.MeshCurvatureConfig;
 import Extrinsic.Runtime.RegistrationConfig;
 import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
-import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
@@ -45,7 +44,6 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakePointSamplingConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kOutlierAnalysisSection>()) ||
-            !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kKernelDensitySection>()) ||
             !registry.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDensityWeightConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakePointConstructionConfigSectionRegistration()) ||

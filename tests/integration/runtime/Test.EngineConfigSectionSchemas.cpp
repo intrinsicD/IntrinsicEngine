@@ -65,7 +65,7 @@ namespace
 TEST(EngineConfigSectionSchemas, EveryRegisteredSectionPublishesASchema)
 {
     const auto registry = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
-    ASSERT_EQ(registry.Entries().size(), 23u); // ARCH-022 Q89: sandbox.point_spacing is its plugin's
+    ASSERT_EQ(registry.Entries().size(), 22u); // ARCH-022 Q89: sandbox.point_spacing and kernel_density are plugins'
     for (const auto& registration : registry.Entries())
         EXPECT_FALSE(registration.SchemaJson.empty())
             << registration.DefaultSection.Name << " has no generated schema";
@@ -102,10 +102,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerLiteralRangesRemainUnchanged)
         {"outlier_analysis", "radius", 0, f32, false},
         {"outlier_analysis", "stddev_multiplier", 0, f32, false},
         {"outlier_analysis", "score_threshold", 0, f32, false},
-        {"kernel_density", "entity", 0, u32, true},
-        {"kernel_density", "k_neighbors", 0, u32, true},
-        {"kernel_density", "gpu_query_batch_size", 1, 16384, true},
-        {"kernel_density", "bandwidth", 0, f32, false},
         {"density_weights", "entity", 0, u32, true},
         {"density_weights", "gpu_query_batch_size", 1, 16384, true},
         {"density_weights", "gpu_radius_capacity", 1, 1024, true},
@@ -175,7 +171,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         {"outlier_analysis", "method", {"statistical", "radius", "local_distance_ratio"}},
         {"outlier_analysis", "operation", {"analyze", "remove_marked"}},
         {"outlier_analysis", "backend", {"cpu_octree", "cpu_lbvh", "vulkan_lbvh"}},
-        {"kernel_density", "backend", {"cpu_octree", "cpu_lbvh", "vulkan_lbvh"}},
         {"density_weights", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"}},
         {"density_weights", "kernel", {"gaussian", "theta_lop", "wendland_c2"}},
         {"density_weights", "mode", {"direct", "reciprocal"}},
@@ -202,7 +197,7 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         }
         EXPECT_FALSE(registration->Validate(Json{{row.Field, "foreign-token"}}.dump(), registration->DefaultSection.PayloadJson, "literal-token").Usable());
     }
-    for (const auto* section : {"normal_estimation", "registration", "outlier_analysis", "kernel_density",
+    for (const auto* section : {"normal_estimation", "registration", "outlier_analysis",
                                 "density_weights", "keypoint_analysis", "point_construction", "selection"})
     {
         const Config::EngineConfigSectionRegistration* registration = nullptr;
@@ -292,7 +287,7 @@ TEST(EngineConfigSectionSchemas, NewSchemasPreserveNestedDefaultsAndBindingEncod
         schema["default"] = defaults;
         check(check, schema, defaults, registration.DefaultSection.Name);
     }
-    EXPECT_EQ(checked, 14u);
+    EXPECT_EQ(checked, 13u);
 }
 
 TEST(EngineConfigSectionSchemas, GeneratedSchemasAgreeWithTheirValidators)

@@ -11,7 +11,7 @@
 #include "PointDomainFixture.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
-import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.ECS.Scene.Registry;
@@ -47,12 +47,13 @@ namespace
         using Result = std::string;
     };
 
-    // A point cloud of eight live samples with a kernel density config on it.
+    // A mesh of live samples with a density weight config on it (ARCH-022 Q89: kernel density, which these cases
+    // ran on, is a plugin).
     struct Fixture
     {
         Extrinsic::ECS::Scene::Registry Scene;
         entt::entity Entity{};
-        R::KernelDensityConfig Config{};
+        R::DensityWeightConfig Config{};
         R::EditorCommandHistory History;
         R::OperationResultStore Store;
         bool Active{true};
@@ -68,8 +69,8 @@ namespace
                 .Positions = {.Domain = D::MeshVertex,
                     .Name = "samples",
                     .ValueKind = Geometry::PropertyValueKind::Vec3},
-                .Density = {D::MeshVertex, "density", Geometry::PropertyValueKind::Float},
-                .KNeighbors = 2};
+                .Weights = {D::MeshVertex, "weights", Geometry::PropertyValueKind::Float},
+                .SupportRadius = 1};
             Context.Scene = &Scene;
             Context.CommandHistory = &History;
             Context.OperationResults = &Store;
@@ -82,9 +83,9 @@ namespace
         {
             return R::BindEditorProcessingCommands(Context);
         }
-        [[nodiscard]] std::shared_ptr<const R::EditorKernelDensityResult> Last() const
+        [[nodiscard]] std::shared_ptr<const R::EditorDensityWeightResult> Last() const
         {
-            return Store.Copy().Last<R::KernelDensityOperation>();
+            return Store.Copy().Last<R::DensityWeightOperation>();
         }
     };
 }
@@ -159,8 +160,8 @@ TEST(OperationResults, OlderRunNeverReplacesNewer)
     Fixture f;
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(f.Context);
-    std::optional<R::EditorKernelDensityResult> first;
-    const auto queued = R::ApplyEditorKernelDensityCommand(f.Commands(),
+    std::optional<R::EditorDensityWeightResult> first;
+    const auto queued = R::ApplyEditorDensityWeightCommand(f.Commands(),
         f.Config,
         [&](auto r)
         {
@@ -169,7 +170,7 @@ TEST(OperationResults, OlderRunNeverReplacesNewer)
     ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
     auto missing = f.Config;
     missing.StableEntityId = std::numeric_limits<std::uint32_t>::max();
-    const auto refused = R::ApplyEditorKernelDensityCommand(f.Commands(),
+    const auto refused = R::ApplyEditorDensityWeightCommand(f.Commands(),
         missing,
         [](auto)
         {
@@ -190,7 +191,7 @@ TEST(OperationResults, DuplicateRefusalLeavesTheActiveRunsSlot)
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(f.Context);
     unsigned firstCalls = 0;
-    const auto queued = R::ApplyEditorKernelDensityCommand(f.Commands(),
+    const auto queued = R::ApplyEditorDensityWeightCommand(f.Commands(),
         f.Config,
         [&](auto)
         {
@@ -199,7 +200,7 @@ TEST(OperationResults, DuplicateRefusalLeavesTheActiveRunsSlot)
     ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending);
     ASSERT_TRUE(f.Last());
     EXPECT_EQ(f.Last()->Message, queued.Message) << "the queued answer is stored";
-    const auto duplicate = R::ApplyEditorKernelDensityCommand(f.Commands(),
+    const auto duplicate = R::ApplyEditorDensityWeightCommand(f.Commands(),
         f.Config,
         [](auto)
         {
@@ -214,25 +215,23 @@ TEST(OperationResults, DuplicateRefusalLeavesTheActiveRunsSlot)
     EXPECT_EQ(f.Last()->Status, R::EditorCommandStatus::Applied) << "any caller's run reaches the slot";
 }
 
-TEST(OperationResults, InlineFallbackDeliversOnce)
+// Without a job lane the run is inline: its result is returned and stored. Density weights do not give it to the
+// sink as well (InlineDeliversToSink false); kernel density did before it became a plugin (ARCH-022 Q89).
+TEST(OperationResults, InlineFallbackReturnsAndStoresTheResult)
 {
     Fixture f;
     unsigned calls = 0;
-    std::optional<R::EditorKernelDensityResult> delivered;
-    const auto result = R::ApplyEditorKernelDensityCommand(f.Commands(),
+    const auto result = R::ApplyEditorDensityWeightCommand(f.Commands(),
         f.Config,
-        [&](auto r)
+        [&](auto)
         {
             ++calls;
-            delivered = r;
         });
     ASSERT_TRUE(result.Succeeded()) << result.Message;
-    EXPECT_EQ(calls, 1u);
-    ASSERT_TRUE(delivered);
-    EXPECT_EQ(delivered->Status, result.Status);
-    EXPECT_EQ(delivered->Message, result.Message);
+    EXPECT_EQ(calls, 0u) << "the returned result is the only answer";
     ASSERT_TRUE(f.Last());
     EXPECT_EQ(f.Last()->Status, result.Status);
+    EXPECT_EQ(f.Last()->Message, result.Message);
 }
 
 TEST(OperationResults, DetachedSessionStoresNothing)
@@ -241,7 +240,7 @@ TEST(OperationResults, DetachedSessionStoresNothing)
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(f.Context);
     unsigned calls = 0;
-    ASSERT_EQ(R::ApplyEditorKernelDensityCommand(f.Commands(),
+    ASSERT_EQ(R::ApplyEditorDensityWeightCommand(f.Commands(),
                   f.Config,
                   [&](auto)
                   {
@@ -255,32 +254,29 @@ TEST(OperationResults, DetachedSessionStoresNothing)
     EXPECT_EQ(calls, 0u) << "a detached workspace receives nothing";
     EXPECT_FALSE(f.Last()) << "and stores nothing";
     f.Active = true;
-    ASSERT_EQ(R::ApplyEditorKernelDensityCommand(f.Commands(), f.Config, {}).Status, R::EditorCommandStatus::Pending);
+    ASSERT_EQ(R::ApplyEditorDensityWeightCommand(f.Commands(), f.Config, {}).Status, R::EditorCommandStatus::Pending);
     EXPECT_TRUE(f.Last()) << "a run of the active attachment stores again";
 }
 
-// The store is written before the sink runs, so a sink that detaches or reads the slot sees its own result.
+// The store is written before the sink runs, so a sink that detaches or reads the slot sees its own result (a queued
+// run: density weights give an inline result only as the return value).
 TEST(OperationResults, TheStoreIsWrittenBeforeTheSinkRuns)
 {
-    for (const bool queued : {false, true})
     {
-        SCOPED_TRACE(queued);
         Fixture f;
         Extrinsic::Tests::EditorJobHarness jobs;
-        if (queued)
-            jobs.Attach(f.Context);
+        jobs.Attach(f.Context);
         bool seen = false;
-        (void)R::ApplyEditorKernelDensityCommand(f.Commands(),
+        (void)R::ApplyEditorDensityWeightCommand(f.Commands(),
             f.Config,
-            [&](const R::EditorKernelDensityResult& r)
+            [&](const R::EditorDensityWeightResult& r)
             {
                 ASSERT_TRUE(f.Last());
                 EXPECT_EQ(f.Last()->Status, r.Status);
                 EXPECT_EQ(f.Last()->Message, r.Message);
                 seen = true;
             });
-        if (queued)
-            ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
         EXPECT_TRUE(seen);
     }
 }

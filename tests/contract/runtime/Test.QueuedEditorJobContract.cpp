@@ -135,9 +135,6 @@ namespace
             check("Normal estimation", [&](auto done) {
                 return R::ApplyEditorNormalEstimationCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Output = Ref("normals", Geometry::PropertyValueKind::Vec3)}, done); });
-            check("Density estimation", [&](auto done) {
-                return R::ApplyEditorKernelDensityCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-                    .Density = Ref("density", Geometry::PropertyValueKind::Float), .KNeighbors = 2}, done); });
             check("Density weights", [&](auto done) {
                 return R::ApplyEditorDensityWeightCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Weights = Ref("weights", Geometry::PropertyValueKind::Float)}, done); });

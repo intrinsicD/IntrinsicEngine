@@ -461,10 +461,6 @@ namespace Extrinsic::Runtime
                     "normal_estimation", "point", "sandbox.normal_estimation", &PrepareEditorNormalFrame,
                     &GetEditorNormalEstimationConfig, &PreviewEditorNormalEstimationCommand,
                     [](const auto& c, auto onComplete) { return ApplyEditorConfiguredNormalEstimation(c, std::move(onComplete)); }));
-                ops.push_back(ConfigSourced<EditorKernelDensityResult>(
-                    "kernel_density", "point", "sandbox.kernel_density", &PrepareEditorPointFieldFrame,
-                    &GetEditorKernelDensityConfig, &PreviewEditorKernelDensityCommand,
-                    [](const auto& c, auto onComplete) { return ApplyEditorConfiguredKernelDensity(c, std::move(onComplete)); }));
                 ops.push_back(ConfigSourced<EditorOutlierAnalysisResult>(
                     "outlier_analysis", "point", "sandbox.outlier_analysis", &PrepareEditorPointAnalysisFrame,
                     &GetEditorOutlierAnalysisConfig, &PreviewEditorOutlierAnalysisCommand,

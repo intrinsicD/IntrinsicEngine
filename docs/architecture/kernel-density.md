@@ -1,11 +1,13 @@
 # Local Gaussian kernel density
 
-**View → Processing → Sampling & Density → Kernel Density**, also exposed in the
-same group of the mesh, graph and point-cloud Processing menus, estimates a named float density property on the selected position domain.
-Choose a canonical float3 input (including face centers or edge/halfedge samples),
-neighbor backend, k and bandwidth. **Estimate density** applies the shared config
-and command; **Show density** uses the scalar visualization recipe. Undo restores
-only the output property. Deleted rows and unrelated properties remain intact.
+**View → Processing → Sampling & Density → Kernel Density** estimates a named density property on the selected
+position domain. It is the plugin `plugins/kernel_density` (ARCH-022), which owns its config section, its MCP tools
+and its window; the point-cloud editing service does the capture, the GPU run and the publication.
+Choose a canonical float3 input (including face centers or edge/halfedge samples), the output (any scalar storage
+on the CPU), neighbor backend, k and bandwidth, and apply the settings. **Estimate density** runs the applied
+settings (a Vulkan run first shows its preview, published by **Accept** and released by **Discard**); **Show
+density** uses the scalar visualization recipe. Undo restores only the output property. Deleted rows and unrelated
+properties remain intact.
 
 ## Formulation
 
@@ -86,22 +88,29 @@ version 1, round-trips these controls:
 
 Unknown domain resolves to the entity's primary point domain; explicit domains
 must match. Inputs and outputs have distinct names; existing output types and
-cardinality must match. Topology/deletion properties are protected. Config/UI
-use `ApplyEditorKernelDensityConfig` then `ApplyEditorConfiguredKernelDensity`;
-agents can use the same path. `PreviewEditorKernelDensityCommand` and
-`GetEditorKernelDensityInputCatalog` share source preflight with execution.
-Results identify the requested/actual backend, used bandwidth, density range,
-written/live/total counts, cache reuse, batch count and CPU/GPU elapsed times.
+cardinality must match. Topology/deletion properties are protected. The window's Apply and `config_apply`
+set the section; the window's **Estimate density** and the MCP tool `kernel_density` run it (the tool waits for the
+end, is cancellable, and a `vulkan_lbvh` run accepts at once), and `kernel_density_preview` answers the readiness the
+window shows (the operation runtime's capture checks and GPU admission, with its texts, through
+`PointCloudEditingService::ScalarAnalysisReadiness`). Results have a status (applied, invalid, busy, failed, stale,
+discarded, cancelled) and identify the requested/actual backend, used bandwidth, density range, written/live/total
+counts, cache reuse, GPU batch and transfer counts and CPU elapsed time. The plugin keeps the newest run, whoever
+started it, for its window while the editor session lasts.
+A CPU run captures through the editing service, so a failure there answers the service's text (a missing entity:
+"The target entity is stale or missing.", where the removed engine operation said "Density target entity is stale or
+missing."); a CPU run that went stale or was cancelled answers "Density input or output changed before publication." or
+"The kernel density run was cancelled." instead of the job gate's "Density estimation was cancelled or its source became stale; nothing
+was applied.". The readiness keeps the operation runtime's texts.
 
 ## Verification scope
 
 `Test.KernelDensity.cpp` checks analytical Gaussians, bandwidth, exhaustive nearest
 candidates, legacy Cloud/span agreement, ties and invalid input.
-`Test.KernelDensityOperations.cpp` covers source domains, config, history,
-visualization and queued stale/cancelled work. The opt-in
-`PointLBVHGpuSmoke.KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy`
-compares actual readback-driven publication against CPU octree for cold/warm
-automatic bandwidth and explicit bandwidth at k=63, plus dense coincident peers.
+`Test.KernelDensityPlugin.cpp` covers the plugin: source domains, config, history, scalar storage,
+visualization, queued stale/cancelled work, the Vulkan admission texts, the latest result and the window. The opt-in
+`KernelDensityPluginGpuSmoke` cases compare actual readback-driven publication against CPU octree for cold/warm
+automatic bandwidth and explicit bandwidth at k=63, plus dense coincident peers, a tiny bandwidth, staleness,
+cancellation, Accept/Discard and an unload.
 
 `geometry.point_lbvh.density_runtime_smoke` records the bounded eight-domain
 fixture. Set `INTRINSIC_DENSITY_BENCHMARK_OUTPUT` to a raw JSON path while running

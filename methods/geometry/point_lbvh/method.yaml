@@ -29,7 +29,8 @@ correctness_tests:
   - ../../../tests/unit/geometry/Test.PointLBVH.cpp
   - ../../../tests/contract/runtime/Test.SpatialIndexCache.cpp
   - ../../../tests/contract/runtime/Test.OutlierAnalysis.cpp
-  - ../../../tests/contract/runtime/Test.KernelDensityOperations.cpp
+  - ../../../tests/contract/runtime/Test.KernelDensityPlugin.cpp
+  - ../../../tests/contract/runtime/Test.PointSpacingPlugin.cpp
   - ../../../tests/unit/geometry/Test.KernelDensity.cpp
   - ../../../tests/unit/geometry/Test.DescriptorAnalysis.cpp
   - ../../../tests/contract/runtime/Test.DescriptorAnalysisPlugin.cpp
@@ -39,6 +40,8 @@ correctness_tests:
   - ../../../tests/contract/runtime/Test.BilateralFilterPlugin.cpp
   - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
   - ../../../tests/integration/graphics/Test.DescriptorAnalysisPluginGpuSmoke.cpp
+  - ../../../tests/integration/graphics/Test.KernelDensityPluginGpuSmoke.cpp
+  - ../../../tests/integration/graphics/Test.PointSpacingPluginGpuSmoke.cpp
   - ../../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
 benchmarks:
   - ../../../benchmarks/geometry/manifests/point_lbvh_point_construction_runtime_smoke.yaml

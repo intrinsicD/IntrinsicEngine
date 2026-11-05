@@ -1,0 +1,83 @@
+module;
+
+#include <memory>
+#include <string>
+#include <string_view>
+
+#include <nlohmann/json.hpp>
+
+module Intrinsic.Plugin.KernelDensity;
+
+import Extrinsic.Runtime.AgentOperations;
+import Extrinsic.Runtime.PluginContract;
+import Extrinsic.Runtime.PluginSections;
+
+namespace Intrinsic::Plugins::KernelDensity
+{
+    namespace
+    {
+        using Json = nlohmann::json;
+
+        Json ResultJson(const Result& r)
+        {
+            return {{"status", r.Status},
+                    {"message", r.Message},
+                    {"requested_backend", ToString(r.RequestedBackend)},
+                    {"actual_backend", r.ActualBackend},
+                    {"density", {{"domain", int(r.Density.Domain)}, {"name", r.Density.Name}}},
+                    {"slot_count", r.SlotCount},
+                    {"live_count", r.LiveCount},
+                    {"written_count", r.WrittenCount},
+                    {"used_bandwidth", r.UsedBandwidth},
+                    {"mean_density", r.MeanDensity},
+                    {"min_density", r.MinDensity},
+                    {"max_density", r.MaxDensity},
+                    {"gpu_query_batches", r.GpuQueryBatches},
+                    {"gpu_input_upload_bytes", r.GpuInputUploadBytes},
+                    {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                    {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                    {"index_reused", r.IndexReused},
+                    {"cpu_compute_ms", r.CpuComputeMilliseconds}};
+        }
+
+        R::AgentOperationOutcome NoConfig()
+        {
+            return {.IsError = true, .Text = "The kernel density section is missing or invalid.", .ErrorCode = "invalid"};
+        }
+    }
+
+    void AddTools(R::PluginRegistrations& staged)
+    {
+        staged.Operations.push_back({
+            .Name = "kernel_density",
+            .Title = "Kernel density",
+            .Description = "Estimates kernel density with the settings of the config section sandbox.kernel_density "
+                           "(set them with config_apply) and answers when the run ends: status applied, invalid, busy, "
+                           "failed, stale, discarded or cancelled, with the bandwidth used and the density range. A "
+                           "vulkan_lbvh run accepts its result as soon as it is ready. Cancellable; the run is a row of "
+                           "the editor's Jobs window.",
+            .ReadOnly = false,
+            .Invoke = [](const R::AgentOperationContext&, std::string_view)
+            {
+                const auto config = R::ActivePluginSection<kSection>();
+                if (!config) return NoConfig();
+                const auto run = Start(*config, true);
+                return R::WaitForPluginRun(
+                    std::shared_ptr<R::PluginRun<Result>>(run), [](const Result& r) { return ResultJson(r).dump(); },
+                    [run] { Refresh(*run); }, [run] { return Cancel(*run); });
+            },
+        });
+        staged.Operations.push_back({
+            .Name = "kernel_density_preview",
+            .Title = "Kernel density readiness",
+            .Description = "Whether kernel_density can run with the section's settings, and why not.",
+            .Invoke = [](const R::AgentOperationContext&, std::string_view)
+            {
+                const auto config = R::ActivePluginSection<kSection>();
+                if (!config) return NoConfig();
+                const auto reason = Preview(*config);
+                return R::AgentOperationOutcome{.Text = Json{{"ready", reason.empty()}, {"reason", reason}}.dump()};
+            },
+        });
+    }
+}

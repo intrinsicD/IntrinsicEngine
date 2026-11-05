@@ -68,7 +68,6 @@ namespace GeometryProcessingDetail::MeshDiscovery
             case EditorGeometryProcessingAlgorithm::BooleanCSG:
             case EditorGeometryProcessingAlgorithm::Registration:
             case EditorGeometryProcessingAlgorithm::OutlierEstimation:
-            case EditorGeometryProcessingAlgorithm::KernelDensity:
             case EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
             case EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
@@ -182,7 +181,6 @@ GetEditorGeometryProcessingMenuItems(
         case EditorGeometryProcessingAlgorithm::NormalEstimation:
         case EditorGeometryProcessingAlgorithm::Registration:
         case EditorGeometryProcessingAlgorithm::OutlierEstimation:
-        case EditorGeometryProcessingAlgorithm::KernelDensity:
         case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
             return Domain::MeshVertices | Domain::MeshEdges | Domain::MeshHalfedges | Domain::MeshFaces |
                    Domain::GraphVertices | Domain::GraphEdges | Domain::GraphHalfedges | Domain::PointCloudPoints;
@@ -259,7 +257,7 @@ GetEditorGeometryProcessingCapabilities(
 ResolveEditorGeometryProcessingEntries(
         const EditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<EditorGeometryProcessingAlgorithm, 24> kAlgorithmOrder{
+        static constexpr std::array<EditorGeometryProcessingAlgorithm, 23> kAlgorithmOrder{
             EditorGeometryProcessingAlgorithm::KMeans,
             EditorGeometryProcessingAlgorithm::NormalEstimation,
             EditorGeometryProcessingAlgorithm::MeshDenoise,
@@ -267,7 +265,6 @@ ResolveEditorGeometryProcessingEntries(
             EditorGeometryProcessingAlgorithm::CurvatureSegmentation,
             EditorGeometryProcessingAlgorithm::Registration,
             EditorGeometryProcessingAlgorithm::OutlierEstimation,
-            EditorGeometryProcessingAlgorithm::KernelDensity,
             EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling,
             EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval,
             EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval,
@@ -393,8 +390,6 @@ ResolveEditorGeometryProcessingEntries(
             return "ICP Registration";
         case EditorGeometryProcessingAlgorithm::OutlierEstimation:
             return "Outlier Estimation";
-        case EditorGeometryProcessingAlgorithm::KernelDensity:
-            return "Kernel Density";
         case EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
             return "Statistical Outlier Removal";
         case EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:

@@ -18,6 +18,10 @@
       "editor_internals": 0,
       "other_plugins": 0
     },
+    "plugins/kernel_density": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
     "plugins/point_spacing": {
       "editor_internals": 0,
       "other_plugins": 0
@@ -40,10 +44,6 @@
     },
     "src/runtime/Modules/Geodesics": {
       "editor_internals": 0,
-      "other_plugins": 0
-    },
-    "src/runtime/Modules/KernelDensity": {
-      "editor_internals": 4,
       "other_plugins": 0
     },
     "src/runtime/Modules/KeypointAnalysis": {

@@ -94,7 +94,6 @@ export namespace Extrinsic::Runtime
         BooleanCSG,
         Registration,
         OutlierEstimation,
-        KernelDensity,
         StatisticalOutlierRemoval,
         RadiusOutlierRemoval,
         ProgressivePoissonSampling,

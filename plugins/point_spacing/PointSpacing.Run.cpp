@@ -29,6 +29,8 @@ namespace Intrinsic::Plugins::PointSpacing
 
         // The plugin's runs (main thread): the newest started one and those not yet ended. Freed by Shutdown, which
         // discards the GPU previews still waiting.
+        // shortcut: this bookkeeping is copied in each scalar plugin (kernel_density, point_spacing); move it into a
+        // host helper when a third one (density weights, outliers) needs it.
         struct Runs
         {
             std::shared_ptr<Run> Latest{};

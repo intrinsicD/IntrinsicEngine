@@ -3695,3 +3695,25 @@ python3 tools/docs/check_doc_links.py --root . --strict
   "**Verdict: approve.**"; the two service-test assertions of fix 2 (`Test.PointCloudEditing.cpp`, slot count and
   resolved domain on the test path) were outside that diff's file list and go to the step 3 review. Step 1's ci-docs run failed once in `Test.ConcurrentCTestDiscovery.py` (a barrier
   timeout, tooling this change does not touch) and passed on rerun.
+- 2026-11-05, Q89 part 2, steps 3 and 4 (kernel density as a plugin; ratchet and docs): `plugins/kernel_density`
+  in the shape of `plugins/point_spacing` (section `sandbox.kernel_density` unchanged, tools
+  `kernel_density`/`kernel_density_preview`, window `view.kernel_density`; method 0 on the GPU). Removed from the
+  engine: `src/runtime/Modules/KernelDensity`, its `run_operation` row, section registration, Sandbox panel and
+  redirects, and its row of the geometry-processing catalog. Both plugin windows now follow the section when it
+  changes elsewhere. Generic tests that ran on kernel density moved to density weights (result store, session frames
+  and readiness, Jobs-window cancel, queued lists, the transaction contract and GPU smokes, the panel duplicate and
+  elsewhere-run cases, the clustering competing ring; two cases into Test.DensityWeightOperations). Recorded
+  deviations: CPU-run capture and stale/cancel texts are the service's and the plugin's (docs of both features); the
+  run bookkeeping is copied in both plugins (`shortcut:`, a host helper with the third scalar plugin); the runtime's
+  default-true inline-sink branch is now used by no engine operation. Counts: window menu 87 to 83, Sandbox sections
+  23 to 22, cloud catalog 11 to 10, R1 28 (measured), R2 `plugins/kernel_density` 0; claims C82/C83 pin their removed
+  proofs to 36a7b50. Verification (build/ci-vulkan-release): full build; CPU suite 6236 with the four known failures;
+  41 GPU smokes; after the review fixes the plugins' 44 contract tests and 8 GPU smokes; eleven mutations on the
+  kernel density path and the new checks each turn their test red. Incident: 30fef2e62 (a one-line claims fix) also
+  committed the staged deletions of this step's unfinished work and broke main's build tree until 8b4403d0e restored
+  the files (its ci-linux-clang run was cancelled before building); lesson in docs/lessons/engineering.md. Code review
+  (Codex, gpt-6-astra xhigh, read-only, recursion protection instruction-only; fresh thread
+  `01a1ac96-62ae-7753-9b9c-8b7121414f0f`): diff `75b4c1c3…` "**Verdict: revise required.**" (the window did not
+  follow external settings; no bitwise CPU check against the geometry functions; optional: texts, the GPU cancel
+  test), diff `f8071138…` verbatim "**Verdict: approve. No remaining blocking findings.**"; its non-blocking caveat
+  (AwaitingApply does not prove the GPU submission) corrected in the two smokes' comments after the approval.

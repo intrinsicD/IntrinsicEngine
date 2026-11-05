@@ -97,6 +97,11 @@ admission, with its texts, through `PointCloudEditingService::ScalarAnalysisRead
 live/slot/written counts, radius and spacing ranges, cache reuse, GPU batch and transfer counts and CPU elapsed time.
 The plugin keeps the newest run, whoever started it, for its window while the editor session lasts; a start refused
 because another run owns the output does not replace it.
+A CPU run captures through the editing service, so a failure there answers the service's text (a missing entity:
+"The target entity is stale or missing.", where the removed engine operation said "Radii target entity is stale or
+missing."); a CPU run that went stale or was cancelled answers "Radii input or output changed before publication." or
+"The point spacing run was cancelled." instead of the job gate's "Radii estimation was cancelled or its source became stale; nothing
+was applied.". The readiness keeps the operation runtime's texts.
 
 ## Verification entry points
 

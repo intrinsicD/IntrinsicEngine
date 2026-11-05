@@ -226,7 +226,7 @@ namespace
 
     constexpr std::array kInputWindows{
         "view.normal_estimation", "view.outlier_analysis", "view.keypoint_analysis",
-        "view.kernel_density", "view.density_weights", "view.point_construction", "view.registration"};
+        "view.density_weights", "view.point_construction", "view.registration"};
 
     void ExpectInputEntities(const Config::EngineConfig& config, std::uint32_t expected,
                              std::uint32_t target = 0u)
@@ -234,7 +234,6 @@ namespace
         EXPECT_EQ(R::GetNormalEstimationConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDerivedSection<R::kOutlierAnalysisSection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetKeypointAnalysisConfig(config)->StableEntityId, expected);
-        EXPECT_EQ(R::GetDerivedSection<R::kKernelDensitySection>(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetDensityWeightConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetPointConstructionConfig(config)->StableEntityId, expected);
         EXPECT_EQ(R::GetRegistrationConfig(config)->SourceStableEntityId, expected);
@@ -702,7 +701,6 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
             ShowAction{"view.outlier_analysis", "Outlier Analysis", "Show score", "outlier_score", true},
             ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show mask", "keypoint_mask", true},
             ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show saliency", "keypoint_saliency", true},
-            ShowAction{"view.kernel_density", "Kernel Density", "Show density", "density", true},
             ShowAction{"view.density_weights", "Compact Density Weights", "Show weights", "density_weight", true}};
         ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(actions[0].Window, true));
         int frame = 0;
@@ -1419,34 +1417,6 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
             },
             1,
             3},
-        Control{"view.kernel_density",
-            "Kernel Density",
-            "Backend",
-            "CPU LBVH (cached)",
-            [](const auto& c)
-            {
-                return int(R::GetDerivedSection<R::kKernelDensitySection>(c)->Backend);
-            },
-            1,
-            1},
-        Control{"view.kernel_density",
-            "Kernel Density",
-            "Backend",
-            "CPU octree",
-            [](const auto& c)
-            {
-                return int(R::GetDerivedSection<R::kKernelDensitySection>(c)->Backend);
-            },
-            0,
-            0},
-        Control{"view.kernel_density",
-            "Kernel Density",
-            "Backend",
-            "Vulkan LBVH",
-            [](const auto& c)
-            {
-                return int(R::GetDerivedSection<R::kKernelDensitySection>(c)->Backend);
-            }},
         Control{"view.density_weights",
             "Compact Density Weights",
             "Backend",
@@ -1738,68 +1708,6 @@ TEST(SandboxProcessingPanels, MeshOperationUsesChosenEntityWithoutChangingSceneS
     };
     h.Engine->Run();
     EXPECT_GE(step, 12);
-}
-
-// ARCH-022 Q89: point spacing's window (a plugin) has its own case in Test.PointSpacingPlugin.
-TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithoutRecomputing)
-{
-    {
-        PanelHarness h;
-        auto& scene = h.Scene();
-        const auto entity = scene.Create();
-        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
-        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
-        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-        const std::string output = "shared_test_scalar";
-        R::EditorProcessingContext referenceContext{.Scene=&scene};
-        {
-            auto c = *R::GetDerivedSection<R::kKernelDensitySection>(config);
-            c.KNeighbors = 3; c.Bandwidth = 0.5f; c.Density.Name = output;
-            R::SetDerivedSection<R::kKernelDensitySection>(config, c);
-            c.StableEntityId = R::SelectionController::ToStableEntityId(entity);
-            c.Density.Name = "reference_scalar";
-            ASSERT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
-        }
-        ASSERT_TRUE(h.Apply(config));
-        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
-        auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
-        std::optional<Geometry::PropertyRevision> revision;
-        std::uint64_t submittedBeforeShow = 0;
-        int frame = 0, step = 0, showFrame = 0;
-        h.Driver->OnFrame = [&](R::Engine& engine) {
-            if (++frame > 400)
-            { ADD_FAILURE() << "Scalar panel did not publish/show output"; engine.RequestExit(); return; }
-            auto* window = ImGui::FindWindowByName("Kernel Density");
-            if (!window) return;
-            ImGui::SetWindowSize(window, {700, 1000});
-            ImGui::SetWindowPos(window, {0, 0});
-            if (++step == 3)
-                ImGui::ActivateItemByID(window->GetID("Estimate density"));
-            if (!properties.Exists(output)) return;
-            if (!showFrame)
-            {
-                EXPECT_EQ(std::as_const(properties).Get<float>(output).Vector(),
-                          std::as_const(properties).Get<float>("reference_scalar").Vector());
-                revision = properties.FindPropertyRevision(output);
-                submittedBeforeShow = engine.Jobs().Stats().SubmittedJobs;
-                ImGui::ActivateItemByID(window->GetID("Show density"));
-                showFrame = frame;
-            }
-            if (frame < showFrame + 3) return;
-            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, submittedBeforeShow);
-            EXPECT_EQ(properties.FindPropertyRevision(output), revision);
-            const auto* overrides = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
-            EXPECT_NE(overrides, nullptr);
-            if (overrides)
-            {
-                EXPECT_TRUE(overrides->Points);
-                if (overrides->Points) EXPECT_EQ(overrides->Points->ScalarFieldName, output);
-            }
-            engine.RequestExit();
-        };
-        h.Engine->Run();
-        EXPECT_GT(showFrame, 0);
-    }
 }
 
 TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePublishing)
@@ -3543,52 +3451,6 @@ TEST(SandboxProcessingPanels, KMeansProgressShowsOnlyForTheEntityItRanOn)
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
-// A point-family panel finds its run by entity and output name through the shared helper
-// and keeps the finished run visible for that output.
-TEST(SandboxProcessingPanels, KernelDensityPanelShowsItsRunForTheOutputItWrites)
-{
-    PanelHarness h;
-    auto& scene = h.Scene();
-    const auto entity = scene.Create();
-    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
-    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
-    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-    auto density = *R::GetDerivedSection<R::kKernelDensitySection>(config);
-    density.KNeighbors = 3;
-    density.Bandwidth = 0.5f;
-    density.Density.Name = "progress_density";
-    R::SetDerivedSection<R::kKernelDensitySection>(config, density);
-    ASSERT_TRUE(h.Apply(config));
-    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
-    auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
-    int frame = 0, step = 0, publishedAt = 0;
-    std::string text;
-    h.Driver->OnFrame = [&](R::Engine& engine) {
-        if (++frame > 400) { ADD_FAILURE() << "density progress test did not finish"; engine.RequestExit(); return; }
-        auto* window = ImGui::FindWindowByName("Kernel Density");
-        if (!window) return;
-        ImGui::SetWindowSize(window, {700, 1000});
-        ImGui::SetWindowPos(window, {0, 0});
-        if (++step == 3) ImGui::ActivateItemByID(window->GetID("Estimate density"));
-        if (!publishedAt && properties.Exists("progress_density"))
-        {
-            publishedAt = frame;
-            ImGui::GetCurrentContext()->LogBuffer.clear();
-            ImGui::LogToBuffer();
-            ImGui::GetCurrentContext()->LogWindow = nullptr;
-        }
-        if (publishedAt && frame == publishedAt + 5)
-        {
-            text = ImGui::GetCurrentContext()->LogBuffer.c_str();
-            ImGui::LogFinish();
-            engine.RequestExit();
-        }
-    };
-    h.Engine->Run();
-    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
-    EXPECT_GT(publishedAt, 0);
-    EXPECT_NE(text.find("done"), std::string::npos) << text;
-}
 
 // Progressive Poisson names its run by the channel it writes; the finished run stays visible.
 TEST(SandboxProcessingPanels, ProgressivePoissonPanelShowsItsFinishedRun)
@@ -5143,8 +5005,8 @@ TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResu
 TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDiscards)
 {
     using Phase=R::EditorGpuTransactionPhase;
-    // ARCH-022 Q89: point spacing (1) is a plugin; its transaction cases are in Test.PointSpacingPlugin.
-    for(unsigned method : {0u, 2u}) for(bool applied:{false,true})
+    // ARCH-022 Q89: kernel density (0) and point spacing (1) are plugins; their transaction cases are theirs.
+    for(unsigned method : {2u}) for(bool applied:{false,true})
     {
         SCOPED_TRACE(method);
         SCOPED_TRACE(applied);PanelHarness h;
@@ -5156,17 +5018,16 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         const auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
         (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(scene.Raw(),entity,mesh);
         auto& rows=scene.Raw().get<GS::Vertices>(entity).Properties;
-        R::KernelDensityConfig density;R::DensityWeightConfig weights;
-        density.StableEntityId=weights.StableEntityId=R::SelectionController::ToStableEntityId(entity);
-        density.Positions.Domain=weights.Positions.Domain=R::GeometryElementDomain::MeshVertex;
-        density.Density.Domain=weights.Weights.Domain=R::GeometryElementDomain::MeshVertex;
-        density.Backend=R::KernelDensityBackend::VulkanLBVH;weights.Backend=R::DensityWeightBackend::VulkanLBVH;
+        R::DensityWeightConfig weights;
+        weights.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+        weights.Positions.Domain=R::GeometryElementDomain::MeshVertex;
+        weights.Weights.Domain=R::GeometryElementDomain::MeshVertex;
+        weights.Backend=R::DensityWeightBackend::VulkanLBVH;
         auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
-        R::SetDerivedSection<R::kKernelDensitySection>(config, density);
         R::SetDensityWeightConfig(config, weights);
         ASSERT_TRUE(h.Apply(config));ASSERT_TRUE(h.Selection().SetSelectedEntity(scene,entity));
-        const char* ids[]={"view.kernel_density","","view.density_weights"};
-        const char* titles[]={"Kernel Density","","Compact Density Weights"};
+        const char* ids[]={"","","view.density_weights"};
+        const char* titles[]={"","","Compact Density Weights"};
         ASSERT_TRUE(h.Shell.SetEditorWindowOpen(ids[method],true));
         R::EditorProcessingContext context;context.Scene=&scene;
         context.JobCommands.Submit=[&](R::JobDesc job,const auto&)->R::JobToken {
@@ -5199,11 +5060,6 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
                     EXPECT_EQ(result->GpuQueryBatches, 1u);
                     return true;
                 };
-                if (method == 0 && check(frame.PointFields.Results.Last<R::KernelDensityOperation>()))
-                {
-                    kept = true;
-                    EXPECT_EQ(frame.PointFields.Results.Last<R::KernelDensityOperation>()->MeanDensity, 3);
-                }
                 if (method == 2 && check(frame.PointFields.Results.Last<R::DensityWeightOperation>()))
                 {
                     kept = true;
@@ -5213,7 +5069,6 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         R::EditorProcessingCommands commands{};
         const auto make=[&]{
             std::vector<float> values(rows.Size(),3);
-            if(method==0)return R::MakeEditorKernelDensityTransactionForTest(commands,density,values,residency,diagnostics);
             return R::MakeEditorDensityWeightTransactionForTest(commands,weights,values,residency,diagnostics);};
         R::EditorPointScalarTransactionHandle run{};
         int frames = 0, terminalFrame = 0, started = 0;
@@ -5273,133 +5128,7 @@ TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDi
         h.Shell.RemoveFrameObserver(observer);
         auto pending=make();ASSERT_TRUE(pending);h.Panels.InjectPointScalarTransactionForTest(method,pending);
         h.Panels.Unregister();EXPECT_EQ(R::SnapshotEditorPointScalar(commands,pending).Phase,Phase::Discarded);
-        EXPECT_EQ(rows.Exists(method==0?density.Density.Name:weights.Weights.Name),applied);
-    }
-}
-
-// RUNTIME-348: when another caller's newer result B is stored before the panel's older GPU run A ends,
-// the panel keeps showing B; it never folds A's terminal answer into B (not even for one frame).
-TEST(SandboxProcessingPanels, OlderGpuRunNeverRewritesANewerResult)
-{
-    using Phase = R::EditorGpuTransactionPhase;
-    // ARCH-022 Q89: point spacing (1) is a plugin; its newest-run case is in Test.PointSpacingPlugin.
-    for (unsigned method = 0; method < 1; ++method)
-    {
-        SCOPED_TRACE(method);
-        PanelHarness h;
-        Extrinsic::Tests::MockDevice device;
-        Extrinsic::Graphics::GpuPropertyResidency residency{device};
-        device.TransferQueue.AcceptBufferUploads = true;
-        auto& scene = h.Scene();
-        const auto entity = scene.Create();
-        scene.Raw().emplace<Extrinsic::ECS::Components::Transform::Component>(entity);
-        Geometry::HalfedgeMesh::Mesh mesh;
-        const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
-        (void)mesh.AddTriangle(a, b, c);
-        GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-        auto& rows = scene.Raw().get<GS::Vertices>(entity).Properties;
-        R::KernelDensityConfig density;
-        density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
-        density.Positions.Domain = R::GeometryElementDomain::MeshVertex;
-        density.Density.Domain = R::GeometryElementDomain::MeshVertex;
-        density.Backend = R::KernelDensityBackend::VulkanLBVH;
-        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-        R::SetDerivedSection<R::kKernelDensitySection>(config, density);
-        ASSERT_TRUE(h.Apply(config));
-        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
-        const char* title = "Kernel Density";
-        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
-        R::EditorProcessingCommands sessionCommands{};
-        const auto observer = h.Shell.AddFrameObserver(
-            [&](const Editor::SandboxEditorContext& frame)
-            {
-                if (!sessionCommands.IsBound())
-                    sessionCommands = frame.PointFields.Commands;
-            });
-        // Run A: the panel's transaction on this test's job surface, bound to the session's store.
-        R::EditorProcessingContext context;
-        context.Scene = &scene;
-        context.JobCommands.Submit = [&](R::JobDesc job, const auto&)
-        {
-            return h.Engine->Jobs().Submit(std::move(job));
-        };
-        R::EditorProcessingCommands commands{};
-        R::EditorPointScalarTransactionHandle run{};
-        const std::string newer = "Density target entity is stale or missing.";
-        int frames = 0, started = 0, terminalFrame = 0;
-        bool checked = false;
-        std::string terminalMessage;
-        h.Driver->OnFrame = [&](R::Engine& engine)
-        {
-            if (++frames > 60)
-            {
-                ADD_FAILURE() << "the run did not end";
-                engine.RequestExit();
-                return;
-            }
-            if (!run)
-            {
-                if (!sessionCommands.IsBound())
-                    return;
-                const auto& session = R::EditorProcessingCommandsAccess::Resolve(sessionCommands);
-                context.OperationResults = session.OperationResults;
-                context.AttachmentActive = session.AttachmentActive;
-                commands = R::BindEditorProcessingCommands(context);
-                std::vector<float> values(rows.Size(), 3);
-                run = R::MakeEditorKernelDensityTransactionForTest(commands, density, values, residency);
-                if (!run)
-                {
-                    ADD_FAILURE() << "no scalar transaction";
-                    engine.RequestExit();
-                    return;
-                }
-                h.Panels.InjectPointScalarTransactionForTest(method, run);
-                started = frames;
-                return;
-            }
-            auto* window = ImGui::FindWindowByName(title);
-            if (!window)
-                return;
-            ImGui::SetWindowSize(window, {800, 1800});
-            ImGui::SetWindowPos(window, {0, 0});
-            if (frames == started + 2)
-            {
-                // Run B, started elsewhere after A: an immediate refusal, the newest stored result.
-                auto missing = density;
-                missing.StableEntityId = 0xFFFFFFF0u;
-                const auto refused = R::ApplyEditorKernelDensityCommand(sessionCommands, missing, {}).Message;
-                EXPECT_EQ(refused, newer);
-                ImGui::GetCurrentContext()->LogBuffer.clear();
-                ImGui::LogToBuffer();
-                ImGui::GetCurrentContext()->LogWindow = nullptr;
-            }
-            if (frames == started + 4)
-                ImGui::ActivateItemByID(window->GetID("Accept##Scalar"));
-            const auto state = R::SnapshotEditorPointScalar(commands, run);
-            if (state.Phase != Phase::Applied && state.Phase != Phase::Failed)
-                return;
-            if (!terminalFrame)
-            {
-                terminalFrame = frames;
-                terminalMessage = state.Message;
-                return;
-            }
-            if (frames == terminalFrame + 3)
-            {
-                const std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};
-                ImGui::LogFinish();
-                EXPECT_EQ(state.Phase, Phase::Applied);
-                ASSERT_FALSE(terminalMessage.empty());
-                EXPECT_EQ(text.find(terminalMessage), std::string::npos)
-                    << "the older run's answer was shown: " << text;
-                EXPECT_NE(text.find(newer), std::string::npos) << text;
-                checked = true;
-                engine.RequestExit();
-            }
-        };
-        h.Engine->Run();
-        EXPECT_TRUE(checked);
-        h.Shell.RemoveFrameObserver(observer);
+        EXPECT_EQ(rows.Exists(weights.Weights.Name),applied);
     }
 }
 
@@ -6159,14 +5888,14 @@ TEST(SandboxProcessingPanels, ARunStartedElsewhereShowsForTheDraftsOutput)
     PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
     ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-    auto density = *R::GetDerivedSection<R::kKernelDensitySection>(config);
+    // ARCH-022 Q89: the density weights panel (kernel density, which this ran on, is a plugin).
+    auto density = *R::GetDensityWeightConfig(config);
     density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
-    density.KNeighbors = 3;
-    density.Bandwidth = 0.5f;
-    density.Density.Name = "elsewhere_density";
-    R::SetDerivedSection<R::kKernelDensitySection>(config, density);
+    density.SupportRadius = 1;
+    density.Weights.Name = "elsewhere_density";
+    R::SetDensityWeightConfig(config, density);
     ASSERT_TRUE(h.Apply(config));
-    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.kernel_density", true));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.density_weights", true));
     R::EditorProcessingCommands commands{};
     const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
         .Id = "test.elsewhere_observer", .MenuPath = {"View"}, .Title = "Elsewhere observer", .OpenByDefault = true,
@@ -6176,12 +5905,12 @@ TEST(SandboxProcessingPanels, ARunStartedElsewhereShowsForTheDraftsOutput)
     std::string text;
     h.Driver->OnFrame = [&](R::Engine& engine) {
         if (++frame > 400) { ADD_FAILURE() << "elsewhere test did not finish"; engine.RequestExit(); return; }
-        auto* window = ImGui::FindWindowByName("Kernel Density");
+        auto* window = ImGui::FindWindowByName("Compact Density Weights");
         if (!window || !commands.IsBound()) return;
         ImGui::SetWindowSize(window, {700, 1000});
         ImGui::SetWindowPos(window, {0, 0});
         // The panel never clicks Estimate: the command comes from outside, as an agent's would.
-        if (++step == 3) EXPECT_TRUE(R::ApplyEditorKernelDensityCommand(commands, density).Status != R::EditorCommandStatus::MissingScene);
+        if (++step == 3) EXPECT_TRUE(R::ApplyEditorDensityWeightCommand(commands, density).Status != R::EditorCommandStatus::MissingScene);
         if (!publishedAt && std::as_const(props).Exists("elsewhere_density"))
         {
             publishedAt = frame;
@@ -6207,7 +5936,7 @@ TEST(SandboxProcessingPanels, ARunStartedElsewhereShowsForTheDraftsOutput)
 // same output is refused as a duplicate. The refusal is shown with the run slot, which follows the
 // active run; it is never stored as the panel's result, which would read "Pending" for good
 // because the active run delivers to its own caller. One case per panel path: the shared
-// DrawProcessingExecution (kernel density) and a direct queued execution (outliers).
+// DrawProcessingExecution (density weights) and a direct queued execution (outliers).
 namespace
 {
     struct DuplicateCase
@@ -6312,25 +6041,26 @@ namespace
 
 TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
 {
-    ExpectDuplicateRefusalIsNotThePanelsResult({.WindowId = "view.kernel_density",
-        .Title = "Kernel Density",
-        .Button = "Estimate density",
+    // ARCH-022 Q89: the shared DrawProcessingExecution path through the density weights panel (kernel density,
+    // which this ran on, is a plugin).
+    ExpectDuplicateRefusalIsNotThePanelsResult({.WindowId = "view.density_weights",
+        .Title = "Compact Density Weights",
+        .Button = "Compute compact weights",
         .Output = "duplicate_density",
         .Configure =
             [](PanelHarness& h, const std::uint32_t id)
         {
             auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
-            auto density = *R::GetDerivedSection<R::kKernelDensitySection>(config);
+            auto density = *R::GetDensityWeightConfig(config);
             density.StableEntityId = id;
-            density.KNeighbors = 3;
-            density.Bandwidth = 0.5f;
-            density.Density.Name = "duplicate_density";
-            R::SetDerivedSection<R::kKernelDensitySection>(config, density);
+            density.SupportRadius = 1;
+            density.Weights.Name = "duplicate_density";
+            R::SetDensityWeightConfig(config, density);
             EXPECT_TRUE(h.Apply(config));
             return std::function<R::EditorCommandStatus(const R::EditorProcessingCommands&, std::function<void()>)>(
                 [density](const R::EditorProcessingCommands& commands, std::function<void()> done) {
-                    return R::ApplyEditorKernelDensityCommand(commands, density,
-                        [done](R::EditorKernelDensityResult) { done(); }).Status; });
+                    return R::ApplyEditorDensityWeightCommand(commands, density,
+                        [done](R::EditorDensityWeightResult) { done(); }).Status; });
         },
         .Commands =
             [](const Editor::SandboxEditorContext& context)
@@ -6340,10 +6070,10 @@ TEST(SandboxProcessingPanels, DuplicateRunRefusalIsNotStoredAsThePanelsResult)
         .PanelResult = [](const Editor::SandboxEditorContext& context)
             -> std::optional<std::pair<R::EditorCommandStatus, std::string>>
         {
-            const auto r = context.PointFields.Results.Last<R::KernelDensityOperation>();
+            const auto r = context.PointFields.Results.Last<R::DensityWeightOperation>();
             return r ? std::optional{std::pair{r->Status, r->Message}} : std::nullopt;
         },
-        .ElsewherePending = "Density estimation queued."});
+        .ElsewherePending = "Density weights queued."});
     ExpectDuplicateRefusalIsNotThePanelsResult({.WindowId = "view.outlier_analysis",
         .Title = "Outlier Analysis",
         .Button = "Detect outliers",

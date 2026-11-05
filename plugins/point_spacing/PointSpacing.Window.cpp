@@ -27,6 +27,7 @@ namespace Intrinsic::Plugins::PointSpacing
         struct WindowState
         {
             std::optional<Config> Draft{};
+            std::string LastApplied{}; // the section the draft was taken from (serialized)
             std::string Message{}, ShowMessage{};
         };
         WindowState* g_Window{nullptr};
@@ -85,7 +86,15 @@ namespace Intrinsic::Plugins::PointSpacing
                 ImGui::End();
                 return;
             }
-            if (!state.Draft) state.Draft = R::ActivePluginSection<kSection>();
+            // The draft follows the section whenever it changes, also when config_apply changed it.
+            const auto active = R::ActivePluginSection<kSection>();
+            if (active)
+                if (auto serialized = R::SerializeDerivedSection<kSection>(*active); serialized != state.LastApplied)
+                {
+                    state.Draft = active;
+                    state.LastApplied = std::move(serialized);
+                    state.Message.clear();
+                }
             if (!state.Draft)
             {
                 ImGui::TextWrapped("The point spacing section is missing or invalid.");
@@ -119,14 +128,15 @@ namespace Intrinsic::Plugins::PointSpacing
             if (ImGui::Button("Apply settings"))
             {
                 std::string error;
-                state.Message = R::ApplyPluginSection<kSection>(draft, error) ? "Settings applied." : error;
+                const bool applied = R::ApplyPluginSection<kSection>(draft, error);
+                state.Message = applied ? "Settings applied." : error;
+                if (applied) state.LastApplied = R::SerializeDerivedSection<kSection>(draft); // its own change
             }
             ImGui::SameLine();
-            if (ImGui::Button("Revert")) state.Draft = R::ActivePluginSection<kSection>();
+            if (ImGui::Button("Revert")) state.Draft = active;
             if (!state.Message.empty()) ImGui::TextWrapped("%s", state.Message.c_str());
             ImGui::Separator();
             // Run uses the applied settings, as the MCP tool does.
-            const auto active = R::ActivePluginSection<kSection>();
             const std::string reason = active ? Preview(*active) : "The section is invalid.";
             ImGui::BeginDisabled(!reason.empty());
             if (ImGui::Button("Estimate radii")) (void)Start(*active, false);

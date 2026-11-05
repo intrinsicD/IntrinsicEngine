@@ -38,6 +38,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointScalarTransaction;
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.AgentOperations;
@@ -1957,15 +1958,15 @@ TEST_F(ClusteringModuleResident, AdmissionReservesTypedAndPresentationAgainstSca
     Runtime::EditorProcessingContext context;
     context.Scene=&Scene();context.World=World;context.Device=&Device;context.SpatialIndices=&Cache;
     Jobs.Attach(context);
-    Runtime::KernelDensityConfig scalar;
+    Runtime::DensityWeightConfig scalar; // a competing point scalar transaction (ARCH-022 Q89: density weights now)
     scalar.StableEntityId=Request.StableEntityId;scalar.Positions=Request.Properties.InputPositions;
-    scalar.Density=Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels);
+    scalar.Weights=Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels);scalar.SupportRadius=1;
     const auto commands=Runtime::BindEditorProcessingCommands(context);
-    auto competing=Runtime::MakeEditorKernelDensityTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
+    auto competing=Runtime::MakeEditorDensityWeightTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
     EXPECT_FALSE(competing);EXPECT_EQ(residency->RingGeneration(presentation),generation);
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
-    competing=Runtime::MakeEditorKernelDensityTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
+    competing=Runtime::MakeEditorDensityWeightTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
     ASSERT_TRUE(competing);
     Start();ASSERT_TRUE(Until([&]{return Results.size()==2;}));EXPECT_FALSE(Results[1].Succeeded());
     EXPECT_TRUE(Runtime::SnapshotEditorPointScalar(commands,competing).CanAccept);
