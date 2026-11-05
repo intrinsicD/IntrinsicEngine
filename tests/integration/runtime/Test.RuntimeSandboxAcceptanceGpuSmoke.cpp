@@ -2025,6 +2025,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.DefaultConfig.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -2284,6 +2285,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.ReferenceTriangleCenter.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -2433,6 +2435,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.ReferenceTriangleVertexColor.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -2630,6 +2633,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAn
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.ReferenceTriangleVertexColorPartial.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -2849,6 +2853,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.ReferenceTriangleEdgePoint.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -3339,6 +3344,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.ScalarFieldColormap.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -3585,7 +3591,7 @@ namespace
         const std::uint64_t size = static_cast<std::uint64_t>(extent.Width) * extent.Height * pixelBytes;
         const auto readback = device.CreateBuffer({
             .SizeBytes = size, .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-            .HostVisible = true, .DebugName = "AnalysisDisplay.Readback"});
+            .HostVisible = true, .HostReadback = true, .DebugName = "AnalysisDisplay.Readback"});
         ASSERT_TRUE(readback.IsValid());
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(readback);
         const auto run = DriveAcceptanceAndCapture(engine);
@@ -3708,6 +3714,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.ScalarFieldSurfaceIsolines.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -3927,6 +3934,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTria
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.Bug024TransformEdit.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -4117,6 +4125,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.ImportedObjTriangle.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -4279,6 +4288,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, DirectMeshEnrichmentPendingRendersGeometr
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.PendingEnrichment.Readback",
     });
     ASSERT_TRUE(readback.IsValid());
@@ -4436,6 +4446,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.GeneratedUvTexture.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -5044,6 +5055,7 @@ static void ExpectImportedModelSceneVisibleAndClickPickable(const int replacemen
             .SizeBytes = readbackSize,
             .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
             .HostVisible = true,
+            .HostReadback = true,
             .DebugName = "Sandbox.Bug094ModelScene.Readback",
         });
     if (!readbackBuffer.IsValid())
@@ -5219,6 +5231,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.HierarchySelection.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -5954,7 +5967,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
                 .SizeBytes = readbackSize,
                 .Usage =
                     Extrinsic::RHI::BufferUsage::TransferDst,
-                .HostVisible = true,
+                .HostVisible = true, .HostReadback = true,
                 .DebugName =
                     "Sandbox.Runtime129ObjectSpaceNormalBake.Readback",
             });
@@ -7353,7 +7366,7 @@ void CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind kind)
                     .SizeBytes = size,
                     .Usage =
                         Extrinsic::RHI::BufferUsage::TransferDst,
-                    .HostVisible = true,
+                    .HostVisible = true, .HostReadback = true,
                     .DebugName = name,
                 });
         };
@@ -7759,6 +7772,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, SeamSplitCornerUvMeshDeIndexesAtUploadAnd
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.Bug137SeamCube.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -8089,7 +8103,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
         .SizeBytes = byteCount,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-        .HostVisible = true,
+        .HostVisible = true, .HostReadback = true,
         .DebugName = "Appearance surface readback"});
     ASSERT_TRUE(readback.IsValid());
   }
@@ -8374,6 +8388,7 @@ void AddReferenceTriangleVectorFields(Engine& engine);
         .SizeBytes = size,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "VectorFieldSmoke.Readback",
     });
     if (!readback.IsValid())
@@ -9289,6 +9304,7 @@ void RunImGuizmoGroupDragSmoke(const GizmoSmokeLayout& layout)
             .SizeBytes = probe.ReadbackSize,
             .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
             .HostVisible = true,
+            .HostReadback = true,
             .DebugName = "Sandbox.Ui078ImGuizmo.Readback",
         });
         glfwGetWindowContentScale(input.Window, &contentScale.x, &contentScale.y);
@@ -9785,6 +9801,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, BoundPointPositionsDrawWhileTheSurfaceSta
         .SizeBytes = byteCount,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "Sandbox.UI083.PerLanePositions.Readback",
     });
     ASSERT_TRUE(readback.IsValid());
@@ -10064,7 +10081,7 @@ namespace
             Readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
                 .SizeBytes = Bytes.size(),
                 .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-                .HostVisible = true,
+                .HostVisible = true, .HostReadback = true,
                 .DebugName = debugName,
             });
             return Readback.IsValid();

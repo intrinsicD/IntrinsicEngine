@@ -412,6 +412,7 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors
 		.SizeBytes = readbackSize,
 		.Usage = Extrinsic::RHI::BufferUsage::TransferDst,
 		.HostVisible = true,
+		.HostReadback = true,
 		.DebugName = "VisualizationOverlay.Readback",
 	});
 	if (!readbackBuffer.IsValid())

@@ -362,14 +362,7 @@ size_t VulkanTransferQueue::AcquireReadbackSlot(uint64_t sizeBytes)
     bufferCI.size = sizeBytes;
     bufferCI.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-    VmaAllocationCreateInfo allocationCI{};
-    // AUTO is needed for VMA to honour the random-access flag (prefer HOST_CACHED); CPU_ONLY ignores it and can
-    // land in uncached memory, where the CPU's copy out of the slot is slow. The visible/coherent eligibility of
-    // CPU_ONLY stays; only the caching preference changes.
-    allocationCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
-    allocationCI.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    allocationCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT
-                       | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    const VmaAllocationCreateInfo allocationCI = HostReadbackAllocationInfo();
 
     ReadbackSlot slot{};
     VmaAllocationInfo info{};
@@ -391,15 +384,7 @@ size_t VulkanTransferQueue::AcquireReadbackSlot(uint64_t sizeBytes)
     slot.MappedPtr = info.pMappedData;
     slot.SizeBytes = sizeBytes;
     slot.InUse = true;
-    VkMemoryPropertyFlags slotFlags{};
-    vmaGetAllocationMemoryProperties(m_Vma, slot.Allocation, &slotFlags);
-    const VkPhysicalDeviceMemoryProperties* memory = nullptr;
-    vmaGetMemoryProperties(m_Vma, &memory);
-    constexpr VkMemoryPropertyFlags cachedHost = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-    const bool cachedAvailable = std::any_of(memory->memoryTypes, memory->memoryTypes + memory->memoryTypeCount,
-        [](const VkMemoryType& type) { return (type.propertyFlags & cachedHost) == cachedHost; });
-    if ((slotFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) == 0 && cachedAvailable)
+    if (IsUncachedHostReadback(m_Vma, slot.Allocation))
         m_ReadbackSlotsUncached.fetch_add(1u, std::memory_order_relaxed);
     m_ReadbackSlots.push_back(slot);
     m_ReadbackRingBytes += sizeBytes;

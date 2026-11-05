@@ -186,7 +186,7 @@ namespace
             Height = extent.Height;
             Pixels = device.CreateBuffer({.SizeBytes = std::uint64_t(PixelBytes) * Width * Height,
                                           .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-                                          .HostVisible = true, .DebugName = "RUNTIME293.Pixels"});
+                                          .HostVisible = true, .HostReadback = true, .DebugName = "RUNTIME293.Pixels"});
             if (!Pixels.IsValid()) return false;
             Kernel().GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(Pixels);
             return true;

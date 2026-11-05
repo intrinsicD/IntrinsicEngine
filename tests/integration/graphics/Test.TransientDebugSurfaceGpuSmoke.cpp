@@ -478,6 +478,7 @@ void ExpectMixedLaneReadback(const bool worldCamera)
 		.SizeBytes = readbackSize,
 		.Usage = Extrinsic::RHI::BufferUsage::TransferDst,
 		.HostVisible = true,
+		.HostReadback = true,
 		.DebugName = "TransientDebug.Readback",
 	});
 	if (!readbackBuffer.IsValid())

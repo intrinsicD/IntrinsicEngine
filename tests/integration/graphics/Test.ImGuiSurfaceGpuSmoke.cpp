@@ -424,6 +424,7 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "ImGuiSurface.VisiblePixel.Readback",
     });
     if (!readbackBuffer.IsValid())

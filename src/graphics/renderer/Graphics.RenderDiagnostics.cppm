@@ -247,6 +247,10 @@ export namespace Extrinsic::Graphics
         // configured with a valid HostVisible+TransferDst buffer and the device
         // is operational during the frame.
         std::uint32_t DefaultRecipeBackbufferReadbackCopyCount = 0;
+        // Backbuffer copies into a host buffer (the readback hooks and the capture) recorded with their copy-to-host
+        // barrier, and the capture's copies among them (ARCH-022 Q90).
+        std::uint32_t BackbufferHostReadBarrierCount = 0;
+        std::uint32_t BackbufferCaptureCopyCount = 0;
         // Count of frames in which the opt-in transient-debug
         // backbuffer-to-host readback seam recorded the same triplet after the
         // default-recipe graph completed. Unlike the canonical default-recipe

@@ -18,6 +18,7 @@
 
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Scene.Registry;
@@ -25,6 +26,7 @@ import Geometry.Sphere;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
@@ -54,6 +56,7 @@ namespace
         std::uint32_t TriangleId{0};
         bool ColorTriangle{false};
         std::optional<Extrinsic::Graphics::CameraViewInput> Before{}, After{};
+        std::uint32_t CaptureCopies{0}, HostReadBarriers{0}; // over every frame's render stats
 
     protected:
         // The reference triangle and its camera, as the Sandbox session seeds them.
@@ -98,6 +101,9 @@ namespace
         void Frame(double, double) override
         {
             ++Frames;
+            const auto& stats = Kernel().GetRenderer().GetLastRenderGraphStats();
+            CaptureCopies += stats.BackbufferCaptureCopyCount;
+            HostReadBarriers += stats.BackbufferHostReadBarrierCount;
             // Let the reference scene upload and present for a few frames first.
             if (Kernel().GetDevice().IsOperational()) ++OperationalFrames;
             if (Ticket == 0 && OperationalFrames > 30 && !Capture->UnavailableReason())
@@ -147,6 +153,7 @@ TEST(ViewCaptureGpuSmoke, SavesTheReferenceTriangleAsPng)
     driver->Request = {.Region = R::ViewCaptureRegion::Window, .OutputPath = path.string()};
     Intrinsic::Tests::AddRuntimeTestModule(engine, std::move(driverModule));
     engine.Initialize();
+    const std::uint64_t uncachedBefore = Extrinsic::Backends::Vulkan::GetUncachedHostReadCount();
     engine.Run();
     const bool operational = engine.GetDevice().IsOperational();
     const auto extent = engine.GetDevice().GetBackbufferExtent();
@@ -155,11 +162,16 @@ TEST(ViewCaptureGpuSmoke, SavesTheReferenceTriangleAsPng)
     if (!operational && driver->Ticket == 0)
         GTEST_SKIP() << "Promoted Vulkan did not become operational on this host.";
     ASSERT_NE(driver->Ticket, 0u) << "no capture was requested";
+    // The CPU read the capture (and anything else it read) from cached host memory where the device has it.
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetUncachedHostReadCount(), uncachedBefore);
     ASSERT_EQ(driver->Result.State, R::ViewCaptureState::Completed) << driver->Result.Diagnostic;
     EXPECT_EQ(driver->Result.Path, path.string());
     EXPECT_EQ(driver->Result.Width, static_cast<std::uint32_t>(extent.Width));
     EXPECT_EQ(driver->Result.Height, static_cast<std::uint32_t>(extent.Height));
     EXPECT_FALSE(std::filesystem::exists(path.string() + ".partial"));
+    // The capture's copy reached the host through its barrier before the CPU read it (ARCH-022 Q90).
+    EXPECT_EQ(driver->CaptureCopies, 1u);
+    EXPECT_EQ(driver->HostReadBarriers, driver->CaptureCopies) << "no readback hook is armed here";
 
     std::ifstream file(path, std::ios::binary);
     const std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};

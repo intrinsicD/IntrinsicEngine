@@ -192,6 +192,7 @@ export namespace Extrinsic::RHI
         uint64_t    SizeBytes   = 0;
         BufferUsage Usage       = BufferUsage::None;
         bool        HostVisible = false;   // mappable / upload heap
+        bool        HostReadback = false;  // with HostVisible: the CPU reads what the GPU writes (cached memory preferred)
         const char* DebugName   = nullptr;
     };
 

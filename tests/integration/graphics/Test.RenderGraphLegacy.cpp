@@ -1545,6 +1545,33 @@ TEST(GraphicsRenderGraph, IncompatibleTransientDescriptorAllocatesNewHandle)
     EXPECT_NE(firstHandle.Index, secondHandle.Index);
 }
 
+// A transient buffer the CPU reads (HostReadback, cached-preferred memory) never reuses a sequential-write one
+// (ARCH-022 Q90).
+TEST(GraphicsRenderGraph, TransientBufferWithAnotherHostReadbackAllocatesNewHandle)
+{
+    RenderGraph graph;
+    Extrinsic::RHI::BufferDesc desc{.SizeBytes = 256u, .HostVisible = true};
+    const auto plain = graph.CreateBuffer("Plain", desc);
+    (void)graph.AddPass("WritePlain", [plain](RenderGraphBuilder& builder) { (void)builder.Write(plain, BufferUsage::TransferDst); },
+                        true);
+    auto first = graph.Compile();
+    ASSERT_TRUE(first.has_value());
+    const auto firstHandle = first->BufferHandles[plain.Index];
+    ASSERT_TRUE(firstHandle.IsValid());
+
+    graph.Reset();
+    desc.HostReadback = true;
+    const auto readback = graph.CreateBuffer("Readback", desc);
+    (void)graph.AddPass("WriteReadback",
+                        [readback](RenderGraphBuilder& builder) { (void)builder.Write(readback, BufferUsage::TransferDst); },
+                        true);
+    auto second = graph.Compile();
+    ASSERT_TRUE(second.has_value());
+    const auto secondHandle = second->BufferHandles[readback.Index];
+    ASSERT_TRUE(secondHandle.IsValid());
+    EXPECT_NE(firstHandle.Index, secondHandle.Index);
+}
+
 TEST(GraphicsRenderGraph, NonOverlappingCompatibleTransientTexturesAliasWithinFrame)
 {
     RenderGraph graph;

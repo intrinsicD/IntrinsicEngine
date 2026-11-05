@@ -89,7 +89,8 @@ namespace Extrinsic::Graphics
         {
             return lhs.SizeBytes == rhs.SizeBytes &&
                    lhs.Usage == rhs.Usage &&
-                   lhs.HostVisible == rhs.HostVisible;
+                   lhs.HostVisible == rhs.HostVisible &&
+                   lhs.HostReadback == rhs.HostReadback;
         }
 
         [[nodiscard]] bool HasSameRange(const RHI::BufferRange lhs,

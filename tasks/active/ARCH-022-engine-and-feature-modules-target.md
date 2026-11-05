@@ -3768,3 +3768,24 @@ python3 tools/docs/check_doc_links.py --root . --strict
   protection instruction-only; fresh thread `01a1ad3f-44c5-7162-86f0-85f03e4ce63b`): diff `1c4569a2…` verbatim
   "**Verdict: revise required.**" (stale CPU runs still answered the publication text; optional: the missing-section
   edge, the window helper's false-positive route, a stale comment), diff `017b319c…` verbatim "**Verdict: approve.**".
+- 2026-11-05, Q90 block 2 (point 1, Q86 finding 8; host reads in the RHI): `BufferDesc::HostReadback` (with
+  HostVisible: the CPU reads it) allocates like the transfer queue's readback slots (`HostReadbackAllocationInfo` in
+  the Vulkan `:Memory` partition: `AUTO_PREFER_HOST`, coherent required, random access), as does `ReadBuffer`'s
+  device-local staging; `ReadBuffer`'s copy and every backbuffer-to-host copy (the capture and the readback hooks, now
+  one `RecordBackbufferToHost`) record a copy-to-host barrier; the capture, picking and histogram buffers and every
+  CPU-read test buffer set the flag (the general compute scratch helpers of two smokes stay unflagged, they serve as
+  inputs too); both transient reuse comparisons include the flag. Diagnostics: `GetReadBufferHostBarrierCount`,
+  `GetUncachedHostReadCount` (a `ReadBuffer` read from memory without HOST_CACHED while a cached type exists,
+  whoever allocated it), renderer stats `BackbufferHostReadBarrierCount` and `BackbufferCaptureCopyCount`. Tests:
+  `BufferReadbackGpuSmoke` (slow-path barrier, staging and a flagged buffer read from cached memory),
+  `ViewCaptureGpuSmoke` (one capture copy with its barrier, no uncached read over the run), the default-recipe hook
+  smokes (barrier sum, no uncached read of the hook's pixels), `GraphicsRenderGraph.TransientBufferWithAnotherHostReadbackAllocatesNewHandle`.
+  Measured here: `CPU_TO_GPU|SEQUENTIAL_WRITE` lands in an uncached type on this RTX 4090 (mutation C). Verification:
+  gpu label 180/183 (the known `IntrinsicKMeansGpuBenchmarkSmoke` Run/Validate and the other session's
+  `RUNTIME290VulkanPointSampling` edit), CPU graphics label 1046/1046; mutations, each red on its own test: both
+  barriers removed, CPU_ONLY staging, flagged buffers back to sequential-write memory, the allocator comparison
+  without the flag, the hook buffer without the flag. Not in scope: `ReadBuffer`'s device idle, `WriteBuffer`'s queue
+  idle (block 7). Code review (Codex, gpt-6-astra xhigh, read-only, recursion protection instruction-only; fresh thread
+  `01a1ad59-9a2e-7bb0-9605-2ff85bae0629`): diff `540cf82e…` "**Verdict: revise required.**" (reuse comparisons, hook
+  buffers unflagged), diff `bae57613…` "**Verdict: revise required.**" (four `Pixels` hook buffers, the slow path
+  counted before reading), diff `ddd57475…` verbatim "**Verdict: approve** for block 2".

@@ -446,6 +446,10 @@ void ExpectDefaultRecipeDebugViewReadbackRecorded(
     EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
         << "Default-recipe readback triplet did not record on any operational "
            "frame.";
+    // Every backbuffer copy into a host buffer reached the host through its barrier (ARCH-022 Q90).
+    EXPECT_EQ(stats.BackbufferHostReadBarrierCount,
+              stats.DefaultRecipeBackbufferReadbackCopyCount + stats.TransientDebugBackbufferReadbackCopyCount +
+                  stats.VisualizationOverlayBackbufferReadbackCopyCount + stats.BackbufferCaptureCopyCount);
 }
 
 [[nodiscard]] Extrinsic::Graphics::FrameRecipeOverride MakeGraphicsOnlyFrameRecipeOverride()
@@ -1008,10 +1012,12 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
         static_cast<std::uint64_t>(bytesPerPixel) *
         static_cast<std::uint64_t>(Readback::kFramebufferWidth) *
         static_cast<std::uint64_t>(Readback::kFramebufferHeight);
+    const std::uint64_t uncachedBefore = Extrinsic::Backends::Vulkan::GetUncachedHostReadCount();
     Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "DefaultRecipe.Readback",
     });
     if (!readbackBuffer.IsValid())
@@ -1072,6 +1078,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
                                         bytesPerPixel,
                                         backbufferFormat,
                                         stats);
+    // The CPU read the hook's pixels from cached host memory where the device has it (ARCH-022 Q90).
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetUncachedHostReadCount(), uncachedBefore);
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
@@ -1263,6 +1271,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "DefaultRecipe.ParallelRecordingReadback",
     });
     if (!readbackBuffer.IsValid())
@@ -1486,6 +1495,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "DefaultRecipe.ParallelAsyncRecordingReadback",
     });
     if (!readbackBuffer.IsValid())
@@ -1728,6 +1738,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndRe
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "DefaultRecipe.TransientAliasingReadback",
     });
     if (!readbackBuffer.IsValid())
@@ -1867,6 +1878,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, VulkanRenderContractPublishesDeclaredArtifact
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "DefaultRecipe.RenderContractReadback",
     });
     if (!readbackBuffer.IsValid())
@@ -2102,6 +2114,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, AsyncComputeHistogramQueueReadbackMatchesMini
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
+        .HostReadback = true,
         .DebugName = "DefaultRecipe.AsyncComputeReadback",
     });
     if (!readbackBuffer.IsValid())

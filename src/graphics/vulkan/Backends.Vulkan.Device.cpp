@@ -39,6 +39,9 @@ namespace
     std::atomic<std::uint64_t> g_FallbackEndFrameAttempts{0};
     std::atomic<std::uint64_t> g_FallbackPresentAttempts{0};
     std::atomic<std::uint64_t> g_FallbackResizeAttempts{0};
+    // ARCH-022 Q90: host reads of device-written buffers.
+    std::atomic<std::uint64_t> g_ReadBufferHostBarriers{0};
+    std::atomic<std::uint64_t> g_UncachedHostReads{0};
     std::atomic<std::uint8_t>  g_LastFallbackPipelineReason{
         static_cast<std::uint8_t>(FallbackPipelineReason::None)};
 
@@ -772,6 +775,16 @@ void NoteFallbackTransferUploadAttempt()
 std::uint64_t GetFallbackTransferUploadAttemptCount() noexcept
 {
     return g_FallbackTransferUploadAttempts.load(std::memory_order_relaxed);
+}
+
+std::uint64_t GetReadBufferHostBarrierCount() noexcept
+{
+    return g_ReadBufferHostBarriers.load(std::memory_order_relaxed);
+}
+
+std::uint64_t GetUncachedHostReadCount() noexcept
+{
+    return g_UncachedHostReads.load(std::memory_order_relaxed);
 }
 
 void NoteFallbackPipelineCreationAttempt(FallbackPipelineReason reason)
@@ -4334,7 +4347,11 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     VmaAllocationCreateInfo aci{};
     VmaAllocationInfo info{};
 
-    if (desc.HostVisible)
+    if (desc.HostVisible && desc.HostReadback)
+    {
+        aci = HostReadbackAllocationInfo(); // the CPU reads it: cached memory preferred
+    }
+    else if (desc.HostVisible)
     {
         // Persistently mapped, coherent where possible.
         aci.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -4370,6 +4387,7 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
         VkMemoryPropertyFlags memProps = 0;
         vmaGetAllocationMemoryProperties(m_Vma, buf.Allocation, &memProps);
         buf.HostCoherent = (memProps & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
+        buf.HostReadUncached = IsUncachedHostReadback(m_Vma, buf.Allocation);
     }
 
     // BUG-015: guard the debug-utils entry point. `m_ValidationEnabled`
@@ -4562,6 +4580,7 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
             }
         }
 
+        if (buf->HostReadUncached) g_UncachedHostReads.fetch_add(1, std::memory_order_relaxed);
         std::memcpy(data, static_cast<const char*>(buf->MappedPtr) + offset, size);
         return;
     }
@@ -4571,10 +4590,7 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
     stagingCI.size = size;
     stagingCI.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-    VmaAllocationCreateInfo stagingACI{};
-    stagingACI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-    stagingACI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT
-                     | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    const VmaAllocationCreateInfo stagingACI = HostReadbackAllocationInfo();
 
     VkBuffer stagingBuf{};
     VmaAllocation stagingAlloc{};
@@ -4616,7 +4632,24 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
             region.dstOffset = 0;
             region.size = size;
             vkCmdCopyBuffer(cmd, buf->Buffer, stagingBuf, 1, &region);
+
+            // The copy's writes become visible to the host before it reads the staging buffer.
+            VkBufferMemoryBarrier2 toHost{};
+            toHost.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+            toHost.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+            toHost.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            toHost.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+            toHost.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+            toHost.buffer = stagingBuf;
+            toHost.offset = 0;
+            toHost.size = size;
+            VkDependencyInfo hostDependency{};
+            hostDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            hostDependency.bufferMemoryBarrierCount = 1;
+            hostDependency.pBufferMemoryBarriers = &toHost;
+            vkCmdPipelineBarrier2(cmd, &hostDependency);
             copyComplete = EndOneShot(cmd);
+            if (copyComplete) g_ReadBufferHostBarriers.fetch_add(1, std::memory_order_relaxed);
         }
     }
 
@@ -4632,6 +4665,8 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
                                 static_cast<int>(invalidateResult));
             }
         }
+        if (IsUncachedHostReadback(m_Vma, stagingAlloc))
+            g_UncachedHostReads.fetch_add(1, std::memory_order_relaxed);
         std::memcpy(data, stagingInfo.pMappedData, static_cast<std::size_t>(size));
     }
 

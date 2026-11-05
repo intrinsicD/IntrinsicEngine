@@ -139,6 +139,29 @@ TEST(BufferReadbackGpuSmoke, TransferQueueDownloadsDeviceLocalBufferWithoutWaitI
     // Every queued download made its copy visible to the host before the CPU reads the slot (ARCH-022 Q89).
     EXPECT_EQ(diagnostics.ReadbackHostBarriers, diagnostics.DownloadsQueued);
 
+    // VulkanDevice::ReadBuffer's device-local path: the CPU reads its staging from cached host memory, after a barrier
+    // made the copy visible; a HostReadback buffer is read from cached memory too (ARCH-022 Q90).
+    namespace V = Extrinsic::Backends::Vulkan;
+    const std::uint64_t barriersBefore = V::GetReadBufferHostBarrierCount();
+    const std::uint64_t uncachedBefore = V::GetUncachedHostReadCount();
+    std::array<std::byte, expected.size()> direct{};
+    device->ReadBuffer(buffer, direct.data(), direct.size(), 0u);
+    EXPECT_EQ(direct, expected);
+    EXPECT_EQ(V::GetReadBufferHostBarrierCount(), barriersBefore + 1u);
+    EXPECT_EQ(V::GetUncachedHostReadCount(), uncachedBefore) << "the staging was read from uncached memory";
+    const Extrinsic::RHI::BufferHandle hostReadback = device->CreateBuffer({
+        .SizeBytes = 256u,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .HostReadback = true,
+        .DebugName = "BufferReadbackGpuSmoke.HostReadback",
+    });
+    ASSERT_TRUE(hostReadback.IsValid());
+    std::array<std::byte, 256> mapped{};
+    device->ReadBuffer(hostReadback, mapped.data(), mapped.size(), 0u);
+    EXPECT_EQ(V::GetUncachedHostReadCount(), uncachedBefore) << "a HostReadback buffer was read from uncached memory";
+    device->DestroyBuffer(hostReadback);
+
     device->DestroyBuffer(buffer);
     device->Shutdown();
 }

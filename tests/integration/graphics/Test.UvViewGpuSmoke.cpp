@@ -357,7 +357,7 @@ private:
             m_ReadbackBuffers[index] = engine.GetDevice().CreateBuffer({
                 .SizeBytes = kReadbackBytes,
                 .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-                .HostVisible = true,
+                .HostVisible = true, .HostReadback = true,
                 .DebugName = kReadbackDebugNames[index],
             });
             if (!m_ReadbackBuffers[index].IsValid())

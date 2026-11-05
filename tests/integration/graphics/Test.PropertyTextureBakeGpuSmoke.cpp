@@ -166,12 +166,14 @@ namespace
             .SizeBytes = texelCount * 16u,
             .Usage = RHI::BufferUsage::TransferDst,
             .HostVisible = true,
+            .HostReadback = true,
             .DebugName = "PropertyTextureBakeGpuSmoke.ValueReadback",
         });
         const RHI::BufferHandle coverageReadback = device.CreateBuffer(RHI::BufferDesc{
             .SizeBytes = texelCount * sizeof(float),
             .Usage = RHI::BufferUsage::TransferDst,
             .HostVisible = true,
+            .HostReadback = true,
             .DebugName = "PropertyTextureBakeGpuSmoke.CoverageReadback",
         });
         buffers.push_back(valueReadback);

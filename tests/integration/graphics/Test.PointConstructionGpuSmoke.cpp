@@ -243,6 +243,7 @@ namespace
                 Readback = device.CreateBuffer({.SizeBytes = std::uint64_t(Width) * Height * 4,
                                                 .Usage = RHI::BufferUsage::TransferDst,
                                                 .HostVisible = true,
+                                                .HostReadback = true,
                                                 .DebugName = "PointConstruction.Readback"});
                 ASSERT_TRUE(Readback.IsValid());
                 Kernel().GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(Readback);

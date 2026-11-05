@@ -428,6 +428,12 @@ namespace Extrinsic::Backends::Vulkan
     // FallbackTransferQueue while the device is non-operational.
     export std::uint64_t GetFallbackTransferUploadAttemptCount() noexcept;
 
+    // ARCH-022 Q90: device-local ReadBuffer copies submitted with their copy-to-host barrier, and ReadBuffer calls
+    // whose bytes the CPU read from memory without HOST_CACHED (a host-visible buffer, or the staging of a device-local
+    // one) while the device has a visible, coherent and cached type.
+    export std::uint64_t GetReadBufferHostBarrierCount() noexcept;
+    export std::uint64_t GetUncachedHostReadCount() noexcept;
+
     // Debug breadcrumb for fail-closed non-operational pipeline creation attempts.
     // Increments for every VulkanDevice::CreatePipeline call that returns an
     // invalid handle because the device is non-operational or the global

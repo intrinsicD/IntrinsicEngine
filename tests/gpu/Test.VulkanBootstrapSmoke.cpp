@@ -391,7 +391,7 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         const Extrinsic::RHI::BufferHandle flushDstBuffer = device->CreateBuffer({
             .SizeBytes = sizeof(kHostVisibleFlushPattern),
             .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-            .HostVisible = true,
+            .HostVisible = true, .HostReadback = true,
             .DebugName = "VulkanBootstrapSmoke.HostVisibleWriteFlush.Dst",
         });
         ASSERT_TRUE(flushDstBuffer.IsValid())

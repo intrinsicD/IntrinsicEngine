@@ -3623,18 +3623,7 @@ namespace Extrinsic::Graphics
                                 graphicsContext.BufferBarrier(readbackBuffer,
                                                               RHI::MemoryAccess::TransferWrite,
                                                               RHI::MemoryAccess::TransferWrite);
-                                graphicsContext.TextureBarrier(backbuffer,
-                                                                RHI::TextureLayout::Present,
-                                                                RHI::TextureLayout::TransferSrc);
-                                graphicsContext.CopyTextureToBuffer(backbuffer,
-                                                                    RHI::TextureLayout::TransferSrc,
-                                                                    0u, 0u,
-                                                                    readbackBuffer,
-                                                                    0u,
-                                                                    0u, 0u, 0u, 0u);
-                                graphicsContext.TextureBarrier(backbuffer,
-                                                                RHI::TextureLayout::TransferSrc,
-                                                                RHI::TextureLayout::Present);
+                                RecordBackbufferToHost(graphicsContext, backbuffer, readbackBuffer);
                             };
 
                             if (m_DefaultRecipeReadbackBuffer.IsValid())
@@ -6085,6 +6074,7 @@ namespace Extrinsic::Graphics
                     .SizeBytes   = pickingReadbackBytes,
                     .Usage       = RHI::BufferUsage::TransferDst,
                     .HostVisible = true,
+                    .HostReadback = true,
                     .DebugName   = "Renderer.PickingReadback",
                 });
                 if (pickingReadbackOr.has_value())
@@ -6189,6 +6179,7 @@ namespace Extrinsic::Graphics
                     .SizeBytes   = histogramReadbackBytes,
                     .Usage       = RHI::BufferUsage::TransferDst,
                     .HostVisible = true,
+                    .HostReadback = true,
                     .DebugName   = "Renderer.HistogramReadback",
                 });
                 if (histogramReadbackOr.has_value())
@@ -7153,7 +7144,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] static bool CompatibleBufferDesc(const RHI::BufferDesc& lhs,
                                                        const RHI::BufferDesc& rhs) noexcept
         {
-            return lhs.SizeBytes == rhs.SizeBytes && lhs.Usage == rhs.Usage && lhs.HostVisible == rhs.HostVisible;
+            return lhs.SizeBytes == rhs.SizeBytes && lhs.Usage == rhs.Usage && lhs.HostVisible == rhs.HostVisible &&
+                   lhs.HostReadback == rhs.HostReadback;
         }
 
         struct TransientMemoryBlockCache
@@ -7915,6 +7907,7 @@ namespace Extrinsic::Graphics
                         .SizeBytes = std::uint64_t{4u} * width * height,
                         .Usage = RHI::BufferUsage::TransferDst,
                         .HostVisible = true,
+                        .HostReadback = true,
                         .DebugName = "BackbufferCapture.Readback",
                     });
                     if (!capture.Buffer.IsValid())
@@ -7964,12 +7957,23 @@ namespace Extrinsic::Graphics
             {
                 return; // reallocated before the next frame
             }
-            graphicsContext.TextureBarrier(backbuffer, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc);
-            graphicsContext.CopyTextureToBuffer(backbuffer, RHI::TextureLayout::TransferSrc, 0u, 0u,
-                                                capture.Buffer, 0u, 0u, 0u, 0u, 0u);
-            graphicsContext.TextureBarrier(backbuffer, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present);
+            RecordBackbufferToHost(graphicsContext, backbuffer, capture.Buffer);
+            ++m_LastRenderGraphStats.BackbufferCaptureCopyCount;
             capture.Copied = true;
             capture.IssuedFrame = m_Device->GetGlobalFrameNumber();
+        }
+
+        // The backbuffer copied into a host buffer the CPU reads (the capture and the readback hooks), the backbuffer
+        // back in Present and the copy made visible to the host.
+        void RecordBackbufferToHost(RHI::ICommandContext& graphicsContext, const RHI::TextureHandle backbuffer,
+                                    const RHI::BufferHandle buffer)
+        {
+            graphicsContext.TextureBarrier(backbuffer, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc);
+            graphicsContext.CopyTextureToBuffer(backbuffer, RHI::TextureLayout::TransferSrc, 0u, 0u, buffer, 0u, 0u, 0u,
+                                                0u, 0u);
+            graphicsContext.TextureBarrier(backbuffer, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present);
+            graphicsContext.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::HostRead);
+            ++m_LastRenderGraphStats.BackbufferHostReadBarrierCount;
         }
 
         void DrainCompletedPickingSlots()

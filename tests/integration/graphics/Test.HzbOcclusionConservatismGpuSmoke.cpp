@@ -363,7 +363,7 @@ TEST(HzbOcclusionConservatismGpuSmoke, TwoPhasePredicateMatchesCpuContractOnOper
     Extrinsic::RHI::BufferHandle resultBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
         .SizeBytes = sizeof(HZBSmokeResult) * kCandidates.size(),
         .Usage = Extrinsic::RHI::BufferUsage::Storage | Extrinsic::RHI::BufferUsage::TransferDst,
-        .HostVisible = true,
+        .HostVisible = true, .HostReadback = true,
         .DebugName = "HZBConservatismSmoke.Results",
     });
     if (!candidateBuffer.IsValid() || !resultBuffer.IsValid())

@@ -242,7 +242,7 @@ namespace
             if (PixelBytes < 4u || extent.Width == 0u || extent.Height == 0u) return false;
             PixelCount = std::size_t(extent.Width) * extent.Height;
             Pixels = device.CreateBuffer({.SizeBytes = std::uint64_t(PixelBytes) * PixelCount, .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
-                                          .HostVisible = true, .DebugName = "RUNTIME292.Pixels"});
+                                          .HostVisible = true, .HostReadback = true, .DebugName = "RUNTIME292.Pixels"});
             if (!Pixels.IsValid()) return false;
             Kernel().GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(Pixels);
             return true;

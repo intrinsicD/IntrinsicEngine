@@ -20,7 +20,8 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] bool BufferDescCompatible(const RHI::BufferDesc& a, const RHI::BufferDesc& b)
         {
-            return a.SizeBytes == b.SizeBytes && a.Usage == b.Usage && a.HostVisible == b.HostVisible;
+            return a.SizeBytes == b.SizeBytes && a.Usage == b.Usage && a.HostVisible == b.HostVisible &&
+                   a.HostReadback == b.HostReadback;
         }
     }
 

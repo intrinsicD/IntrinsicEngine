@@ -252,7 +252,7 @@ TEST(CoherentPointDriftPluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWri
                 const auto extent = device.GetBackbufferExtent();
                 pixels = device.CreateBuffer({.SizeBytes = std::uint64_t(Extrinsic::RHI::BytesPerBlock(device.GetBackbufferFormat())) *
                                                            extent.Width * extent.Height,
-                                              .Usage = Extrinsic::RHI::BufferUsage::TransferDst, .HostVisible = true,
+                                              .Usage = Extrinsic::RHI::BufferUsage::TransferDst, .HostVisible = true, .HostReadback = true,
                                               .DebugName = "CoherentPointDrift.Pixels"});
                 h.Engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(pixels);
                 return false;

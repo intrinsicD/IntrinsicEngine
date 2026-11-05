@@ -275,12 +275,16 @@ each array once.
 
 ### CPU-read GPU memory needs a cached type, an asynchronous read and a host-read barrier
 
-The transfer queue's readback slots were uncached (see the VMA lesson). Still open (Q86): CPU-read `HostVisible`
-buffers (picking, histogram, backbuffer capture) get `CPU_TO_GPU|SEQUENTIAL_WRITE` and are read through `ReadBuffer`,
-which waits for device idle; dirty material ranges go through `WriteBuffer` into device-local memory (queue idle);
-`ReadBuffer`'s slow path and the backbuffer capture record no transfer-write to host-read barrier (the transfer
-queue's downloads record it since Q89, `SubmitReadback`). Safeguard: CPU-read
-buffers use a cached host type, reads go through `DownloadBuffer`, the copy is followed by a host-read barrier.
+The transfer queue's readback slots were uncached (see the VMA lesson), and so were the CPU-read `HostVisible` buffers
+(picking, histogram, backbuffer capture: `CPU_TO_GPU|SEQUENTIAL_WRITE` lands in an uncached type on this host's RTX
+4090, shown by a mutation in Q90). Since Q90 those buffers set `BufferDesc::HostReadback`, which allocates like the
+readback slots and `ReadBuffer`'s staging (`HostReadbackAllocationInfo`), and the transfer queue's downloads (Q89),
+`ReadBuffer`'s device-local copy and every backbuffer-to-host copy record a copy-to-host barrier. Still open:
+`ReadBuffer` waits for device idle, and dirty material ranges go through `WriteBuffer` into device-local memory (queue
+idle). Safeguard: CPU-read buffers set `HostReadback` (or use `HostReadbackAllocationInfo` in the backend), reads go
+through `DownloadBuffer`, the copy is followed by a host-read barrier; the counters `ReadbackSlotsUncached`,
+`GetUncachedHostReadCount` (a `ReadBuffer` read from uncached memory, whoever allocated it), `ReadbackHostBarriers`, `GetReadBufferHostBarrierCount` and the renderer's
+`BackbufferHostReadBarrierCount` show it in a GPU smoke.
 
 ### A per-frame wait hides synchronization hazards
 

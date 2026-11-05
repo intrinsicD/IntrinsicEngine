@@ -643,7 +643,10 @@ and fallback-counter stability contract. The backbuffer-to-host readback seam is
 provided by `RHI::ICommandContext::CopyTextureToBuffer` (Vulkan:
 `vkCmdCopyImageToBuffer`) plus `RHI::IDevice::ReadBuffer` (Vulkan:
 `vkDeviceWaitIdle` + `memcpy` from a HostVisible buffer's persistent map, or a
-synchronous one-shot staging-copy round trip for DeviceLocal buffers). The
+synchronous one-shot staging-copy round trip for DeviceLocal buffers, its staging
+in coherent host memory that prefers a cached type and its copy followed by a
+copy-to-host barrier). A HostVisible buffer the CPU reads sets
+`BufferDesc::HostReadback` for the same cached-preferred placement. The
 renderer exposes an opt-in `IRenderer::SetDefaultRecipeBackbufferReadbackBuffer`
 hook that, when armed on an operational device, inserts a
 `Present -> TransferSrc -> CopyTextureToBuffer -> Present` triplet after the
