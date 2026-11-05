@@ -175,3 +175,27 @@ sha256sum`. A reviewer recomputing it got another digest for the same 100 files:
 locale, so the digest depended on who ran it, and the packet's file count (81) had been read from `ls` (top-level
 entries only). Safeguard: a digest over a file list sorts with `LC_ALL=C`, counts files with the same `find` that
 hashes them, and a reviewer's independent recomputation is part of the review.
+
+## VMA's CPU_ONLY usage ignores the host-access flags
+
+ARCH-022 Q82: the transfer queue's readback slots asked for `VMA_MEMORY_USAGE_CPU_ONLY` with
+`VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT`; VMA 3.4 reads the host-access flags only for the `AUTO*` usages, so on
+the RTX 4090 the slots landed in uncached memory (the first HOST_VISIBLE|COHERENT type) and the CPU's copy out of them
+ran at uncached speed. Safeguard: CPU-read staging uses `VMA_MEMORY_USAGE_AUTO_PREFER_HOST` with the random-access flag
+(and HOST_COHERENT required where no host-read barrier is recorded); `TransferQueueDiagnostics::ReadbackSlotsUncached`
+counts slots that missed HOST_CACHED, and the buffer readback smoke asserts it is zero.
+
+## A measurement that stands for the operator's build compares every typed cache entry
+
+ARCH-022 Q83's first packet called the static `build/ci-vulkan` tree equal to the operator's `build/dev` from a diff of
+the BOOL/STRING cache entries; the dev preset's `BUILD_SHARED_LIBS` and `CMAKE_POSITION_INDEPENDENT_CODE` are
+UNINITIALIZED entries, so the diff dropped them, and the shared build (plugins as MODULEs) was missed. Safeguard:
+configure the operator's own preset in a separate tree and diff every typed cache entry; a binary set digest covers
+the executable and every shared object of the tree.
+
+## A frame hook's FrameIndex is not the frame's pacing index
+
+ARCH-022 Q83: a trace that keyed each Maintenance sample by `RuntimeFrameHookContext::FrameIndex` attached every
+frame's pacing to the frame before it: that index counts render extractions and has moved past the frame by
+Maintenance. Safeguard: key per-frame records by `context.Pacing.FrameIndex`; `SandboxKMeansTrace` puts a known 20 ms
+command into one frame and fails if the drain lands in another frame's record.

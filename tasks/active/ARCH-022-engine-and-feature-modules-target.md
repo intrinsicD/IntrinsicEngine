@@ -179,6 +179,10 @@ contract_review: tracker only; each slice declares its own contracts
     display being off (VSync frames ~1 s) and what "it starts" means: "Du darfst xset benutzen (Empfohlen)" (turn the
     displays on with `xset dpms force on` / `xset -dpms` for the measurement and restore afterwards) and
     "Fortschritt im Panel".
+85. (2026-11-05, multiple choice on the measurement boundary both pre-flight reviewers raised: the clock starts at the
+    request's in-process enqueue, the panel's progress is a proxy (the same iteration count, drawn by code one frame
+    later), the button's work before the enqueue is estimated separately from the same agent calls' frames; or build an
+    input simulation that presses the real button) "Ja, so messen (Empfohlen)"
 
 ## Goal
 - Reach the target in
@@ -3589,3 +3593,21 @@ python3 tools/docs/check_doc_links.py --root . --strict
   validity in ranges, running proxy offset, HTML notes, agent init deadline, cleanup, cadence as display gate, DPMS
   level), round 3 on `72b52c07…` "**Verdict: revise required.**" (display probes outside the cleanup), round 4 on
   `a1fa67d4…` verbatim "**Verdict: approve.**".
+- 2026-11-05, Q83 measurement (packet `tasks/evidence/ARCH-022/preflight-q83/`, revision 4, digest `3c2df281…`; Codex
+  thread `01a1ab18-379a-7f40-980c-7960bf4a0ce7` and Claude session `2fbe646f-b230-4b72-a80e-d2b66b90ef76`, round 1
+  blind, rounds 2–3 REVISE (U was the static tree, not the dev preset; identity once; the click/enqueue boundary — the
+  operator decided it, Q85; the idle rule; the pre-enqueue estimate's frame attribution), round 4 verbatim "**PASS** —
+  revision 4, digest `3c2df281…`" (Codex) and "**Verdict: PASS.**" (Claude); start gate: manifest rebuild matched,
+  both trees ready): `q83_run.sh` exit 0, 9 of 9 processes valid. Results (`docs/reports/2026-11-05-arch-022-q83-kmeans-click.md`,
+  audit `tasks/evidence/ARCH-022/q83-audit.md`): in the operator's dev build the start is one frame of 484–488 ms (run 1;
+  350–359 ms in run 2) — Hierarchical seeding 346–352 ms and snapshot preparation 133 ms (run 1) on the main thread —;
+  the panel would draw the first iteration 526–531 ms after the request (381–390 ms in run 2); the frames around the
+  configuration apply the button performs before the enqueue have a 54–56 ms variable tick; idle frames are
+  VSync-bound (6 ms work). Release with and without validation: start 4.0–4.5 ms, first iteration drawn about 100 ms,
+  first preview 333 ms (19 frames; typically three frames per iteration), applied about 1.8 s; validation adds no
+  decision-relevant time. Predictions missed: U idle (CPU-bound predicted), idle work in all cells, U seeding, Release
+  frames per iteration, U readiness frames. Claims review (Codex, fresh thread `01a1aba7-9781-7d43-b38e-b319cf6ef52c`):
+  rounds 1–2 "revise required", round 3 verbatim "**approve**". Displays restored (xset: DPMS Enabled, Off, saver 0 0).
+  Lessons added (VMA CPU_ONLY, typed cache diff, hook FrameIndex). Open for the operator: options B–D (C: seeding off
+  the main thread, fewer host round trips per iteration), the readback copies' missing host-read barrier,
+  `VulkanDevice::ReadBuffer`'s CPU_ONLY staging, GRAPHICS150 and the local SandboxAgentServer failures.
