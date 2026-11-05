@@ -254,6 +254,18 @@ service's `Current` and publications also require the capture's world to be the 
 `CaptureTransform`, the Transform unchanged and the entity unparented; an empty normal name takes the positions alone.
 Tests: `tests/contract/runtime/Test.CoherentPointDriftPlugin.cpp` and the Vulkan smoke
 `tests/integration/graphics/Test.CoherentPointDriftPluginGpuSmoke.cpp`.
+A point scalar method (one value per point, kernel density and point spacing first) runs on the GPU through the
+editing service's scalar analysis: `ScalarAnalysisReadiness` and `StartScalarAnalysis` apply the operation runtime's
+capture checks and GPU admission (float outputs, k <= 63, normal parameters, an operational float64 device) with its
+texts; the run is the shared point-scalar transaction, its own Jobs run with the Accept stage joined (an auto-accept
+run, as MCP starts it, accepts inside that run), and its preview shows until `Accept` or `Discard`. The plugin owns
+one move-only `ScalarAnalysis` per run; destroying it discards the run, so an unload releases the preview without
+publishing; a run ends at once when the service stops using its workspace (`UseEditorWorkspace`,
+`ReleaseEditorWorkspace`), and a run whose workspace detached is discarded at its next `Poll`. `CurrentSession`/`SessionCurrent`
+tell a plugin whether a kept result still belongs to the editor session (the workspace's attachment, which a detach
+and reattach replaces). A waiting MCP tool over such a run passes `WaitForPluginRun` a refresh (it folds `Poll` into
+`Final`) and a cancel (it discards). Tests: `tests/contract/runtime/Test.PointCloudEditing.cpp` and the Vulkan smoke
+`tests/integration/graphics/Test.PointCloudEditingScalarAnalysisGpuSmoke.cpp`.
 
 **Scope (operator, 2026-10-30):** this applies to **every GPU algorithm**, and to every iterative
 algorithm. Existing ones are brought into this form (inventoried in `ARCH-022`'s plan); new ones are

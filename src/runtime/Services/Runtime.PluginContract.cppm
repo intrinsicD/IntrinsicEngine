@@ -149,9 +149,12 @@ export namespace Extrinsic::Runtime
     // An MCP tool's outcome for a started run, whose texts are `text(result)`: the answer when it already ended, else
     // the pending result's text now, a continuation that answers once `Final` is set, and a cancel hook (MCP
     // notifications/cancelled). The answer succeeds when the result's Status is "applied"; any other status is the
-    // error code.
+    // error code. A run its jobs do not finish (a host-driven GPU run) passes `refresh`, which may set `Final` and runs
+    // before each look at it, and `cancel` (true when a cancel was requested) in place of CancelPluginRun.
     template <class Result, class Text>
-    [[nodiscard]] AgentOperationOutcome WaitForPluginRun(const std::shared_ptr<PluginRun<Result>>& run, Text text)
+    [[nodiscard]] AgentOperationOutcome WaitForPluginRun(const std::shared_ptr<PluginRun<Result>>& run, Text text,
+                                                         std::function<void()> refresh = {},
+                                                         std::function<bool()> cancel = {})
     {
         const auto answer = [text](const Result& result)
         {
@@ -159,16 +162,21 @@ export namespace Extrinsic::Runtime
             return AgentOperationOutcome{.IsError = !applied, .Text = text(result),
                                          .ErrorCode = applied ? std::string{} : result.Status};
         };
+        if (refresh) refresh();
         if (run->Final) return answer(*run->Final);
         AgentOperationOutcome outcome{.Text = text(run->Pending)};
-        outcome.Continuation = [run, answer](const AgentOperationContext&, AgentOperationOutcome& result)
+        outcome.Continuation = [run, answer, refresh](const AgentOperationContext&, AgentOperationOutcome& result)
         {
+            if (refresh) refresh();
             if (!run->Final) return false;
             result = answer(*run->Final);
             return true;
         };
-        outcome.Cancel = [run](const AgentOperationContext&)
-        { return std::string{CancelPluginRun(*run) ? "cancel requested" : "the run is not active"}; };
+        outcome.Cancel = [run, cancel](const AgentOperationContext&)
+        {
+            const bool requested = cancel ? cancel() : CancelPluginRun(*run);
+            return std::string{requested ? "cancel requested" : "the run is not active"};
+        };
         return outcome;
     }
 }

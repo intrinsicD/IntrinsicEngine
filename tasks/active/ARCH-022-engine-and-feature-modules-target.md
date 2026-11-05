@@ -3650,3 +3650,27 @@ python3 tools/docs/check_doc_links.py --root . --strict
   178/182 (the four known failures), CPU transfer tests 101/101. Code review (Codex, fresh thread
   `01a1ac23-b123-7f81-8b8d-1bdc6b0f46f2`, diff `72815894…`) verbatim "Correctness verdict: **approve**". Still open:
   `ReadBuffer`'s slow path and the backbuffer capture (no host-read barrier).
+- 2026-11-05, Q89 part 2, plan (kernel density and point spacing as plugins; local copy
+  `tasks/evidence/ARCH-022/q89-plugin-plan.md`, rev 3 sha256 `b16b5180…`): step 1 a resident scalar analysis on
+  `PointCloudEditingService` (readiness and start through `AdmitPointScalarGpu`, the transaction's own Jobs run and
+  auto-accept as the driver, `Discard` as the plugin's cancel, discard when the plugin's handle goes, a session token
+  of attachment epoch and selected workspace for retention); step 2 `plugins/point_spacing`, step 3
+  `plugins/kernel_density`, step 4 ratchet and docs; the test migration per file. Plan review (Codex, gpt-6-astra
+  xhigh, read-only, recursion protection instruction-only; thread `01a1ac27-f5d3-75b1-a9a4-ef1638d61a08`): rev 1
+  verbatim "**Verdict: revise.**" (admission and readiness, RUNTIME-348 retention owner, driver/cancel/lifetime,
+  migration inventory, bounded verification), rev 2 "**Verdict: revise.**" (the session identity missed an in-place
+  detach and reattach), rev 3 verbatim "**Verdict: approve.**".
+- 2026-11-05, Q89 part 2, step 1 (host): `PointCloudEditingService` runs a point scalar method on the GPU —
+  `ScalarAnalysisReadiness`/`StartScalarAnalysis` with the operation runtime's capture checks and `AdmitPointScalarGpu`
+  (texts unchanged), the shared point-scalar transaction as the one Jobs run, a move-only `ScalarAnalysis` handle
+  (`Poll`, `Accept`, `Discard`; destroying it discards; a detach or the service stopping to use the workspace ends
+  it, Detached), the session token `CurrentSession`/`SessionCurrent`; `WaitForPluginRun` takes an optional refresh and
+  cancel. Deviations from the plan, accepted by the reviewer: the auto-accept case is in the Vulkan smoke (the test
+  residency skips the run job that accepts), the Jobs-surface cancel during Accept stays covered by
+  `Test.PointScalarTransaction`. Tests: five new `PointCloudEditing` contract cases, one `PluginHost` case, the Vulkan
+  smoke `PointCloudEditingScalarAnalysisGpuSmoke`; eleven mutations each turn their test red; the PointCloudEditing,
+  PointScalarTransaction, PluginHost and three plugin suites (96) and eleven GPU smokes pass (build/ci-vulkan-release).
+  jscpd: one 9-line test fixture shared with the bilateral smoke, kept (no normals here). Code review (Codex,
+  gpt-6-astra xhigh, read-only sandbox, recursion protection instruction-only; fresh thread
+  `01a1ac4e-c655-7b21-9687-25092befa045`): diff `58284325…` "**Verdict: revise required.**" (a release without a
+  detach left a run publishable; move-assignment untested), diff `d133fdfa…` verbatim "**Verdict: approve.**".

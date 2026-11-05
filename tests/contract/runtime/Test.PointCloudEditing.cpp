@@ -16,6 +16,7 @@
 
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
@@ -38,6 +39,51 @@ namespace
         if (inPlace) request.Output = request.Positions;
         return request;
     }
+
+    // Point spacing's request (method 1) into a float `spacing` beside the samples.
+    R::ScalarAnalysisRequest Analysis(const entt::entity entity, const D domain, std::string output = "spacing")
+    {
+        return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
+                .Positions = {.Domain = domain, .Name = "samples", .ValueKind = Geometry::PropertyValueKind::Vec3},
+                .Output = {.Domain = domain, .Name = std::move(output), .ValueKind = Geometry::PropertyValueKind::Float},
+                .Params = {.Method = 1, .K = 2, .Scale = 1.f},
+                .Noun = "Radii",
+                .Method = "Point spacing",
+                .History = "Estimate point spacing and radii"};
+    }
+
+    // The readiness once the asynchronous input validation answered.
+    std::string Ready(Harness& harness, const R::ScalarAnalysisRequest& request, const R::ScalarAnalysisBackend backend)
+    {
+        std::string reason;
+        (void)harness.Settled(
+            [&]
+            {
+                reason = harness.Editing().ScalarAnalysisReadiness(request, backend);
+                return reason.find("Wait for input validation") == std::string::npos;
+            });
+        return reason;
+    }
+
+    // A test residency (no device work): runs over given values, captured as a CPU run is.
+    struct ScalarRuns
+    {
+        Extrinsic::Tests::MockDevice Device{};
+        Extrinsic::Graphics::GpuPropertyResidency Residency{Device};
+        ScalarRuns() { Device.TransferQueue.AcceptBufferUploads = true; }
+        R::ScalarAnalysis Start(Harness& harness, const entt::entity entity, const D domain, const float value,
+                                R::ScalarAnalysisRefusal& refusal, std::string output = "spacing")
+        {
+            std::vector<float> values(PointDomainProperties(harness.Scene(), entity, domain).Size(), value);
+            return harness.Editing().StartScalarAnalysisForTest(Analysis(entity, domain, std::move(output)),
+                                                                std::move(values), Residency, refusal);
+        }
+        bool HasRing(Harness& harness, const entt::entity entity, const D domain, std::string output = "spacing")
+        {
+            return Residency.HasRing(R::MakeGpuPropertyKey(harness.Engine.ActiveWorld(), entity,
+                                                           Analysis(entity, domain, std::move(output)).Output));
+        }
+    };
 }
 
 TEST(PointCloudEditing, EveryDomainPublishesLiveRowsWithUndoCopyAndInPlace)
@@ -422,4 +468,185 @@ TEST(PointCloudEditing, ACaptureOfADestroyedWorldIsStaleWithoutReadingIt)
     const std::vector<std::vector<float>> column{std::vector<float>(harness.Editing().View(*scalars).LiveCount, 1.f)};
     EXPECT_EQ(harness.Editing().PublishScalars(*scalars, column, "Scalars"), R::PointPublishStatus::Stale);
     EXPECT_FALSE(harness.Editing().Current(*scalars));
+}
+
+// ARCH-022 Q89: a point scalar method's readiness and GPU start run the capture stage and the GPU admission of the
+// operation runtime, with its texts: the CPU takes any scalar output and any k; the GPU refuses a non-float output,
+// k > 63 and a subnormal parameter, and without a float64 device; readiness and a refused start leave nothing behind.
+TEST(PointCloudEditing, AScalarAnalysisIsAdmittedAsTheOperationRuntimeAdmitsIt)
+{
+    using B = R::ScalarAnalysisBackend;
+    Harness harness{};
+    const auto entity = Make(harness.Scene(), D::PointCloudPoint);
+    harness.Frame(60);
+    const auto refused = [&](const R::ScalarAnalysisRequest& request)
+    {
+        R::ScalarAnalysisRefusal refusal;
+        EXPECT_FALSE(harness.Editing().StartScalarAnalysis(request, true, refusal));
+        EXPECT_FALSE(refusal.Busy);
+        return refusal.Message;
+    };
+    auto wide = Analysis(entity, D::PointCloudPoint);
+    wide.Output.ValueKind = Geometry::PropertyValueKind::Double;
+    EXPECT_EQ(Ready(harness, wide, B::CpuReference), "");
+    EXPECT_EQ(Ready(harness, wide, B::CpuIndex), "");
+    const std::string floatOnly =
+        "Vulkan scalar analysis supports float outputs only; select the CPU backend for other scalar storage.";
+    EXPECT_EQ(Ready(harness, wide, B::Gpu), floatOnly);
+    EXPECT_EQ(refused(wide), floatOnly);
+    auto many = Analysis(entity, D::PointCloudPoint);
+    many.Params.K = 64;
+    const std::string parameters = "Vulkan scalar analysis requires k<=63 and normal or zero parameters.";
+    EXPECT_EQ(Ready(harness, many, B::CpuIndex), "");
+    EXPECT_EQ(Ready(harness, many, B::Gpu), parameters);
+    EXPECT_EQ(refused(many), parameters);
+    auto tiny = Analysis(entity, D::PointCloudPoint);
+    tiny.Params.Scale = std::numeric_limits<float>::denorm_min();
+    EXPECT_EQ(Ready(harness, tiny, B::Gpu), parameters);
+    const std::string device =
+        "Vulkan scalar analysis requires an operational float64 device and framed spatial cache/jobs.";
+    EXPECT_EQ(Ready(harness, Analysis(entity, D::PointCloudPoint), B::Gpu), device) << "no device here";
+    EXPECT_EQ(refused(Analysis(entity, D::PointCloudPoint)), device);
+    auto stale = Analysis(entity, D::PointCloudPoint);
+    stale.StableEntityId = 999999u;
+    EXPECT_EQ(Ready(harness, stale, B::CpuReference), "Radii target entity is stale or missing.");
+    EXPECT_EQ(refused(stale), "Radii target entity is stale or missing.");
+    EXPECT_FALSE(PointDomainProperties(harness.Scene(), entity, D::PointCloudPoint).Exists("spacing"));
+    EXPECT_FALSE(harness.History().CanUndo());
+    for (const auto& job : harness.Engine.Jobs().SnapshotAll())
+        EXPECT_EQ(job.DebugName.find("scalar"), std::string::npos) << "queued: " << job.DebugName;
+}
+
+// Accept publishes the preview once, as one undo entry; Discard (also while Accept waits for its stage) leaves the
+// output and the history as they were; a second start on the output is busy until the first ends.
+TEST(PointCloudEditing, AScalarAnalysisAcceptsOnceAndDiscardsWithoutATrace)
+{
+    using P = R::ScalarAnalysisPhase;
+    Harness harness{};
+    ScalarRuns runs;
+    const auto entity = Make(harness.Scene(), D::PointCloudPoint);
+    harness.Frame(60);
+    auto& props = PointDomainProperties(harness.Scene(), entity, D::PointCloudPoint);
+    R::ScalarAnalysisRefusal refusal;
+    auto run = runs.Start(harness, entity, D::PointCloudPoint, 3.f, refusal);
+    ASSERT_TRUE(run) << refusal.Message;
+    EXPECT_EQ(run.Poll().Phase, P::ReadyToAccept);
+    EXPECT_TRUE(run.Poll().CanAccept);
+    EXPECT_TRUE(runs.HasRing(harness, entity, D::PointCloudPoint)) << "the preview is resident";
+    auto second = runs.Start(harness, entity, D::PointCloudPoint, 5.f, refusal);
+    EXPECT_FALSE(second);
+    EXPECT_TRUE(refusal.Busy) << refusal.Message;
+    EXPECT_EQ(run.Accept().Phase, P::Accepting);
+    harness.Frame(3);
+    EXPECT_EQ(run.Poll().Phase, P::Applied);
+    ASSERT_TRUE(props.Exists("spacing"));
+    EXPECT_EQ(std::as_const(props).Get<float>("spacing").Vector(), std::vector<float>(props.Size(), 3.f));
+    EXPECT_EQ(harness.History().UndoCount(), 1u);
+    EXPECT_NE(run.Accept().Phase, P::Accepting) << "an applied run is not accepted again";
+    harness.Frame(3);
+    EXPECT_EQ(harness.History().UndoCount(), 1u);
+
+    auto discarded = runs.Start(harness, entity, D::PointCloudPoint, 7.f, refusal);
+    ASSERT_TRUE(discarded) << refusal.Message;
+    discarded.Discard();
+    EXPECT_EQ(discarded.Poll().Phase, P::Discarded);
+    EXPECT_FALSE(runs.HasRing(harness, entity, D::PointCloudPoint));
+    auto accepting = runs.Start(harness, entity, D::PointCloudPoint, 9.f, refusal);
+    ASSERT_TRUE(accepting) << refusal.Message;
+    ASSERT_EQ(accepting.Accept().Phase, P::Accepting);
+    accepting.Discard(); // the plugin's cancel, before the Accept stage ran
+    harness.Frame(3);
+    EXPECT_EQ(accepting.Poll().Phase, P::Discarded);
+    EXPECT_EQ(std::as_const(props).Get<float>("spacing").Vector(), std::vector<float>(props.Size(), 3.f));
+    EXPECT_EQ(harness.History().UndoCount(), 1u);
+}
+
+// The owner's lifetime bounds the preview: the last handle going discards the run; a run whose workspace detached is
+// discarded at its next poll and publishes nothing.
+TEST(PointCloudEditing, AScalarAnalysisEndsWithItsHandleAndWithItsWorkspace)
+{
+    using P = R::ScalarAnalysisPhase;
+    Harness harness{};
+    ScalarRuns runs;
+    const auto entity = Make(harness.Scene(), D::PointCloudPoint);
+    harness.Frame(60);
+    R::ScalarAnalysisRefusal refusal;
+    {
+        auto run = runs.Start(harness, entity, D::PointCloudPoint, 3.f, refusal);
+        ASSERT_TRUE(run) << refusal.Message;
+        auto moved = std::move(run);
+        EXPECT_TRUE(runs.HasRing(harness, entity, D::PointCloudPoint));
+        auto other = runs.Start(harness, entity, D::PointCloudPoint, 4.f, refusal, "other");
+        ASSERT_TRUE(other) << refusal.Message;
+        moved = std::move(other); // the run `moved` held goes; the incoming one stays usable
+        EXPECT_FALSE(runs.HasRing(harness, entity, D::PointCloudPoint));
+        EXPECT_TRUE(runs.HasRing(harness, entity, D::PointCloudPoint, "other"));
+        EXPECT_EQ(moved.Poll().Phase, P::ReadyToAccept);
+    }
+    EXPECT_FALSE(runs.HasRing(harness, entity, D::PointCloudPoint, "other")) << "the handle went: the preview with it";
+    auto accepting = runs.Start(harness, entity, D::PointCloudPoint, 5.f, refusal);
+    ASSERT_TRUE(accepting) << refusal.Message;
+    ASSERT_EQ(accepting.Accept().Phase, P::Accepting);
+    harness.Editing().ReleaseEditorWorkspace(harness.Shell);
+    harness.Shell.Detach();
+    const auto state = accepting.Poll();
+    EXPECT_TRUE(state.Detached);
+    EXPECT_EQ(state.Phase, P::Discarded);
+    EXPECT_FALSE(state.CanAccept);
+    harness.Frame(3);
+    EXPECT_FALSE(PointDomainProperties(harness.Scene(), entity, D::PointCloudPoint).Exists("spacing"));
+    EXPECT_FALSE(runs.HasRing(harness, entity, D::PointCloudPoint));
+}
+
+// The service stopping to use a workspace (the Sandbox shell releasing it, still attached) ends that workspace's
+// runs at once, also one whose Accept waits for its stage: nothing is published, the preview goes.
+TEST(PointCloudEditing, AScalarAnalysisEndsWhenTheServiceReleasesItsWorkspace)
+{
+    using P = R::ScalarAnalysisPhase;
+    Harness harness{};
+    ScalarRuns runs;
+    const auto entity = Make(harness.Scene(), D::PointCloudPoint);
+    harness.Frame(60);
+    R::ScalarAnalysisRefusal refusal;
+    auto ready = runs.Start(harness, entity, D::PointCloudPoint, 3.f, refusal);
+    ASSERT_TRUE(ready) << refusal.Message;
+    auto accepting = runs.Start(harness, entity, D::PointCloudPoint, 5.f, refusal, "other");
+    ASSERT_TRUE(accepting) << refusal.Message;
+    ASSERT_EQ(accepting.Accept().Phase, P::Accepting);
+    harness.Editing().ReleaseEditorWorkspace(harness.Shell); // the shell stays attached
+    harness.Frame(3);
+    for (auto* run : {&ready, &accepting})
+    {
+        const auto state = run->Poll();
+        EXPECT_TRUE(state.Detached);
+        EXPECT_EQ(state.Phase, P::Discarded);
+        EXPECT_FALSE(state.CanAccept);
+    }
+    EXPECT_NE(ready.Accept().Phase, P::Accepting);
+    harness.Frame(3);
+    const auto& props = PointDomainProperties(harness.Scene(), entity, D::PointCloudPoint);
+    EXPECT_FALSE(props.Exists("spacing"));
+    EXPECT_FALSE(props.Exists("other"));
+    EXPECT_FALSE(harness.History().CanUndo());
+    EXPECT_FALSE(runs.HasRing(harness, entity, D::PointCloudPoint));
+    EXPECT_FALSE(runs.HasRing(harness, entity, D::PointCloudPoint, "other"));
+}
+
+// A session ends when the workspace's attachment does, also when the same workspace detaches and attaches again in
+// place without another UseEditorWorkspace, and when the service releases the workspace.
+TEST(PointCloudEditing, ASessionEndsWithItsAttachmentAndItsWorkspace)
+{
+    Harness harness{};
+    const auto before = harness.Editing().CurrentSession();
+    EXPECT_TRUE(harness.Editing().SessionCurrent(before));
+    harness.Shell.Detach();
+    EXPECT_FALSE(harness.Editing().SessionCurrent(before));
+    harness.Shell.Attach(harness.Engine.Worlds(), harness.Engine.Services());
+    (void)R::PrepareEditorWorkspaceSnapshotFrame(harness.Shell);
+    EXPECT_FALSE(harness.Editing().SessionCurrent(before)) << "the same workspace, a new attachment";
+    const auto after = harness.Editing().CurrentSession();
+    EXPECT_TRUE(harness.Editing().SessionCurrent(after));
+    harness.Editing().ReleaseEditorWorkspace(harness.Shell);
+    EXPECT_FALSE(harness.Editing().SessionCurrent(after)) << "the service uses its own workspace again";
+    EXPECT_TRUE(harness.Editing().SessionCurrent(harness.Editing().CurrentSession()));
 }

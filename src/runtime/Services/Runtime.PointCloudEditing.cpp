@@ -46,6 +46,7 @@ import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.PointScalarTransaction;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -56,6 +57,7 @@ import Extrinsic.Runtime.WorldRegistry;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 namespace Extrinsic::Runtime
@@ -91,6 +93,8 @@ namespace Extrinsic::Runtime
     struct PointCloudEditingService::Impl
     {
         EditorWorkspaceSlot Workspace{};
+        // The scalar runs started here (owned by their handles), ended when their workspace stops being used.
+        std::vector<std::weak_ptr<ScalarAnalysis::Run>> ScalarRuns{};
 
         // With CaptureTransform: the entity is still unparented and its local Transform as captured (or still none).
         static bool TransformCurrent(const PointEdit& edit)
@@ -126,14 +130,18 @@ namespace Extrinsic::Runtime
     PointCloudEditingService::PointCloudEditingService() : m_Impl(std::make_unique<Impl>()) {}
     PointCloudEditingService::~PointCloudEditingService() = default;
 
+    void EndScalarRunsOutside(std::vector<std::weak_ptr<ScalarAnalysis::Run>>& runs, const void* workspace) noexcept;
+
     void PointCloudEditingService::UseEditorWorkspace(EditorWorkspaceAttachment& workspace) noexcept
     {
         m_Impl->Workspace.Use(workspace);
+        EndScalarRunsOutside(m_Impl->ScalarRuns, m_Impl->Workspace.Current());
     }
 
     void PointCloudEditingService::ReleaseEditorWorkspace(const EditorWorkspaceAttachment& workspace) noexcept
     {
         m_Impl->Workspace.Release(workspace);
+        EndScalarRunsOutside(m_Impl->ScalarRuns, m_Impl->Workspace.Current());
     }
 
     std::shared_ptr<PointEdit> PointCloudEditingService::Capture(const PointEditRequest& request,
@@ -551,6 +559,203 @@ namespace Extrinsic::Runtime
                                                       minimumLiveCount);
         if (domain) std::erase_if(catalog.Entries, [&](const auto& entry) { return entry.Ref.Domain != *domain; });
         return catalog;
+    }
+
+    struct ScalarAnalysis::Run
+    {
+        EditorPointScalarTransactionHandle Transaction{};
+        std::function<bool()> AttachmentActive{}; // the attachment the run was started in
+        const void* Workspace{nullptr};           // the workspace the service used then
+        bool Released{false};                     // the service stopped using that workspace
+    };
+
+    // Discards every live run started in another workspace than `workspace` (the one the service uses now).
+    void EndScalarRunsOutside(std::vector<std::weak_ptr<ScalarAnalysis::Run>>& runs, const void* workspace) noexcept
+    {
+        std::erase_if(runs, [workspace](const std::weak_ptr<ScalarAnalysis::Run>& weak)
+        {
+            const auto run = weak.lock();
+            if (!run) return true;
+            if (run->Workspace == workspace) return false;
+            run->Released = true;
+            DiscardEditorPointScalar({}, run->Transaction);
+            return true;
+        });
+    }
+
+    namespace
+    {
+        // The checks of a point scalar method's capture stage, in the operation runtime's order and with its texts
+        // (`OperationRuntime::Capture`); `copyValues` as an execution captures. Empty: the capture can run.
+        std::string CaptureScalarAnalysis(const EditorProcessingContext& context, const ScalarAnalysisRequest& request,
+                                          const ScalarAnalysisBackend backend, const bool copyValues,
+                                          Detail::PointScalarCapture& capture, entt::entity& entity,
+                                          GeometryPropertyRef& positions)
+        {
+            if (context.Scene == nullptr) return "Scene is unavailable.";
+            const auto resolved = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), request.StableEntityId);
+            if (!resolved) return request.Noun + " target entity is stale or missing.";
+            entity = *resolved;
+            const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
+            positions = request.Positions;
+            auto output = request.Output;
+            std::string why;
+            if (!Detail::CapturePointScalarField(context, entity, a, positions, output, request.Noun, copyValues,
+                                                 capture, why))
+                return why;
+            if (capture.LiveCount < 2u) return request.Method + " requires at least two live samples.";
+            if (backend != ScalarAnalysisBackend::CpuReference &&
+                (context.SpatialIndices == nullptr || !capture.ValidLbvh || capture.LiveCount > (1u << 24)))
+                return "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.";
+            if (backend == ScalarAnalysisBackend::Gpu && !Detail::AdmitPointScalarGpu(context, capture, request.Params, why))
+                return why;
+            return {};
+        }
+
+        ScalarAnalysisPhase PhaseOf(const EditorGpuTransactionPhase phase)
+        {
+            switch (phase)
+            {
+            case EditorGpuTransactionPhase::Running: return ScalarAnalysisPhase::Running;
+            case EditorGpuTransactionPhase::ReadyToAccept: return ScalarAnalysisPhase::ReadyToAccept;
+            case EditorGpuTransactionPhase::Accepting: return ScalarAnalysisPhase::Accepting;
+            case EditorGpuTransactionPhase::Applied: return ScalarAnalysisPhase::Applied;
+            case EditorGpuTransactionPhase::Discarded: return ScalarAnalysisPhase::Discarded;
+            case EditorGpuTransactionPhase::Failed: break;
+            }
+            return ScalarAnalysisPhase::Failed;
+        }
+
+        ScalarAnalysis StartScalarRun(const EditorProcessingContext& context, const ScalarAnalysisRequest& request,
+                                      const void* workspace, std::vector<std::weak_ptr<ScalarAnalysis::Run>>& runs,
+                                      const bool autoAccept,
+                                      Graphics::GpuPropertyResidency* testResidency, std::vector<float> testValues,
+                                      ScalarAnalysisRefusal& refusal)
+        {
+            refusal = {};
+            auto capture = std::make_shared<Detail::PointScalarCapture>();
+            entt::entity entity{};
+            GeometryPropertyRef positions{};
+            // A test run is captured as a CPU run is (no device to admit it).
+            refusal.Message = CaptureScalarAnalysis(
+                context, request, testResidency ? ScalarAnalysisBackend::CpuReference : ScalarAnalysisBackend::Gpu,
+                true, *capture, entity, positions);
+            if (!refusal.Message.empty()) return {};
+            if (testResidency)
+            {
+                if (testValues.size() != capture->SlotCount)
+                {
+                    refusal.Message = "Test values must give one value per slot.";
+                    return {};
+                }
+                capture->AfterValues = std::move(testValues);
+            }
+            EditorPointScalarTransactionSnapshot state;
+            auto transaction = Detail::StartPointScalarGpu(context, capture, entity, request.StableEntityId, positions,
+                                                           request.Params, request.History, request.Noun + " estimation",
+                                                           state, {}, autoAccept, testResidency);
+            if (!transaction)
+            {
+                refusal = {.Message = std::move(state.Message), .Busy = state.OutputBusy};
+                return {};
+            }
+            auto run = std::make_shared<ScalarAnalysis::Run>(std::move(transaction), context.AttachmentActive, workspace);
+            std::erase_if(runs, [](const auto& weak) { return weak.expired(); });
+            runs.push_back(run);
+            return ScalarAnalysis{std::move(run)};
+        }
+    }
+
+    ScalarAnalysis::ScalarAnalysis() noexcept = default;
+    ScalarAnalysis::ScalarAnalysis(std::shared_ptr<Run> run) noexcept : m_Run(std::move(run)) {}
+    ScalarAnalysis::ScalarAnalysis(ScalarAnalysis&&) noexcept = default;
+    ScalarAnalysis& ScalarAnalysis::operator=(ScalarAnalysis&& other) noexcept
+    {
+        if (this != &other)
+        {
+            Discard(); // the run this handle held goes with it
+            m_Run = std::move(other.m_Run);
+        }
+        return *this;
+    }
+    ScalarAnalysis::~ScalarAnalysis() { Discard(); }
+
+    void ScalarAnalysis::Discard()
+    {
+        // A no-op once the run ended or while its Accept publishes.
+        if (m_Run) DiscardEditorPointScalar({}, m_Run->Transaction);
+    }
+
+    ScalarAnalysisState ScalarAnalysis::Poll()
+    {
+        if (!m_Run) return {.Message = "No scalar analysis."};
+        const bool detached = m_Run->Released || (m_Run->AttachmentActive && !m_Run->AttachmentActive());
+        if (detached) Discard();
+        const auto s = SnapshotEditorPointScalar({}, m_Run->Transaction);
+        return {.Phase = PhaseOf(s.Phase),
+                .Message = s.Message,
+                .AcceptRefusal = s.AcceptRefusalReason,
+                .CanAccept = s.CanAccept && !detached,
+                .Stale = s.Status == EditorCommandStatus::StaleEntity,
+                .Detached = detached,
+                .IndexReused = s.IndexReused,
+                .LiveCount = s.LiveCount,
+                .GpuInputUploadBytes = s.GpuInputUploadBytes,
+                .GpuInputCacheHits = s.GpuInputCacheHits,
+                .CpuStageReadbackBytes = s.CpuStageReadbackBytes,
+                .GpuQueryBatches = s.GpuQueryBatches,
+                .Statistics = s.Statistics};
+    }
+
+    ScalarAnalysisState ScalarAnalysis::Accept()
+    {
+        if (!m_Run) return {.Message = "No scalar analysis."};
+        if (m_Run->Released || (m_Run->AttachmentActive && !m_Run->AttachmentActive())) return Poll();
+        const auto accepted = AcceptEditorPointScalar({}, m_Run->Transaction);
+        auto state = Poll();
+        if (state.Phase == ScalarAnalysisPhase::ReadyToAccept) state.Message = accepted.Message; // refused: why
+        return state;
+    }
+
+    std::string PointCloudEditingService::ScalarAnalysisReadiness(const ScalarAnalysisRequest& request,
+                                                                  const ScalarAnalysisBackend backend)
+    {
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
+        Detail::PointScalarCapture capture;
+        entt::entity entity{};
+        GeometryPropertyRef positions{};
+        return CaptureScalarAnalysis(EditorProcessingCommandsAccess::Resolve(commands), request, backend, false, capture,
+                                     entity, positions);
+    }
+
+    ScalarAnalysis PointCloudEditingService::StartScalarAnalysis(const ScalarAnalysisRequest& request,
+                                                                 const bool autoAccept, ScalarAnalysisRefusal& refusal)
+    {
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
+        return StartScalarRun(EditorProcessingCommandsAccess::Resolve(commands), request, m_Impl->Workspace.Current(),
+                              m_Impl->ScalarRuns, autoAccept, nullptr, {}, refusal);
+    }
+
+    ScalarAnalysis PointCloudEditingService::StartScalarAnalysisForTest(const ScalarAnalysisRequest& request,
+                                                                        std::vector<float> values,
+                                                                        Graphics::GpuPropertyResidency& residency,
+                                                                        ScalarAnalysisRefusal& refusal)
+    {
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
+        return StartScalarRun(EditorProcessingCommandsAccess::Resolve(commands), request, m_Impl->Workspace.Current(),
+                              m_Impl->ScalarRuns, false, &residency, std::move(values), refusal);
+    }
+
+    PointSession PointCloudEditingService::CurrentSession()
+    {
+        const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
+        return {.Active = EditorProcessingCommandsAccess::Resolve(commands).AttachmentActive,
+                .Workspace = m_Impl->Workspace.Current()};
+    }
+
+    bool PointCloudEditingService::SessionCurrent(const PointSession& session) const
+    {
+        return session.Active && session.Active() && session.Workspace == m_Impl->Workspace.Current();
     }
 
     bool PointPropertyCombo(const char* label, GeometryPropertyRef& ref, const GeometryPropertyCatalogSnapshot& catalog)

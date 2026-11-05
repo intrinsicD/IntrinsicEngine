@@ -17,7 +17,7 @@ namespace Intrinsic::Tests::Plugins
     {
     public:
         std::function<bool()> Step{};
-        Harness* Owner{nullptr};
+        R::EditorWorkspaceAttachment* Shell{nullptr}; // the harness's shell workspace
         bool Done{false}, TimedOut{false};
 
     protected:
@@ -30,8 +30,8 @@ namespace Intrinsic::Tests::Plugins
                 Kernel().RequestExit();
                 return;
             }
-            if (Owner == nullptr || !Step || !Kernel().GetDevice().IsOperational()) return;
-            (void)R::PrepareEditorWorkspaceSnapshotFrame(Owner->Shell); // as the Sandbox shell does every frame
+            if (Shell == nullptr || !Step || !Kernel().GetDevice().IsOperational()) return;
+            (void)R::PrepareEditorWorkspaceSnapshotFrame(*Shell); // as the Sandbox shell does every frame
             if (Step())
             {
                 Done = true;
@@ -54,7 +54,8 @@ namespace Intrinsic::Tests::Plugins
         return config;
     }
 
-    // `PluginHarness` is the plugin's harness type, constructible from (config, application).
+    // `PluginHarness` is the plugin's harness type (or the editing harness alone), constructible from (config,
+    // application), with a `Shell` workspace.
     template <class PluginHarness>
     struct Gpu
     {
@@ -66,7 +67,7 @@ namespace Intrinsic::Tests::Plugins
             auto app = std::make_unique<GpuScenario>();
             App = app.get();
             H = std::make_unique<PluginHarness>(VulkanConfig(), std::move(app));
-            App->Owner = H.get();
+            App->Shell = &H->Shell;
         }
         bool Run(std::function<bool()> step)
         {

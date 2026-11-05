@@ -1626,3 +1626,33 @@ TEST(PluginHost, TheWaitingToolAnswersAtOnceOrWhenTheRunEnds)
     EXPECT_EQ(result.ErrorCode, "stale");
     EXPECT_EQ(waiting.Cancel({}), "the run is not active") << "a run without a job";
 }
+
+// ARCH-022 Q89: a run its jobs do not finish (a host-driven GPU run) folds its state into Final through `refresh`,
+// before every look at it, and ends through its own `cancel`.
+TEST(PluginHost, TheWaitingToolRefreshesAHostDrivenRunAndCancelsItThroughItsHook)
+{
+    const auto run = std::make_shared<Runtime::PluginRun<RunResult>>(Runtime::PluginRun<RunResult>{.Pending = {"pending"}});
+    bool ended = false, cancelled = false;
+    unsigned refreshes = 0;
+    const auto refresh = [&]
+    {
+        ++refreshes;
+        if (ended) run->Final = RunResult{"applied"};
+    };
+    auto outcome = Runtime::WaitForPluginRun(run, &RunText, refresh, [&] { return !std::exchange(cancelled, true); });
+    EXPECT_EQ(refreshes, 1u) << "refreshed before the first answer";
+    EXPECT_EQ(outcome.Text, "pending");
+    ASSERT_TRUE(outcome.Continuation);
+    Runtime::AgentOperationOutcome result{};
+    EXPECT_FALSE(outcome.Continuation({}, result));
+    ended = true;
+    EXPECT_TRUE(outcome.Continuation({}, result)) << "the refresh set Final";
+    EXPECT_EQ(result.Text, "applied");
+    EXPECT_FALSE(result.IsError);
+    EXPECT_EQ(outcome.Cancel({}), "cancel requested") << "the hook, not CancelPluginRun (the run has no job)";
+    EXPECT_EQ(outcome.Cancel({}), "the run is not active");
+    const auto settled = std::make_shared<Runtime::PluginRun<RunResult>>();
+    const auto immediate = Runtime::WaitForPluginRun(settled, &RunText, [&] { settled->Final = RunResult{"stale"}; });
+    EXPECT_EQ(immediate.ErrorCode, "stale") << "a refresh that ends the run answers at once";
+    EXPECT_FALSE(immediate.Continuation);
+}

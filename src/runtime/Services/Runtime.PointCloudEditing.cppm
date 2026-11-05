@@ -1,12 +1,13 @@
 // ARCH-022: point-cloud edits for plugins. Captures an entity's live points and normals, gives neighbourhood rows
 // (k nearest or within a radius) on the CPU or the GPU, and publishes new positions into a vec3 output, or values
-// into several scalar outputs, with one undo entry. It wraps the
-// editor's shared point helpers, so a plugin imports no editor module, and it holds no plugin callable: undo
-// entries hold host data, so they work after the plugin that recorded them is unloaded.
+// into several scalar outputs, with one undo entry; or runs a point scalar method on the GPU with a resident preview
+// until Accept or Discard. It wraps the editor's shared point helpers, so a plugin imports no editor module, and it
+// holds no plugin callable: undo entries hold host data, so they work after the plugin that recorded them is unloaded.
 module;
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -22,6 +23,8 @@ export module Extrinsic.Runtime.PointCloudEditing;
 export import Extrinsic.Runtime.GeometryAvailability;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.PointLBVH;
+export import Extrinsic.Graphics.PointScalarAnalysis;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.ModuleLifecycle;
 
@@ -81,6 +84,76 @@ export namespace Extrinsic::Runtime
     // Busy: not now (no free ring slot, or another result holds the ring); a later call may show it.
     enum class PointPreviewStatus : std::uint8_t { Shown, Busy, Unavailable };
 
+    // A point scalar method (one value per point into one scalar output), named as its definition names it: `Noun`
+    // ("Radii") names the output, the target and the Jobs row ("<Noun> estimation"), `Method` ("Point spacing") its
+    // sample requirement, `History` the undo entry of a GPU run. `Params` are the device kernel's.
+    struct ScalarAnalysisRequest
+    {
+        std::uint32_t StableEntityId{0u};
+        GeometryPropertyRef Positions{};
+        GeometryPropertyRef Output{}; // any scalar kind on the CPU; the GPU writes float outputs only
+        Graphics::PointScalarGpuParams Params{};
+        std::string Noun{}, Method{}, History{};
+    };
+    // Where the method runs: the readiness differs (the CPU index and the device have limits).
+    enum class ScalarAnalysisBackend : std::uint8_t { CpuReference, CpuIndex, Gpu };
+    enum class ScalarAnalysisPhase : std::uint8_t { Running, ReadyToAccept, Accepting, Applied, Discarded, Failed };
+
+    struct ScalarAnalysisState
+    {
+        ScalarAnalysisPhase Phase{ScalarAnalysisPhase::Failed};
+        std::string Message{}, AcceptRefusal{};
+        bool CanAccept{false};
+        bool Stale{false};    // it ended because an input or the output changed
+        bool Detached{false}; // its workspace detached: discarded, nothing published
+        bool IndexReused{false};
+        std::size_t LiveCount{0u};
+        std::uint64_t GpuInputUploadBytes{0u}, GpuInputCacheHits{0u}, CpuStageReadbackBytes{0u};
+        std::uint32_t GpuQueryBatches{0u};
+        Graphics::PointScalarGpuStats Statistics{};
+    };
+
+    // A refused start: why, and whether another run owns the output (then that run's result answers, not this one).
+    struct ScalarAnalysisRefusal
+    {
+        std::string Message{};
+        bool Busy{false};
+    };
+
+    // One GPU run of a point scalar method (main thread). Its own Jobs run drives it, with the Accept stage joined
+    // to it; the Jobs window's cancel ends it there. Move-only: destroying it discards a run that has not ended
+    // (an Accept already publishing finishes), so the owner's lifetime bounds the preview. It also ends, Detached,
+    // when its workspace detaches or the service stops using that workspace (UseEditorWorkspace, Release).
+    class ScalarAnalysis
+    {
+    public:
+        struct Run;
+        ScalarAnalysis() noexcept;
+        explicit ScalarAnalysis(std::shared_ptr<Run> run) noexcept;
+        ScalarAnalysis(ScalarAnalysis&&) noexcept;
+        ScalarAnalysis& operator=(ScalarAnalysis&&) noexcept;
+        ~ScalarAnalysis();
+        [[nodiscard]] explicit operator bool() const noexcept { return m_Run != nullptr; }
+
+        // The run's state now. After its workspace detached it is discarded here (Detached).
+        [[nodiscard]] ScalarAnalysisState Poll();
+        // Publishes the preview into the output, as one undo entry, once its readback landed (Accepting until then);
+        // refused with the reason while it is not ready or an input changed.
+        ScalarAnalysisState Accept();
+        // Releases the preview; the output and the history stay unchanged.
+        void Discard();
+
+    private:
+        std::shared_ptr<Run> m_Run; // the only owner; the service keeps a weak reference to end it
+    };
+
+    // The editor session a result belongs to: the workspace the service used and that workspace's attachment.
+    struct PointSession
+    {
+        std::function<bool()> Active{};
+        const void* Workspace{nullptr};
+    };
+
     // A plugin window's picker over an InputCatalog (ImGui, the host's context): true when the choice changed `ref`;
     // a `ref` the catalog does not list stays as it is.
     bool PointPropertyCombo(const char* label, GeometryPropertyRef& ref, const GeometryPropertyCatalogSnapshot& catalog);
@@ -135,6 +208,25 @@ export namespace Extrinsic::Runtime
         // none, as one undo entry named `label`. Deleted slots keep their values.
         [[nodiscard]] PointPublishStatus PublishScalars(PointEdit& edit, std::span<const std::vector<float>> columns,
                                                         std::string label);
+        // Main thread, side-effect free: empty when the method can run on `backend`, else why (the target, the
+        // capture, fewer than two live samples, the LBVH limits; on the GPU its admission: a float output, normal
+        // coordinates and parameters, k <= 63 for methods 0 and 1, row and workspace limits, an operational float64
+        // device with the framed spatial cache and jobs).
+        [[nodiscard]] std::string ScalarAnalysisReadiness(const ScalarAnalysisRequest& request,
+                                                          ScalarAnalysisBackend backend);
+        // Main thread: the GPU run after the same checks. The output shows its preview until Accept or Discard; an
+        // `autoAccept` run accepts as soon as it is ready. Empty with the reason in `refusal` otherwise.
+        [[nodiscard]] ScalarAnalysis StartScalarAnalysis(const ScalarAnalysisRequest& request, bool autoAccept,
+                                                         ScalarAnalysisRefusal& refusal);
+        // A run over given values (one per slot) on a test residency, captured as a CPU run is; no device work.
+        [[nodiscard]] ScalarAnalysis StartScalarAnalysisForTest(const ScalarAnalysisRequest& request,
+                                                                std::vector<float> values,
+                                                                Graphics::GpuPropertyResidency& residency,
+                                                                ScalarAnalysisRefusal& refusal);
+        // Main thread: the session results are kept for; current while that workspace is still the one used and
+        // still attached (a detach and reattach of the same workspace makes a new session).
+        [[nodiscard]] PointSession CurrentSession();
+        [[nodiscard]] bool SessionCurrent(const PointSession& session) const;
         // Main thread: shows a property of the entity in the viewport (the processing panels' "Show"); false with
         // the reason when the editor refuses.
         [[nodiscard]] bool ShowProperty(std::uint32_t stableEntityId, const GeometryPropertyRef& property,

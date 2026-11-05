@@ -1938,6 +1938,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.BilateralFilterPluginGpuSmoke.cpp
                 integration/graphics/Test.DescriptorAnalysisPluginGpuSmoke.cpp
                 integration/graphics/Test.CoherentPointDriftPluginGpuSmoke.cpp
+                integration/graphics/Test.PointCloudEditingScalarAnalysisGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
              IntrinsicBilateralFilterPluginObjects IntrinsicDescriptorAnalysisPluginObjects
              IntrinsicCoherentPointDriftPluginObjects
