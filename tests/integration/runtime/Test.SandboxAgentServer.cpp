@@ -178,7 +178,8 @@ namespace
         std::function<void(R::Engine&)> EveryFrame{}; // optional main-thread hook, run on every frame
 
         explicit AgentRig(const std::string& tag, bool withCamera = false, bool minimized = false, unsigned workers = 1u,
-                          std::size_t maxMessageBytes = 8u << 20u)
+                          std::size_t maxMessageBytes = 8u << 20u,
+                          std::chrono::milliseconds progressInterval = std::chrono::milliseconds(250))
             : Minimized(minimized)
         {
             SocketPath = (std::filesystem::temp_directory_path() / ("intrinsic-agent-" + tag + "-" + std::to_string(::getpid()) + ".sock")).string();
@@ -205,7 +206,8 @@ namespace
             Engine->EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
             Server = &Engine->EmplaceModule<R::AgentServerModule>(
                 R::AgentServerOptions{.SocketPath = SocketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()},
-                                      .MaxMessageBytes = maxMessageBytes});
+                                      .MaxMessageBytes = maxMessageBytes,
+                                      .ProgressInterval = progressInterval});
             if (minimized) Engine->EmplaceModule<IdleExit>(Done, *Engine);
             Engine->Initialize();
         }
@@ -739,11 +741,11 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     });
 
     bool smoothedSeen = false;
-    int frameCount = 0;
+    // A time limit, not a frame count: a fast host runs the 25 calls in about 20 000 Null-backend frames (ARCH-022 Q90).
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
     frames->OnFrame = [&](R::Engine& kernel) {
-        ++frameCount;
         smoothedSeen |= vertices.Exists("smooth");
-        if (done.load() || frameCount > 3000) kernel.RequestExit();
+        if (done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
     };
     engine.Run();
     client.join();
@@ -1082,7 +1084,9 @@ TEST(SandboxScreenshotWindow, SavePngIsDisabledWithoutAnOperationalDevice)
 // by the correlation id of its submission, while an older job of someone else runs beside it.
 TEST(SandboxAgentServer, KMeansProgressFollowsTheRunsOwnJob)
 {
-    AgentRig rig("kmeansprogress", false, false, 2u);
+    // Notifications every millisecond: on a fast host the run can finish before the default 250 ms interval (ARCH-022
+    // Q90), and the check needs notes while it runs.
+    AgentRig rig("kmeansprogress", false, false, 2u, 8u << 20u, std::chrono::milliseconds(1));
     ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
     const auto cloud = rig.AddCloud(300000);
     std::atomic_bool blockerStarted{false}, release{false};

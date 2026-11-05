@@ -190,6 +190,11 @@ contract_review: tracker only; each slice declares its own contracts
 88. (2026-11-05, after Q87) "Super. Welches Plugin ist nun als Nächstes dran?"
 89. (2026-11-05, on the answer: next are kernel density and point spacing as plugins, the plan first with a review;
     before it, optionally, the small fix of the readbacks' missing host-read barrier) "Mach bitte beides"
+90. (2026-11-05, on the Q89 report's open points: 1 `ReadBuffer`'s slow path and the backbuffer capture without a
+    host-read barrier, 2 GRAPHICS150, 3 the local SandboxAgentServer failures, 4 options B–D and the Q86 follow-ups,
+    5 the plugins' duplicated run bookkeeping, 6 the unused `InlineDeliversToSink=true` branch, 7 the stale drafts in
+    the bilateral and descriptor windows, 8 the documented text deviations, 9 the cancel smoke's submission claim,
+    10 density weights and outliers as plugins) "Mach bitte die noch offenen Punkte"
 
 ## Goal
 - Reach the target in
@@ -3717,3 +3722,30 @@ python3 tools/docs/check_doc_links.py --root . --strict
   follow external settings; no bitwise CPU check against the geometry functions; optional: texts, the GPU cancel
   test), diff `f8071138…` verbatim "**Verdict: approve. No remaining blocking findings.**"; its non-blocking caveat
   (AwaitingApply does not prove the GPU submission) corrected in the two smokes' comments after the approval.
+- 2026-11-05, Q90 plan (the ten open points; local copy `tasks/evidence/ARCH-022/q90-plan.md`, rev 3 sha256
+  `ea66ce28…`): block 1 the corrections from Q89 (points 6–9), 2 the RHI host reads (point 1), 3 the local failures
+  (points 2–3), 4 publication without a revision rebase (consolidation, Progressive Poisson), 5 a leaner
+  `PublishPointScalarField` (revision check only where equivalence to the exact check is shown), 6 K-Means C1 (seeding
+  on a worker) and D (Accept, same equivalence rule; C2 several iterations per submission is the operator's decision),
+  8 density weights as a plugin with the shared run bookkeeping (point 5), 9 outliers as a plugin (9a a bounded design
+  first), 7 the iterative methods' measurement last. Plan review (Codex, gpt-6-astra xhigh, read-only, recursion
+  protection instruction-only; thread `01a1ad30-24a8-73c1-b01a-5389530a2c07`): rev 1 verbatim "**Verdict: revise.**"
+  (operator decisions versus engineering work, the cancel smoke's submission evidence, revision equivalence for D,
+  block 9's bounded design, focused verification and the renderer barriers' own checks), rev 2 verbatim "**Verdict:
+  approve.**"; rev 3 after the first smoke run (the counter counts frame recordings too: the smokes' cancelled run
+  follows a position change, so its index is rebuilt and its compute defers to the frame).
+- 2026-11-05, Q90 block 3 (the local failures; diagnosis, probes on build/ci-vulkan-release, RTX 4090): all three were
+  test premises that a fast host breaks, none a defect. (1) `SandboxAgentServer.KMeansProgressFollowsTheRunsOwnJob`
+  ("0 notes"): the server emits at most one progress notification per 250 ms and the 300k-point CPU run can end
+  before the first; probe with a 1 ms interval passed 3/3; the rig takes the interval and this test uses 1 ms.
+  (2) `.ClientRunsSmoothingThroughTheSocketAndUndoesIt` (silent, aborted after ~90 s): gdb after 45 s showed the main
+  thread in `client.join()` with `engine.Run` returned and the client in `Client::Tool` → `ReadLine`; the loop's
+  3000-frame cap ended it early; probe with a 60 s deadline passed 3/3 after 20 077–20 889 frames in ~0.74 s; the test
+  keeps the time limit. (3) `GRAPHICS150LowLatencyCompute.ImmediateSubmitsReturnTheFramedBytesInFewerFrames`
+  ("immediate 1.3 frames"): unpaced 64x64 frames took ~1.7 ms (framed 3.0 frames / 5.0–5.3 ms), shorter than the
+  immediate round trip (2.1–2.3 ms incl. polling); probe with each frame paced by 3 ms gave immediate 0.0 frames,
+  framed 3.0; the test paces 8 ms (GRAPHICS-150 measured 3.4 ms on an RTX 3050) and says the milliseconds include it.
+  Each passes 10/10 (`--repeat until-fail:10`), the SandboxAgentServer and GRAPHICS150 suites 35/35. Code review
+  (Codex, gpt-6-astra xhigh, read-only, recursion protection instruction-only; fresh thread
+  `01a1ad45-ac29-7692-9403-36a6b85a4f54`, diff `e2b51fc0…`) verbatim "**Verdict: approve** for block 3’s test-premise
+  corrections."; its two comment-wording notes applied after the approval.

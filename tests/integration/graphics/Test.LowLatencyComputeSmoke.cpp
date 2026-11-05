@@ -11,6 +11,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 #include <gtest/gtest.h>
 import Extrinsic.Platform.Backend.Glfw;
@@ -89,6 +90,11 @@ namespace
 
         void Frame(double, double) override
         {
+            // Every frame lasts at least 8 ms, longer than this E-step's device round trip (3.4 ms on an RTX 3050,
+            // about 2 ms on an RTX 4090), so immediate work has time to finish before the next poll and the frame count
+            // does not depend on the host's frame rate (unpaced 64x64 frames take under 2 ms there; ARCH-022 Q90).
+            // Framed work still waits its frames. A scheduling check: the milliseconds include the pacing.
+            struct Pace { ~Pace() { std::this_thread::sleep_for(std::chrono::milliseconds(8)); } } pace;
             if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(60))
             {
                 ADD_FAILURE() << "GRAPHICS-150 timeout after " << Trips.size() << " round trips";
