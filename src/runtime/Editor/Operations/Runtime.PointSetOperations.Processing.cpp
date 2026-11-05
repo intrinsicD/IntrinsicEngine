@@ -936,34 +936,46 @@ namespace Extrinsic::Runtime
                 raw.remove<T>(entity);
         }
 
+        struct ProgressivePoissonMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+            GeometryElementDomain Domain{GeometryElementDomain::Unknown}; // the run's input and output domain
+            std::array<GeometryPropertyRef, 4> Outputs{};                   // level, rank, splat radius, prefix
+        };
+
+        // A run changes its four output columns on its domain, the point rendering and the visualization; the history
+        // has checked that the rest of the entity already equals the target. Only those are written, the columns in
+        // place: replacing whole sources would renumber every property's revision (ARCH-022 Q90).
         [[nodiscard]] EditorCommandHistoryStatus
         ApplyProgressivePoissonEntityState(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
+            const ProgressivePoissonMutationIdentity& identity,
             const ProgressivePoissonEntityState& state)
         {
-            if (scene == nullptr)
+            if (identity.Scene == nullptr)
                 return EditorCommandHistoryStatus::MissingScene;
 
-            entt::registry& raw = scene->Raw();
+            entt::registry& raw = identity.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
-                ResolveStableEntity(raw, stableEntityId);
+                ResolveStableEntity(raw, identity.StableEntityId);
             if (!entity.has_value())
                 return EditorCommandHistoryStatus::StaleEntity;
 
-            ApplyOptionalComponent(raw, *entity, state.Vertices);
-            ApplyOptionalComponent(raw, *entity, state.Edges);
-            ApplyOptionalComponent(raw, *entity, state.Halfedges);
-            ApplyOptionalComponent(raw, *entity, state.Faces);
-            if (state.HasMeshTopology)
-                raw.emplace_or_replace<GS::HasMeshTopology>(*entity);
-            else
-                raw.remove<GS::HasMeshTopology>(*entity);
-            if (state.HasGraphTopology)
-                raw.emplace_or_replace<GS::HasGraphTopology>(*entity);
-            else
-                raw.remove<GS::HasGraphTopology>(*entity);
-            ApplyOptionalComponent(raw, *entity, state.RenderSurface);
+            auto* live = GeometryProcessingDetail::MutableGeometryProperties(raw, *entity, identity.Domain);
+            const auto* target = ProgressivePoissonProperties(
+                const_cast<ProgressivePoissonEntityState&>(state), identity.Domain); // read only
+            if (live == nullptr || target == nullptr || live->Size() != target->Size())
+                return EditorCommandHistoryStatus::StaleEntity;
+            std::array<GeometryScalarPropertySnapshot, 4> columns;
+            for (std::size_t i = 0; i < columns.size(); ++i)
+            {
+                columns[i] = CaptureGeometryScalarProperty(*target, identity.Outputs[i]);
+                if (!CanApplyGeometryScalarProperty(*live, identity.Outputs[i], columns[i]))
+                    return EditorCommandHistoryStatus::CommandFailed;
+            }
+            for (std::size_t i = 0; i < columns.size(); ++i)
+                (void)ApplyGeometryScalarProperty(*live, identity.Outputs[i], columns[i]);
             ApplyOptionalComponent(raw, *entity, state.RenderPoints);
             ApplyOptionalComponent(raw, *entity, state.Visualization);
             return EditorCommandHistoryStatus::Applied;
@@ -988,13 +1000,6 @@ namespace Extrinsic::Runtime
             state.Visualization = std::move(config);
         }
 
-        struct ProgressivePoissonMutationIdentity
-        {
-            ECS::Scene::Registry* Scene{nullptr};
-            WorldHandle World{};
-            std::uint32_t StableEntityId{0u};
-        };
-
         void StampProgressivePoissonMutation(
             const ProgressivePoissonMutationIdentity& identity)
         {
@@ -1011,6 +1016,8 @@ namespace Extrinsic::Runtime
         CommitProgressivePoissonMutation(
             const EditorProcessingContext& context,
             const std::uint32_t stableEntityId,
+            const GeometryElementDomain domain,
+            const ProgressivePoissonPlaygroundConfig& config,
             ProgressivePoissonEntityState before,
             ProgressivePoissonEntityState after)
         {
@@ -1024,6 +1031,8 @@ namespace Extrinsic::Runtime
                 .Scene = context.Scene,
                 .World = context.World,
                 .StableEntityId = stableEntityId,
+                .Domain = domain,
+                .Outputs = {config.Level, config.Rank, config.SplatRadius, config.PrefixVisible},
             };
 
             const auto validate =
@@ -1066,7 +1075,7 @@ namespace Extrinsic::Runtime
                     if (!entity) return EditorCommandHistoryStatus::StaleEntity;
                     const EditorProcessingContext historyContext{.Scene = candidate.Scene, .CommandHistory = commandHistory};
                     const auto historyBefore = GeometryProcessingDetail::ObservePointPropertyHistory(historyContext, *entity, std::nullopt);
-                    const auto status = ApplyProgressivePoissonEntityState(candidate.Scene, candidate.StableEntityId, *target);
+                    const auto status = ApplyProgressivePoissonEntityState(candidate, *target);
                     if (status == EditorCommandHistoryStatus::Applied)
                         GeometryProcessingDetail::RebasePointPropertyHistory(historyContext, *entity, historyBefore);
                     return status;
@@ -1410,6 +1419,8 @@ namespace Extrinsic::Runtime
                     CommitProgressivePoissonMutation(
                         context,
                         job.Command.StableEntityId,
+                        job.Domain,
+                        job.Command.Config,
                         *job.BeforeState,
                         std::move(after));
                 if (committed != EditorCommandStatus::Applied)
@@ -1682,6 +1693,8 @@ namespace Extrinsic::Runtime
             CommitProgressivePoissonMutation(
                 context,
                 command.StableEntityId,
+                input->Domain,
+                command.Config,
                 beforeState,
                 std::move(afterState));
         if (publishStatus != EditorCommandStatus::Applied)

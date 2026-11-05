@@ -3789,3 +3789,16 @@ python3 tools/docs/check_doc_links.py --root . --strict
   `01a1ad59-9a2e-7bb0-9605-2ff85bae0629`): diff `540cf82e…` "**Verdict: revise required.**" (reuse comparisons, hook
   buffers unflagged), diff `bae57613…` "**Verdict: revise required.**" (four `Pixels` hook buffers, the slow path
   counted before reading), diff `ddd57475…` verbatim "**Verdict: approve** for block 2".
+- 2026-11-05, Q90 block 4 (Q86 order 2; publication without a revision rebase): consolidation's `ApplyPropertyState`
+  checks every output first and then writes in place (no staged copy and move); Progressive Poisson's apply writes its
+  four output columns in place and replaces only `RenderPoints` and `VisualizationConfig` instead of all four
+  geometry sources. Deviation from the plan: Poisson's undo record keeps the whole-entity snapshots, because both the
+  job's apply-time staleness check and the history's validation compare the whole entity (narrowing them would change
+  what counts as stale); the apply relies on that validation for the rest. Tests: an untouched property keeps its
+  revision through publication, undo and redo in `PointCloudConsolidationModule.ExecutesEveryElementDomainPropertyWithoutTopologyConversion`
+  and `SandboxEditorUi.ProgressivePoissonPointHistoryRestoresExactOutputsAndRejectsStaleState` (and after
+  publication in `…ProgressivePoissonCommandPublishesPointPropertiesAndVisualization`); mutations: the staged copy and
+  move put back (consolidation test red at all three), the whole vertex component replaced again (both Poisson tests
+  red). Focused suites 417/417, with block 5's 564/564. Code review (Codex, gpt-6-astra xhigh, read-only, recursion
+  protection instruction-only; fresh thread `01a1ad66-a1c7-79c3-ba10-92192fd49996`): diff `3a7cc151…` "**Verdict:
+  revise required.**" (Poisson undo/redo revision untested), diff `32f3f7b9…` verbatim "**Verdict: approve.**".

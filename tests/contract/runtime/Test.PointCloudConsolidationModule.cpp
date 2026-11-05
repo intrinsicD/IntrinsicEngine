@@ -706,6 +706,11 @@ namespace
                     .get<GS::Faces>(Sources.Mesh)
                     .Properties.Get<OpaqueDomainValue>("f:opaque")
                     .Vector();
+            // A property no run writes: its revision survives every publication, undo and redo (ARCH-022 Q90).
+            KeepRevision = Scene->Raw()
+                               .get<GS::Vertices>(Sources.PointCloud)
+                               .Properties.GetOrAdd<float>("keep", 1.0f)
+                               .Revision();
             GraphEdgeTopologyBefore =
                 Scene->Raw()
                     .get<GS::Edges>(Sources.Graph)
@@ -806,6 +811,7 @@ namespace
         std::vector<std::uint32_t> MeshHalfedgeTopologyBefore{};
         std::vector<std::uint32_t> MeshFaceTopologyBefore{};
         std::vector<OpaqueDomainValue> MeshOpaqueBefore{};
+        Geometry::PropertyRevision KeepRevision{};
         std::vector<std::uint32_t> GraphEdgeTopologyBefore{};
         std::vector<std::uint32_t> GraphHalfedgeTopologyBefore{};
         std::uint32_t Ticks{0u};
@@ -1409,6 +1415,8 @@ TEST(PointCloudConsolidationModule,
     EXPECT_TRUE(
         scene.Raw().all_of<GS::HasGraphTopology>(appPtr->Sources.Graph));
 
+    const auto keepRevision = [&] { return pointVertices.Get<float>("keep").Revision(); };
+    EXPECT_EQ(keepRevision(), appPtr->KeepRevision) << "a publication renumbered an untouched property";
     Runtime::EditorCommandHistory* history =
         engine.Services().Find<Runtime::EditorCommandHistory>();
     ASSERT_NE(history, nullptr);
@@ -1418,6 +1426,7 @@ TEST(PointCloudConsolidationModule,
         EXPECT_EQ(history->Undo().Status,
                   Runtime::EditorCommandHistoryStatus::Undone);
     }
+    EXPECT_EQ(keepRevision(), appPtr->KeepRevision) << "an undo renumbered an untouched property";
     for (const Runtime::GeometryElementDomain domain : kAllElementDomains)
     {
         EXPECT_FALSE(ResolveTestPropertySet(
@@ -1446,6 +1455,7 @@ TEST(PointCloudConsolidationModule,
               appPtr->MeshFaceTopologyBefore);
     EXPECT_EQ(meshFaces.Get<OpaqueDomainValue>("f:opaque").Vector(),
               appPtr->MeshOpaqueBefore);
+    EXPECT_EQ(keepRevision(), appPtr->KeepRevision) << "a redo renumbered an untouched property";
 
     engine.Shutdown();
 }

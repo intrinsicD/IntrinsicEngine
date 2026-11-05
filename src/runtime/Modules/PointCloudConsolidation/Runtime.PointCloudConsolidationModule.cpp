@@ -1738,34 +1738,27 @@ namespace Extrinsic::Runtime
             if (current.Size() != target.ElementCount)
                 return false;
 
-            Geometry::PropertySet staged = current;
+            // Every check first, then the writes in place: copying or moving a PropertySet renumbers every revision,
+            // so the renderer would upload untouched properties again (ARCH-022 Q90; K-Means since Q75).
+            for (const Vec3PropertySnapshot& snapshot : target.Properties)
+            {
+                if (snapshot.Exists && snapshot.Values.size() != target.ElementCount)
+                    return false;
+                if (current.Exists(snapshot.Name) &&
+                    DetectGeometryPropertyValueKind(current, snapshot.Name) !=
+                        Geometry::PropertyValueKind::Vec3)
+                {
+                    return false;
+                }
+            }
             for (const Vec3PropertySnapshot& snapshot : target.Properties)
             {
                 if (snapshot.Exists)
-                {
-                    if (snapshot.Values.size() != target.ElementCount ||
-                        (staged.Exists(snapshot.Name) &&
-                         DetectGeometryPropertyValueKind(
-                             staged, snapshot.Name) !=
-                             Geometry::PropertyValueKind::Vec3))
-                    {
-                        return false;
-                    }
-                    auto property = staged.GetOrAdd<glm::vec3>(
-                        snapshot.Name, glm::vec3{0.0f});
-                    if (!property)
-                        return false;
-                    property.Vector() = snapshot.Values;
-                }
-                else if (staged.Exists(snapshot.Name))
-                {
-                    auto property = staged.Get<glm::vec3>(snapshot.Name);
-                    if (!property)
-                        return false;
-                    staged.Remove(property);
-                }
+                    current.GetOrAdd<glm::vec3>(snapshot.Name, glm::vec3{0.0f})
+                        .Vector() = snapshot.Values;
+                else if (auto property = current.Get<glm::vec3>(snapshot.Name))
+                    current.Remove(property);
             }
-            current = std::move(staged);
             return true;
         }
 

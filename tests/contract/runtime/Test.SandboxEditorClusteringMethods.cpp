@@ -302,6 +302,12 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     };
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const auto positionsRevision = [&] {
+        return std::as_const(registry.Raw().get<GS::Vertices>(cloud).Properties)
+            .Get<glm::vec3>(GS::PropertyNames::kPosition)
+            .Revision();
+    };
+    const auto revisionBefore = positionsRevision();
 
     const Runtime::ProgressivePoissonPlaygroundConfig config{
         .Dimension = 3u,
@@ -327,6 +333,8 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
             });
 
     ASSERT_TRUE(result.Succeeded()) << result.Message;
+    // Only the outputs changed: the positions keep their revision (ARCH-022 Q90).
+    EXPECT_EQ(positionsRevision(), revisionBefore) << "the publication renumbered the positions";
     EXPECT_EQ(result.InputCount, positions.size());
     EXPECT_GT(result.AcceptedCount, 0u);
     EXPECT_EQ(result.PrefixCount, std::min(3u, result.AcceptedCount));
@@ -605,6 +613,13 @@ TEST(SandboxEditorUi,
             {1.0f, 1.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
         });
+    // The positions are no output: they keep their revision through publication, undo and redo (ARCH-022 Q90).
+    const auto positionsRevision = [&] {
+        return std::as_const(registry.Raw().get<GS::Vertices>(cloud).Properties)
+            .Get<glm::vec3>(PN::kPosition)
+            .Revision();
+    };
+    const auto revisionBefore = positionsRevision();
     const std::vector<float> priorLevels(
         registry.Raw().get<GS::Vertices>(cloud).Properties.Size(),
         42.0f);
@@ -648,6 +663,7 @@ TEST(SandboxEditorUi,
             });
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     ASSERT_TRUE(history.CanUndo());
+    EXPECT_EQ(positionsRevision(), revisionBefore) << "the publication renumbered the positions";
 
     const Geometry::PropertySet& appliedProperties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
@@ -662,6 +678,7 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(
         history.Undo().Status,
         Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(positionsRevision(), revisionBefore) << "the undo renumbered the positions";
     const Geometry::PropertySet& undoneProperties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
     ASSERT_TRUE(undoneProperties.Get<float>("v:poisson_level"));
@@ -684,6 +701,7 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(
         history.Redo().Status,
         Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(positionsRevision(), revisionBefore) << "the redo renumbered the positions";
     Geometry::PropertySet& redoneProperties =
         registry.Raw().get<GS::Vertices>(cloud).Properties;
     ASSERT_TRUE(redoneProperties.Get<float>("v:poisson_level"));

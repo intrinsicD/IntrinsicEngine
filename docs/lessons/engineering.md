@@ -260,9 +260,10 @@ Safeguard: key captures and staleness checks on property revisions, not on conte
 
 `PropertyRegistry` copy and move assignment rebase all revisions (`Geometry.Properties.cpp`), so committing outputs by
 `staged = current; ...; current = std::move(staged)` marks unchanged positions and normals modified and the renderer
-re-uploads them; K-Means' Accept did this until Q75 (now written in place, `ApplyKMeansOutputPropertyState`). Still
-in: consolidation's `ApplyPropertyState`; Progressive Poisson replaces whole components. Safeguard: write only the
-output properties in place, and test that an untouched property keeps its revision.
+re-uploads them; K-Means' Accept did this until Q75 (now written in place, `ApplyKMeansOutputPropertyState`),
+consolidation's `ApplyPropertyState` and Progressive Poisson's publication (whole sources replaced) until Q90. Safeguard:
+check every output first, then write only the outputs in place, and test that an untouched property keeps its revision
+(`ExecutesEveryElementDomainPropertyWithoutTopologyConversion`, `ProgressivePoissonCommandPublishesPointPropertiesAndVisualization`).
 
 ### A commit validates by revision, not by recapture
 
