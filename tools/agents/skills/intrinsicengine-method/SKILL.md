@@ -52,7 +52,12 @@ Implement method work in this order. Earlier steps gate later ones; do not skip.
 
 6. **GPU backend (optional, later).** Add only **after** CPU reference parity
    is established. The same parity-delta rules apply — GPU outputs are compared
-   against the reference, not against the optimized CPU backend.
+   against the reference, not against the optimized CPU backend. Before
+   designing or reviewing it (or its Accept/undo publication, or a plugin's GPU
+   path), read the "GPU method performance" lessons in
+   `docs/lessons/engineering.md`: host round trips per iteration, small
+   serialized pages, main-thread start work, capture reuse, PropertySet
+   assignment, commit validation, CPU-read GPU memory.
 
 7. **Limitations and diagnostics.** Document degenerate-input behavior,
    numerical limitations, and failure modes. Method docs must describe current

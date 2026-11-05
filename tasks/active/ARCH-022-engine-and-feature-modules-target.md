@@ -185,6 +185,8 @@ contract_review: tracker only; each slice declares its own contracts
     input simulation that presses the real button) "Ja, so messen (Empfohlen)"
 86. (2026-11-05, after the Q83 result) "Ok danke. Kannst du schauen welche lessons wir hier gelernt haben und für
     andere Plugins und gpu backends gebrauchen können?"
+87. (2026-11-05, on the Q86 answer) "Merke dir die lessons bitte so dass du die entsprechend findest wenn die relevant
+    werden"
 
 ## Goal
 - Reach the target in
@@ -3630,3 +3632,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
   `ReadBuffer` (device idle); the material buffer's dirty ranges go through `WriteBuffer` into device-local memory
   (queue idle); `RecordAndSubmitDownload` lacks the transfer-to-host barrier for every readback. Options went to the
   operator.
+- 2026-11-05, Q87: the K-Means lessons (Q74–Q86) recorded in `docs/lessons/engineering.md`, section "GPU method
+  performance" (nine lessons, each with where else it applies and its safeguard), with pointers from the
+  `intrinsicengine-method` (GPU backend step) and `intrinsicengine-diagnose` (perf branch) skills; a Claude memory entry
+  names the section and when to read it. Claims review (Codex, fresh thread `01a1abfa-b72c-7290-a87d-3a56d6a04cf6`):
+  round 1 "revise required" (overstated causes and titles, the 7a owner, PublishPointScalarField's shape), round 2 on
+  an unwritten edit (the coordinator's script had aborted), round 3 verbatim "**approve**".

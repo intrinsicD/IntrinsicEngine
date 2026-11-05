@@ -189,7 +189,12 @@ logs die.
 establish a baseline measurement using the existing benchmark manifest's
 runner, then bisect. Measure first, fix second. Re-read
 `intrinsicengine-benchmark` for baseline-comparison policy and warmup rules
-before claiming a "fix".
+before claiming a "fix". For a slow or stalling GPU method, plugin or Accept in
+the Sandbox, start from the "GPU method performance" lessons in
+`docs/lessons/engineering.md` (frames per iteration, main-thread start work in
+the operator's build, re-uploads after PropertySet assignment, CPU readbacks);
+the opt-in `--kmeans-trace` (`src/app/Sandbox/Sandbox.KMeansTrace.cppm`) is
+the per-frame trace pattern to reuse.
 
 ### Keep an observation ledger
 

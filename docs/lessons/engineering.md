@@ -199,3 +199,87 @@ ARCH-022 Q83: a trace that keyed each Maintenance sample by `RuntimeFrameHookCon
 frame's pacing to the frame before it: that index counts render extractions and has moved past the frame by
 Maintenance. Safeguard: key per-frame records by `context.Pacing.FrameIndex`; `SandboxKMeansTrace` puts a known 20 ms
 command into one frame and fails if the drain lands in another frame's record.
+
+## GPU method performance (ARCH-022 K-Means, Q74–Q86)
+
+Read before designing, changing or reviewing a GPU method backend, a plugin with a GPU path, a result publication
+(Accept, undo) path, or a CPU readback. Measured on GPU K-Means (`docs/reports/2026-11-04-arch-022-r7-kmeans-q79.md`,
+`docs/reports/2026-11-05-arch-022-q83-kmeans-click.md`); the "also in" lists are the Q86 code-reading sweep (task note
+`ARCH-022`, 2026-11-05), not measurements.
+
+### An iteration that ends at a host readback pays the frame pipeline
+
+Observed: with VSync on, a K-Means iteration took typically three frames (about 50 ms) in Release, 19 frames to the
+first preview. By code, K-Means records the next page only after the previous iteration's diagnostics readback is
+consumed; that this wait is why an iteration spans three frames is an inference, and how much of it is GPU execution
+is not measured (no GPU timestamps). Also in: LOP resident (at least two round trips per iteration),
+consolidation over LBVH (framed 4096-row radius batches, about 2·N/4096 per iteration), the CPD E-step, FPS and CG
+chunks, the bilateral plugin's passes; framed radius/kNN batches never take the immediate path
+(`Runtime.SpatialIndexCache.cpp` `SubmitBatchImmediate`). Safeguard: count frames per iteration before tuning
+kernels (the `--kmeans-trace` pattern), and design for several iterations per submission or a convergence check every
+n iterations.
+
+### Many small serialized pages add submission overhead
+
+K-Means recorded one dispatch per page with a barrier between; block 7b batches up to 64 pages of Reduce and Update
+into one dispatch each, followed by a combine pass, with bitwise-identical results (guarded by a bit oracle in the GPU
+smoke). Together with blocks 6 and 7a it cut the largest
+hold frame at 1M points from 30–31 to 0.4–0.6 ms; 7b's own share was not measured separately. Also in: PCA
+normals (at most 4096 rows per framed submission), the LOP final reduce (one single-workgroup submission per 4096
+rows). Safeguard: batch pages, and keep a bit oracle of the old path's results when restructuring a reduction.
+
+### Main-thread work at a GPU start is measured in the operator's build
+
+K-Means' Hierarchical seeding (a mean pass plus K − 1 passes over N points) and its snapshot run in the command
+drain: 1.4 and 1.7 ms in Release, 347 and 133 ms in the operator's Debug+ASan `dev` build for 173k points — one UI
+frame of about 0.5 s. Also in: consolidation's snapshot copies and its LBVH rebuild on the main gate per iteration,
+smoothing's `Prepare`/`StartVulkan`, point sampling's brute-force prefix check and CPU fallback, normals' before/after
+copies. Safeguard: O(N) start work runs on a worker; time the start's parts (as `ClusteringModuleStats` does) and
+measure in the build the operator uses (see the typed-cache-entry lesson).
+
+### Reuse a request's input capture while its revisions hold
+
+Every K-Means slider request rescanned and copied all points until block 6 cached the capture keyed on the input
+properties' revisions (`KMeansCaptureCache`), shared immutably by the run and its undo record. Every other method
+inspected in Q86 still recaptures per request; consolidation's `.Current` even compares the whole input bitwise on
+every poll.
+Safeguard: key captures and staleness checks on property revisions, not on content comparisons.
+
+### Assigning a PropertySet invalidates unchanged properties
+
+`PropertyRegistry` copy and move assignment rebase all revisions (`Geometry.Properties.cpp`), so committing outputs by
+`staged = current; ...; current = std::move(staged)` marks unchanged positions and normals modified and the renderer
+re-uploads them; K-Means' Accept did this until Q75 (now written in place, `ApplyKMeansOutputPropertyState`). Still
+in: consolidation's `ApplyPropertyState`; Progressive Poisson replaces whole components. Safeguard: write only the
+output properties in place, and test that an untouched property keeps its revision.
+
+### A commit validates by revision, not by recapture
+
+K-Means' Accept (measured 31.8–31.9 ms at 1M points) is, by code reading, about a dozen O(N) passes: output captures,
+new arrays, and an undo validation that recaptures the whole input and compares it bitwise. The shared
+`PublishPointScalarField` (every point-scalar operation, the descriptor plugin's 33 columns) already validates its
+inputs by revision, but copies each output column before and after and recaptures the outputs for a bitwise
+comparison. Safeguard: validate the generation by property revisions, share immutable snapshots in undo records, copy
+each array once.
+
+### CPU-read GPU memory needs a cached type, an asynchronous read and a host-read barrier
+
+The transfer queue's readback slots were uncached (see the VMA lesson). Still open (Q86): CPU-read `HostVisible`
+buffers (picking, histogram, backbuffer capture) get `CPU_TO_GPU|SEQUENTIAL_WRITE` and are read through `ReadBuffer`,
+which waits for device idle; dirty material ranges go through `WriteBuffer` into device-local memory (queue idle);
+`RecordAndSubmitDownload` records no transfer-write to host-read barrier, for every readback. Safeguard: CPU-read
+buffers use a cached host type, reads go through `DownloadBuffer`, the copy is followed by a host-read barrier.
+
+### A per-frame wait hides synchronization hazards
+
+Removing the renderer's per-frame write of the cull bucket table (`CullingSystem`; a `WriteBuffer` into device-local
+memory that ended in `vkQueueWaitIdle` and so also waited for the K-Means pages) exposed cross-frame hazards it had
+masked: readback copies into one buffer, first fills in secondary command buffers (block 7a). Safeguard: remove such a
+wait layer by layer under synchronization validation (see "Check GPU synchronization with the validator that sees
+it"), one fixed layer at a time.
+
+### A VSync measurement needs the display on
+
+With the displays in DPMS off, FIFO presents waited about 1 s per frame (BUG-228), which a frame-time measurement
+would read as a slow application. Safeguard: probe `xset q` before and during the run; turn the displays on only with
+the operator's consent and restore the DPMS state afterwards (`q83_run.sh`).
