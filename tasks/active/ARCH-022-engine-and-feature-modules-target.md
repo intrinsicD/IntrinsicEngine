@@ -168,6 +168,9 @@ contract_review: tracker only; each slice declares its own contracts
     Punkt dass wenn ich k means auf dem armadillo mesh machen (als Beispiel) dauert es für meinen Geschmack nach dem
     Klick auf den run k means Button erstaunlich lange bis die Methode startet. Ich frage mich was da intern alles erst
     passiert bevor es los geht?"
+82. (2026-11-05, on the Q81 answer: options A readback memory type test and fix, B Armadillo click-to-preview
+    measurement, C faster start, D leaner Accept) "Backend war gpu. Bitte mach A. Die Punkte b-d überlegen wir uns nach
+    dem nächsten Test"
 
 ## Goal
 - Reach the target in
@@ -3524,3 +3527,31 @@ python3 tools/docs/check_doc_links.py --root . --strict
   (editor default, K−1 passes over N) runs on the main thread in `Start`, the first run per process creates three
   compute pipelines (no `VkPipelineCache`), and each iteration ends at a host readback, so the first preview comes
   after `GpuPreviewInterval` = 5 iterations at one or more frames each (inference). Options went to the operator.
+- 2026-11-05, Q82 option A, prediction written before the first run: with the slot allocation unchanged
+  (`VMA_MEMORY_USAGE_CPU_ONLY`), `BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle`'s new
+  assertion `ReadbackSlotsUncached == 0` fails on this host (value 1, the smoke's one slot in uncached type 2); with
+  `VMA_MEMORY_USAGE_AUTO_PREFER_HOST` and the random-access flag it passes.
+- 2026-11-05, Q82 option A (readback staging memory type): `VulkanTransferQueue::AcquireReadbackSlot` allocates with
+  `VMA_MEMORY_USAGE_AUTO_PREFER_HOST`, `HOST_COHERENT` required and the random-access flag (VMA honours it only for
+  `AUTO*`), so the slots keep CPU_ONLY's visible/coherent eligibility and prefer HOST_CACHED; new diagnostic
+  `TransferQueueDiagnostics::ReadbackSlotsUncached` (a slot without HOST_CACHED while a visible|coherent|cached type
+  exists). Test: the assertion `ReadbackSlotsUncached == 0` in
+  `BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle` failed before the fix with 1 (the
+  prediction above held: the suspicion is confirmed on this RTX 4090, the slots were in uncached type 2) and passes
+  after it; mutation check on the final version (usage back to CPU_ONLY) fails again with 1. Sensitivity is shown on
+  this host only; the 16-byte smoke says nothing about the 4 MB copy's time, which is not measured. Suites on the
+  final build: gpu;vulkan 178/182, CPU 6258/6262; every failure is independent of this change: the known
+  `IntrinsicKMeansGpuBenchmarkSmoke` (2), `GRAPHICS150LowLatencyCompute.ImmediateSubmitsReturnTheFramedBytesInFewerFrames`
+  (immediate 1.3 frames > 1.0 in 5 of 5 runs with and 5 of 5 without the fix), `SandboxAgentServer.KMeansProgressFollowsTheRunsOwnJob`
+  and `.ClientRunsSmoothingThroughTheSocketAndUndoesIt` (fail locally with and without the fix, pass in CI at
+  11f8f79de), and three point-sampling tests from another session's uncommitted test edits. jscpd CLI over
+  `src/graphics/vulkan` and `src/graphics/rhi`: no clone in the changed lines. Review (Claude → Codex, fresh thread
+  `01a1a926-ac2c-7c60-8fe7-6259cc110597`, requested gpt-6-astra xhigh, reported model not in the event stream,
+  read-only sandbox, recursion protection instruction-only): round 1 on diff `bd2532974cb7…` verbatim "**Verdict:
+  revise required.**" (blocking: widening to non-coherent types needs a transfer-to-host barrier the readback copies
+  lack; optional: counter semantics under VMA fallback, hardware-dependent detector); round 2 on `71f2f70805df…`
+  (coherent required, counter and doc wording) verbatim "**Verdict: approve** for this diff’s scope." The commit
+  differs from that diff only by the allocation comment's wording, the reviewer's optional suggestion. Open, for the
+  operator: the readback copies record no transfer-to-host barrier (pre-existing; the spec asks for one before host
+  reads), `VulkanDevice::ReadBuffer`'s staging (`Backends.Vulkan.Device.cpp:4575`) has the same CPU_ONLY pattern,
+  and the GRAPHICS150 and local SandboxAgentServer failures.

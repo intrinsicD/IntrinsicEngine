@@ -135,7 +135,10 @@ and rendering state ownership remain unchanged.
   out-of-range subresources fail closed. Null/non-operational backends expose
   dropped-readback diagnostics instead of silently ignoring downloads.
 - Vulkan implements the first operational backend with a recycled mapped
-  host-visible readback staging ring on the transfer timeline. The ring copies
+  host-visible, coherent readback staging ring on the transfer timeline that
+  prefers host-cached memory where a compatible type exists and the allocation
+  succeeds (`TransferQueueDiagnostics::ReadbackSlotsUncached` counts slots that
+  missed it; the CPU's copy out of uncached memory is slow). The ring copies
   device-local buffer bytes with `vkCmdCopyBuffer` and texture subresources with
   `vkCmdCopyImageToBuffer`, invalidates the VMA allocation on drain, copies bytes
   into the sink, and only then marks the `ReadbackToken` complete.

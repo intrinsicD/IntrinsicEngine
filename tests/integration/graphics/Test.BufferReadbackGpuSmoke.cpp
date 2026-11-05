@@ -134,6 +134,8 @@ TEST(BufferReadbackGpuSmoke, TransferQueueDownloadsDeviceLocalBufferWithoutWaitI
     EXPECT_GE(diagnostics.DownloadsCompleted, 1u);
     EXPECT_GE(diagnostics.ReadbackBytesStaged, expected.size());
     EXPECT_GE(diagnostics.ReadbackRingHighWaterBytes, expected.size());
+    // The CPU copies every readback out of its slot; uncached memory makes that copy slow (ARCH-022 Q81).
+    EXPECT_EQ(diagnostics.ReadbackSlotsUncached, 0u);
 
     device->DestroyBuffer(buffer);
     device->Shutdown();

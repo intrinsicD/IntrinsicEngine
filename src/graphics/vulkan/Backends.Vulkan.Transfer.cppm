@@ -201,6 +201,7 @@ namespace Extrinsic::Backends::Vulkan
         std::atomic<uint64_t> m_DownloadsDropped{0};
         std::atomic<uint64_t> m_ReadbackBytesStaged{0};
         std::atomic<uint64_t> m_ReadbackRingHighWaterBytes{0};
+        std::atomic<uint64_t> m_ReadbackSlotsUncached{0};
 
         Core::ResourcePool<VulkanBuffer, RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers = nullptr;
         Core::ResourcePool<VulkanImage,  RHI::TextureHandle,  kMaxFramesInFlight>* m_Images  = nullptr;

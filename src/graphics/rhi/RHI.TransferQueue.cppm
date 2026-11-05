@@ -96,6 +96,10 @@ export namespace Extrinsic::RHI
         std::uint64_t DownloadsDropped = 0;
         std::uint64_t ReadbackBytesStaged = 0;
         std::uint64_t ReadbackRingHighWaterBytes = 0;
+        // Readback staging slots placed in host memory without HOST_CACHED although the device offers a cached
+        // coherent host-visible type (VMA may still fall back when that allocation fails): CPU reads of such
+        // slots run at uncached speed.
+        std::uint64_t ReadbackSlotsUncached = 0;
     };
 
     class ITransferQueue
