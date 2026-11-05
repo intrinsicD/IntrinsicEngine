@@ -222,6 +222,7 @@ TEST(TextureReadbackGpuSmoke, TransferQueueDownloadsTextureSubresourceWithoutWai
     EXPECT_GE(diagnostics.DownloadsCompleted, 1u);
     EXPECT_GE(diagnostics.ReadbackBytesStaged, expected.size());
     EXPECT_GE(diagnostics.ReadbackRingHighWaterBytes, expected.size());
+    EXPECT_EQ(diagnostics.ReadbackHostBarriers, diagnostics.DownloadsQueued) << "the texture download's copy is made visible to the host";
 
     ASSERT_TRUE(TransitionTexture(*device,
                                   texture,

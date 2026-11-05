@@ -267,7 +267,8 @@ each array once.
 The transfer queue's readback slots were uncached (see the VMA lesson). Still open (Q86): CPU-read `HostVisible`
 buffers (picking, histogram, backbuffer capture) get `CPU_TO_GPU|SEQUENTIAL_WRITE` and are read through `ReadBuffer`,
 which waits for device idle; dirty material ranges go through `WriteBuffer` into device-local memory (queue idle);
-`RecordAndSubmitDownload` records no transfer-write to host-read barrier, for every readback. Safeguard: CPU-read
+`ReadBuffer`'s slow path and the backbuffer capture record no transfer-write to host-read barrier (the transfer
+queue's downloads record it since Q89, `SubmitReadback`). Safeguard: CPU-read
 buffers use a cached host type, reads go through `DownloadBuffer`, the copy is followed by a host-read barrier.
 
 ### A per-frame wait hides synchronization hazards

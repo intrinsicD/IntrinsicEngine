@@ -100,6 +100,8 @@ export namespace Extrinsic::RHI
         // coherent host-visible type (VMA may still fall back when that allocation fails): CPU reads of such
         // slots run at uncached speed.
         std::uint64_t ReadbackSlotsUncached = 0;
+        // Downloads whose copy into their staging slot was followed by a transfer-write to host-read barrier.
+        std::uint64_t ReadbackHostBarriers = 0;
     };
 
     class ITransferQueue

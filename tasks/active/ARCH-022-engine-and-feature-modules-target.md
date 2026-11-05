@@ -187,6 +187,9 @@ contract_review: tracker only; each slice declares its own contracts
     andere Plugins und gpu backends gebrauchen können?"
 87. (2026-11-05, on the Q86 answer) "Merke dir die lessons bitte so dass du die entsprechend findest wenn die relevant
     werden"
+88. (2026-11-05, after Q87) "Super. Welches Plugin ist nun als Nächstes dran?"
+89. (2026-11-05, on the answer: next are kernel density and point spacing as plugins, the plan first with a review;
+    before it, optionally, the small fix of the readbacks' missing host-read barrier) "Mach bitte beides"
 
 ## Goal
 - Reach the target in
@@ -3638,3 +3641,12 @@ python3 tools/docs/check_doc_links.py --root . --strict
   names the section and when to read it. Claims review (Codex, fresh thread `01a1abfa-b72c-7290-a87d-3a56d6a04cf6`):
   round 1 "revise required" (overstated causes and titles, the 7a owner, PublishPointScalarField's shape), round 2 on
   an unwritten edit (the coordinator's script had aborted), round 3 verbatim "**approve**".
+- 2026-11-05, Q89 part 1 (the readbacks' host-read barrier): `VulkanTransferQueue::SubmitReadback`, the shared
+  submission point of buffer, texture and recorded downloads, records a buffer barrier on the staging slot (COPY /
+  TRANSFER_WRITE to HOST / HOST_READ, the download's size) before ending the command buffer; completion-only
+  submissions skip it; `TransferQueueDiagnostics::ReadbackHostBarriers` counts submitted downloads that recorded it.
+  Tests: the buffer and texture readback smokes assert it equals `DownloadsQueued` (they fail with the branch's flag
+  disabled, 0 against 1, and pass with it; the counter shows coverage, the masks rest on review). gpu;vulkan suite
+  178/182 (the four known failures), CPU transfer tests 101/101. Code review (Codex, fresh thread
+  `01a1ac23-b123-7f81-8b8d-1bdc6b0f46f2`, diff `72815894…`) verbatim "Correctness verdict: **approve**". Still open:
+  `ReadBuffer`'s slow path and the backbuffer capture (no host-read barrier).

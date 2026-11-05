@@ -140,8 +140,10 @@ and rendering state ownership remain unchanged.
   succeeds (`TransferQueueDiagnostics::ReadbackSlotsUncached` counts slots that
   missed it; the CPU's copy out of uncached memory is slow). The ring copies
   device-local buffer bytes with `vkCmdCopyBuffer` and texture subresources with
-  `vkCmdCopyImageToBuffer`, invalidates the VMA allocation on drain, copies bytes
-  into the sink, and only then marks the `ReadbackToken` complete.
+  `vkCmdCopyImageToBuffer`, follows the copy with a transfer-write to host-read
+  barrier (`TransferQueueDiagnostics::ReadbackHostBarriers` counts them),
+  invalidates the VMA allocation on drain, copies bytes into the sink, and only
+  then marks the `ReadbackToken` complete.
   `IDevice::ReadBuffer()` remains a legacy blocking smoke helper and is not the
   new readback path.
 - Renderer-owned drains such as `Picking.Readback` and the post-process

@@ -273,6 +273,30 @@ RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
                                                        uint64_t sizeBytes,
                                                        RHI::ReadbackSink sink)
 {
+    // The copy into the slot is made visible to the host before the CPU reads it at collection: the timeline wait
+    // orders the device's work, a host-read barrier the memory (both buffer and texture downloads end here).
+    bool hostBarrier = false;
+    {
+        std::scoped_lock lock{m_Mutex};
+        if (slotIndex < m_ReadbackSlots.size() && m_ReadbackSlots[slotIndex].Buffer != VK_NULL_HANDLE && sizeBytes > 0u)
+        {
+            VkBufferMemoryBarrier2 toHost{};
+            toHost.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+            toHost.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+            toHost.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            toHost.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+            toHost.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+            toHost.buffer = m_ReadbackSlots[slotIndex].Buffer;
+            toHost.offset = 0u;
+            toHost.size = sizeBytes;
+            VkDependencyInfo dependency{};
+            dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependency.bufferMemoryBarrierCount = 1u;
+            dependency.pBufferMemoryBarriers = &toHost;
+            vkCmdPipelineBarrier2(cmd, &dependency);
+            hostBarrier = true;
+        }
+    }
     if (!FinishCommandBuffer(cmd, "readback"))
         return {};
 
@@ -280,6 +304,8 @@ RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
     const uint64_t ticket = SubmitTimelineLocked(cmd, "readback");
     if (ticket == 0u)
         return {};
+    if (hostBarrier)
+        m_ReadbackHostBarriers.fetch_add(1u, std::memory_order_relaxed);
     const RHI::ReadbackToken token{ticket};
     if (slotIndex < m_ReadbackSlots.size())
         m_ReadbackSlots[slotIndex].RetireValue = ticket;
@@ -1154,6 +1180,7 @@ RHI::TransferQueueDiagnostics VulkanTransferQueue::GetDiagnostics() const noexce
         .ReadbackBytesStaged = m_ReadbackBytesStaged.load(std::memory_order_relaxed),
         .ReadbackRingHighWaterBytes = m_ReadbackRingHighWaterBytes.load(std::memory_order_relaxed),
         .ReadbackSlotsUncached = m_ReadbackSlotsUncached.load(std::memory_order_relaxed),
+        .ReadbackHostBarriers = m_ReadbackHostBarriers.load(std::memory_order_relaxed),
     };
 }
 
