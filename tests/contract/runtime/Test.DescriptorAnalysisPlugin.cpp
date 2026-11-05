@@ -24,6 +24,7 @@
 #include <imgui_internal.h>
 
 #include "DescriptorAnalysisHarness.hpp"
+#include "PluginWindowHarness.hpp"
 #include "TestImGuiFrameScope.hpp"
 #include "PointDomainFixture.hpp"
 
@@ -578,4 +579,16 @@ TEST(DescriptorAnalysisPlugin, ThePositionsPickerMovesTheOutputsToItsDomainAndKe
     EXPECT_EQ(afterChoice->Positions.Domain, D::MeshFace);
     for (const auto& output : afterChoice->Outputs) EXPECT_EQ(output.Domain, D::MeshFace) << output.Name;
     EXPECT_EQ(afterChoice->Normals.Domain, D::MeshFace) << "the normals follow the positions' domain";
+}
+
+TEST(DescriptorAnalysisPlugin, TheWindowFollowsSettingsAppliedElsewhere)
+{
+    Harness harness{};
+    const auto first = Settings(Make(harness.Scene(), D::MeshVertex), D::MeshVertex);
+    auto elsewhere = first;
+    elsewhere.FeatureRadius = 7;
+    const auto active = Intrinsic::Tests::Plugins::ApplyElsewhereThenPressApply<DA::kSection>(
+        harness, "view.descriptor_analysis", "FPFH Descriptor Analysis###view.descriptor_analysis", first, elsewhere);
+    ASSERT_TRUE(active);
+    EXPECT_EQ(active->FeatureRadius, 7) << "the window applied a stale draft";
 }

@@ -22,6 +22,7 @@
 
 #include "PointDomainFixture.hpp"
 #include "KernelDensityHarness.hpp"
+#include "PluginWindowHarness.hpp"
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.VisualizationConfig;
@@ -295,6 +296,10 @@ TEST(KernelDensityPlugin, AChangedInputOrOutputOrACancelEndsTheRunWithoutAWrite)
         case 4: EXPECT_TRUE(KD::Cancel(*run)); break;
         }
         EXPECT_EQ(harness.Wait(*run).Status, expected[change]) << run->Final->Message;
+        if (change != 0)
+            EXPECT_EQ(run->Final->Message,
+                      "Density estimation was cancelled or its source became stale; nothing was applied.")
+                << "the removed operation's text";
         EXPECT_EQ(harness.History().CanUndo(), change == 0);
         EXPECT_EQ(props.Exists("density"), change == 0 || change == 3);
     }
@@ -512,6 +517,7 @@ TEST(KernelDensityPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessio
     const auto refused = KD::Start(missing, false);
     ASSERT_TRUE(refused->Final);
     EXPECT_EQ(refused->Final->Status, "invalid");
+    EXPECT_EQ(refused->Final->Message, "Density target entity is stale or missing.") << "the removed operation's text";
     EXPECT_EQ(KD::Latest(), refused) << "a refusal of this run is its result";
     KD::Dismiss(first);
     EXPECT_EQ(KD::Latest(), refused) << "a dismiss of another run changes nothing";
@@ -732,41 +738,13 @@ TEST(KernelDensityPlugin, CpuOutputsAreBitwiseTheGeometryFunctions)
 TEST(KernelDensityPlugin, TheWindowFollowsSettingsAppliedElsewhere)
 {
     Harness harness{};
-    auto& scene = harness.Scene();
-    const auto entity = Make(scene, D::PointCloudPoint);
+    const auto entity = Make(harness.Scene(), D::PointCloudPoint);
     auto first = Settings(entity, D::PointCloudPoint);
     first.Density.Name = "window_first";
-    ASSERT_TRUE(harness.Apply(first));
-    auto* ui = harness.Engine.Services().Find<R::EditorUiHost>();
-    ASSERT_NE(ui, nullptr);
-    ASSERT_TRUE(ui->SetWindowOpen("view.kernel_density", true));
-    IMGUI_CHECKVERSION();
-    ImGuiContext* context = ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(1280, 1400);
-    io.IniFilename = nullptr;
-    unsigned char* pixels = nullptr;
-    int width = 0, height = 0;
-    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-    for (int frame = 0; frame < 14; ++frame)
-    {
-        io.DeltaTime = 1.f / 60.f;
-        ImGui::NewFrame();
-        if (frame == 4)
-        {
-            auto elsewhere = first;
-            elsewhere.Density.Name = "window_elsewhere";
-            ASSERT_TRUE(harness.Apply(elsewhere));
-        }
-        if (frame == 8)
-            if (auto* window = ImGui::FindWindowByName("Kernel Density###view.kernel_density"))
-                ImGui::ActivateItemByID(window->GetID("Apply settings"));
-        (void)ui->Windows().DrawOpenWindows();
-        ImGui::Render();
-        harness.Frame();
-    }
-    ImGui::DestroyContext(context);
-    const auto active = R::ActivePluginSection<KD::kSection>();
+    auto elsewhere = first;
+    elsewhere.Density.Name = "window_elsewhere";
+    const auto active = Intrinsic::Tests::Plugins::ApplyElsewhereThenPressApply<KD::kSection>(
+        harness, "view.kernel_density", "Kernel Density###view.kernel_density", first, elsewhere);
     ASSERT_TRUE(active);
     EXPECT_EQ(active->Density.Name, "window_elsewhere") << "the window applied a stale draft";
 }

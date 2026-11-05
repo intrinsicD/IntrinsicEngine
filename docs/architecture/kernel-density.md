@@ -96,11 +96,10 @@ window shows (the operation runtime's capture checks and GPU admission, with its
 discarded, cancelled) and identify the requested/actual backend, used bandwidth, density range, written/live/total
 counts, cache reuse, GPU batch and transfer counts and CPU elapsed time. The plugin keeps the newest run, whoever
 started it, for its window while the editor session lasts.
-A CPU run captures through the editing service, so a failure there answers the service's text (a missing entity:
-"The target entity is stale or missing.", where the removed engine operation said "Density target entity is stale or
-missing."); a CPU run that went stale or was cancelled answers "Density input or output changed before publication." or
-"The kernel density run was cancelled." instead of the job gate's "Density estimation was cancelled or its source became stale; nothing
-was applied.". The readiness keeps the operation runtime's texts.
+The texts are the removed engine operation's: a missing entity answers "Density target entity is stale or missing.",
+a CPU run cancelled or made stale before its completion "Density estimation was cancelled or its source became stale;
+nothing was applied.", one whose inputs or output changed before publication "Density input or output changed before
+publication.".
 
 ## Verification scope
 

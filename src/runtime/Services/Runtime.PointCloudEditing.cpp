@@ -156,7 +156,7 @@ namespace Extrinsic::Runtime
         const EditorProcessingContext& context = EditorProcessingCommandsAccess::Resolve(commands);
         if (context.Scene == nullptr) return fail("Scene is unavailable.");
         const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), request.StableEntityId);
-        if (!entity) return fail("The target entity is stale or missing.");
+        if (!entity) return fail((request.Noun.empty() ? "The" : request.Noun) + " target entity is stale or missing.");
         auto edit = std::make_shared<PointEdit>();
         edit->Context = context;
         edit->Entity = *entity;

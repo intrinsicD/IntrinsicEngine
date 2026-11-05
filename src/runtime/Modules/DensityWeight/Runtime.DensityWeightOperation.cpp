@@ -49,7 +49,7 @@ namespace Extrinsic::Runtime
             using Backend = DensityWeightBackend;
             static constexpr Backend ReferenceBackend = Backend::CpuKDTree;
             static constexpr std::uint32_t MinimumLiveCount = 1;
-            static constexpr bool InlineDeliversToSink = false, FinalizeFromPending = true;
+            static constexpr bool FinalizeFromPending = true;
             static constexpr std::string_view Noun{"Density"}, History{"Compute compact density weights"};
             static OperationWording Wording(OperationWording)
             {

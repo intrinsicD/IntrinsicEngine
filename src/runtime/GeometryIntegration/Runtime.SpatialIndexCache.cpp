@@ -312,6 +312,7 @@ namespace Extrinsic::Runtime
             work->DownloadQueued = true;
             work->SubmittedFrame = Device->GetGlobalFrameNumber();
             work->Result->State = SpatialQueryState::Submitted;
+            ++Stats.GpuComputeSubmissions;
             return true;
         }
         void ShutdownBatches()
@@ -676,6 +677,7 @@ namespace Extrinsic::Runtime
                         }
                         work->SubmittedFrame = m_Impl->Device->GetGlobalFrameNumber();
                         work->Result->State = SpatialQueryState::Submitted;
+                        ++m_Impl->Stats.GpuComputeSubmissions;
                     }
                     for (auto& batch : m_Impl->Batches)
                     {

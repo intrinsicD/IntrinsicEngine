@@ -139,13 +139,6 @@ export extern "C++"
                 else
                     return 2u;
             }();
-            static constexpr bool InlineDeliversToSink = []
-            {
-                if constexpr (requires { Def::InlineDeliversToSink; })
-                    return bool(Def::InlineDeliversToSink);
-                else
-                    return true;
-            }();
             static constexpr bool FinalizeFromPending = []
             {
                 if constexpr (requires { Def::FinalizeFromPending; })
@@ -282,8 +275,8 @@ export extern "C++"
             }
 
             // Stages 4-8 on the CPU for a captured run: the shared index of a non-reference backend; then,
-            // without a job lane, execution and publication inline (stored, returned, and given to the sink
-            // unless the definition says otherwise); otherwise one queued run per output (a duplicate answers
+            // without a job lane, execution and publication inline (stored and returned, not given to the
+            // sink); otherwise one queued run per output (a duplicate answers
             // Pending for the active run and is not stored): its Pending answer is stored, stage 6 refuses a
             // cancelled, abandoned or stale run, and the terminal result is stored before the sink receives it.
             template <class Work>
@@ -324,10 +317,7 @@ export extern "C++"
                 if (!context.JobCommands.Available())
                 {
                     Shape::Execute(*w);
-                    const Result result = KeepOperationResult<Op>(context, invocation, Publish(context, w));
-                    if (Traits::InlineDeliversToSink && onComplete)
-                        onComplete(result);
-                    return result;
+                    return KeepOperationResult<Op>(context, invocation, Publish(context, w));
                 }
                 const EditorJobIdentity identity{.EntityId = w->Config.StableEntityId,
                     .Scope = ToEditorJobScope(output.Domain),
@@ -392,7 +382,7 @@ export extern "C++"
         // Output names the parameters' output reference; capture resolves its domain in place. Optional:
         // Method, Evaluation and Failure (default texts); MinimumK (kNN rows, floored at it); Wording(defaults);
         // ReferenceBackend (CpuOctree) and MinimumLiveCount (2); Prepare (a capture step before the Vulkan
-        // admission); GpuParams(params, result); InlineDeliversToSink (true); FinalizeFromPending (false: a
+        // admission); GpuParams(params, result); FinalizeFromPending (false: a
         // failed worker is delivered as it is); RefuseInPlace.
         template <class Def>
         concept PointScalarDefinition = requires(const typename Def::Params& params,

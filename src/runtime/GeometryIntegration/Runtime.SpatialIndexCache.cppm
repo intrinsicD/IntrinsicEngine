@@ -54,6 +54,8 @@ export namespace Extrinsic::Runtime
         std::uint64_t WorkspaceLeases{}, WorkspaceReuses{};
         // Query-input writes only, excluding target-index builds and result readback.
         std::uint64_t GpuQueryUploadBytes{}, GpuQueryTransformUploads{}, GpuQueryImmediateSubmissions{};
+        // Computations (QueueGpuCompute) that reached the device: submitted at once or recorded into the frame.
+        std::uint64_t GpuComputeSubmissions{};
     };
     enum class SpatialIndexSpace : std::uint8_t { Property, EntityTransform };
     struct SpatialIndexSnapshot

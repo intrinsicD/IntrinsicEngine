@@ -86,15 +86,8 @@ namespace Intrinsic::Plugins::PointSpacing
                 ImGui::End();
                 return;
             }
-            // The draft follows the section whenever it changes, also when config_apply changed it.
             const auto active = R::ActivePluginSection<kSection>();
-            if (active)
-                if (auto serialized = R::SerializeDerivedSection<kSection>(*active); serialized != state.LastApplied)
-                {
-                    state.Draft = active;
-                    state.LastApplied = std::move(serialized);
-                    state.Message.clear();
-                }
+            if (R::FollowPluginSection<kSection>(active, state.Draft, state.LastApplied)) state.Message.clear();
             if (!state.Draft)
             {
                 ImGui::TextWrapped("The point spacing section is missing or invalid.");

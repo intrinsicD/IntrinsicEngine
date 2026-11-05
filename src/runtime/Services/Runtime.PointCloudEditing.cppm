@@ -41,6 +41,7 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Output{};
         std::vector<GeometryPropertyRef> ScalarOutputs{};
         std::size_t MinimumLiveCount{2u};
+        std::string Noun{}; // a missing entity answers "<Noun> target entity is stale or missing." (default "The")
         bool CopyValues{true};    // false: readiness only, nothing copied
         bool AcquireIndex{false}; // the cached spatial index of the points (CPU and GPU neighbourhoods)
         // The entity's local Transform (an unparented entity only): its matrix in the view, and the capture is stale

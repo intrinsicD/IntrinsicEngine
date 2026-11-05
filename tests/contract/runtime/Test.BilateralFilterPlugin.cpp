@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,6 +17,7 @@
 #include <imgui_internal.h>
 
 #include "BilateralFilterHarness.hpp"
+#include "PluginWindowHarness.hpp"
 #include "PointDomainFixture.hpp"
 
 import Extrinsic.ECS.Components.GeometrySources;
@@ -351,4 +353,36 @@ TEST(BilateralFilterPlugin, TheWindowRunsTheAppliedSettings)
     EXPECT_TRUE(props.Exists("filtered")) << "the Run button started a run that published";
     EXPECT_TRUE(props.Exists("filtered_too")) << "a second Run with other applied settings";
     EXPECT_EQ(harness.History().UndoCount(), 2u);
+}
+
+TEST(BilateralFilterPlugin, TheWindowFollowsSettingsAppliedElsewhere)
+{
+    Harness harness{};
+    const auto entity = Make(harness.Scene(), D::MeshVertex);
+    auto first = Settings(entity, D::MeshVertex);
+    first.Output.Name = "window_first";
+    auto elsewhere = first;
+    elsewhere.Output.Name = "window_elsewhere";
+    const auto active = Intrinsic::Tests::Plugins::ApplyElsewhereThenPressApply<BF::kSection>(
+        harness, "view.bilateral_filter", "Bilateral Point Filter###view.bilateral_filter", first, elsewhere);
+    ASSERT_TRUE(active);
+    EXPECT_EQ(active->Output.Name, "window_elsewhere") << "the window applied a stale draft";
+}
+
+TEST(BilateralFilterPlugin, AWindowDraftFollowsTheSectionThroughAMissingOne)
+{
+    BF::Config section{};
+    section.Output.Name = "followed";
+    std::optional<BF::Config> draft;
+    std::string seen;
+    EXPECT_TRUE(R::FollowPluginSection<BF::kSection>(section, draft, seen));
+    ASSERT_TRUE(draft);
+    draft->Output.Name = "edited"; // the window's edit
+    EXPECT_FALSE(R::FollowPluginSection<BF::kSection>(section, draft, seen)) << "an unchanged section keeps the edit";
+    EXPECT_EQ(draft->Output.Name, "edited");
+    EXPECT_TRUE(R::FollowPluginSection<BF::kSection>(std::nullopt, draft, seen));
+    EXPECT_FALSE(draft) << "a missing section leaves nothing stale to show or apply";
+    EXPECT_TRUE(R::FollowPluginSection<BF::kSection>(section, draft, seen)) << "the same section again is taken again";
+    ASSERT_TRUE(draft);
+    EXPECT_EQ(draft->Output.Name, "followed");
 }

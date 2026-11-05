@@ -215,8 +215,7 @@ TEST(OperationResults, DuplicateRefusalLeavesTheActiveRunsSlot)
     EXPECT_EQ(f.Last()->Status, R::EditorCommandStatus::Applied) << "any caller's run reaches the slot";
 }
 
-// Without a job lane the run is inline: its result is returned and stored. Density weights do not give it to the
-// sink as well (InlineDeliversToSink false); kernel density did before it became a plugin (ARCH-022 Q89).
+// Without a job lane the run is inline: its result is returned and stored, not given to the sink as well.
 TEST(OperationResults, InlineFallbackReturnsAndStoresTheResult)
 {
     Fixture f;

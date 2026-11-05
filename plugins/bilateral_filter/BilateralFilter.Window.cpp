@@ -27,6 +27,7 @@ namespace Intrinsic::Plugins::BilateralFilter
         struct WindowState
         {
             std::optional<Config> Draft{};
+            std::string LastApplied{}; // the section the draft was taken from (serialized)
             std::vector<std::shared_ptr<Run>> Running{};
             std::shared_ptr<Run> Last{};
             std::string Message{};
@@ -53,7 +54,8 @@ namespace Intrinsic::Plugins::BilateralFilter
                 ImGui::End();
                 return;
             }
-            if (!state.Draft) state.Draft = R::ActivePluginSection<kSection>();
+            const auto active = R::ActivePluginSection<kSection>();
+            if (R::FollowPluginSection<kSection>(active, state.Draft, state.LastApplied)) state.Message.clear();
             if (!state.Draft)
             {
                 ImGui::TextWrapped("The bilateral filter section is missing or invalid.");
@@ -93,14 +95,15 @@ namespace Intrinsic::Plugins::BilateralFilter
             if (ImGui::Button("Apply settings"))
             {
                 std::string error;
-                state.Message = R::ApplyPluginSection<kSection>(draft, error) ? "Settings applied." : error;
+                const bool applied = R::ApplyPluginSection<kSection>(draft, error);
+                state.Message = applied ? "Settings applied." : error;
+                if (applied) state.LastApplied = R::SerializeDerivedSection<kSection>(draft); // its own change
             }
             ImGui::SameLine();
-            if (ImGui::Button("Revert")) state.Draft = R::ActivePluginSection<kSection>();
+            if (ImGui::Button("Revert")) state.Draft = active;
             if (!state.Message.empty()) ImGui::TextWrapped("%s", state.Message.c_str());
             ImGui::Separator();
             // Run uses the applied settings, as the MCP tool does.
-            const auto active = R::ActivePluginSection<kSection>();
             const std::string reason = active ? Preview(*active) : "The section is invalid.";
             std::erase_if(state.Running, [](const auto& run) { return run->Final.has_value(); });
             ImGui::BeginDisabled(!reason.empty());

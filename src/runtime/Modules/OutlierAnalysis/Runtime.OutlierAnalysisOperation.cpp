@@ -114,7 +114,6 @@ namespace Extrinsic::Runtime
             using Work = OutlierWork;
             static constexpr std::string_view Noun{"Outlier"};
             static constexpr std::uint32_t MinimumLiveCount = 1;
-            static constexpr bool InlineDeliversToSink = false;
             static GeometryProcessingDetail::OperationWording Wording(GeometryProcessingDetail::OperationWording w)
             {
                 w.TooFewSamples = "Outlier analysis requires live input samples.";

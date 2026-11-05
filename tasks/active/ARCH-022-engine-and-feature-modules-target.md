@@ -3749,3 +3749,22 @@ python3 tools/docs/check_doc_links.py --root . --strict
   (Codex, gpt-6-astra xhigh, read-only, recursion protection instruction-only; fresh thread
   `01a1ad45-ac29-7692-9403-36a6b85a4f54`, diff `e2b51fc0…`) verbatim "**Verdict: approve** for block 3’s test-premise
   corrections."; its two comment-wording notes applied after the approval.
+- 2026-11-05, Q90 block 1 (points 6–9): (7) `FollowPluginSection` in `Extrinsic.Runtime.PluginSections` (the draft
+  follows the active section, a missing one leaves none) used by all four plugin windows; (6) the operation runtime's
+  `InlineDeliversToSink` trait, its branch and both `false` flags deleted; (8) the removed engine operations' texts
+  restored (the capture request's `Noun` for "<Noun> target entity is stale or missing.", the job gate's "…was
+  cancelled or its source became stale; nothing was applied." for cancelled and stale CPU runs, now checked before
+  publication), the docs' deviation paragraphs replaced; (9) new stat `SpatialIndexCacheStats::GpuComputeSubmissions`
+  (a computation submitted at once or recorded into a frame) and both plugin GPU cancel smokes cancel only after it
+  grew for their run. Tests: `TheWindowFollowsSettingsAppliedElsewhere` for all four plugins on a shared helper
+  (tests/support/PluginWindowHarness.hpp: the window drawn, its Apply leaving "no change" last),
+  `BilateralFilterPlugin.AWindowDraftFollowsTheSectionThroughAMissingOne`, exact texts for the missing entity and the
+  four stale/cancel cases. Focused suites 212/212 (plugins, PointCloudEditing, PluginHost, OperationResults,
+  DensityWeightOperations, OutlierAnalysis, SpatialIndexCache, PointScalarTransaction and their GPU smokes);
+  mutations: the helper initialising once (four window tests red), the service ignoring the noun (two text
+  assertions), no counter increments (both cancel smokes), no currentness check (both stale-text tests), the old
+  missing-section return (the new test), the harness not pressing Apply (four window tests); reverted, green. jscpd:
+  no clone involving the changed windows or the helper. Code review (Codex, gpt-6-astra xhigh, read-only, recursion
+  protection instruction-only; fresh thread `01a1ad3f-44c5-7162-86f0-85f03e4ce63b`): diff `1c4569a2…` verbatim
+  "**Verdict: revise required.**" (stale CPU runs still answered the publication text; optional: the missing-section
+  edge, the window helper's false-positive route, a stale comment), diff `017b319c…` verbatim "**Verdict: approve.**".

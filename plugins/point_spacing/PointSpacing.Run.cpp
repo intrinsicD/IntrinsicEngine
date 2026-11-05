@@ -207,11 +207,12 @@ namespace Intrinsic::Plugins::PointSpacing
                 r.Status = "cancelled";
                 r.Message = "The editor session of the point spacing run ended; nothing was written.";
             }
-            else if (!applied || w.Failed)
+            else if (!applied || w.Failed || !w.Service->Current(*w.Edit))
             {
+                // The job gate's check before publication, as the removed engine operation's: a cancel, or an input or
+                // the output changed while the run went.
                 r.Status = w.Failed ? "failed" : !w.Service->Current(*w.Edit) ? "stale" : "cancelled";
-                if (r.Status == "stale") r.Message = "Radii input or output changed before publication.";
-                else if (r.Status == "cancelled") r.Message = "The point spacing run was cancelled.";
+                if (!w.Failed) r.Message = "Radii estimation was cancelled or its source became stale; nothing was applied.";
             }
             else
             {
@@ -264,7 +265,8 @@ namespace Intrinsic::Plugins::PointSpacing
             w->Edit = service.Capture({.StableEntityId = config.StableEntityId,
                                        .Positions = config.Positions,
                                        .ScalarOutputs = {config.Radii},
-                                       .MinimumLiveCount = 0u},
+                                       .MinimumLiveCount = 0u,
+                                       .Noun = "Radii"},
                                       diagnostic);
             if (w->Edit == nullptr) return fail("invalid", diagnostic);
             auto view = service.View(*w->Edit);
