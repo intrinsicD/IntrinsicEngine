@@ -43,6 +43,7 @@ namespace Extrinsic::Runtime
         KMeansOutputPropertyState BeforeOutputs{};
         Geometry::KMeans::KMeansParams Params{};
         std::string BackendDiagnostic{};
+        std::vector<glm::vec3> Seeds{}; // computed by a worker job (ARCH-022 Q90); empty: the GPU start seeds itself
     };
 
     struct ClusteringGpuSubmission

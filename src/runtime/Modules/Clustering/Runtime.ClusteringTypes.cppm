@@ -199,7 +199,8 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastRequestSteadyMicros{0}; // steady_clock at the latest request's enqueue
         std::uint64_t GpuSnapshotMicros{0};
         std::uint64_t GpuInputResolveMicros{0};
-        std::uint64_t GpuSeedingMicros{0};
+        std::uint64_t GpuSeedingMicros{0}; // main-thread seeding of a GPU start (Random; Hierarchical without a worker)
+        std::uint64_t GpuSeedingJobs{0};   // Hierarchical seedings of GPU requests on a worker (ARCH-022 Q90)
         std::uint64_t GpuWorkspacePrepareMicros{0};
         std::uint64_t GpuSubmissions{0};
     };

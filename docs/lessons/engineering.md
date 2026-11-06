@@ -269,10 +269,13 @@ check every output first, then write only the outputs in place, and test that an
 
 K-Means' Accept (measured 31.8–31.9 ms at 1M points) is, by code reading, about a dozen O(N) passes: output captures,
 new arrays, and an undo validation that recaptures the whole input and compares it bitwise. The shared
-`PublishPointScalarField` (every point-scalar operation, the descriptor plugin's 33 columns) already validates its
-inputs by revision, but copies each output column before and after and recaptures the outputs for a bitwise
-comparison. Safeguard: validate the generation by property revisions, share immutable snapshots in undo records, copy
-each array once.
+`PublishPointScalarField` (every point-scalar operation, the descriptor plugin's 33 columns) validates its inputs and,
+since Q90, its outputs by revision only (it no longer recaptures the outputs for a bitwise comparison at every apply,
+undo and redo); `AScalarPublicationRefusesAnOutputChangedThroughAnyMutablePath` shows writes through `Vector()`,
+`operator[]`, `Span()`, `Data()`, retained vector and span borrows marked with `MarkModified`, and removing and adding
+the property again are refused that way, and `AScalarPublicationChecksOutputRevisionsNotValues` that a write outside
+the contract (a retained borrow never marked) is not seen. It still copies each output column before and after. Safeguard: validate
+the generation by property revisions, share immutable snapshots in undo records, copy each array once.
 
 ### CPU-read GPU memory needs a cached type, an asynchronous read and a host-read barrier
 

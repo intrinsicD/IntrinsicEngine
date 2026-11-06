@@ -1,5 +1,6 @@
 module;
 #include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
+#include <atomic>
 #include <functional>
 #include <chrono>
 
@@ -60,11 +61,24 @@ namespace Extrinsic::Runtime
     // keeping about 16 B per point alive until another request, an active-world change or shutdown (a cloud deleted
     // in the active world stays until then); a writer through a retained mutable borrow must call MarkModified(), as
     // every revision watch assumes.
+    // Hierarchical seeds of one capture for one (seed, cluster count), computed by a worker job: a GPU request waits
+    // for them instead of seeding on the main thread, as a replacing request waits for the run it replaces (ARCH-022
+    // Q90). Ready or Cancelled is set once the job ended.
+    struct KMeansSeeding
+    {
+        std::uint32_t Seed{};
+        std::uint32_t Clusters{};
+        std::vector<glm::vec3> Seeds{};
+        std::atomic_bool Ready{false};
+        std::atomic_bool Cancelled{false};
+    };
+
     struct KMeansCapturedInput
     {
         GeometryPropertyRef Positions{};
         std::vector<GeometryProcessingDetail::PointPropertyWatch> Inputs{};
         std::shared_ptr<const KMeansCapture> Capture{};
+        std::shared_ptr<KMeansSeeding> Seeding{}; // of Capture; a new capture drops it
     };
 
     // The kept capture and the scene-document registration that releases it when the document is replaced.
@@ -351,7 +365,8 @@ namespace Extrinsic::Runtime
             const RunKMeans& command,
             KMeansRunCompleted& failure,
             KMeansCapturedInput& captures,
-            ClusteringModuleStats& stats)
+            ClusteringModuleStats& stats,
+            const bool countReuse = true)
         {
             if (auto rejected = ValidateKMeansRequest(&scene.Raw(), command))
             {
@@ -371,7 +386,7 @@ namespace Extrinsic::Runtime
                     return GeometryProcessingDetail::ObserveGeometryProperty(availability, watch.Domain, watch.Name) ==
                         watch;
                 });
-            if (reuse)
+            if (reuse && countReuse)
                 ++stats.CaptureReuses;
             else
             {
@@ -561,6 +576,9 @@ namespace Extrinsic::Runtime
         {
             KMeansPointSnapshot Points{};
             KMeansOutputPropertySnapshot Outputs{};
+            // A GPU run's Accept only: its revision watches over the input, the deletion mask and the outputs (O(1))
+            // stand for the exact comparison at the first apply; undo and redo compare exactly (ARCH-022 Q90).
+            std::function<bool()> FirstApplyCurrent{};
         };
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyKMeansOutputState(
@@ -602,7 +620,8 @@ namespace Extrinsic::Runtime
             const WorldHandle world,
             EditorCommandHistory* history,
             KMeansSnapshot snapshot,
-            const GK::KMeansResult& clustered)
+            const GK::KMeansResult& clustered,
+            std::function<bool()> firstApplyCurrent = {})
         {
             if (scene == nullptr)
                 return EditorCommandHistoryStatus::MissingScene;
@@ -650,6 +669,7 @@ namespace Extrinsic::Runtime
                            KMeansMutationGeneration{
                                .Points = points,
                                .Outputs = beforeState,
+                               .FirstApplyCurrent = std::move(firstApplyCurrent),
                            },
                            beforeState,
                            afterState,
@@ -709,7 +729,12 @@ namespace Extrinsic::Runtime
                                auto positionRef = mutation.Properties.InputPositions;
                                std::string diagnostic;
                                KMeansOutputPropertyState currentOutputs{};
-                               if (!CapturePointInput(BuildGeometryAvailability(currentRaw, currentEntity),
+                               if (expected.FirstApplyCurrent)
+                               {
+                                   if (!expected.FirstApplyCurrent())
+                                       return EditorCommandHistoryStatus::StaleEntity;
+                               }
+                               else if (!CapturePointInput(BuildGeometryAvailability(currentRaw, currentEntity),
                                        positionRef, true, currentPoints, diagnostic) ||
                                    currentPoints.SlotCount != expected.Points->SlotCount ||
                                    currentPoints.Slots != expected.Points->Slots ||
@@ -1057,7 +1082,9 @@ namespace Extrinsic::Runtime
             SpatialIndexCache* spatialIndices, RHI::IDevice* device, EditorCommandHistory* history,
             EditorWorkspaceSlot& workspace,
             KMeansCapturedInput& captures,
-            ClusteringModuleStats& stats)
+            ClusteringModuleStats& stats,
+            bool* heldForSeeding = nullptr,
+            const bool countCaptureReuse = true)
         {
             stats.CommandsHandled += 1u;
             // A GPU request's capture and start, whichever way it ends (started, refused, or the CPU fallback queued).
@@ -1092,7 +1119,7 @@ namespace Extrinsic::Runtime
                 const ScopedMicros snapshotTimer{
                     command.Backend == ClusteringBackend::VulkanCompute ? &stats.GpuSnapshotMicros : nullptr};
                 snapshot = TryBuildSnapshot(context.ActiveWorld, world, context.Correlation, command, failure,
-                    captures, stats);
+                    captures, stats, countCaptureReuse);
             }
             if (!snapshot.has_value())
             {
@@ -1126,16 +1153,59 @@ namespace Extrinsic::Runtime
                 if (command.Properties.OutputScalarLabels) watch(*command.Properties.OutputScalarLabels);
                 const auto deletion = GeometryProcessingDetail::ResolvePointDeletionSource(command.Properties.InputPositions.Domain);
                 watches.push_back(GeometryProcessingDetail::ObserveGeometryProperty(availability, deletion.Domain, deletion.Name));
-                // O(1) revision watches between pages; exact before/after validation is
-                // retained by CommitKMeansOutputs at the publication boundary.
+                // O(1) revision watches between pages and at the Accept's first apply; undo and redo
+                // validate exactly (CommitKMeansOutputs).
                 const auto current = [processing, entity, watches=std::move(watches)] {
                     return processing.AttachmentActive() && GeometryProcessingDetail::GeometryPropertiesCurrent(processing, entity, watches);
                 };
+                // Hierarchical seeds (O(N k)) come from a worker job: the request waits for them, as a replacing
+                // request waits for the run it replaces, unless the capture has them for these parameters (ARCH-022
+                // Q90). Random seeding is O(k) and stays in the start.
+                if (gpuState != nullptr && editorJobs.Available() && heldForSeeding != nullptr &&
+                    snapshot->Params.Init == GK::Initialization::Hierarchical)
+                {
+                    const auto clusters =
+                        std::min(std::uint32_t(snapshot->Input->Points.size()), snapshot->Params.ClusterCount);
+                    auto& seeding = captures.Seeding;
+                    if (!seeding || seeding->Seed != snapshot->Params.Seed || seeding->Clusters != clusters ||
+                        seeding->Cancelled.load(std::memory_order_acquire))
+                    {
+                        seeding = std::make_shared<KMeansSeeding>();
+                        seeding->Seed = snapshot->Params.Seed;
+                        seeding->Clusters = clusters;
+                        JobDesc job{};
+                        job.DebugName = "Runtime.Clustering.KMeans.Seeding";
+                        job.Scope = world;
+                        job.Work = [seeding, input = snapshot->Input, params = snapshot->Params](const JobCancellation&)
+                        {
+                            seeding->Seeds = GK::BuildInitialCentroids(input->Points, {}, params, seeding->Clusters);
+                            seeding->Ready.store(true, std::memory_order_release);
+                            return JobResultEnvelope{};
+                        };
+                        job.PublishCompletion = [](KernelEventBus&, const JobResultEnvelope&) { return true; };
+                        job.FinalizeUnpublishedOnMainThread = [seeding]
+                        {
+                            if (!seeding->Ready.load(std::memory_order_acquire))
+                                seeding->Cancelled.store(true, std::memory_order_release);
+                        };
+                        if (context.Jobs->Submit(std::move(job)).IsValid())
+                            ++stats.GpuSeedingJobs;
+                        else
+                            seeding.reset(); // no worker: the start seeds itself
+                    }
+                    if (seeding && !seeding->Ready.load(std::memory_order_acquire))
+                    {
+                        *heldForSeeding = true;
+                        return CommandOutcome::Ok();
+                    }
+                    if (seeding)
+                        snapshot->Seeds = seeding->Seeds;
+                }
                 const ClusteringGpuSubmission submission = gpuState != nullptr && editorJobs.Available()
                     ? gpuState->Start(*snapshot, processing, current,
-                        [captured,processing](const GK::KMeansResult& clustered) {
+                        [captured,processing,current](const GK::KMeansResult& clustered) {
                             // Publication is terminal for the run: the captured snapshot is consumed here.
-                            const auto status=CommitKMeansOutputs(processing.Scene,processing.World,processing.CommandHistory,std::move(*captured),clustered);
+                            const auto status=CommitKMeansOutputs(processing.Scene,processing.World,processing.CommandHistory,std::move(*captured),clustered,current);
                             return status==EditorCommandHistoryStatus::Applied?EditorCommandStatus::Applied:
                                 status==EditorCommandHistoryStatus::StaleEntity?EditorCommandStatus::StaleEntity:EditorCommandStatus::GeometryProcessingFailed;
                         })
@@ -1270,12 +1340,21 @@ namespace Extrinsic::Runtime
                     ++m_Stats.GpuReplacementsHeld;
                     return CommandOutcome::Ok();
                 }
-                return HandleRunKMeansCommand(
+                bool heldForSeeding = false;
+                const CommandOutcome outcome = HandleRunKMeansCommand(
                     context,
                     command,
                     m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
                     *m_Workspace, m_Captures->Last,
-                    m_Stats);
+                    m_Stats, &heldForSeeding);
+                if (heldForSeeding)
+                {
+                    // The newest request waits; one already waiting is replaced, as a waiting replacement is.
+                    CancelHeld(KMeansRunStatus::Cancelled, "K-Means request replaced by a newer one before it started.");
+                    m_Held = HeldRequest{
+                        .Command = command, .Correlation = context.Correlation, .World = world, .Seeding = true};
+                }
+                return outcome;
             });
 
         m_JobCompletedSubscription =
@@ -1346,6 +1425,12 @@ namespace Extrinsic::Runtime
     {
         if (!m_Held || m_GpuState == nullptr || !m_GpuState->Settled())
             return;
+        if (const auto& seeding = m_Captures->Last.Seeding; seeding && !seeding->Ready.load(std::memory_order_acquire))
+        {
+            if (seeding->Cancelled.load(std::memory_order_acquire))
+                CancelHeld(KMeansRunStatus::Cancelled, "K-Means seeding was cancelled before the request started.");
+            return;
+        }
         auto* const scene = m_Worlds->Get(m_Held->World);
         if (scene == nullptr || m_Worlds->ActiveWorld() != m_Held->World)
         {
@@ -1354,11 +1439,18 @@ namespace Extrinsic::Runtime
         }
         HeldRequest held = std::move(*m_Held);
         m_Held.reset();
-        ++m_Stats.GpuReplacementsStarted;
+        if (!held.Seeding)
+            ++m_Stats.GpuReplacementsStarted;
         CommandContext context{.ActiveWorld = *scene, .Commands = *m_Service.m_Commands, .Events = m_Events,
             .Jobs = m_Jobs, .Worlds = m_Worlds, .Correlation = held.Correlation};
+        bool heldForSeeding = false;
         (void)HandleRunKMeansCommand(context, held.Command, m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-            *m_Workspace, m_Captures->Last, m_Stats);
+            *m_Workspace, m_Captures->Last, m_Stats, &heldForSeeding, !held.Seeding);
+        if (heldForSeeding)
+        {
+            held.Seeding = true;
+            m_Held = std::move(held); // its seeds are on their way; it starts once they are ready
+        }
     }
 
     void ClusteringModule::ReleaseCapture() noexcept

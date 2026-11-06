@@ -54,6 +54,7 @@ namespace Extrinsic::Runtime
             RunKMeans Command{};
             CommandCorrelationId Correlation{};
             WorldHandle World{}; // the world it was admitted in; it starts only there
+            bool Seeding{false}; // waits for its seeds; its capture was counted when it first drained
         };
         void StartHeld();
         void CancelHeld(KMeansRunStatus status, std::string why);

@@ -256,7 +256,8 @@ namespace Extrinsic::Runtime
             }
             if (!a->Input)
                 return {.Refused = true, .Diagnostic = "K-Means resident input is busy or unavailable."};
-            std::vector<glm::vec3> seeds;
+            std::vector<glm::vec3> seeds = std::move(snapshot.Seeds);
+            if (seeds.empty())
             {
                 const ScopedMicros timer{&Stats.GpuSeedingMicros};
                 seeds = Geometry::KMeans::BuildInitialCentroids(snapshot.Input->Points, {}, snapshot.Params, a->Clusters);

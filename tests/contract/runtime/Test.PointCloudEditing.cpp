@@ -263,6 +263,87 @@ TEST(PointCloudEditing, ScalarColumnsPublishOnlyWhenEveryOutputGetsOneValuePerPo
     EXPECT_EQ(harness.History().UndoCount(), 1u);
 }
 
+// Undo and redo of a scalar publication refuse an output changed through any mutable path that keeps the property
+// contract (Geometry.Properties.cppm: a borrow marks the property, a retained borrow is marked by MarkModified); this is
+// what lets the apply check revisions instead of recapturing the columns (ARCH-022 Q90).
+TEST(PointCloudEditing, AScalarPublicationRefusesAnOutputChangedThroughAnyMutablePath)
+{
+    // 0 Vector(), 1 operator[], 2 a vector borrow retained from before the capture and marked after the write, 3 removed
+    // and added again with the same values, 4 Span(), 5 Data(), 6 a span retained from before the capture and marked
+    // after the write.
+    for (unsigned path = 0; path < 7; ++path)
+        for (const bool redo : {false, true})
+        {
+            SCOPED_TRACE(path);
+            SCOPED_TRACE(redo);
+            Harness harness{};
+            auto& scene = harness.Scene();
+            const auto entity = Make(scene, D::MeshVertex);
+            auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+            props.GetOrAdd<float>("a", 5.f);
+            auto request = Request(entity, D::MeshVertex);
+            request.ScalarOutputs = {{.Domain = D::MeshVertex, .Name = "a", .ValueKind = Geometry::PropertyValueKind::Float}};
+            auto retained = props.Get<float>("a");
+            auto& borrowed = retained.Vector(); // the borrows mark now, before the capture
+            const auto retainedSpan = retained.Span();
+            std::string diagnostic;
+            const auto edit = harness.Editing().Capture(request, diagnostic);
+            ASSERT_TRUE(edit) << diagnostic;
+            const std::vector<std::vector<float>> column{std::vector<float>(harness.Editing().View(*edit).LiveCount, 1.f)};
+            ASSERT_EQ(harness.Editing().PublishScalars(*edit, column, "Scalars"), R::PointPublishStatus::Applied);
+            if (redo) ASSERT_TRUE(harness.History().Undo().Succeeded());
+            const float value = std::as_const(props).Get<float>("a")[1];
+            switch (path)
+            {
+            case 0: props.Get<float>("a").Vector()[1] = value + 1.f; break;
+            case 1: props.Get<float>("a")[1] = value + 1.f; break;
+            case 2:
+                borrowed[1] = value + 1.f;
+                retained.MarkModified();
+                break;
+            case 3:
+            {
+                const auto values = std::as_const(props).Get<float>("a").Vector();
+                auto removed = props.Get<float>("a");
+                props.Remove(removed);
+                props.GetOrAdd<float>("a").Vector() = values;
+                break;
+            }
+            case 4: props.Get<float>("a").Span()[1] = value + 1.f; break;
+            case 5: props.Get<float>("a").Data()[1] = value + 1.f; break;
+            case 6:
+                retainedSpan[1] = value + 1.f;
+                retained.MarkModified();
+                break;
+            }
+            const auto status = redo ? harness.History().Redo().Status : harness.History().Undo().Status;
+            EXPECT_EQ(status, R::EditorCommandHistoryStatus::StaleEntity);
+            EXPECT_EQ(std::as_const(props).Get<float>("a")[1], path == 3 ? value : value + 1.f) << "nothing was written";
+        }
+}
+
+// The apply compares revisions, not values (no recapture of the outputs): a write that bypasses the property contract
+// (a retained span written without MarkModified) is not seen, and the undo restores over it (ARCH-022 Q90).
+TEST(PointCloudEditing, AScalarPublicationChecksOutputRevisionsNotValues)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    props.GetOrAdd<float>("a", 5.f);
+    auto request = Request(entity, D::MeshVertex);
+    request.ScalarOutputs = {{.Domain = D::MeshVertex, .Name = "a", .ValueKind = Geometry::PropertyValueKind::Float}};
+    const auto unmarked = props.Get<float>("a").Span(); // marks now, before the capture
+    std::string diagnostic;
+    const auto edit = harness.Editing().Capture(request, diagnostic);
+    ASSERT_TRUE(edit) << diagnostic;
+    const std::vector<std::vector<float>> column{std::vector<float>(harness.Editing().View(*edit).LiveCount, 1.f)};
+    ASSERT_EQ(harness.Editing().PublishScalars(*edit, column, "Scalars"), R::PointPublishStatus::Applied);
+    unmarked[1] = 99.f; // outside the contract: no revision changes
+    EXPECT_EQ(harness.History().Undo().Status, R::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(std::as_const(props).Get<float>("a")[1], 5.f) << "the undo restored the value before the publication";
+}
+
 TEST(PointCloudEditing, AnInputCatalogOfOneDomainListsOnlyThatDomain)
 {
     // A normals picker offers the positions' domain only: a mesh has vertex and face vectors.

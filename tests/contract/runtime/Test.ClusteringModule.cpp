@@ -1947,9 +1947,50 @@ TEST_F(ClusteringModuleResident, StaleDuringAcceptReadbackReportsStaleSource)
     ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Failed);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
 }
+// ARCH-022 Q90: the Accept's first apply checks the run's revision watches instead of recapturing the input and the
+// outputs. A change during the Accept's readback through any mutable path that keeps the property contract still ends
+// the run stale and writes nothing: 0 positions Vector(), 1 operator[], 2 Span(), 3 a positions span retained from
+// before the run and marked after the write, 4 the deletion mask, 5 the colors output created.
+TEST_F(ClusteringModuleResident, AChangeDuringTheAcceptThroughAnyMutablePathEndsItStale)
+{
+    for (unsigned path = 0; path < 6; ++path)
+    {
+        SCOPED_TRACE(path);
+        auto retained = Properties().Get<glm::vec3>("v:position");
+        const auto span = retained.Span(); // marks now, before the run's capture
+        Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+        (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+        switch (path)
+        {
+        case 0: Properties().Get<glm::vec3>("v:position").Vector()[0].x += 1; break;
+        case 1: Properties().Get<glm::vec3>("v:position")[0].x += 1; break;
+        case 2: Properties().Get<glm::vec3>("v:position").Span()[0].x += 1; break;
+        case 3: span[0].x += 1; retained.MarkModified(); break;
+        case 4: Properties().GetOrAdd<bool>("v:deleted",false)[4] = !std::as_const(Properties()).Get<bool>("v:deleted")[4]; break;
+        case 5: Properties().GetOrAdd<glm::vec4>(Request.Properties.OutputColors.Name, glm::vec4(0)); break;
+        }
+        ASSERT_TRUE(Until([&]{return Results.size()==path+1;}));
+        EXPECT_EQ(Results[path].Status,Runtime::KMeansRunStatus::StaleSource) << Results[path].Message;
+        EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+        if (path == 5) { auto colors = Properties().Get<glm::vec4>(Request.Properties.OutputColors.Name); Properties().Remove(colors); }
+        for (int i = 0; i < 5; ++i) Tick();
+    }
+}
+// ARCH-022 Q90: no recapture at the Accept's first apply: a write outside the property contract (a span retained from
+// before the run, never marked) is not seen, and the Accept publishes.
+TEST_F(ClusteringModuleResident, TheAcceptsFirstApplyChecksRevisionsNotValues)
+{
+    const auto unmarked = Properties().Get<glm::vec3>("v:position").Span(); // marks now, before the run's capture
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    unmarked[0].x += 1; // outside the contract: no revision changes
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_TRUE(Properties().Exists("p:kmeans_label"));
+}
 TEST_F(ClusteringModuleResident, AdmissionReservesTypedAndPresentationAgainstScalarOwners)
 {
-    Start();Tick();
+    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;})); // started once its seeds are ready (ARCH-022 Q90)
     auto* residency=Cache.PropertyResidency();ASSERT_NE(residency,nullptr);
     const auto typed=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
     const auto presentation=Runtime::MakeGpuPropertyKey(World,Entity,Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels));
@@ -2026,7 +2067,7 @@ TEST_F(ClusteringModuleResident, AGpuRunIsAStepRunCountingItsIterations)
 TEST_F(ClusteringModuleResident, ARunRestsAtItsBoundaryAndAcceptPreparesTheCurrentCentroidsLabels)
 {
     Moved=true;Request.Parameters.MaxIterations=10;Request.Parameters.GpuPreviewInterval=100;
-    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    Start();ASSERT_TRUE(Until([&]{return Observation().Submissions>0u;}));
     ASSERT_TRUE(Control(Runtime::StepRunAction::Pause)); // the first page is in flight: it counts, then the run rests
     ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused;}));
     EXPECT_EQ(Observation().Iterations,1u);EXPECT_EQ(StepRun().Steps,1u);
