@@ -743,12 +743,14 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 !PointPropertyHistoryCurrent(context, entity, outputWatches))
                 return EditorCommandHistoryStatus::StaleEntity;
             auto& raw = context.Scene->Raw();
-            // Check every column before writing any, so a refused column leaves all unchanged.
+            // Check every column before writing any, so a refused column leaves all unchanged. The output watches
+            // above stand for the columns' values: every write through the property contract changes a revision (a
+            // borrow marks the property, a retained borrow is marked by MarkModified), so they are not recaptured and
+            // compared (ARCH-022 Q90).
             for (std::size_t i = 0; i < refs.size(); ++i)
             {
                 const auto* props = MutableGeometryProperties(raw, entity, refs[i].Domain);
-                if (!props || props->Exists(refs[i].Name) != expected[i].Exists ||
-                    !SameGeometryScalarPropertySnapshot(CaptureGeometryScalarProperty(*props, refs[i]), expected[i]))
+                if (!props || props->Exists(refs[i].Name) != expected[i].Exists)
                     return EditorCommandHistoryStatus::StaleEntity;
                 if (!CanApplyGeometryScalarProperty(*props, refs[i], target[i]))
                     return EditorCommandHistoryStatus::InvalidCommand;

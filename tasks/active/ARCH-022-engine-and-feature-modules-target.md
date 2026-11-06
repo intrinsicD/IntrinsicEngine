@@ -3811,3 +3811,13 @@ python3 tools/docs/check_doc_links.py --root . --strict
   the new block 2 test is pinned in the baseline and the graphics-integration count raised 75 → 76 (total 181). Blocks 5
   (leaner `PublishPointScalarField`, its round-2 review pending) and 6 (K-Means D and C1, implemented, C1's test
   adaptations in progress) were uncommitted on the other machine and are not in this clone; they stay open.
+- 2026-11-06, Q90 block 5 (Q86 order 3): `PublishPointScalarField`'s apply, undo and redo check the outputs by their
+  revision watches only (no recapture and bitwise compare); the before/after copies stay (the copy reduction would
+  change who owns the caller's Before snapshot, not done). Tests: `PointCloudEditing.AScalarPublicationRefusesAnOutputChangedThroughAnyMutablePath`
+  (seven write paths incl. `Span()`, `Data()` and retained borrows marked with `MarkModified`, undo and redo; red with
+  the revision check disabled) and `…ChecksOutputRevisionsNotValues` (a write outside the contract is not seen; red
+  with the recapture restored). Callers' suites 316/316 (other machine), 206/206 here with block 6. Code review (Codex,
+  read-only, instruction-only recursion protection): thread `01a1ad6f-35de-7502-b34d-21910a57afaa` diff `1bb8a247…`
+  "**Verdict: revise required.**" (no no-recapture regression; Span/Data missing; lesson overstated); round 2 asked
+  in a fresh thread on this machine `01a1b2cd-b8f3-7b23-9385-3ceb24fdf944`, diff `a75b470b…` (identical to the
+  round-2 diff of the other machine), verbatim "**Verdict: approve.**".
