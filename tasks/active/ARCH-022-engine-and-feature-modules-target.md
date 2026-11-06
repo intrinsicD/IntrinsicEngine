@@ -195,6 +195,10 @@ contract_review: tracker only; each slice declares its own contracts
     5 the plugins' duplicated run bookkeeping, 6 the unused `InlineDeliversToSink=true` branch, 7 the stale drafts in
     the bilateral and descriptor windows, 8 the documented text deviations, 9 the cancel smoke's submission claim,
     10 density weights and outliers as plugins) "Mach bitte die noch offenen Punkte"
+91. (2026-11-05, multiple choice on K-Means option C2, several iterations per GPU submission: measure first in block 7,
+    implement with a parity test and a measurement packet, or leave it) "Erst messen (Empfohlen)"
+92. (2026-11-06, after an interruption) "Kannst du bitte weiter machen?"
+93. (2026-11-06, resumed on another machine) "please continue. when you are done please merge to main and push to remote"
 
 ## Goal
 - Reach the target in
@@ -3802,3 +3806,8 @@ python3 tools/docs/check_doc_links.py --root . --strict
   red). Focused suites 417/417, with block 5's 564/564. Code review (Codex, gpt-6-astra xhigh, read-only, recursion
   protection instruction-only; fresh thread `01a1ad66-a1c7-79c3-ba10-92192fd49996`): diff `3a7cc151…` "**Verdict:
   revise required.**" (Poisson undo/redo revision untested), diff `32f3f7b9…` verbatim "**Verdict: approve.**".
+- 2026-11-06, Q93: ci-linux-clang on f4a345f79 failed in the routing check (`Test.TestGateRouting.py`: "BUG-106 affected
+  case baseline mismatch; … extra=['IntrinsicGraphicsIntegrationCpuTests:GraphicsRenderGraph.TransientBufferWithAnotherHostReadbackAllocatesNewHandle']");
+  the new block 2 test is pinned in the baseline and the graphics-integration count raised 75 → 76 (total 181). Blocks 5
+  (leaner `PublishPointScalarField`, its round-2 review pending) and 6 (K-Means D and C1, implemented, C1's test
+  adaptations in progress) were uncommitted on the other machine and are not in this clone; they stay open.
