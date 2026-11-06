@@ -54,10 +54,12 @@ namespace Extrinsic::Runtime
             RunKMeans Command{};
             CommandCorrelationId Correlation{};
             WorldHandle World{}; // the world it was admitted in; it starts only there
+            bool Seeding{false};     // waits for its seeds; its capture was counted when it first drained
+            bool Replacement{false}; // replaces a run: counted in GpuReplacementsStarted once it starts
         };
         void StartHeld();
         void CancelHeld(KMeansRunStatus status, std::string why);
-        void ReleaseCapture() noexcept;
+        void ReleaseCapture();
 
         ClusteringService m_Service{};
         std::optional<HeldRequest> m_Held{};

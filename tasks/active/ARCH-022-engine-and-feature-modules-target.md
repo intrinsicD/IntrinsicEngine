@@ -3821,3 +3821,20 @@ python3 tools/docs/check_doc_links.py --root . --strict
   "**Verdict: revise required.**" (no no-recapture regression; Span/Data missing; lesson overstated); round 2 asked
   in a fresh thread on this machine `01a1b2cd-b8f3-7b23-9385-3ceb24fdf944`, diff `a75b470b…` (identical to the
   round-2 diff of the other machine), verbatim "**Verdict: approve.**".
+- 2026-11-06, Q90 block 6 (K-Means D and C1; C2 left for block 7's measurement per Q91): D, the GPU Accept's first
+  apply checks the run's O(1) revision watches (positions, deletion mask, labels, colors, scalar labels) instead of
+  recapturing the input and outputs; undo, redo and the CPU commit keep the exact comparison. C1, Hierarchical seeds
+  (O(N·K), the ~350 ms Debug main-thread frame of Q83) come from a worker job: the GPU request waits in the module's
+  held-request slot and starts once they are ready; the seeds stay with the capture per (seed, cluster count); a newer
+  admitted request cancels a waiting one, a world change or document replacement (`ReleaseCapture`) ends it, a capture
+  replaced by another request is captured and seeded again. Not measured: the time saved (only that the main thread no
+  longer seeds). Tests: `ClusteringModuleResident.AChangeDuringTheAcceptThroughAnyMutablePathEndsItStale` (11 paths),
+  `…TheAcceptsFirstApplyChecksRevisionsNotValues`, `…ARequestWaitingForItsSeedsIsCancelledByANewerOne`,
+  `…EndsWhenTheSceneChanges`, `…ARejectedRequestLeavesARequestWaitingForItsSeedsToStart`, and one seeding job, no
+  main-thread seeding and no dropped completion in `…AGpuRunIsAStepRunCountingItsIterations`; each red with its
+  mechanism removed. A first version rebuilt a reusable capture on the held pass and looped (~9500 seeding jobs, found by
+  a probe). Affected suites incl. the clustering GPU smokes 217/217, three repeats. Code review (Codex, xhigh,
+  read-only, instruction-only recursion protection; fresh thread `01a1b2df-fd4a-7992-8059-32d3f83baa8d`): diff
+  `1edac5c0…` and `e71c31f1…` "**revise required**" (a parked request outliving a newer one, a document replacement,
+  an invalid job envelope, D's path coverage; then a rejected request ending a valid waiting one), diff `7c98ee21…`
+  verbatim "**Verdict: approve.**".

@@ -1578,6 +1578,17 @@ namespace
         std::uint64_t RunId{};
         auto Observation(){auto run=Service->GpuRun(Correlation);if(!RunId)RunId=run.StepRun;return run;}
         void Start(){Correlation=Service->RunKMeans(Request);RunId=0;}
+        // Occupies both job workers until the returned flag is set: a seeding job then waits in the queue (ARCH-022 Q90).
+        std::shared_ptr<std::atomic_bool> BlockWorkers()
+        {
+            auto release=std::make_shared<std::atomic_bool>(false);
+            for(int i=0;i<2;++i)
+                (void)Jobs.Jobs().Submit({.DebugName="blocker",.Work=[release](const Runtime::JobCancellation& c){
+                    while(!release->load()&&!c.IsCancelled())std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    return Runtime::JobResultEnvelope::Make<bool>(true);},
+                    .PublishCompletion=[](Runtime::KernelEventBus&,const Runtime::JobResultEnvelope&){return true;}});
+            return release;
+        }
         std::uint64_t StepRunId(){return RunId?RunId:Observation().StepRun;}
         Runtime::StepRunObservation StepRun(){auto run=Steps.Observe(StepRunId());EXPECT_TRUE(run);return run?*run:Runtime::StepRunObservation{};}
         bool Control(Runtime::StepRunAction action,std::uint32_t count=1){std::string refusal;return Steps.Control(StepRunId(),action,count,refusal);}
@@ -1947,9 +1958,132 @@ TEST_F(ClusteringModuleResident, StaleDuringAcceptReadbackReportsStaleSource)
     ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Failed);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
 }
+// ARCH-022 Q90: the Accept's first apply checks the run's revision watches instead of recapturing the input and the
+// outputs. A change during the Accept's readback through any mutable path that keeps the property contract still ends
+// the run stale and writes nothing: positions through 0 Vector(), 1 operator[], 2 Span(), 3 Data(), 4 a span retained
+// from before the run and marked after the write; 5 the deletion mask; 6 the colors output created; 7 a point added;
+// existing 8 labels, 9 colors and 10 scalar labels edited.
+TEST_F(ClusteringModuleResident, AChangeDuringTheAcceptThroughAnyMutablePathEndsItStale)
+{
+    const auto base = Request;
+    const auto& labels = base.Properties.OutputLabels.Name;
+    const auto& colors = base.Properties.OutputColors.Name;
+    const std::string scalars = "scalar_labels";
+    const auto remove = [&]<class T>(const std::string& name) {
+        if (auto property = Properties().Get<T>(name)) Properties().Remove(property);
+    };
+    for (unsigned path = 0; path < 11; ++path)
+    {
+        SCOPED_TRACE(path);
+        SetPositions(Scene().Raw().get<GS::Vertices>(Entity), std::vector<glm::vec3>(12, glm::vec3(1, 2, 3)));
+        remove.template operator()<bool>("v:deleted");
+        remove.template operator()<std::uint32_t>(labels);
+        remove.template operator()<glm::vec4>(colors);
+        remove.template operator()<double>(scalars);
+        Request = base;
+        if (path == 8) Properties().GetOrAdd<std::uint32_t>(labels, 0u);
+        if (path == 9) Properties().GetOrAdd<glm::vec4>(colors, glm::vec4(0));
+        if (path == 10)
+        {
+            Request.Properties.OutputScalarLabels = Runtime::GeometryPropertyRef{
+                .Domain = Runtime::GeometryElementDomain::PointCloudPoint, .Name = scalars,
+                .ValueKind = Geometry::PropertyValueKind::Double};
+            Properties().GetOrAdd<double>(scalars, 0.0);
+        }
+        auto retained = Properties().Get<glm::vec3>("v:position");
+        const auto span = retained.Span(); // marks now, before the run's capture
+        const auto before = Results.size();
+        Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+        (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+        switch (path)
+        {
+        case 0: Properties().Get<glm::vec3>("v:position").Vector()[0].x += 1; break;
+        case 1: Properties().Get<glm::vec3>("v:position")[0].x += 1; break;
+        case 2: Properties().Get<glm::vec3>("v:position").Span()[0].x += 1; break;
+        case 3: Properties().Get<glm::vec3>("v:position").Data()[0].x += 1; break;
+        case 4: span[0].x += 1; retained.MarkModified(); break;
+        case 5: Properties().GetOrAdd<bool>("v:deleted",false)[4] = true; break;
+        case 6: Properties().GetOrAdd<glm::vec4>(colors, glm::vec4(0)); break;
+        case 7: Properties().Resize(13); break;
+        case 8: Properties().Get<std::uint32_t>(labels)[0] = 7u; break;
+        case 9: Properties().Get<glm::vec4>(colors)[0] = glm::vec4(7); break;
+        case 10: Properties().Get<double>(scalars)[0] = 7.0; break;
+        }
+        ASSERT_TRUE(Until([&]{return Results.size()==before+1;}));
+        EXPECT_EQ(Results.back().Status,Runtime::KMeansRunStatus::StaleSource) << Results.back().Message;
+        if (path == 8) EXPECT_EQ(std::as_const(Properties()).Get<std::uint32_t>(labels)[0], 7u) << "nothing was written";
+        else EXPECT_FALSE(Properties().Exists(labels)) << "nothing was written";
+        if (path == 9) EXPECT_EQ(std::as_const(Properties()).Get<glm::vec4>(colors)[0], glm::vec4(7));
+        if (path == 10) EXPECT_EQ(std::as_const(Properties()).Get<double>(scalars)[0], 7.0);
+        for (int i = 0; i < 5; ++i) Tick();
+    }
+}
+// ARCH-022 Q90: a request waiting for its seeds that a newer admitted request supersedes is cancelled, even when the
+// newer one starts at once (Random seeds are computed inline), so it never starts after the newer one.
+TEST_F(ClusteringModuleResident, ARequestWaitingForItsSeedsIsCancelledByANewerOne)
+{
+    const auto release=BlockWorkers();
+    Start();for(int i=0;i<3;++i)Tick();
+    ASSERT_TRUE(Results.empty());EXPECT_EQ(Module.Stats().GpuRequestsAccepted,0u)<<"it waits for its seeds";
+    auto newer=Request;newer.ReplaceRunning=true;newer.Parameters.Initialization=Runtime::KMeansInitialization::Random;
+    Correlation=Service->RunKMeans(newer);RunId=0;
+    ASSERT_TRUE(Until([&]{return Results.size()==1u;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled)<<Results[0].Message;
+    EXPECT_TRUE(Until([&]{return Observation().ReadyToAccept;}))<<"the newer request runs";
+    release->store(true);
+    for(int i=0;i<10;++i)Tick();
+    EXPECT_EQ(Module.Stats().GpuRequestsAccepted,1u)<<"the cancelled one never starts";
+}
+// ARCH-022 Q90: a request waiting for its seeds ends when its capture is released (a world change or a scene document
+// replacement), even when the same world is active again before its seeds are ready.
+TEST_F(ClusteringModuleResident, ARequestWaitingForItsSeedsEndsWhenTheSceneChanges)
+{
+    const auto release=BlockWorkers();
+    Start();for(int i=0;i<3;++i)Tick();
+    ASSERT_TRUE(Results.empty());
+    const auto first=World;
+    ASSERT_TRUE(Worlds.RequestSetActiveWorld(Worlds.CreateWorld("other")));(void)Worlds.ApplyMaintenance(Events,Jobs.Jobs());
+    (void)Events.Pump();
+    ASSERT_TRUE(Worlds.RequestSetActiveWorld(first));(void)Worlds.ApplyMaintenance(Events,Jobs.Jobs());(void)Events.Pump();
+    release->store(true);
+    ASSERT_TRUE(Until([&]{return Results.size()==1u;}));
+    EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::StaleWorld)<<Results[0].Message;
+    EXPECT_EQ(Module.Stats().GpuRequestsAccepted,0u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+}
+// ARCH-022 Q90: a request rejected for its input (a NaN position) replaces the shared capture but neither cancels nor
+// supersedes a valid request waiting for its seeds: that one captures and seeds again and starts.
+TEST_F(ClusteringModuleResident, ARejectedRequestLeavesARequestWaitingForItsSeedsToStart)
+{
+    auto bad=Properties().GetOrAdd<glm::vec3>("bad_positions",glm::vec3(0));
+    bad[0].x=std::numeric_limits<float>::quiet_NaN();
+    const auto release=BlockWorkers();
+    Start();for(int i=0;i<3;++i)Tick();
+    const auto waiting=Correlation;
+    auto invalid=Request;invalid.Properties.InputPositions.Name="bad_positions";
+    (void)Service->RunKMeans(invalid);
+    ASSERT_TRUE(Until([&]{return Results.size()==1u;}));
+    EXPECT_NE(Results[0].Correlation,waiting)<<"only the rejected request completes";
+    EXPECT_FALSE(Results[0].Succeeded());
+    release->store(true);
+    Correlation=waiting;RunId=0;
+    EXPECT_TRUE(Until([&]{return Observation().ReadyToAccept;}))<<"the waiting request starts";
+    EXPECT_EQ(Results.size(),1u);
+}
+// ARCH-022 Q90: no recapture at the Accept's first apply: a write outside the property contract (a span retained from
+// before the run, never marked) is not seen, and the Accept publishes.
+TEST_F(ClusteringModuleResident, TheAcceptsFirstApplyChecksRevisionsNotValues)
+{
+    const auto unmarked = Properties().Get<glm::vec3>("v:position").Span(); // marks now, before the run's capture
+    Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
+    unmarked[0].x += 1; // outside the contract: no revision changes
+    ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    EXPECT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_TRUE(Properties().Exists("p:kmeans_label"));
+}
 TEST_F(ClusteringModuleResident, AdmissionReservesTypedAndPresentationAgainstScalarOwners)
 {
-    Start();Tick();
+    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;})); // started once its seeds are ready (ARCH-022 Q90)
     auto* residency=Cache.PropertyResidency();ASSERT_NE(residency,nullptr);
     const auto typed=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
     const auto presentation=Runtime::MakeGpuPropertyKey(World,Entity,Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels));
@@ -2007,6 +2141,9 @@ TEST_F(ClusteringModuleResident, MillionRowsRespectPairAndSerialBudgets)
 TEST_F(ClusteringModuleResident, AGpuRunIsAStepRunCountingItsIterations)
 {
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
+    // Hierarchical seeds come from a worker job, not the main thread's start, and the job completes (ARCH-022 Q90).
+    EXPECT_EQ(Module.Stats().GpuSeedingJobs,1u);EXPECT_EQ(Module.Stats().GpuSeedingMicros,0u);
+    EXPECT_EQ(Jobs.Jobs().Stats().DroppedCompletions,0u);
     ASSERT_NE(StepRunId(),0u);
     auto run=StepRun();
     EXPECT_EQ(run.Owner,"Runtime.ClusteringModule");
@@ -2026,7 +2163,7 @@ TEST_F(ClusteringModuleResident, AGpuRunIsAStepRunCountingItsIterations)
 TEST_F(ClusteringModuleResident, ARunRestsAtItsBoundaryAndAcceptPreparesTheCurrentCentroidsLabels)
 {
     Moved=true;Request.Parameters.MaxIterations=10;Request.Parameters.GpuPreviewInterval=100;
-    Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    Start();ASSERT_TRUE(Until([&]{return Observation().Submissions>0u;}));
     ASSERT_TRUE(Control(Runtime::StepRunAction::Pause)); // the first page is in flight: it counts, then the run rests
     ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused;}));
     EXPECT_EQ(Observation().Iterations,1u);EXPECT_EQ(StepRun().Steps,1u);
