@@ -18,8 +18,8 @@ Repair the historical source reference in docs/reviews/2026-10-16-src-runtime-au
 changing its findings. Discovered during ARCH-023 startup on unchanged main dbe5312f3.
 
 ## Acceptance criteria
-- [ ] The historical reference resolves to the relevant source revision or current owner.
-- [ ] Strict doc links pass; no checker exception is added.
+- [x] The historical reference resolves to the relevant source revision or current owner.
+- [x] Strict doc links pass; no checker exception is added.
 
 ## Verification
 ```bash
@@ -30,4 +30,6 @@ python3 tools/docs/check_doc_links.py --root . --strict
 Main [ci-docs run 42406828027](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/42406828027)
 fails at markdown links. Reproduced 2026-11-07: review document links to
 `src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp`, which no longer exists.
-Temporary output: `tasks/evidence/ARCH-023/doc-links-baseline.log`. Include this task in ARCH-023's PR.
+Completed 2026-11-07. Commit: the implementation commit whose message names BUG-257
+(`git log --grep BUG-257`). The retirement log records the correction.
+Temporary outputs stay under ARCH-023 while that task consumes its baseline and repaired link checks.

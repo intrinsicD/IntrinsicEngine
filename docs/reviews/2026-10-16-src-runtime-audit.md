@@ -267,7 +267,7 @@ Finite-/Positivprüfung auf `double`. `OutlierAnalysisConfig::Radius` ist `float
 die Konvertierung liefert 0. Der Validator meldet dennoch nutzbare Konfiguration,
 deren kanonischer Payload von derselben Validierung abgelehnt wird.
 
-**Fundstellen:** [Outlier-Codec](../../src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp)
+**Fundstellen:** [Outlier-Codec](https://github.com/intrinsicD/IntrinsicEngine/blob/1e58fa7555059689dabce664d5dfc7befaad4a48/src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp)
 :36, :77–88 und [Radius-Feld](../../src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm):31.
 KDE (:145–146), PointSpacing (:211–212) und
 [Bilateral](../../src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp):67–69

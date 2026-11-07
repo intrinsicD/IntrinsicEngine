@@ -43,7 +43,6 @@ picking backlog work; theme priorities and rationale live in
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
-- unblocked: `BUG-257` — Main docs CI links to a retired neighborhood codec (tasks/backlog/BUG-257-main-doc-link-retired-neighborhood-codec.md)
 - unblocked: `GEOIO-005` — PLY arbitrary property attributes and CSV/NPY property-table IO (tasks/backlog/geometry/GEOIO-005-property-attributes-and-table-io.md)
 - unblocked: `GEOM-078` — Intrinsic surface-sample point cloud with contiguous face ranges (tasks/backlog/geometry/GEOM-078-intrinsic-surface-sample-point-cloud.md)
 - unblocked: `GEOM-110` — Connected components and per-component topology/genus (tasks/backlog/geometry/GEOM-110-connected-components-and-topology.md)
