@@ -397,8 +397,15 @@ redirects are gone. A plugin job on a scalar output is a scalar-field run in the
 own scalar runs see each other on the same output. Kernel density is the plugin `plugins/kernel_density`
 ([feature](kernel-density.md)) in the same shape (section `sandbox.kernel_density` unchanged, tools `kernel_density`
 and `kernel_density_preview`); its engine module, `run_operation` row, panel, redirects and its row of the editor's
-geometry-processing catalog are gone. The two plugins copy their run bookkeeping (a `shortcut:` until a third scalar
-plugin, density weights or outliers, makes a host helper worth it).
+geometry-processing catalog are gone.
+
+**State (2026-11-07, Q90 block 8):** density weights are the plugin `plugins/density_weights`
+([feature](density-weights.md)) in the same shape (section `sandbox.density_weights` unchanged, tools
+`density_weights` and `density_weights_preview`); the service's GPU scalar analysis learned a request's minimum live
+count and its text (density weights need one sample), and the plugin derives an automatic support radius before the
+GPU start. Its engine module, its hand-written codec, `run_operation` row, panel and redirects are gone, and with
+them the operation runtime's point scalar shape (outliers are its last user). The three scalar plugins share their
+run bookkeeping (`PluginRunBook` in the plugin contract).
 
 **Open, for the first plan** (`ARCH-022`):
 1. **Numeric targets for R4 and R6**: set on 2026-10-31 (table above).

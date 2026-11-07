@@ -38,7 +38,7 @@ import Intrinsic.Plugin.KernelDensity; // ARCH-022 Q89: its section, held to the
 import Intrinsic.Plugin.PointSpacing; // ARCH-022 Q89: its section, held to the same contracts
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
-import Extrinsic.Runtime.DensityWeightConfig;
+import Intrinsic.Plugin.DensityWeights; // ARCH-022 Q90: its section, held to the same contracts
 import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
 import Extrinsic.Runtime.RegistrationConfig;
@@ -49,6 +49,7 @@ namespace Runtime = Extrinsic::Runtime;
 namespace Sandbox = Extrinsic::Sandbox;
 namespace PS = Intrinsic::Plugins::PointSpacing;
 namespace KD = Intrinsic::Plugins::KernelDensity;
+namespace DW = Intrinsic::Plugins::DensityWeights;
 
 TEST(SandboxConfigSections, ActiveNormalRadiusRemainsPositiveInFloatStorage)
 {
@@ -1178,11 +1179,11 @@ TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedP
             {
                 return Runtime::GetDerivedSection<KD::kSection>(c).has_value();
             }},
-        {Runtime::kDensityWeightConfigSectionName,
-            Runtime::kDensityWeightConfigSectionSchemaId,
+        {DW::kSectionName,
+            DW::kSectionSchemaId,
             [](const CoreConfig::EngineConfig& c)
             {
-                return Runtime::GetDensityWeightConfig(c).has_value();
+                return Runtime::GetDerivedSection<DW::kSection>(c).has_value();
             }},
         {PS::kSectionName,
             PS::kSectionSchemaId,
@@ -1341,10 +1342,14 @@ TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContrac
         SetDerivedSection<PS::kSection>,
         GetDerivedSection<PS::kSection>,
         ZeroGpuQueryBatch<PS::Config>);
-    ExpectPointConfigSectionContract<DensityWeightConfig>(kDensityWeightConfigSectionName,
-        kDensityWeightConfigSectionSchemaId, SerializeDensityWeightConfig, ValidateDensityWeightConfigSection,
-        MakeDensityWeightConfigSectionRegistration, SetDensityWeightConfig, GetDensityWeightConfig,
-        ZeroGpuQueryBatch<DensityWeightConfig>);
+    ExpectPointConfigSectionContract<DW::Config>(DW::kSectionName,
+        DW::kSectionSchemaId,
+        SerializeDerivedSection<DW::kSection>,
+        ValidateDerivedSection<DW::kSection>,
+        MakeDerivedSectionRegistration<DW::kSection>,
+        SetDerivedSection<DW::kSection>,
+        GetDerivedSection<DW::kSection>,
+        ZeroGpuQueryBatch<DW::Config>);
     ExpectPointConfigSectionContract<NormalEstimationConfig>(kNormalEstimationConfigSectionName,
         kNormalEstimationConfigSectionSchemaId, SerializeNormalEstimationConfig, ValidateNormalEstimationConfigSection,
         MakeNormalEstimationConfigSectionRegistration, SetNormalEstimationConfig, GetNormalEstimationConfig,
@@ -1404,11 +1409,11 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         {"DensityWeight",
             +[](const Runtime::GeometryPropertyRef& ref)
             {
-                Runtime::DensityWeightConfig config;
+                DW::Config config;
                 config.Positions = ref;
-                return Runtime::SerializeDensityWeightConfig(config);
+                return Runtime::SerializeDerivedSection<DW::kSection>(config);
             },
-            Runtime::ValidateDensityWeightConfigSection},
+            Runtime::ValidateDerivedSection<DW::kSection>},
     }};
     struct Case
     {
@@ -1519,8 +1524,8 @@ TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
         Runtime::SerializeDerivedSection<Runtime::kOutlierAnalysisSection>);
     check(Runtime::KeypointAnalysisConfig{}, &Runtime::KeypointAnalysisConfig::Positions,
           Runtime::SerializeKeypointAnalysisConfig);
-    check(Runtime::DensityWeightConfig{}, &Runtime::DensityWeightConfig::Positions,
-          Runtime::SerializeDensityWeightConfig);
+    check(DW::Config{}, &DW::Config::Positions,
+          Runtime::SerializeDerivedSection<DW::kSection>);
     check(Runtime::NormalEstimationConfig{}, &Runtime::NormalEstimationConfig::Positions,
           Runtime::SerializeNormalEstimationConfig);
     check(Runtime::PointConstructionConfig{}, &Runtime::PointConstructionConfig::Positions,
@@ -1596,15 +1601,15 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
                 return Runtime::SerializeKeypointAnalysisConfig(c);
             }},
         Family{"DensityWeight",
-            Runtime::ValidateDensityWeightConfigSection,
+            Runtime::ValidateDerivedSection<DW::kSection>,
             "Density weight config must be an object.",
             "Unknown density weight field: ",
             {"entity", "gpu_query_batch_size", "gpu_radius_capacity"},
             [](std::uint32_t id)
             {
-                Runtime::DensityWeightConfig c;
+                DW::Config c;
                 c.StableEntityId = id;
-                return Runtime::SerializeDensityWeightConfig(c);
+                return Runtime::SerializeDerivedSection<DW::kSection>(c);
             }},
         Family{"NormalEstimation",
             Runtime::ValidateNormalEstimationConfigSection,
@@ -1836,7 +1841,9 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
         Family{"PointSpacing", Runtime::ValidateDerivedSection<PS::kSection>, typed, domain},
         Family{"OutlierAnalysis", Runtime::ValidateDerivedSection<Runtime::kOutlierAnalysisSection>, typed, domain},
         Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
-        Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection, density, density},
+        // ARCH-022 Q90: the derived codec reports a wrong kind or domain as every derived section does; the shared text
+        // stays for distinct names on one domain (Test.DensityWeightsPlugin).
+        Family{"DensityWeight", Runtime::ValidateDerivedSection<DW::kSection>, typed, domain},
         Family{"NormalEstimation",
             Runtime::ValidateNormalEstimationConfigSection,
             "positions requires domain, nonempty name and kind=vec3.",
@@ -2016,7 +2023,7 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
     }
     {
         SCOPED_TRACE("DensityWeight");
-        using C = Runtime::DensityWeightConfig;
+        using C = DW::Config;
         for (const auto kernel : {Geometry::PointCloud::Kernels::KernelType::Gaussian,
                                   Geometry::PointCloud::Kernels::KernelType::ThetaLop,
                                   Geometry::PointCloud::Kernels::KernelType::WendlandC2})
@@ -2026,8 +2033,8 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
                 C config;
                 config.Kernel = kernel;
                 config.Mode = mode;
-                check(config, {&C::Positions, &C::Weights}, Runtime::SetDensityWeightConfig,
-                    Runtime::GetDensityWeightConfig, Runtime::SerializeDensityWeightConfig);
+                check(config, {&C::Positions, &C::Weights}, Runtime::SetDerivedSection<DW::kSection>,
+                    Runtime::GetDerivedSection<DW::kSection>, Runtime::SerializeDerivedSection<DW::kSection>);
             }
     }
     {

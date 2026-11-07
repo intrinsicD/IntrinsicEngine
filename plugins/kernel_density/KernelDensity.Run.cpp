@@ -27,46 +27,8 @@ namespace Intrinsic::Plugins::KernelDensity
     {
         namespace PC = Geometry::PointCloud;
 
-        // The plugin's runs (main thread): the newest started one and those not yet ended. Freed by Shutdown, which
-        // discards the GPU previews still waiting.
-        // shortcut: this bookkeeping is copied in each scalar plugin (kernel_density, point_spacing); move it into a
-        // host helper when a third one (density weights, outliers) needs it.
-        struct Runs
-        {
-            std::shared_ptr<Run> Latest{};
-            std::vector<std::shared_ptr<Run>> Active{};
-        };
-        Runs* g_Runs{nullptr};
-        Runs& State()
-        {
-            if (g_Runs == nullptr) g_Runs = new Runs();
-            return *g_Runs;
-        }
-
-        void Forget(const Run& run)
-        {
-            if (g_Runs != nullptr)
-                std::erase_if(g_Runs->Active, [&](const auto& active) { return active.get() == &run; });
-        }
-
-        // The one terminal outcome of a run: the window and a waiting MCP call read it.
-        void Finish(Run& run, Result result)
-        {
-            if (run.Final) return;
-            run.Final = std::move(result);
-            Forget(run);
-        }
-
-        // Every start but one the host or the service refused because another run owns the output: that refusal
-        // answers for the other run, so it does not replace the latest result.
-        std::shared_ptr<Run> Keep(std::shared_ptr<Run> run, const bool busy = false)
-        {
-            if (busy) return run;
-            auto& state = State();
-            state.Latest = run;
-            if (!run->Final) state.Active.push_back(run);
-            return run;
-        }
+        // The plugin's runs; freed by Shutdown, which discards the GPU previews still waiting.
+        R::PluginRunBook<Run> g_Runs{};
 
         R::ScalarAnalysisBackend BackendOf(const DensityBackend backend)
         {
@@ -234,7 +196,7 @@ namespace Intrinsic::Plugins::KernelDensity
                 }
             }
             if (run.Handle.IsValid()) R::ReportPluginJobOutcome(run.Handle, R::PluginJobDomain::Cpu, r.Message);
-            Finish(run, r);
+            g_Runs.Finish(run, r);
             // The job's callables keep `w` until the host reaps them: release the copies and the index lease now.
             w.Edit.reset();
             w.Points = std::vector<glm::vec3>{};
@@ -250,7 +212,7 @@ namespace Intrinsic::Plugins::KernelDensity
                 auto result = run->Pending;
                 result.Status = std::move(status);
                 result.Message = std::move(message);
-                Finish(*run, std::move(result));
+                g_Runs.Finish(*run, std::move(result));
             };
             std::string diagnostic;
             auto w = std::make_shared<Work>(Work{.Cfg = config, .Service = &service, .Shared = run});
@@ -317,7 +279,7 @@ namespace Intrinsic::Plugins::KernelDensity
             result.Status = std::move(status);
             result.Message = std::move(message);
             run->Final = std::move(result);
-            return Keep(run, busy);
+            return g_Runs.Keep(run, busy);
         };
         auto* service = R::PluginService<R::PointCloudEditingService>();
         if (service == nullptr) return fail("invalid", "The point-cloud editing service is unavailable.");
@@ -326,80 +288,28 @@ namespace Intrinsic::Plugins::KernelDensity
         if (config.Backend != DensityBackend::VulkanLBVH)
         {
             StartCpu(run, config, *service);
-            return Keep(run, run->Final && run->Final->Status == "busy");
+            return g_Runs.Keep(run, run->Final && run->Final->Status == "busy");
         }
         R::ScalarAnalysisRefusal refusal;
         run->Analysis = service->StartScalarAnalysis(Request(config), autoAccept, refusal);
-        if (!run->Analysis) return fail(refusal.Busy ? "busy" : "invalid", std::move(refusal.Message), refusal.Busy);
-        Keep(run);
+        if (!run->Analysis)
+            return fail(refusal.Busy ? "busy" : refusal.Failed ? "failed" : "invalid", std::move(refusal.Message), refusal.Busy);
+        g_Runs.Keep(run);
         Refresh(*run);
         return run;
     }
 
-    void Refresh(Run& run)
-    {
-        if (run.Final || !run.Analysis) return;
-        const auto state = run.Analysis.Poll();
-        auto r = run.Pending;
-        Fold(r, state);
-        switch (state.Phase)
-        {
-        case R::ScalarAnalysisPhase::Running:
-        case R::ScalarAnalysisPhase::ReadyToAccept:
-        case R::ScalarAnalysisPhase::Accepting: run.Pending = std::move(r); return;
-        case R::ScalarAnalysisPhase::Applied:
-            r.Status = "applied";
-            r.WrittenCount = r.LiveCount;
-            break;
-        case R::ScalarAnalysisPhase::Discarded: r.Status = state.Stale ? "stale" : "discarded"; break;
-        case R::ScalarAnalysisPhase::Failed: r.Status = "failed"; break;
-        }
-        Finish(run, std::move(r));
-    }
+    void Refresh(Run& run) { R::RefreshScalarPluginRun(g_Runs, run, Fold); }
 
-    void Accept(Run& run)
-    {
-        if (run.Final || !run.Analysis) return;
-        const auto state = run.Analysis.Accept();
-        if (state.Phase == R::ScalarAnalysisPhase::ReadyToAccept) run.Pending.Message = state.Message; // why not
-        Refresh(run);
-    }
+    void Accept(Run& run) { R::AcceptScalarPluginRun(g_Runs, run, Fold); }
 
-    bool Cancel(Run& run)
-    {
-        if (run.Final) return false;
-        if (!run.Analysis) return R::CancelPluginRun(run);
-        run.Analysis.Discard();
-        Refresh(run);
-        return true;
-    }
+    bool Cancel(Run& run) { return R::CancelScalarPluginRun(g_Runs, run, Fold); }
 
-    std::shared_ptr<Run> Latest()
-    {
-        if (g_Runs == nullptr || g_Runs->Latest == nullptr) return nullptr;
-        auto* service = R::PluginService<R::PointCloudEditingService>();
-        if (service == nullptr || !service->SessionCurrent(g_Runs->Latest->Session))
-        {
-            g_Runs->Latest.reset(); // a result of an earlier editor session
-            return nullptr;
-        }
-        return g_Runs->Latest;
-    }
+    std::shared_ptr<Run> Latest() { return R::LatestScalarPluginRun(g_Runs); }
 
-    std::span<const std::shared_ptr<Run>> Active()
-    {
-        if (g_Runs == nullptr) return {};
-        return g_Runs->Active;
-    }
+    std::span<const std::shared_ptr<Run>> Active() { return g_Runs.Active(); }
 
-    void Dismiss(const std::shared_ptr<Run>& run)
-    {
-        if (g_Runs != nullptr && g_Runs->Latest == run) g_Runs->Latest.reset();
-    }
+    void Dismiss(const std::shared_ptr<Run>& run) { g_Runs.Dismiss(run); }
 
-    void ShutdownRuns() noexcept
-    {
-        delete g_Runs; // the GPU runs' handles go with it: their previews are discarded
-        g_Runs = nullptr;
-    }
+    void ShutdownRuns() noexcept { g_Runs.Shutdown(); }
 }

@@ -692,4 +692,44 @@ namespace Extrinsic::Runtime
             GP::DiscardGpuTransaction(
                 w->Core, EditorCommandStatus::NoChange, "Scalar preview discarded; CPU fields retained.");
     }
+    EditorPointScalarTransactionHandle MakeEditorPointScalarTransactionForTest(const EditorProcessingCommands& commands,
+        const std::uint32_t stableEntityId, GeometryPropertyRef positions, GeometryPropertyRef output,
+        std::vector<float> values, Graphics::GpuPropertyResidency* testResidency,
+        const EditorPointScalarTransactionSnapshot& diagnostics, const Graphics::PointScalarGpuParams& params,
+        EditorPointScalarTransactionSnapshot* refused)
+    {
+        std::string reason;
+        const auto refuse = [&](std::string text) -> EditorPointScalarTransactionHandle
+        {
+            if (refused)
+                *refused = {.Phase = EditorGpuTransactionPhase::Failed,
+                    .Status = EditorCommandStatus::InvalidProcessingParameters,
+                    .Message = std::move(text)};
+            return {};
+        };
+        const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
+        if (!ctx.Scene)
+            return refuse("Scene is unavailable.");
+        const auto entity = EditorFeatureDetail::ResolveStableEntity(ctx.Scene->Raw(), stableEntityId);
+        if (!entity)
+            return refuse("Target entity is stale or missing.");
+        auto capture = std::make_shared<GP::PointScalarCapture>();
+        if (!GP::CapturePointScalarField(ctx, *entity, BuildGeometryAvailability(ctx.Scene->Raw(), *entity), positions,
+                output, "Weight", true, *capture, reason))
+            return refuse(std::move(reason));
+        if (testResidency)
+        {
+            if (values.size() != capture->SlotCount)
+                return refuse("Test values must give one value per slot.");
+            capture->AfterValues = std::move(values);
+        }
+        else if (!GP::AdmitPointScalarGpu(ctx, *capture, params, reason))
+            return refuse(std::move(reason));
+        EditorPointScalarTransactionSnapshot state;
+        auto run = GP::StartPointScalarGpu(ctx, capture, *entity, stableEntityId, positions, params,
+            "Estimate density weights", "Density weights", state, {}, false, testResidency, diagnostics);
+        if (!run && refused)
+            *refused = std::move(state);
+        return run;
+    }
 }

@@ -246,9 +246,8 @@ inspect the fixed boundary profile. Configured Run uses the shared selected-mesh
 preflight and undoable property publication. Its position input and face/edge
 output names are editable, and each output has a Show button. Automatic display
 uses the configured region and feature colors on the surface and edge overlay.
-Normal estimation, density/spacing, keypoint analysis and density weights share the
-draft/apply/run control (the bilateral filter and FPFH descriptors are plugins with
-windows of their own). Construction, outlier
+Normal estimation and keypoint analysis share the draft/apply/run control (the bilateral filter, FPFH
+descriptors, kernel density, point spacing and density weights are plugins with windows of their own). Construction, outlier
 detection/removal and ICP reuse its apply-before-execute mechanism and the runtime
 readiness button. Construction preserves its normalized request; outlier actions
 set their respective operation; ICP preserves final-pose and trajectory-step triggers.
@@ -704,6 +703,12 @@ binds point-valued properties on all domains to CPU octree, cached CPU LBVH or V
 Processing → Sampling & Density → Kernel Density**, choose the input/backend/bandwidth, apply and run **Estimate
 density** (a Vulkan run waits for Accept or Discard); **Show density** displays the named output. The same
 `sandbox.kernel_density` config drives the window and the MCP tools `kernel_density` and `kernel_density_preview`.
+
+[Compact Density Weights](../../../docs/architecture/density-weights.md) is the startup plugin
+`plugins/density_weights`: CPU KD-tree, cached CPU LBVH or Vulkan radius candidates under **View → Processing →
+Sampling & Density → Compact Density Weights**, **Compute compact weights** (a Vulkan run waits for Accept or Discard)
+and **Show weights**; the `sandbox.density_weights` config drives the window and the MCP tools `density_weights` and
+`density_weights_preview`.
 
 [Point Spacing and Radii](../../../docs/architecture/point-spacing.md) is the startup plugin `plugins/point_spacing`: it exposes canonical positions, radius output, k, scale and CPU/Vulkan neighborhoods through **View → Processing → Sampling & Density** (a Vulkan run waits for Accept or Discard), with the MCP tools `point_spacing` and `point_spacing_preview`. Show radii uses scalar colors; model-space radius rendering is tracked by RUNTIME-222.
 

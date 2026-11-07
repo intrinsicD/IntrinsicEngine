@@ -31,8 +31,6 @@ target_sources(${target_name}
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
-        Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
-        Modules/DensityWeight/Runtime.DensityWeightOperation.cppm
         Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
@@ -167,7 +165,6 @@ target_sources(${target_name}
         Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
         Editor/Operations/Runtime.PointScalarTransaction.cpp
-        Modules/DensityWeight/Runtime.DensityWeightOperation.cpp
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp
@@ -190,7 +187,6 @@ target_sources(${target_name}
         Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
         Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cpp
         Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
-        Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         Editor/Runtime.EditorCommandHistory.cpp
         Editor/Runtime.EditorCommon.Public.cpp
         Editor/Runtime.EditorWorkspaceAttachment.cpp

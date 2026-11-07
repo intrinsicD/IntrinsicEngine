@@ -47,13 +47,13 @@ namespace
         using Result = std::string;
     };
 
-    // A mesh of live samples with a density weight config on it (ARCH-022 Q89: kernel density, which these cases
-    // ran on, is a plugin).
+    // A mesh of live samples with an outlier analysis config on it (ARCH-022 Q89/Q90: kernel density and then density
+    // weights, which these cases ran on, are plugins; outliers are the operation runtime's last user).
     struct Fixture
     {
         Extrinsic::ECS::Scene::Registry Scene;
         entt::entity Entity{};
-        R::DensityWeightConfig Config{};
+        R::OutlierAnalysisConfig Config{};
         R::EditorCommandHistory History;
         R::OperationResultStore Store;
         bool Active{true};
@@ -69,8 +69,9 @@ namespace
                 .Positions = {.Domain = D::MeshVertex,
                     .Name = "samples",
                     .ValueKind = Geometry::PropertyValueKind::Vec3},
-                .Weights = {D::MeshVertex, "weights", Geometry::PropertyValueKind::Float},
-                .SupportRadius = 1};
+                .Mask = {D::MeshVertex, "outliers", Geometry::PropertyValueKind::UInt32},
+                .Score = {D::MeshVertex, "scores", Geometry::PropertyValueKind::Float},
+                .KNeighbors = 2};
             Context.Scene = &Scene;
             Context.CommandHistory = &History;
             Context.OperationResults = &Store;
@@ -83,9 +84,9 @@ namespace
         {
             return R::BindEditorProcessingCommands(Context);
         }
-        [[nodiscard]] std::shared_ptr<const R::EditorDensityWeightResult> Last() const
+        [[nodiscard]] std::shared_ptr<const R::EditorOutlierAnalysisResult> Last() const
         {
-            return Store.Copy().Last<R::DensityWeightOperation>();
+            return Store.Copy().Last<R::OutlierOperation>();
         }
     };
 }
@@ -160,8 +161,8 @@ TEST(OperationResults, OlderRunNeverReplacesNewer)
     Fixture f;
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(f.Context);
-    std::optional<R::EditorDensityWeightResult> first;
-    const auto queued = R::ApplyEditorDensityWeightCommand(f.Commands(),
+    std::optional<R::EditorOutlierAnalysisResult> first;
+    const auto queued = R::ApplyEditorOutlierAnalysisCommand(f.Commands(),
         f.Config,
         [&](auto r)
         {
@@ -170,7 +171,7 @@ TEST(OperationResults, OlderRunNeverReplacesNewer)
     ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
     auto missing = f.Config;
     missing.StableEntityId = std::numeric_limits<std::uint32_t>::max();
-    const auto refused = R::ApplyEditorDensityWeightCommand(f.Commands(),
+    const auto refused = R::ApplyEditorOutlierAnalysisCommand(f.Commands(),
         missing,
         [](auto)
         {
@@ -191,7 +192,7 @@ TEST(OperationResults, DuplicateRefusalLeavesTheActiveRunsSlot)
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(f.Context);
     unsigned firstCalls = 0;
-    const auto queued = R::ApplyEditorDensityWeightCommand(f.Commands(),
+    const auto queued = R::ApplyEditorOutlierAnalysisCommand(f.Commands(),
         f.Config,
         [&](auto)
         {
@@ -200,7 +201,7 @@ TEST(OperationResults, DuplicateRefusalLeavesTheActiveRunsSlot)
     ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending);
     ASSERT_TRUE(f.Last());
     EXPECT_EQ(f.Last()->Message, queued.Message) << "the queued answer is stored";
-    const auto duplicate = R::ApplyEditorDensityWeightCommand(f.Commands(),
+    const auto duplicate = R::ApplyEditorOutlierAnalysisCommand(f.Commands(),
         f.Config,
         [](auto)
         {
@@ -220,7 +221,7 @@ TEST(OperationResults, InlineFallbackReturnsAndStoresTheResult)
 {
     Fixture f;
     unsigned calls = 0;
-    const auto result = R::ApplyEditorDensityWeightCommand(f.Commands(),
+    const auto result = R::ApplyEditorOutlierAnalysisCommand(f.Commands(),
         f.Config,
         [&](auto)
         {
@@ -239,7 +240,7 @@ TEST(OperationResults, DetachedSessionStoresNothing)
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(f.Context);
     unsigned calls = 0;
-    ASSERT_EQ(R::ApplyEditorDensityWeightCommand(f.Commands(),
+    ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(f.Commands(),
                   f.Config,
                   [&](auto)
                   {
@@ -253,12 +254,12 @@ TEST(OperationResults, DetachedSessionStoresNothing)
     EXPECT_EQ(calls, 0u) << "a detached workspace receives nothing";
     EXPECT_FALSE(f.Last()) << "and stores nothing";
     f.Active = true;
-    ASSERT_EQ(R::ApplyEditorDensityWeightCommand(f.Commands(), f.Config, {}).Status, R::EditorCommandStatus::Pending);
+    ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(f.Commands(), f.Config, {}).Status, R::EditorCommandStatus::Pending);
     EXPECT_TRUE(f.Last()) << "a run of the active attachment stores again";
 }
 
 // The store is written before the sink runs, so a sink that detaches or reads the slot sees its own result (a queued
-// run: density weights give an inline result only as the return value).
+// run: an inline result is only the return value).
 TEST(OperationResults, TheStoreIsWrittenBeforeTheSinkRuns)
 {
     {
@@ -266,9 +267,9 @@ TEST(OperationResults, TheStoreIsWrittenBeforeTheSinkRuns)
         Extrinsic::Tests::EditorJobHarness jobs;
         jobs.Attach(f.Context);
         bool seen = false;
-        (void)R::ApplyEditorDensityWeightCommand(f.Commands(),
+        (void)R::ApplyEditorOutlierAnalysisCommand(f.Commands(),
             f.Config,
-            [&](const R::EditorDensityWeightResult& r)
+            [&](const R::EditorOutlierAnalysisResult& r)
             {
                 ASSERT_TRUE(f.Last());
                 EXPECT_EQ(f.Last()->Status, r.Status);

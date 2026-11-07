@@ -2,6 +2,9 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <string>
+#include <optional>
+#include <memory>
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
@@ -26,6 +29,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
@@ -1020,4 +1024,79 @@ TEST(OutlierAnalysisConfig, NegativeMarksTheInliersOnCpuBackendsAndVulkanRefuses
             EXPECT_EQ(vulkanRemoved.ActualBackend, "published_mask");
             EXPECT_EQ(props.Size(), 2u);
         }
+}
+
+// The operation runtime's duplicate check on the CPU path reads only active job records (moved from
+// Test.DensityWeightOperations when density weights became a plugin, ARCH-022 Q90; outliers are its last user).
+TEST(OutlierAnalysisOperations, OnlyActiveJobRecordsBlockSubmission)
+{
+    using State = R::JobState;
+    const std::array cases{
+        std::pair{State::Invalid, false}, std::pair{State::AwaitingDependencies, true},
+        std::pair{State::Queued, true}, std::pair{State::Running, true},
+        std::pair{State::AwaitingGate, true}, std::pair{State::AwaitingApply, true},
+        std::pair{State::Published, false}, std::pair{State::Dropped, false},
+        std::pair{State::Cancelled, false}, std::pair{State::Rejected, false},
+        std::pair{State::StaleDiscarded, false}};
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::MeshVertex);
+    const auto config = Config(entity, D::MeshVertex);
+    R::EditorProcessingContext context{.Scene = &scene};
+    unsigned submissions = 0, lookups = 0;
+    context.JobCommands.Submit = [&](R::JobDesc, R::EditorJobIdentity identity) {
+        ++submissions;
+        EXPECT_EQ(identity.EntityId, config.StableEntityId);
+        EXPECT_EQ(identity.OutputName, config.Mask.Name);
+        return R::JobToken{};
+    };
+    const auto apply = [&] {
+        submissions = lookups = 0;
+        return R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), config);
+    };
+    for (const auto [state, blocks] : cases)
+    {
+        SCOPED_TRACE(static_cast<unsigned>(state));
+        context.JobCommands.FindActive = [&](const R::EditorJobIdentity& identity) {
+            ++lookups;
+            return std::optional{R::EditorJobRecord{.Identity = identity, .State = state}};
+        };
+        const auto result = apply();
+        EXPECT_EQ(lookups, 1u);
+        EXPECT_EQ(submissions, blocks ? 0u : 1u);
+        EXPECT_EQ(result.Status, blocks ? R::EditorCommandStatus::Pending
+                                       : R::EditorCommandStatus::GeometryProcessingFailed);
+    }
+    context.JobCommands.FindActive = {};
+    EXPECT_EQ(apply().Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(lookups, 0u);
+    EXPECT_EQ(submissions, 1u);
+    context.JobCommands.FindActive = [&](const R::EditorJobIdentity&) -> std::optional<R::EditorJobRecord> {
+        ++lookups;
+        return std::nullopt;
+    };
+    EXPECT_EQ(apply().Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(lookups, 1u);
+    EXPECT_EQ(submissions, 1u);
+    EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshVertex).Exists(config.Mask.Name));
+}
+
+// RUNTIME-350: the shared index admission explains a mismatch itself; the GPU starts that report its
+// diagnostic (point scalar transaction, outliers, keypoints, point normals) refused with no message.
+TEST(PointIndexAdmission, MismatchedSnapshotExplainsItself)
+{
+    R::WorldRegistry worlds;
+    const auto world = worlds.CreateWorld("index source");
+    const auto entity = Make(*worlds.Get(world), D::PointCloudPoint);
+    R::SpatialIndexCache cache(worlds);
+    const auto config = Config(entity, D::PointCloudPoint);
+    const std::uint32_t slots[]{0};
+    const glm::vec3 points[]{{99, 99, 99}};
+    R::SpatialIndexHandle handle{};
+    std::shared_ptr<const R::SpatialIndexSnapshot> snapshot;
+    bool reused{};
+    std::string diagnostic;
+    EXPECT_EQ(R::GeometryProcessingDetail::AcquirePointIndex(
+                  cache, world, entity, config.Positions, slots, points, handle, snapshot, reused, diagnostic),
+        R::GeometryProcessingDetail::PointIndexState::Mismatched);
+    EXPECT_EQ(diagnostic, "Spatial index snapshot does not match the selected samples.");
 }

@@ -812,15 +812,13 @@ TEST(SandboxEditorSessionLifecycle, MeshFieldFramesRetainCurvatureAndRejectExpir
 // guarantees are the same (frames copy, a newer result replaces, dismissal per operation, an expired
 // frame neither delivers nor dismisses), but results now arrive through runs of the operations, here
 // immediate refusals, which the runtime stores. RUNTIME-353 carried density weights' guarantees from the
-// point analysis slots here (their results moved to the same store).
+// point analysis slots here; since ARCH-022 Q90 density weights are a plugin and outliers are the store's only
+// operation (the independence of two operations' slots is Test.OperationResults').
 TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndRejectExpiredDelivery)
 {
     Runtime::Engine engine{HeadlessConfig()};
     engine.Initialize();
-    using Weights = Runtime::DensityWeightOperation;
     using Outliers = Runtime::OutlierOperation;
-    const Runtime::DensityWeightConfig missingWeights{.StableEntityId = 0xFFFFFFF0u};
-    const Runtime::DensityWeightConfig invalidWeights{.Backend = static_cast<Runtime::DensityWeightBackend>(7)};
     const Runtime::OutlierAnalysisConfig missingOutliers{.StableEntityId = 0xFFFFFFF0u};
     const Runtime::OutlierAnalysisConfig invalidOutliers{.Backend = static_cast<Runtime::OutlierAnalysisBackend>(7)};
     Runtime::EditorPointFieldPreparedFrame expired{};
@@ -832,10 +830,8 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         const auto empty = Runtime::PrepareEditorPointFieldFrame(attachment);
         ASSERT_TRUE(empty.Commands.IsBound());
         ASSERT_TRUE(empty.DismissResult);
-        EXPECT_FALSE(empty.Results.Last<Weights>());
         EXPECT_FALSE(empty.Results.Last<Outliers>());
         (void)Runtime::ApplyEditorOutlierAnalysisCommand(empty.Commands, missingOutliers, {});
-        (void)Runtime::ApplyEditorDensityWeightCommand(empty.Commands, missingWeights, {});
         const auto first = Runtime::PrepareEditorPointFieldFrame(attachment);
         ASSERT_TRUE(first.Results.Last<Outliers>());
         EXPECT_EQ(first.Results.Last<Outliers>()->Message, "Outlier target entity is stale or missing.");
@@ -844,50 +840,28 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>()->Message,
             invalidOutlier.Message);
         EXPECT_EQ(first.Results.Last<Outliers>()->Message, "Outlier target entity is stale or missing.");
-        ASSERT_TRUE(first.Results.Last<Weights>());
-        EXPECT_EQ(first.Results.Last<Weights>()->Message, "Density-weight target is stale or missing.");
-        EXPECT_FALSE(empty.Results.Last<Weights>());
-        const auto invalid = Runtime::ApplyEditorDensityWeightCommand(empty.Commands, invalidWeights, {});
-        EXPECT_NE(invalid.Message, "Density-weight target is stale or missing.");
-        EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>()->Message, invalid.Message);
-        EXPECT_EQ(first.Results.Last<Weights>()->Message, "Density-weight target is stale or missing.");
         Runtime::DismissOperationResult<Outliers>(empty.DismissResult);
         const auto dismissed = Runtime::PrepareEditorPointFieldFrame(attachment);
         EXPECT_FALSE(dismissed.Results.Last<Outliers>());
-        ASSERT_TRUE(dismissed.Results.Last<Weights>()) << "another operation's dismissal leaves it";
         (void)Runtime::ApplyEditorOutlierAnalysisCommand(empty.Commands, missingOutliers, {});
         ASSERT_TRUE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>());
-        Runtime::DismissOperationResult<Weights>(empty.DismissResult);
-        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>());
-        EXPECT_EQ(first.Results.Last<Weights>()->Message, "Density-weight target is stale or missing.");
-        (void)Runtime::ApplyEditorDensityWeightCommand(empty.Commands, missingWeights, {});
-        ASSERT_TRUE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>());
         expired = empty;
         attachment.Detach();
         EXPECT_FALSE(expired.Commands.IsBound());
-        EXPECT_FALSE(Runtime::PreviewEditorDensityWeightCommand(expired.Commands, {}).Enabled);
-        EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>());
+        EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(expired.Commands, {}).Enabled);
         EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>());
-        EXPECT_FALSE(Runtime::GetEditorDensityWeightConfig(expired.Commands));
+        EXPECT_FALSE(Runtime::GetEditorOutlierAnalysisConfig(expired.Commands));
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
         const auto current = Runtime::PrepareEditorPointFieldFrame(attachment);
-        (void)Runtime::ApplyEditorDensityWeightCommand(current.Commands, missingWeights, {});
-        (void)Runtime::ApplyEditorDensityWeightCommand(expired.Commands, invalidWeights, {});
-        Runtime::DismissOperationResult<Weights>(expired.DismissResult);
         (void)Runtime::ApplyEditorOutlierAnalysisCommand(current.Commands, missingOutliers, {});
         (void)Runtime::ApplyEditorOutlierAnalysisCommand(expired.Commands, invalidOutliers, {});
         Runtime::DismissOperationResult<Outliers>(expired.DismissResult);
         ASSERT_TRUE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>());
         EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Outliers>()->Message,
             "Outlier target entity is stale or missing.");
-        ASSERT_TRUE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>());
-        EXPECT_EQ(Runtime::PrepareEditorPointFieldFrame(attachment).Results.Last<Weights>()->Message,
-            "Density-weight target is stale or missing.");
         expired = current;
     }
-    (void)Runtime::ApplyEditorDensityWeightCommand(expired.Commands, missingWeights, {});
-    Runtime::DismissOperationResult<Weights>(expired.DismissResult);
     (void)Runtime::ApplyEditorOutlierAnalysisCommand(expired.Commands, missingOutliers, {});
     Runtime::DismissOperationResult<Outliers>(expired.DismissResult);
     engine.Shutdown();
@@ -945,7 +919,7 @@ TEST(SandboxEditorSessionLifecycle, PointAnalysisFramesRetainAllSlotsAndRejectEx
         expired = empty;
         attachment.Detach();
         EXPECT_FALSE(expired.Commands.IsBound());
-        EXPECT_FALSE(Runtime::GetEditorDensityWeightConfig(expired.Commands));
+        EXPECT_FALSE(Runtime::GetEditorKeypointAnalysisConfig(expired.Commands));
         EXPECT_FALSE(Runtime::PreviewEditorKeypointAnalysisCommand(expired.Commands, {}).Enabled);
         EXPECT_FALSE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastKeypointAnalysisResult);
         attachment.Attach(engine.Worlds(), engine.Services());
@@ -1103,7 +1077,9 @@ namespace
         Runtime::KeypointAnalysisConfig Keypoints{};
         Runtime::OutlierAnalysisConfig Outliers{};
         Runtime::NormalEstimationConfig Normals{};
-        Runtime::DensityWeightConfig Weights{};
+        // Density weights' readiness as their plugin asks the editing service (ARCH-022 Q90).
+        Runtime::ScalarAnalysisRequest Weights{};
+        Runtime::ScalarAnalysisBackend WeightsBackend{Runtime::ScalarAnalysisBackend::CpuReference};
         Runtime::PointEditRequest Bilateral{.MinimumLiveCount = 2u}; // the bilateral plugin's capture
         // The descriptor plugin's capture (scalar outputs; PreviewScalarEdit refuses zero normals), but with a
         // minimum of one live sample, so the two consumers' minimums differ.
@@ -1142,9 +1118,15 @@ namespace
             Normals.StableEntityId = Keypoints.StableEntityId;
             Normals.Positions = Keypoints.Positions;
             Normals.Output = {Keypoints.Positions.Domain, "normals", Geometry::PropertyValueKind::Vec3};
-            Weights.StableEntityId = Keypoints.StableEntityId;
-            Weights.Positions = Keypoints.Positions;
-            Weights.Weights = {Keypoints.Positions.Domain, "weights", Geometry::PropertyValueKind::Float};
+            Weights = {.StableEntityId = Keypoints.StableEntityId,
+                       .Positions = Keypoints.Positions,
+                       .Output = {Keypoints.Positions.Domain, "weights", Geometry::PropertyValueKind::Float},
+                       .Params = {.Method = 2, .Capacity = 256, .Kernel = 1},
+                       .Noun = "Density-weight",
+                       .Method = "Density weights",
+                       .History = "Estimate density weights",
+                       .MinimumLiveCount = 1u,
+                       .TooFewSamples = "Density weights require at least one live sample."};
             Construction.StableEntityId = Keypoints.StableEntityId;
             Construction.Positions = Keypoints.Positions;
             Construction.Method = Runtime::PointConstructionMethod::KnnGraph;
@@ -1171,11 +1153,12 @@ namespace
             return Runtime::PreviewEditorNormalEstimationCommand(
                 Runtime::PrepareEditorNormalFrame(Attachment).Commands, Normals);
         }
-        // ARCH-022 Q89: kernel density's and point spacing's readiness are their plugins' (Test.KernelDensityPlugin,
-        // Test.PointSpacingPlugin).
+        // ARCH-022 Q89/Q90: kernel density, point spacing and density weights are plugins; the readiness they ask the
+        // editing service for shares the editor's input verdict.
         std::array<Runtime::ActionReadiness, 1> PreviewScalars()
         {
-            return {Runtime::PreviewEditorDensityWeightCommand(Commands, Weights)};
+            const auto reason = Editing().ScalarAnalysisReadiness(Weights, WeightsBackend);
+            return {Runtime::ActionReadiness{reason.empty(), reason}};
         }
         Runtime::EditorPointInputReadinessStats Stats() { return Runtime::GetEditorPointInputReadinessStats(Commands); }
         void SetNormalInputs()
@@ -1347,7 +1330,7 @@ TEST_F(EditorPointReadiness, ScalarReadinessCachesNegativeInputsButRevalidatesOu
     for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
     (void)Properties().GetOrAdd<glm::vec3>("weights");
     const auto invalidOutputs = PreviewScalars();
-    const std::array labels{"Weight"};
+    const std::array labels{"Density-weight"}; // the plugin's noun (the removed operation said "Weight")
     for (unsigned i = 0; i < invalidOutputs.size(); ++i)
     {
         EXPECT_FALSE(invalidOutputs[i].Enabled);
@@ -1383,7 +1366,7 @@ TEST_F(EditorPointReadiness, ScalarMinimumCountsAndCatalogMembershipRemainMethod
 
 TEST_F(EditorPointReadiness, ScalarBackendPredicatesFollowTheSharedInputVerdict)
 {
-    Weights.Backend = Runtime::DensityWeightBackend::CpuLBVH;
+    WeightsBackend = Runtime::ScalarAnalysisBackend::CpuIndex;
     for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     Drain();
     for (const auto& preview : PreviewScalars()) ASSERT_TRUE(preview.Enabled) << preview.DisabledReason;
@@ -1399,7 +1382,7 @@ TEST_F(EditorPointReadiness, ScalarBackendPredicatesFollowTheSharedInputVerdict)
     // Catalog eligibility is independent of the chosen execution backend.
     EXPECT_EQ(Runtime::GetEditorPointInputCatalog(Commands, Weights.StableEntityId).Size(), 1u);
     Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::denorm_min();
-    Weights.Backend = Runtime::DensityWeightBackend::VulkanLBVH;
+    WeightsBackend = Runtime::ScalarAnalysisBackend::Gpu;
     for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     Drain();
     const auto subnormal = PreviewScalars();
@@ -1427,7 +1410,10 @@ TEST_F(EditorPointReadiness, ScalarOutputMetadataFollowsPendingInputValidation)
 TEST_F(EditorPointReadiness, ScalarCommandsSubmitWhileReadinessIsPending)
 {
     for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
-    EXPECT_EQ(Runtime::ApplyEditorDensityWeightCommand(Commands, Weights).Status, Runtime::EditorCommandStatus::Pending);
+    std::string diagnostic; // a run's capture copies the values whatever the readiness says
+    EXPECT_NE(Editing().Capture({.StableEntityId = Weights.StableEntityId, .Positions = Weights.Positions,
+                                 .ScalarOutputs = {Weights.Output}, .MinimumLiveCount = 0u}, diagnostic),
+              nullptr) << diagnostic;
     EXPECT_EQ(Stats().PropertyScans, 0u);
     EXPECT_EQ(Stats().ChecksQueued, 1u);
 }
@@ -1438,9 +1424,11 @@ TEST_F(EditorPointReadiness, ScalarCommandsRecaptureDespiteWarmReadiness)
     Drain();
     for (const auto& preview : PreviewScalars()) ASSERT_TRUE(preview.Enabled);
     Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::quiet_NaN();
-    const auto weights = Runtime::ApplyEditorDensityWeightCommand(Commands, Weights);
-    EXPECT_EQ(weights.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_EQ(weights.Message, "Live position samples must be finite.");
+    std::string diagnostic;
+    EXPECT_EQ(Editing().Capture({.StableEntityId = Weights.StableEntityId, .Positions = Weights.Positions,
+                                 .ScalarOutputs = {Weights.Output}, .MinimumLiveCount = 0u}, diagnostic),
+              nullptr);
+    EXPECT_EQ(diagnostic, "Live position samples must be finite.");
     EXPECT_FALSE(Properties().Exists("weights"));
     EXPECT_EQ(Stats().PropertyScans, 1u);
 }
@@ -2467,7 +2455,7 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     Keypoints.Positions.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
     Keypoints.Mask.Domain = Keypoints.Score.Domain = Keypoints.Positions.Domain;
     Normals.Positions.Domain = Normals.Output.Domain = Keypoints.Positions.Domain;
-    Weights.Positions.Domain = Weights.Weights.Domain = Keypoints.Positions.Domain;
+    Weights.Positions.Domain = Weights.Output.Domain = Keypoints.Positions.Domain;
     for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     EXPECT_FALSE(PreviewConstruction().Ready);
@@ -3260,11 +3248,13 @@ TEST(SandboxEditorSession, EditorJobCancelReachesOnlyThisAttachmentsEditorJobs)
     auto& points = scene.Raw().emplace<GS::Vertices>(entity).Properties;
     points.Resize(4);
     points.GetOrAdd<glm::vec3>("samples").Vector() = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
-    Runtime::DensityWeightConfig density{}; // ARCH-022 Q89: density weights (kernel density is a plugin)
+    // ARCH-022 Q89/Q90: outliers (kernel density and density weights are plugins).
+    Runtime::OutlierAnalysisConfig density{};
     density.StableEntityId = Runtime::SelectionController::ToStableEntityId(entity);
     density.Positions = {Runtime::GeometryElementDomain::PointCloudPoint, "samples", Geometry::PropertyValueKind::Vec3};
-    density.Weights = {density.Positions.Domain, "density", Geometry::PropertyValueKind::Float};
-    density.SupportRadius = 2;
+    density.Mask = {density.Positions.Domain, "density", Geometry::PropertyValueKind::UInt32};
+    density.Score = {density.Positions.Domain, "density_score", Geometry::PropertyValueKind::Float};
+    density.KNeighbors = 2;
 
     Runtime::EditorWorkspaceAttachment attachment;
     attachment.Attach(engine.Worlds(), engine.Services());
@@ -3274,10 +3264,10 @@ TEST(SandboxEditorSession, EditorJobCancelReachesOnlyThisAttachmentsEditorJobs)
     };
     auto fields = prepare();
     // Input readiness settles through the command drain before the command queues a job.
-    (void)Runtime::PreviewEditorDensityWeightCommand(fields, density);
+    (void)Runtime::PreviewEditorOutlierAnalysisCommand(fields, density);
     engine.Commands().Drain(scene);
     fields = prepare();
-    ASSERT_TRUE(Runtime::PreviewEditorDensityWeightCommand(fields, density).Enabled);
+    ASSERT_TRUE(Runtime::PreviewEditorOutlierAnalysisCommand(fields, density).Enabled);
 
     // A foreign job holds the only worker, so the editor job stays queued behind it.
     std::atomic_bool release{false};
@@ -3285,7 +3275,7 @@ TEST(SandboxEditorSession, EditorJobCancelReachesOnlyThisAttachmentsEditorJobs)
     ASSERT_TRUE(WaitFor([&] { return jobs.GetState(foreign) == Runtime::JobState::Running; }));
     int delivered = 0;
     bool succeeded = true;
-    const auto applied = Runtime::ApplyEditorDensityWeightCommand(fields, density, [&](Runtime::EditorDensityWeightResult result) {
+    const auto applied = Runtime::ApplyEditorOutlierAnalysisCommand(fields, density, [&](Runtime::EditorOutlierAnalysisResult result) {
         ++delivered;
         succeeded = result.Succeeded();
     });
@@ -3673,8 +3663,6 @@ TEST_F(EditorQueuedPointJobs, DuplicateSubmissionAnswersPendingWithTheSharedMess
         return Runtime::ApplyEditorNormalEstimationCommand(normals, Normals, done); });
     SetNormalInputs();
     const auto construction = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
-    ExpectDuplicateRefused("Density weights", [&](auto done) {
-        return Runtime::ApplyEditorDensityWeightCommand(Commands, Weights, done); });
     ExpectDuplicateRefused("Keypoint analysis", [&](auto done) {
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectDuplicateRefused("Point construction", [&](auto done) {
@@ -3700,9 +3688,9 @@ TEST_F(EditorQueuedPointJobs, OutlivedRunsStoreNothingInTheNextSession)
         other.Attach(Engine.Worlds(), Engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(other));
         const auto fields = Runtime::PrepareEditorPointFieldFrame(other).Commands;
-        auto elsewhere = Weights;
-        elsewhere.Weights.Name = "other_session_weights";
-        ASSERT_EQ(Runtime::ApplyEditorDensityWeightCommand(fields,
+        auto elsewhere = Outliers;
+        elsewhere.Mask.Name = "other_session_outliers";
+        ASSERT_EQ(Runtime::ApplyEditorOutlierAnalysisCommand(fields,
                       elsewhere,
                       [&](auto)
                       {
@@ -3713,10 +3701,10 @@ TEST_F(EditorQueuedPointJobs, OutlivedRunsStoreNothingInTheNextSession)
         remember(fields);
     }
     const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
-    auto weights = Weights;
-    weights.Weights.Name = "outlived_weights";
-    ASSERT_EQ(Runtime::ApplyEditorDensityWeightCommand(Commands,
-                  weights,
+    auto outliers = Outliers;
+    outliers.Mask.Name = "outlived_outliers";
+    ASSERT_EQ(Runtime::ApplyEditorOutlierAnalysisCommand(Commands,
+                  outliers,
                   [&](auto)
                   {
                       ++calls;
@@ -3745,7 +3733,7 @@ TEST_F(EditorQueuedPointJobs, OutlivedRunsStoreNothingInTheNextSession)
         << "the outlived runs finished";
     EXPECT_EQ(calls, 0u);
     const auto results = Runtime::PrepareEditorPointFieldFrame(Attachment).Results;
-    EXPECT_FALSE(results.Last<Runtime::DensityWeightOperation>());
+    EXPECT_FALSE(results.Last<Runtime::OutlierOperation>());
 }
 
 TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
@@ -3757,8 +3745,6 @@ TEST_F(EditorQueuedPointJobs, CancelledRunDeliversOnceWithTheSharedWording)
         return Runtime::ApplyEditorNormalEstimationCommand(normals, Normals, done); });
     SetNormalInputs();
     const auto construction = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
-    ExpectCancelFinalizesOnce("Density weights", [&](auto done) {
-        return Runtime::ApplyEditorDensityWeightCommand(Commands, Weights, done); });
     ExpectCancelFinalizesOnce("Keypoint analysis", [&](auto done) {
         return Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints, done); });
     ExpectCancelFinalizesOnce("Point construction", [&](auto done) {

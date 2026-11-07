@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 11 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 121 |
+| `runtime` | 119 |
 
 ## Modules
 
@@ -446,8 +446,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ClusteringTypes` | `src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshCurvatureConfig` | `src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.CurvatureSegmentationConfig` | `src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm` | `runtime` |
-| `Extrinsic.Runtime.DensityWeightConfig` | `src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm` | `runtime` |
-| `Extrinsic.Runtime.DensityWeightOperation` | `src/runtime/Modules/DensityWeight/Runtime.DensityWeightOperation.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeodesicsConfig` | `src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.KeypointAnalysisConfig` | `src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.NormalEstimationConfig` | `src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm` | `runtime` |
@@ -487,4 +485,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **460**
+Total modules: **458**

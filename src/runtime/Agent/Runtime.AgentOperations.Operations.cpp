@@ -465,10 +465,6 @@ namespace Extrinsic::Runtime
                     "outlier_analysis", "point", "sandbox.outlier_analysis", &PrepareEditorPointAnalysisFrame,
                     &GetEditorOutlierAnalysisConfig, &PreviewEditorOutlierAnalysisCommand,
                     [](const auto& c, auto onComplete) { return ApplyEditorConfiguredOutlierAnalysis(c, std::move(onComplete)); }));
-                ops.push_back(ConfigSourced<EditorDensityWeightResult>(
-                    "density_weight", "point", "sandbox.density_weights", &PrepareEditorPointAnalysisFrame,
-                    &GetEditorDensityWeightConfig, &PreviewEditorDensityWeightCommand,
-                    [](const auto& c, auto onComplete) { return ApplyEditorConfiguredDensityWeight(c, std::move(onComplete)); }));
                 ops.push_back(ConfigSourced<EditorPointConstructionResult>(
                     "point_construction", "point", "sandbox.point_construction", &PrepareEditorPointConstructionFrame,
                     &GetEditorPointConstructionConfig,
@@ -1101,8 +1097,8 @@ namespace Extrinsic::Runtime
             [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, true, nullptr); });
         add("run_operation", "Run operation",
             "Run a configured editor operation (mesh-field operations, mesh curvature, geodesics, curvature segmentation, "
-            "parameterization, scalar ridges, mesh denoise, remesh, subdivide and simplify, normal estimation, kernel density, "
-            "point spacing, outlier analysis, density weight, point construction, "
+            "parameterization, scalar ridges, mesh denoise, remesh, subdivide and simplify, normal estimation, "
+            "outlier analysis, point construction, "
             "progressive Poisson) with its config section or `params`; one undoable step like the panel button, answers when "
             "done. Operations: " + OperationSummary(nullptr) + ".",
             configuredSchema, false, [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, false, nullptr); },

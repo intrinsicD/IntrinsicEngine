@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -41,7 +42,15 @@ namespace
     public:
         R::EditorProcessingContext Context{};
         R::EditorCommandHistory History{};
-        R::DensityWeightConfig Weight{};
+        // The density weights kernel (method 2) as its plugin starts it (ARCH-022 Q90: no engine method starts one).
+        R::GeometryPropertyRef Positions{.Domain = R::GeometryElementDomain::PointCloudPoint, .Name = "v:position",
+                                         .ValueKind = Geometry::PropertyValueKind::Vec3};
+        R::GeometryPropertyRef Output{.Domain = R::GeometryElementDomain::PointCloudPoint, .Name = "scalar",
+                                      .ValueKind = Geometry::PropertyValueKind::Float};
+        std::uint32_t Id{};
+        double SupportRadius{0.6};
+        Geometry::PointCloud::Kernels::KernelType WeightKernel{};
+        Geometry::PointCloud::Kernels::DensityWeightMode WeightMode{};
         R::EditorPointScalarTransactionHandle Run{};
         entt::entity Entity{};
         int Step{},Method{2}; // 2..7: the density weight variants (0, 1 are plugins)
@@ -67,19 +76,18 @@ namespace
             for(std::size_t i=0;i<66;++i)Points.push_back(positions[i]);
             Rows().GetOrAdd<bool>("v:deleted",false)[66]=true;
             const auto id=R::SelectionController::ToStableEntityId(Entity);
-            Weight.StableEntityId=id;
-            Weight.Backend=R::DensityWeightBackend::VulkanLBVH;
-            Weight.Positions.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Weight.Weights.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Weight.Weights.Name="scalar";
-            Weight.SupportRadius=0.6;
+            Id=id;
             Rows().GetOrAdd<float>("scalar",0)[66]=123;
         }
         void Fail(const std::string& message){ADD_FAILURE()<<message;Kernel().RequestExit();}
         void Start()
         {
-            std::string why;
-            R::EditorDensityWeightResult r;Run=R::StartEditorDensityWeightTransaction(Commands(),Weight,r);why=r.Message;
+            std::string why;R::EditorPointScalarTransactionSnapshot refused;
+            const auto query=Geometry::PointCloud::Kernels::ConservativeQueryRadius(SupportRadius);
+            if(!query){Fail("no query radius");return;}
+            Run=R::MakeEditorPointScalarTransactionForTest(Commands(),Id,Positions,Output,{},nullptr,{},
+                {.Method=2,.Capacity=256,.Kernel=std::uint32_t(WeightKernel),.Inverse=std::uint32_t(WeightMode),.QueryRadius=*query,
+                 .SupportRadius=SupportRadius},&refused);why=refused.Message;
             if(!Run)Fail(why);else ++Starts;
         }
         void Frame(double,double) override
@@ -92,10 +100,10 @@ namespace
                     Points={{0,0,0},{separation,0,0}};
                     auto p=Rows().Get<glm::vec3>("v:position");p[0]=Points[0];p[1]=Points[1];
                     auto deleted=Rows().Get<bool>("v:deleted");for(unsigned j=2;j<67;++j)deleted[j]=true;
-                    Weight.SupportRadius=2e-20;
+                    SupportRadius=2e-20;
                 }
-                {Weight.Kernel=Geometry::PointCloud::Kernels::KernelType((Method-2)/2);Weight.Mode=Geometry::PointCloud::Kernels::DensityWeightMode((Method-2)%2);
-                    auto r=Geometry::PointCloud::Kernels::ComputeDensityWeights(Points,Weight.SupportRadius,Weight.Kernel,Weight.Mode);if(!r.Succeeded()){Fail("CPU weights failed");return;}Reference=r.Weights;}
+                {WeightKernel=Geometry::PointCloud::Kernels::KernelType((Method-2)/2);WeightMode=Geometry::PointCloud::Kernels::DensityWeightMode((Method-2)%2);
+                    auto r=Geometry::PointCloud::Kernels::ComputeDensityWeights(Points,SupportRadius,WeightKernel,WeightMode);if(!r.Succeeded()){Fail("CPU weights failed");return;}Reference=r.Weights;}
                 Start();Step=1;return;
             }
             const auto snapshot=R::SnapshotEditorPointScalar(Commands(),Run);
@@ -143,8 +151,8 @@ namespace
     public:
         R::EditorProcessingContext Context{};
         Extrinsic::ECS::Scene::Registry Captured{};
-        R::DensityWeightConfig Density{}; // a GPU scalar start (ARCH-022 Q89: density weights; kernel density is a plugin)
-        std::optional<R::EditorDensityWeightResult> Refused{};
+        std::uint32_t Id{}; // a GPU scalar start of the density weights kernel (ARCH-022 Q90: a plugin's)
+        std::optional<std::string> Refused{};
         bool Started{};
         static void Fill(Extrinsic::ECS::Scene::Registry& scene, entt::entity entity, float shift)
         {
@@ -175,22 +183,21 @@ namespace
             {
                 return Kernel().Jobs().Submit(std::move(job));
             };
-            Density.StableEntityId = R::SelectionController::ToStableEntityId(entity);
-            Density.Backend = R::DensityWeightBackend::VulkanLBVH;
-            Density.Positions.Domain = Density.Weights.Domain = R::GeometryElementDomain::PointCloudPoint;
-            Density.Weights.Name = "scalar";
-            Density.SupportRadius = 0.6;
+            Id = R::SelectionController::ToStableEntityId(entity);
         }
         void Frame(double, double) override
         {
             if (Started || !Kernel().GetDevice().IsOperational() || !Context.SpatialIndices)
                 return;
             Started = true;
-            R::EditorDensityWeightResult result;
-            const auto run =
-                R::StartEditorDensityWeightTransaction(R::BindEditorProcessingCommands(Context), Density, result);
+            R::EditorPointScalarTransactionSnapshot why;
+            const auto domain = R::GeometryElementDomain::PointCloudPoint;
+            const auto run = R::MakeEditorPointScalarTransactionForTest(R::BindEditorProcessingCommands(Context), Id,
+                {domain, "v:position", Geometry::PropertyValueKind::Vec3},
+                {domain, "scalar", Geometry::PropertyValueKind::Float}, {}, nullptr, {},
+                {.Method = 2, .Capacity = 256, .Kernel = 1, .QueryRadius = 0.6f, .SupportRadius = 0.6}, &why);
             EXPECT_FALSE(run);
-            Refused = result;
+            Refused = why.Message;
             Kernel().RequestExit();
         }
         void Shutdown() override
@@ -242,6 +249,5 @@ TEST(RUNTIME350IndexMismatch, GpuStartExplainsAMismatchedSnapshot)
     engine.Run();
     ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_TRUE(run->Refused);
-    EXPECT_EQ(run->Refused->Status, R::EditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_EQ(run->Refused->Message, "Spatial index snapshot does not match the selected samples.");
+    EXPECT_EQ(*run->Refused, "Spatial index snapshot does not match the selected samples.");
 }

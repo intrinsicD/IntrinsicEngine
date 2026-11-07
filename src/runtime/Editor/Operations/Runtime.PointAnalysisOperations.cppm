@@ -13,7 +13,6 @@ export import Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.OutlierAnalysisOperation;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
-export import Extrinsic.Runtime.DensityWeightOperation;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 export namespace Extrinsic::Runtime

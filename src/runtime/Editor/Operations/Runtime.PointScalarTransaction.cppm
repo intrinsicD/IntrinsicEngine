@@ -12,7 +12,7 @@ module;
 export module Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
-import Extrinsic.Graphics.PointScalarAnalysis;
+export import Extrinsic.Graphics.PointScalarAnalysis;
 export import Extrinsic.Graphics.GpuPropertyResidency;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export namespace Extrinsic::Runtime
@@ -69,4 +69,15 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&,const EditorPointScalarTransactionHandle&,
         std::function<void(EditorPointScalarTransactionSnapshot)> sink = {});
     void DiscardEditorPointScalar(const EditorProcessingCommands&,const EditorPointScalarTransactionHandle&);
+    // The transaction's own tests (no engine method starts one alone since ARCH-022 Q90): the GPU kernel `params` over
+    // `output` as the editing service starts it, captured as a CPU run would be. With `testResidency`, over given
+    // `values` (one per slot of the output's domain) on that residency with no device work; without, on the device and
+    // the spatial cache of `commands` after their admission (`values` unused). Null with the refusal in `refused` (its
+    // Message, and Status GeometryProcessingFailed for a rejected submission).
+    [[nodiscard]] EditorPointScalarTransactionHandle MakeEditorPointScalarTransactionForTest(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, GeometryPropertyRef positions,
+        GeometryPropertyRef output, std::vector<float> values, Graphics::GpuPropertyResidency* testResidency,
+        const EditorPointScalarTransactionSnapshot& diagnostics = {},
+        const Graphics::PointScalarGpuParams& params = {.Method = 2, .Capacity = 256, .Kernel = 1, .SupportRadius = 1},
+        EditorPointScalarTransactionSnapshot* refused = nullptr);
 }

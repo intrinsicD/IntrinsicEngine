@@ -612,7 +612,9 @@ namespace Extrinsic::Runtime
             if (!Detail::CapturePointScalarField(context, entity, a, positions, output, request.Noun, copyValues,
                                                  capture, why))
                 return why;
-            if (capture.LiveCount < 2u) return request.Method + " requires at least two live samples.";
+            if (capture.LiveCount < request.MinimumLiveCount)
+                return request.TooFewSamples.empty() ? request.Method + " requires at least two live samples."
+                                                     : request.TooFewSamples;
             if (backend != ScalarAnalysisBackend::CpuReference &&
                 (context.SpatialIndices == nullptr || !capture.ValidLbvh || capture.LiveCount > (1u << 24)))
                 return "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.";
@@ -665,7 +667,8 @@ namespace Extrinsic::Runtime
                                                            state, {}, autoAccept, testResidency);
             if (!transaction)
             {
-                refusal = {.Message = std::move(state.Message), .Busy = state.OutputBusy};
+                refusal = {.Message = std::move(state.Message), .Busy = state.OutputBusy,
+                           .Failed = state.Status == EditorCommandStatus::GeometryProcessingFailed};
                 return {};
             }
             auto run = std::make_shared<ScalarAnalysis::Run>(std::move(transaction), context.AttachmentActive, workspace,
@@ -730,13 +733,13 @@ namespace Extrinsic::Runtime
     }
 
     std::string PointCloudEditingService::ScalarAnalysisReadiness(const ScalarAnalysisRequest& request,
-                                                                  const ScalarAnalysisBackend backend)
+                                                                  const ScalarAnalysisBackend backend, const bool current)
     {
         const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
         Detail::PointScalarCapture capture;
         entt::entity entity{};
         GeometryPropertyRef positions{};
-        return CaptureScalarAnalysis(EditorProcessingCommandsAccess::Resolve(commands), request, backend, false, capture,
+        return CaptureScalarAnalysis(EditorProcessingCommandsAccess::Resolve(commands), request, backend, current, capture,
                                      entity, positions);
     }
 

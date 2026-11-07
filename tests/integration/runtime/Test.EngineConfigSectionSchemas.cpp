@@ -65,7 +65,7 @@ namespace
 TEST(EngineConfigSectionSchemas, EveryRegisteredSectionPublishesASchema)
 {
     const auto registry = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
-    ASSERT_EQ(registry.Entries().size(), 22u); // ARCH-022 Q89: sandbox.point_spacing and kernel_density are plugins'
+    ASSERT_EQ(registry.Entries().size(), 21u); // ARCH-022 Q89/Q90: point_spacing, kernel_density, density_weights: plugins'
     for (const auto& registration : registry.Entries())
         EXPECT_FALSE(registration.SchemaJson.empty())
             << registration.DefaultSection.Name << " has no generated schema";
@@ -102,10 +102,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerLiteralRangesRemainUnchanged)
         {"outlier_analysis", "radius", 0, f32, false},
         {"outlier_analysis", "stddev_multiplier", 0, f32, false},
         {"outlier_analysis", "score_threshold", 0, f32, false},
-        {"density_weights", "entity", 0, u32, true},
-        {"density_weights", "gpu_query_batch_size", 1, 16384, true},
-        {"density_weights", "gpu_radius_capacity", 1, 1024, true},
-        {"density_weights", "support_radius", 0, f32, false},
         {"keypoint_analysis", "entity", 0, u32, true},
         {"keypoint_analysis", "minimum_neighbors", 0, u32, true},
         {"keypoint_analysis", "gpu_query_batch_size", 1, 16384, true},
@@ -171,9 +167,6 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         {"outlier_analysis", "method", {"statistical", "radius", "local_distance_ratio"}},
         {"outlier_analysis", "operation", {"analyze", "remove_marked"}},
         {"outlier_analysis", "backend", {"cpu_octree", "cpu_lbvh", "vulkan_lbvh"}},
-        {"density_weights", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh"}},
-        {"density_weights", "kernel", {"gaussian", "theta_lop", "wendland_c2"}},
-        {"density_weights", "mode", {"direct", "reciprocal"}},
         {"keypoint_analysis", "backend", {"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh", "vulkan_compute"}},
         {"point_construction", "method", {"hoppe", "knn_graph"}},
         {"point_construction", "backend", {"cpu_reference", "cpu_lbvh", "vulkan_lbvh"}},
@@ -198,7 +191,7 @@ TEST(EngineConfigSectionSchemas, StrictOwnerTokensAndKeysRemainUnchanged)
         EXPECT_FALSE(registration->Validate(Json{{row.Field, "foreign-token"}}.dump(), registration->DefaultSection.PayloadJson, "literal-token").Usable());
     }
     for (const auto* section : {"normal_estimation", "registration", "outlier_analysis",
-                                "density_weights", "keypoint_analysis", "point_construction", "selection"})
+                                "keypoint_analysis", "point_construction", "selection"})
     {
         const Config::EngineConfigSectionRegistration* registration = nullptr;
         for (const auto& candidate : registry.Entries())
@@ -287,7 +280,7 @@ TEST(EngineConfigSectionSchemas, NewSchemasPreserveNestedDefaultsAndBindingEncod
         schema["default"] = defaults;
         check(check, schema, defaults, registration.DefaultSection.Name);
     }
-    EXPECT_EQ(checked, 13u);
+    EXPECT_EQ(checked, 12u);
 }
 
 TEST(EngineConfigSectionSchemas, GeneratedSchemasAgreeWithTheirValidators)

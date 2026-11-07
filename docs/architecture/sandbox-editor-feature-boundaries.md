@@ -147,13 +147,10 @@ and normal prepared frames therefore do not import normal algorithms, owning
 mesh/point-cloud containers or spatial indices. The compiler-derived
 `ProcessingCompilationLocality.NormalContracts` test guards that boundary.
 
-Density-weight config and point-analysis results use
-`Geometry.PointCloud.Kernels.Types` for the kernel/mode enums, their token
-spellings and copied density diagnostics. The algorithm module re-exports this
-owner. Config codecs and point-analysis prepared frames do not import the kernel
-algorithms or spatial-query/index modules; the execution unit imports its kernel
-API explicitly. `ProcessingCompilationLocality.DensityWeightContracts` checks
-these configured compiler dependencies.
+`Geometry.PointCloud.Kernels.Types` owns the kernel/mode enums and the copied density diagnostics (the density weights
+plugin's section and result use them; ARCH-022 Q90). The algorithm module re-exports this owner. The kernel types and
+point-analysis prepared frames do not import the kernel algorithms or spatial-query/index modules;
+`ProcessingCompilationLocality.PointAnalysisContracts` checks these configured compiler dependencies.
 
 Mesh-topology results use `Geometry.Smoothing.Types` for the canonical denoiser
 status. The smoothing algorithm re-exports this enum; its functions and status
@@ -226,11 +223,11 @@ implementation owner and is declared only in the private
 The config interface, shared codec and Sandbox config registration producers
 exclude the segmentation algorithm through
 `ConfigCompilationLocality.CurvatureInterface`. Consolidation token functions
-retain their feature implementation owner. Ten point-processing schemas likewise
-own globally attached functions compiled by three ordinary private translation
-units: `Runtime.PointNeighborhoodConfigCodecs.cpp` (outlier, density, spacing and
-weights), `Runtime.PointFeaturesConfigCodecs.cpp` (bilateral, keypoint, descriptor
-and construction), and `Runtime.PointNormalsRegistrationConfigCodecs.cpp`.
+retain their feature implementation owner. The hand-written point-processing schemas likewise
+own globally attached functions compiled by ordinary private translation
+units: `Runtime.PointFeaturesConfigCodecs.cpp` (bilateral, keypoint, descriptor
+and construction) and `Runtime.PointNormalsRegistrationConfigCodecs.cpp` (the third,
+`Runtime.PointNeighborhoodConfigCodecs.cpp`, went with density weights' codec, ARCH-022 Q90).
 These units share JSON header parsing and template instantiation within each
 cohort; they retain the original typed schemas, validators and token functions.
 They reuse the shared TU's string-token property encoder, validator and name/domain

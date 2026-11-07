@@ -3,7 +3,7 @@
 // domain on both CPU backends with one undo entry, its stale and cancelled runs, scalar storage with checked
 // conversion, the Vulkan backend's admission texts, the latest result it keeps for its window, and its window.
 // Replaces the engine's Test.KernelDensityOperations (its two cases of shared editor machinery moved to
-// Test.DensityWeightOperations).
+// Test.DensityWeightOperations, and with density weights a plugin since Q90 to Test.OutlierAnalysis).
 #include <algorithm>
 #include <array>
 #include <cmath>

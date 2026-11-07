@@ -7,8 +7,11 @@ module;
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 export module Extrinsic.Runtime.PluginContract;
@@ -145,6 +148,67 @@ export namespace Extrinsic::Runtime
     {
         return run.Handle.IsValid() && CancelPluginJob(run.Handle);
     }
+
+    // A plugin's runs (main thread): the newest started one, for its window, and those not yet ended. A plugin keeps
+    // one as a global; it holds its state on the heap and frees it only in Shutdown, never in a destructor, so a run
+    // whose handle reaches the host is never released after the host is gone.
+    template <class Run>
+    class PluginRunBook
+    {
+    public:
+        using Result = std::remove_cvref_t<decltype(std::declval<Run&>().Pending)>;
+
+        // The one terminal outcome of a run (the window and a waiting MCP call read it); the first one stays.
+        void Finish(Run& run, Result result)
+        {
+            if (run.Final) return;
+            run.Final = std::move(result);
+            if (m_State != nullptr)
+                std::erase_if(m_State->Active, [&](const auto& active) { return active.get() == &run; });
+        }
+        // Keeps a started run as the latest, and as active until it ends. A start refused because another run owns
+        // the output (`busy`) answers for that run, so it replaces nothing.
+        std::shared_ptr<Run> Keep(std::shared_ptr<Run> run, const bool busy = false)
+        {
+            if (busy) return run;
+            if (m_State == nullptr) m_State = new State();
+            m_State->Latest = run;
+            if (!run->Final) m_State->Active.push_back(run);
+            return run;
+        }
+        // The latest run while `current(run)` holds (its editor session), else none and it is forgotten.
+        template <class Current>
+        [[nodiscard]] std::shared_ptr<Run> Latest(Current&& current)
+        {
+            if (m_State == nullptr || m_State->Latest == nullptr) return nullptr;
+            if (!current(*m_State->Latest)) m_State->Latest.reset();
+            return m_State->Latest;
+        }
+        [[nodiscard]] std::span<const std::shared_ptr<Run>> Active() const
+        {
+            if (m_State == nullptr) return {};
+            return m_State->Active;
+        }
+        // Forgets `run` as the latest (a window's Dismiss); another run stays.
+        void Dismiss(const std::shared_ptr<Run>& run)
+        {
+            if (m_State != nullptr && m_State->Latest == run) m_State->Latest.reset();
+        }
+        // The plugin's shutdown: the runs go (a GPU run's handle discards its preview).
+        void Shutdown() noexcept
+        {
+            delete m_State;
+            m_State = nullptr;
+        }
+
+    private:
+        struct State
+        {
+            std::shared_ptr<Run> Latest{};
+            std::vector<std::shared_ptr<Run>> Active{};
+        };
+        State* m_State{nullptr};
+    };
 
     // An MCP tool's outcome for a started run, whose texts are `text(result)`: the answer when it already ended, else
     // the pending result's text now, a continuation that answers once `Final` is set, and a cancel hook (MCP

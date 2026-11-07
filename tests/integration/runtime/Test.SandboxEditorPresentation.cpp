@@ -436,7 +436,8 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 83u); // ARCH-022 Q89: point spacing's and kernel density's windows and redirects are plugins'
+    ASSERT_EQ(menu.size(), 79u); // ARCH-022 Q89/Q90: point spacing's, kernel density's and density weights' windows
+                                 // and redirects are plugins'
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -458,7 +459,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
                       segmentation = "Segmentation & Clustering", fields = "Fields & Spectral",
                       sampling = "Sampling & Density", remeshing = "Remeshing & UV",
                       reconstruction = "Reconstruction & Registration";
-    const std::array<ExpectedWindow, 70> expected{{
+    const std::array<ExpectedWindow, 66> expected{{
         {"view.property_inspector", {"View"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -506,16 +507,12 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", normals}},
         {"view.normal_estimation", {"View", "Processing", normals}},
         {"view.keypoint_analysis", {"View", "Processing", features}},
-        {"view.density_weights", {"View", "Processing", sampling}},
         {"view.point_construction", {"View", "Processing", reconstruction}},
         {"mesh.processing.keypoints", {"Mesh", "Processing", features}},
-        {"mesh.processing.density_weights", {"Mesh", "Processing", sampling}},
         {"mesh.processing.point_construction", {"Mesh", "Processing", reconstruction}},
         {"graph.processing.keypoints", {"Graph", "Processing", features}},
-        {"graph.processing.density_weights", {"Graph", "Processing", sampling}},
         {"graph.processing.point_construction", {"Graph", "Processing", reconstruction}},
         {"pointcloud.processing.keypoints", {"PointCloud", "Processing", features}},
-        {"pointcloud.processing.density_weights", {"PointCloud", "Processing", sampling}},
         {"pointcloud.processing.point_construction", {"PointCloud", "Processing", reconstruction}},
         {"view.outlier_analysis", {"View", "Processing", filtering}},
         {"mesh.processing.outliers", {"Mesh", "Processing", filtering}},
@@ -1941,7 +1938,6 @@ TEST(SandboxEditorPresentation, DomainMenusOpenOneSharedWindow)
         {"view.normal_estimation", {"mesh.processing.vertices.normals", "graph.processing.vertices.normals", "pointcloud.processing.vertices.normals", "mesh.processing.faces.normals"}, true},
         {"view.outlier_analysis", {"mesh.processing.outliers", "graph.processing.outliers", "pointcloud.processing.remove_outliers"}, true},
         {"view.keypoint_analysis", {"mesh.processing.keypoints", "graph.processing.keypoints", "pointcloud.processing.keypoints"}, true},
-        {"view.density_weights", {"mesh.processing.density_weights", "graph.processing.density_weights", "pointcloud.processing.density_weights"}, true},
         {"view.point_construction", {"mesh.processing.point_construction", "graph.processing.point_construction", "pointcloud.processing.point_construction"}, true},
     };
     for (const SharedWindowCase& c : cases)

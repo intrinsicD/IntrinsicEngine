@@ -135,9 +135,6 @@ namespace
             check("Normal estimation", [&](auto done) {
                 return R::ApplyEditorNormalEstimationCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Output = Ref("normals", Geometry::PropertyValueKind::Vec3)}, done); });
-            check("Density weights", [&](auto done) {
-                return R::ApplyEditorDensityWeightCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-                    .Weights = Ref("weights", Geometry::PropertyValueKind::Float)}, done); });
             check("Keypoint analysis", [&](auto done) {
                 return R::ApplyEditorKeypointAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
                     .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
@@ -566,14 +563,14 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         "ProcessingCompilationLocality.ConfigPropertyTypes",
         "ProcessingCompilationLocality.ConsolidationContracts",
     };
-    // RUNTIME-349: kernel density and point spacing left the boundary and use kPosition.
-    constexpr std::array<std::string_view, 18> allowedPositionLiterals{
+    // RUNTIME-349: kernel density and point spacing left the boundary and use kPosition; density weights left the
+    // engine (ARCH-022 Q90).
+    constexpr std::array<std::string_view, 17> allowedPositionLiterals{
         "GeometryIntegration/Runtime.GeometryProperty.Types.cpp",
         "Modules/Clustering/Runtime.ClusteringTypes.cppm",
         "Modules/Curvature/Runtime.MeshCurvatureConfig.cpp",
         "Modules/Curvature/Runtime.MeshCurvatureConfig.cppm",
         "Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm",
-        "Modules/DensityWeight/Runtime.DensityWeightConfig.cppm",
         "Modules/Geodesics/Runtime.GeodesicsConfig.cpp",
         "Modules/Geodesics/Runtime.GeodesicsConfig.cppm",
         "Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm",

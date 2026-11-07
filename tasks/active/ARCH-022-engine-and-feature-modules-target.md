@@ -199,6 +199,9 @@ contract_review: tracker only; each slice declares its own contracts
     implement with a parity test and a measurement packet, or leave it) "Erst messen (Empfohlen)"
 92. (2026-11-06, after an interruption) "Kannst du bitte weiter machen?"
 93. (2026-11-06, resumed on another machine) "please continue. when you are done please merge to main and push to remote"
+94. (2026-11-07, after the report that blocks 5 and 6 were on main with green CI) "und?"
+95. (2026-11-07, on the proposed order of the remaining blocks: 8, then 9, then 7 with its pre-flight) "ja ok. dann mach
+    das bitte so"
 
 ## Goal
 - Reach the target in
@@ -3838,3 +3841,28 @@ python3 tools/docs/check_doc_links.py --root . --strict
   `1edac5c0…` and `e71c31f1…` "**revise required**" (a parked request outliving a newer one, a document replacement,
   an invalid job envelope, D's path coverage; then a rejected request ending a valid waiting one), diff `7c98ee21…`
   verbatim "**Verdict: approve.**".
+- 2026-11-07, Q90 block 8 (points 5 and 10a; Q94/Q95): density weights are the plugin `plugins/density_weights`
+  (section `sandbox.density_weights` derived from bound rows, payload unchanged; tools `density_weights`,
+  `density_weights_preview`; window `view.density_weights`): CPU KD-tree and CPU LBVH (complete radius rows of the cached
+  index at the conservative query radius, as the engine queried them) as plugin jobs, Vulkan through the service's GPU
+  scalar analysis (method 2); the automatic radius is derived on the worker (CPU) or, after a fresh-copy readiness, on
+  the frame thread before the GPU start. The service's request gained `MinimumLiveCount`/`TooFewSamples`, its readiness
+  `current`, its refusal `Failed` (a rejected submission is "failed", not "invalid"). Point 5: `PluginRunBook` in the
+  plugin contract and `Refresh/Accept/Cancel/LatestScalarPluginRun` in the editing service serve all three scalar plugins.
+  Removed: the engine module, its codec, run_operation row, Sandbox panel and redirects, the operation runtime's point
+  scalar shape (outliers are its last user). Text deviations (documented in density-weights.md): the derived section's
+  kind/domain texts and error order; the noun "Density-weight" for a missing target and the outputs; a CPU run's capture
+  text for a topology output. Tests: Test.DensityWeightsPlugin (17) and DensityWeightsPluginGpuSmoke (5) replace
+  Test.DensityWeightOperations and PointLBVHGpuSmoke.DensityWeight*; generic cases moved to outliers (job admission,
+  index mismatch, operation results, session frames, panels); the transaction's tests run on a neutral
+  `MakeEditorPointScalarTransactionForTest` (test residency or device), with a restored initial-rejection case. Full CPU
+  suite 6249/6249, touched suites and 16 GPU smokes green (RTX 4090). Mutations, each red: run book busy guard, service
+  MinimumLiveCount, GPU readiness before the analysis, fresh vs cached verdict, unpublished text, a refusal text, GPU
+  contribution fold, the maker's refusal state, the panel discriminator, the service's and the plugin's `Failed`; survived
+  and argued equivalent: float instead of double LBVH row distances (the double kernel filters the conservative shell).
+  R1 28 -> 27, R2 plugins/density_weights 0. Code review (Codex, gpt-6-astra xhigh, read-only, recursion protection
+  instruction-only; fresh thread `01a1b3a3-1352-7c01-8360-26edd7bcc042`): diff `84e4d9be…` "**Correctness verdict: revise
+  required.**" (panel discriminator, rejected submission status, row overflow guard, C88), diff `91f050df…` "**Verdict:
+  revise required.**" (production-path rejection test, C88), r3 verbatim "**Verdict: revise required — solely because C88
+  remains unresolved.**" C88 (`ara/logic/claims.md`, cites the deleted test) awaits the operator: the pin edit was
+  refused by the permission classifier (the "do not touch ara/*" rule).

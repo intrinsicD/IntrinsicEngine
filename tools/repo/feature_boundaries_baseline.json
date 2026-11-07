@@ -1,12 +1,16 @@
 {
   "schema_version": 1,
-  "r1_files": 28,
+  "r1_files": 27,
   "r2": {
     "plugins/bilateral_filter": {
       "editor_internals": 0,
       "other_plugins": 0
     },
     "plugins/coherent_point_drift": {
+      "editor_internals": 0,
+      "other_plugins": 0
+    },
+    "plugins/density_weights": {
       "editor_internals": 0,
       "other_plugins": 0
     },
@@ -36,10 +40,6 @@
     },
     "src/runtime/Modules/CurvatureSegmentation": {
       "editor_internals": 0,
-      "other_plugins": 0
-    },
-    "src/runtime/Modules/DensityWeight": {
-      "editor_internals": 4,
       "other_plugins": 0
     },
     "src/runtime/Modules/Geodesics": {

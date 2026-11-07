@@ -52,7 +52,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyT
         --check-source src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cppm
         --check-source src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cpp
         --check-source src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
-        --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cppm
         --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
@@ -63,7 +62,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyT
         --check-source src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         --check-source src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
         --check-source src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
-        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
         --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         # RuntimeReuseDriftGuard lets only sources in this boundary keep a serialized v:position default literal.
         --check-source src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm
@@ -134,7 +132,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisResults
         --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
         --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cppm
-        --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         --check-source src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
@@ -148,7 +145,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
-        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightOperation.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp
         --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisOperation.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
@@ -186,7 +182,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.UnrelatedAdapte
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisTests
-        --check-source tests/contract/runtime/Test.DensityWeightOperations.cpp
         --check-source tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
         --check-source tests/contract/runtime/Test.OutlierAnalysis.cpp
         --forbid-module Extrinsic.Runtime.PointFieldOperations
@@ -215,12 +210,11 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Normals
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-intrinsic_add_module_boundary_test(ProcessingCompilationLocality.DensityWeightContracts
+# The kernel types and the point-analysis interfaces stay free of the spatial-query modules (once the density weights
+# contracts; ARCH-022 Q90 moved density weights into a plugin).
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisContracts
         --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cppm
         --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cpp
-        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
-        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightOperation.cppm
-        --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp
@@ -229,7 +223,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.DensityWeightCo
         --forbid-module Geometry.SpatialQueries
         --forbid-module Geometry.Octree
         --forbid-module Geometry.PointLBVH)
-set_tests_properties(ProcessingCompilationLocality.DensityWeightContracts
+set_tests_properties(ProcessingCompilationLocality.PointAnalysisContracts
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopologyContracts
         --check-source src/geometry/Geometry.Smoothing.Types.cppm
@@ -855,7 +849,6 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.TestContext
         --check-source tests/contract/runtime/Test.NormalEstimation.cpp
         --check-source tests/contract/runtime/Test.OutlierAnalysis.cpp
         --check-source tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
-        --check-source tests/contract/runtime/Test.DensityWeightOperations.cpp
         --check-source tests/contract/runtime/Test.PointConstructionOperations.cpp
         --check-source tests/contract/runtime/Test.RuntimeReferenceScene.cpp
         --check-source tests/contract/runtime/Test.SandboxEditorModels.cpp
@@ -1325,7 +1318,6 @@ if(TARGET ExtrinsicRuntime)
         Test.NormalEstimation.cpp
         Test.OutlierAnalysis.cpp
         Test.KeypointAnalysisOperations.cpp
-    Test.DensityWeightOperations.cpp
     Test.PointConstructionOperations.cpp
     Test.QueuedEditorJobContract.cpp
     Test.OperationResults.cpp
@@ -1341,6 +1333,7 @@ if(TARGET ExtrinsicRuntime)
         Test.DescriptorAnalysisPlugin.cpp
         Test.CoherentPointDriftPlugin.cpp
         Test.KernelDensityPlugin.cpp
+        Test.DensityWeightsPlugin.cpp
         Test.PointSpacingPlugin.cpp
         Test.RuntimeConfigControl.cpp
         Test.RuntimeEngineConfigBoot.cpp
@@ -1406,7 +1399,7 @@ if(TARGET ExtrinsicRuntime)
     target_compile_definitions(RuntimeContractTestObjs PRIVATE INTRINSIC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     # ARCH-022: the plugin tests link the plugins' objects (in-process plugins).
     target_link_libraries(RuntimeContractTestObjs PRIVATE IntrinsicBilateralFilterPluginObjects
-        IntrinsicDescriptorAnalysisPluginObjects IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects)
+        IntrinsicDescriptorAnalysisPluginObjects IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects IntrinsicDensityWeightsPluginObjects)
 
     intrinsic_resolve_test_sources(_runtime_contract_slow_test_sources
         SEARCH_DIRS contract/runtime
@@ -1897,17 +1890,18 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.CoherentPointDriftPluginGpuSmoke.cpp
                 integration/graphics/Test.PointCloudEditingScalarAnalysisGpuSmoke.cpp
                 integration/graphics/Test.KernelDensityPluginGpuSmoke.cpp
+                integration/graphics/Test.DensityWeightsPluginGpuSmoke.cpp
                 integration/graphics/Test.PointSpacingPluginGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
              IntrinsicBilateralFilterPluginObjects IntrinsicDescriptorAnalysisPluginObjects
-             IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects
+             IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects IntrinsicDensityWeightsPluginObjects
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
     target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners)
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
         OBJECTS PointLBVHGpuTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicBilateralFilterPluginObjects
-                  IntrinsicDescriptorAnalysisPluginObjects IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects
+                  IntrinsicDescriptorAnalysisPluginObjects IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects IntrinsicDensityWeightsPluginObjects
         LABELS integration graphics gpu vulkan
     )
     intrinsic_add_glsl_shaders(IntrinsicPointLBVHGpuTests)
@@ -2406,7 +2400,7 @@ if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
         OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference IntrinsicBilateralFilterPluginObjects
-            IntrinsicDescriptorAnalysisPluginObjects IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects
+            IntrinsicDescriptorAnalysisPluginObjects IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects IntrinsicDensityWeightsPluginObjects
         LABELS contract runtime
     )
 endif()
@@ -3062,7 +3056,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(DescriptorAnalysisPluginGpuSmoke.EightDomainsAgreeWithTheCpuKdTreeColdWarmAndAutomatic DescriptorAnalysisPluginGpuSmoke.StaleInputsACancelBetweenStagesAndRadiusOverflowWriteNothing DescriptorAnalysisPluginGpuSmoke.ALowestIdCapServesADenseRadius DescriptorAnalysisPluginGpuSmoke.AnUnloadDuringAChainEndsTheRunOnceAndAReloadRunsAgain PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(CoherentPointDriftPluginGpuSmoke.APausedRunShowsItsPreviewAndOnlyAcceptWritesIt PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(KernelDensityPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled KernelDensityPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster KernelDensityPluginGpuSmoke.TinyBandwidthsMatchTheCpuReference PointSpacingPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled PointSpacingPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster PointSpacingPluginGpuSmoke.TinySeparationsAndScalesMatchTheCpuReference PointSpacingPluginGpuSmoke.AnUnloadReleasesAWaitingPreviewWithoutWriting PointCloudEditingScalarAnalysisGpuSmoke.AcceptPublishesTheCpuReferenceAndAnAutoAcceptRunNeedsNoCaller PROPERTIES TIMEOUT 120)\n"
-        "  set_tests_properties(PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(DensityWeightsPluginGpuSmoke.EightDomainsEveryKernelAndModeAndAnAutomaticRadiusAgreeWithTheCpuKdTree DensityWeightsPluginGpuSmoke.AcceptDiscardStaleCancelAndARadiusOverflow DensityWeightsPluginGpuSmoke.TinySupportsAndOneSampleMatchTheCpuReference PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
         "if(DEFINED IntrinsicRuntimePointCloudConsolidationGpuParityTests_TESTS)\n"
         "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures PROPERTIES TIMEOUT 300)\n"

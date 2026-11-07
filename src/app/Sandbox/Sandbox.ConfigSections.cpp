@@ -13,7 +13,6 @@ import Extrinsic.Runtime.RegistrationConfig;
 import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
-import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -45,7 +44,6 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDerivedSectionRegistration<Runtime::kOutlierAnalysisSection>()) ||
             !registry.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()) ||
-            !registry.Register(Runtime::MakeDensityWeightConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakePointConstructionConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeClusteringConfigSectionRegistration(std::move(callbacks.Clustering))) ||
             !registry.Register(Runtime::MakeCurvatureSegmentationConfigSectionRegistration(

@@ -1,6 +1,13 @@
 # Compact density weights
 
-**View → Processing → Sampling & Density → Compact Density Weights** and the mesh, graph and point-cloud Processing menus share the validated `sandbox.density_weights` config and execution commands. A canonical vec3 position property produces one named float property on the same element domain. The panel uses the existing scalar visualization recipe to show the weights.
+**View → Processing → Sampling & Density → Compact Density Weights** computes a named weight property on the selected
+position domain. It is the plugin `plugins/density_weights` (ARCH-022 Q90), which owns its config section
+(`sandbox.density_weights`, payload unchanged), its MCP tools `density_weights` and `density_weights_preview` and its
+window; the point-cloud editing service does the capture, the GPU run and the publication. A canonical vec3 position
+property produces one named scalar property (any scalar storage on the CPU, float on Vulkan) on the same element
+domain. **Compute compact weights** runs the applied settings (a Vulkan run first shows its preview, published by
+**Accept** and released by **Discard**; the tool accepts at once); **Show weights** uses the scalar visualization
+recipe.
 
 ## Formulation and support
 
@@ -18,7 +25,7 @@ The KD-tree and indexed adapters query a conservative float radius derived in do
 - `cpu_lbvh` reuses the selected-property index in `SpatialIndexCache` and supplies complete candidate rows to the same reducer.
 - `vulkan_lbvh` gathers complete radius rows and evaluates strict support and double kernel sums on the device through `Graphics.PointScalarAnalysis`. Original source IDs retain compact-order semantics without neighborhood download.
 
-The shared shader `lbvhQueryDouble` supplies ascending source IDs for fixed-order double reductions. Gaussian and ThetaLop reuse the double exponential from property filtering (`include/exp_double.glsl`); WendlandC2 uses double polynomial arithmetic. CPU LBVH, keypoints and descriptors retain their radius-row helper. The three scalar GPU methods share `Runtime.PointScalarTransaction`, not a new service.
+The shared shader `lbvhQueryDouble` supplies ascending source IDs for fixed-order double reductions. Gaussian and ThetaLop reuse the double exponential from property filtering (`include/exp_double.glsl`); WendlandC2 uses double polynomial arithmetic. The plugin's CPU LBVH rows are the cached index's complete radius rows at the conservative query radius (self excluded, double distances, ascending), as the removed engine operation queried them. The scalar GPU methods share `Runtime.PointScalarTransaction` through the editing service's GPU scalar analysis (method 2).
 
 Vulkan capacity is 1..1024 hits per row and batch size 1..16384. Density weights require complete support: overflow fails without publication, even when omitted hits might ultimately fall outside strict support. The overflow message names the support radius as too large, reports the largest candidate count `N` and capacity `C`, and suggests about `R*C/N`, 0 for automatic, or a CPU backend. There is no estimator cap or silent fallback. CPU LBVH supports at most 2^24 samples and Vulkan at most 2^20. Coordinates and the expanded query radius must stay within 1e18. A one-sample Vulkan request uses physical capacity one and accepts its empty nonself row.
 
@@ -31,16 +38,20 @@ CPU LBVH retains candidate rows in host memory. Vulkan retains at most 2^24 cand
 
 ## Configuration and publication
 
-The editor/config command surface is owned by
-`Extrinsic.Runtime.PointAnalysisOperations`. It uses the shared
-`EditorProcessingCommands` handle and explicit completion callbacks for newly
-queued jobs. `PrepareEditorPointAnalysisFrame` supplies guarded commands,
-completion sinks and copied results to the editor. See
-[processing compilation locality](sandbox-editor-feature-boundaries.md#processing-compilation-locality).
+The plugin's section is derived from its bound rows (`Extrinsic.Runtime.DerivedConfigSections`) and writes the payload
+the removed hand-written codec wrote. Its texts are the codec's where one field is wrong (backend, kernel, mode, the
+capacity pair, distinct names on one domain); a wrong reference kind or domain answers as every derived section does
+("positions needs a canonical typed property reference.", "Unknown element domain.") instead of the codec's shared
+binding text; a missing entity answers "Density-weight target entity is stale or missing." and a mismatched output
+"Density-weight outputs must be …" (the plugin's noun, where the operation said "Density-weight target is stale or
+missing." and "Weight outputs …"; a CPU run's own capture answers an output that would replace a topology or deletion
+property with the editing service's "The outputs cannot replace topology or deletion properties.", the readiness with
+"Density-weight outputs cannot replace topology/deletion properties."), and a payload with several wrong fields reports the first in the derived order (integers, tokens,
+floats, references, the cross-field check).
 
 The version-1 schema is `intrinsic.runtime.sandbox.density_weights`. Fields are `entity`, `backend`, `positions`, `weights`, `support_radius`, `kernel`, `mode`, `gpu_query_batch_size` and `gpu_radius_capacity`. Defaults are `cpu_kdtree`, support radius 0 (automatic), `theta_lop`, `direct`, batch 4096 and capacity 256. Support radius 0 or positive finite values up to floatmax are accepted; indexed paths apply their additional range checks.
 
-Support radius 0 derives the radius from the captured live positions through `Geometry.SupportRadius` with the LOP-family row of the [support-radius policy](support-radius-policy.md) (16th neighbour, P75, factor 1.25; backoff to rank 4). The workload budget is `gpu_radius_capacity` for every backend, so the derived radius does not depend on the backend. The rule is the same on all eight domains and scales with the model. Fewer than two live samples, a zero-extent set or an over-budget minimum rank fails with `InvalidProcessingParameters` and "Automatic support radius failed (status); set a positive support radius." The budget is checked on at most 2048 sampled rows, so it is not a guarantee: on Vulkan a denser unsampled row can still overflow and fail. CPU backends resolve on the job worker; Vulkan resolves on the frame thread because its dispatch starts there, after the radius-independent admission (point count, neighbour workspace, device) and before the admission of the resolved radius. Readiness does not resolve an automatic radius. Positive values are used unchanged in source units (RUNTIME-291). Unknown fields, invalid enum tokens, property aliasing, incompatible domains/kinds and invalid limits fail validation.
+Support radius 0 derives the radius from the captured live positions through `Geometry.SupportRadius` with the LOP-family row of the [support-radius policy](support-radius-policy.md) (16th neighbour, P75, factor 1.25; backoff to rank 4). The workload budget is `gpu_radius_capacity` for every backend, so the derived radius does not depend on the backend. The rule is the same on all eight domains and scales with the model. Too few live samples for the analysis, a zero-extent set or an over-budget minimum rank fails with `InvalidProcessingParameters` and "Automatic support radius failed (status); set a positive support radius." The budget is checked on at most 2048 sampled rows, so it is not a guarantee: on Vulkan a denser unsampled row can still overflow and fail. CPU backends resolve on the job worker; Vulkan resolves on the frame thread because its dispatch starts there, after the radius-independent admission (point count, neighbour workspace, device; the service's readiness at query radius 0) and before the admission of the resolved radius (three captures: the admission on a fresh copy, the positions for the analysis, the run's own). Readiness does not resolve an automatic radius. Positive values are used unchanged in source units (RUNTIME-291). Unknown fields, invalid enum tokens, property aliasing, incompatible domains/kinds and invalid limits fail validation.
 
 All eight canonical domains are accepted: mesh vertices/edges/halfedges/faces, graph nodes/edges/halfedges and point-cloud points. Halfedges use paired edge deletion masks. Finite live positions are required; deleted nonfinite rows are excluded. Existing deleted output rows are preserved; newly created deleted rows initialize to zero. Position, deletion and output revisions guard one atomic history operation. Unrelated properties and topology remain intact. Stale, cancelled and partially rejected job chains preserve output/history.
 
@@ -48,7 +59,7 @@ Results report requested/actual backend, slot/live/written counts, kernel diagno
 
 ## Verification entry points
 
-`Test.PointCloudKernels.cpp` covers analytic contributions, supplied rows, malformed support, extreme radii and tiny-radius internal-node regression. `Test.PointCloudConsolidation.cpp` checks widened candidate shells, tiny support and derivative overflow guards. `Test.DensityWeightOperations.cpp` covers canonical domains, strict config, CPU/cache agreement, deleted/unrelated preservation, history and stale/cancelled work, and the automatic radius (mesh vertices, graph nodes and point clouds, both CPU backends, x1000 scaling). `PointScalarTransaction` checks that Vulkan resolves it before submission. `PointLBVHGpuSmoke.DensityWeight*` exercises all kernel/mode combinations, stale/cancel/overflow (including the suggested radius)/partial-submission failures, subnormal-coordinate rejection, tiny support and a single sample. Existing keypoint and descriptor GPU tests cover shared pagination behavior.
+`Test.PointCloudKernels.cpp` covers analytic contributions, supplied rows, malformed support, extreme radii and tiny-radius internal-node regression. `Test.PointCloudConsolidation.cpp` checks widened candidate shells, tiny support and derivative overflow guards. `Test.DensityWeightsPlugin.cpp` covers the section (name, payload, bounds, texts), the tools and the Jobs window row, canonical domains with every kernel and mode, CPU/cache agreement, bitwise equality with the geometry functions, deleted/unrelated preservation, history and replaced storage, stale/cancelled work, checked scalar storage, the automatic radius (mesh vertices, graph nodes and point clouds, both CPU backends, x1000 scaling), the Vulkan admission texts (refused before the automatic radius is derived) and the window. `DensityWeightsPluginGpuSmoke` exercises all kernel/mode combinations on eight domains, an automatic radius equal to the CPU's, Accept/Discard, stale/cancel/overflow (including the suggested radius), subnormal-coordinate rejection, tiny support, a single sample and an unload. A rejected Accept submission is `PointScalarTransaction`'s. Existing keypoint and descriptor GPU tests cover shared pagination behavior.
 
 `geometry.point_lbvh.density_weight_runtime_smoke` measures eight-domain requests through publication after one warmup. `INTRINSIC_DENSITY_WEIGHT_BENCHMARK_OUTPUT` writes raw diagnostics. Debug smoke does not establish a performance improvement. [RUNTIME-227](../../tasks/done/RUNTIME-227-compact-density-weight-spatial-backends.md) owns verification and review.
 
@@ -63,7 +74,7 @@ leaves CPU rows unchanged. Input/deletion/output watches guard publication,
 detach discards, and batch/agent execution auto-accepts. The colormap observes
 the pending scalar front. Deleted output rows preserve their base bytes.
 
-`PointScalarTransaction` mock contracts cover all three adapters.
+`PointScalarTransaction` mock contracts run on a test transaction of method 2.
 `RUNTIME298PointScalarResidency.ParityResidentSecondRunAndDiscard` covers all
 three kernels in direct and reciprocal modes, a deleted row, second-run zero
 upload and Discard. It records maximum absolute delta per variant; 2e-5 bounds

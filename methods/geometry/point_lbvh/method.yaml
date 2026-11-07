@@ -25,7 +25,7 @@ correctness_tests:
   - ../../../tests/contract/runtime/Test.PointConstructionOperations.cpp
   - ../../../tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp
   - ../../../tests/unit/geometry/Test.PointCloudKernels.cpp
-  - ../../../tests/contract/runtime/Test.DensityWeightOperations.cpp
+  - ../../../tests/contract/runtime/Test.DensityWeightsPlugin.cpp
   - ../../../tests/unit/geometry/Test.PointLBVH.cpp
   - ../../../tests/contract/runtime/Test.SpatialIndexCache.cpp
   - ../../../tests/contract/runtime/Test.OutlierAnalysis.cpp
@@ -41,6 +41,7 @@ correctness_tests:
   - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
   - ../../../tests/integration/graphics/Test.DescriptorAnalysisPluginGpuSmoke.cpp
   - ../../../tests/integration/graphics/Test.KernelDensityPluginGpuSmoke.cpp
+  - ../../../tests/integration/graphics/Test.DensityWeightsPluginGpuSmoke.cpp
   - ../../../tests/integration/graphics/Test.PointSpacingPluginGpuSmoke.cpp
   - ../../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
 benchmarks:

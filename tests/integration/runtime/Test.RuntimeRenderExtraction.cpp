@@ -2740,7 +2740,7 @@ TEST(RuntimeRenderExtraction, PublishedAnalysisPropertiesReuseMeshGeometry)
 {
     namespace R = Runtime;
     namespace GS = ECS::Components::GeometrySources;
-    for (const int method : {0, 1, 2, 3})
+    for (const int method : {0, 1, 2})
     {
         SCOPED_TRACE(method);
         RendererFixture fixture;
@@ -2781,7 +2781,7 @@ TEST(RuntimeRenderExtraction, PublishedAnalysisPropertiesReuseMeshGeometry)
             ASSERT_TRUE(result.Succeeded()) << result.Message;
             output = config.Score;
         }
-        else if (method == 2)
+        else // ARCH-022 Q90: density weights (method 3 before) are a plugin
         {
             R::OutlierAnalysisConfig config;
             config.StableEntityId = StableId(entity); config.KNeighbors = 3;
@@ -2789,15 +2789,6 @@ TEST(RuntimeRenderExtraction, PublishedAnalysisPropertiesReuseMeshGeometry)
             const auto result = R::ApplyEditorOutlierAnalysisCommand(commands, config);
             ASSERT_TRUE(result.Succeeded()) << result.Message;
             output = config.Score;
-        }
-        else
-        {
-            R::DensityWeightConfig config;
-            config.StableEntityId = StableId(entity); config.SupportRadius = 2;
-            config.Positions.Domain = config.Weights.Domain = R::GeometryElementDomain::MeshVertex;
-            const auto result = R::ApplyEditorDensityWeightCommand(commands, config);
-            ASSERT_TRUE(result.Succeeded()) << result.Message;
-            output = config.Weights;
         }
         ASSERT_EQ(R::ApplyEditorVisualizationRecipeCommand(context, {
             .StableEntityId = StableId(entity),

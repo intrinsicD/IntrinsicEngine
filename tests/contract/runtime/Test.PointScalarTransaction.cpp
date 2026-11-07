@@ -57,18 +57,15 @@ namespace
         Extrinsic::Tests::EditorJobHarness Jobs;
         R::EditorProcessingContext Context;
         ScalarTarget Density;
-        R::DensityWeightConfig Weight;
         entt::entity Entity;
         void SetUp() override
         {
             Entity=Intrinsic::Tests::MakePointDomainSource(Scene,R::GeometryElementDomain::PointCloudPoint);
             const auto id=R::SelectionController::ToStableEntityId(Entity);
-            Density.StableEntityId=Weight.StableEntityId=id;
-            Density.Positions.Domain=Weight.Positions.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Density.Density.Domain=Weight.Weights.Domain=R::GeometryElementDomain::PointCloudPoint;
-            Density.Density.Name=Weight.Weights.Name="result";
-            Weight.Backend=R::DensityWeightBackend::VulkanLBVH;
-            Weight.SupportRadius=1; // The coincident fixture has no automatic radius (RUNTIME-291).
+            Density.StableEntityId=id;
+            Density.Positions.Domain=R::GeometryElementDomain::PointCloudPoint;
+            Density.Density.Domain=R::GeometryElementDomain::PointCloudPoint;
+            Density.Density.Name="result";
             (void)Rows().GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
             Context.Scene=&Scene;Context.CommandHistory=&History;Context.Device=&Device;
             Device.TransferQueue.AcceptBufferUploads=true;Jobs.Attach(Context);
@@ -79,7 +76,8 @@ namespace
         auto Ready(float value = 3.0f)
         {
             std::vector<float> values(Rows().Size(),value);
-            return R::MakeEditorDensityWeightTransactionForTest(Commands(),Weight,values,Residency);
+            return R::MakeEditorPointScalarTransactionForTest(Commands(),Density.StableEntityId,Density.Positions,
+                                                              Density.Density,values,&Residency);
         }
     };
 }
@@ -191,9 +189,9 @@ TEST_P(PointScalarTransaction, SuccessiveEditsReplayAndRejectForeignOutputChange
     // An independent mesh-field author creates a float mask before B edits it.
     History.ClearHistory();
     Entity = Intrinsic::Tests::MakePointDomainSource(Scene, R::GeometryElementDomain::MeshVertex);
-    Density.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
-    Density.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::MeshVertex;
-    Density.Density.Domain = Weight.Weights.Domain = R::GeometryElementDomain::MeshVertex;
+    Density.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
+    Density.Positions.Domain = R::GeometryElementDomain::MeshVertex;
+    Density.Density.Domain = R::GeometryElementDomain::MeshVertex;
     R::EditorGeodesicsCommand geodesics;
     geodesics.StableEntityId = Density.StableEntityId;
     geodesics.Config.SourceVertices = {0};
@@ -236,9 +234,9 @@ TEST_P(PointScalarTransaction, SuccessiveEditsReplayAndRejectForeignOutputChange
     // A scalar edit followed by outlier analysis retains the legal UndoB -> UndoA prefix.
     History.ClearHistory();
     Entity = Intrinsic::Tests::MakePointDomainSource(Scene, R::GeometryElementDomain::PointCloudPoint);
-    Density.StableEntityId = Weight.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
-    Density.Positions.Domain = Weight.Positions.Domain = R::GeometryElementDomain::PointCloudPoint;
-    Density.Density.Domain = Weight.Weights.Domain = R::GeometryElementDomain::PointCloudPoint;
+    Density.StableEntityId = R::SelectionController::ToStableEntityId(Entity);
+    Density.Positions.Domain = R::GeometryElementDomain::PointCloudPoint;
+    Density.Density.Domain = R::GeometryElementDomain::PointCloudPoint;
     Rows().GetOrAdd<glm::vec3>("v:position").Vector() = {{0, 0, 0}, {.01f, 0, 0}, {.02f, 0, 0}, {10, 0, 0}, {.03f, 0, 0}};
     const auto beforeOutliers = Ready(29.0f);
     ASSERT_TRUE(beforeOutliers);
@@ -286,30 +284,9 @@ TEST_P(PointScalarTransaction,ChangedInputRefusesAccept)
     EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),run).Status,R::EditorCommandStatus::StaleEntity);
     R::DiscardEditorPointScalar(Commands(),run);EXPECT_FALSE(Rows().Exists("result"));
 }
-TEST_P(PointScalarTransaction,MissingDeviceRefusesAdmission)
-{
-    Context.Device=nullptr;
-    if(GetParam()==2)EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(Commands(),Weight).Enabled);
-}
-TEST_P(PointScalarTransaction,ConfigRoundTrip)
-{
-    auto config=R::CreateReferenceEngineConfig();
-    if(GetParam()==2){R::SetDensityWeightConfig(config,Weight);const auto restored=R::GetDensityWeightConfig(config);ASSERT_TRUE(restored);EXPECT_EQ(R::SerializeDensityWeightConfig(*restored),R::SerializeDensityWeightConfig(Weight));}
-}
-// ARCH-022 Q89: kernel density (0) and point spacing (1) are plugins; their transaction cases are the plugins'
-// (Test.KernelDensityPlugin, Test.PointSpacingPlugin). Density weights (2) keep the transaction's.
+// ARCH-022 Q89/Q90: kernel density (0), point spacing (1) and density weights (2) are plugins; their admission and
+// run cases are the plugins' (Test.*Plugin). The transaction's own cases run on a test transaction with method 2.
 INSTANTIATE_TEST_SUITE_P(ThreeMethods,PointScalarTransaction,::testing::Values(2));
-TEST_P(PointScalarTransaction,UnsupportedStorageAndSubnormalCoordinatesRefuseAdmission)
-{
-    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
-    const auto preview=[&]{
-        return R::PreviewEditorDensityWeightCommand(Commands(),Weight);};
-    Weight.Weights.ValueKind=Geometry::PropertyValueKind::Double;
-    auto result=preview();EXPECT_FALSE(result.Enabled);EXPECT_NE(result.DisabledReason.find("float outputs"),std::string::npos);
-    Weight.Weights.ValueKind=Geometry::PropertyValueKind::Float;
-    Rows().Get<glm::vec3>("v:position")[0]={std::numeric_limits<float>::denorm_min(),0,0};
-    result=preview();EXPECT_FALSE(result.Enabled);EXPECT_NE(result.DisabledReason.find("subnormal"),std::string::npos);
-}
 TEST_P(PointScalarTransaction,DeletionChangeRefusesAccept)
 {
     auto run=Ready();ASSERT_TRUE(run);Rows().GetOrAdd<bool>("v:deleted",false)[0]=true;
@@ -318,80 +295,8 @@ TEST_P(PointScalarTransaction,DeletionChangeRefusesAccept)
     R::DiscardEditorPointScalar(Commands(),run);EXPECT_FALSE(Rows().Exists("result"));
 }
 
-TEST_P(PointScalarTransaction, InitialSubmissionRejectsWithoutCallback)
-{
-    
-    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
-    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
-    Context.World=worlds.CreateWorld("initial-rejection");Context.Scene=worlds.Get(Context.World);
-    const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
-    (void)Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint).GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
-    Density.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);
-    services.BeginRegistration();
-    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
-    R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
-    ASSERT_TRUE(cache.OnRegister(setup).has_value());
-    unsigned callbacks=0,submissions=0;
-    Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
-    const auto result=R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}).Status;
-    EXPECT_EQ(result,R::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_EQ(submissions,1u);EXPECT_EQ(callbacks,0u); // One terminal outcome, returned directly.
-    R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
-}
 
-// RUNTIME-291: Vulkan resolves an automatic support radius before admission and submission, to the
-// value the CPU backend reports; a set without an automatic radius refuses without submitting.
-TEST_P(PointScalarTransaction, AutomaticSupportRadiusResolvesBeforeVulkanSubmission)
-{
-    if(GetParam()!=2)return;
-    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
-    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
-    Context.World=worlds.CreateWorld("automatic-radius");Context.Scene=worlds.Get(Context.World);
-    const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
-    auto& rows=Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint);
-    (void)rows.GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
-    Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);Weight.SupportRadius=0;
-    services.BeginRegistration();
-    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
-    R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
-    ASSERT_TRUE(cache.OnRegister(setup).has_value());
-    unsigned submissions=0;
-    Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
-    // Radius-independent Vulkan refusals come before the automatic analysis, which would fail first here.
-    Device.ShaderFloat64=false;
-    const auto refused=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
-    EXPECT_EQ(refused.Status,R::EditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_NE(refused.Message.find("float64"),std::string::npos)<<refused.Message;
-    EXPECT_EQ(submissions,0u);
-    Device.ShaderFloat64=true;
-    // Readiness never runs the automatic analysis (RUNTIME-353): it would refuse these samples.
-    EXPECT_TRUE(R::PreviewEditorDensityWeightCommand(Commands(),Weight).Enabled);
-    const auto coincident=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
-    EXPECT_EQ(coincident.Status,R::EditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_NE(coincident.Message.find("Automatic support radius"),std::string::npos)<<coincident.Message;
-    EXPECT_EQ(submissions,0u);
-    const glm::vec3 spread[]{{0,0,0},{1.25f,.5f,0},{.25f,2.75f,.5f},{2.5f,3,-.75f},{1,1,1}};
-    for(std::size_t i=0;i<rows.Size();++i)rows.Get<glm::vec3>("v:position")[i]=spread[i];
-    const auto gpu=R::ApplyEditorDensityWeightCommand(Commands(),Weight);
-    EXPECT_EQ(gpu.Status,R::EditorCommandStatus::GeometryProcessingFailed)<<gpu.Message; // The mock rejects the submission.
-    EXPECT_EQ(submissions,1u);
-    auto cpu=Weight;cpu.Backend=R::DensityWeightBackend::CpuKDTree;cpu.Weights.Name="cpu";
-    const auto reference=R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands({.Scene=Context.Scene}),cpu);
-    ASSERT_TRUE(reference.Succeeded())<<reference.Message;
-    EXPECT_GT(gpu.SupportRadius,0);
-    EXPECT_EQ(gpu.SupportRadius,reference.SupportRadius);
-    EXPECT_EQ(gpu.QueryRadius,reference.QueryRadius);
-    R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
-}
 
-TEST_P(PointScalarTransaction, DoubleSubnormalSupportReachesDeviceAdmission)
-{
-    if(GetParam()!=2)return;
-    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
-    Weight.SupportRadius=std::numeric_limits<double>::denorm_min();
-    const auto ready=R::PreviewEditorDensityWeightCommand(Commands(),Weight);
-    EXPECT_FALSE(ready.Enabled);EXPECT_NE(ready.DisabledReason.find("operational float64 device"),std::string::npos);
-}
 
 TEST_P(PointScalarTransaction, AcceptSinkDeliveredExactlyOnce)
 {
@@ -402,70 +307,47 @@ TEST_P(PointScalarTransaction, AcceptSinkDeliveredExactlyOnce)
     ASSERT_TRUE(Jobs.DrainUntilTerminal());EXPECT_EQ(calls,1u);
     R::DiscardEditorPointScalar(Commands(),run);EXPECT_EQ(calls,1u);
 }
-// RUNTIME-348: the operation runtime keeps a GPU run's results in the session's store without a panel:
-// its started answer, then its terminal result under the same run, also when Accept brings its own sink.
-TEST_P(PointScalarTransaction, GpuResultsAreRetainedWithoutThePanel)
+// A device run whose initial submission is rejected fails (not an invalid request) and holds no ring (restored from the
+// density weights operation's InitialSubmissionRejectsWithoutCallback, ARCH-022 Q90).
+TEST_P(PointScalarTransaction, ARejectedInitialSubmissionFailsAndHoldsNoRing)
 {
-    R::OperationResultStore store;
-    Context.OperationResults = &store;
-    Context.AttachmentActive = []
-    {
-        return true;
-    };
-    const auto stored = [&]() -> std::optional<std::pair<R::EditorCommandStatus, std::size_t>>
-    {
-        const auto copy = store.Copy();
-        if (GetParam() == 2)
-            if (const auto r = copy.Last<R::DensityWeightOperation>())
-                return std::pair{r->Status, r->WrittenCount};
-        return std::nullopt;
-    };
-    auto run = Ready();
-    ASSERT_TRUE(run);
-    ASSERT_TRUE(stored()) << "the started answer is stored";
-    EXPECT_EQ(stored()->second, 0u);
-    const auto started = stored()->first;
-    EXPECT_FALSE(Ready(5.0f)) << "the output's ring awaits Accept or Discard";
-    EXPECT_EQ(stored()->first, started) << "a start refused because another run owns the output is not stored";
-    unsigned calls = 0;
-    ASSERT_EQ(R::AcceptEditorPointScalar(Commands(),
-                  run,
-                  [&](auto)
-                  {
-                      ++calls;
-                  })
-                  .Status,
-        R::EditorCommandStatus::Pending);
-    ASSERT_TRUE(Jobs.DrainUntilTerminal());
-    EXPECT_EQ(calls, 1u);
-    ASSERT_TRUE(stored());
-    EXPECT_EQ(stored()->first, R::EditorCommandStatus::Applied) << "Accept's sink does not replace the retention";
-    EXPECT_EQ(stored()->second, R::SnapshotEditorPointScalar(Commands(), run).LiveCount) << "the folded result";
-    auto discarded = Ready(4.0f);
-    ASSERT_TRUE(discarded);
-    R::DiscardEditorPointScalar(Commands(), discarded);
-    ASSERT_TRUE(stored());
-    EXPECT_EQ(stored()->first, R::SnapshotEditorPointScalar(Commands(), discarded).Status) << "a discard is stored too";
-    EXPECT_EQ(stored()->second, 0u);
-    // A run whose Accept cannot be submitted fails; its failure is stored before its sink runs.
-    Context.JobCommands.Submit = [](R::JobDesc, R::EditorJobIdentity)
-    {
-        return R::JobToken{};
-    };
-    auto failing = Ready(6.0f);
-    ASSERT_TRUE(failing);
-    bool sinkSawFailure = false;
-    (void)R::AcceptEditorPointScalar(Commands(),
-        failing,
-        [&](const R::EditorPointScalarTransactionSnapshot& s)
-        {
-            ASSERT_TRUE(stored());
-            sinkSawFailure = stored()->first == s.Status;
-        });
-    EXPECT_EQ(R::SnapshotEditorPointScalar(Commands(), failing).Phase, R::EditorGpuTransactionPhase::Failed);
-    EXPECT_TRUE(sinkSawFailure);
-    ASSERT_TRUE(stored());
-    EXPECT_EQ(stored()->first, R::SnapshotEditorPointScalar(Commands(), failing).Status) << "a failure is stored too";
+    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
+    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
+    Context.World=worlds.CreateWorld("initial-rejection");Context.Scene=worlds.Get(Context.World);
+    const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
+    auto& rows=Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint);
+    (void)rows.GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
+    Density.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+    services.BeginRegistration();
+    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
+    R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
+    ASSERT_TRUE(cache.OnRegister(setup).has_value());
+    unsigned submissions=0;
+    Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
+    R::EditorPointScalarTransactionSnapshot refused;
+    const auto run=R::MakeEditorPointScalarTransactionForTest(Commands(),Density.StableEntityId,Density.Positions,
+        Density.Density,{},nullptr,{},{.Method=2,.Capacity=256,.Kernel=1,.QueryRadius=1.f,.SupportRadius=1},&refused);
+    EXPECT_FALSE(run);
+    EXPECT_EQ(refused.Status,R::EditorCommandStatus::GeometryProcessingFailed)<<refused.Message;
+    EXPECT_NE(refused.Message.find("submission was rejected"),std::string::npos)<<refused.Message;
+    EXPECT_EQ(submissions,1u);
+    EXPECT_FALSE(rows.Exists("result"));
+    EXPECT_FALSE(cache.PropertyResidency()->HasRing(R::MakeGpuPropertyKey(Context.World,entity,Density.Density)));
+    R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
+}
+
+// A run whose Accept cannot be submitted fails, delivers once and publishes nothing.
+TEST_P(PointScalarTransaction, ARejectedAcceptSubmissionFailsAndDeliversOnce)
+{
+    Context.JobCommands.Submit=[](R::JobDesc,R::EditorJobIdentity){return R::JobToken{};};
+    auto run=Ready();ASSERT_TRUE(run);unsigned calls=0;
+    (void)R::AcceptEditorPointScalar(Commands(),run,[&](const R::EditorPointScalarTransactionSnapshot& s){
+        ++calls;EXPECT_EQ(s.Phase,R::EditorGpuTransactionPhase::Failed);});
+    const auto state=R::SnapshotEditorPointScalar(Commands(),run);
+    EXPECT_EQ(state.Phase,R::EditorGpuTransactionPhase::Failed);
+    EXPECT_NE(state.Message.find("submission was rejected"),std::string::npos)<<state.Message;
+    EXPECT_EQ(calls,1u);EXPECT_FALSE(Rows().Exists("result"));EXPECT_FALSE(Residency.HasRing(Key()));
+    R::DiscardEditorPointScalar(Commands(),run);EXPECT_EQ(calls,1u);
 }
 TEST_P(PointScalarTransaction, ReplacedRingRefusesAcceptAndDiscardPreservesReplacement)
 {
@@ -489,9 +371,9 @@ TEST_P(PointScalarTransaction, DestroyedWorldIsCheckedBeforeSceneAccess)
     Entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
     auto& rows=Intrinsic::Tests::PointDomainProperties(*Context.Scene,Entity,R::GeometryElementDomain::PointCloudPoint);
     (void)rows.GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
-    Density.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(Entity);
-    const std::vector<float> values(rows.Size(),3);
-    auto run=R::MakeEditorDensityWeightTransactionForTest(Commands(),Weight,values,Residency);
+    Density.StableEntityId=R::SelectionController::ToStableEntityId(Entity);
+    auto run=R::MakeEditorPointScalarTransactionForTest(Commands(),Density.StableEntityId,Density.Positions,
+                                                        Density.Density,std::vector<float>(rows.Size(),3),&Residency);
     ASSERT_TRUE(run);
     worlds.Clear(); // Captured context deliberately retains the dead Scene address.
     ASSERT_EQ(worlds.Get(Context.World),nullptr);
@@ -500,33 +382,6 @@ TEST_P(PointScalarTransaction, DestroyedWorldIsCheckedBeforeSceneAccess)
     R::DiscardEditorPointScalar(Commands(),run);
 }
 
-// RUNTIME-313: a duplicate device run answers Pending with the shared wording (before:
-// InvalidProcessingParameters), never submits and never takes the callback.
-TEST_P(PointScalarTransaction, DuplicateStartIsPendingWithTheSharedMessage)
-{
-    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
-    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
-    Context.World=worlds.CreateWorld("duplicate");Context.Scene=worlds.Get(Context.World);
-    const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
-    (void)Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint).GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
-    Density.StableEntityId=Weight.StableEntityId=R::SelectionController::ToStableEntityId(entity);
-    services.BeginRegistration();
-    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
-    R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
-    ASSERT_TRUE(cache.OnRegister(setup).has_value());
-    unsigned callbacks=0,submissions=0;
-    Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
-    Context.JobCommands.FindActive=[](const R::EditorJobIdentity& identity){
-        return std::optional{R::EditorJobRecord{.Token=R::JobToken{5,1},.Identity=identity,.State=R::JobState::Running}};};
-    // The same label as the CPU run of each operation.
-    const std::string label="Density weights";
-    const auto check=[&](const auto& result){
-        EXPECT_EQ(result.Status,R::EditorCommandStatus::Pending)<<result.Message;
-        EXPECT_EQ(result.Message,label+" already has an active running job (job 5:1).");};
-    check(R::ApplyEditorDensityWeightCommand(Commands(),Weight,[&](auto){++callbacks;}));
-    EXPECT_EQ(submissions,0u);EXPECT_EQ(callbacks,0u);
-    R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
-}
 
 // RUNTIME-311: the scalar transaction runs on the shared GPU transaction lifecycle. A second
 // Accept while the first is under way answers Pending without a sink (before:

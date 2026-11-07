@@ -184,12 +184,6 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
-        // RUNTIME-348: results the operation runtime stores itself. The panel shows their transfer
-        // counters but never folds a finished transaction into them: the stored result may be a newer run's.
-        template <class Result>
-        constexpr bool kStoredByOperationRuntime =
-            std::same_as<Result, Runtime::EditorDensityWeightResult>;
-
         template <class State>
         bool DrawPointScalarTransaction(const Runtime::EditorProcessingCommands& commands,
             Runtime::EditorPointScalarTransactionHandle& run,
@@ -206,7 +200,6 @@ namespace Extrinsic::Sandbox::Editor
             const bool active = phase == Runtime::EditorGpuTransactionPhase::Running ||
                 phase == Runtime::EditorGpuTransactionPhase::Accepting ||
                 phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept;
-            constexpr bool showsTransfer = kStoredByOperationRuntime<typename decltype(state.LastResult)::value_type>;
             if (!active)
             {
                 run.reset();
@@ -215,10 +208,6 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", snapshot.Message.c_str());
             GpuTransactionRowView row{
                 .Phase = phase, .CanAccept = snapshot.CanAccept, .AcceptRefusal = snapshot.AcceptRefusalReason};
-            if constexpr (showsTransfer)
-                row.Io = GpuTransactionIo{.UploadBytes = snapshot.GpuInputUploadBytes,
-                    .CacheHits = snapshot.GpuInputCacheHits,
-                    .CpuReadbackBytes = snapshot.CpuStageReadbackBytes};
             switch (DrawGpuTransactionControls(row, "Scalar"))
             {
             case GpuTransactionRowAction::Accept: (void)Runtime::AcceptEditorPointScalar(commands, run); break;
@@ -324,8 +313,6 @@ namespace Extrinsic::Sandbox::Editor
             ProcessingDraftState<Runtime::OutlierAnalysisConfig, Runtime::EditorOutlierAnalysisResult>;
         using KeypointsState =
             ProcessingDraftState<Runtime::KeypointAnalysisConfig, Runtime::EditorKeypointAnalysisResult>;
-        using DensityWeightsState =
-            ProcessingDraftState<Runtime::DensityWeightConfig, Runtime::EditorDensityWeightResult>;
         using ConstructionState =
             ProcessingDraftState<Runtime::PointConstructionConfig, Runtime::EditorPointConstructionResult>;
 
@@ -420,9 +407,8 @@ namespace Extrinsic::Sandbox::Editor
             std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
         Runtime::EditorOutlierTransactionHandle OutlierTransaction{};
-        Runtime::EditorPointScalarTransactionHandle WeightTransaction{}, KeypointTransaction{};
+        Runtime::EditorPointScalarTransactionHandle KeypointTransaction{};
         KeypointsState Keypoints{};
-        DensityWeightsState DensityWeights{};
         ConstructionState Construction{};
 
         void Register(EditorShell& editorShell);
@@ -460,7 +446,6 @@ namespace Extrinsic::Sandbox::Editor
         void DrawNormalTransaction(const SandboxEditorContext&);
         void DrawOutliersWindow(bool&, const SandboxEditorContext&);
         void DrawKeypointsWindow(bool&, const SandboxEditorContext&);
-        void DrawDensityWeightsWindow(bool&, const SandboxEditorContext&);
         void DrawConstructionWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
         void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
@@ -567,16 +552,6 @@ namespace Extrinsic::Sandbox::Editor
                 {domain, "Processing", "Features & Descriptors"},
                 "ISS Keypoint Analysis",
                 "view.keypoint_analysis");
-        RegisterWindow("view.density_weights",
-            {"View", "Processing", "Sampling & Density"},
-            "Compact Density Weights",
-            &Impl::DrawDensityWeightsWindow);
-        for (const auto& [id, domain] :
-            std::array<std::pair<const char*, const char*>, 3>{{{"mesh.processing.density_weights", "Mesh"},
-                {"graph.processing.density_weights", "Graph"},
-                {"pointcloud.processing.density_weights", "PointCloud"}}})
-            RegisterRedirectWindow(
-                id, {domain, "Processing", "Sampling & Density"}, "Compact Density Weights", "view.density_weights");
         RegisterWindow("view.point_construction",
             {"View", "Processing", "Reconstruction & Registration"},
             "Construct from Points",
@@ -685,14 +660,11 @@ namespace Extrinsic::Sandbox::Editor
         if (OutlierTransaction)
             Runtime::DiscardEditorOutlierAnalysis({}, OutlierTransaction);
         OutlierTransaction.reset();
-        Runtime::DiscardEditorPointScalar({}, WeightTransaction);
-        WeightTransaction.reset();
         Outliers = {};
         if (KeypointTransaction)
             Runtime::DiscardEditorPointScalar({}, KeypointTransaction);
         KeypointTransaction.reset();
         Keypoints = {};
-        DensityWeights = {};
         Construction = {};
     }
 
@@ -2398,143 +2370,6 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::End();
     }
 
-    void MeshProcessingPanels::Impl::DrawDensityWeightsWindow(bool& open, const SandboxEditorContext& context)
-    {
-        // RUNTIME-353: the operation runtime stores every run's result (the session store, which the point
-        // field frame copies whole); the panel only reads it.
-        if (const auto stored = context.PointFields.Results.Last<Runtime::DensityWeightOperation>())
-            DensityWeights.LastResult = *stored;
-        const std::function<void(Runtime::EditorDensityWeightResult)> noSessionSink{};
-        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Compact Density Weights", &open))
-        {
-            ImGui::End();
-            return;
-        }
-        const auto active = Runtime::GetEditorDensityWeightConfig(context.PointAnalysis.Commands)
-                                .value_or(Runtime::DensityWeightConfig{});
-        const auto serialized = Runtime::SerializeDensityWeightConfig(active);
-        DensityWeights.Synchronize(active, serialized);
-        auto& config = DensityWeights.Draft;
-        bool changed = false;
-        changed |= DrawProcessingEntity(
-            "Entity##DensityWeights", context, config.StableEntityId, DensityWeights.LastSelectedEntity);
-        if (DrawProcessingPointInput(
-                "Positions##DensityWeights",
-                [&]
-                {
-                    return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId);
-                },
-                config.Positions))
-        {
-            config.Weights.Domain = config.Positions.Domain;
-            changed = true;
-        }
-        for (auto [label, ref] : {std::pair{"Weight property", &config.Weights}})
-            changed |= DrawProcessingScalarOutput(label, *ref);
-        int backend = int(config.Backend);
-        if (ImGui::Combo("Backend",
-                &backend,
-                OwnerConfigEnumLabels<Runtime::DensityWeightBackend, 3>(
-                    Runtime::DensityWeightConfigFieldSpecs(), "backend")
-                    .data(),
-                3))
-        {
-            config.Backend = Runtime::DensityWeightBackend(backend);
-            changed = true;
-        }
-        changed |= ImGui::InputDouble("Support radius (0 = automatic)", &config.SupportRadius);
-        int kernel = int(config.Kernel), mode = int(config.Mode);
-        if (ImGui::Combo("Kernel", &kernel, "Gaussian (sigma = h/4)\0LOP theta\0Wendland C2\0"))
-        {
-            config.Kernel = decltype(config.Kernel)(kernel);
-            changed = true;
-        }
-        if (ImGui::Combo("Weight", &mode, "Direct\0Reciprocal\0"))
-        {
-            config.Mode = decltype(config.Mode)(mode);
-            changed = true;
-        }
-        ImGui::TextWrapped(
-            "Sums compact kernel contributions inside the support radius, with a leading 1. An isolated sample has weight 1. Units follow the selected position property.");
-        if (config.Backend == Runtime::DensityWeightBackend::VulkanLBVH)
-        {
-            changed |= ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &config.GpuQueryBatchSize);
-            changed |= ImGui::InputScalar("GPU radius capacity", ImGuiDataType_U32, &config.GpuRadiusCapacity);
-            ImGui::TextWrapped(
-                "Vulkan collects complete conservative radius candidates. Overflow fails without changing the output and suggests a smaller radius. Subnormal coordinate components are unsupported.");
-        }
-        const bool scalarActive =
-            DrawPointScalarTransaction(context.PointAnalysis.Commands, WeightTransaction, DensityWeights);
-        DrawProcessingExecution(
-            context.PointAnalysis.Commands,
-            DensityWeights,
-            changed,
-            [&](const auto& request)
-            {
-                return Runtime::PreviewEditorDensityWeightCommand(context.PointAnalysis.Commands, request);
-            },
-            [&](const auto& request)
-            {
-                return Runtime::ApplyEditorDensityWeightConfig(context.PointAnalysis.Commands, request);
-            },
-            [&]
-            {
-                if (config.Backend == Runtime::DensityWeightBackend::VulkanLBVH)
-                {
-                    Runtime::EditorDensityWeightResult result;
-                    WeightTransaction =
-                        Runtime::StartEditorDensityWeightTransaction(context.PointAnalysis.Commands, config, result);
-                    return result;
-                }
-                return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands, noSessionSink);
-            },
-            noSessionSink,
-            "Compute compact weights",
-            "Controls were rejected by density config validation.",
-            "Density config was rejected.",
-            [](const auto& c)
-            {
-                return std::pair{c.StableEntityId, c.Weights.Name};
-            },
-            scalarActive);
-        const Runtime::EditorOutputRef densityWeightsDraft{config.StableEntityId, config.Weights.Name};
-        DensityWeights.Run.Draw(
-            context.PointAnalysis.Commands, config.StableEntityId, "density_weights_progress", &densityWeightsDraft);
-        ImGui::TextWrapped(
-            "Vulkan previews compact weights using double kernel sums. Accept publishes with Undo; Discard retains CPU rows.");
-        DrawProcessingPropertyShowButton(
-            context, config.StableEntityId, config.Weights, DensityWeights.VisualizationDiagnostic, "Show weights");
-        DrawProcessingDisplayDiagnostic(DensityWeights.VisualizationDiagnostic);
-        if (DensityWeights.LastResult)
-        {
-            const auto& result = *DensityWeights.LastResult;
-            ImGui::Separator();
-            ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
-            ImGui::Text(
-                "Requested: %s; ran: %s", Runtime::ToString(result.RequestedBackend), result.ActualBackend.c_str());
-            ImGui::Text("Live / total: %zu / %zu", result.LiveCount, result.SlotCount);
-            ImGui::Text("Weight min / max: %.5g / %.5g", double(result.MinWeight), double(result.MaxWeight));
-            ImGui::Text("Contributions: %zu; largest candidate row: %zu",
-                result.Diagnostics.NeighborContributionCount,
-                result.MaximumNeighbors);
-            ImGui::Text("Support radius %.5g; query radius %.5g; GPU batches %zu",
-                result.SupportRadius,
-                double(result.QueryRadius),
-                result.GpuQueryBatches);
-            ImGui::Text("Cache reused: %s; CPU %.3f ms; GPU neighborhoods %.3f ms",
-                result.IndexReused ? "yes" : "no",
-                result.CpuComputeMilliseconds,
-                result.GpuNeighborhoodMilliseconds);
-            ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##DensityWeights",
-                DensityWeights.LastResult,
-                &Runtime::OperationResultKey<Runtime::DensityWeightOperation>::Tag,
-                context.PointFields.DismissResult);
-        }
-        ImGui::End();
-    }
-
     void MeshProcessingPanels::Impl::DrawConstructionWindow(bool& open, const SandboxEditorContext& context)
     {
         if (context.PointConstruction.Results.LastPointConstructionResult)
@@ -3473,16 +3308,6 @@ namespace Extrinsic::Sandbox::Editor
         Runtime::EditorPropertySmoothingTransactionHandle transaction)
     {
         m_Impl->SmoothingTransaction = std::move(transaction);
-    }
-
-    void MeshProcessingPanels::InjectPointScalarTransactionForTest(
-        unsigned method, Runtime::EditorPointScalarTransactionHandle transaction)
-    {
-        if (method == 2)
-        {
-            m_Impl->WeightTransaction = std::move(transaction);
-            m_Impl->DensityWeights.LastResult.emplace();
-        }
     }
 
     void MeshProcessingPanels::InjectOutlierTransactionForTest(Runtime::EditorOutlierTransactionHandle transaction)

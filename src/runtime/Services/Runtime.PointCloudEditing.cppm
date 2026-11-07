@@ -13,6 +13,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <glm/mat4x4.hpp>
@@ -25,6 +26,7 @@ export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.PointLBVH;
 export import Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.GpuPropertyResidency;
+export import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.ModuleLifecycle;
 
@@ -95,6 +97,9 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Output{}; // any scalar kind on the CPU; the GPU writes float outputs only
         Graphics::PointScalarGpuParams Params{};
         std::string Noun{}, Method{}, History{};
+        // Fewer live samples are refused with `TooFewSamples` (empty: "<Method> requires at least two live samples.").
+        std::size_t MinimumLiveCount{2u};
+        std::string TooFewSamples{};
     };
     // Where the method runs: the readiness differs (the CPU index and the device have limits).
     enum class ScalarAnalysisBackend : std::uint8_t { CpuReference, CpuIndex, Gpu };
@@ -120,6 +125,7 @@ export namespace Extrinsic::Runtime
     {
         std::string Message{};
         bool Busy{false};
+        bool Failed{false}; // admitted, but its work was not submitted (a failure, not invalid input)
     };
 
     // One GPU run of a point scalar method (main thread). Its own Jobs run drives it, with the Accept stage joined
@@ -217,11 +223,13 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] PointPublishStatus PublishScalars(PointEdit& edit, std::span<const std::vector<float>> columns,
                                                         std::string label);
         // Main thread, side-effect free: empty when the method can run on `backend`, else why (the target, the
-        // capture, fewer than two live samples, the LBVH limits; on the GPU its admission: a float output, normal
+        // capture, fewer than MinimumLiveCount live samples, the LBVH limits; on the GPU its admission: a float output, normal
         // coordinates and parameters, k <= 63 for methods 0 and 1, row and workspace limits, an operational float64
         // device with the framed spatial cache and jobs).
+        // `current` checks a fresh copy of the values, as a start does, instead of the editor's cached verdict (which
+        // may still be pending).
         [[nodiscard]] std::string ScalarAnalysisReadiness(const ScalarAnalysisRequest& request,
-                                                          ScalarAnalysisBackend backend);
+                                                          ScalarAnalysisBackend backend, bool current = false);
         // Main thread: the GPU run after the same checks. The output shows its preview until Accept or Discard; an
         // `autoAccept` run accepts as soon as it is ready. Empty with the reason in `refusal` otherwise.
         [[nodiscard]] ScalarAnalysis StartScalarAnalysis(const ScalarAnalysisRequest& request, bool autoAccept,
@@ -255,6 +263,61 @@ export namespace Extrinsic::Runtime
         std::unique_ptr<Impl> m_Impl;
         friend class PointCloudEditingModule;
     };
+
+    // A scalar plugin's GPU run in its run book (ARCH-022 Q90; shared by kernel density, point spacing and density
+    // weights): `Run` is a PluginRun with the service's run (`Analysis`) and its editor session (`Session`), its Result
+    // has Status, Message, LiveCount and WrittenCount, and `fold` copies a GPU state into it (texts, counts,
+    // statistics). Main thread. Refresh folds the state into Pending, and into Final once the run ended.
+    template <class Run, class Fold>
+    void RefreshScalarPluginRun(PluginRunBook<Run>& book, Run& run, Fold&& fold)
+    {
+        if (run.Final || !run.Analysis) return;
+        const auto state = run.Analysis.Poll();
+        auto r = run.Pending;
+        fold(r, state);
+        switch (state.Phase)
+        {
+        case ScalarAnalysisPhase::Running:
+        case ScalarAnalysisPhase::ReadyToAccept:
+        case ScalarAnalysisPhase::Accepting: run.Pending = std::move(r); return;
+        case ScalarAnalysisPhase::Applied:
+            r.Status = "applied";
+            r.WrittenCount = r.LiveCount;
+            break;
+        case ScalarAnalysisPhase::Discarded: r.Status = state.Stale ? "stale" : "discarded"; break;
+        case ScalarAnalysisPhase::Failed: r.Status = "failed"; break;
+        }
+        book.Finish(run, std::move(r));
+    }
+    // Publishes a ready preview; a refused Accept leaves its reason in Pending.
+    template <class Run, class Fold>
+    void AcceptScalarPluginRun(PluginRunBook<Run>& book, Run& run, Fold&& fold)
+    {
+        if (run.Final || !run.Analysis) return;
+        const auto state = run.Analysis.Accept();
+        if (state.Phase == ScalarAnalysisPhase::ReadyToAccept) run.Pending.Message = state.Message; // why not
+        RefreshScalarPluginRun(book, run, fold);
+    }
+    // Discards a GPU run's preview, or cancels a CPU run's jobs; false when nothing was active.
+    template <class Run, class Fold>
+    bool CancelScalarPluginRun(PluginRunBook<Run>& book, Run& run, Fold&& fold)
+    {
+        if (run.Final) return false;
+        if (!run.Analysis) return CancelPluginRun(run);
+        run.Analysis.Discard();
+        RefreshScalarPluginRun(book, run, fold);
+        return true;
+    }
+    // The book's latest run while the service still works in its editor session; one of an earlier session is gone.
+    template <class Run>
+    [[nodiscard]] std::shared_ptr<Run> LatestScalarPluginRun(PluginRunBook<Run>& book)
+    {
+        return book.Latest([](const Run& run)
+        {
+            auto* service = PluginService<PointCloudEditingService>();
+            return service != nullptr && service->SessionCurrent(run.Session);
+        });
+    }
 
     class PointCloudEditingModule final : public IRuntimeModule
     {

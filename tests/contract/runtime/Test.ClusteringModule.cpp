@@ -2092,15 +2092,16 @@ TEST_F(ClusteringModuleResident, AdmissionReservesTypedAndPresentationAgainstSca
     Runtime::EditorProcessingContext context;
     context.Scene=&Scene();context.World=World;context.Device=&Device;context.SpatialIndices=&Cache;
     Jobs.Attach(context);
-    Runtime::DensityWeightConfig scalar; // a competing point scalar transaction (ARCH-022 Q89: density weights now)
-    scalar.StableEntityId=Request.StableEntityId;scalar.Positions=Request.Properties.InputPositions;
-    scalar.Weights=Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels);scalar.SupportRadius=1;
     const auto commands=Runtime::BindEditorProcessingCommands(context);
-    auto competing=Runtime::MakeEditorDensityWeightTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
+    // A competing point scalar transaction on the presentation key (ARCH-022 Q90: no engine method starts one alone).
+    const auto make=[&]{return Runtime::MakeEditorPointScalarTransactionForTest(commands,Request.StableEntityId,
+        Request.Properties.InputPositions,Runtime::GpuPropertyPresentationRef(Request.Properties.OutputLabels),
+        std::vector<float>(12,3),residency);};
+    auto competing=make();
     EXPECT_FALSE(competing);EXPECT_EQ(residency->RingGeneration(presentation),generation);
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
-    competing=Runtime::MakeEditorDensityWeightTransactionForTest(commands,scalar,std::vector<float>(12,3),*residency);
+    competing=make();
     ASSERT_TRUE(competing);
     Start();ASSERT_TRUE(Until([&]{return Results.size()==2;}));EXPECT_FALSE(Results[1].Succeeded());
     EXPECT_TRUE(Runtime::SnapshotEditorPointScalar(commands,competing).CanAccept);
