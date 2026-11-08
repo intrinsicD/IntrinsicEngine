@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `ARCH-022` — Engine and feature modules: the architecture target (tasks/active/ARCH-022-engine-and-feature-modules-target.md)
+- `BUG-262` — Correct worker-method sanitizer fixtures (tasks/active/BUG-262-worker-method-sanitizer-fixtures.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 

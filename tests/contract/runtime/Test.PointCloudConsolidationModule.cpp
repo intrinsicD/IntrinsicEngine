@@ -2217,8 +2217,9 @@ namespace
                 const auto found = PulledBytes.find(token.Value);
                 if (found == PulledBytes.end())
                     return Stopping;
-                std::memcpy(
-                    destination.data(), found->second.data(), std::min(destination.size(), found->second.size()));
+                const auto bytes = std::min(destination.size(), found->second.size());
+                if (bytes != 0u)
+                    std::memcpy(destination.data(), found->second.data(), bytes);
                 PulledBytes.erase(found);
                 return true;
             };
@@ -3274,7 +3275,7 @@ TEST_F(ResidentLop, APausedRunShowsItsBoundaryOnceAndAcceptsThatIteration)
 }
 
 // run_control's Accept of a result whose inputs changed publishes nothing and fails the run; its Discard while a page
-// is in flight ends the run unpublished exactly once, after that page completed.
+// is in flight ends the run unpublished exactly once without waiting for the device page.
 TEST_F(ResidentLop, RunControlStaleAcceptAndInFlightDiscardPublishNothing)
 {
     Start();
@@ -3319,25 +3320,26 @@ TEST_F(ResidentLop, RunControlStaleAcceptAndInFlightDiscardPublishNothing)
     ASSERT_NE(discarded, 0u);
     ASSERT_TRUE(Control(discarded, Runtime::StepRunAction::Discard));
     EXPECT_EQ(Run(discarded).Phase, Runtime::StepRunPhase::Discarded) << "terminal at once";
-    for (unsigned i = 0u; i < 5u; ++i)
-        Tick();
-    EXPECT_EQ(Results.size(), 1u) << "the run ends once its page completed";
-    EXPECT_TRUE(Run(discarded).SegmentInFlight) << "the page holds the run";
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 2u && !Run(discarded).SegmentInFlight;
+        }))
+        << "logical cancellation does not wait for the held device page";
+    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
+    EXPECT_TRUE(HasHeld()) << "the device page is still pending after logical cancellation";
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), edited);
+    EXPECT_EQ(History.UndoCount(), undo);
     HoldCompletion = false;
     std::array<std::uint32_t, 16> grid{};
     grid[3] = 1u;
     grid[11] = 2u * Before.size();
     ReleaseHeld(std::as_bytes(std::span(grid)));
-    ASSERT_TRUE(Until(
-        [&]
-        {
-            return Results.size() == 2u;
-        }));
-    EXPECT_EQ(Results.back().Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
-    EXPECT_FALSE(Run(discarded).SegmentInFlight);
     for (unsigned i = 0u; i < 10u; ++i)
         Tick();
     EXPECT_EQ(Results.size(), 2u);
+    EXPECT_EQ(Run(discarded).Phase, Runtime::StepRunPhase::Discarded);
+    EXPECT_FALSE(Run(discarded).SegmentInFlight);
     EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), edited);
     EXPECT_EQ(History.UndoCount(), undo);
 }
