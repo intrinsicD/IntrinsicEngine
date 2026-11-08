@@ -41,7 +41,8 @@ namespace Extrinsic::Runtime
         std::string BackendDiagnostic{};
         // RUNTIME-289: why a Vulkan initial order ran on the CPU. A device order arrives through
         // InitialOrdering from the job InitialOrderJob, which the worker job depends on; RunWorker
-        // moves it into Params.InitialOrder, from which results report the backend.
+        // moves it into Params.InitialOrder, from which results report the backend. ARCH-023: that job
+        // orders on its worker but writes InitialOrdering only on the main thread, as it publishes.
         std::string InitialSamplingDiagnostic{};
         struct InitialOrderingState
         {

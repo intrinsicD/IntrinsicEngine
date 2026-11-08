@@ -615,7 +615,7 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
                                                      "Runtime.GeometryProcessingOperations.JobFailure.hpp"};
     // Files that own a job lifecycle the helper does not cover (keep this list short; a new
     // queued operation belongs on `QueuedJobDelivery`).
-    constexpr std::array<std::string_view, 6> handWritten{
+    constexpr std::array<std::string_view, 5> handWritten{
         // The resident keypoint run guards the sink of the scalar publication it drives
         // (the GPU Run/Accept transactions themselves are on Runtime.GpuTransactionLifecycle).
         "Runtime.PointAnalysisOperations.Keypoints.cpp",
@@ -625,8 +625,6 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
         "Runtime.ParameterizationOperations.Processing.cpp",
         "Runtime.MeshFieldOperations.Curvature.cpp",
         "Runtime.MeshTopologyOperations.Topology.cpp",
-        // A run object with interactive steps (Busy flag, optional completion).
-        "Runtime.RegistrationOperations.CoherentPointDrift.cpp",
     };
     // RUNTIME-311: Accept front readbacks belong to the shared GPU transaction lifecycle, which
     // defines the readback primitive its header declares.

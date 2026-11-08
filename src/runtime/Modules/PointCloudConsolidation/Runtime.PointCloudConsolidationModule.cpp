@@ -61,7 +61,6 @@ import Geometry.SupportRadius;
 #include "Editor/internal/Runtime.EditorPropertyHistory.hpp"
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp"
-#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -3226,9 +3225,12 @@ namespace Extrinsic::Runtime
             return CommandOutcome::Ok();
         }
 
-        // RUNTIME-289: farthest-point initial samples asked on Vulkan are ordered by a framed device
-        // job (resident canonical positions; the snapshot holds the same rows in local space) before
-        // the solve, whose first job depends on it and adopts the verified order in RunWorker.
+        // RUNTIME-289/ARCH-023 (RUNTIME-355 F3): farthest-point initial samples asked on Vulkan are ordered by a worker
+        // job (resident canonical positions; the snapshot holds the same rows in local space) before the solve, whose
+        // first job depends on it and adopts the verified order in RunWorker. The ordering's pages are submitted and
+        // waited for on that worker (no frame or owner poll paces them); its owner prepares the workspace here, writes
+        // the result into InitialOrdering only on the main thread (the dependent's finalizer may read it while the
+        // ordering still runs) and releases what it used once the job ended, published or not.
         void SubmitInitialOrdering(CommandContext& context, const WorldHandle world, SpatialIndexCache* cache,
                                    RHI::IDevice* device, PointCloudConsolidationSnapshot& snapshot)
         {
@@ -3253,42 +3255,75 @@ namespace Extrinsic::Runtime
                 if (!positions || positions->Layout.Count != points)
                     why = "Resident sampling input acquisition refused; sampling ran on the CPU.";
             }
-            if (!why.empty()) return;
-            auto ordering = std::make_shared<PointCloudConsolidationSnapshot::InitialOrderingState>();
+            if (!why.empty())
+                return;
             auto gpu = std::make_shared<PointSamplingGpuRun>(
                 *cache, Graphics::FarthestPointGpuInput{.Positions = *positions, .FirstIndex = sampling->FirstIndex,
                                                         .Count = std::uint32_t(count)},
                 snapshot.Positions, *sampling);
-            JobDesc job = EditorFeatureDetail::MakeFramedGpuJobDesc({
-                .DebugName = "Consolidation Vulkan initial samples",
+            if (!gpu->PrepareWorker(*device, *residency))
+            {
+                why = "The Vulkan sampler refused its resident input; sampling ran on the CPU.";
+                return;
+            }
+            auto ordering = std::make_shared<PointCloudConsolidationSnapshot::InitialOrderingState>();
+            const auto current =
+                [worlds = context.Worlds, world, id = snapshot.Request.StableEntityId, state = snapshot.SourceState]
+            {
+                auto* scene = worlds->Get(world);
+                const auto entity = scene ? ResolveEntity(scene->Raw(), id) : ECS::InvalidEntityHandle;
+                const auto* properties = entity != ECS::InvalidEntityHandle
+                    ? ResolveGeometryPropertySet(BuildGeometryAvailability(scene->Raw(), entity), state.Domain)
+                    : nullptr;
+                return properties != nullptr && SamePropertyState(*properties, state);
+            };
+            // The worker's answer: whether the device order was verified, else why the CPU orders instead.
+            using Ordered = std::pair<bool, std::string>;
+            JobDesc job{.DebugName = "Consolidation Vulkan initial samples",
                 .Scope = world,
-                .Current = [worlds = context.Worlds, world, id = snapshot.Request.StableEntityId, state = snapshot.SourceState] {
-                    auto* scene = worlds->Get(world);
-                    const auto entity = scene ? ResolveEntity(scene->Raw(), id) : ECS::InvalidEntityHandle;
-                    const auto* properties = entity != ECS::InvalidEntityHandle
-                        ? ResolveGeometryPropertySet(BuildGeometryAvailability(scene->Raw(), entity), state.Domain) : nullptr;
-                    return properties != nullptr && SamePropertyState(*properties, state);
+                .CorrelationId = snapshot.Correlation.Value,
+                .Work =
+                    [gpu](const JobCancellation&)
+                {
+                    Ordered ordered{};
+                    ordered.first = gpu->OrderOnWorker(ordered.second);
+                    return JobResultEnvelope::Make(std::move(ordered));
                 },
-                .Queue = [cache, gpu] { return gpu->QueueNext(*cache); },
-                .Observe = [gpu](const SpatialGpuResult& chunk) { return gpu->Observe(chunk); },
-                .Publish = [ordering, gpu, count](const SpatialGpuResult* chunk) {
-                    if (chunk == nullptr || chunk->State != SpatialQueryState::Ready)
-                        ordering->Diagnostic = (chunk && !chunk->Diagnostic.empty() ? chunk->Diagnostic
-                                                                                    : std::string("GPU sampling submission refused")) +
-                                               "; sampling ran on the CPU.";
-                    else if (gpu->Current().Order.size() != count)
-                        ordering->Diagnostic = "The Vulkan sampler returned an incomplete order; sampling ran on the CPU.";
-                    else if (gpu->VerifyPrefix(ordering->Diagnostic))
-                        ordering->Order = gpu->Current();
+                // A cancel (a world close, the shutdown drain) gives a waiting page up; nothing more is submitted.
+                .WakeOnCancel =
+                    [gpu]
+                {
+                    gpu->Abort();
+                },
+                // Stale: the dependent consolidation job is cancelled with it.
+                .ValidateBeforeApply =
+                    [current]
+                {
+                    return current() ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration;
+                },
+                .PublishCompletion =
+                    [ordering, gpu](KernelEventBus&, const JobResultEnvelope& result)
+                {
+                    if (const auto* ordered = result.TryGet<Ordered>())
+                    {
+                        if (ordered->first)
+                            ordering->Order = gpu->Current();
+                        else
+                            ordering->Diagnostic = ordered->second;
+                    }
+                    gpu->Release();
                     return true;
                 },
-                // Stale or cancelled: the dependent consolidation job is cancelled with it.
-                .Abandon = [] {},
-            });
-            job.CorrelationId = snapshot.Correlation.Value;
+                // Cancelled or stale: nothing is adopted (the dependent is cancelled too, so no CPU fallback runs).
+                .FinalizeUnpublishedOnMainThread =
+                    [gpu]
+                {
+                    gpu->Release();
+                }};
             const JobToken token = context.Jobs->Submit(std::move(job));
             if (!token.IsValid())
             {
+                gpu->Release(); // nothing was submitted
                 why = "The job lane rejected the Vulkan initial-sample run; sampling ran on the CPU.";
                 return;
             }

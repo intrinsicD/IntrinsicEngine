@@ -55,9 +55,8 @@ RULES: list[Rule] = [
     Rule("OperationModuleBoundary", "GrandfatheredIncludesArePinned/consolidation",
          files=("src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp",),
          require=('#include "Editor/internal/Runtime.EditorPropertyHistory.hpp"',
-                  '#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"',
-                  '#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"'),
-         count=(('#include "Editor/', 3),)),
+                  '#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"'),
+         count=(('#include "Editor/', 2),)),
 
     # --- RenderWorldPoolEngineWiring ------------------------------------------------
     Rule("RenderWorldPoolEngineWiring", "ConfiguresPrivatePoolFromExtractionMode",

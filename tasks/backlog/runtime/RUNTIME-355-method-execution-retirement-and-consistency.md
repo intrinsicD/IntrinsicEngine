@@ -71,12 +71,11 @@ python3 tools/docs/check_doc_links.py --root . --strict
 ```
 
 ## Review context
-F3 (worker GPU initial ordering and CPD Vulkan-subsample worker stepping) is being completed
-inside active ARCH-023 to finish the operator’s full Q9 scope; it is not deferred to this task.
+F3 (worker GPU initial ordering and CPD Vulkan-subsample worker stepping) was implemented and
+independently verified inside ARCH-023; it is not deferred to this task.
 
 The final ARCH-023 reviewer (Opus session `3bed78aa-f0ae-4a1b-bf64-1407f84919d8`, source tree
 `ee4ed57b0cd4c9951d31993427ade413889cb63d`) classified these as non-blocking. K-Means already
 shares the run protocol; its local transport loop predates the common worker-page helper.
-Initial sampling's frame dependence is an implementation limitation, not an algorithmic necessity.
 The owner-thread queue methods and OwnerSteps are no longer used by production method callers.
 The [coverage matrix](../../../docs/methods/gpu-method-coverage.md) records these limits explicitly.

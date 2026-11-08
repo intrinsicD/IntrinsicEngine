@@ -9762,3 +9762,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-11-01 — **BUG-256**: The Jobs window test read the cancel reason after the cancelled job could have ended; its job now waits for the test. Found in ARCH-022 slice 3 step 1b. `CPUContracted`. [Task](BUG-256-jobs-window-cancel-reason-race.md).
 
 - 2026-11-07 — **BUG-257**: Repaired the historical runtime audit link to the removed neighborhood codec using verified Git object `1e58fa7555059689dabce664d5dfc7befaad4a48`; audit findings unchanged. `git cat-file -e` and strict markdown links passed. Trivial link correction, no peer or C++ build required. Raw checks retained for active ARCH-023. [Task](BUG-257-main-doc-link-retired-neighborhood-codec.md).
+
+- 2026-11-08 — **BUG-258**: Bound C88's retired test citation to its verified historical Git object; statement and status unchanged. Both criteria accepted by independent Opus review; exact object existence and strict claims validation passed. Commit `65f8ba718`, PR #1046. Raw checks retained for active ARCH-023. [Task](BUG-258-historical-density-weight-proof.md).

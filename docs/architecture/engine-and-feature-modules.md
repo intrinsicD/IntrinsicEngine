@@ -308,8 +308,8 @@ ARCH-023 makes it the one control owner of GPU method runs.
   read back): the run stays Accepting after its holder ended and the owner's `CommitFinished` decides it, also
   settling it after a discard won first. LOP, CPD, smoothing and the query-based plugins use this same worker
   submission seam; the resident preview example is LOP's `WorkerStep`/`WorkerPreview`/`Show` in
-  `Runtime.PointCloudConsolidationGpu.cpp`. Runtime CPD with a Vulkan subsample backend retains
-  its owner-driven iteration pump (RUNTIME-355), as recorded in the method coverage matrix.
+  `Runtime.PointCloudConsolidationGpu.cpp`. Initial farthest-point orders (CPD subsamples, consolidation's
+  initial samples) are worker pages of `PointSamplingGpuRun::OrderOnWorker` too (RUNTIME-355 F3).
 - **One-shot controls.** Scalar, normal and outlier transactions can start ready without recording device work,
   stop with a completed result retained, and restart with a fresh ring generation, recording again into the input
   views and workspaces the run holds until it ends. Their CPU backends are one-shot worker step runs
@@ -360,8 +360,8 @@ moves a source cloud onto a target one step per `Step` in world space (each unpa
 Transform, captured with `CaptureTransform`; the source's result mapped back by the full affine inverse), shows the
 moving source through the point-cloud editing service's `PreviewPositions` (a CPU-made front of the positions'
 residency ring, which the renderer draws; released by `DiscardPreview` and before `Publish`), and Accept publishes the
-positions with one undo entry. It runs beside the editor's built-in CPD, which uses the same step-run lifecycle as an
-owner-driven run (one EM iteration per step, its own variants, E-steps and publications). The editing
+positions with one undo entry. It runs beside the editor's built-in CPD, which uses the same step-run lifecycle as a
+worker run (one EM iteration per step, its own variants, E-steps and publications). The editing
 service's `Current` and publications also require the capture's world to be the active one and, with
 `CaptureTransform`, the Transform unchanged and the entity unparented; an empty normal name takes the positions alone.
 Tests: `tests/contract/runtime/Test.CoherentPointDriftPlugin.cpp` and the Vulkan smoke

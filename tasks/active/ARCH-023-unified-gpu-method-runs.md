@@ -163,8 +163,12 @@ cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests
 The shared lifecycle and queue implementation has passed deterministic verification and independent
 review. Before closing the operator’s full Q9 scope, this task now completes render-independent
 initial GPU sampling for consolidation/CPD and worker stepping for runtime CPD with Vulkan subsampling
-(the review’s F3). The accepted core is frozen at tree a85668cebdebad9186cb8643230b94f8ac6c6592;
-the new slice requires its own plan review, focused regression evidence and final review. The [verification/review note](../../docs/reviews/2026-11-08-unified-gpu-method-runs.md)
+(the review’s F3). That slice is implemented and deterministically verified; independent Opus review approved
+its code, behaviour and verification at tree e031b367d8a5529ce69cf4b5d45022bf5b1374a8.
+Overall closure review remains pending. The accepted core is frozen at tree a85668cebdebad9186cb8643230b94f8ac6c6592.
+The independent Opus counter-review accepts the new slice's design and ownership, requiring
+case-budget synchronization and bounded failure cleanup in the cancellation tests. These corrections
+are implemented, including red-before-fix and mechanism-removal checks. The [verification/review note](../../docs/reviews/2026-11-08-unified-gpu-method-runs.md)
 records the exact source trees, commands, combined GPU result, corrected fixture, skips and limits.
 The [coverage matrix](../../docs/methods/gpu-method-coverage.md) owns the current family inventory;
 the [method template](../../docs/methods/method-template.md) owns the reusable adapter pattern.

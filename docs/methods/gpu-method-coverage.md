@@ -20,8 +20,10 @@ as gaps, with their current owner.
 - **Frame dependency.** Worker steps submit and wait for bounded compute pages without rendering
   frames. Owner-side GPU Init and Accept callbacks, and preview-fence visibility, still need
   the frame's transfer collection (`CollectCompleted`), not just the main-thread job drain;
-  when the window is minimized, GPU Accept waits until frames resume. The per-family rows
-  identify additional initial sampling phases. The first page orders initial uploads;
+  when the window is minimized, GPU Accept waits until frames resume. Initial farthest-point
+  orders (CPD subsamples, consolidation's initial samples) are worker pages too; the owner's
+  drain still starts the work, uploads the first producer input and publishes, and consolidation's
+  order reaches its solve job through one drain. The first page orders initial uploads;
   later prepared pages do not wait for unrelated graphics uploads. Hardware sharing one
   graphics queue necessarily shares its queue ordering.
 
@@ -36,9 +38,9 @@ as gaps, with their current owner.
 | Property smoothing, explicit and implicit ([smoothing](../../src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Smoothing.cpp)) | One explicit pass, or one implicit time step over every channel (its CG chunks are not steps) | Worker-stepped `GpuTransactionCore` (ARCH-023: owner Init page, worker pages; Run batches explicit passes); Restart keeps the workspaces | Resident rings and solver state; Accept readback | Ring front | Panel row; section execution rows. `run_operation` (`property_smoothing`) waits by default; `wait: false` runs the section's start and answers with `run`. | [Smoothing smoke](../../tests/integration/graphics/Test.PropertySmoothingGpuSmoke.cpp) |
 | K-Means, GPU ([GPU state](../../src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp)) | One Lloyd iteration (pages) | Worker step run | Resident assignments and centroids; bytes of metrics per page | Live preview ring at the shared cadence | Panel row; section execution rows; `run_kmeans` waits; `start_kmeans` answers with the run id | [Clustering GPU smoke](../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp) |
 | Resident LOP and isotropic WLOP, in place ([consolidation GPU](../../src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp)) | One iteration (pages) | Worker step run (ARCH-023: owner Init, worker pages, owner terminal pages); the Accept-only GPU-positions transaction | Resident positions | Live preview at the shared cadence | Panel row; section execution rows; `run_point_cloud_consolidation` waits; `start_point_cloud_consolidation` answers with the run id | [Consolidation GPU parity](../../tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp) |
-| Hybrid consolidation: LOP, WLOP, CLOP, EAR with Vulkan LBVH ([module](../../src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp)) | One projection iteration; rows on the device, projection on the CPU | Worker step run (ARCH-023: rows from three query sessions its Init prepared, paged on the worker). Frame-paced phase: a Vulkan initial point order runs as a framed GPU job before the run's job (`InitialOrderJob`) | Hybrid: neighbour rows cross the device boundary each iteration (reported) | Shared cadence | As resident LOP | Consolidation GPU parity |
+| Hybrid consolidation: LOP, WLOP, CLOP, EAR with Vulkan LBVH ([module](../../src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp)) | One projection iteration; rows on the device, projection on the CPU | Worker step run (ARCH-023: rows from three query sessions its Init prepared, paged on the worker). A Vulkan initial point order runs first as a worker job of bounded pages (`SubmitInitialOrdering`, `PointSamplingGpuRun::OrderOnWorker`); the run's job depends on it (`InitialOrderJob`) | Hybrid: neighbour rows cross the device boundary each iteration (reported) | Shared cadence | As resident LOP | Consolidation GPU parity |
 | ICP, Vulkan ([registration](../../src/runtime/Editor/Operations/Runtime.RegistrationOperations.Processing.cpp)) | One ICP iteration (a correspondence batch) | Step run; Accept writes the transform | Hybrid: correspondences read back each iteration | Pose preview | Panel row; section execution rows. `run_registration` waits by default; `wait: false` runs the section's start and answers with its id `run`. | [LBVH ICP](../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp) |
-| Coherent Point Drift, runtime ([CPD](../../src/runtime/Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp)) | One EM iteration (device E-step where supported) | Step run. With a Vulkan subsample backend, framed jobs first order target/source samples; the whole run then remains owner-driven, submitting one iteration per main-thread job drain. Other supported configurations step on a worker | Hybrid: per-iteration E-step traffic (reported as device iterations and CPU rows) | Source preview | Panel row; `run_registration` waits by default; `wait: false` starts with the section’s options and returns its run id. | Runtime CPD operations and GPU E-step/subsampling tests |
+| Coherent Point Drift, runtime ([CPD](../../src/runtime/Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp)) | One EM iteration (device E-step where supported) | Worker step run for every configuration. With a Vulkan subsample backend the start prepares the target/source orders and the first step computes them on its worker (`PointSamplingGpuRun::OrderOnWorker`) before the solver samples; a restart reuses them | Hybrid: per-iteration E-step traffic (reported as device iterations and CPU rows) | Source preview | Panel row; `run_registration` waits by default; `wait: false` starts with the section’s options and returns its run id. | Runtime CPD operations and GPU E-step/subsampling tests; [no-frame probe](../../tests/integration/graphics/Test.WorkerProducersNoFrameGpuSmoke.cpp) (Vulkan subsample orders and iterations with graphics held) |
 | Keypoints, Vulkan compute ([keypoints](../../src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Keypoints.cpp)) | Paged score pass | Resident `vulkan_compute`: the scalar publication transaction's worker-stepped producer (ARCH-023: owner Init with a retained index view, every page on the worker); `vulkan_lbvh`: query sessions (the query slice) | Resident score and mask rings; Accept readback | Ring fronts | Panel row; section `auto_accept` and `start`. `run_keypoint_analysis` waits by default (runs and accepts at its end); `wait: false` runs the section's start and answers with `run`. | [LBVH keypoints](../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp) |
 | Keypoints, Vulkan LBVH (same owner) | One-shot analysis with bounded query pages | Shared one-shot worker run with prepared query sessions | Hybrid: rows read back | None | As above | LBVH keypoints |
 | Point construction, Vulkan LBVH: Hoppe surface and kNN graph ([construction](../../src/runtime/Editor/Operations/Runtime.PointConstructionOperations.Processing.cpp)) | One-shot: preparation, every kNN query page, then CPU field or graph assembly and extraction | Shared one-shot worker run (`MeshSupport::StartOneShotCpuRun`) with one prepared `Uploads` query session: the worker writes each page's CPU-generated grid or sample queries into one fixed page and queries its active rows, no frame; a discard stops at the next page boundary or a waiting page; Accept creates the entity (one undo entry) | Hybrid: every page uploads the fixed page of 12-byte query rows and reads its kNN rows back, reported per generation as `CpuStageUploadBytes` and `CpuStageReadbackBytes` (padding included, the session's initial rows excluded) | None (the result is a new entity at Accept) | `sandbox.point_construction` binds `auto_accept` and `start`; the panel edits them and draws the host row. `run_operation` waits by default; `wait: false` answers with `run`. | [Construction GPU smoke](../../tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp) (common script, reference parity, stale/cancel/refused/discard), [no-frame probe](../../tests/integration/graphics/Test.WorkerProducersNoFrameGpuSmoke.cpp), session paging contract in [`Test.QueuedEditorJobContract.cpp`](../../tests/contract/runtime/Test.QueuedEditorJobContract.cpp) |
@@ -65,7 +67,7 @@ record that pipeline. Moving the bake would need a compute port, which does not 
 | K-Means, CPU | Worker step run (seeds on a worker) | Migrated |
 | Bilateral plugin, CPU | Worker step run with Restart | Migrated |
 | Descriptor plugin, every backend | One-shot worker step run (`StartOneShotWorkerRun`) with Restart | Migrated: its result arrives at the settled end |
-| Consolidation, CPU | Worker step run; with a farthest-point initial sampling and a Vulkan `initial_backend` the initial point order first runs as a framed GPU job (`SubmitInitialOrdering`), as in the hybrid row | Migrated |
+| Consolidation, CPU | Worker step run; with a farthest-point initial sampling and a Vulkan `initial_backend` the initial point order first runs as a worker job of bounded device pages (`SubmitInitialOrdering`), as in the hybrid row | Migrated |
 | ICP, CPU (k-d tree, LBVH) | Worker step run | Migrated |
 | CPD, CPU: runtime and [CPU-only plugin](../../plugins/coherent_point_drift/CoherentPointDrift.Run.cpp) | Step run | Migrated: the plugin uses the rigid CPU reference solver; `coherent_point_drift_start` starts ready and returns its run id. It has no GPU E-step. |
 | Template ([`methods/_template`](../../methods/_template/src/TemplateMethod.cpp)) | Iterative worker step run (rows and initial state built by the first worker step of a generation; no live preview, `preview_every` normalized to 0), and a one-shot method on its CPU counterpart and on the scalar GPU producer (one of its existing kernels, chosen by `Params.Method`) | Migrated; [`Test.MethodTemplate.cpp`](../../tests/contract/runtime/Test.MethodTemplate.cpp), and the GPU path in the scalar analysis smoke |
@@ -100,16 +102,25 @@ known-answer tests exercise these paths, but do not replace those specific probe
 The session-upload wait and `Abandon` clearing `Valid`, `Commit` and `Prepared` have no
 individual removal probe either; clearing `Restart` was independently exercised.
 
+The initial farthest-point orders stamp their resident input slots with the compute fence before
+they are released. That stamp has no removal probe: an idle pooled farthest-point workspace still
+holds its last input view, which keeps the slot leased and masks the probe. A CPD ordering page
+in flight at engine shutdown relies on device completion (step segments have no cancel wake-up).
+A next ordering page submitted after the pre-drain idle wait is waited for by the job drain;
+consolidation's ordering job is woken by the cancel itself. CPD initial ordering has no separate
+Jobs-window row or stage text; its time is included in the first step.
+Consolidation's ordering has no real-Vulkan no-frame check of its own; the CPD smoke covers the
+shared worker transport.
+
 ### Remaining implementation differences
 
 K-Means keeps its own stateful page recorder and submit/wait loop: a mid-run reseed orders a
 new upload before recording more pages. Its shared run controls are covered by the same lifecycle
 checks. New resident methods use `WorkerGpuPages` through the shared transaction core.
-Consolidation's initial order and runtime CPD subsampling currently use framed child jobs because
-the order is a dependency of the solver's initial snapshot. Consolidation then starts a worker run;
-runtime CPD with a Vulkan subsample backend remains owner-driven for its whole run, submitting
-one iteration per main-thread job drain. These pacing differences are implementation limitations,
-not requirements of the algorithms. Some start tools accept execution
+Initial farthest-point orders use `PointSamplingGpuRun`'s own worker pages. A runtime CPD run
+with a Vulkan subsample backend holds its ordering workspace and resident input from its start to
+its settled end (an interactive run included), as its Vulkan E-step workspace is held; an editor
+detach ends it as stale ("inputs changed"), like every worker CPD run. Some start tools accept execution
 arguments directly, while nonwaiting `run_*` tools read the same validated section settings.
 [RUNTIME-355](../../tasks/backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md)
 owns these internal simplifications, the obsolete test-only queue APIs and owner-step branches,

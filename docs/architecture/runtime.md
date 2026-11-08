@@ -1526,12 +1526,10 @@ validates `sandbox.coherent_point_drift` (`Extrinsic.Runtime.CoherentPointDriftC
 declared in a `ConfigFieldSpec` table with the shared step-run execution rows; by default a
 run starts ready and waits for Accept), captures both operands in world space and starts a
 step run of the session's `StepRunsService` (ARCH-023), controlled by `run_control` and the
-panel's shared row. One step is one EM iteration. With the CPU E-step choices the run's `Step`
-calls `Solver::Step` on a worker (StepRuns segments); a Vulkan E-step run steps on a worker the same
-way and evaluates each device E-step there (ARCH-023). A run whose first iteration waits for device
-subsample orderings is owner-driven: its pump job (main thread, every drain) submits one iteration
-job at a time when the controls ask for one, so it advances at most one iteration per drain (its
-iteration job evaluates a Vulkan E-step on its own worker too). Iterations write a mutex-guarded trace and running scalars; the moving
+panel's shared row. One step is one EM iteration, and every run steps on a worker (StepRuns
+segments): its `Step` calls `Solver::Step` there; a Vulkan E-step run evaluates each device E-step
+on that worker, and a Vulkan subsample backend's orders are computed by the first step on that
+worker before the solver samples (ARCH-023, RUNTIME-355 F3). Iterations write a mutex-guarded trace and running scalars; the moving
 source is copied into the snapshot (`SnapshotEditorCoherentPointDrift`) only at the run's
 preview cadence. Accept revalidates captured property revisions, entity
 identity and both entity transforms, then publishes one history entry: the source
@@ -1544,8 +1542,9 @@ and accepting at its end, whatever the section's `start` and `auto_accept`, with
 callback; agents reach it through `run_registration`. A run that ends without a commit answers
 that callback (and its snapshot result) at its settled end (`StepRunCallbacks::Finished`, from the
 final observation), so a same-source run started from inside it is admitted; its Discard only stops
-the solver and closes a pending device E-step. Without a job lane it iterates and
-publishes at once.
+the solver, closes a pending device E-step and gives a waiting subsample-ordering page up. A
+detached editor session makes its captures stale, which ends the run like changed inputs. Without a
+job lane it iterates and publishes at once.
 
 The section also selects the METHOD-049 backends: `e_step` (reference, dense, truncated,
 auto, fast Gauss, and the approximate METHOD-053 Nystroem with `nystrom_landmarks` and
@@ -1564,8 +1563,8 @@ with a pulled readback, waits for it in bounded slices (`Runtime.WorkerGpuPages.
 statistics, with no frame or main-thread pump. The lease spans every step, pause and restart, the
 float-float target is converted and uploaded once, and the per-iteration source staging is reused.
 Discard closes the broker at once (a waiting E-step gives its page up without a CPU fallback); the
-Commit, the pump of an owner-driven run or the broker's destruction returns the workspace, which the
-pool reuses only after the compute fence. Only the E-step is on the device: the M-step, objective and exactly evaluated rows stay
+Commit or the broker's destruction returns the workspace, which the pool reuses only after the
+compute fence. Only the E-step is on the device: the M-step, objective and exactly evaluated rows stay
 on the CPU, so each iteration still uploads the moved source (32 bytes per point, plus 4 bytes
 per row of skip flags when any) and reads back `2n + 4m` doubles. Without the job
 lane, an operational device with shader float64, or after a device failure or a timeout observed by the waiting worker, the
@@ -1582,19 +1581,25 @@ landmarks are picked (every `Geometry.PointSampling` method; exact farthest poin
 cloud consolidation takes the same block as `initial_*` for its initial samples (Random keeps
 the seeded legacy subsample; CPU and Vulkan paths share `SelectInitialSamples`).
 `subsample_backend` (CPD) and `initial_backend` (consolidation, `"cpu"` / `"vulkan"`) order
-those samples on the device: a framed job runs exact farthest point through
-`Extrinsic.Runtime.PointSamplingGpu` on the resident positions (CPD: captured live rows and
-model; consolidation: local rows) before the solver job, which depends on it and takes the
-verified order (`CPD::Params::SubsampleTargetOrder` / `SubsampleSourceOrder`,
+those samples on the device: exact farthest point through `Extrinsic.Runtime.PointSamplingGpu`
+on the resident positions (CPD: captured live rows and model; consolidation: local rows). The
+owner prepares the order (`PointSamplingGpuRun::PrepareWorker`: workspace, pipeline, buffers and
+its page gate); a worker computes it in bounded pages it submits and waits for itself
+(`OrderOnWorker`, ARCH-023 RUNTIME-355 F3), with no frame or owner poll, and checks the
+leading samples against the CPU there. CPD's first step does this before its solver samples;
+consolidation runs it as a job its solve job depends on, which publishes the result on the main
+thread. The verified order is taken (`CPD::Params::SubsampleTargetOrder` / `SubsampleSourceOrder`,
 `Consolidation::Params::InitialOrder`; the geometry rejects orders that repeat or exceed an
-index). Any other case orders on the CPU and says why. CPD reports
+index). Any other case orders on the CPU and says why; a cancelled or stale run takes no order
+and does not order on the CPU either. Once the ordering has ended, the owner seals its pages and
+stamps the resident input with the compute fence before the workspace goes. CPD reports
 `subsample_requested_backend`, `subsample_target_backend`, `subsample_source_backend` (empty
 when that set is not subsampled) and `subsample_backend_diagnostic`; consolidation reports
 `initial_sampling_requested_backend`, `initial_sampling_backend` (empty for the random
 subsample) and `initial_sampling_diagnostic`, apart from its solve backend. A run that ends
 before solving (cancelled, rejected input) reports the backend that was to order its samples.
-CPD landmarks always stay on the CPU. Cancellation wakes the parked coroutine and
-abandons the pending step before CPU fallback or the M-step. Request latency
+CPD landmarks always stay on the CPU. A discard makes a waiting device E-step or ordering page
+give up and abandons the pending step before CPU fallback or the M-step. Request latency
 statistics do not measure blocked worker time.
 
 
@@ -1623,12 +1628,6 @@ preview); the first 64 samples (fewer for a shorter prefix) are recomputed on th
 result may report `gpu_vulkan_compute`. Every other case (another method, no job
 lane or device, no shader float64, a device failure or mismatch) runs the CPU order and
 reports `requested_backend`, `backend` and `backend_diagnostic`.
-
-Framed GPU jobs of editor operations share `EditorFeatureDetail::MakeFramedGpuJobDesc`
-(`Editor/internal/Runtime.EditorFramedGpuJob.hpp`): the worker does nothing, the main thread
-queues `SpatialIndexCache::QueueGpuCompute` chunks from `IsReadyToApply` until the operation's
-`Observe` says done, then publishes (consolidation's and CPD's device sampling stages use it;
-keypoints and point sampling run on the GPU transaction lifecycle).
 
 ## Render artifact publication
 

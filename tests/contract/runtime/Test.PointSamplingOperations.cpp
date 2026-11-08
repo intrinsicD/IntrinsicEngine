@@ -1108,11 +1108,14 @@ TEST_F(ResidentPointSampling, WarmWorkspaceKeepsCapacityAndUnbindsPriorRowMap)
     EXPECT_EQ(Device.CreatePipelineCount, pipelines);
 }
 
-// RUNTIME-289: a Bayesian CPD run orders its target subsample on the device before the first
-// iteration. The solver registers exactly the device order once its verified prefix (64 samples)
-// matches the CPU: a delivered order that differs only after the prefix is what the run uses.
-// A mismatch inside the prefix leaves the CPU order with the reason, and discarding the run (or
-// its first iteration) stops the ordering job. The untouched source set reports no backend.
+// RUNTIME-289, ARCH-023 (RUNTIME-355 F3): a Bayesian CPD run orders its target subsample on the device in its first
+// step, on the step run's worker: no pump job and no framed ordering job; the start queues only the run's holder, and
+// neither the start nor the holder's pump (which only starts the worker segment) submits a page. The segment's step
+// submits exactly one bounded page, ordered after the issued input uploads and pulled by that worker. The solver
+// registers exactly the device order once its verified prefix (64 samples) matches the CPU: a delivered order that
+// differs only after the prefix is what the run uses. A mismatch inside the prefix, or a refused page, leaves the CPU
+// order with the reason; a discard or a cancelled segment before the step submits nothing. The untouched source set
+// reports no backend. Red before F3: the start queued three jobs (holder, pump, framed ordering).
 TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFirstStep)
 {
     const auto source = MakeCloud(S, 40);
@@ -1159,16 +1162,38 @@ TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFir
         return R::EditorJobCancelStatus::Requested;
     };
     S.Context.JobCommands.Retire = {}; // the step run's retirement falls back to this lane's Cancel
-    std::optional<Extrinsic::RHI::ReadbackSink> sink;
-    Device.ComputeReadback = [&](auto record, std::uint64_t, auto completion) {
-        EXPECT_TRUE(record(Device.CommandContext).IsValid());
-        sink = std::move(completion);
-        return Extrinsic::RHI::ReadbackToken{1};
-    };
     constexpr std::uint32_t kCount = 80;
     const auto points = std::as_const(S.Registry.Raw().get<GS::Vertices>(target).Properties).Get<glm::vec3>("v:position");
     const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, kCount);
     ASSERT_TRUE(reference.Succeeded());
+    // The device: a pulled page completes at once with `answer` (its worker takes the bytes), unless it is refused.
+    std::vector<std::byte> answer;
+    bool refuse = false;
+    std::vector<std::uint64_t> pageBytes; // every accepted or refused submission's readback size, in order
+    std::size_t pulledPages = 0u;
+    std::function<void()> cancelSecondOrdering;
+    Device.ComputeReadback = [&](auto record, const std::uint64_t bytes, Extrinsic::RHI::ReadbackSink completion)
+    {
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        std::scoped_lock lock{Gpu};
+        pageBytes.push_back(bytes);
+        if (pageBytes.size() == 2u && cancelSecondOrdering)
+            std::exchange(cancelSecondOrdering, {})();
+        if (refuse)
+            return Extrinsic::RHI::ReadbackToken{};
+        const Extrinsic::RHI::ReadbackToken token{(1ull << 63u) | ++Submissions};
+        if (completion.Pulled)
+        {
+            ++pulledPages;
+            Pulled.emplace_back(token.Value, answer);
+        }
+        return token;
+    };
+    const auto submitted = [&]
+    {
+        std::scoped_lock lock{Gpu};
+        return pageBytes.size();
+    };
     R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
                                        .Method = R::CoherentPointDriftMethod::Bayesian, .OutlierWeight = 0.1,
                                        .Output = R::CoherentPointDriftOutput::DisplacementProperty,
@@ -1176,70 +1201,133 @@ TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFir
     config.SubsampleBackend = R::PointSamplingBackend::Vulkan;
     R::StepRunsService runs;
     S.Context.StepRuns = &runs;
-    enum class Delivery { AfterPrefix, InsidePrefix, Cancelled, StepCancelled };
-    for (const auto delivery : {Delivery::AfterPrefix, Delivery::InsidePrefix, Delivery::Cancelled, Delivery::StepCancelled})
+    enum class Delivery
     {
+        AfterPrefix,
+        InsidePrefix,
+        Refused,
+        Cancelled,
+        StepCancelled,
+        CancelledAfterTarget
+    };
+    for (const auto delivery : {Delivery::AfterPrefix,
+             Delivery::InsidePrefix,
+             Delivery::Refused,
+             Delivery::Cancelled,
+             Delivery::StepCancelled,
+             Delivery::CancelledAfterTarget})
+    {
+        SCOPED_TRACE(static_cast<int>(delivery));
+        config.Subsample = delivery == Delivery::CancelledAfterTarget ? 16u : 0u;
         jobs.clear();
         *lane = {};
-        sink.reset();
+        auto order = reference.Order;
+        if (delivery == Delivery::AfterPrefix)
+            std::swap(order[70], order[71]);
+        else if (delivery == Delivery::InsidePrefix)
+            std::swap(order[1], order[2]);
+        {
+            std::scoped_lock lock{Gpu};
+            pageBytes.clear();
+            pulledPages = 0u;
+            Pulled.clear();
+            answer.assign(kCount * 12u, std::byte{0});
+            std::memcpy(answer.data(), reference.Clearance.data(), kCount * sizeof(double));
+            std::memcpy(answer.data() + kCount * sizeof(double), order.data(), kCount * sizeof(std::uint32_t));
+            refuse = delivery == Delivery::Refused;
+        }
+        {
+            std::scoped_lock lock{Device.ComputeInputOrderMutex};
+            Device.ComputeInputOrders.clear();
+        }
         R::EditorCoherentPointDriftResult failure;
         const auto run = R::StartEditorCoherentPointDrift(S.Commands(), config, failure);
         ASSERT_TRUE(run) << failure.Message;
         const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
         EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.SubsampleRequestedBackend, "gpu_vulkan_compute");
-        ASSERT_EQ(jobs.size(), 3u) << "the step run's holder, the run's pump, the device ordering";
+        ASSERT_EQ(jobs.size(), 1u) << "the start queues only the step run's holder: no pump, no framed ordering job";
+        EXPECT_EQ(submitted(), 0u) << "a ready run submits no sampling page";
         std::string refusal;
         ASSERT_TRUE(runs.Control(id, R::StepRunAction::Step, 1u, refusal)) << refusal;
-        EXPECT_FALSE(jobs[0].IsReadyToApply()); // the step run's pump: running, owner-driven
-        EXPECT_FALSE(jobs[1].IsReadyToApply()); // the run's pump submits the first iteration
-        ASSERT_EQ(jobs.size(), 4u) << "then the first iteration";
-        ASSERT_EQ(jobs[3].DependsOn.size(), 1u);
-        EXPECT_EQ(jobs[3].DependsOn[0].Job, (R::JobToken{3, 1}));
-        auto& ordering = jobs[2];
-        EXPECT_FALSE(ordering.IsReadyToApply());
-        ASSERT_TRUE(sink);
+        EXPECT_FALSE(jobs[0].IsReadyToApply()); // the holder's pump starts the run's worker segment
+        ASSERT_EQ(jobs.size(), 2u) << "the pump submitted one worker segment";
+        EXPECT_EQ(submitted(), 0u) << "the owner's pump submits no sampling page";
+        if (delivery == Delivery::CancelledAfterTarget)
+            cancelSecondOrdering = [&]
+            {
+                lane->List = true;
+                EXPECT_TRUE(runs.Control(id, R::StepRunAction::Discard, 1u, refusal));
+                EXPECT_FALSE(jobs[0].IsReadyToApply()); // owner cancellation while the second page is being submitted
+            };
         if (delivery == Delivery::Cancelled || delivery == Delivery::StepCancelled)
         {
-            // Through the run's controls, or by cancelling its first iteration (job lane / panel).
+            // Through the run's controls (its segment then runs no step), or by cancelling the segment (job lane /
+            // panel) before it ran.
             lane->List = true;
             if (delivery == Delivery::Cancelled)
+            {
                 ASSERT_TRUE(runs.Control(id, R::StepRunAction::Discard, 1u, refusal));
+                (void)jobs[1].Work(R::JobCancellation{});
+                (void)jobs[1].PublishCompletion(Events, R::JobResultEnvelope::Make(true));
+            }
             else
-                jobs[3].FinalizeUnpublishedOnMainThread();
-            EXPECT_FALSE(jobs[0].IsReadyToApply()); // the discarded run settles: its Discard ends the run
-            EXPECT_EQ(ordering.ValidateBeforeApply(), R::JobApplyValidation::StaleGeneration);
-            ordering.FinalizeUnpublishedOnMainThread();
-            if (delivery == Delivery::Cancelled)
-                jobs[3].FinalizeUnpublishedOnMainThread();
+                jobs[1].FinalizeUnpublishedOnMainThread();
+            EXPECT_FALSE(jobs[0].IsReadyToApply()); // the discarded run settles: its holder is cancelled
+            jobs[0].FinalizeUnpublishedOnMainThread(); // the cancelled holder ends: the run's settled end
+            EXPECT_EQ(submitted(), 0u) << "a run that ended before its first step submits no sampling page";
             EXPECT_EQ(runs.Observe(id)->Phase, R::StepRunPhase::Discarded);
+            EXPECT_EQ(runs.Observe(id)->Steps, 0u);
             EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.SubsampleRequestedBackend, "gpu_vulkan_compute");
             continue;
         }
-        auto order = reference.Order;
-        if (delivery == Delivery::AfterPrefix) std::swap(order[70], order[71]);
-        else std::swap(order[1], order[2]);
-        std::vector<std::byte> bytes(kCount * 12u);
-        std::memcpy(bytes.data(), reference.Clearance.data(), kCount * sizeof(double));
-        std::memcpy(bytes.data() + kCount * sizeof(double), order.data(), kCount * sizeof(std::uint32_t));
-        sink->Deliver(bytes);
-        ASSERT_TRUE(ordering.IsReadyToApply());
-        ASSERT_EQ(ordering.ValidateBeforeApply(), R::JobApplyValidation::Current);
-        ASSERT_TRUE(ordering.PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
-        auto& step = jobs[3];
-        (void)step.Work(R::JobCancellation{});
-        ASSERT_TRUE(step.PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
+        (void)jobs[1].Work(R::JobCancellation{}); // the worker segment: its first step, here on this thread
+        if (delivery == Delivery::CancelledAfterTarget)
+        {
+            (void)jobs[1].PublishCompletion(Events, R::JobResultEnvelope::Make(true));
+            jobs[0].FinalizeUnpublishedOnMainThread();
+            const auto ended = R::SnapshotEditorCoherentPointDrift(run);
+            EXPECT_EQ(runs.Observe(id)->Phase, R::StepRunPhase::Discarded);
+            EXPECT_EQ(runs.Observe(id)->Steps, 0u);
+            EXPECT_EQ(ended.Result.SubsampleTargetBackend, "gpu_vulkan_compute")
+                << "cancelling the source order must retain the completed target's actual backend";
+            EXPECT_TRUE(ended.Result.SubsampleBackendDiagnostic.empty()) << "cancellation is no CPU fallback";
+            EXPECT_EQ(submitted(), 2u);
+            continue;
+        }
+        {
+            std::scoped_lock lock{Gpu};
+            ASSERT_EQ(pageBytes.size(), 1u) << "one bounded page orders the 80 samples";
+            EXPECT_EQ(pageBytes[0], kCount * 12u) << "it reads back the order and clearances, once";
+            EXPECT_EQ(pulledPages, delivery == Delivery::Refused ? 0u : 1u) << "the step's worker pulls its own page";
+        }
+        {
+            std::scoped_lock lock{Device.ComputeInputOrderMutex};
+            ASSERT_FALSE(Device.ComputeInputOrders.empty());
+            EXPECT_EQ(Device.ComputeInputOrders.front(), Extrinsic::RHI::ComputeInputOrder::AfterIssuedTransfers)
+                << "the run's first page waits for the issued input uploads";
+        }
+        ASSERT_TRUE(jobs[1].PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
         const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
         ASSERT_TRUE(snapshot.TargetSamples);
         const bool device = delivery == Delivery::AfterPrefix;
         EXPECT_EQ(*snapshot.TargetSamples, device ? order : reference.Order);
         EXPECT_EQ(snapshot.Result.SubsampleSourceBackend, "");
         EXPECT_EQ(snapshot.Result.SubsampleTargetBackend, device ? "gpu_vulkan_compute" : "cpu_reference");
-        EXPECT_EQ(snapshot.Result.SubsampleBackendDiagnostic.empty(), device) << snapshot.Result.SubsampleBackendDiagnostic;
+        if (delivery == Delivery::AfterPrefix)
+            EXPECT_EQ(snapshot.Result.SubsampleBackendDiagnostic, "");
+        else if (delivery == Delivery::InsidePrefix)
+            EXPECT_NE(snapshot.Result.SubsampleBackendDiagnostic.find("differs from the CPU reference at sample 1"),
+                std::string::npos)
+                << snapshot.Result.SubsampleBackendDiagnostic;
+        else
+            EXPECT_EQ(snapshot.Result.SubsampleBackendDiagnostic,
+                "Target: GPU sampling submission refused; sampling ran on the CPU.");
         EXPECT_EQ(runs.Observe(id)->Steps, 1u);
         lane->List = true;
         ASSERT_TRUE(runs.Control(id, R::StepRunAction::Discard, 1u, refusal));
         EXPECT_FALSE(jobs[0].IsReadyToApply()) << "the discarded run's holder is cancelled, not applied";
         EXPECT_NE(std::ranges::find(lane->Cancelled, R::JobToken{1, 1}), lane->Cancelled.end());
+        jobs[0].FinalizeUnpublishedOnMainThread(); // the cancelled holder ends: the run's settled end
     }
     S.Context.StepRuns = nullptr;
 }

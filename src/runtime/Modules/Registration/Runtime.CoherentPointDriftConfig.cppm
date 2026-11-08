@@ -92,7 +92,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t SubsampleTarget{0u};
         PointSamplingConfig SubsampleSampling{};
         // Where the subsamples are ordered (RUNTIME-289): Vulkan runs exact farthest point on the
-        // device before the first step; landmarks always stay on the CPU.
+        // device in the run's first step, on its worker; landmarks always stay on the CPU.
         PointSamplingBackend SubsampleBackend{PointSamplingBackend::Cpu};
         PointSamplingConfig LandmarkSampling{};
     };

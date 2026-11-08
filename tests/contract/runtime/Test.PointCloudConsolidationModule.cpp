@@ -15,6 +15,7 @@
 #include <limits>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -59,6 +60,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.PointCloud.Consolidation;
+import Geometry.PointSampling;
 import Geometry.Properties;
 
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -4344,4 +4346,224 @@ TEST_F(ResidentLop, ADiscardDuringAHeldHybridStepPublishesAFixedResultAndAbortsT
         Tick();
     EXPECT_EQ(Results.size(), 1u) << "nothing more is published after the worker returned";
     EXPECT_EQ(Run(id).Phase, Runtime::StepRunPhase::Discarded);
+}
+
+namespace
+{
+    // The device result of a farthest-point order of `order.size()` samples: the clearances, then the indices.
+    std::vector<std::byte> FarthestPointBytes(
+        const std::vector<double>& clearance, const std::vector<std::uint32_t>& order)
+    {
+        std::vector<std::byte> bytes(order.size() * (sizeof(double) + sizeof(std::uint32_t)), std::byte{0});
+        std::memcpy(bytes.data(), clearance.data(), clearance.size() * sizeof(double));
+        std::memcpy(bytes.data() + order.size() * sizeof(double), order.data(), order.size() * sizeof(std::uint32_t));
+        return bytes;
+    }
+
+    // A CPU batch of the fixture's entity (run at once, accepted at its end) whose farthest-point initial samples are
+    // ordered on `backend`.
+    void UseOrderedCpuBatch(Runtime::PointCloudConsolidationRequest& request,
+        const Runtime::PointSamplingBackend backend,
+        std::string output)
+    {
+        UseCpuRun(request, Runtime::PointCloudConsolidationStrategy::Lop, 2u, std::move(output));
+        request.Config.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+        request.Config.Execution.Start = Runtime::StepRunStart::Run;
+        request.Config.InitialSampling.Method = Runtime::PointSamplingMethod::FarthestPoint;
+        request.Config.InitialBackend = backend;
+    }
+}
+
+// ARCH-023 (RUNTIME-355 F3): a farthest-point initial order asked on Vulkan is one bounded device page that a worker
+// submits, pulls and checks against the CPU (no frame, owner poll or framed job), and it is adopted when it matches:
+// the run reports the device and publishes the CPU-ordered run's output bitwise. A mismatch inside the verified prefix
+// falls back to the CPU order with the reason (the same output). Red before F3: the page was submitted on this thread
+// from the framed job's main-thread readiness, with an owner-delivered sink, not pulled by a worker.
+TEST_F(ResidentLop, VulkanInitialOrderIsAWorkerPageMatchingTheCpuOrder)
+{
+    Device.ShaderFloat64 = true;
+    const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(Before), {}, Before.size());
+    ASSERT_TRUE(reference.Succeeded());
+    // The device's answer and what each submission looked like; shared, so the hook may outlive this body.
+    struct Pages
+    {
+        std::vector<std::byte> Answer{};
+        std::vector<bool> Pulled{};
+        std::vector<std::thread::id> Submitters{};
+    };
+    const auto pages = std::make_shared<Pages>();
+    Device.ComputeReadback = [this, pages](auto record, const std::uint64_t bytes, Extrinsic::RHI::ReadbackSink sink)
+    {
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        std::scoped_lock lock{Gpu};
+        EXPECT_EQ(bytes, pages->Answer.size()) << "a CPU run's only device page is its initial order";
+        pages->Pulled.push_back(sink.Pulled);
+        pages->Submitters.push_back(std::this_thread::get_id());
+        return Defer(std::move(sink), pages->Answer);
+    };
+    CompletePulledAtOnce = true; // a pulled page completes as soon as it is submitted
+    const auto run =
+        [&](const Runtime::PointSamplingBackend backend, std::string output, const std::vector<std::uint32_t>& order)
+    {
+        {
+            std::scoped_lock lock{Gpu};
+            pages->Answer = FarthestPointBytes(reference.Clearance, order);
+            pages->Pulled.clear();
+            pages->Submitters.clear();
+        }
+        Results.clear();
+        UseOrderedCpuBatch(Request, backend, std::move(output));
+        Start();
+        return Until(
+            [&]
+            {
+                return Results.size() == 1u;
+            });
+    };
+    const auto rows = [&](const std::string& name)
+    {
+        return std::as_const(Properties()).Get<glm::vec3>(name).Vector();
+    };
+
+    ASSERT_TRUE(run(Runtime::PointSamplingBackend::Cpu, "cpu_ordered", reference.Order));
+    ASSERT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_EQ(Results[0].InitialSamplingBackend, "cpu_reference");
+    {
+        std::scoped_lock lock{Gpu};
+        EXPECT_TRUE(pages->Pulled.empty()) << "the CPU order submits no device page";
+    }
+    const auto expected = rows("cpu_ordered");
+    ASSERT_FALSE(expected.empty());
+
+    ASSERT_TRUE(run(Runtime::PointSamplingBackend::Vulkan, "vulkan_ordered", reference.Order));
+    ASSERT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_EQ(Results[0].InitialSamplingRequestedBackend, "gpu_vulkan_compute");
+    EXPECT_EQ(Results[0].InitialSamplingBackend, "gpu_vulkan_compute") << Results[0].InitialSamplingDiagnostic;
+    EXPECT_EQ(Results[0].InitialSamplingDiagnostic, "");
+    {
+        std::scoped_lock lock{Gpu};
+        ASSERT_EQ(pages->Pulled.size(), 1u) << "one bounded page orders the 25 points";
+        EXPECT_TRUE(pages->Pulled[0]) << "a worker pulls the page's bytes (no owner sink, no frame)";
+        EXPECT_NE(pages->Submitters[0], std::this_thread::get_id())
+            << "the page is submitted on a worker, not by the owner";
+    }
+    EXPECT_EQ(rows("vulkan_ordered"), expected) << "the device order is the CPU's";
+
+    auto swapped = reference.Order;
+    std::swap(swapped[1], swapped[2]);
+    ASSERT_TRUE(run(Runtime::PointSamplingBackend::Vulkan, "fallback_ordered", swapped));
+    ASSERT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_EQ(Results[0].InitialSamplingBackend, "cpu_reference");
+    EXPECT_NE(
+        Results[0].InitialSamplingDiagnostic.find("differs from the CPU reference at sample 1"), std::string::npos)
+        << Results[0].InitialSamplingDiagnostic;
+    EXPECT_EQ(rows("fallback_ordered"), expected) << "the CPU order replaces the rejected one";
+}
+
+// ARCH-023 (RUNTIME-355 F3): while a Vulkan initial-order page is held on the device: a world cancel wakes its worker,
+// which gives the page up at once (ReleaseReadback), and the run answers once, Cancelled, publishing nothing; a source
+// edit lets the page finish, but the stale order is never used (Cancelled, nothing published); a shutdown's
+// CancelAndDrain wakes the waiting worker itself instead of waiting for the device (a watchdog completes the page
+// after 2 s and records that it had to). No case claims a CPU fallback. Red before F3: the framed page is never given
+// up by a worker (ReleaseReadback stays 0).
+TEST_F(ResidentLop, AHeldInitialOrderEndsOnCancelStaleOrShutdownWithoutPublishing)
+{
+    Device.ShaderFloat64 = true;
+    const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(Before), {}, Before.size());
+    ASSERT_TRUE(reference.Succeeded());
+    const auto answer = FarthestPointBytes(reference.Clearance, reference.Order);
+    const auto released = std::make_shared<std::uint32_t>(0u); // shared: the hook may outlive this body
+    Device.TransferQueue.ReleaseReadbackHook = [this, released](Extrinsic::RHI::ReadbackToken)
+    {
+        std::scoped_lock lock{Gpu};
+        ++*released;
+    };
+    const auto releases = [&]
+    {
+        std::scoped_lock lock{Gpu};
+        return *released;
+    };
+    // Starts the batch with its initial order's page held on the device; true once it is held.
+    const auto start = [&](std::string output)
+    {
+        Results.clear();
+        UseOrderedCpuBatch(Request, Runtime::PointSamplingBackend::Vulkan, std::move(output));
+        HoldCompletion = true;
+        Start();
+        const bool held = Until(
+            [&]
+            {
+                return HasHeld();
+            });
+        HoldCompletion = false;
+        return held;
+    };
+    const auto published = [&](const std::string& output)
+    {
+        return std::as_const(Properties()).Exists(output);
+    };
+
+    // A world cancel while the page is held.
+    ASSERT_TRUE(start("cancelled_order")) << "the initial order's page never reached the device";
+    (void)Jobs.Jobs().CancelAllForWorld(World);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1u;
+        }))
+        << "the cancel settles the run while its page is held";
+    EXPECT_TRUE(Until(
+        [&]
+        {
+            return releases() == 1u;
+        }))
+        << "the waiting worker gives the held page up";
+    EXPECT_EQ(Results[0].Status, Runtime::PointCloudConsolidationRunStatus::Cancelled) << Results[0].Message;
+    EXPECT_EQ(Results[0].InitialSamplingDiagnostic.find("ran on the CPU"), std::string::npos)
+        << Results[0].InitialSamplingDiagnostic;
+    EXPECT_FALSE(published("cancelled_order"));
+    EXPECT_EQ(std::as_const(Properties()).Get<glm::vec3>("v:position").Vector(), Before);
+    ReleaseHeld(answer); // the device finished the given-up page; nobody takes its bytes
+    for (int i = 0; i < 5; ++i)
+        Tick();
+    EXPECT_EQ(Results.size(), 1u) << "nothing more is published";
+
+    // A source edit while the page is held: the page completes, but its order is never used.
+    ASSERT_TRUE(start("stale_order"));
+    Properties().Get<glm::vec3>("v:position")[0].x += 0.5f;
+    ReleaseHeld(answer);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1u;
+        }));
+    EXPECT_EQ(Results[0].Status, Runtime::PointCloudConsolidationRunStatus::Cancelled) << Results[0].Message;
+    EXPECT_FALSE(published("stale_order"));
+    EXPECT_EQ(releases(), 1u) << "a completed page is taken, not given up";
+
+    // A shutdown while the page is held: CancelAndDrain wakes the waiting worker; it does not wait for the device.
+    ASSERT_TRUE(start("shutdown_order"));
+    std::atomic<bool> drained{false}, forced{false};
+    std::thread watchdog(
+        [&]
+        {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+            while (!drained && std::chrono::steady_clock::now() < deadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            if (!drained)
+            {
+                std::scoped_lock lock{Gpu};
+                Stopping = true; // a worker still waiting for its page returns
+                forced = true;
+            }
+        });
+    Jobs.Jobs().CancelAndDrain();
+    drained = true;
+    watchdog.join();
+    EXPECT_FALSE(forced) << "CancelAndDrain must wake the worker waiting for the held page";
+    EXPECT_EQ(releases(), 2u) << "the shutdown's waiting worker gives its page up";
+    (void)Events.Pump();
+    ASSERT_EQ(Results.size(), 1u);
+    EXPECT_EQ(Results[0].Status, Runtime::PointCloudConsolidationRunStatus::Cancelled) << Results[0].Message;
+    EXPECT_FALSE(published("shutdown_order"));
 }

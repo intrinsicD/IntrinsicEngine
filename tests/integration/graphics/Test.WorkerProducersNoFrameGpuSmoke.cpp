@@ -2,7 +2,9 @@
 // (HeldStepRunProbe over the shared HeldFramesProgress gate): farthest-point sampling (its batch of samples), property
 // smoothing explicit (its batched passes) and implicit (time steps, each its CG pages), the point normals one-shot
 // (the shared transaction core's kernel against a retained index view), the Vulkan E-step of Coherent Point
-// Drift and point construction's hybrid kNN graph (its one step's query-session pages). Asserted outcomes only, bounded deadlines; no timing is measured or claimed.
+// Drift and point construction's hybrid kNN graph (its one step's query-session pages). RUNTIME-355 F3: a Bayesian CPD
+// run whose subsamples are ordered on Vulkan orders them in its first worker step and iterates, all with graphics held.
+// Asserted outcomes only, bounded deadlines; no timing is measured or claimed.
 #include "RuntimeTestModule.hpp"
 #include <chrono>
 #include <cstdint>
@@ -58,7 +60,8 @@ namespace
         SmoothingImplicit,
         PointNormals,
         Cpd,
-        Construction
+        Construction,
+        CpdSubsampled
     };
 
     class NoFrameApp final : public Intrinsic::Tests::RuntimeTestModule
@@ -92,6 +95,7 @@ namespace
             if (++Frames > 4'000u || std::chrono::steady_clock::now() - Started > std::chrono::seconds(90))
             {
                 TimedOut = true;
+                Probe.ReleaseHold(); // never exit with the method queue held: the device could not go idle
                 Kernel().RequestExit();
                 return;
             }
@@ -104,6 +108,13 @@ namespace
             }
             if (!Probe.Frame(Kernel().GetDevice(), *Steps))
                 return;
+            if (Cpd)
+            {
+                // The order each subsampled set was registered with, once the probe finished.
+                const auto result = Runtime::SnapshotEditorCoherentPointDrift(Cpd).Result;
+                SubsampleBackends = result.SubsampleTargetBackend + "/" + result.SubsampleSourceBackend;
+                SubsampleDiagnostic = result.SubsampleBackendDiagnostic;
+            }
             std::string refusal;
             (void)Steps->Control(Probe.Run, Runtime::StepRunAction::Discard, 1u, refusal);
             Kernel().RequestExit();
@@ -118,7 +129,7 @@ namespace
 
         Producer Which;
         Intrinsic::Tests::HeldStepRunProbe Probe{};
-        std::string Refusal{};
+        std::string Refusal{}, SubsampleBackends{}, SubsampleDiagnostic{};
         bool TimedOut{};
 
     private:
@@ -222,10 +233,25 @@ namespace
                 break;
             }
             case Producer::Cpd:
+            case Producer::CpdSubsampled:
             {
                 Runtime::CoherentPointDriftConfig config{.SourceStableEntityId = id,
                     .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(Other),
                     .EStep = Runtime::CoherentPointDriftEStep::Vulkan};
+                if (Which == Producer::CpdSubsampled)
+                {
+                    // RUNTIME-355 F3: Bayesian, both sets subsampled and ordered on Vulkan, with the CPU E-step (the
+                    // run's device work is its orderings). Held first, so the first step's ordering pages wait
+                    // behind the held method queue and run only with graphics held, then the EM iterations follow.
+                    Probe.Order = Intrinsic::Tests::HeldStepRunProbe::Mode::HoldFirst;
+                    config.Method = Runtime::CoherentPointDriftMethod::Bayesian;
+                    config.Output = Runtime::CoherentPointDriftOutput::DisplacementProperty;
+                    config.DisplacementName = "no_frame_bcpd";
+                    config.EStep = Runtime::CoherentPointDriftEStep::Auto;
+                    config.Subsample = 300u;
+                    config.SubsampleTarget = 400u;
+                    config.SubsampleBackend = Runtime::PointSamplingBackend::Vulkan;
+                }
                 config.Execution = ready(config.Execution);
                 config.Execution.IterationCap = 12u;
                 config.Tolerance = 1.0e-12; // the cap ends the run: no early convergence within the held steps
@@ -250,6 +276,60 @@ namespace
         unsigned Frames{};
         std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
     };
+
+    // One producer's run on a fresh engine: what the probe observed, read before the engine shuts down. `Skip` names
+    // why the device cannot run it.
+    struct NoFrameOutcome
+    {
+        std::string Skip{};
+        std::uint64_t Run{};
+        bool TimedOut{}, Done{}, Separate{}, Gated{}, Progressed{};
+        std::uint32_t Without{}, StepsBefore{}, Want{};
+        std::string Refusal{}, SubsampleBackends{}, SubsampleDiagnostic{};
+        bool ValidationClean{};
+    };
+
+    NoFrameOutcome RunWithoutFrames(const Producer producer)
+    {
+        auto config = Runtime::CreateReferenceEngineConfig();
+        config.Window.Width = 64;
+        config.Window.Height = 64;
+        config.Render.EnableValidation = true;
+        config.Render.EnableVSync = false;
+        config.ReferenceScene.Enabled = false;
+        auto app = std::make_unique<NoFrameApp>(producer);
+        const auto* observed = app.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+        engine.EmplaceModule<Runtime::SpatialIndexCache>();
+        engine.EmplaceModule<Runtime::StepRunsModule>();
+        engine.Initialize();
+        const auto readiness = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+        if (!readiness.LogicalDeviceReady || !readiness.SwapchainReady || !readiness.CommandSyncReady ||
+            !engine.GetDevice().SupportsShaderFloat64())
+        {
+            engine.Shutdown();
+            return {.Skip = "Vulkan bootstrap or shader float64 unavailable"};
+        }
+        const auto before = Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
+        engine.Run();
+        NoFrameOutcome outcome{.Run = observed->Probe.Run,
+            .TimedOut = observed->TimedOut,
+            .Done = observed->Probe.Done,
+            .Separate = observed->Probe.SeparateQueue,
+            .Gated = observed->Probe.Gated,
+            .Progressed = observed->Probe.Progressed,
+            .Without = observed->Probe.StepsWithoutFrames,
+            .StepsBefore = observed->Probe.StepsBefore,
+            .Want = observed->Probe.Want,
+            .Refusal = observed->Refusal,
+            .SubsampleBackends = observed->SubsampleBackends,
+            .SubsampleDiagnostic = observed->SubsampleDiagnostic};
+        engine.Shutdown();
+        outcome.ValidationClean =
+            Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot().VulkanValidationErrorCount ==
+            before.VulkanValidationErrorCount;
+        return outcome;
+    }
 }
 
 // Predictions per producer: started ready (a step run id), the probe gated graphics, the worker completed the wanted
@@ -270,44 +350,46 @@ TEST(ARCH023WorkerProducers, EditorProducersAdvanceWithGraphicsHeldAndNoFrames)
              Producer::Construction})
     {
         SCOPED_TRACE(static_cast<int>(producer));
-        auto config = Runtime::CreateReferenceEngineConfig();
-        config.Window.Width = 64;
-        config.Window.Height = 64;
-        config.Render.EnableValidation = true;
-        config.Render.EnableVSync = false;
-        config.ReferenceScene.Enabled = false;
-        auto app = std::make_unique<NoFrameApp>(producer);
-        const auto* observed = app.get();
-        Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
-        engine.EmplaceModule<Runtime::SpatialIndexCache>();
-        engine.EmplaceModule<Runtime::StepRunsModule>();
-        engine.Initialize();
-        const auto readiness = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
-        if (!readiness.LogicalDeviceReady || !readiness.SwapchainReady || !readiness.CommandSyncReady ||
-            !engine.GetDevice().SupportsShaderFloat64())
-        {
-            engine.Shutdown();
-            GTEST_SKIP() << "Vulkan bootstrap or shader float64 unavailable";
-        }
-        const auto before = Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
-        engine.Run();
-        const bool timedOut = observed->TimedOut;
-        const auto probe = std::make_tuple(observed->Probe.Run, observed->Probe.Done, observed->Probe.SeparateQueue,
-            observed->Probe.Gated, observed->Probe.Progressed, observed->Probe.StepsWithoutFrames,
-            observed->Probe.StepsBefore, observed->Probe.Want, observed->Refusal);
-        engine.Shutdown();
-        const auto& [run, done, separate, gated, progressed, without, stepsBefore, want, refusal] = probe;
-        ASSERT_NE(run, 0u) << "the producer did not start: " << refusal;
-        ASSERT_FALSE(timedOut);
-        ASSERT_TRUE(done);
-        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot().VulkanValidationErrorCount,
-            before.VulkanValidationErrorCount);
-        if (!separate)
+        const auto outcome = RunWithoutFrames(producer);
+        if (!outcome.Skip.empty())
+            GTEST_SKIP() << outcome.Skip;
+        ASSERT_NE(outcome.Run, 0u) << "the producer did not start: " << outcome.Refusal;
+        ASSERT_FALSE(outcome.TimedOut);
+        ASSERT_TRUE(outcome.Done);
+        EXPECT_TRUE(outcome.ValidationClean);
+        if (!outcome.Separate)
             GTEST_SKIP() << "No separate method compute queue: no-frame progress cannot be separated from graphics.";
-        EXPECT_TRUE(gated);
-        EXPECT_TRUE(progressed);
-        EXPECT_GE(without, want);
+        EXPECT_TRUE(outcome.Gated);
+        EXPECT_TRUE(outcome.Progressed);
+        EXPECT_GE(outcome.Without, outcome.Want);
         if (producer != Producer::PointNormals && producer != Producer::Construction)
-            EXPECT_EQ(stepsBefore, 1u) << "Step(1) is exactly one logical step";
+            EXPECT_EQ(outcome.StepsBefore, 1u) << "Step(1) is exactly one logical step";
     }
+}
+
+// RUNTIME-355 F3: a Bayesian CPD run with both subsamples ordered on Vulkan, started ready and held first (HoldFirst:
+// CPU contracts separately assert that Ready submits no ordering pages). Predictions: the run's worker segment comes (the probe gates graphics, Gated); with
+// graphics held and no frame its first step orders both sets on the device (each order verified and adopted:
+// "gpu_vulkan_compute" for target and source; together with the Ready contract this places the pages under the gate)
+// and at least three EM iterations complete (Progressed, StepsWithoutFrames >= 3); no new validation error. Red before
+// F3: an owner-driven run puts no worker segment in flight, so the probe ends without gating (Gated and Progressed
+// false, 0 steps) after its segment limit, and its framed orderings cannot complete behind the held method queue
+// (both sets "cpu_reference").
+TEST(ARCH023WorkerProducers, SubsampledCpdOrdersAndIteratesWithGraphicsHeldAndNoFrames)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    const auto outcome = RunWithoutFrames(Producer::CpdSubsampled);
+    if (!outcome.Skip.empty())
+        GTEST_SKIP() << outcome.Skip;
+    ASSERT_NE(outcome.Run, 0u) << "the run did not start: " << outcome.Refusal;
+    ASSERT_FALSE(outcome.TimedOut);
+    ASSERT_TRUE(outcome.Done);
+    EXPECT_TRUE(outcome.ValidationClean);
+    if (!outcome.Separate)
+        GTEST_SKIP() << "No separate method compute queue: no-frame progress cannot be separated from graphics.";
+    EXPECT_TRUE(outcome.Gated) << "the run's worker segment was in flight with the method queue held";
+    EXPECT_TRUE(outcome.Progressed);
+    EXPECT_GE(outcome.Without, 3u) << "the orderings and three EM iterations, all without a frame";
+    EXPECT_EQ(outcome.SubsampleBackends, "gpu_vulkan_compute/gpu_vulkan_compute") << outcome.SubsampleDiagnostic;
 }

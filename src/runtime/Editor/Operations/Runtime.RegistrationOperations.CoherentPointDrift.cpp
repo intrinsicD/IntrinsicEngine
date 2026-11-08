@@ -1,12 +1,11 @@
 // Coherent Point Drift editor operation (RUNTIME-273) as a step run (ARCH-023). A run owns world-space copies of both
-// point sets and a Geometry::CoherentPointDrift::Solver; one step is one EM iteration. With the CPU E-step choices the
-// run's Step calls Solver::Step on a worker (StepRuns segments, as the CPD plugin does). A Vulkan E-step run, or one
-// whose first iteration waits for device subsample orderings, is owner-driven (StepRunsService's Driver): its pump job,
-// on the main thread every drain, pumps the E-step broker and submits one iteration job at a time when the controls
-// ask for one; with the Vulkan E-step that job is a coroutine (BeginStep) that parks while the device E-step is
-// recorded. Panels and agents read a mutex-guarded snapshot (trace, result, the shown preview). Nothing is written to
-// the scene until the run's one Accept, which revalidates the captured inputs and both entity transforms and
-// publishes one undoable history entry.
+// point sets and a Geometry::CoherentPointDrift::Solver; one step is one EM iteration, and every run steps on a worker
+// (StepRuns segments, as the CPD plugin does): its Step calls the solver there. A Vulkan E-step is evaluated on that
+// worker (its own bounded page per iteration), and Vulkan subsample orders (RUNTIME-289) are computed by the run's
+// first step on that worker before the solver samples (RUNTIME-355 F3), with no frame or main-thread pump. Panels and
+// agents read a mutex-guarded snapshot (trace, result, the shown preview). Nothing is written to the scene until the
+// run's one Accept, which revalidates the captured inputs and both entity transforms and publishes one undoable
+// history entry.
 module;
 #include <chrono>
 #include <algorithm>
@@ -34,7 +33,6 @@ module Extrinsic.Runtime.RegistrationOperations;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Core.Tasks.CounterEvent;
@@ -68,7 +66,6 @@ import Geometry.Registration.CoherentPointDrift;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
-#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
@@ -85,7 +82,8 @@ namespace Extrinsic::Runtime
 
     struct EditorCoherentPointDriftRun
     {
-        // Written once on the main thread before the run's first iteration.
+        // Written once on the main thread before the run's first iteration (the device subsample orders in Params:
+        // by the first step, see SubsampleOrdering).
         CoherentPointDriftConfig Config{};
         EditorProcessingContext Context{};
         entt::entity SourceEntity{entt::null}, TargetEntity{entt::null};
@@ -100,19 +98,21 @@ namespace Extrinsic::Runtime
         // none.
         std::shared_ptr<CoherentPointDriftGpuEStep> GpuEStep{};
         std::string GpuUnavailable{};
-        // Bayesian subsamples (RUNTIME-289), per set: the backend that ordered it (empty: not
-        // subsampled), why the CPU did, and whether a device run is still to be queued. Written on
-        // the main thread before the first iteration, which depends on the device runs.
+        // Bayesian subsamples (RUNTIME-289), per set: the backend that ordered it (empty: not subsampled), why the CPU
+        // did, and whether a device order is still to be computed (Pending). ARCH-023 (RUNTIME-355 F3): the start (main
+        // thread) prepares the device order (Device: its workspace and resident input); the run's first step computes it
+        // on its worker before the solver samples, and from then on that step owns Pending, Backend, Diagnostic and
+        // Params' order. Discard aborts a waiting page; the settled end releases Device once no step runs.
         struct SubsampleOrdering
         {
             std::string Backend{}, Diagnostic{};
             bool Pending{false};
+            std::shared_ptr<PointSamplingGpuRun> Device{};
         };
         SubsampleOrdering TargetOrdering{}, SourceOrdering{};
-        std::vector<JobToken> Orderings{}; // the device orderings the first iteration waits for
 
-        // Iteration state: the run's one iteration job changes it while it runs; the main thread reads or resets it
-        // (Preview, Commit, Restart, the iteration's completion) only while none runs.
+        // Iteration state: the run's one worker step changes it while it runs; the main thread reads or resets it
+        // (Commit, Restart, the settled end) only while none runs.
         CPD::Solver Solver{};
         bool Initialized{false};
         std::chrono::steady_clock::time_point Started{}, LastIteration{};
@@ -122,12 +122,9 @@ namespace Extrinsic::Runtime
 
         // Main thread.
         std::uint64_t Run{0u};
-        StepRunDriver Driver{};
-        JobToken Holder{};
-        bool IterationInFlight{false};
         bool Ended{false}; // committed, or its Discard ran
         std::function<void(EditorCoherentPointDriftResult)> Sink{};
-        bool Delivered{false}; // the one terminal result: Commit, else the settled end (Finished) or AbandonRun
+        bool Delivered{false}; // the one terminal result: Commit, else the settled end (Finished)
 
         mutable std::mutex Mutex{};
         EditorCoherentPointDriftSnapshot Snapshot{};
@@ -180,8 +177,8 @@ namespace Extrinsic::Runtime
         }
 
         // Shared by readiness (no value copy) and Start (values copied, world space).
-        // Why a Vulkan E-step cannot run here (empty: it can). The coroutine awaits results
-        // recorded on the main thread, requiring the job lane and a framed device with shader float64.
+        // Why a Vulkan E-step cannot run here (empty: it can): the run's worker submits and waits for its pages, which
+        // needs the job lane and an operational device with shader float64.
         std::string VulkanEStepUnavailable(const EditorProcessingContext& context)
         {
             if (!context.JobCommands.Available()) return "No job lane";
@@ -331,7 +328,8 @@ namespace Extrinsic::Runtime
                 raw->Snapshot.Stage = std::string(CPD::ToString(stage));
                 raw->Snapshot.StageStarted = std::chrono::steady_clock::now();
             };
-            // Subsampled sets as the solver decides them; a device run is queued with the first step.
+            // Subsampled sets as the solver decides them; a device order is prepared at the start and computed by the
+            // first step.
             const auto plan = [&](EditorCoherentPointDriftRun::SubsampleOrdering& set, const std::uint32_t count,
                                   const std::size_t points) {
                 if (config.Method != CoherentPointDriftMethod::Bayesian || count == 0u || count >= points) return;
@@ -429,11 +427,44 @@ namespace Extrinsic::Runtime
             ++run.Snapshot.Revision;
         }
 
-        // Worker: the first iteration prepares the solver (kernel builds included).
+        // RUNTIME-289/ARCH-023 (RUNTIME-355 F3), worker, the first step: the device subsample orders the start prepared,
+        // each in bounded pages submitted and waited for on this worker (no frame), before the solver samples; once per
+        // run (a restart reuses the orders in Params). A verified order is the solver's; otherwise the set stays on the
+        // CPU with the reason. A run that ended meanwhile records nothing: its Discard gave the waiting page up.
+        void OrderSubsamples(EditorCoherentPointDriftRun& run)
+        {
+            bool processed = false;
+            for (const bool target : {true, false})
+            {
+                auto& set = target ? run.TargetOrdering : run.SourceOrdering;
+                if (run.CancelRequested.load() || !std::exchange(set.Pending, false) || !set.Device)
+                    continue;
+                std::string why;
+                const bool ordered = set.Device->OrderOnWorker(why);
+                if (run.CancelRequested.load())
+                    break; // preserve the backend of an earlier completed order when the next one is cancelled
+                processed = true;
+                if (ordered)
+                {
+                    set.Backend = std::string(kPointSamplingGpuBackendId);
+                    (target ? run.Params.SubsampleTargetOrder : run.Params.SubsampleSourceOrder) =
+                        set.Device->Current();
+                }
+                else
+                    set.Diagnostic = std::move(why);
+            }
+            if (processed)
+                ReportSubsampling(run);
+        }
+
+        // Worker: the first iteration prepares the solver (kernel builds included), its device subsample orders first.
         [[nodiscard]] CPD::Status InitializeRun(EditorCoherentPointDriftRun& run)
         {
             if (run.Initialized)
                 return CPD::Status::Success;
+            OrderSubsamples(run);
+            if (run.CancelRequested.load())
+                return CPD::Status::Cancelled;
             run.Initialized = true;
             run.Started = run.LastIteration = std::chrono::steady_clock::now();
             {
@@ -469,11 +500,6 @@ namespace Extrinsic::Runtime
             ++run.Snapshot.Revision;
         }
 
-        [[nodiscard]] bool Cancelled(const EditorCoherentPointDriftRun& run, const JobCancellation& cancellation)
-        {
-            return cancellation.IsCancelled() || run.CancelRequested.load();
-        }
-
         // Worker, once the iteration's solver call returned: the step's outcome. The solver detects convergence in an
         // E-step that ends without an iteration, so a step may iterate nothing: its metric is that E-step's. The
         // solver's cap is the run's (Params.MaxIterations is Execution.IterationCap): the run ends it at that step.
@@ -502,11 +528,11 @@ namespace Extrinsic::Runtime
         // its one page submitted and waited for here (no frame or main-thread pump); the M-step, the objective and rows
         // flagged for exact evaluation stay on the CPU (hybrid: every iteration uploads the moved source and reads back
         // the row and source statistics). A refused or failed device E-step runs on the CPU; an ended run abandons the
-        // pending step without fallback or M-step.
-        void Iterate(EditorCoherentPointDriftRun& run, const JobCancellation& cancellation)
+        // pending step without fallback or M-step (the solver polls CancelRequested, which Discard sets).
+        void Iterate(EditorCoherentPointDriftRun& run)
         {
             run.LastOutcome = StepOutcome::Failed;
-            if (Cancelled(run, cancellation) || InitializeRun(run) != CPD::Status::Success)
+            if (run.CancelRequested.load() || InitializeRun(run) != CPD::Status::Success)
                 return;
             bool iterated = false;
             const CPD::IterationObserver observer = [&](const CPD::IterationTrace& trace)
@@ -520,7 +546,7 @@ namespace Extrinsic::Runtime
             {
                 const auto* request = run.Solver.PendingExternalRequest();
                 const bool success = run.GpuEStep->Evaluate(*request);
-                if (Cancelled(run, cancellation))
+                if (run.CancelRequested.load())
                     return; // abandoned: no fallback, no M-step
                 (void)run.Solver.CompleteExternalStep(success, observer);
             }
@@ -661,97 +687,65 @@ namespace Extrinsic::Runtime
                 : mutate(*after);
         }
 
-        // RUNTIME-289: orders one full set on the device (resident positions, captured live rows and
-        // model, so the rows match the world copies the solver samples). The verified order goes to
-        // the solver's params; otherwise the set stays on the CPU with the reason. Returns the job
-        // the run's first iteration depends on (invalid when nothing was queued).
+        // The run's output identity: every job of the run carries it.
         EditorJobIdentity Identity(const EditorCoherentPointDriftRun& run)
         {
             return EditorJobIdentity{.EntityId = run.Config.SourceStableEntityId,
                 .Scope = ToEditorJobScope(run.Config.SourcePositions.Domain),
                 .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "coherent_point_drift",
-                .Run = run.Holder,
                 .RequestedDomain = run.Config.EStep == CoherentPointDriftEStep::Vulkan ? EditorJobDomain::GpuCompute
                                                                                        : EditorJobDomain::Cpu};
         }
 
-        JobToken SubmitSubsampleOrdering(const EditorProcessingContext& context, const EditorCoherentPointDriftRunHandle& run,
-                                         const bool target)
+        // RUNTIME-289/ARCH-023 (RUNTIME-355 F3), main thread at the start: prepares one full set's device order on its
+        // resident positions (captured live rows and model, so the rows match the world copies the solver samples):
+        // the workspace's pipeline, buffers, row map and transform, and the order's page gate. The run's first step
+        // orders it on its worker (OrderSubsamples). Otherwise the set stays on the CPU with the reason.
+        void PrepareSubsampleOrdering(
+            const EditorProcessingContext& context, EditorCoherentPointDriftRun& run, const bool target)
         {
-            auto& set = target ? run->TargetOrdering : run->SourceOrdering;
-            set.Pending = false;
-            const auto fallback = [&set, &run](std::string why) {
-                set.Diagnostic = std::move(why) + "; sampling ran on the CPU.";
-                ReportSubsampling(*run);
-                return JobToken{};
+            auto& set = target ? run.TargetOrdering : run.SourceOrdering;
+            const auto fallback = [&set](std::string_view why)
+            {
+                set.Pending = false;
+                set.Diagnostic = std::string(why) + "; sampling ran on the CPU.";
             };
             auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
-            if (residency == nullptr || context.Scene == nullptr) return fallback("GPU property residency unavailable");
-            const auto& capture = target ? run->Target : run->Source;
-            const auto positions = ResolveGpuPropertyInput(*residency, *context.Scene, context.World,
-                                                           target ? run->TargetEntity : run->SourceEntity,
-                                                           target ? run->Config.TargetPositions : run->Config.SourcePositions);
+            if (residency == nullptr || context.Scene == nullptr || context.Device == nullptr)
+                return fallback("GPU property residency unavailable");
+            const auto& capture = target ? run.Target : run.Source;
+            const auto positions = ResolveGpuPropertyInput(*residency,
+                *context.Scene,
+                context.World,
+                target ? run.TargetEntity : run.SourceEntity,
+                target ? run.Config.TargetPositions : run.Config.SourcePositions);
             if (!positions) return fallback("Resident sampling input acquisition refused");
-            const std::uint32_t count = target ? run->Params.SubsampleTarget : run->Params.SubsampleSource;
-            Graphics::FarthestPointGpuInput input{.Positions = *positions, .Rows = capture.Slots,
-                                                  .FirstIndex = run->Params.SubsampleSampling.FirstIndex, .Count = count};
+            const std::uint32_t count = target ? run.Params.SubsampleTarget : run.Params.SubsampleSource;
+            Graphics::FarthestPointGpuInput input{.Positions = *positions,
+                .Rows = capture.Slots,
+                .FirstIndex = run.Params.SubsampleSampling.FirstIndex,
+                .Count = count};
             if (capture.Slots.size() == positions->Layout.Count) input.Rows = {};
-            const glm::dmat4& model = target ? run->TargetModel : run->SourceModel;
+            const glm::dmat4& model = target ? run.TargetModel : run.SourceModel;
             for (std::size_t column = 0; column < 4; ++column)
                 for (std::size_t row = 0; row < 4; ++row) input.Model[4 * column + row] = model[column][row];
-            auto gpu = std::make_shared<PointSamplingGpuRun>(*context.SpatialIndices, input,
-                                                             target ? run->TargetWorld : run->SourceWorld,
-                                                             run->Params.SubsampleSampling);
-            JobDesc job = EditorFeatureDetail::MakeFramedGpuJobDesc({
-                .DebugName = target ? "Vulkan CPD target subsample" : "Vulkan CPD source subsample",
-                .Scope = context.World,
-                // An ended run stops queuing chunks; the dependent first iteration is cancelled with it.
-                .Current =
-                    [context, run]
-                {
-                    std::string why;
-                    return !run->CancelRequested.load() && GPD::EditorProcessingContextWorldCurrent(context) &&
-                           InputsCurrent(context, *run, why);
-                },
-                .Queue =
-                    [context, gpu]
-                {
-                    return gpu->QueueNext(*context.SpatialIndices);
-                },
-                .Observe =
-                    [gpu](const SpatialGpuResult& chunk)
-                {
-                    return gpu->Observe(chunk);
-                },
-                .Publish =
-                    [run, gpu, target, count](const SpatialGpuResult* chunk)
-                {
-                    auto& done = target ? run->TargetOrdering : run->SourceOrdering;
-                    if (chunk == nullptr || chunk->State != SpatialQueryState::Ready)
-                        done.Diagnostic = (chunk && !chunk->Diagnostic.empty() ? chunk->Diagnostic
-                                                                               : std::string("GPU sampling submission refused")) +
-                                          "; sampling ran on the CPU.";
-                    else if (gpu->Current().Order.size() != count)
-                        done.Diagnostic = "The Vulkan sampler returned an incomplete order; sampling ran on the CPU.";
-                    else if (gpu->VerifyPrefix(done.Diagnostic))
-                    {
-                        done.Backend = std::string(kPointSamplingGpuBackendId);
-                        (target ? run->Params.SubsampleTargetOrder : run->Params.SubsampleSourceOrder) = gpu->Current();
-                    }
-                    ReportSubsampling(*run);
-                    return true;
-                },
-                // Stale or cancelled: the dependent first iteration is cancelled with it, which discards the run.
-                .Abandon = [] {},
-            });
-            auto identity = Identity(*run);
-            identity.OutputName = target ? "coherent_point_drift.target_subsample" : "coherent_point_drift.source_subsample";
-            identity.RequestedDomain = EditorJobDomain::GpuCompute;
-            identity.Run = run->Holder;
-            const JobToken token = context.JobCommands.Submit(std::move(job), std::move(identity));
-            if (!token.IsValid()) return fallback("The job lane rejected the Vulkan subsample run");
-            return token;
+            auto gpu = std::make_shared<PointSamplingGpuRun>(*context.SpatialIndices,
+                input,
+                target ? run.TargetWorld : run.SourceWorld,
+                run.Params.SubsampleSampling);
+            if (!gpu->PrepareWorker(*context.Device, *residency))
+                return fallback("The Vulkan sampler refused its resident input");
+            set.Device = std::move(gpu);
+        }
+
+        // Main thread, once no step runs (the settled end): the device orders' resident input slots, stamped with the
+        // compute fence, and their workspaces go; a page a discarded run gave up keeps them reserved until it completed.
+        void ReleaseOrderings(EditorCoherentPointDriftRun& run)
+        {
+            for (auto* set : {&run.TargetOrdering, &run.SourceOrdering})
+                if (auto device = std::exchange(set->Device, {}))
+                    device->Release();
         }
 
         // Accept (no iteration runs): the current estimate, after revalidating the captured inputs and both entity
@@ -807,14 +801,18 @@ namespace Extrinsic::Runtime
         }
 
         // The run's Discard: it ended without a commit (discarded, cancelled, stale or failed). Nothing is published.
-        // At once, also while an iteration runs: it stops at its solver's next poll and a pending device E-step wakes
-        // without a CPU fallback; the broker stays with the run until the pump settles it. Reads no iteration state.
+        // At once, also while an iteration runs: it stops at its solver's next poll, and a pending device E-step or
+        // subsample ordering page is given up without a CPU fallback (the device may still run it: the settled end
+        // releases what it uses, reserved until it completed). Reads no iteration state.
         void DiscardRun(EditorCoherentPointDriftRun& run)
         {
             run.Ended = true;
             run.CancelRequested = true;
             if (run.GpuEStep)
                 run.GpuEStep->Close("Coherent Point Drift ended.");
+            for (auto* set : {&run.TargetOrdering, &run.SourceOrdering})
+                if (set->Device)
+                    set->Device->Abort();
         }
 
         // The run's settled end (StepRunCallbacks::Finished: no iteration runs and the holder released the source, so
@@ -841,16 +839,6 @@ namespace Extrinsic::Runtime
                 : stale ? "Coherent Point Drift inputs changed since the run started; nothing was applied."
                         : "Coherent Point Drift was cancelled; nothing was applied.";
             Deliver(run, std::move(result));
-        }
-
-        // An owner-driven run whose attachment is gone (its owner goes away): Abandon drops Finished, so a run that
-        // had not ended answers here; one that ended already answers at its settled end.
-        void AbandonRun(EditorCoherentPointDriftRun& run)
-        {
-            if (run.Ended)
-                return;
-            run.Driver.Abandon(); // its Discard ends the run
-            EndRun(run, {.Id = run.Run, .Phase = StepRunPhase::Discarded});
         }
 
         // Restart (no iteration runs): a new generation from the captured inputs. The broker, its workspace and the
@@ -881,100 +869,18 @@ namespace Extrinsic::Runtime
             ReportSubsampling(run); // the orderings' report survives the new generation
         }
 
-        // Main thread: an iteration job ended. A completed one is the run's step; a cancelled or dropped one (its
-        // world closed, an ordering it waited for was abandoned) ends the run.
-        void IterationDone(EditorCoherentPointDriftRun& run, const bool completed)
+        // The run's callbacks: every step is a StepRuns segment step on a worker (one EM iteration, the first one with
+        // the device subsample orders); the rest runs on the main thread.
+        [[nodiscard]] StepRunCallbacks MakeCallbacks(const EditorCoherentPointDriftRunHandle& run)
         {
-            run.IterationInFlight = false;
-            run.Driver.Recording(false);
-            if (run.Ended)
-                return;
-            if (!completed)
-            {
-                std::string refusal;
-                (void)run.Context.StepRuns->Control(run.Run, StepRunAction::Discard, 1u, refusal);
-                return;
-            }
-            (void)run.Driver.Stepped(run.LastMetric, run.LastOutcome);
-            if (run.LastOutcome != StepOutcome::Failed && run.Driver.MayPreview())
-            {
-                std::vector<float> values;
-                RefreshEstimate(run, &values);
-                ShowEstimate(run, values);
-                run.Driver.Previewed();
-            }
-        }
-
-        void SubmitIteration(const EditorCoherentPointDriftRunHandle& run)
-        {
-            const auto& context = run->Context;
-            JobDesc desc{
-                .DebugName = "Sandbox.CoherentPointDrift",
-                .Scope = context.World,
-                .Priority = Core::Dag::TaskPriority::Normal,
-                .ValidateBeforeApply =
-                    []
+            return StepRunCallbacks{
+                .Step =
+                    [run](StepRunMetric& metric)
                 {
-                    return JobApplyValidation::Current;
+                    Iterate(*run); // the solver and a pending device page stop at once once Discard ran
+                    metric.Values = run->LastMetric.Values;
+                    return run->LastOutcome;
                 },
-                .PublishCompletion =
-                    [run](KernelEventBus&, const JobResultEnvelope&)
-                {
-                    IterationDone(*run, true);
-                    return true;
-                },
-                .FinalizeUnpublishedOnMainThread =
-                    [run]
-                {
-                    IterationDone(*run, false);
-                },
-            };
-            // The first iteration orders its subsamples after the device runs.
-            for (const JobToken ordering : std::exchange(run->Orderings, {}))
-                desc.DependsOn.push_back({ordering, "Order the subsample on the device first"});
-            desc.Work = [run](const JobCancellation& cancellation)
-            {
-                Iterate(*run, cancellation);
-                return JobResultEnvelope::Make(true);
-            };
-            run->IterationInFlight = true;
-            run->Driver.Recording(true);
-            if (!context.JobCommands.Submit(std::move(desc), Identity(*run)).IsValid())
-            {
-                run->IterationInFlight = false;
-                run->Driver.Recording(false);
-                (void)run->Driver.Stepped({}, StepOutcome::Failed);
-            }
-        }
-
-        // Main thread, every drain (the pump job's readiness gate of a run whose first iteration waits for device
-        // subsample orderings): the next iteration is submitted once the controls ask for one. True once the run ended
-        // and its last iteration completed: the broker's workspace then returns to the cache's pool.
-        bool Pump(const EditorCoherentPointDriftRunHandle& run)
-        {
-            const auto& context = run->Context;
-            if (context.AttachmentActive && !context.AttachmentActive())
-                AbandonRun(*run);
-            if (run->Ended)
-            {
-                if (run->IterationInFlight)
-                    return false;
-                if (run->GpuEStep)
-                {
-                    run->GpuEStep->Close();
-                    run->GpuEStep->ReleaseDeviceResources();
-                }
-                return true;
-            }
-            if (!run->IterationInFlight && run->Driver.MayStart())
-                SubmitIteration(run);
-            return false;
-        }
-
-        // `worker`: the run's steps are StepRuns segments on a worker (CPU E-step choices); else the run is owner-driven.
-        [[nodiscard]] StepRunCallbacks MakeCallbacks(const EditorCoherentPointDriftRunHandle& run, const bool worker)
-        {
-            StepRunCallbacks callbacks{
                 .Preview =
                     [run](StepPreview& preview)
                 {
@@ -1024,17 +930,10 @@ namespace Extrinsic::Runtime
                 .Finished =
                     [run](const StepRunObservation& observed)
                 {
+                    ReleaseOrderings(*run); // no step runs any more
                     EndRun(*run, observed);
                 },
             };
-            if (worker)
-                callbacks.Step = [run](StepRunMetric& metric)
-                {
-                    Iterate(*run, JobCancellation{}); // the solver polls CancelRequested (set by Discard)
-                    metric.Values = run->LastMetric.Values;
-                    return run->LastOutcome;
-                };
-            return callbacks;
         }
 
         // Without a job lane (the immediate outcome of the one-shot command): every iteration at once, then Accept.
@@ -1062,8 +961,8 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        // A run that captured its inputs: its step run, its pump job and its device subsample orderings. Null with
-        // `failure` when the session refuses it (no step runs, another run holds the output, a job refused).
+        // A run that captured its inputs: its step run and its prepared device subsample orders. Null with `failure`
+        // when the session refuses it (no step runs, another run holds the output, a job refused).
         EditorCoherentPointDriftRunHandle StartRun(const EditorProcessingContext& context,
             const CoherentPointDriftConfig& config,
             std::function<void(EditorCoherentPointDriftResult)> sink,
@@ -1098,16 +997,12 @@ namespace Extrinsic::Runtime
                 .SourcePointCount = run->SourceWorld.size(),
                 .TargetPointCount = run->TargetWorld.size(),
                 .Message = "Coherent Point Drift is ready."};
-            ReportSubsampling(*run);
             snapshot.SourcePreview = std::make_shared<const std::vector<glm::vec3>>(run->SourceWorld);
             snapshot.Target = std::make_shared<const std::vector<glm::vec3>>(run->TargetWorld);
             snapshot.Revision = 1u;
 
-            // Every run steps on a worker (StepRuns segments), its Vulkan E-step evaluated there (ARCH-023). One whose
-            // first iteration waits for device subsample orderings is owner-driven: its pump submits one iteration job
-            // at a time (an iteration job can depend on the orderings), which evaluates its E-step on its own worker.
-            const bool worker = !run->TargetOrdering.Pending && !run->SourceOrdering.Pending;
-            const auto holder = std::make_shared<JobToken>();
+            // Every run steps on a worker (StepRuns segments), its Vulkan E-step and subsample orders computed there
+            // (ARCH-023).
             std::string refusal;
             run->Run = context.StepRuns->Start(
                 {.Label = "Coherent Point Drift",
@@ -1115,8 +1010,8 @@ namespace Extrinsic::Runtime
                     .Output = {.StableEntityId = resolved.SourceStableEntityId, .Property = resolved.SourcePositions},
                     .Execution = resolved.Execution,
                     .MetricNames = {"sigma2", "objective", "matched", "nll"}},
-                MakeCallbacks(run, worker),
-                EditorStepRunJobs(context.JobCommands, Identity(*run), holder),
+                MakeCallbacks(run),
+                EditorStepRunJobs(context.JobCommands, Identity(*run), std::make_shared<JobToken>()),
                 refusal);
             if (run->Run == 0u)
             {
@@ -1126,66 +1021,15 @@ namespace Extrinsic::Runtime
                     "The job lane rejected the Coherent Point Drift run: " + refusal);
                 return nullptr;
             }
-            run->Driver = context.StepRuns->Driver(run->Run);
-            run->Holder = *holder;
             snapshot.StepRun = run->Run;
             snapshot.Result.StepRun = run->Run;
             run->Sink = std::move(sink);
-            if (worker)
-                return run;
-            JobDesc pump{
-                .DebugName = "Sandbox.CoherentPointDrift.Pump",
-                .Scope = context.World,
-                // Established ahead of the iterations it submits.
-                .Priority = Core::Dag::TaskPriority::High,
-                .Work =
-                    [](const JobCancellation&)
-                {
-                    return JobResultEnvelope::Make(true);
-                },
-                .IsReadyToApply =
-                    [run]
-                {
-                    return Pump(run);
-                },
-                .ValidateBeforeApply =
-                    []
-                {
-                    return JobApplyValidation::Current;
-                },
-                .PublishCompletion =
-                    [](KernelEventBus&, const JobResultEnvelope&)
-                {
-                    return true;
-                },
-                // Cancelled or its world closed: the run is discarded through its step run, so it answers at its
-                // settled end once a running iteration returned (its holder cancels that iteration). It ends here at
-                // once too, so a pending E-step wakes without a CPU fallback (an in-flight computation keeps its own
-                // lease until it completed).
-                .FinalizeUnpublishedOnMainThread =
-                    [run]
-                {
-                    std::string refusal; // refused: the run had ended already
-                    (void)run->Context.StepRuns->Control(run->Run, StepRunAction::Discard, 1u, refusal);
-                    DiscardRun(*run);
-                },
-            };
-            auto pumpIdentity = Identity(*run);
-            pumpIdentity.OutputName = "coherent_point_drift.pump";
-            if (!context.JobCommands.Submit(std::move(pump), std::move(pumpIdentity)).IsValid())
-            {
-                run->Delivered = true;
-                run->Driver.Abandon();
-                failure = Failure(resolved,
-                    EditorCommandStatus::GeometryProcessingFailed,
-                    "The job lane rejected the Coherent Point Drift pump.");
-                return nullptr;
-            }
-            // The solver orders its subsamples in its first iteration, after the device runs.
+            // RUNTIME-355 F3: the device subsample orders' owner side, before any step (a segment starts from the
+            // holder's pump in a later drain); the first step computes them on its worker.
             for (const bool target : {true, false})
                 if ((target ? run->TargetOrdering : run->SourceOrdering).Pending)
-                    if (const JobToken ordering = SubmitSubsampleOrdering(context, run, target); ordering.IsValid())
-                        run->Orderings.push_back(ordering);
+                    PrepareSubsampleOrdering(context, *run, target);
+            ReportSubsampling(*run);
             return run;
         }
     }

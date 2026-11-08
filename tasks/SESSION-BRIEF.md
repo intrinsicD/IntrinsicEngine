@@ -10,7 +10,6 @@ picking backlog work; theme priorities and rationale live in
 
 - `ARCH-022` — Engine and feature modules: the architecture target (tasks/active/ARCH-022-engine-and-feature-modules-target.md)
 - `ARCH-023` — Shared GPU method execution (tasks/active/ARCH-023-unified-gpu-method-runs.md)
-- `BUG-258` — Historical density-weight proof cites a retired test path (tasks/active/BUG-258-historical-density-weight-proof.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 

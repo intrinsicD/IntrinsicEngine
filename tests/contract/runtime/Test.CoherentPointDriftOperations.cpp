@@ -38,6 +38,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.CoherentPointDriftEStep;
+import Geometry.PointSampling;
 import Geometry.Registration.CoherentPointDrift;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.StepRuns;
@@ -1384,38 +1385,67 @@ TEST_F(CpdSingleWorkerWait, EditorDiscardWakesPendingEStepWithoutFallbackOrItera
     cleanup();
 }
 
-// ARCH-023 Q7: a run whose device subsample ordering is pending at its start is owner-driven (its pump job submits
-// the iterations). Cancelled from the Jobs window while an iteration runs, its holder, pump and iteration end
-// together, and the pump's finalizer can run first (here the pump row is cancelled and drained first). The run
-// answers once, at its settled end after the held iteration returned: a same-source run started from that answer is
-// admitted. Prediction, the pump finalizer abandoning the run: one delivery in the pump's drain while the iteration
-// is held, the run no longer in flight, the start inside it refused as busy. Fixed: none while held, then exactly
-// one cancelled result, and the new run is ready with its own step run.
-TEST_F(CpdBrokerWorkspaceReuse, ACancelledOwnerDrivenRunAnswersOnceItsHeldIterationReturned)
+// ARCH-023 (RUNTIME-355 F3): a run with a Vulkan subsample backend steps on its worker from its first step, which
+// orders the subsample on the device there; no owner pump drives it. While that ordering page is held on the device,
+// a cancel from the Jobs window, or a changed input (a stale capture), makes the worker give the page up at once (the
+// run's Discard aborts its wait; no frame or device completion is needed): the run answers exactly once at its settled
+// end, with no CPU fallback, iteration or publication, and a same-source run started from that answer is admitted. The given-up page's
+// workspace is served to no other run before that page completed. Predictions per case: no pump row, Released +1,
+// Taken +0, the page still waiting on the device, one terminal result ("cancelled" or "inputs changed") with 0 steps
+// and no displacement; a probe ordering while the page is held leases a new workspace (no reuse), one after the page
+// completed and frames retired reuses a pooled one. Red before F3: the run is owner-driven (a pump row exists) and its
+// framed ordering page is never given up (Released stays 0). Every exit releases the held page before the job lane is
+// cancelled and drained.
+TEST_F(CpdBrokerWorkspaceReuse, ACancelledSubsampledRunWakesItsHeldOrderingAndAnswersOnce)
 {
+    Device.TransferQueue.AcceptBufferUploads = true; // the subsampled set's resident positions
     Scene scene;
     const auto source = Make(scene.Registry, D::PointCloudPoint, Cloud(64, 31));
     const auto target = Make(scene.Registry, D::PointCloudPoint, Cloud(64, 37));
     Jobs.Attach(scene.Context);
     scene.Context.SpatialIndices = &Cache;
     scene.Context.Device = &Device;
-    // The iteration's device E-step waits on its worker until released; closing the broker does not end this wait.
-    const auto held = std::make_shared<std::atomic<bool>>(true);
-    const auto entered = std::make_shared<std::atomic<bool>>(false);
-    Device.TransferQueue.ComputeWait = [held, entered, base = Device.TransferQueue.ComputeWait](
-                                           const Extrinsic::RHI::ReadbackToken token, const std::uint64_t timeout)
-    {
-        *entered = true;
-        while (*held)
-            std::this_thread::sleep_for(std::chrono::milliseconds{1});
-        return base(token, timeout);
-    };
+    // What a run's sink writes; declared before the cleanup, so a run that answers only there writes live state.
     unsigned delivered = 0u;
     std::optional<R::EditorCoherentPointDriftResult> ended;
     R::EditorCoherentPointDriftRunHandle next;
     R::EditorCoherentPointDriftResult refused;
-    // The mock refuses uploads, so the pending source ordering falls back to the CPU when it is submitted: the run
-    // stays owner-driven and its first iteration depends on nothing.
+    // Every exit: the held page completes first (a waiting worker returns), then the lane is cancelled and drained.
+    struct Cleanup
+    {
+        std::function<void()> Run;
+        ~Cleanup()
+        {
+            Run();
+        }
+    } cleanup{[&]
+        {
+            Release();
+            (void)Jobs.Jobs().CancelAll();
+            (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+            (void)Jobs.Jobs().ShutdownGpuQueueParticipants(
+                [&]
+                {
+                    Device.WaitIdle();
+                });
+            Jobs.Jobs().CancelAndDrain();
+        }};
+    const auto rows = [&]
+    {
+        return scene.Context.JobCommands.SnapshotAll();
+    };
+    const auto idle = [&]
+    {
+        return std::ranges::none_of(rows(),
+            [](const R::EditorJobRecord& row)
+            {
+                return R::IsActiveEditorJobState(row.State);
+            });
+    };
+    const auto published = [&]
+    {
+        return std::as_const(scene.Registry.Raw().get<GS::Vertices>(source).Properties).Exists("bcpd");
+    };
     R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source),
         .TargetStableEntityId = Id(target),
         .Method = M::Bayesian,
@@ -1423,118 +1453,371 @@ TEST_F(CpdBrokerWorkspaceReuse, ACancelledOwnerDrivenRunAnswersOnceItsHeldIterat
         .InitialSigma2 = 10.0,
         .Output = O::DisplacementProperty,
         .DisplacementName = "bcpd",
-        .EStep = R::CoherentPointDriftEStep::Vulkan,
         .Threads = 1u,
-        .Subsample = 32u};
+        .SubsampleTarget = 32u};
     config.SubsampleBackend = R::PointSamplingBackend::Vulkan;
-    const auto pending = R::ApplyEditorCoherentPointDriftCommand(scene.Commands(),
-        config,
-        [&](R::EditorCoherentPointDriftResult result)
-        {
-            ++delivered;
-            ended = std::move(result);
-            next = R::StartEditorCoherentPointDrift(
-                scene.Commands(), {.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target)}, refused);
-        });
-    const auto rows = [&]
+    // A ready run of the same request whose first step orders on the device, not held: the workspace reuse probe.
+    const auto probeOrdering = [&]
     {
-        return scene.Context.JobCommands.SnapshotAll();
-    };
-    R::JobToken pump{}, holder{};
-    for (const auto& row : rows())
-        if (row.Identity.OutputName == "coherent_point_drift.pump")
+        auto probe = config;
+        probe.Execution = Cap(1u);
+        R::EditorCoherentPointDriftResult refusal;
+        const auto run = R::StartEditorCoherentPointDrift(scene.Commands(), probe, refusal);
+        if (!run)
         {
-            pump = row.Token;
-            holder = row.Identity.Run;
+            ADD_FAILURE() << "the probe run did not start: " << refusal.Message;
+            return false;
         }
-    // The old run's active jobs: its holder and every job that joined it.
-    const auto active = [&]
-    {
-        return std::ranges::count_if(rows(),
-            [&](const R::EditorJobRecord& row)
-            {
-                return (row.Token == holder || row.Identity.Run == holder) && R::IsActiveEditorJobState(row.State);
-            });
+        const auto probeId = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+        const bool stepped = Control(Jobs, probeId, R::StepRunAction::Step, 1u) &&
+            DrainUntil(
+                Jobs,
+                [&]
+                {
+                    const auto observed = Jobs.StepRuns().Observe(probeId);
+                    return observed && observed->Steps == 1u && !observed->SegmentInFlight;
+                },
+                std::chrono::seconds{3});
+        EXPECT_TRUE(stepped) << "the probe's first step ordered its subsample";
+        (void)Control(Jobs, probeId, R::StepRunAction::Discard);
+        return DrainUntil(Jobs, idle, std::chrono::seconds{3}) && stepped;
     };
-    const auto cleanup = [&]
+    for (const bool stale : {false, true})
     {
-        *held = false;
-        (void)Jobs.Jobs().CancelAll();
-        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-        (void)Jobs.Jobs().ShutdownGpuQueueParticipants(
-            [&]
+        SCOPED_TRACE(stale ? "a stale capture" : "a Jobs window cancel");
+        const auto released = Count(Released), taken = Count(Taken);
+        delivered = 0u;
+        ended.reset();
+        next.reset();
+        refused = {};
+        HoldNext();
+        const auto pending = R::ApplyEditorCoherentPointDriftCommand(scene.Commands(),
+            config,
+            [&](R::EditorCoherentPointDriftResult result)
             {
-                Device.WaitIdle();
+                ++delivered;
+                ended = std::move(result);
+                next = R::StartEditorCoherentPointDrift(scene.Commands(),
+                    {.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target)},
+                    refused);
             });
-        Jobs.Jobs().CancelAndDrain();
-    };
-    if (pending.Status != R::EditorCommandStatus::Pending || !pump.IsValid() || !holder.IsValid())
-    {
-        cleanup();
-        FAIL() << "the pending device ordering makes the run owner-driven, its pump joining the holder: "
-               << pending.Message;
-    }
-    EXPECT_NE(pending.SubsampleBackendDiagnostic.find("Resident sampling input acquisition refused"), std::string::npos)
-        << pending.SubsampleBackendDiagnostic;
-    const auto id = pending.StepRun;
-    if (!DrainUntil(
+        ASSERT_EQ(pending.Status, R::EditorCommandStatus::Pending) << pending.Message;
+        const auto id = pending.StepRun;
+        ASSERT_TRUE(AwaitHeld(true)) << "the run never submitted its subsample ordering page";
+        EXPECT_TRUE(std::ranges::none_of(rows(),
+            [](const R::EditorJobRecord& row)
+            {
+                return row.Identity.OutputName == "coherent_point_drift.pump";
+            }))
+            << "no owner pump: every step runs on the run's worker";
+        // The device's compute fence names the held page: what it reads may be reused only once it completed.
+        Device.TransferQueue.ComputeFenceToken = {Count(HeldToken)};
+        if (stale)
+            scene.Registry.Raw().get<GS::Vertices>(target).Properties.GetOrAdd<glm::vec3>("v:position").Vector()[0] +=
+                glm::vec3(1.0f);
+        else
+        {
+            R::JobToken holder{};
+            for (const auto& row : rows())
+                if (row.Identity.OutputName == "coherent_point_drift" && R::IsActiveEditorJobState(row.State))
+                    holder = R::EditorJobRunOf(row.Token, row.Identity);
+            ASSERT_TRUE(holder.IsValid()) << "the run's jobs are listed";
+            EXPECT_GE(
+                R::CancelEditorRuns(scene.Context.JobCommands, std::span<const R::JobToken>{&holder, 1u}).Requested,
+                1u);
+        }
+        ASSERT_TRUE(DrainUntil(
             Jobs,
             [&]
             {
-                return entered->load();
+                return delivered > 0u;
             },
-            std::chrono::seconds{5}))
-    {
-        cleanup();
-        FAIL() << "the pump's iteration never reached its held device E-step";
-    }
-
-    // The Jobs window: the pump row first (its finalizer runs in this drain), then the run (holder and iteration).
-    EXPECT_EQ(R::CancelEditorRuns(scene.Context.JobCommands, std::span<const R::JobToken>{&pump, 1u}).Requested, 1u);
-    (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-    EXPECT_EQ(delivered, 0u) << "no answer from the pump's finalizer while the iteration runs";
-    EXPECT_EQ(R::CancelEditorRuns(scene.Context.JobCommands, std::span<const R::JobToken>{&holder, 1u}).Requested, 2u)
-        << "the holder and the held iteration";
-    for (int drain = 0; drain < 20; ++drain)
-    {
-        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-        std::this_thread::sleep_for(std::chrono::milliseconds{1});
-    }
-    EXPECT_EQ(delivered, 0u) << "no answer while the iteration is held";
-    const auto whileHeld = Jobs.StepRuns().Observe(id);
-    EXPECT_TRUE(whileHeld && whileHeld->Phase == R::StepRunPhase::Discarded && whileHeld->SegmentInFlight)
-        << "discarded, its held iteration still in flight";
-    EXPECT_EQ(active(), 1) << "only the held iteration: the holder and the pump are finalized";
-
-    *held = false;
-    EXPECT_TRUE(DrainUntil(Jobs,
-        [&]
+            std::chrono::seconds{3}))
+            << "the run must settle while its ordering page is held: its worker gives the page up";
+        EXPECT_EQ(delivered, 1u);
+        EXPECT_EQ(Count(Released), released + 1u) << "the held ordering page is given up by its worker";
+        EXPECT_EQ(Count(Taken), taken) << "no bytes of the given-up page are taken";
+        EXPECT_TRUE(Waiting()) << "the page still runs on the device";
+        const auto settled = Jobs.StepRuns().Observe(id);
+        EXPECT_TRUE(settled && R::IsTerminal(settled->Phase) && !settled->SegmentInFlight && settled->Steps == 0u);
+        ASSERT_TRUE(ended);
+        EXPECT_EQ(ended->Status, R::EditorCommandStatus::StaleEntity);
+        EXPECT_NE(ended->Message.find(stale ? "inputs changed" : "cancelled"), std::string::npos) << ended->Message;
+        EXPECT_EQ(ended->StepRun, id);
+        EXPECT_EQ(ended->Iterations, 0u);
+        EXPECT_EQ(ended->SubsampleBackendDiagnostic.find("ran on the CPU"), std::string::npos)
+            << "an ended run claims no CPU fallback: " << ended->SubsampleBackendDiagnostic;
+        EXPECT_FALSE(published()) << "nothing was published";
+        EXPECT_FALSE(scene.History.CanUndo());
+        EXPECT_TRUE(next) << "admitted, not refused as busy: " << refused.Message;
+        if (next)
         {
-            return delivered > 0u;
-        }));
+            const auto nextId = R::SnapshotEditorCoherentPointDrift(next).StepRun;
+            EXPECT_NE(nextId, id);
+            EXPECT_EQ(Jobs.StepRuns().Observe(nextId)->Phase, R::StepRunPhase::Ready);
+            EXPECT_TRUE(Control(Jobs, nextId, R::StepRunAction::Discard));
+        }
+        ASSERT_TRUE(DrainUntil(Jobs, idle, std::chrono::seconds{3})) << "no stranded holder or segment";
+        if (!stale)
+        {
+            // Frames retire meanwhile, but the given-up page's workspace waits for the page itself.
+            const auto reuses = Cache.Stats().WorkspaceReuses;
+            RetireFrames();
+            ASSERT_TRUE(probeOrdering());
+            EXPECT_EQ(Cache.Stats().WorkspaceReuses, reuses)
+                << "the held page's workspace is not served to another run";
+            Release(); // the device finished the given-up page
+            RetireFrames();
+            ASSERT_TRUE(probeOrdering());
+            EXPECT_EQ(Cache.Stats().WorkspaceReuses, reuses + 1u)
+                << "a pooled workspace is reused once its page completed";
+        }
+        Release();
+    }
+}
+
+// ARCH-023 (RUNTIME-355 F3): with a Vulkan subsample backend the run's controls behave as with the CPU's. A refused
+// resident upload orders the set on the CPU with the reason at the start. A ready run submits no ordering page before
+// Run or Step; its first step orders the subsample on its worker (one pulled page, taken once); a batch, single steps
+// to the end, and two steps then a restart and a run all publish the CPU-subsample batch's displacement bitwise (the
+// mock device answers the CPU reference order, which is verified and adopted, so the samples are the same); the
+// restart reuses the order (no second page); a computing run's shutdown answers once and publishes nothing (no page
+// is held). Red before F3: the framed ordering never completes in this fixture (no frame delivers its sink), so the
+// Vulkan batch never answers.
+TEST_F(CpdBrokerWorkspaceReuse, VulkanSubsampledStepsRunAndRestartEqualTheCpuSubsample)
+{
+    constexpr std::uint32_t kSamples = 24u; // even: the page's 12-byte rows fill whole doubles
+    const auto sourcePoints = Cloud(64, 51);
+    std::vector<glm::vec3> targetPoints;
+    for (const auto& p : sourcePoints)
+        targetPoints.push_back(p + glm::vec3(0.05f * std::sin(3.0f * p.y), 0.02f, -0.03f));
+    Scene scene;
+    const auto source = Make(scene.Registry, D::PointCloudPoint, sourcePoints);
+    const auto target = Make(scene.Registry, D::PointCloudPoint, targetPoints);
+    Jobs.Attach(scene.Context);
+    scene.Context.SpatialIndices = &Cache;
+    scene.Context.Device = &Device;
+    // The device answers an ordering page with the CPU reference order and clearances of the target (identity
+    // transforms: the resident rows are the world rows).
+    const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(targetPoints), {}, kSamples);
+    ASSERT_TRUE(reference.Succeeded());
+    std::vector<double> packed(kSamples * 12u / sizeof(double));
+    std::memcpy(packed.data(), reference.Clearance.data(), kSamples * sizeof(double));
+    std::memcpy(reinterpret_cast<std::byte*>(packed.data()) + kSamples * sizeof(double),
+        reference.Order.data(),
+        kSamples * sizeof(std::uint32_t));
+    Answer = [packed](const std::size_t doubles)
+    {
+        return doubles == packed.size() ? packed : std::vector<double>(doubles, 0.0);
+    };
+    // Sinks write these; declared before the cleanup so they outlive every run's terminal answer.
+    std::optional<R::EditorCoherentPointDriftResult> cpu, vulkan, shutdown;
+    unsigned shutdownDeliveries = 0u;
+    struct Cleanup
+    {
+        std::function<void()> Run;
+        ~Cleanup()
+        {
+            Run();
+        }
+    } cleanup{[&]
+        {
+            Release();
+            (void)Jobs.Jobs().CancelAll();
+            (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+            (void)Jobs.Jobs().ShutdownGpuQueueParticipants(
+                [&]
+                {
+                    Device.WaitIdle();
+                });
+            Jobs.Jobs().CancelAndDrain();
+        }};
+    const auto displacement = [&](const std::string& name)
+    {
+        const auto& properties = std::as_const(scene.Registry.Raw().get<GS::Vertices>(source).Properties);
+        return properties.Exists(name) ? properties.Get<glm::vec3>(name).Vector() : std::vector<glm::vec3>{};
+    };
+    const auto observe = [&](const std::uint64_t run)
+    {
+        return Jobs.StepRuns().Observe(run);
+    };
+    const auto rests = [&](const std::uint64_t run)
+    {
+        return DrainUntil(
+            Jobs,
+            [&]
+            {
+                const auto o = observe(run);
+                return o && (o->Phase == R::StepRunPhase::Paused || R::IsTerminal(o->Phase)) && !o->SegmentInFlight;
+            },
+            std::chrono::seconds{5});
+    };
+    const auto terminal = [&](const std::uint64_t run)
+    {
+        return DrainUntil(
+                   Jobs,
+                   [&]
+                   {
+                       const auto o = observe(run);
+                       return o && R::IsTerminal(o->Phase);
+                   },
+                   std::chrono::seconds{5}) &&
+            Jobs.DrainUntilTerminal();
+    };
+    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target),
+        .Method = M::Bayesian,
+        .OutlierWeight = 0.1,
+        .Execution = Cap(6u),
+        .Output = O::DisplacementProperty,
+        .Threads = 1u,
+        .SubsampleTarget = kSamples};
+    const auto variant = [&](std::string name, const R::PointSamplingBackend backend)
+    {
+        auto c = config;
+        c.DisplacementName = std::move(name);
+        c.SubsampleBackend = backend;
+        return c;
+    };
+    const auto batch = [&](std::optional<R::EditorCoherentPointDriftResult>& into, const R::CoherentPointDriftConfig& c)
+    {
+        const auto pending = R::ApplyEditorCoherentPointDriftCommand(scene.Commands(),
+            c,
+            [&into](R::EditorCoherentPointDriftResult result)
+            {
+                into = std::move(result);
+            });
+        EXPECT_EQ(pending.Status, R::EditorCommandStatus::Pending) << pending.Message;
+        return DrainUntil(
+                   Jobs,
+                   [&]
+                   {
+                       return into.has_value();
+                   },
+                   std::chrono::seconds{5}) &&
+            Jobs.DrainUntilTerminal();
+    };
+
+    // A refused resident upload: the set is ordered on the CPU, with the reason, from the start.
+    {
+        R::EditorCoherentPointDriftResult failure;
+        const auto run = R::StartEditorCoherentPointDrift(
+            scene.Commands(), variant("bcpd_refused", R::PointSamplingBackend::Vulkan), failure);
+        ASSERT_TRUE(run) << failure.Message;
+        EXPECT_NE(R::SnapshotEditorCoherentPointDrift(run).Result.SubsampleBackendDiagnostic.find(
+                      "Target: Resident sampling input acquisition refused; sampling ran on the CPU."),
+            std::string::npos)
+            << R::SnapshotEditorCoherentPointDrift(run).Result.SubsampleBackendDiagnostic;
+        const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+        ASSERT_TRUE(Control(Jobs, id, R::StepRunAction::Discard));
+        ASSERT_TRUE(terminal(id));
+    }
+    Device.TransferQueue.AcceptBufferUploads = true; // from here on the subsampled set is resident
+
+    // The CPU subsample, as a batch: the reference displacement; the CPU orders, so no device page.
+    ASSERT_TRUE(batch(cpu, variant("bcpd_cpu", R::PointSamplingBackend::Cpu)));
+    ASSERT_TRUE(cpu->Succeeded()) << cpu->Message;
+    EXPECT_EQ(cpu->SubsampleTargetBackend, "cpu_reference");
+    const auto expected = displacement("bcpd_cpu");
+    ASSERT_FALSE(expected.empty());
+    EXPECT_EQ(Count(Tokens), 0u);
+
+    // The Vulkan subsample, as a batch: one ordering page, pulled and taken by the step's worker.
+    ASSERT_TRUE(batch(vulkan, variant("bcpd_batch", R::PointSamplingBackend::Vulkan)))
+        << "the Vulkan subsample batch must answer without a frame";
+    ASSERT_TRUE(vulkan->Succeeded()) << vulkan->Message;
+    EXPECT_EQ(vulkan->SubsampleTargetBackend, "gpu_vulkan_compute") << vulkan->SubsampleBackendDiagnostic;
+    EXPECT_EQ(vulkan->SubsampleBackendDiagnostic, "");
+    EXPECT_EQ(vulkan->Iterations, cpu->Iterations);
+    EXPECT_EQ(displacement("bcpd_batch"), expected) << "the device order is the CPU's";
+    EXPECT_EQ(Count(Tokens), 1u) << "one bounded ordering page";
+    EXPECT_EQ(Count(Taken), 1u) << "taken once, by the step's worker";
+
+    // Ready, then single steps to the end, then Accept: no page before the first step, then exactly one.
+    R::EditorCoherentPointDriftResult failure;
+    const auto stepped = R::StartEditorCoherentPointDrift(
+        scene.Commands(), variant("bcpd_stepped", R::PointSamplingBackend::Vulkan), failure);
+    ASSERT_TRUE(stepped) << failure.Message;
+    const auto steppedId = R::SnapshotEditorCoherentPointDrift(stepped).StepRun;
     for (int drain = 0; drain < 5; ++drain)
         (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-    EXPECT_EQ(delivered, 1u);
-    EXPECT_EQ(active(), 0) << "no stranded holder, pump or later iteration";
-    const auto settled = Jobs.StepRuns().Observe(id);
-    EXPECT_TRUE(settled && !settled->SegmentInFlight && settled->Steps == 0u);
-    if (ended)
+    EXPECT_EQ(Count(Tokens), 1u) << "a ready run submits no ordering page before Run or Step";
+    for (int step = 0; step < 50 && observe(steppedId)->End == R::StepRunEnd::None; ++step)
     {
-        EXPECT_EQ(ended->Status, R::EditorCommandStatus::StaleEntity);
-        EXPECT_NE(ended->Message.find("cancelled"), std::string::npos) << ended->Message;
-        EXPECT_EQ(ended->StepRun, id);
+        ASSERT_TRUE(Control(Jobs, steppedId, R::StepRunAction::Step, 1u));
+        ASSERT_TRUE(rests(steppedId));
     }
-    EXPECT_TRUE(next) << "admitted, not refused as busy: " << refused.Message;
-    if (next)
-    {
-        const auto nextId = R::SnapshotEditorCoherentPointDrift(next).StepRun;
-        EXPECT_NE(nextId, 0u);
-        EXPECT_NE(nextId, id);
-        const auto ready = Jobs.StepRuns().Observe(nextId);
-        EXPECT_TRUE(ready && ready->Phase == R::StepRunPhase::Ready);
-    }
-    cleanup();
-    EXPECT_EQ(delivered, 1u) << "one terminal result for the cancelled run";
+    EXPECT_EQ(Count(Tokens), 2u) << "its first step ordered the subsample, later steps nothing";
+    ASSERT_TRUE(Control(Jobs, steppedId, R::StepRunAction::Accept));
+    ASSERT_TRUE(terminal(steppedId));
+    EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(stepped).Result.Succeeded())
+        << R::SnapshotEditorCoherentPointDrift(stepped).Result.Message;
+    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(stepped).Result.SubsampleTargetBackend, "gpu_vulkan_compute");
+    EXPECT_EQ(displacement("bcpd_stepped"), expected) << "single steps equal the batch";
+
+    // Two steps, a restart and a run: the restart begins a new generation and reuses the order.
+    const auto restarted = R::StartEditorCoherentPointDrift(
+        scene.Commands(), variant("bcpd_restarted", R::PointSamplingBackend::Vulkan), failure);
+    ASSERT_TRUE(restarted) << failure.Message;
+    const auto restartedId = R::SnapshotEditorCoherentPointDrift(restarted).StepRun;
+    ASSERT_TRUE(Control(Jobs, restartedId, R::StepRunAction::Step, 2u));
+    ASSERT_TRUE(rests(restartedId));
+    EXPECT_EQ(Count(Tokens), 3u);
+    ASSERT_TRUE(Control(Jobs, restartedId, R::StepRunAction::Restart));
+    ASSERT_TRUE(DrainUntil(
+        Jobs,
+        [&]
+        {
+            const auto o = observe(restartedId);
+            return o && o->Generation == 1u && o->Phase == R::StepRunPhase::Ready;
+        },
+        std::chrono::seconds{5}));
+    ASSERT_TRUE(Control(Jobs, restartedId, R::StepRunAction::Run));
+    ASSERT_TRUE(DrainUntil(
+        Jobs,
+        [&]
+        {
+            const auto o = observe(restartedId);
+            return o && o->End != R::StepRunEnd::None && !o->SegmentInFlight;
+        },
+        std::chrono::seconds{5}));
+    EXPECT_EQ(Count(Tokens), 3u) << "the restart reuses the device order: no second page";
+    ASSERT_TRUE(Control(Jobs, restartedId, R::StepRunAction::Accept));
+    ASSERT_TRUE(terminal(restartedId));
+    EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(restarted).Result.Succeeded())
+        << R::SnapshotEditorCoherentPointDrift(restarted).Result.Message;
+    EXPECT_EQ(displacement("bcpd_restarted"), expected) << "two steps, a restart and a run equal the batch";
+    EXPECT_TRUE(AllPulled) << "every ordering page was pulled by its worker";
+
+    // A computing run shut down: its first step ordered on the device, no page is held, one answer, no publication.
+    auto computing = variant("bcpd_shutdown", R::PointSamplingBackend::Vulkan);
+    computing.Execution.IterationCap = 10000u;
+    computing.Tolerance = 0.0;
+    const auto pending = R::ApplyEditorCoherentPointDriftCommand(scene.Commands(),
+        computing,
+        [&](R::EditorCoherentPointDriftResult result)
+        {
+            ++shutdownDeliveries;
+            shutdown = std::move(result);
+        });
+    ASSERT_EQ(pending.Status, R::EditorCommandStatus::Pending) << pending.Message;
+    ASSERT_TRUE(DrainUntil(
+        Jobs,
+        [&]
+        {
+            const auto o = observe(pending.StepRun);
+            return o && o->Steps >= 2u;
+        },
+        std::chrono::seconds{5}));
+    EXPECT_EQ(Count(Tokens), 4u);
+    EXPECT_FALSE(Waiting()) << "no page is held at the shutdown";
+    Jobs.Jobs().CancelAndDrain();
+    (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+    EXPECT_TRUE(R::IsTerminal(observe(pending.StepRun)->Phase));
+    EXPECT_EQ(shutdownDeliveries, 1u) << "one terminal result";
+    ASSERT_TRUE(shutdown);
+    EXPECT_FALSE(shutdown->Succeeded());
+    EXPECT_TRUE(displacement("bcpd_shutdown").empty()) << "a shutdown publishes nothing";
 }
 
 TEST_F(CpdBrokerWorkspaceReuse, StepsAndRunsReuseThePooledWorkspaceAndUploadEachTargetOnce)
