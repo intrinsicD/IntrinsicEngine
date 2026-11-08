@@ -1,8 +1,10 @@
 // Standalone point sampling (RUNTIME-274): orders one entity's points with a selectable
 // Geometry.PointSampling method and publishes the selection as undoable rank/selection
-// properties or as a new point-cloud entity. CPU runs are synchronous; the Vulkan backend
-// (RUNTIME-290, Runtime.PointSamplingGpu) runs as a framed GPU job and falls back to the CPU,
-// saying why, where it cannot run.
+// properties or as a new point-cloud entity. ARCH-023: with the session's step runs and job lane
+// both backends run as step runs (one selected sample is one step of exact farthest-point
+// sampling, any other method one step): the CPU on a worker, Vulkan (RUNTIME-290,
+// Runtime.PointSamplingGpu) as an owner-stepped GPU transaction that falls back to the CPU,
+// saying why, where it cannot run. Without them the CPU orders inline.
 module;
 #include <cstdint>
 #include <functional>
@@ -32,17 +34,29 @@ export namespace Extrinsic::Runtime
         std::string BackendDiagnostic{};
         std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
         std::string Message{};
+        // ARCH-023: the run's step run (run_control, run_observe); 0 for an inline run or a refusal. Steps: the
+        // logical steps of the published result (samples of exact farthest point, else 1).
+        std::uint64_t StepRun{};
+        std::uint32_t Steps{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status == EditorCommandStatus::Applied; }
     };
 
     [[nodiscard]] ActionReadiness PreviewEditorPointSamplingCommand(const EditorProcessingCommands&,
                                                                     const PointSamplingOperationConfig&);
-    // CPU runs return the final result. A Vulkan run with a job lane and device returns Pending
-    // and delivers the final result to `onComplete` (also called for immediate results). While a
-    // Vulkan run writes the same rank output, a property-output request (either backend) answers
-    // Pending "Point sampling already has an active ... job" without calling `onComplete`.
+    // The batch command (agent, scripts): runs at once and accepts at its end whatever the config's start and
+    // auto_accept. With the session's step runs and job lane it returns Pending and delivers the final result to
+    // `onComplete` (also called for immediate results); without them the CPU publishes at once. While a run writes
+    // the same rank output, a property-output request (either backend) answers Pending "Point sampling already has
+    // an active ... job" without calling `onComplete`.
     [[nodiscard]] EditorPointSamplingResult ApplyEditorPointSamplingCommand(
         const EditorProcessingCommands&, const PointSamplingOperationConfig&,
+        std::function<void(EditorPointSamplingResult)> onComplete = {});
+    // The interactive start: the step run with the config's start and auto_accept (ready by default: nothing is
+    // computed until run or step n). Pending with StepRun on success, which the shared controls drive (Stop keeps
+    // the samples so far, Accept publishes them once, Restart begins again); refused without the session's step
+    // runs and job lane.
+    [[nodiscard]] EditorPointSamplingResult StartEditorPointSampling(const EditorProcessingCommands&,
+        const PointSamplingOperationConfig&,
         std::function<void(EditorPointSamplingResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPointSamplingConfig(const EditorProcessingCommands&,
                                                                                const PointSamplingOperationConfig&,

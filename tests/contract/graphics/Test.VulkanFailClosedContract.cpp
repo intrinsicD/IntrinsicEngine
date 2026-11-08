@@ -274,6 +274,81 @@ TEST(VulkanFailClosedContract, QueueFamilyTokenResolverMapsAffinityTokens)
               5u);
 }
 
+// ARCH-023: readback tokens carry their transfer lane, and completion is judged against that lane's own
+// timeline only. A graphics token must not complete because the compute lane advanced, and vice versa.
+TEST(VulkanFailClosedContract, TransferLaneTokensCompleteOnlyOnTheirOwnLane)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+    const std::uint64_t graphics = VK::EncodeLaneTicket(VK::TransferLane::Graphics, 5u);
+    const std::uint64_t compute = VK::EncodeLaneTicket(VK::TransferLane::Compute, 5u);
+    EXPECT_EQ(graphics, 5u) << "graphics-lane tokens keep the plain timeline value";
+    EXPECT_NE(compute, graphics);
+    EXPECT_NE(compute, 0u);
+    EXPECT_EQ(VK::LaneOfTicket(graphics), VK::TransferLane::Graphics);
+    EXPECT_EQ(VK::LaneOfTicket(compute), VK::TransferLane::Compute);
+    EXPECT_EQ(VK::LaneTicketValue(compute), 5u);
+
+    // {graphics completed, compute completed}
+    EXPECT_FALSE(VK::IsLaneTicketComplete(graphics, {4u, 100u})) << "compute progress must not complete graphics";
+    EXPECT_FALSE(VK::IsLaneTicketComplete(compute, {100u, 4u})) << "graphics progress must not complete compute";
+    EXPECT_TRUE(VK::IsLaneTicketComplete(graphics, {5u, 0u}));
+    EXPECT_TRUE(VK::IsLaneTicketComplete(compute, {0u, 5u}));
+    EXPECT_TRUE(VK::IsLaneTicketComplete(0u, {0u, 0u})) << "the invalid token means nothing was submitted";
+}
+
+// ARCH-023: the method-compute lane uses the queue-affinity vocabulary: async compute is requested unless the
+// validated render.method_compute_graphics_queue setting forces graphics; missing hardware is a demotion.
+TEST(VulkanFailClosedContract, MethodComputeLaneReportsRequestedResolvedAndDemotion)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+    using Extrinsic::RHI::QueueAffinity;
+    const auto separate = VK::ResolveMethodComputeLane(true, false);
+    EXPECT_EQ(separate.Requested, QueueAffinity::AsyncCompute);
+    EXPECT_EQ(separate.Resolved, QueueAffinity::AsyncCompute);
+    EXPECT_FALSE(separate.Demoted);
+
+    const auto unavailable = VK::ResolveMethodComputeLane(false, false);
+    EXPECT_EQ(unavailable.Requested, QueueAffinity::AsyncCompute);
+    EXPECT_EQ(unavailable.Resolved, QueueAffinity::Graphics);
+    EXPECT_TRUE(unavailable.Demoted);
+
+    for (const bool available : {true, false})
+    {
+        const auto forced = VK::ResolveMethodComputeLane(available, true);
+        EXPECT_EQ(forced.Requested, QueueAffinity::Graphics);
+        EXPECT_EQ(forced.Resolved, QueueAffinity::Graphics);
+        EXPECT_FALSE(forced.Demoted) << "a configured graphics lane is not a fallback";
+    }
+}
+
+TEST(VulkanFailClosedContract, MethodComputeUsesASpareQueueBeforeSharingFrameCompute)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+    const auto dedicated = VK::SelectMethodComputeQueue(0u, 16u, 2u, 0u, 8u);
+    EXPECT_TRUE(dedicated.Available);
+    EXPECT_EQ(dedicated.Family, 2u);
+    EXPECT_EQ(dedicated.Index, 1u);
+    const auto sameFamily = VK::SelectMethodComputeQueue(0u, 3u, 0u, 1u, 3u);
+    EXPECT_TRUE(sameFamily.Available);
+    EXPECT_EQ(sameFamily.Family, 0u);
+    EXPECT_EQ(sameFamily.Index, 2u);
+    const auto graphicsSpare = VK::SelectMethodComputeQueue(0u, 2u, 2u, 0u, 1u);
+    EXPECT_TRUE(graphicsSpare.Available);
+    EXPECT_EQ(graphicsSpare.Family, 0u);
+    EXPECT_EQ(graphicsSpare.Index, 1u);
+    const auto shared = VK::SelectMethodComputeQueue(0u, 1u, 2u, 0u, 1u);
+    EXPECT_TRUE(shared.Available);
+    EXPECT_EQ(shared.Family, 2u);
+    EXPECT_EQ(shared.Index, 0u);
+    const auto noGraphicsCompute = VK::SelectMethodComputeQueue(0u, 0u, 2u, 0u, 1u);
+    EXPECT_EQ(noGraphicsCompute.Family, 2u);
+    EXPECT_EQ(noGraphicsCompute.Index, 0u);
+    const auto onlyGraphics = VK::SelectMethodComputeQueue(0u, 1u, 0u, 0u, 0u);
+    EXPECT_FALSE(onlyGraphics.Available);
+    EXPECT_EQ(onlyGraphics.Family, 0u);
+    EXPECT_EQ(onlyGraphics.Index, 0u);
+}
+
 TEST(VulkanFailClosedContract, FrameGraphBarrierFamiliesCollapseUnderGraphicsOnlyProfile)
 {
     namespace VK = Extrinsic::Backends::Vulkan;

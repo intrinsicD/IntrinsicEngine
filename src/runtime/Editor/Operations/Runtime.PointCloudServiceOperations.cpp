@@ -16,6 +16,7 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.StepRunExecution;
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorPendingGpuOutput.hpp"
@@ -89,7 +90,8 @@ namespace Extrinsic::Runtime
         auto request = command;
         request.AttachmentActive = context.AttachmentActive;
         // Only an auto-accepted run commits on its own; a run awaiting the panel's Accept is committed by the user.
-        if (context.CommandHistory != nullptr && request.AutoAccept) request.LabelPrefix = context.CommandHistory->LabelPrefix();
+        if (context.CommandHistory != nullptr && request.Parameters.Execution.AutoAccept != StepRunAutoAccept::Never)
+            request.LabelPrefix = context.CommandHistory->LabelPrefix();
         result.Correlation = clustering->RunKMeans(std::move(request));
         result.Status = KMeansRunStatus::Queued;
         result.Message = "K-Means runtime job queued.";
@@ -134,7 +136,8 @@ namespace Extrinsic::Runtime
         }
 
         request.AttachmentActive = context.AttachmentActive;
-        if (context.CommandHistory != nullptr && request.AutoAccept) request.LabelPrefix = context.CommandHistory->LabelPrefix();
+        if (context.CommandHistory != nullptr && request.Config.Execution.AutoAccept != StepRunAutoAccept::Never)
+            request.LabelPrefix = context.CommandHistory->LabelPrefix();
         result.Correlation = consolidation->Run(std::move(request));
         if (!result.Correlation.IsValid())
         {

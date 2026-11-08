@@ -171,7 +171,7 @@ Averaging, spectral heat, Taubin, bilateral and conjugate-gradient implicit
 smoothing also run on Vulkan (`backend` 1, `vulkan_compute`); direct (Cholesky)
 implicit smoothing and the variational fit are CPU-only and the validator rejects
 a Vulkan request for them. Admission needs an
-operational device with shader double precision, the framed spatial-index GPU
+operational device with shader double precision, the spatial-index GPU
 queue and editor jobs; there is no hidden CPU fallback, and the result reports
 the requested and actual backend.
 
@@ -199,15 +199,30 @@ the kernels gather the input from the property's canonical residency slot
 property's ring in its own scalar type, with a float presentation ring beside a
 double output. The renderer binds the ring front as the colormap scalar while
 the appearance shows the output, so the preview is visible before anything
-reaches the CPU. Interactively (`StartEditorPropertySmoothing`, the panel's
-Smooth Property button with the Vulkan backend) the finished or stopped run
-waits for **Accept** (one readback in the property's precision, the undoable
-publication, then the front becomes the canonical slot of the new revision so
-the next run uploads nothing) or **Discard** (nothing published, ring
-released). Stop ends a chunked implicit solve after its current chunk and
-offers its latest preview. A result whose inputs changed while it waits is
-stale: Accept is refused with the reason and only Discard remains.
-`ApplyEditorPropertySmoothingCommand` (batch, agent) accepts automatically.
+reaches the CPU. ARCH-023: every run, either backend, is a step run of the
+session's `StepRunsService` (results and agent answers carry its id, `run`); one
+step is one explicit pass, or one backward-Euler time step over every channel
+(its chained CG solves are bounded submission chunks, not steps), and the cap is
+`iterations` (the variational fit is one step solved whole). The shared
+execution options `preview_every`, `preview_interval_ms`, `auto_accept` and
+`start` are config fields. Interactively (`StartEditorPropertySmoothing`, the
+panel's Smooth Property button) the run starts ready (nothing computed) and the
+shared row runs, pauses or steps it: Run records the allowed passes in the same
+bounded submissions as one Step at a time would, a pause or stop takes effect
+at a step boundary (an implicit time step in progress completes), and a
+latest-complete step is stored into the output ring only when live preview
+takes it, at rest, or for Accept (preview off stores once, at Accept). The
+stopped or ended run waits for **Accept** (one readback in the property's
+precision, the undoable publication, then the front becomes the canonical slot
+of the new revision so the next run uploads nothing), **Discard** (nothing
+published, ring released after its completions) or **Restart** (the captured
+input again, a fresh ring generation). Its workspaces stay leased until then.
+An input or output edited while the run computes or waits discards it.
+`ApplyEditorPropertySmoothingCommand` (batch, agent) runs at once and accepts
+at its end. The CPU counterpart steps on a worker through
+`Geometry::Smoothing::PropertyFilterRun` (`FilterProperty` is its Begin, steps
+and Finish) with the same controls and no live preview; without the step-run
+service or job lane (headless callers) it filters and publishes inline.
 Implicit smoothing seeds its chained solves from the canonical slot on the
 device; the CPU stage that remains (ADR 0030 decision 8) is the assembly of the
 right-hand-side diagonal (mass) and the fixed-row coupling
@@ -218,8 +233,9 @@ operator, weights and the graph are CPU-built inputs of every backend, rebuilt
 from the captured inputs and written again by every run; no operator is cached
 across runs. The device workspaces (`PropertyFilterWorkspace`,
 `SparseConjugateGradientWorkspace`) are leased from
-`SpatialIndexCache::LeaseGpuWorkspace`: a run keeps the pipeline and buffers of a
-retired workspace, replaces only an undersized buffer, zeroes its solver reports
+`SpatialIndexCache::LeaseGpuWorkspace`: a run keeps the pipeline of a retired
+workspace, takes its buffers from the method scratch cache (growing only an
+undersized one within the run), zeroes its solver reports
 and uploads its own row map and restore mask, and returns the workspaces when its
 last submission completed (a cancelled or failed run with work still queued keeps
 them until its recorders are released).
@@ -246,7 +262,7 @@ matrix once on the CPU with fixed rows eliminated, and every step and channel so
 this assembly. `Graphics.SparseConjugateGradient` (RUNTIME-269) runs the chained
 solves as device Jacobi-preconditioned CG mirroring `Sparse::SolveCG` step by step:
 the same stopping rule `|r| <= tol * max(|b|, 1)`, breakdown and non-finite codes
-and iteration counting. It records at most 2048 dispatches per framed submission,
+and iteration counting. It records at most 2048 dispatches per compute-lane submission,
 reads each chunk's status back and skips iterations of solves that finished, so
 the loop stays on the device without oversized command buffers. SpMV sums rows in
 column order like the CPU; dot products use a deterministic workgroup tree, so

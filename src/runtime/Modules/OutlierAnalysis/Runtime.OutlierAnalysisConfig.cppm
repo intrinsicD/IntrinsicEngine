@@ -1,4 +1,5 @@
-// Persisted statistical/radius/distance-ratio detection and explicit marked-point removal controls.
+// Persisted statistical/radius/distance-ratio detection and explicit marked-point removal controls, with the one-shot
+// run options (auto_accept and start) its interactive and agent starts use.
 module;
 #include <array>
 #include <cstdint>
@@ -10,6 +11,7 @@ module;
 export module Extrinsic.Runtime.OutlierAnalysisConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Extrinsic.Runtime.DerivedConfigSections;
+export import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
@@ -32,6 +34,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t KNeighbors{16}, MinimumNeighbors{4}, GpuQueryBatchSize{4096};
         float StdDevMultiplier{1}, Radius{1}, ScoreThreshold{2};
         bool Negative{};
+        // ARCH-023: the one-shot options of an interactive or agent start (rows auto_accept and start; one step, no
+        // live preview): by default every one-shot's, ready and waiting for Accept. A batch (Apply, a waiting agent
+        // call) runs at once and accepts at its end whatever they say.
+        StepRunExecution Execution{kOneShotStepRunExecution};
     };
     // RUNTIME-354: the section declared once (rows bound to the record, the codec derived from them),
     // keeping the hand-written codec's messages, stage order and conversions (its golden pins them);
@@ -51,6 +57,7 @@ export namespace Extrinsic::Runtime
     {
         return false;
     }
+    inline constexpr auto kOutlierAnalysisExecutionRows = BindStepRunExecution<&OutlierAnalysisConfig::Execution>(1u);
     inline constexpr std::array kOutlierAnalysisRows{
         Bind<&OutlierAnalysisConfig::StableEntityId>(
             {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."}),
@@ -126,6 +133,8 @@ export namespace Extrinsic::Runtime
             .Description = "Score.",
             .RefKinds = kOutlierAnalysisFloatKind,
             .AnyScalar = true}),
+        kOutlierAnalysisExecutionRows[3], // auto_accept
+        kOutlierAnalysisExecutionRows[4], // start
     };
     inline constexpr auto kOutlierAnalysisFields = SpecsOf(kOutlierAnalysisRows);
     inline constexpr DerivedConfigSection<OutlierAnalysisConfig> kOutlierAnalysisSection{

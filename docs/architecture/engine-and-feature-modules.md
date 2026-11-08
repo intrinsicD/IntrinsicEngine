@@ -210,13 +210,27 @@ an external solver owns the inner loop, the step boundary is the outer loop.
 **Lifetime and the buffer cache.**
 - A run's buffers live until **Accept**, **Reset** or **accept on convergence** (an option per
   algorithm).
-- Then they are parked in the host's buffer cache, keyed by size class and usage, instead of being
-  destroyed.
-- When the cache needs room for its memory budget, the least recently used parked buffers are
-  destroyed first. Buffers of an active run are pinned and never evicted; if the budget cannot be
-  met, a new run is refused with a reason.
-- A GPU buffer is reused only after its fence has signalled.
-- The cache holds raw buffers, never types from a plugin, so it survives a plugin reload.
+- Then they are parked in the host's buffer cache instead of being destroyed. The cache is
+  `SpatialIndexCache::MethodScratch()`, an `RHI::BufferManager` whose `CreateScratch` leases are
+  matched by power-of-two size class (64 bytes and up), usage and memory kind. `GetDesc`/`View`
+  report the requested size; reused contents are undefined.
+- A parked buffer moves Returned → Pending → Idle. It is reused only once the shared retirement
+  stamp passed: the frames in flight plus one retired (graphics-queue uploads and readbacks precede
+  that frame's fence in submission order) and the compute-lane fence then current completed.
+- Leased, returned, pending and idle bytes all count toward
+  `render.gpu_method_buffer_budget_megabytes`. Only idle buffers are evicted, least recently used
+  first. A request that still does not fit is refused with `ResourceBudgetExceeded` before any
+  device call; the run fails with the byte counts and publishes nothing. `SpatialIndexCacheStats`
+  reports the bytes per state, hits, misses, refusals and evictions.
+- Typed workspaces from `LeaseGpuWorkspace` keep their pipelines while parked and give their
+  buffers back (`ReleaseScratch`) when the owner thread stamps them, with the same stamp.
+- The cache holds raw buffers and host-owned values, never types, callbacks or names from a
+  plugin, so it survives a plugin reload. Each engine run owner explicitly instantiates its
+  workspace kinds through the private `Extrinsic.Runtime.Private.WorkspaceLease` module;
+  the cache owns no registry of method types. Plugin-owned state may lease raw scratch from
+  `MethodScratch()` and must drop it before its plugin unloads.
+- Property residency keeps its own budget; per-entity spatial index storage is outside both and
+  reported as `IndexDeviceBytes`. Graphics-owned buffers (texture bake) stay on the renderer.
 
 **Observation.** Each algorithm has a **live preview** checkbox, on by default for iterative ones.
 Off means no intermediate copies at all; the result is identical.
@@ -242,14 +256,112 @@ is the run driver: the owner gives `Step` (a worker, one iteration), `Preview`, 
 holder job that stays parked by its readiness gate until the run ends, so a paused run keeps its output, has its Jobs
 row and is cancelled by the Jobs window and an unload drain, and whose gate is the run's main-thread pump; and segment
 jobs joined to it, the worker loop that checks the controls between `Step` calls. The transition table is at the top
-of the module. MCP: `run_control` (run, pause, step n, stop, accept, discard) and `run_observe`; waiting for a
-condition is not there yet. Its contract tests are `tests/contract/runtime/Test.StepRuns.cpp`.
+of the module. MCP: `run_control` (run, pause, step n, stop, accept, discard, restart) and `run_observe`; waiting
+for a condition is not there yet. Its contract tests are `tests/contract/runtime/Test.StepRuns.cpp`.
+ARCH-023 makes it the one control owner of GPU method runs.
+
+- **Shared execution options.** `StepRunExecution` (`Extrinsic.Runtime.StepRunExecution`) is one struct with one
+  field table (`StepRunExecutionFields`, the method's own iteration limit) and one check
+  (`StepRunExecutionRefusal`): `max_iterations` (the logical iteration cap), `preview_every` (0: no live preview),
+  `preview_interval_ms` (0: no time limit), `auto_accept` (`never`, `converged`, or `end`: at convergence or the cap)
+  and `start` (`ready`: initialized, nothing computed until run or step n; `run`). `StepRunOptions::Execution`
+  carries it; `sandbox.clustering` (K-Means parameters) and `sandbox.point_cloud_consolidation` embed it under those
+  names through one codec reader and encoder (`Runtime.FeatureConfigCodecs.Detail.cpp`); a derived plugin section
+  binds the rows to its member with `BindStepRunExecution` (the bilateral filter all five, the one-step descriptor
+  analysis `auto_accept` and `start` only); every start tool (the CPD, bilateral, descriptor and scalar plugins',
+  `start_kmeans`, `start_point_cloud_consolidation`) takes them through the one reader and schema of the leaf
+  `Extrinsic.Runtime.StepRunExecution` (`ReadStepRunExecutionArguments`, `StepRunExecutionSchemaProperties`), and
+  panels edit them with `DrawStepRunExecutionOptions` (preview rows only where the path previews, no cap for a
+  one-step run). Every consolidation backend uses the shared step-run execution options; the agent's waiting `run_kmeans`,
+  `run_point_cloud_consolidation`, `bilateral_filter` and `descriptor_analysis` run at once and accept at the end
+  whatever the section says, and the start tools (`start_kmeans`, `bilateral_filter_start`,
+  `descriptor_analysis_start`) answer the run id at once.
+- **Stop and automatic Accept.** Stop ends a run at the next boundary and keeps its state; a stopped run waits for
+  Accept or Discard and is never accepted on its own (`auto_accept` applies to convergence and the cap only).
+- **Restart.** `run_control` restart calls the owner's `StepRunCallbacks::Restart` initializer once nothing of the
+  run is in flight: generation + 1 from step 0, computing when the run starts running or was running (not a step n),
+  else ready; copies of the older generation are never shown and a refused initializer changes nothing. K-Means
+  (from its initial centroids on either backend, a Vulkan run also after it prepared final labels, before Accept),
+  in-place LOP (uploads its input again), the CPD plugin (its solver from the captured clouds), the bilateral filter
+  (its captured positions) and the descriptor analysis (its capture, the rows queried again) give one; scalar, normal and outlier one-shot transactions reset through their typed restart initializer.
+- **Controls.** `Extrinsic.Runtime.StepRunControls` is the host's one Run/Pause/Step n/Stop/Restart/Accept/Discard
+  row (`DrawStepRunControls`); its buttons call `StepRunsService::Control`, the call `run_control` makes. The
+  Sandbox's `DrawGpuTransactionControls` draws it for a row with a step run (K-Means, LOP, scalar, outliers,
+  normals), the K-Means panel draws it for a CPU run, and the CPD, bilateral and descriptor plugin windows use it.
+- **Owners.** LOP, WLOP and the bilateral filter's and descriptor analysis' Vulkan hybrids
+  step on workers; the plugins use a job gate joined to the run's holder
+  (`PluginStepRunJobs(holder)`). The CPU K-Means reference (`Geometry.KMeans` Lloyd steps) and the plugins' CPU
+  backends step on a worker. A module's run uses `EditorStepRunJobs`; an owner's Discard callable names an ended
+  run's status with `UncommittedStatus`. `MayPreview` only says a live preview may be made now; the owner calls `Previewed` once
+  its copy is submitted (a busy ring that drops the copy counts nothing). `Publishing` is asked at the real
+  publication boundary: false when the run ended first (a discard won), so nothing publishes. `Abandon` ends a run
+  whose owner state is destroyed (its module shuts down with a page in flight) and drops the owner's callables.
+- **GPU worker steps (ARCH-023).** Resident K-Means' `Step` runs on the run's worker: the existing page planner
+  records into `IDevice::SubmitComputeReadback` (any thread) with a `ReadbackSink::Pull()` sink, the worker waits for
+  its own page with `ITransferQueue::WaitCompute` and takes the page's few metric bytes with `TakeCompletedReadback`
+  (an abandoned step calls `ReleaseReadback`; the render thread never consumes pulled bytes), so iterations
+  complete without a frame, drain or present. The owner keeps live ECS, residency, publication and every resource
+  allocation and release on the main thread; the worker gets captured views, prepared pipelines, the leased workspace
+  and immutable configuration. A GPU `Preview` copies into a device slot the owner offered through a
+  `StepPreviewMailbox` and returns false (no copy, nothing counted) when none is free; it sets `StepPreview::Fence`,
+  and the owner's `Show` answers Later until that fence completed. A worker run's `Commit` may answer Pending (labels
+  read back): the run stays Accepting after its holder ended and the owner's `CommitFinished` decides it, also
+  settling it after a discard won first. LOP, CPD, smoothing and the query-based plugins use this same worker
+  submission seam; the resident preview example is LOP's `WorkerStep`/`WorkerPreview`/`Show` in
+  `Runtime.PointCloudConsolidationGpu.cpp`. Runtime CPD with a Vulkan subsample backend retains
+  its owner-driven iteration pump (RUNTIME-355), as recorded in the method coverage matrix.
+- **One-shot controls.** Scalar, normal and outlier transactions can start ready without recording device work,
+  stop with a completed result retained, and restart with a fresh ring generation, recording again into the input
+  views and workspaces the run holds until it ends. Their CPU backends are one-shot worker step runs
+  (`StartOneShotWorkerRun`; the scalar plugins through `PointCloudEditingService::StartScalarCpuRun`, outliers,
+  normals and the keypoint CPU and Vulkan LBVH backends through `MeshSupport::StartOneShotCpuRun`, the descriptor
+  plugin directly) with the same controls. The sections bind the one-shot rows `auto_accept` and `start`, which
+  interactive and agent starts read; batch Apply entry points run and accept automatically; automatic Accept never
+  overrides Stop. One default for every one-shot (an ARCH-023 implementation choice under the operator's Q6/Q7/Q9
+  request for one lifecycle with identical controls on every backend; the operator did not choose `ready` itself):
+  `kOneShotStepRunExecution`, ready and waiting for Accept, for every section and interactive start; a batch is `kOneShotBatchExecution` (run at once, accept at the end); both live in `Extrinsic.Runtime.StepRunExecution`
+  with `OneShotExecution`. So the CPU panels, plugin windows and the normals, outliers, descriptor and scalar plugin
+  sections, which computed at once before, now start ready (Run or Step computes, Accept publishes), as their GPU
+  paths do.
+- **The settled end.** `StepRunCallbacks::Finished` runs once, on the main thread, after the run is terminal, nothing
+  of it is in flight and its holder job finished: the output is free again. The owner's `Discard` still runs at once
+  (a GPU page is aborted, previews released), but a one-shot delivers its result (`OneShotWorkerCallbacks::Ended`,
+  `ScalarCpuRun::Finish`) only at the settled end, so it never frees or reports what a held worker still reads, and a
+  new run on the same output is admitted from there; the bilateral filter and ICP end their uncommitted runs there too. A holder whose cancel is refused (a detached surface) completes
+  once nothing is in flight. Finished gets the run's final observation from the run itself (`StepFailed`: a step
+  answered Failed), is never called from inside `Discard`, and is dropped uncalled by `Abandon` or a refused start. A
+  start of the same output from inside it is admitted on the cancel path; after a publication its holder is still
+  the completing job, so such a start may be refused as busy until Finished returned. A one-shot's step run holds its transaction until the run
+  ends, and every Accept passes `GpuTransactionCurrent`, which includes the editor session's attachment.
+- **GPU transactions.** A `GpuTransactionCore` transaction with a Run job (scalar analysis, normals, outliers) is a
+  one-step run of `EditorProcessingContext::StepRuns` and is refused without the service:
+  run_control's Accept and Discard reach `BeginGpuTransactionAccept` and `DiscardGpuTransaction`, and any Accept the
+  transaction starts itself is the run's one Commit (`StepRunDriver::Committing`). Results and agent answers carry
+  its run id under the one key `run`. Accept-only transactions (K-Means' and LOP's publications) have no run of their own; LOP binds
+  its run's `Publishing` into the GPU-position Accept (`AcceptEditorGpuPositionRun`'s `publishing`). An
+  owner-stepped transaction (`GpuTransactionCore::OwnerSteps`; no producer uses it since ARCH-023) takes its
+  method's `Execution` and counts its own logical steps
+  (`GpuTransactionStepAllowance`, `GpuTransactionStepped`, batched with `StepRunDriver::Allowance` and
+  `Stepped(..., count)`); its Run job lasts until the run's Commit, which ends it once the latest complete step is
+  resident, and its Restart hook renews the rings (`RestartGpuTransactionRings`). A worker-stepped transaction
+  (ARCH-023, `GpuTransactionCore::Pages`: smoothing and farthest-point sampling as `GpuTransactionKind::Iterative`, their `Execution` whole; the scalar,
+  normal and outlier one-shots and the resident keypoint producer of `SubmitEditorPointScalarRun`, whose index-bound
+  kernels record against a `SpatialIndexCache::PrepareGpuIndex` lease) has its Init on the main thread
+  (`Hooks.Prepare`, once the run computes; `StepRunCallbacks::Prepared` holds the segment until then) and its steps
+  on the step run's worker (`Hooks.Step`, optionally `StepBatch`), each submitting and waiting for its own pages
+  through `Runtime.WorkerGpuPages.hpp`; Release seals the pages and stamps the slots they used with the compute
+  fence before the views go. A metric log holds at most
+  `kMaxStepRunMetricRecords` records; every step still counts.
+- **Lifetime.** The host drains its jobs before it shuts the modules down, and module objects outlive every
+  `OnShutdown`; resident GPU states abandon their runs in their destructors, a plugin unload drains the plugin's jobs
+  and its retired runs keep no callable of it.
 The CPU case is the plugin `plugins/coherent_point_drift`: coherent point drift (the CPU reference solver, rigid)
 moves a source cloud onto a target one step per `Step` in world space (each unparented cloud mapped by its local
 Transform, captured with `CaptureTransform`; the source's result mapped back by the full affine inverse), shows the
 moving source through the point-cloud editing service's `PreviewPositions` (a CPU-made front of the positions'
 residency ring, which the renderer draws; released by `DiscardPreview` and before `Publish`), and Accept publishes the
-positions with one undo entry. It runs beside the editor's built-in CPD until that feature migrates. The editing
+positions with one undo entry. It runs beside the editor's built-in CPD, which uses the same step-run lifecycle as an
+owner-driven run (one EM iteration per step, its own variants, E-steps and publications). The editing
 service's `Current` and publications also require the capture's world to be the active one and, with
 `CaptureTransform`, the Transform unchanged and the entity unparented; an empty normal name takes the positions alone.
 Tests: `tests/contract/runtime/Test.CoherentPointDriftPlugin.cpp` and the Vulkan smoke
@@ -406,6 +518,15 @@ count and its text (density weights need one sample), and the plugin derives an 
 GPU start. Its engine module, its hand-written codec, `run_operation` row, panel and redirects are gone, and with
 them the operation runtime's point scalar shape (outliers are its last user). The three scalar plugins share their
 run bookkeeping (`PluginRunBook` in the plugin contract).
+
+**State (ARCH-023):** every scalar plugin run is a one-shot step run: the service's GPU run, or its CPU run
+(`StartScalarCpuRun`, a worker step run whose holder is a plugin job on the output and whose validity includes the
+editor session). The sections bind the one-shot rows `auto_accept` and `start`; the plugin windows edit them and
+draw the host's run-control row (`DrawScalarAnalysisControls`, the actions `run_control` issues) for either backend.
+The tools take the same `start` and `auto_accept` arguments (`RunScalarPluginTool`): without them the call is the
+waiting batch (`kOneShotBatchExecution`); each one named replaces the section's own (the section's other option
+stays), and a run that then does not run at once and accept by itself answers at once with its run id `run`, on every
+backend.
 
 **Open, for the first plan** (`ARCH-022`):
 1. **Numeric targets for R4 and R6**: set on 2026-10-31 (table above).

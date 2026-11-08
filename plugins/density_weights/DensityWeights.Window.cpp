@@ -53,25 +53,13 @@ namespace Intrinsic::Plugins::DensityWeights
             if (!r.Message.empty()) ImGui::TextWrapped("%s", r.Message.c_str());
         }
 
-        // A run not yet ended: a Vulkan run's preview with Accept and Discard, a CPU run with Cancel.
+        // A run not yet ended: the host's run-control row (CPU and Vulkan alike).
         void DrawActive(Run& run)
         {
             Refresh(run);
             if (run.Final) return;
             ImGui::TextWrapped("Into '%s': %s", run.Pending.Weights.Name.c_str(), run.Pending.Message.c_str());
-            if (!run.Analysis)
-            {
-                if (ImGui::Button("Cancel")) (void)Cancel(run);
-                return;
-            }
-            const auto state = run.Analysis.Poll();
-            ImGui::BeginDisabled(!state.CanAccept);
-            if (ImGui::Button("Accept")) Accept(run);
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (ImGui::Button("Discard")) (void)Cancel(run);
-            if (state.Phase == R::ScalarAnalysisPhase::ReadyToAccept && !state.CanAccept && !state.AcceptRefusal.empty())
-                ImGui::TextWrapped("%s", state.AcceptRefusal.c_str());
+            R::DrawScalarAnalysisControls(run.Analysis, run.Pending.StepRun, {}, run.Row);
         }
 
         void Draw(bool& open)
@@ -125,6 +113,8 @@ namespace Intrinsic::Plugins::DensityWeights
                                    "changing the output and suggests a smaller radius. Subnormal coordinate components "
                                    "are unsupported.");
             }
+            // One step, no live preview: Accept and start alone (no inert control), as the section's rows.
+            (void)R::DrawStepRunExecutionOptions("DensityWeights", draft.Execution, 1u, true, false);
             if (ImGui::Button("Apply settings"))
             {
                 std::string error;
@@ -139,7 +129,8 @@ namespace Intrinsic::Plugins::DensityWeights
             // Run uses the applied settings, as the MCP tool does.
             const std::string reason = active ? Preview(*active) : "The section is invalid.";
             ImGui::BeginDisabled(!reason.empty());
-            if (ImGui::Button("Compute compact weights")) (void)Start(*active, false);
+            if (ImGui::Button("Compute compact weights"))
+                (void)Start(*active);
             ImGui::EndDisabled();
             if (!reason.empty()) ImGui::TextWrapped("Not ready: %s", reason.c_str());
             // A copy: Accept, Discard and Cancel change the plugin's list of active runs.
@@ -150,8 +141,10 @@ namespace Intrinsic::Plugins::DensityWeights
                 DrawActive(*runs[i]);
                 ImGui::PopID();
             }
-            ImGui::TextWrapped("Vulkan previews compact weights using double kernel sums. Accept publishes with Undo; "
-                               "Discard retains CPU rows.");
+            ImGui::TextWrapped(
+                "Every backend computes one step a run (Run or Step); Vulkan previews compact weights using double "
+                "kernel sums. Accept publishes with Undo; Discard retains the property; Restart computes again from "
+                "the same input.");
             if (editing != nullptr && ImGui::Button("Show weights"))
             {
                 std::string diagnostic;

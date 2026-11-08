@@ -52,8 +52,10 @@ and entity provenance remain intact.
 The Sandbox section `sandbox.normal_estimation` has schema
 `intrinsic.runtime.sandbox.normal_estimation`, version 1. Its payload includes
 entity, method, backend, full Position/Output references, neighborhood size,
-radius, orientation, fallback normal, mesh weighting, numerical tolerances and
-`gpu_query_batch_size` (default 4096, range 1..16384).
+radius, orientation, fallback normal, mesh weighting, numerical tolerances,
+`gpu_query_batch_size` (default 4096, range 1..16384) and the shared one-shot rows
+`auto_accept` (default `never`) and `start` (default `ready`, every one-shot's: the panel's CPU start computes on
+Run or Step and waits for Accept, as its Vulkan transaction does).
 For example, a payload can bind face centers as follows (omitted controls use
 schema defaults):
 
@@ -80,9 +82,16 @@ preserved. Invalid edits never replace the active config.
 
 `Extrinsic.Runtime.NormalOperations` exposes commands through the generic
 `EditorProcessingCommands` handle and copies results through
-`PrepareEditorNormalFrame`. Its implementation runs copied CPU jobs through JobService
-when composed, with a synchronous path for CPU direct/headless callers. Vulkan
-requests require the framed cache, a float64-capable device and JobService. The
+`PrepareEditorNormalFrame`. ARCH-023: every backend runs as a one-shot step run of the
+session's step-run service: the CPU backends as a worker step run
+(`MeshSupport::StartOneShotCpuRun`, one step, Accept publishing once), Vulkan as its
+transaction. `ApplyEditorNormalEstimationCommand` is the batch (it computes at once and
+accepts at its end); `StartEditorNormalEstimationRun` and
+`StartEditorConfiguredNormalEstimation` use the section's `auto_accept` and `start`, as the
+panel and `run_operation` with `wait: false` do, and answer with the run's id. Without the
+step-run service the CPU batch runs as one queued job, and a synchronous path serves CPU
+direct/headless callers without a job lane; a ready start is refused there. Vulkan
+requests require the spatial-index GPU queue, a float64-capable device and JobService. The
 resident PCA kernel computes neighborhoods, covariance and normals on the device;
 a terminal job waits for Accept/Discard. Workers do not wait on GPU fences. Worker code does
 not access live property containers. Publication checks entity identity and the
@@ -191,7 +200,7 @@ fails the whole result before publication. Radius queries return capacity+1 imme
 on overflow; scalar/outlier queries still count every dense neighbor. Complete rows
 are heapsorted by source index, then by distance/index for PCA, preserving the
 reference order. Pages clamp `gpu_query_batch_size` to 64..4096 rows for both modes (a configured
-value of 1 still exercises the smallest dispatch chunk). Each page is a separate framed
+value of 1 still exercises the smallest dispatch chunk). Each page is a separate compute-lane
 compute submission; the next is queued only after completion/readback of the previous
 page. Scratch is reused and diagnostics accumulate across pages; output is published
 only once, after every page succeeds. Cancellation, staleness or overflow discards the

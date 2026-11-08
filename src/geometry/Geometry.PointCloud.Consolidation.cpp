@@ -2574,7 +2574,7 @@ namespace Geometry::PointCloud::Consolidation
 
     std::span<const glm::vec3> NeighborhoodProjection::Positions() const noexcept
     {
-        return m_Impl->Projected;
+        return m_Impl->CurrentPhase == ProjectionPhase::Finished ? m_Impl->Output.Positions : m_Impl->Projected;
     }
 
     bool NeighborhoodProjection::NeedsAttraction() const noexcept
@@ -2592,6 +2592,21 @@ namespace Geometry::PointCloud::Consolidation
     bool NeighborhoodProjection::IncludesSelf() const noexcept
     {
         return m_Impl->Output.Diagnostics.UsedDensityWeighting;
+    }
+
+    const Diagnostics& NeighborhoodProjection::CurrentDiagnostics() const noexcept
+    {
+        return m_Impl->Output.Diagnostics;
+    }
+
+    std::span<const glm::vec3> NeighborhoodProjection::Normals() const noexcept
+    {
+        return m_Impl->CurrentPhase == ProjectionPhase::Finished ? m_Impl->Output.Normals : m_Impl->ProjectedNormals;
+    }
+
+    Status NeighborhoodProjection::State() const noexcept
+    {
+        return m_Impl->Output.State;
     }
 
     void NeighborhoodProjection::Advance(

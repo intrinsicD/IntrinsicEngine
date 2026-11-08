@@ -12,6 +12,7 @@ export module Extrinsic.RHI.TransferQueue;
 
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+export import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Transfer;
 
 // ============================================================
@@ -38,13 +39,17 @@ import Extrinsic.RHI.Transfer;
 //     and deliver bytes later through a ReadbackSink from CollectCompleted().
 //   IsComplete — safe from any thread (atomic read).
 //   CollectCompleted — render thread only, once per frame, after
-//     EndFrame().  This is the only call that waits on GPU state.
+//     EndFrame().  Retires staging and delivers sinks; it never waits.
+//   WaitCompute / TakeCompletedReadback / ReleaseReadback — any thread (ARCH-023):
+//     a method worker waits, bounded, for its own submission and consumes (or
+//     gives up) its pulled readback (ReadbackSink::Pull) without the render
+//     thread or a frame. Ordinary sinks run only from CollectCompleted.
 //
 // Invariant (matches src/ async-upload guarantee):
 //   No caller thread ever blocks on a GPU fence inside
 //   UploadBuffer / UploadTexture / UploadTextureFullChain / DownloadBuffer /
-//   DownloadTexture. Fence waiting happens exclusively inside CollectCompleted()
-//   on the render thread.
+//   DownloadTexture. The only wait is WaitCompute's, bounded by its timeout and
+//   on the caller's own token.
 // ============================================================
 
 export namespace Extrinsic::RHI
@@ -64,6 +69,9 @@ export namespace Extrinsic::RHI
     {
         std::span<std::byte> Destination{};
         ReadbackCallback Callback{};
+        // ARCH-023: the submitter pulls the bytes itself (ITransferQueue::TakeCompletedReadback, any thread) or gives
+        // them up (ReleaseReadback). CollectCompleted never delivers, copies or drops a pulled readback.
+        bool Pulled{false};
 
         [[nodiscard]] static ReadbackSink CopyTo(std::span<std::byte> destination)
         {
@@ -75,9 +83,14 @@ export namespace Extrinsic::RHI
             return ReadbackSink{.Callback = std::move(callback)};
         }
 
+        [[nodiscard]] static ReadbackSink Pull()
+        {
+            return ReadbackSink{.Pulled = true};
+        }
+
         [[nodiscard]] bool IsValidForSize(std::uint64_t sizeBytes) const noexcept
         {
-            return Callback || Destination.size_bytes() == static_cast<std::size_t>(sizeBytes);
+            return Pulled || Callback || Destination.size_bytes() == static_cast<std::size_t>(sizeBytes);
         }
 
         void Deliver(std::span<const std::byte> bytes) const
@@ -102,6 +115,54 @@ export namespace Extrinsic::RHI
         std::uint64_t ReadbackSlotsUncached = 0;
         // Downloads whose copy into their staging slot was followed by a transfer-write to host-read barrier.
         std::uint64_t ReadbackHostBarriers = 0;
+        // ARCH-023: where IDevice::SubmitComputeReadback runs. Requested is async compute unless configuration
+        // forces graphics; Demoted when no async compute queue exists. Resolved is the actual lane.
+        QueueAffinityResolution ComputeLane{};
+        // True when hardware/configuration forces method work to share the framegraph's compute queue.
+        bool ComputeSharesFrameComputeQueue = false;
+        // True when method compute submits under the host lock of a frame queue (graphics, present, frame compute or
+        // transfer): a blocked present or frame submission then also delays a method worker's submission.
+        bool ComputeSharesFrameQueueLock = false;
+        // Accepted submissions on a separate compute lane, and the cross-queue handoffs they carried: waits on
+        // the last graphics-lane transfer ticket issued before them (uploads, downloads, device one-shot uploads, and
+        // through queue order earlier graphics batches; ComputeInputOrder::AfterIssuedTransfers submissions only),
+        // compute-lane readbacks with their
+        // host-read barrier, and graphics-queue submissions that acquired completed (published) compute results.
+        std::uint64_t ComputeSubmissions = 0;
+        std::uint64_t ComputeGraphicsWaits = 0;
+        std::uint64_t ComputeHostBarriers = 0;
+        std::uint64_t ComputeVisibilityWaits = 0;
+    };
+
+    // WaitCompute's answer: the token's work finished; still running when the timeout passed; or it never will
+    // (lost device, a backend that cannot wait, an invalid service).
+    enum class ComputeWaitStatus : std::uint8_t
+    {
+        Complete,
+        Pending,
+        Failed
+    };
+
+    // ARCH-023: what an IDevice::SubmitComputeReadback waits for before it runs. Either way it follows the earlier
+    // submissions of its own lane (queue order; the recorder's barriers make their writes visible). Neither order
+    // names a frame, but neither promises to skip one: see AfterIssuedTransfers and the shared-queue note below.
+    enum class ComputeInputOrder : std::uint8_t
+    {
+        // Also every transfer-queue upload/download and device one-shot upload issued before the call: a wait on
+        // the graphics lane's last issued ticket (counted in ComputeGraphicsWaits). The default; owner submissions
+        // and every first submission of a run use it. That ticket is signaled by a graphics-queue submission, so it
+        // also covers every earlier graphics-queue batch, frames and their swapchain-image waits included: after a
+        // renderer or preview upload the submission can wait for the frame submitted before that upload. Use it
+        // only where an upload must be ordered (a run's first submission), not for every page.
+        AfterIssuedTransfers,
+        // Its own lane only, no graphics-lane wait: valid only when every input the submission reads was written by
+        // the host before the call, by earlier work on the compute lane, or on the graphics lane before an accepted
+        // AfterIssuedTransfers submission of this lane that preceded it (a worker's pages after its run's prepared
+        // first submission). A graphics-queue upload issued since (a preview, another run) is then not waited for.
+        // Where method compute shares a queue with frames (the graphics lane, or the framegraph's compute queue,
+        // TransferQueueDiagnostics::ComputeSharesFrameComputeQueue), queue order always applies: both orders then
+        // follow the frame work submitted earlier to that queue.
+        LaneOrderOnly,
     };
 
     class ITransferQueue
@@ -217,6 +278,45 @@ export namespace Extrinsic::RHI
         [[nodiscard]] virtual TransferQueueDiagnostics GetDiagnostics() const noexcept
         {
             return {};
+        }
+
+        /// ARCH-023: a token that IsComplete once every compute submission accepted so far finished (on a
+        /// separate compute lane, whose work a frame's retirement does not cover). Invalid when there is none,
+        /// which IsComplete treats as complete. Owners that reuse host-visible or pooled buffers by frame count
+        /// stamp it as well.
+        [[nodiscard]] virtual ReadbackToken ComputeFence() const noexcept
+        {
+            return {};
+        }
+
+        /// ARCH-023, any thread: waits at most `timeout` for the device work of `token` (a token of
+        /// IDevice::SubmitComputeReadback) on its own lane's timeline, without CollectCompleted or a frame. An
+        /// invalid token is Complete. The default (no backend wait) answers from IsComplete and never blocks.
+        [[nodiscard]] virtual ComputeWaitStatus WaitCompute(ReadbackToken token, std::uint64_t timeoutNanoseconds)
+        {
+            (void)timeoutNanoseconds;
+            return IsComplete(token) ? ComputeWaitStatus::Complete : ComputeWaitStatus::Failed;
+        }
+
+        /// ARCH-023, any thread: once the device finished a pulled readback (submitted with ReadbackSink::Pull),
+        /// copies its staged bytes into `destination` (exactly its size, empty for zero bytes), releases its staging
+        /// slot and its record, and retires the lane's completed command buffers; it counts as completed once.
+        /// CollectCompleted never takes it first. False (nothing taken) for an unknown, already taken or released,
+        /// not pulled or not yet complete token, or another size. IsComplete holds from the next CollectCompleted
+        /// on, which also never reports a later token of the lane complete while an earlier one is untaken.
+        [[nodiscard]] virtual bool TakeCompletedReadback(ReadbackToken token, std::span<std::byte> destination)
+        {
+            (void)token;
+            (void)destination;
+            return false;
+        }
+
+        /// ARCH-023, any thread: gives up a pulled readback that will not be taken (a cancelled worker step). No
+        /// callback runs; its staging slot and record are released once the device finished it (here when it
+        /// already has, otherwise by a later Take, Release or CollectCompleted). Ignored for other tokens.
+        virtual void ReleaseReadback(ReadbackToken token)
+        {
+            (void)token;
         }
     };
 }

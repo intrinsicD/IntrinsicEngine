@@ -15,11 +15,9 @@ void main()
         LopGpuDiagnosticsRef(state.DiagnosticsBDA);
     if (diagnostics.Active == 0u) return;
 
-    const vec3 query =
-        pc.Strategy == LOP_GPU_STRATEGY_LOP
-        ? LopLoadPosition(state.SourcePositionsBDA, state.SeedRowsBDA == uint64_t(0)
-            ? index : LopUIntArrayRO(state.SeedRowsBDA).Values[index])
-        : LopLoadPosition(state.ProjectedBBDA, index);
+    // The initial samples are source rows (SeedRows; none: the identity).
+    const vec3 query = LopLoadPosition(state.SourcePositionsBDA, state.SeedRowsBDA == uint64_t(0)
+        ? index : LopUIntArrayRO(state.SeedRowsBDA).Values[index]);
     ivec3 center;
     uint ignoredCell;
     if (!LopCellForPoint(query, center, ignoredCell))

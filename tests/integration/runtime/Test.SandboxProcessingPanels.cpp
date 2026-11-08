@@ -144,10 +144,8 @@ namespace
             Engine->EmplaceModule<R::SceneInteractionModule>();
             Engine->EmplaceModule<R::AsyncWorkModule>();
             if (clustering)
-            {
                 Engine->EmplaceModule<R::ClusteringModule>();
-                Engine->EmplaceModule<R::StepRunsModule>(); // a GPU K-Means run is a step run
-            }
+            Engine->EmplaceModule<R::StepRunsModule>(); // all interactive processing runs share this service
             if (consolidation)
             {
                 Engine->EmplaceModule<R::SpatialIndexCache>();
@@ -610,30 +608,6 @@ TEST(SandboxProcessingPanels, RunActionExplainsWhyItIsDisabledWhileAGpuRunIsPend
     EXPECT_EQ(refused.DisabledReason, "Select a point cloud.");
 }
 
-// The CPD Step and Apply buttons take their reasons from the runtime, per phase.
-TEST(SandboxProcessingPanels, CoherentPointDriftStepAndApplyReadinessFollowThePhase)
-{
-    using Phase = R::EditorCoherentPointDriftPhase;
-    struct Case { Phase Phase; bool Step, Apply; };
-    for (const Case c : {Case{Phase::Ready, true, false}, Case{Phase::Running, false, false},
-                         Case{Phase::Paused, true, true}, Case{Phase::Finished, false, true},
-                         Case{Phase::Applied, false, false}, Case{Phase::Failed, false, false},
-                         Case{Phase::Cancelled, false, false}})
-    {
-        R::EditorCoherentPointDriftSnapshot snapshot{};
-        snapshot.Phase = c.Phase;
-        const auto step = R::ResolveEditorCoherentPointDriftStepReadiness(snapshot);
-        const auto apply = R::ResolveEditorCoherentPointDriftApplyReadiness(snapshot);
-        EXPECT_EQ(step.Enabled, c.Step) << R::ToString(c.Phase);
-        EXPECT_EQ(apply.Enabled, c.Apply) << R::ToString(c.Phase);
-        EXPECT_EQ(step.DisabledReason.empty(), c.Step) << R::ToString(c.Phase);
-        // The panel offers Discard (it cancels a running step), never a "Cancel" button.
-        if (c.Phase == Phase::Running)
-            EXPECT_NE(apply.DisabledReason.find("Discard"), std::string::npos) << apply.DisabledReason;
-        EXPECT_EQ(apply.DisabledReason.empty(), c.Apply) << R::ToString(c.Phase);
-    }
-}
-
 // UI-060: View > Jobs is a registered window of the shell.
 TEST(SandboxProcessingPanels, JobsWindowIsRegisteredUnderView)
 {
@@ -690,6 +664,8 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
         normals.Method = domain == R::GeometryElementDomain::MeshVertex
             ? R::NormalEstimationMethod::MeshFaceWeighted : R::NormalEstimationMethod::PointSetPCA;
         normals.KNeighbors = 8u;
+        // ARCH-023: the panel starts the section's one-shot run (by default ready); this one runs and accepts at once.
+        normals.Execution = R::kOneShotBatchExecution;
         R::SetNormalEstimationConfig(config, normals);
         ASSERT_TRUE(harness.Apply(config));
 
@@ -872,6 +848,11 @@ TEST(SandboxProcessingPanels, FaceOutputsDisplayWithTheirCanonicalDomain)
         outliers.Score.Name = "f:score";
         // Already-published face scores remain displayable when k is too large to run.
         R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
+        // ARCH-023: the panel starts the section's one-shot run (by default ready); the normals one runs and accepts
+        // at once.
+        auto faceNormals = *R::GetNormalEstimationConfig(config);
+        faceNormals.Execution = R::kOneShotBatchExecution;
+        R::SetNormalEstimationConfig(config, faceNormals);
         ASSERT_TRUE(harness.Apply(config));
         ASSERT_EQ(R::GetDerivedSection<R::kOutlierAnalysisSection>(
                       harness.Control().GetEngineConfigControlState().ActiveConfig)
@@ -1713,6 +1694,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             auto c = *R::GetKeypointAnalysisConfig(config);
             c.StableEntityId = id; c.SalientRadius = 2; c.NonMaxRadius = 1;
             c.Score.Name = output; c.Mask.Name = "configured_mask";
+            c.Execution = R::kOneShotBatchExecution; // ARCH-023: the panel's one-shot runs and accepts at once
             R::SetKeypointAnalysisConfig(config, c);
             c.Positions.Name = "missing_positions";
             R::SetKeypointAnalysisConfig(missingInputConfig, c);
@@ -1725,6 +1707,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             auto c = *R::GetNormalEstimationConfig(config);
             c.StableEntityId = id; c.UseRadiusSearch = true; c.Radius = 2;
             c.Output.Name = output;
+            c.Execution = R::kOneShotBatchExecution; // ARCH-023: the panel's one-shot runs and accepts at once
             R::SetNormalEstimationConfig(config, c);
             c.Positions.Name = "missing_positions";
             R::SetNormalEstimationConfig(missingInputConfig, c);
@@ -2148,6 +2131,7 @@ TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejected
     outliers.StableEntityId = R::SelectionController::ToStableEntityId(entity);
     outliers.Method = R::OutlierAnalysisMethod::Radius;
     outliers.Radius = 1.1f; outliers.MinimumNeighbors = 1;
+    outliers.Execution = R::kOneShotBatchExecution; // ARCH-023: the panel's one-shot runs and accepts at once
     R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
@@ -2307,8 +2291,10 @@ TEST(SandboxProcessingPanels, RegistrationRetriesConfigBeforeRunningAndPreserves
         {
             EXPECT_TRUE(result->HasResult);
             EXPECT_GT(result->AppliedStep, 0u);
-            EXPECT_EQ(result->AppliedStep, std::min(std::size_t(registration.MaxIterations), result->TrajectoryLength));
-            EXPECT_EQ(active().TrajectoryStep, registration.MaxIterations);
+            EXPECT_EQ(result->AppliedStep,
+                std::min(std::size_t(registration.Execution.IterationCap), result->TrajectoryLength));
+            EXPECT_EQ(active().TrajectoryStep, registration.Execution.IterationCap);
+            EXPECT_NE(result->StepRun, 0u) << "a queued ICP run is a step run";
             finalPosition = scene.Raw().get<Transform>(source).Position;
             EXPECT_NE(finalPosition, glm::vec3(0));
             jobsBefore = engine.Jobs().Stats().SubmittedJobs;
@@ -2321,18 +2307,19 @@ TEST(SandboxProcessingPanels, RegistrationRetriesConfigBeforeRunningAndPreserves
             {
                 EXPECT_EQ(active().TrajectoryStep, 0u);
                 EXPECT_EQ(scene.Raw().get<Transform>(source).Position, finalPosition);
-                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1);
+                // The CPU run's holder and its one segment (start=run, auto_accept=end: one Run to its end).
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 2);
                 jobsBefore = engine.Jobs().Stats().SubmittedJobs;
                 phase = 3; step = 0;
             }
         }
         else if (phase == 3)
         {
+            // The shared execution row clamps to its range (max_iterations >= 1), the range the codec enforces.
             EditScalarControl(window, "Max iterations##ICP", step - 3, "0");
-            if (step == 10) run();
             if (step == 14)
             {
-                EXPECT_EQ(active().MaxIterations, registration.MaxIterations);
+                EXPECT_EQ(active().Execution.IterationCap, 1u);
                 EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
                 registration.SourcePositions.Name = "missing_positions";
                 R::SetRegistrationConfig(config, registration);
@@ -3338,6 +3325,10 @@ TEST(SandboxProcessingPanels, KMeansAdmissionKeepsControlsVisibleAndRetriesRejec
             reject = false;
             click("Run K-Means##KMeans");
         }
+        // ARCH-023 B8: the CPU run is a step run that waits for Accept (the section's default); the panel's host run
+        // row accepts it once it ended (an earlier press is refused while it computes).
+        if (step > 23 && (!result || result->Status == R::KMeansRunStatus::Queued))
+            click("Accept##KMeansCpu");
         if (step > 23 && result && result->Status != R::KMeansRunStatus::Queued)
         {
             EXPECT_TRUE(result->Succeeded()) << result->Message;
@@ -3345,7 +3336,7 @@ TEST(SandboxProcessingPanels, KMeansAdmissionKeepsControlsVisibleAndRetriesRejec
             EXPECT_TRUE(props.Get<std::uint32_t>("p:kmeans_label"));
             EXPECT_TRUE(props.Get<glm::vec4>("p:kmeans_color"));
             EXPECT_FALSE(props.Exists("v:position"));
-            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1u);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 2u) << "the run's holder and its one segment";
             completed = true;
             engine.RequestExit();
         }
@@ -3385,6 +3376,9 @@ TEST(SandboxProcessingPanels, KMeansProgressShowsOnlyForTheEntityItRanOn)
         ImGui::SetWindowPos(window, {0, 0});
         ++step;
         if (phase == 0 && step == 3) ImGui::ActivateItemByID(window->GetID("Run K-Means##KMeans"));
+        // ARCH-023 B8: the CPU step run waits for Accept; the panel's run row accepts it once it ended.
+        if (phase == 0 && step > 5 && (!result || result->Status == R::KMeansRunStatus::Queued))
+            ImGui::ActivateItemByID(window->GetID("Accept##KMeansCpu"));
         if (phase == 0 && step > 5 && result && result->Status != R::KMeansRunStatus::Queued)
         {
             EXPECT_TRUE(result->Succeeded()) << result->Message;
@@ -3844,6 +3838,9 @@ TEST(SandboxProcessingPanels, PropertySmoothingVariationalFitHonorsPerRowBounds)
     smoothing.Output={R::GeometryElementDomain::MeshVertex,"fitted",Geometry::PropertyValueKind::Double};
     smoothing.Filter.Method=Geometry::Smoothing::PropertyFilter::VariationalFit;
     smoothing.Filter.Bound=Geometry::Smoothing::FitBound::PerRow;
+    // ARCH-023: an interactive start is ready by default; this panel run computes and accepts at once.
+    smoothing.Execution.Start = R::StepRunStart::Run;
+    smoothing.Execution.AutoAccept = R::StepRunAutoAccept::End;
     smoothing.BoundRadii={R::GeometryElementDomain::MeshVertex,"tolerance",Geometry::PropertyValueKind::Float};
     auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
     auto section=R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
@@ -3905,7 +3902,11 @@ TEST(SandboxProcessingPanels, PropertySmoothingSessionSwitchesMethodsSolversAndI
     }
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
     auto section = R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
-    section.PayloadJson = R::SerializePropertySmoothingConfig({});
+    // ARCH-023: each click starts a step run that computes and accepts at once (the default is ready).
+    R::PropertySmoothingConfig running;
+    running.Execution.Start = R::StepRunStart::Run;
+    running.Execution.AutoAccept = R::StepRunAutoAccept::End;
+    section.PayloadJson = R::SerializePropertySmoothingConfig(running);
     Config::UpsertEngineConfigSection(config.AppSections, section);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
@@ -3940,7 +3941,19 @@ TEST(SandboxProcessingPanels, PropertySmoothingSessionSwitchesMethodsSolversAndI
     const auto idle = Action{[](ImGuiWindow*) {}};
     std::vector<Action> script;
     const auto add = [&](std::vector<Action> actions) { for (auto& a : actions) { script.push_back(std::move(a)); script.push_back(idle); script.push_back(idle); } };
-    const auto run = [&](const char* step) { add({click, idle, snapshotChanged(step)}); };
+    // The worker run publishes a few frames after the click (its step and Accept are jobs).
+    const auto settle = [&](Action check)
+    {
+        std::vector<Action> actions{click};
+        for (int i = 0; i < 12; ++i)
+            actions.push_back(idle);
+        actions.push_back(std::move(check));
+        return actions;
+    };
+    const auto run = [&](const char* step)
+    {
+        add(settle(snapshotChanged(step)));
+    };
     run("averaging");
     add(combo("Method", 5, "Variational fit (robust / TV / bounded)"));
     add(combo("Smoothness penalty", 2, "L1 (total variation)"));
@@ -3956,25 +3969,33 @@ TEST(SandboxProcessingPanels, PropertySmoothingSessionSwitchesMethodsSolversAndI
     add(combo("Method", 0, "Averaging"));
     run("averaging after lumped implicit");
     add(combo("Input property##Smoothing", int(R::GeometryElementDomain::MeshVertex), "MeshVertex: v:direction"));
-    add({click, idle, Action{[&](ImGuiWindow*) {
-        EXPECT_TRUE(std::as_const(vertices).Get<glm::vec3>("v:direction_smoothed")) << "vector input publishes a vec3 output";
-    }}});
+    add(settle(Action{[&](ImGuiWindow*)
+        {
+            EXPECT_TRUE(std::as_const(vertices).Get<glm::vec3>("v:direction_smoothed"))
+                << "vector input publishes a vec3 output";
+        }}));
     add(combo("Weights", 3, "Nonnegative mesh cotangent"));
     add(combo("Input property##Smoothing", int(R::GeometryElementDomain::MeshFace), "MeshFace: f:roughness"));
-    add({click, idle, Action{[&](ImGuiWindow*) {
-        EXPECT_TRUE(std::as_const(faces).Get<double>("f:roughness_smoothed")) << "face input with mesh weights left selected";
-    }}});
+    add(settle(Action{[&](ImGuiWindow*)
+        {
+            EXPECT_TRUE(std::as_const(faces).Get<double>("f:roughness_smoothed"))
+                << "face input with mesh weights left selected";
+        }}));
 
     int frames = 0;
     std::size_t next = 0;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
     h.Driver->OnFrame = [&](R::Engine& engine) {
         ++frames;
         auto* window = ImGui::FindWindowByName("Smooth Property");
         // Focusing the panel closes open combo popups, so only focus it while none is open.
         if (window) { ImGui::SetWindowSize(window, {750, 1400}); ImGui::SetWindowPos(window, {0, 0}); }
         if (window && ImGui::GetCurrentContext()->OpenPopupStack.empty()) ImGui::FocusWindow(window);
-        if (window && frames >= 10 && next < script.size()) script[next++](window);
-        if (next == script.size() || frames > 600) engine.RequestExit();
+        // A clicked run owns worker jobs through publication and admission retirement.
+        if (window && frames >= 10 && next < script.size() && engine.Jobs().Stats().InFlightJobs == 0u)
+            script[next++](window);
+        if (next == script.size() || std::chrono::steady_clock::now() >= deadline)
+            engine.RequestExit();
     };
     h.Engine->Run();
     EXPECT_EQ(next, script.size()) << "the scripted session did not finish";
@@ -3995,6 +4016,9 @@ TEST(SandboxProcessingPanels, PropertySmoothingExecutesConfiguredPropertyAndPubl
     smoothing.Input={R::GeometryElementDomain::MeshVertex,"custom_uv",Geometry::PropertyValueKind::Vec2};
     smoothing.Output={R::GeometryElementDomain::MeshVertex,"filtered_uv",Geometry::PropertyValueKind::Vec2};
     smoothing.Filter.Method=Geometry::Smoothing::PropertyFilter::Implicit;
+    // ARCH-023: an interactive start is ready by default; this panel run computes and accepts at once.
+    smoothing.Execution.Start = R::StepRunStart::Run;
+    smoothing.Execution.AutoAccept = R::StepRunAutoAccept::End;
     smoothing.Filter.TimeStep=2;
     auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
     auto section=R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
@@ -4491,9 +4515,9 @@ TEST(SandboxProcessingPanels, ConfigFieldClampStepsInsideExclusiveIntegerBounds)
     EXPECT_EQ(R::ClampToConfigFieldRange(closed, 2.0), 1.0);
 }
 
-// UI-055: the Coherent Point Drift panel drives a run through its own buttons: Start
-// captures, Step and Run to end iterate on the job service while the preview overlay
-// follows, and Apply publishes the transform. Apply and Discard drop the preview.
+// UI-055: the Coherent Point Drift panel drives a run through the shared step-run row: Start
+// captures (the section starts ready), Step and Run iterate on the job service while the preview
+// overlay follows, and Accept publishes the transform. An ended run and Discard drop the preview.
 TEST(SandboxProcessingPanels, CoherentPointDriftPanelStepsRunsAndApplies)
 {
     PanelHarness h;
@@ -4548,18 +4572,19 @@ TEST(SandboxProcessingPanels, CoherentPointDriftPanelStepsRunsAndApplies)
         }
         if (frames == 14) click(window, "Start##CPD");
         if (frames == 18) click(window, "Step##CPD");
-        if (frames == 28) click(window, "Run to end##CPD");
+        if (frames == 28)
+            click(window, "Run##CPD");
         if (frames == 70)
         {
             EXPECT_EQ(transform.Position, glm::vec3(0.0f)) << "nothing is published before Apply";
             EXPECT_GT(overlay(), 0u) << "the moving source is previewed";
-            click(window, "Apply##CPD");
+            click(window, "Accept##CPD");
         }
-        // Apply and Discard drop the preview; the frame that clicks them must not redraw it.
+        // An ended run and Discard drop the preview; the frame that clicks them must not redraw it.
         if (frames == 74)
         {
-            EXPECT_EQ(overlay(), 0u) << "the preview outlived Apply";
-            click(window, "Restart##CPD");
+            EXPECT_EQ(overlay(), 0u) << "the preview outlived Accept";
+            click(window, "New run##CPD");
         }
         if (frames == 78) click(window, "Step##CPD");
         if (frames == 90)
@@ -4658,10 +4683,10 @@ TEST(SandboxProcessingPanels, PropertySmoothingAcceptsOrDiscardsAPendingGpuResul
             {
                 // The runtime's refusal reason shows once, inline (UI-071), not composed by the panel.
                 const std::string whole = finishLog();
-                const auto section = whole.find("--- GPU result");
+                const auto section = whole.find("--- GPU run");
                 ASSERT_NE(section, std::string::npos) << whole;
                 // One drawn frame: up to the next frame's section heading.
-                const auto next = whole.find("--- GPU result", section + 1);
+                const auto next = whole.find("--- GPU run", section + 1);
                 const std::string text = whole.substr(section, next == std::string::npos ? next : next - section);
                 const auto reason = R::SnapshotEditorPropertySmoothing(commands, stale).AcceptDisabledReason;
                 ASSERT_FALSE(reason.empty());
@@ -5253,8 +5278,7 @@ namespace
     }
 }
 
-// A run that never converges ends only through the widget's Cancel, which calls the
-// panel's existing cancel (CancelEditorRegistration).
+// A run that never converges ends only through the widget's Cancel, which discards its step run.
 TEST(SandboxProcessingPanels, IcpProgressWidgetCancelStopsARunThatNeverConverges)
 {
     PanelHarness h;
@@ -5269,7 +5293,7 @@ TEST(SandboxProcessingPanels, IcpProgressWidgetCancelStopsARunThatNeverConverges
     auto registration = *R::GetRegistrationConfig(config);
     registration.SourceStableEntityId = R::SelectionController::ToStableEntityId(source);
     registration.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
-    registration.MaxIterations = 100000u;
+    registration.Execution.IterationCap = 100000u;
     registration.ConvergenceThreshold = 0.0;
     registration.InlierRatio = 1.0;
     R::SetRegistrationConfig(config, registration);
@@ -5329,7 +5353,7 @@ TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
     auto cpd = *R::GetCoherentPointDriftConfig(config);
     cpd.SourceStableEntityId = R::SelectionController::ToStableEntityId(source);
     cpd.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
-    cpd.MaxIterations = 10000u;
+    cpd.Execution.IterationCap = 10000u;
     cpd.Tolerance = 0.0;
     R::SetCoherentPointDriftConfig(config, cpd);
     ASSERT_TRUE(h.Apply(config));
@@ -5344,7 +5368,8 @@ TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
         ImGui::SetWindowPos(window, {0, 0});
         ++step;
         if (step == 3) ImGui::ActivateItemByID(window->GetID("Start##CPD"));
-        if (step == 6) ImGui::ActivateItemByID(window->GetID("Run to end##CPD"));
+        if (step == 6)
+            ImGui::ActivateItemByID(window->GetID("Run##CPD")); // the step-run row (the run starts ready)
         if (step > 6 && AnyActiveJob(engine)) ++activeFrames;
         if (activeFrames > 10 && holdUntil < 0) holdUntil = frame + 40;
         if (holdUntil >= 0 && frame <= holdUntil) EXPECT_TRUE(AnyActiveJob(engine)) << "frame " << frame;
@@ -5361,7 +5386,8 @@ TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
             }
             if (settled >= 0 && frame > settled + 4)
             {
-                cancelledPhase = std::string{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find("Phase: cancelled") != std::string::npos;
+                cancelledPhase = std::string{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find("Phase: discarded") !=
+                    std::string::npos;
                 ImGui::LogFinish();
                 completed = true;
                 engine.RequestExit();
@@ -5370,7 +5396,7 @@ TEST(SandboxProcessingPanels, CpdProgressWidgetCancelStopsARunToTheCap)
     };
     h.Engine->Run();
     EXPECT_TRUE(completed) << "the 10000-iteration run only ends through Cancel";
-    EXPECT_TRUE(cancelledPhase) << "the run ends in the Cancelled phase";
+    EXPECT_TRUE(cancelledPhase) << "the step run ends discarded";
     if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
 }
 
@@ -5514,6 +5540,7 @@ TEST(SandboxProcessingPanels, OutlierPanelShowsItsFinishedRunOnlyForItsEntity)
     outliers.Method = R::OutlierAnalysisMethod::Radius;
     outliers.Radius = 1.1f;
     outliers.MinimumNeighbors = 1;
+    outliers.Execution = R::kOneShotBatchExecution; // ARCH-023: the panel's one-shot runs and accepts at once
     R::SetDerivedSection<R::kOutlierAnalysisSection>(config, outliers);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
@@ -5532,6 +5559,7 @@ TEST(SandboxProcessingPanels, PointConstructionPanelShowsItsFinishedRunOnlyForIt
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
     auto construction = *R::GetPointConstructionConfig(config);
     construction.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    construction.Execution = R::kOneShotBatchExecution; // ARCH-023: the panel's one-shot runs and accepts at once
     R::SetPointConstructionConfig(config, construction);
     ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.point_construction", true));
@@ -5563,6 +5591,12 @@ TEST(SandboxProcessingPanels, ConsolidationPanelShowsItsFinishedRunOnlyForItsEnt
         scene.Raw().emplace<G::RenderPoints>(e);
     }
     ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    // The run accepts at its end (the section's default waits for Accept).
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto consolidation = *R::GetPointCloudConsolidationConfig(config);
+    consolidation.Execution.AutoAccept = R::StepRunAutoAccept::End;
+    R::SetPointCloudConsolidationConfig(config, consolidation);
+    ASSERT_TRUE(h.Apply(config));
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.consolidation", true));
     std::optional<R::PointCloudConsolidationResult> result;
     const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{

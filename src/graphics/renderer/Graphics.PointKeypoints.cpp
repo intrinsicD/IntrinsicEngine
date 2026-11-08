@@ -8,6 +8,7 @@ module;
 module Extrinsic.Graphics.PointKeypoints;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -33,14 +34,17 @@ namespace Extrinsic::Graphics
     struct PointKeypointWorkspace::Impl
     {
         RHI::IDevice& Device;
+        RHI::BufferManager& Scratch;
         RHI::PipelineHandle Pipeline{};
-        RHI::BufferHandle Scratch{}, Output{}, States{};
+        RHI::BufferManager::BufferLease Scratches{}, Output{}, States{};
         std::uint32_t Capacity{};
-        explicit Impl(RHI::IDevice& device) : Device(device) {}
+        // ARCH-023: addresses resolved with the reservation (device-owner thread); Prepared: Prepare reserved, so a
+        // page within Capacity makes no device call (a method worker records it).
+        std::uint64_t ScratchesAddress{}, OutputAddress{}, StatesAddress{};
+        bool Prepared{};
+        Impl(RHI::IDevice& device, RHI::BufferManager& scratch) : Device(device), Scratch(scratch) {}
         ~Impl()
         {
-            for (auto buffer : {Scratch, Output, States})
-                if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
         }
         bool Reserve(std::uint32_t count)
@@ -52,72 +56,112 @@ namespace Extrinsic::Graphics
                 if (!Pipeline.IsValid()) return false;
             }
             if (count <= Capacity) return true;
-            auto allocate = [&](std::uint64_t bytes) {
-                return Device.CreateBuffer({.SizeBytes = bytes,
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                    .HostVisible = true, .DebugName = "PointKeypoints.Workspace"});
-            };
-            const auto scratch = allocate((std::uint64_t(count) + (count+4095)/4096) * 8);
-            const auto states = allocate(std::uint64_t(std::min(count,16384u)) * 384);
-            const auto output = allocate(sizeof(PointKeypointHeader) + std::uint64_t(count) * 8);
-            if (!scratch.IsValid() || !output.IsValid() || !states.IsValid())
+            const auto desc = [](std::uint64_t bytes)
             {
-                if (scratch.IsValid()) Device.DestroyBuffer(scratch);
-                if (states.IsValid()) Device.DestroyBuffer(states);
-                if (output.IsValid()) Device.DestroyBuffer(output);
+                return RHI::BufferDesc{.SizeBytes = bytes,
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
+                    .HostVisible = true,
+                    .DebugName = "PointKeypoints.Workspace"};
+            };
+            // All or nothing: a partial reservation keeps no capacity.
+            Capacity = 0;
+            if (!Scratch.EnsureScratch(Scratches, desc((std::uint64_t(count) + (count + 4095) / 4096) * 8)) ||
+                !Scratch.EnsureScratch(States, desc(std::uint64_t(std::min(count, 16384u)) * 384)) ||
+                !Scratch.EnsureScratch(Output, desc(sizeof(PointKeypointHeader) + std::uint64_t(count) * 8)))
                 return false;
-            }
-            for (auto buffer : {Scratch, Output, States})
-                if (buffer.IsValid()) Device.DestroyBuffer(buffer);
-            Scratch = scratch; Output = output; States = states; Capacity = count;
+            ScratchesAddress = Device.GetBufferDeviceAddress(Scratches.GetHandle());
+            OutputAddress = Device.GetBufferDeviceAddress(Output.GetHandle());
+            StatesAddress = Device.GetBufferDeviceAddress(States.GetHandle());
+            Capacity = count;
             return true;
         }
     };
-    PointKeypointWorkspace::PointKeypointWorkspace(RHI::IDevice& device) : m_Impl(std::make_unique<Impl>(device)) {}
+    PointKeypointWorkspace::PointKeypointWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch)
+        : m_Impl(std::make_unique<Impl>(device, scratch))
+    {
+    }
     PointKeypointWorkspace::~PointKeypointWorkspace() = default;
+    void PointKeypointWorkspace::ReleaseScratch()
+    {
+        m_Impl->Scratches = {};
+        m_Impl->Output = {};
+        m_Impl->States = {};
+        m_Impl->Capacity = 0;
+        m_Impl->Prepared = false;
+    }
+    bool PointKeypointWorkspace::Prepare(const std::uint32_t count)
+    {
+        auto& s = *m_Impl;
+        s.Prepared = count >= 2u && s.Reserve(count);
+        return s.Prepared;
+    }
     RHI::BufferHandle PointKeypointWorkspace::RecordPage(RHI::ICommandContext& commands,
         std::uint64_t nodes, const GpuPropertyView& positions, std::uint64_t slots,
         std::uint32_t count, const PointKeypointParams& params, const PointKeypointPage& page,
         const GpuPropertyView& score, const GpuPropertyView& mask)
     {
         auto& s = *m_Impl;
-        if (!nodes || !positions.Address || positions.Layout.ElementBytes()!=12 || !slots || count<2 || params.MinimumNeighbors>=count ||
-            !page.Rows || page.First>=count || page.Rows>count-page.First || !page.Visits || page.Visits>1024 ||
-            ((page.Mode==0 || page.Mode==2 || page.Mode==3) &&
-                (page.Rows>16384 || std::uint64_t(page.Rows)*page.Visits>(1u<<24u))) ||
-            !std::isfinite(params.Gamma21) || params.Gamma21<0 || params.Gamma21>1 ||
-            !std::isfinite(params.Gamma32) || params.Gamma32<0 || params.Gamma32>1 ||
-            !std::isfinite(params.SalientRadius) || params.SalientRadius<0 || params.SalientRadius>1e18f ||
-            !std::isfinite(params.NonMaxRadius) || params.NonMaxRadius<0 || params.NonMaxRadius>1e18f ||
-            (page.Mode==4 && (!score.Address || !mask.Address)) ||
-            page.Mode>5 || !s.Reserve(count)) return {};
+        if (!nodes || !positions.Address || positions.Layout.ElementBytes() != 12 || !slots || count < 2 ||
+            params.MinimumNeighbors >= count || !page.Rows || page.First >= count || page.Rows > count - page.First ||
+            !page.Visits || page.Visits > 1024 ||
+            ((page.Mode == 0 || page.Mode == 2 || page.Mode == 3) &&
+                (page.Rows > 16384 || std::uint64_t(page.Rows) * page.Visits > (1u << 24u))) ||
+            !std::isfinite(params.Gamma21) || params.Gamma21 < 0 || params.Gamma21 > 1 ||
+            !std::isfinite(params.Gamma32) || params.Gamma32 < 0 || params.Gamma32 > 1 ||
+            !std::isfinite(params.SalientRadius) || params.SalientRadius < 0 || params.SalientRadius > 1e18f ||
+            !std::isfinite(params.NonMaxRadius) || params.NonMaxRadius < 0 || params.NonMaxRadius > 1e18f ||
+            (page.Mode == 4 && (!score.Address || !mask.Address)) || page.Mode > 5 ||
+            (s.Prepared ? count > s.Capacity : !s.Reserve(count)))
+            return {};
+        const auto scratch = s.Scratches.GetHandle(), output = s.Output.GetHandle(), states = s.States.GetHandle();
         // Only reset the page's unfinished count. All writes occur after the previous
         // completion; scale/error/count survive across pages and stages.
+        // ARCH-023: recorded fills, not host writes, so a worker records the page; ordered after the previous page's
+        // reads of the header by the barrier below.
+        commands.BufferBarrier(output,
+            RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferRead,
+            RHI::MemoryAccess::TransferWrite);
         if (page.Mode==0 && page.First==0 && !page.Resume) {
-            const PointKeypointHeader header{};
-            s.Device.WriteBuffer(s.Output,&header,sizeof(header));
+            // A value-initialized header is all zero bits (integers and +0.0f).
+            commands.FillBuffer(output, 0u, sizeof(PointKeypointHeader), 0u);
         } else {
-            const std::uint32_t zero{};
-            s.Device.WriteBuffer(s.Output,&zero,sizeof(zero),offsetof(PointKeypointHeader,Reserved));
-            if(page.Mode==2 && page.First==0 && !page.Resume)s.Device.WriteBuffer(s.Output,&zero,sizeof(zero));
+            commands.FillBuffer(output, offsetof(PointKeypointHeader, Reserved), sizeof(std::uint32_t), 0u);
+            if (page.Mode == 2 && page.First == 0 && !page.Resume)
+                commands.FillBuffer(output, 0u, sizeof(std::uint32_t), 0u);
         }
-        Push push{nodes,positions.Address,slots,s.Device.GetBufferDeviceAddress(s.Scratch),
-            s.Device.GetBufferDeviceAddress(s.Output),count,page.First,page.Rows,params.MinimumNeighbors,
-            params.SalientRadius,params.NonMaxRadius,params.Gamma21,params.Gamma32,0,page.Mode,
-            s.Device.GetBufferDeviceAddress(s.States),score.Address,mask.Address,page.Visits,page.Resume};
+        Push push{nodes,
+            positions.Address,
+            slots,
+            s.ScratchesAddress,
+            s.OutputAddress,
+            count,
+            page.First,
+            page.Rows,
+            params.MinimumNeighbors,
+            params.SalientRadius,
+            params.NonMaxRadius,
+            params.Gamma21,
+            params.Gamma32,
+            0,
+            page.Mode,
+            s.StatesAddress,
+            score.Address,
+            mask.Address,
+            page.Visits,
+            page.Resume};
         if (!push.Scratch || !push.Output || !push.States) return {};
-        for(auto buffer:{s.Output,s.Scratch,s.States})
+        for (auto buffer : {output, scratch, states})
             commands.BufferBarrier(buffer,RHI::MemoryAccess::TransferWrite|RHI::MemoryAccess::ShaderWrite,
                 RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::ShaderWrite);
         commands.BufferBarrier(positions.Buffer,RHI::MemoryAccess::TransferWrite,RHI::MemoryAccess::ShaderRead);
         commands.BindPipeline(s.Pipeline);
         commands.PushConstants(&push,sizeof(push),0);
         commands.Dispatch(page.Mode==1?1:page.Mode==5?(page.Rows+4095)/4096:(page.Rows+63)/64,1,1);
-        for(auto buffer:{s.Output,s.Scratch,s.States})
+        for (auto buffer : {output, scratch, states})
             commands.BufferBarrier(buffer,RHI::MemoryAccess::ShaderWrite,
                 RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::TransferRead);
         if(page.Mode==4)for(auto buffer:{score.Buffer,mask.Buffer})
             commands.BufferBarrier(buffer,RHI::MemoryAccess::ShaderWrite,RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::TransferRead);
-        return s.Output;
+        return output;
     }
 }

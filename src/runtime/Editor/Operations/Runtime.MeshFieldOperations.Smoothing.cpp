@@ -2,6 +2,7 @@
 module;
 #include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -23,6 +24,8 @@ module;
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
 #include <array>
+#include <atomic>
+#include <mutex>
 module Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Scene.Registry;
@@ -33,6 +36,8 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRunExecution;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Smoothing;
@@ -44,6 +49,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Private.WorkspaceLease;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.GeometryPresentation;
@@ -58,11 +64,17 @@ import Geometry.Properties;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 #include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
+#include "Services/Runtime.WorkerGpuPages.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.hpp"
 
 namespace Extrinsic::Runtime
 {
+    template std::shared_ptr<Graphics::PropertyFilterWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::PropertyFilterWorkspace>();
+    template std::shared_ptr<Graphics::SparseConjugateGradientWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::SparseConjugateGradientWorkspace>();
+
     namespace
     {
         namespace S = Geometry::Smoothing;
@@ -91,41 +103,170 @@ namespace Extrinsic::Runtime
         constexpr std::array<std::string_view, 2> kBoundNormNames{"Per channel (box)", "Euclidean (ball, ADMM)"};
         constexpr std::array<std::string_view, 2> kOrderNames{"First (differences)", "Second (non-local TGV, ADMM)"};
         constexpr std::array<std::string_view, 2> kBackendNames{"CPU reference", "Vulkan (shader double precision)"};
+        // ARCH-023: the shared execution rows after max_iterations (the run's cap is `iterations`).
+        constexpr auto kExecutionFields = StepRunExecutionFields(10000u);
         constexpr std::array kFields{
-            ConfigFieldSpec{.Name = "input", .Type = FT::PropertyRef, .Description = "Floating scalar or vector property to smooth.", .RefKinds = kFloating},
-            ConfigFieldSpec{.Name = "output", .Type = FT::PropertyRef, .Description = "Property receiving the result, on the input domain with the input's channel count.", .RefKinds = kFloating},
-            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Positions that define neighborhoods and distances.", .RefKinds = kVec3},
-            ConfigFieldSpec{.Name = "weight", .Type = FT::Enum, .Description = "Neighbor weighting; the mesh weights need mesh-vertex input.", .EnumNames = kWeightNames},
-            ConfigFieldSpec{.Name = "method", .Type = FT::Enum, .Description = "Smoothing filter.", .EnumNames = kMethodNames},
-            ConfigFieldSpec{.Name = "laplacian", .Type = FT::Enum, .Description = "Laplacian normalization.", .EnumNames = kLaplacianNames},
-            ConfigFieldSpec{.Name = "iterations", .Type = FT::UInt, .Description = "Filter passes of the explicit methods.", .Min = 1, .Max = 10000},
-            ConfigFieldSpec{.Name = "neighbors", .Type = FT::UInt, .Description = "k of the k-nearest-neighbor graph.", .Min = 1, .Max = 1024},
-            ConfigFieldSpec{.Name = "spatial_sigma", .Type = FT::Float, .Description = "Distance scale of Gaussian and bilateral weights (position units).", .Min = 0, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "lambda", .Type = FT::Float, .Description = "Step size of averaging, bilateral and Taubin passes.", .Min = 0, .Max = 1, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "mu", .Type = FT::Float, .Description = "Taubin's negative inflation step.", .Min = -1, .Max = 0, .ExclusiveMax = true},
-            ConfigFieldSpec{.Name = "heat_time", .Type = FT::Float, .Description = "Diffusion time of the spectral heat filter.", .Min = 0, .Max = 1000, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "range_sigma", .Type = FT::Float, .Description = "Value scale of the bilateral filter (property units).", .Min = 0, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "time_step", .Type = FT::Float, .Description = "Backward-Euler time step of implicit smoothing.", .Min = 0, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "solver_tolerance", .Type = FT::Float, .Description = "Relative residual at which conjugate gradient stops.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
-            ConfigFieldSpec{.Name = "max_solver_iterations", .Type = FT::UInt, .Description = "Conjugate-gradient iteration cap.", .Min = 1, .Max = 100000},
-            ConfigFieldSpec{.Name = "solver", .Type = FT::Enum, .Description = "Linear solver of implicit smoothing.", .EnumNames = kSolverNames},
-            ConfigFieldSpec{.Name = "preserve_boundary", .Type = FT::Bool, .Description = "Keep mesh-boundary values fixed (mesh-vertex input only)."},
-            ConfigFieldSpec{.Name = "smoothness_penalty", .Type = FT::Enum, .Description = "Penalty on neighbor differences in the variational fit.", .EnumNames = kSmoothnessPenaltyNames},
-            ConfigFieldSpec{.Name = "data_penalty", .Type = FT::Enum, .Description = "Penalty on deviation from the input in the variational fit.", .EnumNames = kDataPenaltyNames},
-            ConfigFieldSpec{.Name = "fidelity", .Type = FT::Enum, .Description = "Fixed data weight, or the weight whose RMS residual matches the noise level.", .EnumNames = kFidelityNames},
-            ConfigFieldSpec{.Name = "fit_weight", .Type = FT::Float, .Description = "Data weight of the variational fit.", .Min = 0, .Max = 1e12, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "noise_level", .Type = FT::Float, .Description = "Target RMS residual (property units).", .Min = 0, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "penalty_delta", .Type = FT::Float, .Description = "Huber/L1 smoothing threshold (property units); 0 only with ADMM and no Huber penalty.", .Min = 0},
-            ConfigFieldSpec{.Name = "bound", .Type = FT::Enum, .Description = "Tolerance bound on the deviation from the input.", .EnumNames = kBoundNames},
-            ConfigFieldSpec{.Name = "bound_radius", .Type = FT::Float, .Description = "Uniform bound radius (property units).", .Min = 0},
-            ConfigFieldSpec{.Name = "bound_radii", .Type = FT::PropertyRef, .Description = "Per-row bound radii on the input domain.", .Nullable = true, .RefKinds = kFloatScalar},
-            ConfigFieldSpec{.Name = "fit_solver", .Type = FT::Enum, .Description = "Variational-fit algorithm.", .EnumNames = kFitSolverNames},
-            ConfigFieldSpec{.Name = "max_fit_iterations", .Type = FT::UInt, .Description = "Variational-fit iteration cap.", .Min = 1, .Max = 100000},
-            ConfigFieldSpec{.Name = "bound_norm", .Type = FT::Enum, .Description = "Bound shape on vector properties.", .EnumNames = kBoundNormNames},
-            ConfigFieldSpec{.Name = "smoothness_order", .Type = FT::Enum, .Description = "First-order differences or second-order non-local TGV.", .EnumNames = kOrderNames},
-            ConfigFieldSpec{.Name = "second_order_weight", .Type = FT::Float, .Description = "Weight of the second-order TGV term.", .Min = 0, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "backend", .Type = FT::Enum, .Description = "CPU reference or Vulkan for the explicit filters and CG implicit smoothing.", .EnumNames = kBackendNames},
-            ConfigFieldSpec{.Name = "fit_tolerance", .Type = FT::Float, .Description = "Relative change at which the variational fit stops.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "input",
+                .Type = FT::PropertyRef,
+                .Description = "Floating scalar or vector property to smooth.",
+                .RefKinds = kFloating},
+            ConfigFieldSpec{.Name = "output",
+                .Type = FT::PropertyRef,
+                .Description = "Property receiving the result, on the input domain with the input's channel count.",
+                .RefKinds = kFloating},
+            ConfigFieldSpec{.Name = "positions",
+                .Type = FT::PropertyRef,
+                .Description = "Positions that define neighborhoods and distances.",
+                .RefKinds = kVec3},
+            ConfigFieldSpec{.Name = "weight",
+                .Type = FT::Enum,
+                .Description = "Neighbor weighting; the mesh weights need mesh-vertex input.",
+                .EnumNames = kWeightNames},
+            ConfigFieldSpec{
+                .Name = "method", .Type = FT::Enum, .Description = "Smoothing filter.", .EnumNames = kMethodNames},
+            ConfigFieldSpec{.Name = "laplacian",
+                .Type = FT::Enum,
+                .Description = "Laplacian normalization.",
+                .EnumNames = kLaplacianNames},
+            ConfigFieldSpec{.Name = "iterations",
+                .Type = FT::UInt,
+                .Description = "Filter passes of the explicit methods.",
+                .Min = 1,
+                .Max = 10000},
+            ConfigFieldSpec{.Name = "neighbors",
+                .Type = FT::UInt,
+                .Description = "k of the k-nearest-neighbor graph.",
+                .Min = 1,
+                .Max = 1024},
+            ConfigFieldSpec{.Name = "spatial_sigma",
+                .Type = FT::Float,
+                .Description = "Distance scale of Gaussian and bilateral weights (position units).",
+                .Min = 0,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "lambda",
+                .Type = FT::Float,
+                .Description = "Step size of averaging, bilateral and Taubin passes.",
+                .Min = 0,
+                .Max = 1,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "mu",
+                .Type = FT::Float,
+                .Description = "Taubin's negative inflation step.",
+                .Min = -1,
+                .Max = 0,
+                .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "heat_time",
+                .Type = FT::Float,
+                .Description = "Diffusion time of the spectral heat filter.",
+                .Min = 0,
+                .Max = 1000,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "range_sigma",
+                .Type = FT::Float,
+                .Description = "Value scale of the bilateral filter (property units).",
+                .Min = 0,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "time_step",
+                .Type = FT::Float,
+                .Description = "Backward-Euler time step of implicit smoothing.",
+                .Min = 0,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "solver_tolerance",
+                .Type = FT::Float,
+                .Description = "Relative residual at which conjugate gradient stops.",
+                .Min = 0,
+                .Max = 1,
+                .ExclusiveMin = true,
+                .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "max_solver_iterations",
+                .Type = FT::UInt,
+                .Description = "Conjugate-gradient iteration cap.",
+                .Min = 1,
+                .Max = 100000},
+            ConfigFieldSpec{.Name = "solver",
+                .Type = FT::Enum,
+                .Description = "Linear solver of implicit smoothing.",
+                .EnumNames = kSolverNames},
+            ConfigFieldSpec{.Name = "preserve_boundary",
+                .Type = FT::Bool,
+                .Description = "Keep mesh-boundary values fixed (mesh-vertex input only)."},
+            ConfigFieldSpec{.Name = "smoothness_penalty",
+                .Type = FT::Enum,
+                .Description = "Penalty on neighbor differences in the variational fit.",
+                .EnumNames = kSmoothnessPenaltyNames},
+            ConfigFieldSpec{.Name = "data_penalty",
+                .Type = FT::Enum,
+                .Description = "Penalty on deviation from the input in the variational fit.",
+                .EnumNames = kDataPenaltyNames},
+            ConfigFieldSpec{.Name = "fidelity",
+                .Type = FT::Enum,
+                .Description = "Fixed data weight, or the weight whose RMS residual matches the noise level.",
+                .EnumNames = kFidelityNames},
+            ConfigFieldSpec{.Name = "fit_weight",
+                .Type = FT::Float,
+                .Description = "Data weight of the variational fit.",
+                .Min = 0,
+                .Max = 1e12,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "noise_level",
+                .Type = FT::Float,
+                .Description = "Target RMS residual (property units).",
+                .Min = 0,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "penalty_delta",
+                .Type = FT::Float,
+                .Description = "Huber/L1 smoothing threshold (property units); 0 only with ADMM and no Huber penalty.",
+                .Min = 0},
+            ConfigFieldSpec{.Name = "bound",
+                .Type = FT::Enum,
+                .Description = "Tolerance bound on the deviation from the input.",
+                .EnumNames = kBoundNames},
+            ConfigFieldSpec{.Name = "bound_radius",
+                .Type = FT::Float,
+                .Description = "Uniform bound radius (property units).",
+                .Min = 0},
+            ConfigFieldSpec{.Name = "bound_radii",
+                .Type = FT::PropertyRef,
+                .Description = "Per-row bound radii on the input domain.",
+                .Nullable = true,
+                .RefKinds = kFloatScalar},
+            ConfigFieldSpec{.Name = "fit_solver",
+                .Type = FT::Enum,
+                .Description = "Variational-fit algorithm.",
+                .EnumNames = kFitSolverNames},
+            ConfigFieldSpec{.Name = "max_fit_iterations",
+                .Type = FT::UInt,
+                .Description = "Variational-fit iteration cap.",
+                .Min = 1,
+                .Max = 100000},
+            ConfigFieldSpec{.Name = "bound_norm",
+                .Type = FT::Enum,
+                .Description = "Bound shape on vector properties.",
+                .EnumNames = kBoundNormNames},
+            ConfigFieldSpec{.Name = "smoothness_order",
+                .Type = FT::Enum,
+                .Description = "First-order differences or second-order non-local TGV.",
+                .EnumNames = kOrderNames},
+            ConfigFieldSpec{.Name = "second_order_weight",
+                .Type = FT::Float,
+                .Description = "Weight of the second-order TGV term.",
+                .Min = 0,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "backend",
+                .Type = FT::Enum,
+                .Description = "CPU reference or Vulkan for the explicit filters and CG implicit smoothing.",
+                .EnumNames = kBackendNames},
+            ConfigFieldSpec{.Name = "fit_tolerance",
+                .Type = FT::Float,
+                .Description = "Relative change at which the variational fit stops.",
+                .Min = 0,
+                .Max = 1,
+                .ExclusiveMin = true,
+                .ExclusiveMax = true},
+            kExecutionFields[1],
+            kExecutionFields[2],
+            kExecutionFields[3],
+            kExecutionFields[4],
         };
         using PropertyGraphDetail::Snapshot;
         using PropertyGraphDetail::Channels;
@@ -198,6 +339,12 @@ namespace Extrinsic::Runtime
             c.Backend = PropertySmoothingBackend(doc.at("backend").get<unsigned>());
             c.Filter.MaxFitIterations = doc.at("max_fit_iterations").get<std::uint32_t>();
             c.Filter.FitTolerance = doc.at("fit_tolerance").get<double>();
+            // The merged document passed the field table: the tokens parse.
+            c.Execution.PreviewEvery = doc.at("preview_every").get<std::uint32_t>();
+            c.Execution.PreviewIntervalMs = doc.at("preview_interval_ms").get<std::uint32_t>();
+            c.Execution.AutoAccept =
+                ParseStepRunAutoAccept(doc.at("auto_accept").get<std::string>()).value_or(StepRunAutoAccept::Never);
+            c.Execution.Start = ParseStepRunStart(doc.at("start").get<std::string>()).value_or(StepRunStart::Ready);
             return c;
         }
         Core::Config::EngineConfigSectionValidationResult Validate(
@@ -344,20 +491,46 @@ namespace Extrinsic::Runtime
 
     std::string SerializePropertySmoothingConfig(const PropertySmoothingConfig& c)
     {
-        return Json{{"input", ConfigDetail::EncodePointPropertyRef(c.Input)}, {"output", ConfigDetail::EncodePointPropertyRef(c.Output)},
-            {"positions", ConfigDetail::EncodePointPropertyRef(c.Positions)}, {"weight", unsigned(c.Weight)},
-            {"method", unsigned(c.Filter.Method)}, {"laplacian", unsigned(c.Filter.Laplacian)},
-            {"iterations", c.Filter.Iterations}, {"neighbors", c.Neighbors}, {"spatial_sigma", c.SpatialSigma},
-            {"lambda", c.Filter.Lambda}, {"mu", c.Filter.Mu}, {"heat_time", c.Filter.HeatTime}, {"range_sigma", c.Filter.RangeSigma},
-            {"time_step", c.Filter.TimeStep}, {"solver_tolerance", c.Filter.SolverTolerance},
-            {"max_solver_iterations", c.Filter.MaxSolverIterations}, {"solver", unsigned(c.Filter.Solver)}, {"preserve_boundary", c.PreserveBoundary},
-            {"smoothness_penalty", unsigned(c.Filter.SmoothnessPenalty)}, {"data_penalty", unsigned(c.Filter.DataPenalty)},
-            {"fidelity", unsigned(c.Filter.Fidelity)}, {"fit_weight", c.Filter.FitWeight}, {"noise_level", c.Filter.NoiseLevel},
-            {"penalty_delta", c.Filter.PenaltyDelta}, {"bound", unsigned(c.Filter.Bound)}, {"bound_radius", c.Filter.BoundRadius},
-            {"bound_radii", c.BoundRadii.Name.empty() ? Json(nullptr) : ConfigDetail::EncodePointPropertyRef(c.BoundRadii)},
-            {"fit_solver", unsigned(c.Filter.FitAlgorithm)}, {"max_fit_iterations", c.Filter.MaxFitIterations},
-            {"bound_norm", unsigned(c.Filter.BoundNorm)}, {"smoothness_order", unsigned(c.Filter.SmoothnessOrder)},
-            {"second_order_weight", c.Filter.SecondOrderWeight}, {"backend", unsigned(c.Backend)}, {"fit_tolerance", c.Filter.FitTolerance}}.dump();
+        return Json{{"input", ConfigDetail::EncodePointPropertyRef(c.Input)},
+            {"output", ConfigDetail::EncodePointPropertyRef(c.Output)},
+            {"positions", ConfigDetail::EncodePointPropertyRef(c.Positions)},
+            {"weight", unsigned(c.Weight)},
+            {"method", unsigned(c.Filter.Method)},
+            {"laplacian", unsigned(c.Filter.Laplacian)},
+            {"iterations", c.Filter.Iterations},
+            {"neighbors", c.Neighbors},
+            {"spatial_sigma", c.SpatialSigma},
+            {"lambda", c.Filter.Lambda},
+            {"mu", c.Filter.Mu},
+            {"heat_time", c.Filter.HeatTime},
+            {"range_sigma", c.Filter.RangeSigma},
+            {"time_step", c.Filter.TimeStep},
+            {"solver_tolerance", c.Filter.SolverTolerance},
+            {"max_solver_iterations", c.Filter.MaxSolverIterations},
+            {"solver", unsigned(c.Filter.Solver)},
+            {"preserve_boundary", c.PreserveBoundary},
+            {"smoothness_penalty", unsigned(c.Filter.SmoothnessPenalty)},
+            {"data_penalty", unsigned(c.Filter.DataPenalty)},
+            {"fidelity", unsigned(c.Filter.Fidelity)},
+            {"fit_weight", c.Filter.FitWeight},
+            {"noise_level", c.Filter.NoiseLevel},
+            {"penalty_delta", c.Filter.PenaltyDelta},
+            {"bound", unsigned(c.Filter.Bound)},
+            {"bound_radius", c.Filter.BoundRadius},
+            {"bound_radii",
+                c.BoundRadii.Name.empty() ? Json(nullptr) : ConfigDetail::EncodePointPropertyRef(c.BoundRadii)},
+            {"fit_solver", unsigned(c.Filter.FitAlgorithm)},
+            {"max_fit_iterations", c.Filter.MaxFitIterations},
+            {"bound_norm", unsigned(c.Filter.BoundNorm)},
+            {"smoothness_order", unsigned(c.Filter.SmoothnessOrder)},
+            {"second_order_weight", c.Filter.SecondOrderWeight},
+            {"backend", unsigned(c.Backend)},
+            {"fit_tolerance", c.Filter.FitTolerance},
+            {"preview_every", c.Execution.PreviewEvery},
+            {"preview_interval_ms", c.Execution.PreviewIntervalMs},
+            {"auto_accept", std::string{ToString(c.Execution.AutoAccept)}},
+            {"start", std::string{ToString(c.Execution.Start)}}}
+            .dump();
     }
     Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration()
     {
@@ -539,7 +712,13 @@ namespace Extrinsic::Runtime
     }
 
     // The Vulkan run's job state (ADR 0030 decision 1): the capture, the device workspaces, the
-    // residency slots it reads and writes, and the transaction phase the panel drives.
+    // residency slots it reads and writes, and its logical steps. ARCH-023: the transaction is
+    // worker-stepped (Core.Pages): its Init (Prepare, main thread) gathers the input and uploads the run's
+    // constants in one owner page; each step then runs on the step run's worker, recording and waiting for its own
+    // bounded pages without a frame: one explicit pass, or one implicit time step over every channel (its chained
+    // CG solves in bounded chunks; the chunks are not steps). A step reads back only its completion word or the
+    // solver reports. Live preview copies the latest step into the write slot the owner offers (Mailbox); Accept's
+    // store of the latest step is an owner page.
     struct EditorPropertySmoothingTransaction : std::enable_shared_from_this<EditorPropertySmoothingTransaction>
     {
         // The shared Run/Accept lifecycle: ring 0 is the output (read back on Accept), ring 1 the
@@ -555,11 +734,10 @@ namespace Extrinsic::Runtime
         bool Implicit{};
         std::vector<std::uint32_t> Offsets{}, Columns{};
         S::PropertyImplicitSystem System{};
-        // Device workspaces leased from the spatial cache; the recorders reach them through this
-        // run, so they stay leased while queued work may still record or execute.
+        // Device workspaces leased from the spatial cache for the whole run (until Accept, Discard or
+        // the run's end); each recorder captures its own lease, so queued work keeps them alive.
         std::shared_ptr<Graphics::SparseConjugateGradientWorkspace> Solver{};
         std::shared_ptr<Graphics::PropertyFilterWorkspace> Filter{}; // the explicit kernels, or the CG path's store
-        bool FinalQueued{}; // the last chunk (reports only) is under way
         EditorPropertySmoothingResult Result{};
         std::function<void(EditorPropertySmoothingResult)> Sink{};
         bool Presentation{};
@@ -570,30 +748,66 @@ namespace Extrinsic::Runtime
         std::vector<std::uint32_t> RestoreMask{}; // fixed or isolated working rows keep the input value
         GP::PointPropertyWatch OutputWatch{};
         std::uint64_t CpuStageBytes{}; // implicit: the CPU-assembled coupling uploaded per run (ADR 0030, 8)
-        bool StoreRecorded{}; // the queued submission writes the output back
         std::uint32_t Previews{};
-        bool StopRequested{}, Stopped{};
+        // The chunk in flight; Done: steps the device completed (the step run's count); Recorded: the steps the
+        // explicit chunk in flight adds; Limit: the implicit chunk's solve bound; Stored: the step the ring's front
+        // holds, Storing: the step the chunk in flight stores.
+        std::shared_ptr<SpatialGpuResult> Chunk{};
+        std::atomic<std::uint32_t> Done{}; // written by a worker step, read by the owner once none runs (or here)
+        std::uint32_t Recorded{}, Limit{};
+        std::optional<std::uint32_t> Stored{}, Storing{};
+        std::size_t Applications{};
+        std::string Failure{};
         // Accept's test seam: the front's values (no readback).
         std::optional<std::vector<double>> TestFront{};
+        // ARCH-023: what the worker steps with, captured by Prepare and touched only by a step or preview (one at a
+        // time) while the run computes: its own workspace references (Release drops the owner's at once), the input
+        // endpoints and the solver reports of the step in flight.
+        struct WorkerView
+        {
+            std::shared_ptr<Graphics::SparseConjugateGradientWorkspace> Solver{};
+            std::shared_ptr<Graphics::PropertyFilterWorkspace> Filter{};
+            Graphics::PropertyFilterResidentIo Io{};
+            std::vector<std::byte> Reports{};
+        } Worker{};
+        // The live preview's write slot, offered by the owner and borrowed by a preview copy; the buffers ever
+        // offered (at most the rings' depth) are stamped before the run's slots go. InitPage: the Init's owner page.
+        struct PreviewSlot
+        {
+            std::optional<Graphics::GpuPropertyView> Output{}, Presentation{};
+        };
+        StepPreviewMailbox<PreviewSlot> Mailbox{};
+        std::vector<RHI::BufferHandle> Offered{};
+        std::shared_ptr<SpatialGpuResult> InitPage{};
+        std::uint32_t Reported{}; // the step count last reported as the Run job's progress
     };
 
     namespace PropertySmoothingDetail
     {
         using Work = std::shared_ptr<EditorPropertySmoothingTransaction>;
+        using PreviewSlot = EditorPropertySmoothingTransaction::PreviewSlot;
         constexpr std::uint32_t kRingDepth = 3u;   // fronts bound directly by the renderer (ADR 0030 decision 4)
         constexpr const char* kRefused = "Vulkan property smoothing could not queue its device work; previous output retained.";
 
         // The captured inputs and the output are unchanged (an edit or undo of either while
         // the run computes or waits makes it stale; the publication keeps its own value guard).
-        bool InputsCurrent(const EditorPropertySmoothingTransaction& w)
+        bool InputsCurrent(
+            const EditorProcessingContext& ctx, const SmoothingPublication& p, const GP::PointPropertyWatch& output)
         {
-            const auto& ctx = w.Core.Context;
-            return GP::GeometryPropertiesCurrent(ctx, w.Publication.Entity, w.Publication.Watches) &&
-                   GP::GeometryPropertiesCurrent(ctx, w.Publication.Entity, std::span{&w.OutputWatch, 1});
+            return GP::GeometryPropertiesCurrent(ctx, p.Entity, p.Watches) &&
+                GP::GeometryPropertiesCurrent(ctx, p.Entity, std::span{&output, 1});
         }
         bool Current(const Work& w) { return GP::GpuTransactionCurrent(w->Core); }
         auto& Output(const Work& w) { return w->Core.Rings[0]; }
         auto& PresentationRing(const Work& w) { return w->Core.Rings[1]; }
+        std::uint32_t ChannelCount(const Work& w)
+        {
+            return std::uint32_t(w->Plan.Channels);
+        }
+        std::uint32_t TotalSolves(const Work& w)
+        {
+            return w->Publication.Config.Filter.Iterations * ChannelCount(w);
+        }
         // Recorders own their workspace leases (the cache keeps them until the readback is
         // safe), so the run returns its own at once.
         void ReleaseWorkspaces(const Work& w)
@@ -628,10 +842,9 @@ namespace Extrinsic::Runtime
             for (const auto* view : {&w->Input, &w->Base, &Output(w).Back, &PresentationRing(w).Back})
                 if (*view) w->Core.Residency->NoteUse((*view)->Buffer, frame);
         }
-        // The slots a submission needs: the canonical input (uploaded once per revision) and a
-        // write slot of the output ring(s). False while the residency defers (a refused upload
-        // or an exhausted ring); the caller polls again next frame.
-        bool AcquireSlots(const Work& w)
+        // The canonical input (uploaded once per revision) and, for an existing output, its canonical slot. False
+        // while the residency defers (a refused upload); the caller polls again next frame.
+        bool AcquireInputs(const Work& w)
         {
             auto& r = *w->Core.Residency;
             const auto& c = w->Publication.Config;
@@ -650,212 +863,581 @@ namespace Extrinsic::Runtime
                 w->Base = aliased ? w->Input : ResolveGpuPropertyInput(r, *ctx.Scene, ctx.World, entity, c.Output);
                 if (!w->Base || w->Base->Layout.Count != w->Count) { w->Base.reset(); return false; }
             }
-            // A ring another run created defers like an exhausted one.
+            return true;
+        }
+        // A write slot of the output ring(s); false while the ring is exhausted or another run created it.
+        bool AcquireBack(const Work& w)
+        {
+            const auto& c = w->Publication.Config;
+            const auto entity = w->Publication.Entity;
             if (GP::AcquireGpuTransactionBack(w->Core, 0, entity, c.Output, w->Count, kRingDepth) != GP::GpuRingAcquisition::Ready)
                 return false;
             return !w->Presentation ||
                    GP::AcquireGpuTransactionBack(w->Core, 1, entity, GpuPropertyPresentationRef(c.Output), w->Count, kRingDepth) ==
                        GP::GpuRingAcquisition::Ready;
         }
-        // Ends the compute job as failed without queueing more work.
-        bool Refuse(const Work& w, std::string diagnostic)
+        // The run fails (CompleteRun reports it) without queueing more work.
+        bool Fail(const Work& w, std::string diagnostic)
         {
-            ReleaseWorkspaces(w);
-            auto& gpu = w->Core.Gpu;
-            gpu = std::make_shared<SpatialGpuResult>();
-            gpu->State = SpatialQueryState::Failed;
-            gpu->Diagnostic = std::move(diagnostic);
+            w->Failure = std::move(diagnostic);
             return true;
         }
         bool Defer(const Work& w)
         {
             if (!GP::GpuTransactionDeferralsExhausted(w->Core)) return false;
-            return Refuse(w, "The GPU property residency refused the run's input or output slot; previous output retained.");
+            return Fail(
+                w, "The GPU property residency refused the run's input or output slot; previous output retained.");
         }
         // The submission that wrote Back has finished: its slot becomes the front the renderer shows.
         void PublishPreview(const Work& w)
         {
-            const bool recorded = std::exchange(w->StoreRecorded, false);
+            const auto storing = std::exchange(w->Storing, std::nullopt);
             Output(w).Back.reset();
             PresentationRing(w).Back.reset();
             auto* residency = w->Core.Residency;
-            if (!recorded || !residency) return;
-            if (residency->Publish(Output(w).Key)) ++w->Previews;
+            if (!storing || !residency)
+                return;
+            if (residency->Publish(Output(w).Key))
+            {
+                ++w->Previews;
+                w->Stored = storing;
+            }
             if (w->Presentation) (void)residency->Publish(PresentationRing(w).Key);
         }
-        // False without a workspace; QueueGpuCompute always returns a result (a refusal is Failed).
-        bool QueueExplicit(const Work& w)
+        void Queued(const Work& w, std::shared_ptr<SpatialGpuResult> chunk)
         {
-            const auto& ctx = w->Core.Context;
-            auto& gpu = w->Core.Gpu;
-            w->Filter = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PropertyFilterWorkspace>();
-            if (!w->Filter) return false;
-            w->StoreRecorded = true;
-            // The result stays on the device (the ring); the readback is one word that only
-            // reports completion.
-            gpu = ctx.SpatialIndices->QueueGpuCompute(sizeof(double),
-                [w, filter = w->Filter](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Core.Abandoned) return {};
-                    NoteUses(w);
-                    const auto io = ResidentIo(w);
-                    return filter->Record(commands, {.Values = w->Values, .Channels = std::uint32_t(w->Plan.Channels),
-                        .Edges = w->Edges, .Weights = w->Weights, .Degree = w->Plan.Degree, .Fixed = w->Fixed}, w->Params, &io);
-                });
-            return true;
+            w->Chunk = w->Core.Gpu = std::move(chunk);
+            GP::GpuTransactionRecording(w->Core, true);
+            w->Core.Deferrals = 0u;
         }
-        // One bounded chunk per immediate submission (GRAPHICS-150); each chunk reads back only
-        // the reports it is observed by. A chunk also stores the latest complete time step into
-        // the ring when a write slot is held (a dropped preview otherwise); the final pass, after
-        // every solve finished, stores the result.
-        void QueueChunk(const Work& w, const bool final)
+        // Accept's store of the current values into the ring's write slot (an owner page, after the Init began the
+        // explicit run). The result stays on the device; the readback is one word that only reports completion.
+        void QueueExplicitStore(const Work& w)
         {
-            const auto& ctx = w->Core.Context;
-            auto& gpu = w->Core.Gpu;
-            const std::uint32_t solves = w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels);
-            w->FinalQueued = final;
-            gpu = ctx.SpatialIndices->QueueGpuCompute(
-                Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(solves),
-                [w, final, solver = w->Solver, filter = w->Filter](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    if (w->Core.Abandoned) return {};
-                    const auto channels = std::uint32_t(w->Plan.Channels), rows = std::uint32_t(w->Plan.Count);
-                    if (solver->Chunks() == 0u)
+            w->Recorded = 0u;
+            w->Storing = w->Done.load();
+            Queued(w,
+                w->Core.Context.SpatialIndices->QueueGpuCompute(sizeof(double),
+                    [w, filter = w->Filter](
+                        RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle
                     {
-                        // The seeds (each channel's first solve starts from the input) come from
-                        // the canonical slot; only the CPU-assembled coupling was uploaded.
-                        NoteUses(w);
-                        const auto io = ResidentIo(w);
-                        if (!solver->RecordUpload(commands) ||
-                            !filter->RecordLoad(commands, io, channels, solver->ResultBuffer(), solver->SolutionsAddress(), 1u, rows))
+                        if (w->Core.Abandoned)
                             return {};
-                    }
-                    const auto buffer = final ? solver->RecordFinal(commands) : solver->RecordNext(commands);
-                    if (!buffer.IsValid()) return {};
-                    const auto iterations = solver->CompletedSolves() / channels;
-                    if (Output(w).Back && iterations > 0u)
-                    {
                         NoteUses(w);
                         const auto io = ResidentIo(w);
-                        const std::uint64_t solutions = solver->SolutionsAddress() +
-                            std::uint64_t(iterations - 1u) * channels * rows * sizeof(double);
-                        w->StoreRecorded = filter->RecordStore(commands, io, channels, solver->ResultBuffer(), solutions, 1u, rows);
-                    }
-                    return buffer;
-                }, SpatialGpuLatency::Immediate);
+                        const auto buffer = filter->RecordIterations(commands, 0u);
+                        if (!buffer.IsValid() || !filter->RecordStoreCurrent(commands, io))
+                            return {};
+                        return buffer;
+                    }));
         }
-        // Main-thread readiness poll of the compute job: queues the device work, publishes each
-        // finished preview and reports when the run reached its end (or failed / was stopped).
-        bool Poll(const Work& w)
+        // One bounded chunk (GRAPHICS-150) of the chained solves below `limit`; each chunk reads back only the
+        // reports. It stores the latest complete time step into the ring when a write slot is held and live preview
+        // takes it, or always with `force` (Accept's store, a resting preview).
+        void QueueImplicit(const Work& w, const std::uint32_t limit, const bool force)
         {
             const auto& ctx = w->Core.Context;
-            auto& gpu = w->Core.Gpu;
+            w->Limit = limit;
+            w->Storing.reset();
+            Queued(w,
+                ctx.SpatialIndices->QueueGpuCompute(
+                    Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(TotalSolves(w)),
+                    [w, limit, force, solver = w->Solver, filter = w->Filter](
+                        RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle
+                    {
+                        if (w->Core.Abandoned)
+                            return {};
+                        const auto channels = ChannelCount(w), rows = std::uint32_t(w->Plan.Count);
+                        if (solver->Chunks() == 0u && !solver->Finished())
+                        {
+                            // The seeds (each channel's first solve starts from the input) come from
+                            // the canonical slot; only the CPU-assembled coupling was uploaded.
+                            NoteUses(w);
+                            const auto io = ResidentIo(w);
+                            if (!solver->RecordUpload(commands) ||
+                                !filter->RecordLoad(commands,
+                                    io,
+                                    channels,
+                                    solver->ResultBuffer(),
+                                    solver->SolutionsAddress(),
+                                    1u,
+                                    rows))
+                                return {};
+                        }
+                        const auto buffer =
+                            solver->Finished() ? solver->RecordFinal(commands) : solver->RecordNext(commands, limit);
+                        if (!buffer.IsValid())
+                            return {};
+                        const auto steps = solver->CompletedSolves() / channels;
+                        if (Output(w).Back && steps > 0u && steps > w->Stored.value_or(0u) &&
+                            (force || GP::GpuTransactionMayPreviewAt(w->Core, steps)))
+                        {
+                            NoteUses(w);
+                            const auto io = ResidentIo(w);
+                            const std::uint64_t solutions = solver->SolutionsAddress() +
+                                std::uint64_t(steps - 1u) * channels * rows * sizeof(double);
+                            if (filter->RecordStore(
+                                    commands, io, channels, solver->ResultBuffer(), solutions, 1u, rows))
+                            {
+                                w->Storing = steps;
+                                if (!force)
+                                    GP::GpuTransactionPreviewed(w->Core);
+                            }
+                        }
+                        return buffer;
+                    }));
+        }
+        bool BeginSolver(const Work& w)
+        {
+            const auto& f = w->Publication.Config.Filter;
+            return w->Solver->Begin({.Matrix = {.Rows = std::uint32_t(w->Plan.Count),
+                                         .RowOffsets = w->Offsets,
+                                         .Columns = w->Columns,
+                                         .Values = w->System.Matrix.Values},
+                .Solves = TotalSolves(w),
+                .RhsDiagonal = w->System.RhsDiagonal,
+                .RhsConstant = w->System.RhsConstant,
+                .ChainStride = ChannelCount(w),
+                .SeedsOnDevice = true,
+                .MaxIterations = f.MaxSolverIterations,
+                .Tolerance = f.SolverTolerance});
+        }
+        // Accept's store of the latest complete step into the ring (an owner page; it waits for a write slot).
+        bool QueueStore(const Work& w)
+        {
+            if (!AcquireBack(w))
+                return Defer(w);
+            if (w->Implicit)
+                QueueImplicit(w, w->Done.load() * ChannelCount(w), true);
+            else
+                QueueExplicitStore(w);
+            return false;
+        }
+        // Accept's consumed store page (it completes no step; the solver observes its reports): its store becomes the
+        // front. False: the run failed.
+        bool Consume(const Work& w, const SpatialGpuResult& chunk)
+        {
+            const std::uint32_t done = w->Done.load();
+            std::uint32_t completed = done + w->Recorded;
+            double metric = 0.0;
             if (w->Implicit)
             {
-                if (!w->Solver)
-                {
-                    if (!AcquireSlots(w)) return Defer(w);
-                    w->Solver = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::SparseConjugateGradientWorkspace>();
-                    w->Filter = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PropertyFilterWorkspace>();
-                    if (!w->Solver || !w->Filter) return Refuse(w, "Vulkan property smoothing device workspace unavailable; previous output retained.");
-                    const auto& f = w->Publication.Config.Filter;
-                    const auto channelCount = std::uint32_t(w->Plan.Channels);
-                    if (!w->Solver->Begin({.Matrix = {.Rows = std::uint32_t(w->Plan.Count), .RowOffsets = w->Offsets,
-                            .Columns = w->Columns, .Values = w->System.Matrix.Values},
-                            .Solves = f.Iterations * channelCount,
-                            .RhsDiagonal = w->System.RhsDiagonal, .RhsConstant = w->System.RhsConstant,
-                            .ChainStride = channelCount, .SeedsOnDevice = true,
-                            .MaxIterations = f.MaxSolverIterations, .Tolerance = f.SolverTolerance}))
-                        return Refuse(w, "The Vulkan solver refused the implicit system; previous output retained.");
-                    QueueChunk(w, false);
-                    return false;
-                }
-                if (!gpu || gpu->State == SpatialQueryState::Failed) return true;
-                if (gpu->State != SpatialQueryState::Ready) return false;
-                PublishPreview(w);
-                if (w->FinalQueued) return true;
-                w->Solver->Observe(gpu->Data);
-                if (ctx.JobCommands.ReportProgress && w->Core.RunToken.IsValid())
-                {
-                    // Chained solves (iterations x channels) are the one place a
-                    // count is known; the explicit kernels are a single dispatch.
-                    const auto total = std::max<std::uint32_t>(
-                        1u, w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels));
-                    ctx.JobCommands.ReportProgress(
-                        w->Core.RunToken,
-                        {.Normalized = std::min(1.0f, float(w->Solver->CompletedSolves()) / float(total)),
-                         .Determinate = true});
-                }
-                if (w->Solver->Finished())
-                {
-                    // The final store needs a write slot: wait for one rather than accept a stale front.
-                    if (!AcquireSlots(w)) return Defer(w);
-                    QueueChunk(w, true);
-                    return false;
-                }
-                if (w->StopRequested) { w->Stopped = true; return true; }
-                (void)AcquireSlots(w); // no slot: this chunk computes without a preview
-                QueueChunk(w, false);
-                return false;
-            }
-            if (!gpu)
-            {
-                if (!AcquireSlots(w)) return Defer(w);
-                return QueueExplicit(w) ? false : Refuse(w, kRefused);
-            }
-            if (gpu->State == SpatialQueryState::Ready) PublishPreview(w);
-            return gpu->State == SpatialQueryState::Ready || gpu->State == SpatialQueryState::Failed;
-        }
-        // The compute job ended: the run either waits for Accept or failed.
-        void CompleteRun(const Work& w)
-        {
-            w->Input.reset();
-            const auto& gpu = w->Core.Gpu;
-            if (!gpu || gpu->State != SpatialQueryState::Ready)
-            {
-                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                       gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic
-                       : "Vulkan property smoothing did not return a result; previous output retained.");
-                return;
-            }
-            if (w->Implicit && !w->Stopped)
-            {
-                // Every chained solve must converge, as on the CPU.
-                const std::size_t solves = std::size_t(w->Publication.Config.Filter.Iterations) * w->Plan.Channels;
-                bool converged = w->Solver && w->Solver->Finished() &&
-                    gpu->Data.size() == Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(std::uint32_t(solves));
-                std::size_t applications = 0;
-                for (std::size_t k = 0; converged && k < solves; ++k)
+                const auto channels = ChannelCount(w);
+                const auto solves = TotalSolves(w);
+                if (chunk.Data.size() != Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(solves))
+                    return !Fail(
+                        w, "Vulkan property smoothing did not return its solver reports; previous output retained.");
+                w->Solver->Observe(chunk.Data);
+                completed = w->Solver->CompletedSolves() / channels;
+                for (std::size_t k = std::size_t(done) * channels; k < std::size_t(completed) * channels; ++k)
                 {
                     Graphics::SparseCgReport report{};
-                    std::memcpy(&report, gpu->Data.data() + k * sizeof(report), sizeof(report));
-                    converged = report.Status == Graphics::SparseCgStatus::Converged;
-                    applications += report.Iterations + 1;
+                    std::memcpy(&report, chunk.Data.data() + k * sizeof(report), sizeof(report));
+                    // Every chained solve must converge, as on the CPU.
+                    if (report.Status != Graphics::SparseCgStatus::Converged)
+                        return !Fail(w, "Implicit solver failed to converge on Vulkan; no property was changed.");
+                    w->Applications += report.Iterations + 1;
+                    metric += report.Iterations;
                 }
-                if (!converged)
-                {
-                    Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                           "Implicit solver failed to converge on Vulkan; no property was changed.");
-                    return;
-                }
-                w->Result.OperatorApplications = applications;
             }
-            else if (!w->Implicit) w->Result.OperatorApplications = Graphics::PropertyFilterWorkspace::DispatchCount(w->Params);
-            if (w->Previews == 0u)
+            else
             {
-                // Nothing to accept: a Stop before the first preview ends the run as no change
-                // (delivered from the publication, so a restart from the callback is admitted).
-                if (w->Stopped)
-                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::NoChange,
-                           "Vulkan property smoothing stopped before a preview; previous output retained.");
-                else
-                    Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
-                           "Vulkan property smoothing published no preview; previous output retained.");
+                auto done = w->Params;
+                done.Iterations = w->Params.Iterations ? completed : 0u;
+                w->Applications = Graphics::PropertyFilterWorkspace::DispatchCount(done);
+                metric = double(w->Applications);
+            }
+            (void)metric;
+            w->Recorded = 0u;
+            PublishPreview(w);
+            if (completed != done) // a store page records no solve past the latest complete step
+                return !Fail(w, "Vulkan property smoothing stored an unfinished step; previous output retained.");
+            return true;
+        }
+        // The worker's residency slots (input, base and every write slot offered), stamped with the compute fence
+        // before they go: a preview copy is not waited for.
+        void Uses(const Work& w, std::vector<RHI::BufferHandle>& buffers)
+        {
+            for (const auto* view : {&w->Input, &w->Base})
+                if (*view)
+                    buffers.push_back((*view)->Buffer);
+            buffers.insert(buffers.end(), w->Offered.begin(), w->Offered.end());
+        }
+        void StampWorkerUses(const Work& w)
+        {
+            std::vector<RHI::BufferHandle> buffers;
+            Uses(w, buffers);
+            GP::StampGpuTransactionUses(w->Core, buffers);
+        }
+        // Owner, no step running: the preview slot goes (stamped first: its copy may be in flight).
+        void ClearMailbox(const Work& w)
+        {
+            if (auto slot = w->Mailbox.Clear())
+            {
+                std::vector<RHI::BufferHandle> buffers;
+                for (const auto* view : {&slot->first.Output, &slot->first.Presentation})
+                    if (*view)
+                        buffers.push_back((*view)->Buffer);
+                GP::StampGpuTransactionUses(w->Core, buffers);
+            }
+        }
+        // Owner, any time: a free write slot for the next live preview copy, never waited for (a busy ring offers
+        // none and that preview is dropped); nothing while live preview is off, the Init runs or the run accepts.
+        void OfferPreview(const Work& w)
+        {
+            auto& t = w->Core;
+            if (t.Execution.PreviewEvery == 0u || !t.Prepared || t.CommitWanted || !w->Mailbox.Empty())
+                return;
+            const auto run = t.Context.StepRuns->Observe(t.StepRun);
+            if (!run || IsTerminal(run->Phase) || run->Phase == StepRunPhase::Accepting || !AcquireBack(w))
+                return;
+            PreviewSlot slot{.Output = std::exchange(Output(w).Back, std::nullopt),
+                .Presentation = std::exchange(PresentationRing(w).Back, std::nullopt)};
+            for (const auto* view : {&slot.Output, &slot.Presentation})
+                if (*view && std::ranges::find(w->Offered, (*view)->Buffer) == w->Offered.end())
+                    w->Offered.push_back((*view)->Buffer);
+            (void)w->Mailbox.Offer(std::move(slot));
+        }
+        // The Init's owner page: the explicit run's Begin (uploads, the resident gather), or the implicit solver's
+        // upload and its seeds gathered from the canonical slot. Recorded once the last worker copy completed (Begin
+        // rewrites host-visible buffers a copy may still read).
+        std::shared_ptr<SpatialGpuResult> QueueInit(const Work& w)
+        {
+            return w->Core.Context.SpatialIndices->QueueGpuCompute(0u,
+                [w, filter = w->Filter, solver = w->Solver](
+                    RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle
+                {
+                    if (w->Core.Abandoned)
+                        return {};
+                    NoteUses(w);
+                    auto io = ResidentIo(w);
+                    io.Output = io.Presentation = {};
+                    io.OutputBytes = io.PresentationBytes = 0u;
+                    if (!w->Implicit)
+                        return filter->Begin(commands,
+                                   {.Values = w->Values,
+                                       .Channels = std::uint32_t(w->Plan.Channels),
+                                       .Edges = w->Edges,
+                                       .Weights = w->Weights,
+                                       .Degree = w->Plan.Degree,
+                                       .Fixed = w->Fixed},
+                                   w->Params,
+                                   &io)
+                            ? w->Input->Buffer
+                            : RHI::BufferHandle{};
+                    return solver->RecordUpload(commands) &&
+                            filter->RecordLoad(commands,
+                                io,
+                                ChannelCount(w),
+                                solver->ResultBuffer(),
+                                solver->SolutionsAddress(),
+                                1u,
+                                std::uint32_t(w->Plan.Count))
+                        ? solver->ResultBuffer()
+                        : RHI::BufferHandle{};
+                });
+        }
+        // The Init (main thread, the Run job's readiness): inputs, workspaces and the Init page; the worker view once
+        // it completed. Pending while the residency defers or a page is in flight.
+        GP::GpuTransactionPrepare Prepare(const Work& w, std::string& why)
+        {
+            using P = GP::GpuTransactionPrepare;
+            auto& t = w->Core;
+            if (w->InitPage)
+            {
+                if (w->InitPage->State == SpatialQueryState::Failed)
+                {
+                    why = w->InitPage->Diagnostic.empty() ? kRefused : w->InitPage->Diagnostic;
+                    return P::Failed;
+                }
+                if (w->InitPage->State != SpatialQueryState::Ready)
+                    return P::Pending;
+                w->InitPage.reset();
+                w->Worker.Solver = w->Solver;
+                w->Worker.Filter = w->Filter;
+                w->Worker.Io = ResidentIo(w);
+                w->Worker.Io.Output = w->Worker.Io.Presentation = {};
+                w->Worker.Io.OutputBytes = w->Worker.Io.PresentationBytes = 0u;
+                t.Pages->ClearAbort(RHI::ComputeInputOrder::LaneOrderOnly); // owner Init ordered the input uploads
+                return P::Ready;
+            }
+            if (!t.Context.Device->GetTransferQueue().IsComplete(t.Pages->Last()))
+                return P::Pending; // a restart's older copy still reads the workspace
+            if (!AcquireInputs(w))
+            {
+                if (!GP::GpuTransactionDeferralsExhausted(t))
+                    return P::Pending;
+                why = "The GPU property residency refused the run's input or output slot; previous output retained.";
+                return P::Failed;
+            }
+            t.Deferrals = 0u;
+            if (!w->Filter)
+                w->Filter = t.Context.SpatialIndices->LeaseGpuWorkspace<Graphics::PropertyFilterWorkspace>();
+            if (w->Implicit && !w->Solver)
+            {
+                w->Solver = t.Context.SpatialIndices->LeaseGpuWorkspace<Graphics::SparseConjugateGradientWorkspace>();
+                if (w->Solver && !BeginSolver(w))
+                {
+                    why = "The Vulkan solver refused the implicit system; previous output retained.";
+                    return P::Failed;
+                }
+            }
+            if (!w->Filter || (w->Implicit && !w->Solver))
+            {
+                why = w->Implicit ? "Vulkan property smoothing device workspace unavailable; previous output retained."
+                                  : kRefused;
+                return P::Failed;
+            }
+            w->InitPage = t.Gpu = QueueInit(w); // the run's device work is queued (DeviceWorkQueued)
+            if (w->InitPage->State == SpatialQueryState::Failed)
+            {
+                why = w->InitPage->Diagnostic.empty() ? kRefused : w->InitPage->Diagnostic;
+                return P::Failed;
+            }
+            return P::Pending;
+        }
+        // One page of a worker step: nullopt once it completed, else the step's outcome (a failure says why).
+        std::optional<StepOutcome> RunPage(EditorPropertySmoothingTransaction& w,
+            const std::function<RHI::BufferHandle(RHI::ICommandContext&)>& record,
+            const std::span<std::byte> out)
+        {
+            switch (w.Core.Pages->Run(record, out))
+            {
+            case WorkerGpuPageStatus::Complete: return std::nullopt;
+            case WorkerGpuPageStatus::Aborted:  return StepOutcome::Failed; // given up: the owner ended the run
+            case WorkerGpuPageStatus::Refused:  w.Core.WorkerFailure = kRefused; return StepOutcome::Failed;
+            case WorkerGpuPageStatus::Failed:
+            case WorkerGpuPageStatus::TimedOut: break;
+            }
+            w.Core.WorkerFailure = "Vulkan property smoothing page did not complete: the device was lost.";
+            return StepOutcome::Failed;
+        }
+        // The step run's Step, on a worker: one explicit pass, or one implicit time step over every channel (its
+        // chunks until the step's last solve finished; each one only reads its reports back). Every chained solve
+        // must converge, as on the CPU. Owner state is never touched.
+        // The explicit passes of a batch (Run: the step run's allowance, in one submission as before; one for Step).
+        StepOutcome ExplicitSteps(const Work& self, StepRunMetric& metric, const std::uint32_t count)
+        {
+            auto& w = *self;
+            if (w.Core.Pages->Aborted())
+                return StepOutcome::Failed;
+            const std::uint32_t done = w.Done.load();
+            auto& worker = w.Worker;
+            double word{};
+            // A zero rate iterates nothing, as on the CPU.
+            const std::uint32_t iterations = w.Params.Iterations ? count : 0u;
+            if (const auto failed = RunPage(
+                    w,
+                    [&worker, iterations](RHI::ICommandContext& commands)
+                    {
+                        return worker.Filter->RecordIterations(commands, iterations);
+                    },
+                    std::as_writable_bytes(std::span{&word, 1u})))
+                return *failed;
+            auto params = w.Params;
+            params.Iterations = w.Params.Iterations ? done + count : 0u;
+            w.Applications = Graphics::PropertyFilterWorkspace::DispatchCount(params);
+            metric.Values[0] = double(w.Applications);
+            w.Done.store(done + count);
+            return StepOutcome::Continue;
+        }
+        StepOutcome WorkerStep(const Work& self, StepRunMetric& metric)
+        {
+            auto& w = *self;
+            if (!w.Implicit)
+                return ExplicitSteps(self, metric, 1u);
+            if (w.Core.Pages->Aborted())
+                return StepOutcome::Failed;
+            const std::uint32_t done = w.Done.load();
+            auto& worker = w.Worker;
+            const auto channels = ChannelCount(self);
+            const std::uint32_t limit = (done + 1u) * channels;
+            worker.Reports.resize(Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(TotalSolves(self)));
+            do
+            {
+                if (const auto failed = RunPage(
+                        w,
+                        [&worker, limit](RHI::ICommandContext& commands)
+                        {
+                            return worker.Solver->RecordNext(commands, limit);
+                        },
+                        worker.Reports))
+                    return *failed;
+                worker.Solver->Observe(worker.Reports);
+            } while (worker.Solver->CompletedSolves() < limit);
+            double iterations = 0.0;
+            for (std::size_t k = std::size_t(done) * channels; k < limit; ++k)
+            {
+                Graphics::SparseCgReport report{};
+                std::memcpy(&report, worker.Reports.data() + k * sizeof(report), sizeof(report));
+                if (report.Status != Graphics::SparseCgStatus::Converged)
+                {
+                    w.Core.WorkerFailure = "Implicit solver failed to converge on Vulkan; no property was changed.";
+                    return StepOutcome::Failed;
+                }
+                w.Applications += report.Iterations + 1;
+                iterations += report.Iterations;
+            }
+            metric.Values[0] = iterations;
+            w.Done.store(done + 1u);
+            return StepOutcome::Continue;
+        }
+        // The step run's Preview, after a step on the worker (or at a rest on the owner): the latest step into the
+        // slot the owner offered, its own submission, not waited for; Show publishes it once its fence completed.
+        // No slot offered: no copy (the run goes on).
+        bool WorkerPreview(const Work& self, StepPreview& preview)
+        {
+            auto& w = *self;
+            PreviewSlot slot{};
+            if (!w.Mailbox.Borrow(
+                    [&slot](const PreviewSlot& offered)
+                    {
+                        slot = offered; // the views alone: the leases stay in the mailbox
+                        for (auto* view : {&slot.Output, &slot.Presentation})
+                            if (*view)
+                                (*view)->Lease.reset();
+                    }))
+                return false;
+            auto io = w.Worker.Io;
+            io.Output = View(slot.Output);
+            io.OutputBytes = slot.Output ? slot.Output->Bytes : 0u;
+            io.Presentation = View(slot.Presentation);
+            io.PresentationBytes = slot.Presentation ? slot.Presentation->Bytes : 0u;
+            const std::uint32_t done = w.Done.load();
+            const auto channels = ChannelCount(self), rows = std::uint32_t(w.Plan.Count);
+            const auto token = done == 0u || !slot.Output
+                ? RHI::ReadbackToken{}
+                : w.Core.Pages->SubmitCopy(
+                      [&](RHI::ICommandContext& commands) -> RHI::BufferHandle
+                      {
+                          if (!w.Implicit)
+                              return w.Worker.Filter->RecordStoreCurrent(commands, io) ? slot.Output->Buffer
+                                                                                       : RHI::BufferHandle{};
+                          const auto& solver = *w.Worker.Solver;
+                          const std::uint64_t solutions =
+                              solver.SolutionsAddress() + std::uint64_t(done - 1u) * channels * rows * sizeof(double);
+                          return w.Worker.Filter->RecordStore(
+                                     commands, io, channels, solver.ResultBuffer(), solutions, 1u, rows)
+                              ? slot.Output->Buffer
+                              : RHI::BufferHandle{};
+                      });
+            w.Mailbox.Recorded(token.Value);
+            preview.Fence = token.Value;
+            return token.IsValid();
+        }
+        // The step run's Show (owner): a completed copy becomes the front; an incomplete one waits; one no longer in
+        // the mailbox (cleared for Accept or a restart) is never shown.
+        StepRunShow ShowPreview(const Work& w, const StepPreview& preview)
+        {
+            auto& t = w->Core;
+            if (preview.Fence == 0u)
+                return StepRunShow::Never;
+            if (!t.Context.Device->GetTransferQueue().IsComplete(RHI::ReadbackToken{preview.Fence}))
+                return StepRunShow::Later;
+            auto slot = w->Mailbox.Take(preview.Fence);
+            if (!slot)
+                return StepRunShow::Never;
+            slot.reset(); // its leases go before the publication (the copy completed)
+            if (!t.Residency || !t.Residency->Publish(Output(w).Key))
+                return StepRunShow::Never;
+            if (w->Presentation)
+                (void)t.Residency->Publish(PresentationRing(w).Key);
+            ++w->Previews;
+            w->Stored = preview.Step;
+            return StepRunShow::Shown;
+        }
+        // The owner's side of the Run job's readiness (after the Init): offers live preview slots while steps run;
+        // once none runs, reports progress and, at the step run's Commit, stores the latest complete step into the
+        // ring (an owner page). True once that store is the front (or the run failed).
+        bool Poll(const Work& w)
+        {
+            auto& t = w->Core;
+            if (!w->Failure.empty())
+                return true;
+            OfferPreview(w);
+            if (GP::GpuTransactionWorkerBusy(t))
+                return false;
+            const std::uint32_t done = w->Done.load();
+            if (const auto& ctx = t.Context;
+                done != w->Reported && ctx.JobCommands.ReportProgress && t.RunToken.IsValid())
+            {
+                w->Reported = done;
+                ctx.JobCommands.ReportProgress(t.RunToken,
+                    {.Normalized = std::min(1.0f, float(done) / float(std::max(1u, t.Execution.IterationCap))),
+                        .Determinate = true});
+            }
+            if (w->Chunk)
+            {
+                if (w->Chunk->State == SpatialQueryState::Failed)
+                {
+                    GP::GpuTransactionRecording(t, false);
+                    return Fail(w, w->Chunk->Diagnostic.empty() ? kRefused : w->Chunk->Diagnostic);
+                }
+                if (w->Chunk->State != SpatialQueryState::Ready)
+                    return false;
+                const auto chunk = std::exchange(w->Chunk, {});
+                const bool consumed = Consume(w, *chunk);
+                GP::GpuTransactionRecording(t, false);
+                if (!consumed)
+                    return true;
+            }
+            if (!t.CommitWanted)
+                return false;
+            ClearMailbox(w); // the latest step's own store replaces an unpublished live preview
+            return done == 0u || w->Stored == done || QueueStore(w);
+        }
+        // The Run job ended at the step run's Commit: Accept starts on the front (or the run failed).
+        void CompleteRun(const Work& w)
+        {
+            if (!w->Failure.empty())
+            {
+                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed, w->Failure);
                 return;
             }
+            if (w->Previews == 0u)
+            {
+                Finish(w,
+                    EditorGpuTransactionPhase::Discarded,
+                    EditorCommandStatus::StaleEntity,
+                    "Vulkan property smoothing published no result; previous output retained.");
+                return;
+            }
+            ClearMailbox(w);
+            StampWorkerUses(w); // a live preview copy is not waited for
             ReleaseWorkspaces(w);
+            w->Input.reset();
+            w->Base.reset();
+            w->Result.OperatorApplications = w->Applications;
+            w->Result.Steps = w->Done.load();
             GP::ReadyGpuTransaction(w->Core);
             w->Result.Status = EditorCommandStatus::Pending;
-            w->Result.Message = w->Stopped ? "Stopped; the latest preview waits for Accept or Discard."
-                                           : "The GPU result waits for Accept or Discard.";
+            w->Result.Message = "The GPU result waits for Accept or Discard.";
+        }
+        // run_control restart: the captured input again, a fresh output ring, nothing of the older steps.
+        bool Restart(const Work& w, std::string& diagnostic)
+        {
+            if (!w->Failure.empty())
+            {
+                diagnostic = w->Failure;
+                return false;
+            }
+            if (w->Solver && !BeginSolver(w))
+            {
+                diagnostic = "The Vulkan solver refused the implicit system.";
+                return false;
+            }
+            w->Done.store(0u);
+            w->Recorded = w->Limit = w->Reported = 0u;
+            w->Stored.reset();
+            w->Storing.reset();
+            w->Previews = 0u;
+            w->Applications = 0u;
+            // The workspaces stay leased (their capacity too); the next Init begins the explicit run again and
+            // regathers the captured input, or uploads the solver's operator and seeds again.
+            w->InitPage.reset();
+            ClearMailbox(w);
+            GP::RestartGpuTransactionRings(w->Core);
+            return true;
         }
         // Accept landed: the front's rows become the published property and the canonical slot.
         void CompleteAccept(const Work& w)
@@ -928,25 +1510,81 @@ namespace Extrinsic::Runtime
             t.Label = "Vulkan property smoothing";
             t.AcceptJobName = "Vulkan property smoothing accept";
             t.JobLabel = "Property smoothing";
-            t.Hooks = {
-                .Current = [raw] { return InputsCurrent(*raw); },
-                .Poll = [self] { return Poll(self()); },
-                .CompleteRun = [self] { CompleteRun(self()); },
-                .CompleteAccept = [self] { CompleteAccept(self()); },
-                .Accepting = [raw] {
+            t.Hooks = {.Current =
+                           [raw]
+                {
+                    return InputsCurrent(raw->Core.Context, raw->Publication, raw->OutputWatch);
+                },
+                .Poll =
+                    [self]
+                {
+                    return Poll(self());
+                },
+                .CompleteRun =
+                    [self]
+                {
+                    CompleteRun(self());
+                },
+                .CompleteAccept =
+                    [self]
+                {
+                    CompleteAccept(self());
+                },
+                .Accepting =
+                    [raw]
+                {
                     raw->Result.Status = EditorCommandStatus::Pending;
                     raw->Result.Message = "Reading the GPU result back.";
                 },
-                .Release = [self] {
+                .Restart =
+                    [self](std::string& diagnostic)
+                {
+                    return Restart(self(), diagnostic);
+                },
+                .Prepare =
+                    [self](std::string& diagnostic)
+                {
+                    return Prepare(self(), diagnostic);
+                },
+                .Step =
+                    [self](StepRunMetric& metric)
+                {
+                    return WorkerStep(self(), metric);
+                },
+                .Preview =
+                    [self](StepPreview& preview)
+                {
+                    return WorkerPreview(self(), preview);
+                },
+                .Show =
+                    [self](const StepPreview& preview)
+                {
+                    return ShowPreview(self(), preview);
+                },
+                .Uses =
+                    [self](std::vector<RHI::BufferHandle>& buffers)
+                {
+                    Uses(self(), buffers);
+                },
+                .Release =
+                    [self]
+                {
                     const auto w = self();
+                    ClearMailbox(w); // the core sealed the pages and stamped the slots
                     ReleaseWorkspaces(w);
                     w->Input.reset();
                     w->Base.reset();
+                    w->Worker = {}; // no step or preview runs any more (the core waits for that)
                 },
-                .Deliver = [raw](const EditorCommandStatus status, std::string message) {
+                .Deliver =
+                    [raw](const EditorCommandStatus status, std::string message)
+                {
                     raw->Result.Status = status;
                     raw->Result.Message = std::move(message);
-                    if (auto sink = std::move(raw->Sink)) sink(raw->Result);
+                    raw->Result.StepRun = raw->Core.StepRun;
+                    raw->Result.Steps = raw->Done.load();
+                    if (auto sink = std::move(raw->Sink))
+                        sink(raw->Result);
                 }};
         }
         // Sets the output (and presentation) ring keys of `entity`'s output.
@@ -972,11 +1610,29 @@ namespace Extrinsic::Runtime
             (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
             return w->Result;
         }
-        // Builds the run from the capture and queues its compute job. Null with `result` filled
+        // The run's logical cap: the method's iterations (explicit passes, implicit time steps), or 1 for the
+        // variational fit, solved whole.
+        StepRunExecution RunExecution(const PropertySmoothingConfig& c, StepRunExecution execution)
+        {
+            execution.IterationCap = c.Filter.Method == S::PropertyFilter::VariationalFit ? 1u : c.Filter.Iterations;
+            return execution;
+        }
+        // The batch command's execution: at once, accepted at its end.
+        StepRunExecution BatchExecution(StepRunExecution execution)
+        {
+            execution.Start = StepRunStart::Run;
+            execution.AutoAccept = StepRunAutoAccept::End;
+            return execution;
+        }
+        // Builds the run from the capture and queues its Run job and step run. Null with `result` filled
         // (a rejection) when the request cannot run.
-        Work StartVulkan(const EditorProcessingContext& context, const std::uint32_t id, const PropertySmoothingConfig& c,
-                         Prepared prepared, EditorPropertySmoothingResult& result,
-                         std::function<void(EditorPropertySmoothingResult)> onComplete, const bool autoAccept)
+        Work StartVulkan(const EditorProcessingContext& context,
+            const std::uint32_t id,
+            const PropertySmoothingConfig& c,
+            Prepared prepared,
+            EditorPropertySmoothingResult& result,
+            std::function<void(EditorPropertySmoothingResult)> onComplete,
+            const StepRunExecution& execution)
         {
             const auto fail = [&](std::string message) {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
@@ -1030,6 +1686,13 @@ namespace Extrinsic::Runtime
             }
             if (w->Implicit)
                 w->CpuStageBytes = (w->System.RhsDiagonal.size() + w->System.RhsConstant.size()) * sizeof(double);
+            else // Run records the allowed passes in one submission
+                w->Core.Hooks.StepBatch =
+                    [raw = w.get()](StepRunMetric& metric, const std::uint32_t allowance, std::uint32_t& completed)
+                {
+                    completed = allowance;
+                    return ExplicitSteps(raw->shared_from_this(), metric, allowance);
+                };
             for (std::size_t i = 0; i < w->Plan.Count; ++i)
                 w->RestoreMask.push_back(w->Plan.Fixed[i] || w->Plan.Isolated[i] ? 1u : 0u);
             w->Values = std::move(values);
@@ -1049,45 +1712,347 @@ namespace Extrinsic::Runtime
                 result.Message = std::move(refused->Message);
                 return {};
             }
-            t.AutoAccept = autoAccept;
+            if (!context.Device)
+                return fail("Vulkan property smoothing requires a device.");
+            t.Pages = std::make_shared<WorkerGpuPages>(*context.Device); // its steps run on the step run's worker
+            t.Kind = GP::GpuTransactionKind::Iterative;
+            t.Execution = RunExecution(c, execution);
             w->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
             w->Result = result;
             w->Result.Status = EditorCommandStatus::Pending;
-            w->Result.Message = "Vulkan property smoothing queued.";
+            w->Result.Message = t.Execution.Start == StepRunStart::Ready
+                ? "Vulkan property smoothing is ready; run or step it."
+                : "Vulkan property smoothing queued.";
             if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Vulkan property smoothing").IsValid())
             {
                 result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 result.Message = GP::MeshSupport::QueuedJobRejectedMessage(t.JobLabel);
                 return {};
             }
+            w->Result.StepRun = t.StepRun;
             result = w->Result;
             return w;
         }
+
+        // The per-row bound radii of a variational fit, captured on the main thread with the other inputs; false
+        // when one is negative or not finite.
+        bool CaptureRadii(const Prepared& prepared, const PropertySmoothingConfig& c, std::vector<double>& radii)
+        {
+            radii.clear();
+            if (!PerRowBounds(c))
+                return true;
+            bool valid = true;
+            std::visit(
+                [&](const auto& stored)
+                {
+                    for (const auto slot : prepared.Samples.Slots)
+                    {
+                        const double r = Channel(stored[slot], 0);
+                        valid &= std::isfinite(r) && r >= 0;
+                        radii.push_back(r);
+                    }
+                },
+                Capture(*prepared.Props, c.BoundRadii).Values);
+            return valid;
+        }
+        // The variational fit, solved whole (one logical step); its summary for the result message. Reads only the
+        // captured inputs (it may run on a worker).
+        S::PropertyFilterResult Fit(const Prepared& prepared,
+            const PropertySmoothingConfig& c,
+            std::span<const double> radii,
+            EditorPropertySmoothingResult& result,
+            std::string& summary)
+        {
+            const auto& samples = prepared.Samples;
+            // Second order measures gradients against the same sample points the graph was built from.
+            std::vector<double> positions;
+            if (c.Filter.SmoothnessOrder == S::FitOrder::Second)
+                for (const auto& point : samples.Points)
+                    positions.insert(positions.end(), {point.x, point.y, point.z});
+            const auto& graph = prepared.Graph;
+            const auto fit = Geometry::HarmonicField::FitProperty(prepared.Values,
+                prepared.Channels,
+                graph.Edges,
+                c.Filter,
+                graph.BoundaryRows,
+                graph.Mass,
+                radii,
+                positions);
+            result.FitWeight = fit.Stats.FitWeight;
+            result.RmsResidual = fit.Stats.RmsResidual;
+            result.ActiveBounds = fit.Stats.ActiveBounds;
+            const auto number = [](double x)
+            {
+                char text[32];
+                std::snprintf(text, sizeof text, "%.6g", x);
+                return std::string{text};
+            };
+            summary = "; weight " + number(fit.Stats.FitWeight) + ", RMS residual " + number(fit.Stats.RmsResidual) +
+                ", " + std::to_string(fit.Stats.Iterations) + " iteration(s), " +
+                std::to_string(fit.Stats.Factorizations) + " factorization(s), " +
+                std::to_string(fit.Stats.ActiveBounds) + " active bound(s)" +
+                (fit.Stats.NoiseTargetClamped ? "; noise level unreachable, weight clamped" : "");
+            return {.Success = fit.Success,
+                .Diagnostic = fit.Diagnostic,
+                .Values = fit.Values,
+                .OperatorApplications = fit.Stats.Solves};
+        }
+
+        // ARCH-023: the CPU counterpart as a worker step run of the session's step runs. A step is one explicit
+        // pass or implicit time step (Geometry PropertyFilterRun), the fit one step solved whole; Commit publishes
+        // the last complete step once through the undoable smoothing transaction. The CPU run has no live preview.
+        struct CpuRun
+        {
+            EditorProcessingContext Context{};
+            PropertySmoothingConfig Config{};
+            Prepared Captured{};
+            // Written by Step on the worker, read by Commit, Restart and a failed run's Discard once no step runs (the
+            // run orders them); Steps is also read by a Discard during a step.
+            std::optional<S::PropertyFilterRun> Filter{};
+            S::PropertyFilterResult Fitted{};
+            std::string FitSummary{}, Failure{};
+            std::vector<double> Radii{}; // the fit's per-row bounds, captured at the start
+            std::atomic<std::uint32_t> Steps{};
+            EditorPropertySmoothingResult Result{}; // the fit's statistics are written by its step
+            EditorPropertySmoothingResult Base{}; // main thread only
+            std::uint64_t Id{};
+            std::function<void(EditorPropertySmoothingResult)> Sink{};
+            bool Delivered{};
+            void Deliver(EditorPropertySmoothingResult result)
+            {
+                if (std::exchange(Delivered, true))
+                    return;
+                Result = std::move(result);
+                if (auto sink = std::move(Sink))
+                    sink(Result);
+            }
+        };
+        bool BeginCpu(CpuRun& run, std::string& diagnostic)
+        {
+            run.Steps.store(0u);
+            run.Fitted = {};
+            run.Result = run.Base;
+            run.Failure.clear();
+            run.Filter.reset();
+            if (run.Config.Filter.Method == S::PropertyFilter::VariationalFit)
+                return true;
+            const auto& graph = run.Captured.Graph;
+            run.Filter.emplace();
+            return run.Filter->Begin(run.Captured.Values,
+                run.Captured.Channels,
+                graph.Edges,
+                run.Config.Filter,
+                graph.BoundaryRows,
+                graph.Mass,
+                diagnostic);
+        }
+        EditorPropertySmoothingResult StartCpu(const EditorProcessingContext& context,
+            const std::uint32_t id,
+            const PropertySmoothingConfig& c,
+            Prepared prepared,
+            EditorPropertySmoothingResult result,
+            std::function<void(EditorPropertySmoothingResult)> onComplete,
+            StepRunExecution execution)
+        {
+            const auto refuse = [&](EditorCommandStatus status, std::string message)
+            {
+                result.Status = status;
+                result.Message = std::move(message);
+                return result;
+            };
+            const EditorJobIdentity identity{.EntityId = id,
+                .Scope = ToEditorJobScope(c.Output.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+                .OutputName = c.Output.Name,
+                .RequestedDomain = EditorJobDomain::Cpu};
+            if (auto busy = GP::MeshSupport::ActiveOutputJobRefusal(context, identity, "Property smoothing"))
+                return refuse(
+                    EditorCommandStatus::Pending, std::move(busy->Message)); // the active run keeps its callback
+            auto run = std::make_shared<CpuRun>();
+            run->Context = context;
+            run->Config = c;
+            run->Captured = std::move(prepared);
+            run->Base = result;
+            run->Base.BackendId = "cpu_reference";
+            run->Result = run->Base;
+            std::string diagnostic;
+            if (!CaptureRadii(run->Captured, c, run->Radii))
+                return refuse(
+                    EditorCommandStatus::InvalidProcessingParameters, "Bound radii must be finite and nonnegative.");
+            if (!BeginCpu(*run, diagnostic))
+                return refuse(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
+            // No live preview on the CPU: the run says so rather than accepting the option silently.
+            const bool previewAsked = execution.PreviewEvery != 0u;
+            execution = RunExecution(c, execution);
+            execution.PreviewEvery = 0u;
+            const std::weak_ptr<CpuRun> weak = run;
+            StepRunCallbacks callbacks{.Step =
+                                           [run](StepRunMetric& metric)
+                {
+                    if (run->Config.Filter.Method == S::PropertyFilter::VariationalFit)
+                    {
+                        run->Fitted = Fit(run->Captured, run->Config, run->Radii, run->Result, run->FitSummary);
+                        run->Steps.store(1u);
+                        if (!run->Fitted.Success)
+                        {
+                            run->Failure = run->Fitted.Diagnostic;
+                            return StepOutcome::Failed;
+                        }
+                        metric.Values[0] = double(run->Fitted.OperatorApplications);
+                        return StepOutcome::Converged;
+                    }
+                    std::string why;
+                    if (!run->Filter->Step(why))
+                    {
+                        run->Failure = std::move(why);
+                        return StepOutcome::Failed;
+                    }
+                    run->Steps.store(run->Filter->Steps());
+                    metric.Values[0] = double(run->Filter->Finish().OperatorApplications);
+                    return StepOutcome::Continue;
+                },
+                .Valid =
+                    [weak]
+                {
+                    const auto r = weak.lock();
+                    return r && GP::EditorProcessingContextWorldCurrent(r->Context) &&
+                        InputsCurrent(r->Context, r->Captured.Publication, r->Captured.OutputWatch);
+                },
+                .Commit =
+                    [weak](std::string& diagnostic)
+                {
+                    const auto r = weak.lock();
+                    if (!r)
+                    {
+                        diagnostic = "The smoothing run ended.";
+                        return StepRunCommit::Refused;
+                    }
+                    const bool fit = r->Config.Filter.Method == S::PropertyFilter::VariationalFit;
+                    auto published = Publish(r->Context,
+                        r->Captured.Publication,
+                        fit ? r->Fitted : r->Filter->Finish(),
+                        r->Result,
+                        r->FitSummary);
+                    published.Steps = r->Steps.load();
+                    const bool committed = published.Succeeded();
+                    if (!committed)
+                        diagnostic = published.Message;
+                    r->Deliver(std::move(published));
+                    return committed ? StepRunCommit::Committed : StepRunCommit::Refused;
+                },
+                .Discard =
+                    [weak]
+                {
+                    const auto r = weak.lock();
+                    if (!r || r->Delivered)
+                        return;
+                    // A failed run's step has completed; a discard may come while a step runs (its state is not read).
+                    const auto observed = r->Context.StepRuns->Observe(r->Id);
+                    const bool failed = observed && observed->Phase == StepRunPhase::Failed;
+                    auto ended = r->Base;
+                    ended.StepRun = r->Id;
+                    ended.Steps = r->Steps.load();
+                    ended.Status =
+                        failed ? EditorCommandStatus::GeometryProcessingFailed : EditorCommandStatus::StaleEntity;
+                    ended.Message = failed ? (r->Failure.empty() ? observed->Diagnostic : r->Failure)
+                                           : "Property smoothing discarded or stale; previous output retained.";
+                    r->Deliver(std::move(ended));
+                },
+                .Restart =
+                    [weak](std::string& diagnostic)
+                {
+                    const auto r = weak.lock();
+                    return r && BeginCpu(*r, diagnostic);
+                }};
+            const auto holder = std::make_shared<JobToken>();
+            std::string refusal;
+            run->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
+            const auto stepRun = context.StepRuns->Start({.Label = "Property smoothing",
+                                                             .Owner = "Runtime.PropertySmoothing",
+                                                             .Execution = execution,
+                                                             .MetricNames = {"operator_applications", "", "", ""}},
+                std::move(callbacks),
+                EditorStepRunJobs(context.JobCommands, identity, holder),
+                refusal);
+            if (!stepRun)
+            {
+                run->Sink = {};
+                return refuse(EditorCommandStatus::GeometryProcessingFailed,
+                    GP::MeshSupport::QueuedJobRejectedMessage("Property smoothing") + " " + refusal);
+            }
+            run->Id = stepRun;
+            run->Base.StepRun = run->Result.StepRun = stepRun;
+            result = run->Base;
+            result.Status = EditorCommandStatus::Pending;
+            result.Message = execution.Start == StepRunStart::Ready ? "Property smoothing is ready; run or step it."
+                                                                    : "Property smoothing queued.";
+            if (previewAsked)
+                result.Message += " The CPU backend has no live preview.";
+            return result;
+        }
+        // The CPU run inline, without run controls (no step-run service or job lane): the same steps, published at
+        // once.
+        EditorPropertySmoothingResult RunCpuInline(const EditorProcessingContext& context,
+            const PropertySmoothingConfig& c,
+            const Prepared& prepared,
+            EditorPropertySmoothingResult result)
+        {
+            if (c.Filter.Method == S::PropertyFilter::VariationalFit)
+            {
+                std::vector<double> radii;
+                if (!CaptureRadii(prepared, c, radii))
+                {
+                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                    result.Message = "Bound radii must be finite and nonnegative.";
+                    return result;
+                }
+                std::string summary;
+                const auto fitted = Fit(prepared, c, radii, result, summary);
+                result.Steps = 1u;
+                return Publish(context, prepared.Publication, fitted, std::move(result), summary);
+            }
+            const auto filtered = S::FilterProperty(prepared.Values,
+                prepared.Channels,
+                prepared.Graph.Edges,
+                c.Filter,
+                prepared.Graph.BoundaryRows,
+                prepared.Graph.Mass);
+            result.Steps = filtered.Success ? c.Filter.Iterations : 0u;
+            return Publish(context, prepared.Publication, filtered, std::move(result), {});
+        }
+        bool StepRunsAvailable(const EditorProcessingContext& context)
+        {
+            return context.StepRuns && context.JobCommands.Available();
+        }
     }
 
-    EditorPropertySmoothingTransactionHandle StartEditorPropertySmoothing(const EditorProcessingCommands& commands, const std::uint32_t id,
-                                                                          const PropertySmoothingConfig& c,
-                                                                          EditorPropertySmoothingResult& failure)
+    EditorPropertySmoothingTransactionHandle StartEditorPropertySmoothing(const EditorProcessingCommands& commands,
+        const std::uint32_t id,
+        const PropertySmoothingConfig& c,
+        EditorPropertySmoothingResult& result,
+        std::function<void(EditorPropertySmoothingResult)> onComplete)
     {
         namespace PS = PropertySmoothingDetail;
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        failure = {};
-        failure.RequestedBackend = c.Backend;
-        failure.Status = EditorCommandStatus::InvalidProcessingParameters;
-        if (c.Backend != PropertySmoothingBackend::Vulkan)
+        result = {};
+        result.RequestedBackend = c.Backend;
+        result.Status = EditorCommandStatus::InvalidProcessingParameters;
+        std::string diagnostic;
+        auto prepared = PS::Prepare(context, id, c, result, diagnostic);
+        if (!prepared)
         {
-            failure.Message = "The smoothing transaction runs the Vulkan backend; CPU runs publish at once.";
+            result.Message = diagnostic;
             return {};
         }
-        std::string diagnostic;
-        auto prepared = PS::Prepare(context, id, c, failure, diagnostic);
-        if (!prepared) { failure.Message = diagnostic; return {}; }
-        return PS::StartVulkan(context, id, c, std::move(*prepared), failure, {}, false);
-    }
-
-    void StopEditorPropertySmoothing(const EditorPropertySmoothingTransactionHandle& run)
-    {
-        if (run) run->StopRequested = true;
+        if (c.Backend == PropertySmoothingBackend::Vulkan)
+            return PS::StartVulkan(context, id, c, std::move(*prepared), result, std::move(onComplete), c.Execution);
+        if (!PS::StepRunsAvailable(context))
+        {
+            result.Message = "Interactive smoothing needs the session's step runs and job lane.";
+            return {};
+        }
+        result = PS::StartCpu(context, id, c, std::move(*prepared), result, std::move(onComplete), c.Execution);
+        return {};
     }
 
     EditorPropertySmoothingTransactionSnapshot SnapshotEditorPropertySmoothing(const EditorProcessingCommands& commands,
@@ -1107,6 +2072,8 @@ namespace Extrinsic::Runtime
         snapshot.Previews = run->Previews;
         snapshot.DeviceWorkQueued = run->Core.Gpu != nullptr;
         snapshot.Result = run->Result;
+        snapshot.Result.StepRun = run->Core.StepRun;
+        snapshot.Result.Steps = run->Done.load();
         if (run->Core.Phase == EditorGpuTransactionPhase::ReadyToAccept)
         {
             snapshot.Stale = !PropertySmoothingDetail::Current(run);
@@ -1207,62 +2174,26 @@ namespace Extrinsic::Runtime
                                                                       std::function<void(EditorPropertySmoothingResult)> onComplete)
     {
         namespace PS = PropertySmoothingDetail;
-        using PropertyGraphDetail::Channel;
-        using PropertyGraphDetail::Capture;
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         EditorPropertySmoothingResult result;
         result.RequestedBackend = c.Backend;
-        const auto fail = [&](std::string message) { result.Status = EditorCommandStatus::InvalidProcessingParameters; result.Message = std::move(message); return result; };
         std::string diagnostic;
         auto prepared = PS::Prepare(context, id, c, result, diagnostic);
-        if (!prepared) return fail(diagnostic);
-        if (c.Backend == PropertySmoothingBackend::Vulkan)
+        if (!prepared)
         {
-            // Batch and agent callers accept automatically when the device finishes.
-            (void)PS::StartVulkan(context, id, c, std::move(*prepared), result, std::move(onComplete), true);
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
+            result.Message = std::move(diagnostic);
             return result;
         }
-        auto& samples = prepared->Samples;
-        auto& values = prepared->Values;
-        auto& graph = prepared->Graph;
-        const auto channels = prepared->Channels;
-        const auto* props = prepared->Props;
-        S::PropertyFilterResult filtered;
-        std::string fitSummary;
-        if (c.Filter.Method == S::PropertyFilter::VariationalFit)
+        // Batch and agent callers: at once, accepted at the run's end.
+        const auto execution = PS::BatchExecution(c.Execution);
+        if (c.Backend == PropertySmoothingBackend::Vulkan)
         {
-            std::vector<double> radii;
-            if (PerRowBounds(c))
-            {
-                bool valid = true;
-                std::visit([&](const auto& stored) {
-                    for (const auto slot : samples.Slots)
-                    {
-                        const double r = Channel(stored[slot], 0);
-                        valid &= std::isfinite(r) && r >= 0;
-                        radii.push_back(r);
-                    }
-                }, Capture(*props, c.BoundRadii).Values);
-                if (!valid) return fail("Bound radii must be finite and nonnegative.");
-            }
-            // Second order measures gradients against the same sample points the graph was built from.
-            std::vector<double> positions;
-            if (c.Filter.SmoothnessOrder == S::FitOrder::Second)
-                for (const auto& point : samples.Points) positions.insert(positions.end(), {point.x, point.y, point.z});
-            const auto fit = Geometry::HarmonicField::FitProperty(values, channels, graph.Edges, c.Filter,
-                                                                  graph.BoundaryRows, graph.Mass, radii, positions);
-            filtered = {.Success = fit.Success, .Diagnostic = fit.Diagnostic, .Values = fit.Values,
-                        .OperatorApplications = fit.Stats.Solves};
-            result.FitWeight = fit.Stats.FitWeight;
-            result.RmsResidual = fit.Stats.RmsResidual;
-            result.ActiveBounds = fit.Stats.ActiveBounds;
-            const auto number = [](double x) { char text[32]; std::snprintf(text, sizeof text, "%.6g", x); return std::string{text}; };
-            fitSummary = "; weight " + number(fit.Stats.FitWeight) + ", RMS residual " +
-                         number(fit.Stats.RmsResidual) + ", " + std::to_string(fit.Stats.Iterations) +
-                         " iteration(s), " + std::to_string(fit.Stats.Factorizations) + " factorization(s), " + std::to_string(fit.Stats.ActiveBounds) + " active bound(s)" +
-                         (fit.Stats.NoiseTargetClamped ? "; noise level unreachable, weight clamped" : "");
+            (void)PS::StartVulkan(context, id, c, std::move(*prepared), result, std::move(onComplete), execution);
+            return result;
         }
-        else filtered = S::FilterProperty(values, channels, graph.Edges, c.Filter, graph.BoundaryRows, graph.Mass);
-        return PS::Publish(context, prepared->Publication, filtered, std::move(result), fitSummary);
+        if (!PS::StepRunsAvailable(context))
+            return PS::RunCpuInline(context, c, *prepared, std::move(result));
+        return PS::StartCpu(context, id, c, std::move(*prepared), std::move(result), std::move(onComplete), execution);
     }
 }

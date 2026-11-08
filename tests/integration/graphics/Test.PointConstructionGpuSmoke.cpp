@@ -13,6 +13,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include "OneShotLifecycleScript.hpp"
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Descriptors;
@@ -25,6 +26,7 @@ import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.JobService;
@@ -48,11 +50,18 @@ namespace
         std::vector<std::uint32_t> Edge0, Edge1;
         std::size_t Faces{};
     };
+    // ARCH-023: every request is a one-shot step run of the session's service (Vulkan pages its kNN rows on the
+    // worker through a prepared query session). Failure modes, each creating no entity: 1 a stale source (edited
+    // after the start), 2 the Jobs window's cancel of the run (its holder job) once its step is in flight or done,
+    // 3 the lane refusing the run's step job, 4 a Discard (run_control's) once its step is in flight or done; modes 2
+    // and 4 wait for Accept, so the cancel always precedes any Commit. Scripted: the common one-shot script on the
+    // device, accepted into the CPU reference.
     class ConstructionApp final : public Intrinsic::Tests::RuntimeTestModule
     {
       public:
         unsigned Phase{}, FailureMode{};
-        bool Done{}, TimedOut{}, Cancelled{};
+        bool Scripted{}, Done{}, TimedOut{}, Cancelled{};
+        Intrinsic::Tests::OneShotLifecycleScript Script{};
         double MaxError{};
         std::vector<double> PhaseMs, CpuMs;
         std::vector<std::size_t> ForegroundPixels;
@@ -63,6 +72,8 @@ namespace
             Context.World = Kernel().ActiveWorld();
             Context.SpatialIndices = Kernel().Services().Find<R::SpatialIndexCache>();
             ASSERT_NE(Context.SpatialIndices, nullptr);
+            Context.StepRuns = Kernel().Services().Find<R::StepRunsService>(); // ARCH-023: every run is a step run
+            ASSERT_NE(Context.StepRuns, nullptr);
             // Retain the reference camera while replacing its triangle with the
             // actual generated result for the pixel test.
             std::vector<entt::entity> old;
@@ -170,7 +181,7 @@ namespace
             Submissions = 0;
             PhaseStarted = std::chrono::steady_clock::now();
             Submitted = true;
-            const unsigned count = FailureMode ? 1 : 8;
+            const unsigned count = FailureMode || Scripted ? 1 : 8;
             double cpu = 0;
             if (!FailureMode)
                 for (unsigned d = 1; d <= count; ++d)
@@ -194,8 +205,7 @@ namespace
             Context.JobCommands.Submit = [this](R::JobDesc desc, R::EditorJobIdentity)
             {
                 ++Submissions;
-                if ((FailureMode == 3 && Submissions == 2) ||
-                    (FailureMode == 4 && Submissions == 3))
+                if (FailureMode == 3 && Submissions == 2) // the run's step job (its holder is the first)
                     return R::JobToken{};
                 const auto token = Kernel().Jobs().Submit(std::move(desc));
                 EXPECT_TRUE(token.IsValid());
@@ -204,12 +214,34 @@ namespace
             };
             for (unsigned d = 1; d <= count; ++d)
             {
-                const auto result = R::ApplyEditorPointConstructionCommand(
-                    R::BindEditorProcessingCommands(Context), Config(d),
-                    [this, d](R::EditorPointConstructionResult r)
-                    { Results.emplace_back(d, std::move(r)); });
+                const auto deliver = [this, d](R::EditorPointConstructionResult r)
+                {
+                    Results.emplace_back(d, std::move(r));
+                };
+                auto c = Config(d);
+                // Interactive starts: ready for the script, computing at once but waiting for Accept for 2 and 4.
+                if (FailureMode == 2 || FailureMode == 4)
+                    c.Execution.Start = R::StepRunStart::Run;
+                const auto commands = R::BindEditorProcessingCommands(Context);
+                const auto result = Scripted || FailureMode == 2 || FailureMode == 4
+                    ? R::StartEditorPointConstructionRun(commands, c, deliver)
+                    : R::ApplyEditorPointConstructionCommand(commands, c, deliver);
+                EXPECT_NE(result.StepRun, 0u) << result.Message;
+                RunId = result.StepRun;
                 if (result.Status != R::EditorCommandStatus::Pending)
                     Results.emplace_back(d, result);
+            }
+            if (Scripted)
+            {
+                const auto nothing = [this]
+                {
+                    EXPECT_TRUE(Results.empty()) << "nothing delivered before Accept";
+                    EXPECT_EQ(Context.Scene->Raw().view<GS::Vertices>().size(), 8u) << "no entity before Accept";
+                };
+                Script = {.OnReadyHeld = nothing,
+                    .OnFirstResult = nothing,
+                    .OnRestartedReady = nothing,
+                    .OnRestartedResult = nothing};
             }
             if (FailureMode == 1)
                 Props(1).Get<glm::vec3>("samples")[0].x += .1f;
@@ -253,12 +285,20 @@ namespace
                 Start();
                 return;
             }
-            if (FailureMode == 2 && !Cancelled && Tokens.size() == 3 &&
-                Kernel().Jobs().GetState(Tokens[1]) == R::JobState::AwaitingApply)
+            if (Scripted && !Script.Advance(*Context.StepRuns, RunId))
+                return;
+            if ((FailureMode == 2 || FailureMode == 4) && !Cancelled && !Tokens.empty())
             {
-                Cancelled = Kernel().Jobs().Cancel(Tokens[1]);
+                const auto run = Context.StepRuns->Observe(RunId);
+                if (run && (run->WorkerInFlight || run->Steps > 0u))
+                {
+                    std::string refusal;
+                    Cancelled = FailureMode == 2
+                        ? Kernel().Jobs().Cancel(Tokens.front())
+                        : Context.StepRuns->Control(RunId, R::StepRunAction::Discard, 1u, refusal);
+                }
             }
-            if (Results.size() != (FailureMode ? 1u : 8u))
+            if (Results.size() != (FailureMode || Scripted ? 1u : 8u))
                 return;
             if (FailureMode)
             {
@@ -292,6 +332,13 @@ namespace
                     ASSERT_TRUE(result.Succeeded()) << "domain=" << d << " " << result.Message;
                     EXPECT_EQ(result.ActualBackend, "vulkan_lbvh");
                     EXPECT_GT(result.GpuQueryBatches, 0u);
+                    EXPECT_NE(result.StepRun, 0u);
+                    // The hybrid traffic of the step: every page uploads the session's full fixed page (73 grid
+                    // rows; a graph's page holds at most its samples), and its rows come back.
+                    EXPECT_EQ(result.CpuStageUploadBytes,
+                        result.GpuQueryBatches * (Phase < 3 ? 73u : std::min<std::size_t>(73u, result.InputCount)) *
+                            12u);
+                    EXPECT_GT(result.CpuStageReadbackBytes, 0u);
                     if (Phase > 0)
                         EXPECT_TRUE(result.IndexReused);
                     const auto output = Read(result);
@@ -309,6 +356,12 @@ namespace
                 }
                 Checked = true;
                 VisibleFrames = 0;
+                if (Scripted)
+                {
+                    EXPECT_EQ(Script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
+                    Done = true;
+                    Kernel().RequestExit();
+                }
                 return;
             }
             if (++VisibleFrames < 6)
@@ -363,6 +416,7 @@ namespace
         std::vector<R::JobToken> Tokens;
         std::chrono::steady_clock::time_point Started{}, PhaseStarted{};
         RHI::BufferHandle Readback{};
+        std::uint64_t RunId{};
         unsigned Width{}, Height{}, Submissions{}, VisibleFrames{};
         bool Submitted{}, Checked{};
     };
@@ -380,6 +434,7 @@ TEST(PointConstructionGpuSmoke, QueriesMatchReferenceAcrossDomainsAndGeneratedGe
     auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
     engine.Initialize();
     engine.Run();
     ASSERT_TRUE(engine.GetDevice().IsOperational());
@@ -428,12 +483,41 @@ TEST(PointConstructionGpuSmoke, StaleCancelledAndPartialSubmissionCreateNoEntity
         run->FailureMode = failure;
         Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
         engine.EmplaceModule<R::SpatialIndexCache>();
+        engine.EmplaceModule<R::StepRunsModule>();
         engine.Initialize();
         engine.Run();
         ASSERT_TRUE(engine.GetDevice().IsOperational());
         ASSERT_FALSE(run->TimedOut);
         ASSERT_TRUE(run->Done);
-        if (failure == 2)
+        if (failure == 2 || failure == 4)
             EXPECT_TRUE(run->Cancelled);
     }
+}
+// ARCH-023: a Vulkan Hoppe construction started ready follows the common one-shot script on the device (nothing
+// recorded while ready, Step 1, Restart from the same capture and session, Run, one Accept). Predictions: no entity
+// and no delivered result before Accept; the accepted surface equals the CPU reference (positions within 1e-4, the
+// same edges and faces) with GPU batches and hybrid traffic reported. Mutations: a restart that keeps the first
+// generation's field (no reset in Compute) fails Run's extraction; a start that ignores `start: ready` fails the
+// script's hold-ready stage.
+TEST(PointConstructionGpuSmoke, TheCommonOneShotScriptRunsOnTheDevice)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    auto config = R::CreateReferenceEngineConfig();
+    config.Window.Width = 64;
+    config.Window.Height = 64;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    auto app = std::make_unique<ConstructionApp>();
+    auto* run = app.get();
+    run->Scripted = true;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
+    engine.Initialize();
+    engine.Run();
+    ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut);
+    ASSERT_TRUE(run->Done);
+    EXPECT_LE(run->MaxError, 1e-4);
 }

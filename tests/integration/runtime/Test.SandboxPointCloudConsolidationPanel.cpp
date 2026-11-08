@@ -53,6 +53,7 @@ import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -338,7 +339,7 @@ TEST(SandboxPointCloudConsolidationPanel,
     config.SupportRadiusMode = Runtime::
         PointCloudConsolidationSupportRadiusMode::Manual;
     config.RepulsionWeight = 0.25;
-    config.MaxIterations = 18u;
+    config.Execution.IterationCap = 18u;
     config.ConvergenceTolerance = 2.0e-5;
     config.TargetPointCount = 73u;
     config.Seed = 0x1234abcdu;
@@ -576,6 +577,7 @@ TEST(SandboxPointCloudConsolidationPanel,
         HeadlessConfig(), std::make_unique<OneFrameApplication>()};
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.Initialize();
 
     ECS::Scene::Registry* scene =
@@ -690,6 +692,7 @@ TEST(SandboxPointCloudConsolidationPanel,
         HeadlessConfig(), std::make_unique<OneFrameApplication>()};
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.Initialize();
 
     ECS::Scene::Registry* scene =
@@ -802,6 +805,7 @@ TEST(SandboxPointCloudConsolidationPanel,
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.Initialize();
 
     ECS::Scene::Registry* scene = engine.Worlds().Get(engine.ActiveWorld());
@@ -836,7 +840,8 @@ TEST(SandboxPointCloudConsolidationPanel,
     requested.Strategy = Runtime::PointCloudConsolidationStrategy::Wlop;
     requested.SupportRadius = 0.65;
     requested.RepulsionWeight = 0.0;
-    requested.MaxIterations = 1u;
+    requested.Execution.IterationCap = 1u;
+    requested.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
     requested.ConvergenceTolerance = 1.0;
     requested.TargetPointCount = 16u;
     requested.Seed = 17u;

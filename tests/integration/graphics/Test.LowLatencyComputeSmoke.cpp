@@ -1,8 +1,9 @@
-// GRAPHICS-150: SpatialIndexCache::QueueGpuCompute with SpatialGpuLatency::Immediate records the
-// same recorder on a command buffer of its own and submits at once. The CPD E-step workspace
-// (METHOD-056) runs the same request framed and immediately: the readback bytes are identical,
-// and the immediate round trip completes in fewer frames (in the frame that queued it once the
-// GPU finished before maintenance). Frames and milliseconds per round trip are printed.
+// GRAPHICS-150/ARCH-023: SpatialIndexCache::QueueGpuCompute records every request on a command
+// buffer of its own and submits it at once through the compute lane; there is no framed variant
+// to compare with any more (the Framed/Immediate axis was removed), so this checks the one
+// scheduling contract instead. The CPD E-step workspace (METHOD-056) runs the same request
+// repeatedly: every readback is identical, and each round trip is delivered by the maintenance of
+// the frame after the one that queued it. Frames and milliseconds per round trip are printed.
 #include "RuntimeTestModule.hpp"
 #include <chrono>
 #include <cmath>
@@ -64,7 +65,7 @@ namespace
     class LatencyApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        static constexpr int kRuns = 6; // alternating framed, immediate
+        static constexpr int kRuns = 6;
 
         void Resolve() override
         {
@@ -74,18 +75,20 @@ namespace
             Source = Points(3000, 12u);
         }
 
-        void Queue(bool immediate)
+        void Queue()
         {
             auto& trip = Trips.emplace_back();
-            trip.Workspace = std::make_shared<Graphics::CoherentPointDriftEStepWorkspace>(Kernel().GetDevice());
+            trip.Workspace = std::make_shared<Graphics::CoherentPointDriftEStepWorkspace>(
+                Kernel().GetDevice(), *Cache->MethodScratch());
             trip.Queued = std::chrono::steady_clock::now();
             trip.Gpu = Cache->QueueGpuCompute(
                 Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(Target.size() / 8u, Source.size() / 8u),
-                [this, workspace = trip.Workspace](Extrinsic::RHI::ICommandContext& commands, const Runtime::SpatialGpuIndexView&) {
+                [this, workspace = trip.Workspace](
+                    Extrinsic::RHI::ICommandContext& commands, const Runtime::SpatialGpuIndexView&)
+                {
                     return workspace->Record(commands, {.Target = Target, .TargetGeneration = 1u, .Source = Source,
                                                         .Sigma2 = 0.05, .LogOutlier = -std::numeric_limits<double>::infinity()});
-                },
-                immediate ? Runtime::SpatialGpuLatency::Immediate : Runtime::SpatialGpuLatency::Framed);
+                });
         }
 
         void Frame(double, double) override
@@ -93,7 +96,7 @@ namespace
             // Every frame lasts at least 8 ms, longer than this E-step's device round trip (3.4 ms on an RTX 3050,
             // about 2 ms on an RTX 4090), so immediate work has time to finish before the next poll and the frame count
             // does not depend on the host's frame rate (unpaced 64x64 frames take under 2 ms there; ARCH-022 Q90).
-            // Framed work still waits its frames. A scheduling check: the milliseconds include the pacing.
+            // A scheduling check, not a measurement: the milliseconds include the pacing.
             struct Pace { ~Pace() { std::this_thread::sleep_for(std::chrono::milliseconds(8)); } } pace;
             if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(60))
             {
@@ -102,7 +105,11 @@ namespace
                 return;
             }
             if (!Kernel().GetDevice().IsOperational() || Cache == nullptr) return;
-            if (Trips.empty()) { Queue(false); return; }
+            if (Trips.empty())
+            {
+                Queue();
+                return;
+            }
             auto& trip = Trips.back();
             if (trip.Gpu->State == Runtime::SpatialQueryState::Failed)
             {
@@ -115,7 +122,7 @@ namespace
             if (trip.Milliseconds == 0.0)
                 trip.Milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - trip.Queued).count();
             if (int(Trips.size()) == kRuns) { Kernel().RequestExit(); return; }
-            Queue(Trips.size() % 2u == 1u);
+            Queue();
         }
 
         // The workspaces own device buffers; the readback bytes stay for the assertions.
@@ -131,7 +138,7 @@ namespace
     };
 }
 
-TEST(GRAPHICS150LowLatencyCompute, ImmediateSubmitsReturnTheFramedBytesInFewerFrames)
+TEST(GRAPHICS150LowLatencyCompute, LaneSubmissionsReturnIdenticalBytesByTheNextFrame)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
     auto config = Runtime::CreateReferenceEngineConfig();
@@ -150,20 +157,21 @@ TEST(GRAPHICS150LowLatencyCompute, ImmediateSubmitsReturnTheFramedBytesInFewerFr
     engine.Run();
     ASSERT_EQ(run->Trips.size(), std::size_t(LatencyApp::kRuns));
 
-    int framed = 0, immediate = 0;
-    double framedMs = 0.0, immediateMs = 0.0;
+    int frames = 0;
+    double milliseconds = 0.0;
     const auto& reference = run->Trips.front().Gpu->Data;
     for (std::size_t i = 0; i < run->Trips.size(); ++i)
     {
         const auto& trip = run->Trips[i];
         ASSERT_EQ(trip.Gpu->State, Runtime::SpatialQueryState::Ready) << i;
-        EXPECT_EQ(trip.Gpu->Data, reference) << "round trip " << i << " differs from the first framed one";
-        (i % 2u == 0u ? framed : immediate) += trip.Frames;
-        (i % 2u == 0u ? framedMs : immediateMs) += trip.Milliseconds;
+        EXPECT_EQ(trip.Gpu->Data, reference) << "round trip " << i << " differs from the first one";
+        frames += trip.Frames;
+        milliseconds += trip.Milliseconds;
     }
-    const double runs = LatencyApp::kRuns / 2.0;
-    std::printf("GRAPHICS-150: framed %.1f frames / %.2f ms, immediate %.1f frames / %.2f ms per round trip\n",
-                framed / runs, framedMs / runs, immediate / runs, immediateMs / runs);
-    EXPECT_LT(immediate, framed);
-    EXPECT_LE(immediate / runs, 1.0) << "an immediate submit is delivered by the next frame's maintenance";
+    std::printf("GRAPHICS-150: %.1f frames / %.2f ms per round trip\n",
+        frames / double(LatencyApp::kRuns),
+        milliseconds / LatencyApp::kRuns);
+    // Formerly only the immediate half met this bound and the framed half waited its frames in flight.
+    EXPECT_LE(frames / double(LatencyApp::kRuns), 1.0)
+        << "each submission is delivered by the next frame's maintenance";
 }

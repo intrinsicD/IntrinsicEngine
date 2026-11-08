@@ -1,6 +1,7 @@
 module;
 #include <functional>
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <bit>
 #include <chrono>
@@ -22,6 +23,7 @@ module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Private.WorkspaceLease;
 import Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.PointKeypoints;
 import Extrinsic.RHI.Device;
@@ -43,17 +45,21 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRuns;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorPendingGpuOutput.hpp"
-#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.OneShotCpuRun.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
 {
+    template std::shared_ptr<Graphics::PointKeypointWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::PointKeypointWorkspace>();
+
     namespace
     {
         namespace GS = ECS::Components::GeometrySources;
@@ -83,6 +89,26 @@ namespace Extrinsic::Runtime
             Graphics::PointKeypointHeader Header{};
             std::optional<EditorKeypointAnalysisResult> MainFailure{};
             EditorKeypointAnalysisResult Result{};
+            // ARCH-023: the resident run's failure (the transaction's producer) and the result as admitted (a restart
+            // begins from it). Its Init (owner) retains the index view and captures what the worker's pages record
+            // with (the views without their leases); the worker writes only Page, Header, Failure and its counters,
+            // which the owner reads once the step ended.
+            std::string Failure{};
+            EditorKeypointAnalysisResult Initial{};
+            // ARCH-023, Vulkan LBVH as a step run: the radius-row session prepared at the start (paged by the worker
+            // step, no frame) and the run's discard, which a waiting page observes.
+            std::shared_ptr<SpatialQuerySession> Session{};
+            std::atomic<bool> Abort{false};
+            std::shared_ptr<SpatialGpuIndexLease> IndexView{};
+            struct WorkerView
+            {
+                std::shared_ptr<Graphics::PointKeypointWorkspace> Workspace{};
+                std::shared_ptr<SpatialGpuIndexLease> Index{};
+                Graphics::GpuPropertyView Input{}, Typed{}, Companion{};
+                std::optional<RHI::BufferHandle> ScoreBase{}, MaskBase{};
+                std::uint32_t Batches{};
+                std::uint64_t ReadbackBytes{};
+            } Worker{};
         };
         bool CurrentInput(const EditorProcessingContext& context, const KeypointWork& w)
         {
@@ -164,7 +190,11 @@ namespace Extrinsic::Runtime
                         c.Backend == KeypointAnalysisBackend::VulkanCompute) &&
                     (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable() ||
                         w->Result.LiveCount > (1u << 20)))
-                    return fail("Vulkan keypoints require framed GPU queries/jobs and at most 2^20 samples.");
+                    return fail("Vulkan keypoints require GPU queries/jobs and at most 2^20 samples.");
+                // ARCH-023: Vulkan LBVH neighbourhoods are a worker step run; a composition without the session's
+                // step runs cannot run them (there is no frame-paced substitute).
+                if (c.Backend == KeypointAnalysisBackend::VulkanLBVH && !context.StepRuns)
+                    return fail("Vulkan LBVH keypoints require the session's step runs.");
                 if (c.Backend == KeypointAnalysisBackend::VulkanCompute &&
                     (!context.Device || !context.Device->SupportsShaderFloat64()))
                     return fail("Vulkan keypoint computation requires shader double-precision support.");
@@ -278,39 +308,36 @@ namespace Extrinsic::Runtime
             r.Message = "Keypoint mask and saliency computed with " + r.ActualBackend +
                 " neighborhoods; scale, covariance and suppression run on CPU.";
         }
-        bool AdvanceGpu(const EditorProcessingContext& context, KeypointWork& w)
+        // ARCH-023, the step run's worker step for Vulkan LBVH, before Compute: the scale, then every radius row
+        // through the prepared session (the shared radius-page decoder). False with the result's reason when
+        // the scale or a page failed, or the run's discard aborted the rows.
+        bool QueryRowsOnWorker(KeypointWork& w)
         {
-            if (w.Abandoned || !CurrentInput(context, w))
-            {
-                w.Result.Status = EditorCommandStatus::StaleEntity;
-                w.Result.Message = "Keypoint input changed or the job was cancelled.";
-                w.MainFailure = w.Result;
-                w.Rows.Batch.reset();
-                return true;
-            }
+            Prepare(w);
+            if (w.Result.Status == EditorCommandStatus::GeometryProcessingFailed)
+                return false;
             std::string diagnostic;
-            const auto state = GeometryProcessingDetail::AdvancePointRadiusRows(*context.SpatialIndices,
-                w.GpuIndex,
-                w.Points,
+            const auto state = GeometryProcessingDetail::ComputePointRadiusRows(*w.Session,
                 w.Slots,
                 std::max(w.Result.SalientRadius, w.Result.NonMaxRadius),
-                w.Config.GpuQueryBatchSize,
-                w.Config.GpuRadiusCapacity,
                 0,
+                w.Abort,
                 w.Rows,
                 diagnostic);
             w.Result.MaximumNeighbors = w.Rows.MaximumNeighbors;
-            w.Result.GpuQueryBatches = w.Rows.QueryBatches;
+            w.Result.GpuQueryBatches = w.Session->Pages();
             w.Result.GpuNeighborhoodMilliseconds = w.Rows.Milliseconds;
             if (w.Rows.Queried)
                 w.Result.ActualBackend = "vulkan_lbvh";
-            if (state == GeometryProcessingDetail::RowsState::Failed)
-            {
-                w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
-                w.Result.Message = std::move(diagnostic);
-                w.MainFailure = w.Result;
-            }
-            return state != GeometryProcessingDetail::RowsState::Pending;
+            if (state == GeometryProcessingDetail::RowsState::Ready)
+                return true;
+            w.Result.Status = state == GeometryProcessingDetail::RowsState::Pending
+                ? EditorCommandStatus::StaleEntity
+                : EditorCommandStatus::GeometryProcessingFailed;
+            w.Result.Message = state == GeometryProcessingDetail::RowsState::Pending
+                ? "Keypoint analysis was discarded or its input changed; nothing was applied."
+                : std::move(diagnostic);
+            return false;
         }
         EditorKeypointAnalysisResult Publish(
             const EditorProcessingContext& context, const std::shared_ptr<KeypointWork>& w)
@@ -342,6 +369,55 @@ namespace Extrinsic::Runtime
                     ? "Output values are not exactly representable in the selected scalar storage."
                     : "Keypoint publication rejected by history checks.";
             return r;
+        }
+        // ARCH-023: the neighbourhood backends as a one-shot worker step run (the shared helper, OneShotCpuRun.hpp)
+        // with the caller's execution: a batch runs at once and accepts at its end, an interactive start honours the
+        // section's start and auto_accept; Commit publishes once through the scalar history. Vulkan LBVH pages its
+        // radius rows on the device inside that step (QueryRowsOnWorker, the session prepared before the start),
+        // between its CPU scale and covariance; a discard aborts a waiting page at once. Without the step-run service
+        // the CPU backends keep the job below (a batch only); Vulkan LBVH is refused at capture.
+        EditorKeypointAnalysisResult StartKeypointRun(const EditorProcessingContext& context,
+            const std::shared_ptr<KeypointWork>& w,
+            const EditorJobIdentity& identity,
+            const GeometryProcessingDetail::MeshSupport::QueuedJobDelivery<EditorKeypointAnalysisResult>& delivery,
+            const StepRunExecution& execution)
+        {
+            namespace MS = GeometryProcessingDetail::MeshSupport;
+            return MS::StartOneShotCpuRun<KeypointWork, EditorKeypointAnalysisResult>(
+                context,
+                {.Label = "Keypoint analysis",
+                    .Owner = "Runtime.KeypointAnalysis",
+                    .Identity = identity,
+                    .Execution = execution,
+                    .Abort =
+                        [w]
+                    {
+                        w->Abort.store(true, std::memory_order_release); // a waiting device page gives up
+                    },
+                    .MetricNames = {"keypoints", "", "", ""},
+                    .Metric =
+                        [w](StepRunMetric& metric)
+                    {
+                        metric.Values[0] = double(w->Result.KeypointCount);
+                    }},
+                w,
+                // From the result as captured (the helper restores it): the rows of this generation only.
+                [](KeypointWork& work)
+                {
+                    work.Rows = {};
+                    // A failed page keeps its reason (failed); an aborted one belongs to a run already discarded.
+                    if (!work.Session || QueryRowsOnWorker(work))
+                        Compute(work);
+                },
+                [context](const KeypointWork& work)
+                {
+                    return CurrentInput(context, work);
+                },
+                [context](const std::shared_ptr<KeypointWork>& work)
+                {
+                    return Publish(context, work);
+                },
+                delivery);
         }
     }
     EditorPointScalarTransactionHandle StartEditorKeypointAnalysisTransaction(const EditorProcessingCommands& commands,
@@ -410,12 +486,15 @@ namespace Extrinsic::Runtime
             w->GpuIndex,
             w->Index,
             w->Result.IndexReused,
-            why);
+            why,
+            false); // the resident kernels read the device hierarchy only
         if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable ||
             indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
             return refuse(why);
         w->Result.Status = EditorCommandStatus::Pending;
-        w->Result.Message = "Keypoint traversal queued; score preview follows suppression.";
+        w->Result.Message = automatic || config.Execution.Start == StepRunStart::Run
+            ? "Keypoint traversal queued; score preview follows suppression."
+            : "Keypoint analysis is ready; run or step it.";
         EditorPointScalarTransactionSnapshot initial;
         auto transaction = BeginEditorPointScalarPublication(commands,
             {.EntityId = SelectionController::ToStableEntityId(w->Entity),
@@ -444,6 +523,8 @@ namespace Extrinsic::Runtime
                 w->ScoreBase.reset();
                 w->MaskBase.reset();
                 w->Back.reset();
+                w->Workspace.reset();
+                w->IndexView.reset();
                 if (w->Result.Status != EditorCommandStatus::GeometryProcessingFailed &&
                     w->Result.Status != EditorCommandStatus::StaleEntity)
                 {
@@ -451,6 +532,7 @@ namespace Extrinsic::Runtime
                     w->Result.Message = snapshot.Message;
                 }
                 w->Result.CpuStageReadbackBytes += snapshot.CpuStageReadbackBytes;
+                w->Result.StepRun = snapshot.StepRun;
                 w->Abandoned = true;
                 if (w->Admitted && sink)
                     sink(w->Result);
@@ -458,190 +540,213 @@ namespace Extrinsic::Runtime
         if (!transaction)
             return refuse(initial.Message);
         w->Transaction = transaction;
-        w->Back = AcquireEditorPointScalarBack(transaction);
-        if (!w->Back)
-        {
-            DiscardEditorPointScalar(commands, transaction);
-            return refuse("Keypoint output rings unavailable.");
-        }
         w->Limits = KeypointPagingForTesting;
         w->Limits.Pairs = std::clamp(w->Limits.Pairs, 1u, 1u << 24u);
         w->Limits.Visits = std::clamp(w->Limits.Visits, 1u, std::min(1024u, std::max(1u, w->Limits.Pairs)));
         w->Limits.Rows =
             std::max(1u, std::min({w->Limits.Rows, std::max(1u, w->Limits.Pairs / w->Limits.Visits), 16384u}));
-        w->Page = {.Rows = std::min(w->Limits.Rows, std::uint32_t(w->LiveCount)), .Visits = w->Limits.Visits};
         w->Workspace = context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointKeypointWorkspace>();
         if (!w->Workspace)
         {
             DiscardEditorPointScalar(commands, transaction);
             return refuse("Keypoint device workspace unavailable.");
         }
-        const auto current = [context, w]
+        w->Initial = w->Result;
+        // One page per submission; the device header says whether the page resumes, the stage advances or the
+        // traversal ended. Commands only (a worker records it): the retained index view and the captured views.
+        const auto recordPage = [w](RHI::ICommandContext& cmd)
         {
-            const auto t = w->Transaction.lock();
-            return t && !w->Abandoned && CurrentInput(context, *w) &&
-                SnapshotEditorPointScalar(BindEditorProcessingCommands(context), t).Phase ==
-                EditorGpuTransactionPhase::Running;
-        };
-        JobDesc job = EditorFeatureDetail::MakeFramedGpuJobDesc({.DebugName = "Resident paged keypoints",
-            .Scope = context.World,
-            .Current = current,
-            .Queue =
-                [context, w, residency]
+            auto& worker = w->Worker;
+            for (const auto buffer : worker.Index->Barriers())
+                cmd.BufferBarrier(buffer,
+                    RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferWrite,
+                    RHI::MemoryAccess::ShaderRead);
+            if (w->Page.Mode == 4 && w->Page.First == 0)
             {
-                ++w->Result.GpuQueryBatches;
-                w->Result.CpuStageUploadBytes += (w->Page.Mode == 0 && w->Page.First == 0 && !w->Page.Resume) ? 32 : 4;
-                if (w->Page.Mode == 2 && w->Page.First == 0 && !w->Page.Resume)
-                    w->Result.CpuStageUploadBytes += 4;
-                return context.SpatialIndices->QueueGpuCompute(
-                    w->GpuIndex,
-                    sizeof(Graphics::PointKeypointHeader),
-                    [context,
-                        w,
-                        residency,
-                        input = w->Input,
-                        back = w->Back,
-                        scoreBase = w->ScoreBase,
-                        maskBase = w->MaskBase](RHI::ICommandContext& cmd, const SpatialGpuIndexView& index)
+                const auto initialize =
+                    [&](const std::optional<RHI::BufferHandle>& base, const RHI::BufferHandle output)
+                {
+                    if (base)
                     {
-                        if (w->Abandoned || !w->Workspace || !input || !back)
-                            return RHI::BufferHandle{};
-                        const auto frame = context.Device->GetGlobalFrameNumber();
-                        for (auto buffer : {input->Buffer, back->Typed.Buffer, back->Companion.Buffer})
-                            residency->NoteUse(buffer, frame);
-                        if (w->Page.Mode == 4 && w->Page.First == 0)
-                        {
-                            const auto initialize = [&](const auto& base, auto output)
-                            {
-                                if (base)
-                                {
-                                    residency->NoteUse(base->Buffer, frame);
-                                    cmd.BufferBarrier(base->Buffer,
-                                        RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
-                                        RHI::MemoryAccess::TransferRead);
-                                    cmd.CopyBuffer(base->Buffer, output, 0, 0, w->SlotCount * 4);
-                                }
-                                else
-                                    cmd.FillBuffer(output, 0, w->SlotCount * 4, 0);
-                            };
-                            initialize(scoreBase, back->Typed.Buffer);
-                            initialize(maskBase, back->Companion.Buffer);
-                            for (auto b : {back->Typed.Buffer, back->Companion.Buffer})
-                                cmd.BufferBarrier(b, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderWrite);
-                        }
-                        const auto& c = w->Config;
-                        return w->Workspace->RecordPage(cmd,
-                            index.NodesBDA,
-                            *input,
-                            index.OriginalSlotsBDA,
-                            index.Count,
-                            {c.SalientRadius, c.NonMaxRadius, c.Gamma21, c.Gamma32, c.MinimumNeighbors},
-                            w->Page,
-                            back->Typed,
-                            back->Companion);
-                    },
-                    SpatialGpuLatency::Immediate);
-            },
-            .Observe =
-                [w](const SpatialGpuResult& gpu)
+                        cmd.BufferBarrier(*base,
+                            RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
+                            RHI::MemoryAccess::TransferRead);
+                        cmd.CopyBuffer(*base, output, 0, 0, w->SlotCount * 4);
+                    }
+                    else
+                        cmd.FillBuffer(output, 0, w->SlotCount * 4, 0);
+                };
+                initialize(worker.ScoreBase, worker.Typed.Buffer);
+                initialize(worker.MaskBase, worker.Companion.Buffer);
+                for (auto b : {worker.Typed.Buffer, worker.Companion.Buffer})
+                    cmd.BufferBarrier(b, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderWrite);
+            }
+            const auto& c = w->Config;
+            const auto& index = worker.Index->View();
+            return worker.Workspace->RecordPage(cmd,
+                index.NodesBDA,
+                worker.Input,
+                index.OriginalSlotsBDA,
+                index.Count,
+                {c.SalientRadius, c.NonMaxRadius, c.Gamma21, c.Gamma32, c.MinimumNeighbors},
+                w->Page,
+                worker.Typed,
+                worker.Companion);
+        };
+        // A completed page: true once the traversal ended (or the device reported an error).
+        const auto observePage = [w]
+        {
+            auto& p = w->Page;
+            if (w->Header.Error)
+                return true;
+            if (w->Header.Reserved)
             {
-                if (gpu.Data.size() != sizeof(w->Header))
-                    return true;
-                w->Result.ActualBackend = "vulkan_compute";
-                w->Result.CpuStageReadbackBytes += gpu.Data.size();
-                w->Result.CpuStageUploadBytes += gpu.CpuStageUploadBytes;
-                std::memcpy(&w->Header, gpu.Data.data(), sizeof(w->Header));
-                auto& p = w->Page;
-                if (w->Header.Error)
-                    return true;
-                if (w->Header.Reserved)
-                {
-                    p.Resume = 1;
-                    return false;
-                }
-                p.Resume = 0;
-                p.First += p.Rows;
-                if (p.First >= w->LiveCount || p.Mode == 1)
-                {
-                    p.First = 0;
-                    if (p.Mode == 4)
-                        return true;
-                    p.Mode = p.Mode == 0 ? 5 : p.Mode == 5 ? 1 : p.Mode == 1 ? 2 : p.Mode + 1;
-                }
-                if (p.Mode == 4 || p.Mode == 5)
-                    p.Rows = std::uint32_t(w->LiveCount);
-                else
-                    p.Rows = std::min(w->Limits.Rows, std::uint32_t(w->LiveCount) - p.First);
+                p.Resume = 1;
                 return false;
-            },
-            .Publish =
-                [commands, w, transaction, automatic](const SpatialGpuResult* gpu)
+            }
+            p.Resume = 0;
+            p.First += p.Rows;
+            if (p.First >= w->LiveCount || p.Mode == 1)
             {
-                if (!gpu || gpu->State != SpatialQueryState::Ready || gpu->Data.size() != sizeof(w->Header) ||
-                    w->Header.Error)
+                p.First = 0;
+                if (p.Mode == 4)
+                    return true;
+                p.Mode = p.Mode == 0 ? 5 : p.Mode == 5 ? 1 : p.Mode == 1 ? 2 : p.Mode + 1;
+            }
+            if (p.Mode == 4 || p.Mode == 5)
+                p.Rows = std::uint32_t(w->LiveCount);
+            else
+                p.Rows = std::min(w->Limits.Rows, std::uint32_t(w->LiveCount) - p.First);
+            return false;
+        };
+        const std::weak_ptr<EditorPointScalarTransaction> weak = transaction;
+        const auto strip = [](Graphics::GpuPropertyView view)
+        {
+            view.Lease.reset(); // the owner keeps the lease
+            return view;
+        };
+        // ARCH-023: the paged traversal is the transaction's one logical step (pages bound each submission), run on
+        // the step run's worker; the step run decides when it starts, and Accept, Discard and Restart go through the
+        // shared controls.
+        EditorPointScalarProducer producer{.Prepare =
+                                               [w, weak, context, strip]
+            {
+                const auto t = weak.lock();
+                w->Back = t ? AcquireEditorPointScalarBack(t) : std::nullopt;
+                if (!w->Back)
                 {
-                    w->Result.Status = EditorCommandStatus::GeometryProcessingFailed;
-                    w->Result.Message = w->Header.Error
-                        ? "Keypoints rejected invalid scale, covariance or spatial traversal."
-                        : "Keypoint GPU submission failed.";
-                    DiscardEditorPointScalar(commands, transaction);
+                    w->Failure = "Keypoint output rings unavailable.";
                     return false;
                 }
+                std::string why;
+                if (!w->IndexView)
+                    w->IndexView = context.SpatialIndices->PrepareGpuIndex(w->GpuIndex, why);
+                if (!w->IndexView)
+                {
+                    w->Failure = why;
+                    return false;
+                }
+                const auto refusals = context.SpatialIndices->Stats().ScratchRefusals;
+                if (!w->Workspace || !w->Workspace->Prepare(w->IndexView->View().Count))
+                {
+                    w->Failure = context.SpatialIndices->MethodScratchDiagnostic(
+                        refusals, "Keypoint device workspace unavailable.");
+                    return false;
+                }
+                auto& worker = w->Worker;
+                worker = {.Workspace = w->Workspace,
+                    .Index = w->IndexView,
+                    .Input = strip(*w->Input),
+                    .Typed = strip(w->Back->Typed),
+                    .Companion = strip(w->Back->Companion),
+                    .ScoreBase = w->ScoreBase ? std::optional{w->ScoreBase->Buffer} : std::nullopt,
+                    .MaskBase = w->MaskBase ? std::optional{w->MaskBase->Buffer} : std::nullopt};
+                w->Header = {};
+                w->Page = {.Rows = std::min(w->Limits.Rows, std::uint32_t(w->LiveCount)), .Visits = w->Limits.Visits};
+                return true;
+            },
+            .Step = [w, recordPage, observePage](const EditorPointScalarPage& page) -> std::string
+            {
+                for (;;)
+                {
+                    ++w->Worker.Batches;
+                    if (!page(recordPage, std::as_writable_bytes(std::span{&w->Header, 1u})))
+                        return w->Failure = "Keypoint GPU submission failed.";
+                    w->Worker.ReadbackBytes += sizeof(w->Header);
+                    if (observePage())
+                        return {};
+                }
+            },
+            .Outcome = [w, weak]() -> std::string
+            {
                 auto& r = w->Result;
+                r.GpuQueryBatches += std::exchange(w->Worker.Batches, 0u);
+                r.CpuStageReadbackBytes += std::exchange(w->Worker.ReadbackBytes, 0u);
+                if (!w->Failure.empty())
+                    return w->Failure;
+                r.ActualBackend = "vulkan_compute";
+                if (w->Header.Error)
+                    return "Keypoints rejected invalid scale, covariance or spatial traversal.";
                 r.MeanSpacing = w->Header.MeanSpacing;
                 r.SalientRadius = w->Header.SalientRadius;
                 r.NonMaxRadius = w->Header.NonMaxRadius;
                 r.MaximumNeighbors = w->Header.MaximumNeighbors;
                 r.KeypointCount = w->Header.KeypointCount;
                 w->Back.reset();
-                w->Input.reset();
-                w->ScoreBase.reset();
-                w->MaskBase.reset();
-                w->Workspace.reset(); // Final page completion proves scratch is no longer in use.
-                if (!PublishEditorPointScalarBack(transaction, true))
-                {
-                    DiscardEditorPointScalar(commands, transaction);
-                    return false;
-                }
-                if (automatic)
-                {
-                    const auto accepted = AcceptEditorPointScalar(commands, transaction);
-                    if (accepted.Status != EditorCommandStatus::Pending)
-                    {
-                        w->Result.Status = accepted.Phase == EditorGpuTransactionPhase::Failed
-                            ? accepted.Status
-                            : EditorCommandStatus::StaleEntity;
-                        w->Result.Message = accepted.Message;
-                        DiscardEditorPointScalar(commands, transaction);
-                    }
-                }
-                return true;
+                const auto t = weak.lock();
+                return t && PublishEditorPointScalarBack(t, false) ? std::string{}
+                                                                   : std::string{"Keypoint ring publication failed."};
             },
-            .Abandon =
-                [commands, w, transaction]
+            .Reset =
+                [w]
             {
-                if (!w->Abandoned)
-                {
-                    w->Result.Status = EditorCommandStatus::StaleEntity;
-                    w->Result.Message = "Keypoint job stopped, detached or stale.";
-                    DiscardEditorPointScalar(commands, transaction);
-                }
-            }});
+                w->Back.reset();
+                w->Failure.clear();
+                w->Header = {};
+                w->Worker.Batches = 0u;
+                w->Worker.ReadbackBytes = 0u;
+                w->Result = w->Initial;
+            },
+            .Uses =
+                [w](std::vector<RHI::BufferHandle>& buffers)
+            {
+                for (const auto* view : {&w->Input, &w->ScoreBase, &w->MaskBase})
+                    if (*view)
+                        buffers.push_back((*view)->Buffer);
+                if (w->Back)
+                    for (const auto& view : {w->Back->Typed, w->Back->Presentation, w->Back->Companion})
+                        if (view.Buffer.IsValid())
+                            buffers.push_back(view.Buffer);
+            },
+            // No step runs any more: the worker's workspace and index references return with the run (the sink
+            // dropped the owner's already).
+            .Release =
+                [w]
+            {
+                w->Worker = {};
+            }};
         EditorJobIdentity runIdentity{.EntityId = config.StableEntityId,
             .Scope = ToEditorJobScope(w->Config.Mask.Domain),
             .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
             .OutputName = w->Config.Mask.Name,
             .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
-        const auto token = context.JobCommands.Submit(std::move(job), runIdentity);
-        if (!token.IsValid())
-        {
-            DiscardEditorPointScalar(commands, transaction);
-            return refuse(GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("Keypoint analysis"));
-        }
-        runIdentity.Run = token; // the publication's Accept stage joins this run
-        JoinEditorPointScalarRun(transaction, std::move(runIdentity));
+        // A batch (automatic) runs at once and accepts at its end; an interactive start keeps the config's choice.
+        const StepRunExecution execution = automatic ? kOneShotBatchExecution : OneShotExecution(config.Execution);
         w->Admitted = true;
+        std::string rejected;
+        if (!SubmitEditorPointScalarRun(transaction,
+                std::move(runIdentity),
+                execution,
+                std::move(producer),
+                "Resident paged keypoints",
+                rejected))
+        {
+            w->Admitted = false;
+            return refuse(std::move(rejected));
+        }
         result = w->Result;
+        result.StepRun = SnapshotEditorPointScalar(commands, transaction).StepRun;
+        w->Initial.StepRun = result.StepRun;
         return transaction;
     }
     ActionReadiness PreviewEditorKeypointAnalysisCommand(
@@ -652,14 +757,19 @@ namespace Extrinsic::Runtime
         const auto work = Capture(context, config, diagnostic, CapturePurpose::Readiness);
         return {bool(work), std::move(diagnostic)};
     }
-    EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(const EditorProcessingCommands& commands,
-        const KeypointAnalysisConfig& config,
-        std::function<void(EditorKeypointAnalysisResult)> onComplete)
+    // Apply's run (a batch) or a start's (`execution`, the section's): Vulkan compute as its resident transaction,
+    // the other backends as a one-shot worker step run of the session's service; without that service (or
+    // without a job lane) only a batch runs, as one queued job (or inline).
+    EditorKeypointAnalysisResult RunKeypointAnalysis(const EditorProcessingCommands& commands,
+        KeypointAnalysisConfig config,
+        std::function<void(EditorKeypointAnalysisResult)> onComplete,
+        const StepRunExecution& execution)
     {
         if (config.Backend == KeypointAnalysisBackend::VulkanCompute)
         {
+            config.Execution = execution;
             EditorKeypointAnalysisResult result;
-            (void)StartEditorKeypointAnalysisTransaction(commands, config, result, std::move(onComplete), true);
+            (void)StartEditorKeypointAnalysisTransaction(commands, config, result, std::move(onComplete));
             return result;
         }
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
@@ -692,12 +802,17 @@ namespace Extrinsic::Runtime
                 w->GpuIndex,
                 w->Index,
                 w->Result.IndexReused,
-                diagnostic);
+                diagnostic,
+                w->Config.Backend == KeypointAnalysisBackend::CpuLBVH); // Vulkan LBVH rows build no CPU hierarchy
             if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
                 return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
             if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
                 return report(EditorCommandStatus::StaleEntity, "Keypoint index does not match the selected samples.");
         }
+        const bool batch = execution.Start == StepRunStart::Run && execution.AutoAccept != StepRunAutoAccept::Never;
+        if (!batch && (!context.StepRuns || !context.JobCommands.Available()))
+            return report(EditorCommandStatus::InvalidProcessingParameters,
+                "Keypoint analysis needs the step-run service and a job lane for its run controls; none is composed.");
         if (!context.JobCommands.Available())
         {
             Compute(*w);
@@ -711,12 +826,30 @@ namespace Extrinsic::Runtime
         namespace MS = GeometryProcessingDetail::MeshSupport;
         if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Keypoint analysis"))
             return report(EditorCommandStatus::Pending, std::move(busy->Message)); // the active job owns the callback
-        // Once submitted, Result belongs to the running stage. Submission failures
-        // report from the delivery's immutable snapshot while earlier stages wind down.
+        if (context.StepRuns && w->Config.Backend == KeypointAnalysisBackend::VulkanLBVH)
+        {
+            // The radius-row session, once, on the main thread: resident index, buffers, pipelines, the captured
+            // points as queries excluding their own rows; the radii come with the step.
+            w->Session = context.SpatialIndices->PrepareQuerySession(w->GpuIndex,
+                {.Radius = true,
+                    .Capacity =
+                        GeometryProcessingDetail::PointRadiusCapacity(w->Config.GpuRadiusCapacity, w->Points.size(), 0),
+                    .PageQueries = w->Config.GpuQueryBatchSize,
+                    .Queries = w->Points,
+                    .Excluded = w->Slots},
+                diagnostic);
+            if (!w->Session)
+                return report(EditorCommandStatus::GeometryProcessingFailed,
+                    "Vulkan keypoint radius support could not be prepared: " + diagnostic);
+        }
+        // Once submitted, Result belongs to the running job. A submission failure reports from the delivery's
+        // immutable snapshot.
         const MS::QueuedJobDelivery<EditorKeypointAnalysisResult> delivery{context,
             std::move(onComplete),
             report(EditorCommandStatus::Pending, "Keypoint analysis queued."),
             "Keypoint analysis"};
+        if (context.StepRuns)
+            return StartKeypointRun(context, w, identity, delivery, execution);
         const auto validate = [context, w]
         {
             return MS::ValidateQueuedJob(w->Abandoned, CurrentInput(context, *w));
@@ -741,67 +874,6 @@ namespace Extrinsic::Runtime
                 w->Abandoned = true;
                 delivery.Finalize(w->MainFailure);
             }};
-        if (w->Config.Backend == KeypointAnalysisBackend::VulkanLBVH)
-        {
-            JobDesc prepare{.DebugName = "Keypoint scale",
-                .Scope = context.World,
-                .Work =
-                    [w](const JobCancellation&)
-                {
-                    Prepare(*w);
-                    return JobResultEnvelope::Make(true);
-                },
-                .ValidateBeforeApply = validate,
-                .PublishCompletion =
-                    [w](KernelEventBus&, const JobResultEnvelope&)
-                {
-                    if (w->Result.Status == EditorCommandStatus::GeometryProcessingFailed)
-                    {
-                        w->MainFailure = w->Result;
-                        return false;
-                    }
-                    return true;
-                },
-                .FinalizeUnpublishedOnMainThread =
-                    [w]
-                {
-                    w->Abandoned = true;
-                }};
-            const auto scale = context.JobCommands.Submit(std::move(prepare), identity);
-            identity.Run = scale; // later stages join the run
-            if (!scale.IsValid())
-                return delivery.Rejected("scale");
-            JobDesc gpu{.DebugName = "Keypoint radius support (Vulkan)",
-                .Scope = context.World,
-                .Work =
-                    [](const JobCancellation&)
-                {
-                    return JobResultEnvelope::Make(true);
-                },
-                .IsReadyToApply =
-                    [context, w]
-                {
-                    return AdvanceGpu(context, *w);
-                },
-                .PublishCompletion =
-                    [w](KernelEventBus&, const JobResultEnvelope&)
-                {
-                    return w->Rows.Finished;
-                },
-                .FinalizeUnpublishedOnMainThread =
-                    [w]
-                {
-                    w->Abandoned = true;
-                }};
-            gpu.DependsOn.push_back({scale, "Resolve keypoint radii before complete Vulkan support"});
-            const auto support = context.JobCommands.Submit(std::move(gpu), identity);
-            if (!support.IsValid())
-            {
-                w->Abandoned = true;
-                return delivery.Rejected("Vulkan radius support");
-            }
-            desc.DependsOn.push_back({support, "Complete radius support before keypoint covariance and suppression"});
-        }
         const auto token = context.JobCommands.Submit(std::move(desc), identity);
         if (!token.IsValid())
         {
@@ -809,6 +881,18 @@ namespace Extrinsic::Runtime
             return delivery.Rejected();
         }
         return delivery.Pending();
+    }
+    EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(const EditorProcessingCommands& commands,
+        const KeypointAnalysisConfig& config,
+        std::function<void(EditorKeypointAnalysisResult)> onComplete)
+    {
+        return RunKeypointAnalysis(commands, config, std::move(onComplete), kOneShotBatchExecution);
+    }
+    EditorKeypointAnalysisResult StartEditorKeypointAnalysisRun(const EditorProcessingCommands& commands,
+        const KeypointAnalysisConfig& config,
+        std::function<void(EditorKeypointAnalysisResult)> onComplete)
+    {
+        return RunKeypointAnalysis(commands, config, std::move(onComplete), config.Execution);
     }
     EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(
         const EditorProcessingCommands& commands, std::function<void(EditorKeypointAnalysisResult)> onComplete)
@@ -818,5 +902,14 @@ namespace Extrinsic::Runtime
             return {.Status = EditorCommandStatus::InvalidProcessingParameters,
                 .Message = "Keypoint config is unavailable."};
         return ApplyEditorKeypointAnalysisCommand(commands, *config, std::move(onComplete));
+    }
+    EditorKeypointAnalysisResult StartEditorConfiguredKeypointAnalysis(
+        const EditorProcessingCommands& commands, std::function<void(EditorKeypointAnalysisResult)> onComplete)
+    {
+        const auto config = GetEditorKeypointAnalysisConfig(commands);
+        if (!config)
+            return {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                .Message = "Keypoint config is unavailable."};
+        return StartEditorKeypointAnalysisRun(commands, *config, std::move(onComplete));
     }
 } // namespace Extrinsic::Runtime

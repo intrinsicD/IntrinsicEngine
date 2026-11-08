@@ -28,6 +28,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -69,6 +70,13 @@ namespace
             Context.Device=&Kernel().GetDevice();Context.SpatialIndices=Kernel().Services().Find<R::SpatialIndexCache>();
             Context.CommandHistory=&History;
             Context.JobCommands.Submit=[this](R::JobDesc job,R::EditorJobIdentity){return Kernel().Jobs().Submit(std::move(job));};
+            // ARCH-023: a GPU transaction is a step run of the composed service, its holder cancelled like the run's jobs.
+            Context.StepRuns = Kernel().Services().Find<R::StepRunsService>();
+            Context.JobCommands.Cancel = [this](R::JobToken token)
+            {
+                return Kernel().Jobs().Cancel(token) ? R::EditorJobCancelStatus::Requested
+                                                     : R::EditorJobCancelStatus::NotActive;
+            };
             Entity=Context.Scene->Create();Context.Scene->Raw().emplace<GS::Vertices>(Entity).Properties.Resize(67);
             auto positions=Rows().GetOrAdd<glm::vec3>("v:position");
             for(std::size_t i=0;i<64;++i)positions[i]={float(i%8)*0.25f,float(i/8)*0.25f,float(i%3)*0.03125f};
@@ -85,22 +93,56 @@ namespace
             std::string why;R::EditorPointScalarTransactionSnapshot refused;
             const auto query=Geometry::PointCloud::Kernels::ConservativeQueryRadius(SupportRadius);
             if(!query){Fail("no query radius");return;}
-            Run=R::MakeEditorPointScalarTransactionForTest(Commands(),Id,Positions,Output,{},nullptr,{},
-                {.Method=2,.Capacity=256,.Kernel=std::uint32_t(WeightKernel),.Inverse=std::uint32_t(WeightMode),.QueryRadius=*query,
-                 .SupportRadius=SupportRadius},&refused);why=refused.Message;
-            if(!Run)Fail(why);else ++Starts;
+            Run = R::MakeEditorPointScalarTransactionForTest(Commands(),
+                Id,
+                Positions,
+                Output,
+                {},
+                nullptr,
+                {},
+                {.Method = 2,
+                    .Capacity = 256,
+                    .Kernel = std::uint32_t(WeightKernel),
+                    .Inverse = std::uint32_t(WeightMode),
+                    .QueryRadius = *query,
+                    .SupportRadius = SupportRadius},
+                &refused);
+            why = refused.Message;
+            if (!Run)
+            {
+                Fail(why);
+                return;
+            }
+            ++Starts;
+            const auto state = R::SnapshotEditorPointScalar(Commands(), Run);
+            const auto ready = Context.StepRuns->Observe(state.StepRun);
+            ASSERT_TRUE(ready);
+            ASSERT_EQ(ready->Phase, R::StepRunPhase::Ready);
+            if (!Context.StepRuns->Control(state.StepRun, R::StepRunAction::Run, 1u, why))
+                Fail(why);
         }
-        void Frame(double,double) override
+        void Frame(double, double) override
         {
-            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(120)){Fail("Scalar smoke timed out");return;}
-            if(!Kernel().GetDevice().IsOperational()||!Context.SpatialIndices)return;
-            if(Step==0){
-                if(Boundary){
-                    const float separation=1e-20f;
-                    Points={{0,0,0},{separation,0,0}};
-                    auto p=Rows().Get<glm::vec3>("v:position");p[0]=Points[0];p[1]=Points[1];
-                    auto deleted=Rows().Get<bool>("v:deleted");for(unsigned j=2;j<67;++j)deleted[j]=true;
-                    SupportRadius=2e-20;
+            if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(120))
+            {
+                Fail("Scalar smoke timed out");
+                return;
+            }
+            if (!Kernel().GetDevice().IsOperational() || !Context.SpatialIndices)
+                return;
+            if (Step == 0)
+            {
+                if (Boundary)
+                {
+                    const float separation = 1e-20f;
+                    Points = {{0, 0, 0}, {separation, 0, 0}};
+                    auto p = Rows().Get<glm::vec3>("v:position");
+                    p[0] = Points[0];
+                    p[1] = Points[1];
+                    auto deleted = Rows().Get<bool>("v:deleted");
+                    for (unsigned j = 2; j < 67; ++j)
+                        deleted[j] = true;
+                    SupportRadius = 2e-20;
                 }
                 {WeightKernel=Geometry::PointCloud::Kernels::KernelType((Method-2)/2);WeightMode=Geometry::PointCloud::Kernels::DensityWeightMode((Method-2)%2);
                     auto r=Geometry::PointCloud::Kernels::ComputeDensityWeights(Points,SupportRadius,WeightKernel,WeightMode);if(!r.Succeeded()){Fail("CPU weights failed");return;}Reference=r.Weights;}
@@ -179,6 +221,7 @@ namespace
             Context.World = Kernel().ActiveWorld();
             Context.Device = &Kernel().GetDevice();
             Context.SpatialIndices = Kernel().Services().Find<R::SpatialIndexCache>();
+            Context.StepRuns = Kernel().Services().Find<R::StepRunsService>(); // ARCH-023: GPU runs are step runs
             Context.JobCommands.Submit = [this](R::JobDesc job, R::EditorJobIdentity)
             {
                 return Kernel().Jobs().Submit(std::move(job));
@@ -212,7 +255,10 @@ TEST(RUNTIME298PointScalarResidency,ParityResidentSecondRunAndDiscard)
     auto config=R::CreateReferenceEngineConfig();config.Window.Width=128;config.Window.Height=128;
     config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
     auto app=std::make_unique<ScalarApp>();auto* run=app.get();
-    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<R::SpatialIndexCache>();engine.Initialize();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
+    engine.Initialize();
     struct Shutdown { R::Engine& Engine;~Shutdown(){Engine.Shutdown();} } shutdown{engine};
     if(!engine.GetDevice().SupportsShaderFloat64())GTEST_SKIP()<<"Shader float64 unavailable";
     engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());ASSERT_TRUE(run->Done)<<"step "<<run->Step;
@@ -235,6 +281,7 @@ TEST(RUNTIME350IndexMismatch, GpuStartExplainsAMismatchedSnapshot)
     auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
     engine.Initialize();
     struct Shutdown
     {

@@ -25,6 +25,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
@@ -69,6 +70,7 @@ namespace Intrinsic::Tests
         Runtime::EditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         Runtime::EditorVisualizationRecipeCommandSurface VisualizationRecipes{};
         std::uint64_t VisualizationRecipeRevision{0u};
+        Runtime::StepRunsService* StepRuns{nullptr};
         Runtime::EditorJobCommandSurface JobCommands{};
         Runtime::RuntimeAssetImportQueueSnapshot AssetImportQueue{};
         std::string PendingAssetImportPath{};

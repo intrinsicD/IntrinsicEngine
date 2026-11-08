@@ -85,7 +85,6 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         PointCloudConsolidationPropertyRefs Properties{};
         PointCloudConsolidationConfig Config{};
-        bool AutoAccept{true};
         std::function<bool()> AttachmentActive{};
         // History label prefix active when the run was queued; the commit applies it again.
         std::string LabelPrefix{};
@@ -109,6 +108,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t GpuQueryBatches{}, SpatialWorkspaceBuilds{};
         std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
         std::uint32_t GpuSubmissions{}, GpuPreviews{};
+        std::uint64_t StepRun{}; // the run's step run (run_control, run_observe); 0: it never started one
         std::string BackendDiagnostic{};
         // Initial samples (RUNTIME-289): the backend asked for, the one that orders them (for a run
         // that ends before solving, the one that was to order them; empty: the seeded random
@@ -156,11 +156,15 @@ export namespace Extrinsic::Runtime
     };
 
     enum class PointCloudConsolidationGpuAction : std::uint8_t { Observe, Stop, Accept, Discard };
+    // A consolidation run in progress, of any backend (each is a step run; `StepRun`: its id for run_control and
+    // run_observe). ReadyToAccept: ended, or paused at an iteration boundary (Accept then publishes that iteration's
+    // positions). Submissions and the stage counters are a resident run's pages or a hybrid run's query batches.
     struct PointCloudConsolidationGpuObservation
     {
         CommandCorrelationId Correlation{};
         bool Running{}, ReadyToAccept{}, Accepting{}, CanAccept{};
         std::string Message{};
+        std::uint64_t StepRun{};
         std::uint32_t Iterations{}, Submissions{}, Previews{};
         std::uint64_t InputUploadBytes{}, InputCacheHits{}, CpuStageUploadBytes{}, CpuStageReadbackBytes{};
     };

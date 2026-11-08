@@ -10,6 +10,7 @@ module;
 #include <memory>
 #include <mutex>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "Vulkan.hpp"
@@ -60,7 +61,11 @@ namespace Extrinsic::Backends::Vulkan
         void WaitIdle()  override;
 
         [[nodiscard]] bool IsOperational() const noexcept override;
-        [[nodiscard]] bool IsDeviceLost() const noexcept override { return m_DeviceLost; }
+        // A loss a method worker observed (its compute wait) counts as well.
+        [[nodiscard]] bool IsDeviceLost() const noexcept override
+        {
+            return m_DeviceLost || (m_TransferQueue && m_TransferQueue->Lost());
+        }
 
         // GRAPHICS-033E: receive the renderer's most recent recipe-aware
         // validation outcome. Stored in `m_LatestRecipeValidationClean` and
@@ -106,6 +111,8 @@ namespace Extrinsic::Backends::Vulkan
 
         [[nodiscard]] RHI::BufferHandle CreateBuffer(const RHI::BufferDesc& desc) override;
         void DestroyBuffer(RHI::BufferHandle handle) override;
+        [[nodiscard]] bool WriteMappedBuffer(
+            RHI::BufferHandle handle, const void* data, uint64_t size, uint64_t offset = 0) override;
         void WriteBuffer(RHI::BufferHandle handle, const void* data,
                          uint64_t size, uint64_t offset) override;
         void ReadBuffer(RHI::BufferHandle handle, void* data,
@@ -140,8 +147,10 @@ namespace Extrinsic::Backends::Vulkan
 
         [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override;
         [[nodiscard]] RHI::ReadbackToken SubmitComputeReadback(
-            std::function<RHI::BufferHandle(RHI::ICommandContext&)> record, std::uint64_t readbackBytes,
-            RHI::ReadbackSink sink) override;
+            std::function<RHI::BufferHandle(RHI::ICommandContext&)> record,
+            std::uint64_t readbackBytes,
+            RHI::ReadbackSink sink,
+            RHI::ComputeInputOrder order = RHI::ComputeInputOrder::AfterIssuedTransfers) override;
         [[nodiscard]] RHI::IBindlessHeap& GetBindlessHeap() override;
         [[nodiscard]] RHI::IProfiler*      GetProfiler()      override { return m_Profiler.get(); }
         [[nodiscard]] uint32_t GetFramesInFlight()    const override { return kMaxFramesInFlight; }
@@ -165,6 +174,8 @@ namespace Extrinsic::Backends::Vulkan
         friend bool IsVulkanProfilerCommandContextOwned(
             const RHI::IDevice* device,
             const RHI::ICommandContext* context) noexcept;
+        friend std::function<bool()> HoldVulkanQueue(RHI::IDevice* device, VulkanGatedQueue queue);
+        friend bool WithVulkanFrameQueueLockHeld(RHI::IDevice* device, const std::function<void()>& whileHeld);
 
         [[nodiscard]] static VulkanProfilerCommandContextView
         ResolveProfilerCommandContext(
@@ -305,6 +316,8 @@ namespace Extrinsic::Backends::Vulkan
 
         void DeferDelete(VulkanDeferredDelete fn);
         void FlushDeletionQueue(uint32_t frameSlot);
+        // Runs deferred deletes whose compute fence completed (all of them once the device is idle).
+        void ProcessComputeGatedDeletes(bool deviceIdle);
         void ProcessResourcePoolDeletions();
 
         VkInstance               m_Instance       = VK_NULL_HANDLE;
@@ -316,14 +329,35 @@ namespace Extrinsic::Backends::Vulkan
 
         VkQueue  m_GraphicsQueue     = VK_NULL_HANDLE;
         VkQueue  m_AsyncComputeQueue = VK_NULL_HANDLE;
+        VkQueue m_MethodComputeQueue = VK_NULL_HANDLE;
         VkQueue  m_PresentQueue      = VK_NULL_HANDLE;
         VkQueue  m_TransferVkQueue   = VK_NULL_HANDLE;
         uint32_t m_GraphicsFamily = 0;
         uint32_t m_AsyncComputeFamily = 0;
+        uint32_t m_MethodComputeFamily = 0;
         uint32_t m_AsyncComputeQueueIndex = 0;
         uint32_t m_PresentFamily  = 0;
         uint32_t m_TransferFamily = 0;
+        // Host synchronization per VkQueue (ARCH-023): the frame queues (graphics, present, frame compute,
+        // transfer) share m_QueueMutex; a distinct method queue has its own, so a blocked present or frame submit
+        // never holds up a method worker. MethodQueueMutex() is the method queue's lock either way.
         std::mutex m_QueueMutex;
+        std::mutex m_MethodQueueMutex;
+        bool m_MethodQueueOwnsLock = false;
+        [[nodiscard]] std::mutex& MethodQueueMutex() noexcept
+        {
+            return m_MethodQueueOwnsLock ? m_MethodQueueMutex : m_QueueMutex;
+        }
+        struct AllQueueLocks
+        {
+            std::unique_lock<std::mutex> Frame, Method;
+        };
+        [[nodiscard]] AllQueueLocks LockAllQueues();
+        // Barrier queue families of method-compute command contexts (graphics, async compute, present,
+        // transfer), resolved once at initialization so a worker never reads live swapchain state.
+        std::array<uint32_t, 4> m_MethodBarrierFamilies{};
+        // ARCH-023: frame-retired deletes still waiting for the compute lane (owner thread).
+        std::vector<std::pair<RHI::ReadbackToken, VulkanDeferredDelete>> m_ComputeGatedDeletes;
 
         VkSwapchainKHR              m_Swapchain        = VK_NULL_HANDLE;
         VkFormat                    m_SwapchainFormat  = VK_FORMAT_UNDEFINED;
@@ -344,6 +378,7 @@ namespace Extrinsic::Backends::Vulkan
         std::array<std::vector<PendingParallelCommandContext>, kMaxFramesInFlight> m_ParallelCommandBuffers;
         VkCommandPool   m_OneShotCmdPool   = VK_NULL_HANDLE;
         VkCommandBuffer m_OneShotCmdBuffer = VK_NULL_HANDLE;
+        VkFence m_OneShotFence = VK_NULL_HANDLE;
         bool            m_OneShotRecording = false;
         std::mutex      m_OneShotMutex;
 

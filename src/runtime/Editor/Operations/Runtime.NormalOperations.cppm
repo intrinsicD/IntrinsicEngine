@@ -13,6 +13,7 @@ export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Graphics.GpuPropertyResidency;
 export namespace Extrinsic::Runtime
@@ -29,6 +30,7 @@ export namespace Extrinsic::Runtime
         Geometry::PointCloud::Normals::Diagnostics PointDiagnostics{};
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
+        std::uint64_t StepRun{}; // the run's step run (run_control, run_observe); 0: none (refused, no service)
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         // Input traffic, resident hits and diagnostic/Accept downloads. Topology bytes apply
         // to mesh methods; PCA uses the cached LBVH and never downloads neighborhoods.
@@ -64,6 +66,15 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(const EditorProcessingCommands&, const NormalEstimationConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(const EditorProcessingCommands&, std::function<void(EditorNormalEstimationResult)> onComplete = {});
+    // ARCH-023: Apply's run with `config.Execution` instead of the batch (Apply always computes at once and accepts at
+    // its end): on every backend a one-shot step run of the session's service (the CPU's a worker run, Vulkan's its
+    // transaction), driven by run_control or a panel's row; its answer names it (StepRun, Pending while it runs) and
+    // `onComplete` gets its terminal result.
+    [[nodiscard]] EditorNormalEstimationResult StartEditorNormalEstimationRun(const EditorProcessingCommands&,
+        const NormalEstimationConfig&,
+        std::function<void(EditorNormalEstimationResult)> onComplete = {});
+    [[nodiscard]] EditorNormalEstimationResult StartEditorConfiguredNormalEstimation(
+        const EditorProcessingCommands&, std::function<void(EditorNormalEstimationResult)> onComplete = {});
 
     // Mesh and point-set PCA normals share a GPU property transaction (ADR 0030
     // decisions 6-7): the kernels read the canonical positions slot and a topology bundle the
@@ -85,7 +96,10 @@ export namespace Extrinsic::Runtime
     };
     struct EditorNormalTransaction;
     using EditorNormalTransactionHandle = std::shared_ptr<EditorNormalTransaction>;
-    // Validates and captures like the command, then queues the device run. Null with `failure`
+    // Validates and captures like the command, then queues the device run, a one-shot step run (Result.StepRun) with
+    // `config.Execution`: its start (ready: nothing recorded until run_control run or step) and automatic Accept (any
+    // but never: once the step ended, unless stopped); it restarts from the same capture, reusing its resident inputs
+    // and workspaces, until Accept or Discard. Null with `failure`
     // filled when the request is rejected (an unsupported method/mode, CPU backend, missing device or
     // residency, or a result for the same output still waiting for Accept or Discard). An active
     // job on the same output answers Pending with the shared "already has an active" message.

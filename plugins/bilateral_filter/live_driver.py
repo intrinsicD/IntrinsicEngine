@@ -5,9 +5,10 @@ Starts <build>/bin/ExtrinsicSandbox like plugins/fixture/s1_driver.py (isolated 
 settings for a Vulkan exit) but with its built-in plugins, so the bilateral filter is the startup plugin. It imports
 a point cloud with normals (a .pwn written here) and, over the agent socket:
   1. finds the plugin loaded at startup with its tools, its section sandbox.bilateral_filter and its window;
-  2. runs zero passes (the output equals the positions) and one and three passes on CPU octree, compared with an
-     independent float64 reference of the documented kernel (exhaustive kNN);
-  3. runs CPU LBVH and Vulkan LBVH with the same settings: both agree with the octree run, and the Vulkan run pages
+  2. starts a step run ready (bilateral_filter_start): step 0, and its Discard writes nothing; then runs one and
+     three passes on CPU octree (bilateral_filter: run and accept at the end), compared with an independent float64
+     reference of the documented kernel (exhaustive kNN);
+  3. runs CPU LBVH, Vulkan LBVH and Vulkan brute force with the same settings: all agree with the octree run, and each Vulkan run pages
      its queries 64 at a time (gpu_query_batch_size 64);
   4. lists a long run in jobs_list and cancels it through MCP notifications/cancelled: the run ends, nothing is
      written (its row belongs to the editor's Jobs window, so jobs_cancel, the agent session's, is refused there);
@@ -110,7 +111,8 @@ class Session:
 
     def settings(self, entity: int, positions: str, normals: str, output: str, **values) -> bool:
         payload = {"entity": entity, "backend": "cpu_octree", "k_neighbors": K, "spatial_sigma": SPATIAL,
-                   "normal_sigma": NORMAL, "iterations": 1, "gpu_query_batch_size": 4096,
+                   "normal_sigma": NORMAL, "max_iterations": 1, "preview_every": 1, "preview_interval_ms": 33,
+                   "auto_accept": "never", "start": "run", "gpu_query_batch_size": 4096,
                    "positions": {"domain": DOMAIN, "name": positions, "kind": "vec3"},
                    "normals": {"domain": DOMAIN, "name": normals, "kind": "vec3"},
                    "output": {"domain": DOMAIN, "name": output, "kind": "vec3"}} | values
@@ -161,7 +163,7 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
     loaded = [p.get("name") for p in (listed.get("loaded") or [])] if isinstance(listed, dict) else []
     checks.check("startup: the bilateral filter plugin is loaded", "bilateral_filter" in loaded, listed)
     names = {tool["name"] for tool in agent.request("tools/list", {}).get("result", {}).get("tools", [])}
-    checks.check("startup: its tools are registered", {"bilateral_filter", "bilateral_filter_preview"} <= names)
+    checks.check("startup: its tools are registered", {"bilateral_filter", "bilateral_filter_start", "bilateral_filter_preview"} <= names)
     ok, sections, _ = session.call("config_sections")
     checks.check("startup: its section is registered",
                  ok and any(s.get("section") == SECTION for s in (s1.find(sections, "sections") or [])))
@@ -188,15 +190,20 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
     stored = session.values(entity, positions, len(points))
     checks.check("scene: positions imported as written", stored is not None and np.allclose(stored, points, atol=1e-6))
 
-    # Zero passes copy; one and three passes match the reference.
-    session.settings(entity, positions, normal_name, "filtered", iterations=0)
-    result = session.run()
-    copied = session.values(entity, "filtered", len(points))
-    checks.check("zero passes: applied, output equals positions",
-                 result.get("status") == "applied" and copied is not None and np.array_equal(copied, stored), result)
+    # A ready start computes nothing and its Discard writes nothing; one and three passes match the reference.
+    session.settings(entity, positions, normal_name, "ready_output")
+    ok, started, _ = session.call("bilateral_filter_start", {"start": "ready"})
+    run_id = started.get("run") if ok and isinstance(started, dict) else None
+    ok, observed, _ = session.call("run_observe", {"run": run_id}) if run_id else (False, None, "")
+    checks.check("ready start: a step run waiting at step 0",
+                 ok and isinstance(observed, dict) and observed.get("phase") == "ready" and observed.get("steps") == 0,
+                 {"started": started, "observed": observed})
+    ok, discarded, _ = session.call("run_control", {"run": run_id, "action": "discard"}) if run_id else (False, None, "")
+    checks.check("discarding the ready run writes nothing",
+                 ok and "ready_output" not in session.properties(entity), discarded)
     outputs: dict[str, np.ndarray] = {}
-    for passes in (1, 3):
-        session.settings(entity, positions, normal_name, "filtered", iterations=passes)
+    for passes in (0, 1, 3):
+        session.settings(entity, positions, normal_name, "filtered", max_iterations=passes)
         result = session.run()
         filtered = session.values(entity, "filtered", len(points))
         expected = reference(points, normals, passes)
@@ -206,13 +213,19 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
         checks.check(f"{passes} pass(es) cpu_octree: applied, matches the reference within {TOLERANCE}",
                      result.get("status") == "applied" and result.get("completed_iterations") == passes
                      and error <= TOLERANCE, {"result": result, "max_error": error})
-        checks.check(f"{passes} pass(es): the reference moves points by more than the tolerance (not a no-op)",
-                     moved > 10 * TOLERANCE, moved)
+        if passes == 0:
+            checks.check("zero passes: copies the input and filters no points",
+                         filtered is not None and np.array_equal(filtered, stored)
+                         and result.get("points_filtered") == 0, result)
+        else:
+            checks.check(f"{passes} pass(es): the reference moves points by more than the tolerance (not a no-op)",
+                         moved > 10 * TOLERANCE, moved)
         outputs["cpu_octree"] = filtered
 
     # Backends agree; Vulkan pages 64 queries per batch.
-    for backend, extra in (("cpu_lbvh", {}), ("vulkan_lbvh", {"gpu_query_batch_size": 64})):
-        session.settings(entity, positions, normal_name, "filtered", iterations=3, backend=backend, **extra)
+    for backend, extra in (("cpu_lbvh", {}), ("vulkan_lbvh", {"gpu_query_batch_size": 64}),
+                           ("vulkan_brute_force", {"gpu_query_batch_size": 64})):
+        session.settings(entity, positions, normal_name, "filtered", max_iterations=3, backend=backend, **extra)
         result = session.run()
         filtered = session.values(entity, "filtered", len(points))
         error = float(np.abs(filtered - outputs["cpu_octree"]).max()) if filtered is not None else math.inf
@@ -220,9 +233,9 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
         checks.check(f"{backend}: applied with that backend, agrees with cpu_octree within {TOLERANCE}",
                      result.get("status") == "applied" and result.get("actual_backend") == backend
                      and error <= TOLERANCE, {"result": result, "max_error": error})
-        if backend == "vulkan_lbvh":
+        if backend in ("vulkan_lbvh", "vulkan_brute_force"):
             pages = 3 * math.ceil(len(points) / 64)
-            checks.check(f"vulkan_lbvh: {pages} query batches of at most 64 over three passes",
+            checks.check(f"{backend}: {pages} query batches of at most 64 over three passes",
                          result.get("gpu_query_batches") == pages, result.get("gpu_query_batches"))
 
     # The Jobs window lists runs and cancels them; MCP cancellation cancels too. A long run: a big cloud, many passes.
@@ -235,13 +248,13 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
     checks.check("cancel: the big cloud imported", big_entity is not None)
     if big_entity is not None:
         # One pass's time bounds the cancel latency: the CPU run checks for a cancel between passes.
-        session.settings(big_entity, positions, normal_name, "one_pass", iterations=1, k_neighbors=30)
+        session.settings(big_entity, positions, normal_name, "one_pass", max_iterations=1, k_neighbors=30)
         started = time.monotonic()
         one = session.run()
         pass_seconds = time.monotonic() - started
         meta.update(big_one_pass_seconds=pass_seconds, big_one_pass_cpu_ms=one.get("cpu_compute_ms"))
         checks.check("cancel: one pass on the big cloud applied", one.get("status") == "applied", one)
-        session.settings(big_entity, positions, normal_name, "cancelled_output", iterations=30, k_neighbors=30)
+        session.settings(big_entity, positions, normal_name, "cancelled_output", max_iterations=30, k_neighbors=30)
         pending = agent.send("tools/call", {"name": "bilateral_filter", "arguments": {}})
         job = session.running("Bilateral point filter")
         checks.check("cancel: the run is a running jobs_list row", job is not None, session.last_jobs)
@@ -262,7 +275,7 @@ def steps(agent: Agent, checks: s1.Checks, out: Path, build: Path, meta: dict) -
         checks.check("MCP cancel: nothing written", "cancelled_output" not in session.properties(big_entity))
 
     # Undo and redo outlive the plugin.
-    session.settings(entity, positions, normal_name, "history_output", iterations=1)
+    session.settings(entity, positions, normal_name, "history_output", max_iterations=1)
     result = session.run()
     written = session.values(entity, "history_output", len(points))
     checks.check("history: a run applied", result.get("status") == "applied" and written is not None, result)

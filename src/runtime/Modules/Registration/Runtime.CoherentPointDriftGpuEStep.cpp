@@ -1,4 +1,5 @@
 module;
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -15,30 +16,23 @@ module Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 
 import Extrinsic.Graphics.CoherentPointDriftEStep;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Private.WorkspaceLease;
+
+#include "Services/Runtime.WorkerGpuPages.hpp"
 
 namespace Extrinsic::Runtime
 {
+    template std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::CoherentPointDriftEStepWorkspace>();
+
     namespace EStep = Geometry::CoherentPointDrift::EStep;
 
     namespace
     {
-        // One iteration's device input, reused (capacity kept) by every iteration of the run. The
-        // worker fills it only while the slot is Idle, so no computation can still read it; the
-        // recording closure keeps it alive and reads it only before its result is Ready or Failed.
-        struct Request
-        {
-            // Float-float target, converted once per target generation (every request for 0).
-            std::shared_ptr<const std::vector<float>> Target{};
-            std::uint64_t TargetGeneration{0u};
-            std::vector<float> Source{};
-            std::vector<std::uint32_t> SkipRows{};
-            double Sigma2{1.0}, LogOutlier{0.0};
-        };
-
-        enum class Slot : std::uint8_t { Idle, Preparing, Queued, InFlight, Done };
-
         bool HasValidShape(const EStep::ExternalRequest& request)
         {
             const std::size_t n = request.Target.Size(), m = request.Moved.Size();
@@ -52,104 +46,159 @@ namespace Extrinsic::Runtime
     {
         SpatialIndexCache& Cache;
         std::chrono::milliseconds Timeout;
-        // Main thread: a SpatialIndexCache lease, held from a step's first request until its pump
-        // ends; the pool then serves it (pipelines, grown buffers, uploaded target) to the next.
+        WorkerGpuPages Pages;
+        // A SpatialIndexCache lease, held from the run's Init until the run is done (the terminal release, Close or
+        // destruction): steps keep its prepared buffers and uploaded target.
         std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> Workspace{};
-        const std::shared_ptr<Request> Staging{std::make_shared<Request>()};
+        std::size_t Targets{0u}, Sources{0u}; // the prepared shape
+
+        // One iteration's device input, reused (capacity kept) by every iteration of the run; touched only by the
+        // one request in flight (Evaluate is serial).
+        std::shared_ptr<const std::vector<float>> Target{}; // float-float, converted once per target generation
+        std::uint64_t TargetGeneration{0u};
+        std::vector<float> Source{};
+        std::vector<std::uint32_t> SkipRows{};
+        std::vector<std::byte> Data{};
 
         mutable std::mutex Mutex{};
-        Slot State{Slot::Idle};
-        std::shared_ptr<Core::Tasks::CounterEvent> Pending{};
-        std::chrono::steady_clock::time_point Started{};
-        bool Settled{false};
-        std::shared_ptr<SpatialGpuResult> Gpu{};
-        std::vector<std::byte> Data{};
-        bool IsClosed{false}, IsWorkerActive{false};
+        bool IsClosed{false};
         std::string LastDiagnostic{};
         CoherentPointDriftGpuEStepStats Counters{};
 
-        std::shared_ptr<Core::Tasks::CounterEvent> SettleLocked()
+        Impl(SpatialIndexCache& cache, RHI::IDevice& device, std::chrono::milliseconds timeout)
+            : Cache(cache), Timeout(timeout), Pages(device, RHI::ComputeInputOrder::LaneOrderOnly)
         {
-            if (!Pending || Settled) return {};
-            Settled = true;
-            Counters.WaitSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - Started).count();
-            return Pending;
         }
 
-        Impl(SpatialIndexCache& cache, std::chrono::milliseconds timeout) : Cache(cache), Timeout(timeout) {}
+        // Closes with `why` (kept when one was given before), returning the workspace reference for the caller to drop
+        // outside the lock.
+        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> CloseLocked(std::string why)
+        {
+            IsClosed = true;
+            Pages.Abort();
+            if (!why.empty())
+                LastDiagnostic = std::move(why);
+            return std::move(Workspace);
+        }
     };
 
-    CoherentPointDriftGpuEStep::CoherentPointDriftGpuEStep(SpatialIndexCache& cache, std::chrono::milliseconds timeout)
-        : m_Impl(std::make_unique<Impl>(cache, timeout)) {}
+    CoherentPointDriftGpuEStep::CoherentPointDriftGpuEStep(
+        SpatialIndexCache& cache, RHI::IDevice& device, std::chrono::milliseconds timeout)
+        : m_Impl(std::make_unique<Impl>(cache, device, timeout))
+    {
+    }
 
-    CoherentPointDriftGpuEStep::~CoherentPointDriftGpuEStep() = default;
+    CoherentPointDriftGpuEStep::~CoherentPointDriftGpuEStep()
+    {
+        if (m_Impl)
+            m_Impl->Pages.Seal(); // nothing more is recorded with the workspace or the device
+    }
 
-    std::shared_ptr<Core::Tasks::CounterEvent> CoherentPointDriftGpuEStep::Queue(const EStep::ExternalRequest& request)
+    bool CoherentPointDriftGpuEStep::Prepare(const std::size_t targets, const std::size_t sources)
     {
         auto& s = *m_Impl;
+        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> dropped;
+        std::scoped_lock lock{s.Mutex};
+        if (s.IsClosed)
+            return false;
+        if (!s.Workspace)
+            s.Workspace = s.Cache.LeaseGpuWorkspace<Graphics::CoherentPointDriftEStepWorkspace>();
+        if (!s.Workspace)
+        {
+            ++s.Counters.Failed;
+            dropped = s.CloseLocked("No Vulkan E-step workspace (no device); the run continues on the CPU.");
+            return false;
+        }
+        if (!s.Workspace->Prepare(targets, sources))
+        {
+            ++s.Counters.Failed;
+            dropped = s.CloseLocked("The Vulkan E-step workspace could not be prepared; the run continues on the CPU.");
+            return false;
+        }
+        s.Targets = targets;
+        s.Sources = sources;
+        return true;
+    }
+
+    bool CoherentPointDriftGpuEStep::Evaluate(const EStep::ExternalRequest& request)
+    {
+        auto& s = *m_Impl;
+        if (!HasValidShape(request))
+            return false;
         const std::size_t n = request.Target.Size(), m = request.Moved.Size();
-        if (!HasValidShape(request)) return {};
+        const auto started = std::chrono::steady_clock::now();
+        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> workspace;
         {
             std::scoped_lock lock{s.Mutex};
-            if (s.IsClosed || s.State != Slot::Idle) return {}; // the staging may still be read
-            s.State = Slot::Preparing;
+            if (s.IsClosed || !s.Workspace)
+                return false;
+            ++s.Counters.Requests;
+            if (n > s.Targets || m > s.Sources)
+            {
+                ++s.Counters.Failed;
+                (void)s.CloseLocked(
+                    "The Vulkan E-step request exceeds its prepared workspace; the run continues on the CPU.");
+                return false;
+            }
+            workspace = s.Workspace; // the step's own reference: a Close meanwhile drops only the run's
         }
-        // Normalized coordinates convert to float-float pairs here, off the main thread; the
-        // target once per run.
+        // Normalized coordinates convert to float-float pairs here, off the main thread; the target once per run.
         const auto split = [](float* to, const double x, const double y, const double z, const double w) {
             const float hx = float(x), hy = float(y), hz = float(z);
             to[0] = hx; to[1] = hy; to[2] = hz; to[3] = float(w);
             to[4] = float(x - double(hx)); to[5] = float(y - double(hy)); to[6] = float(z - double(hz)); to[7] = 0.0f;
         };
-        Request& staged = *s.Staging;
-        if (!staged.Target || request.TargetGeneration == 0u || staged.TargetGeneration != request.TargetGeneration)
+        if (!s.Target || request.TargetGeneration == 0u || s.TargetGeneration != request.TargetGeneration)
         {
             auto target = std::make_shared<std::vector<float>>(8u * n);
             for (std::size_t j = 0; j < n; ++j)
                 split(target->data() + 8u * j, request.Target.X[j], request.Target.Y[j], request.Target.Z[j], 0.0);
-            staged.Target = std::move(target);
-            staged.TargetGeneration = request.TargetGeneration;
+            s.Target = std::move(target);
+            s.TargetGeneration = request.TargetGeneration;
         }
-        staged.Sigma2 = request.Sigma2;
-        staged.LogOutlier = request.LogOutlier;
-        staged.SkipRows.assign(request.SkipRows.begin(), request.SkipRows.end());
-        staged.Source.resize(8u * m);
+        s.SkipRows.assign(request.SkipRows.begin(), request.SkipRows.end());
+        s.Source.resize(8u * m);
         for (std::size_t i = 0; i < m; ++i)
-            split(staged.Source.data() + 8u * i, request.Moved.X[i], request.Moved.Y[i], request.Moved.Z[i],
-                  request.LogWeights[i]);
-
-        std::scoped_lock lock{s.Mutex};
-        if (s.IsClosed)
-        {
-            s.State = Slot::Idle;
-            return {};
-        }
-        s.Pending = std::make_shared<Core::Tasks::CounterEvent>(1u);
-        s.Started = std::chrono::steady_clock::now();
-        s.Settled = false;
-        s.State = Slot::Queued;
-        ++s.Counters.Requests;
-        return s.Pending;
-    }
-
-    bool CoherentPointDriftGpuEStep::Complete(
-        const std::shared_ptr<Core::Tasks::CounterEvent>& event,
-        const EStep::ExternalRequest& request)
-    {
-        auto& s = *m_Impl;
-        if (!HasValidShape(request)) return false;
-        const std::size_t n = request.Target.Size(), m = request.Moved.Size();
-        std::vector<std::byte> data;
+            split(s.Source.data() + 8u * i,
+                request.Moved.X[i],
+                request.Moved.Y[i],
+                request.Moved.Z[i],
+                request.LogWeights[i]);
+        s.Data.resize(Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m));
+        const auto status = s.Pages.Run(
+            [&](RHI::ICommandContext& commands)
+            {
+                return workspace->Record(commands,
+                    {.Target = *s.Target,
+                        .TargetGeneration = s.TargetGeneration,
+                        .Source = s.Source,
+                        .SkipRows = s.SkipRows,
+                        .Sigma2 = request.Sigma2,
+                        .LogOutlier = request.LogOutlier});
+            },
+            s.Data,
+            s.Timeout);
+        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> dropped;
         {
             std::scoped_lock lock{s.Mutex};
-            if (!event || event != s.Pending || s.IsClosed || s.State != Slot::Done) return false;
-            data = std::move(s.Data);
-            s.Pending.reset();
-            s.State = Slot::Idle;
+            s.Counters.WaitSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+            switch (status)
+            {
+            case WorkerGpuPageStatus::Complete: ++s.Counters.Completed; break;
+            case WorkerGpuPageStatus::Aborted:  return false; // closed meanwhile (cancelled): no fallback reason
+            case WorkerGpuPageStatus::TimedOut:
+                dropped = s.CloseLocked("No Vulkan E-step result arrived in time; the run continues on the CPU.");
+                return false;
+            case WorkerGpuPageStatus::Refused:
+            case WorkerGpuPageStatus::Failed:
+                ++s.Counters.Failed;
+                dropped = s.CloseLocked("The Vulkan E-step was refused or failed; the run continues on the CPU.");
+                return false;
+            }
         }
-        if (data.size() != Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m)) return false;
-        const auto copy = [&](std::span<double> to, std::size_t offset) {
-            std::memcpy(to.data(), data.data() + offset * sizeof(double), to.size_bytes());
+        const auto copy = [&](std::span<double> to, std::size_t offset)
+        {
+            std::memcpy(to.data(), s.Data.data() + offset * sizeof(double), to.size_bytes());
         };
         copy(request.LogDenominator, 0u);
         copy(request.Pt1, n);
@@ -160,114 +209,25 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    void CoherentPointDriftGpuEStep::Pump()
-    {
-        auto& s = *m_Impl;
-        std::shared_ptr<Core::Tasks::CounterEvent> signal;
-        {
-            std::scoped_lock lock{s.Mutex};
-            if (s.Pending && !s.Settled && std::chrono::steady_clock::now() - s.Started >= s.Timeout)
-            {
-                s.IsClosed = true;
-                s.LastDiagnostic = "No Vulkan E-step result arrived in time; the run continues on the CPU.";
-                signal = s.SettleLocked();
-                s.Pending.reset();
-                if (s.State != Slot::InFlight) s.State = Slot::Idle;
-            }
-            if (s.State == Slot::Queued)
-            {
-                if (!s.Workspace) s.Workspace = s.Cache.LeaseGpuWorkspace<Graphics::CoherentPointDriftEStepWorkspace>();
-                if (!s.Workspace)
-                {
-                    s.LastDiagnostic = "No Vulkan E-step workspace (no device); the run continues on the CPU.";
-                    ++s.Counters.Failed;
-                    s.IsClosed = true;
-                    s.State = Slot::Idle;
-                    signal = s.SettleLocked();
-                    s.Pending.reset();
-                }
-                else
-                {
-                    const auto request = s.Staging;
-                    const std::size_t n = request->Target->size() / 8u, m = request->Source.size() / 8u;
-                    s.Gpu = s.Cache.QueueGpuCompute(Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m),
-                        [workspace = s.Workspace, request](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
-                            return workspace->Record(commands, {.Target = *request->Target,
-                                .TargetGeneration = request->TargetGeneration, .Source = request->Source,
-                                .SkipRows = request->SkipRows,
-                                .Sigma2 = request->Sigma2, .LogOutlier = request->LogOutlier});
-                        }, SpatialGpuLatency::Immediate);
-                    s.State = Slot::InFlight;
-                }
-            }
-            if (s.State == Slot::InFlight && s.Gpu)
-            {
-                if (s.Gpu->State == SpatialQueryState::Ready)
-                {
-                    ++s.Counters.Completed;
-                    s.State = s.Pending ? Slot::Done : Slot::Idle;
-                    if (s.Pending)
-                    {
-                        s.Data = std::move(s.Gpu->Data);
-                        signal = s.SettleLocked();
-                    }
-                    s.Gpu.reset();
-                }
-                else if (s.Gpu->State == SpatialQueryState::Failed)
-                {
-                    s.LastDiagnostic = s.Gpu->Diagnostic.empty()
-                        ? std::string("The Vulkan E-step was refused or failed; the run continues on the CPU.")
-                        : s.Gpu->Diagnostic;
-                    s.Gpu.reset();
-                    ++s.Counters.Failed;
-                    s.IsClosed = true;
-                    s.State = Slot::Idle;
-                    if (auto completed = s.SettleLocked()) signal = std::move(completed);
-                    s.Pending.reset();
-                }
-            }
-        }
-        if (signal) signal->Signal();
-    }
-
     void CoherentPointDriftGpuEStep::ReleaseDeviceResources()
     {
+        m_Impl->Pages.Seal();
+        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> dropped;
         std::scoped_lock lock{m_Impl->Mutex};
-        m_Impl->Workspace.reset(); // back to the pool; an in-flight computation keeps its own lease
+        dropped = std::move(m_Impl->Workspace); // back to the pool once its compute fence retired
     }
 
     void CoherentPointDriftGpuEStep::Close(std::string diagnostic)
     {
-        auto& s = *m_Impl;
-        std::shared_ptr<Core::Tasks::CounterEvent> signal;
-        {
-            std::scoped_lock lock{s.Mutex};
-            s.IsClosed = true;
-            if (!diagnostic.empty()) s.LastDiagnostic = std::move(diagnostic);
-            signal = s.SettleLocked();
-            s.Pending.reset();
-            s.Data.clear();
-            if (s.State == Slot::Queued || s.State == Slot::Done) s.State = Slot::Idle;
-        }
-        if (signal) signal->Signal();
+        std::shared_ptr<Graphics::CoherentPointDriftEStepWorkspace> dropped;
+        std::scoped_lock lock{m_Impl->Mutex};
+        dropped = m_Impl->CloseLocked(std::move(diagnostic));
     }
 
     bool CoherentPointDriftGpuEStep::Closed() const
     {
         std::scoped_lock lock{m_Impl->Mutex};
         return m_Impl->IsClosed;
-    }
-
-    void CoherentPointDriftGpuEStep::SetWorkerActive(const bool active)
-    {
-        std::scoped_lock lock{m_Impl->Mutex};
-        m_Impl->IsWorkerActive = active;
-    }
-
-    bool CoherentPointDriftGpuEStep::WorkerActive() const
-    {
-        std::scoped_lock lock{m_Impl->Mutex};
-        return m_Impl->IsWorkerActive;
     }
 
     std::string CoherentPointDriftGpuEStep::Diagnostic() const

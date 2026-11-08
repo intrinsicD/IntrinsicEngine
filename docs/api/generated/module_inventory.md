@@ -15,12 +15,12 @@ Root scanned: `src`
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 80 |
+| `graphics/renderer` | 81 |
 | `graphics/rhi` | 18 |
-| `graphics/vulkan` | 11 |
+| `graphics/vulkan` | 12 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 119 |
+| `runtime` | 122 |
 
 ## Modules
 
@@ -282,6 +282,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.PointKeypoints` | `src/graphics/renderer/Graphics.PointKeypoints.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointLBVH` | `src/graphics/renderer/Graphics.PointLBVH.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointNormals` | `src/graphics/renderer/Graphics.PointNormals.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.PointQuery` | `src/graphics/renderer/Graphics.PointQuery.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointScalarAnalysis` | `src/graphics/renderer/Graphics.PointScalarAnalysis.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src/graphics/renderer/Graphics.PostProcessSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PropertyFilter` | `src/graphics/renderer/Graphics.PropertyFilter.cppm` | `graphics/renderer` |
@@ -358,6 +359,7 @@ Root scanned: `src`
 | `Extrinsic.Backends.Vulkan:Swapchain` | `src/graphics/vulkan/Backends.Vulkan.Swapchain.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Sync` | `src/graphics/vulkan/Backends.Vulkan.Sync.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Transfer` | `src/graphics/vulkan/Backends.Vulkan.Transfer.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:TransferLanes` | `src/graphics/vulkan/Backends.Vulkan.TransferLanes.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan` | `src/graphics/vulkan/Backends.Vulkan.cppm` | `graphics/vulkan` |
 | `Extrinsic.Physics.World` | `src/physics/Physics.World.cppm` | `physics` |
 | `Extrinsic.Platform.Window` | `src/platform/Platform.IWindow.cppm` | `platform` |
@@ -422,6 +424,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.MeshPrimitiveView` | `src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshSurfaceTopology` | `src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
+| `Extrinsic.Runtime.Private.WorkspaceLease` | `src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.Workspaces.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialIndexCache` | `src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/GeometryIntegration/Runtime.VertexChannelBindings.cppm` | `runtime` |
@@ -480,9 +483,11 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PluginHost` | `src/runtime/Services/Runtime.PluginHost.cppm` | `runtime` |
 | `Extrinsic.Runtime.PluginSections` | `src/runtime/Services/Runtime.PluginSections.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudEditing` | `src/runtime/Services/Runtime.PointCloudEditing.cppm` | `runtime` |
+| `Extrinsic.Runtime.StepRunControls` | `src/runtime/Services/Runtime.StepRunControls.cppm` | `runtime` |
+| `Extrinsic.Runtime.StepRunExecution` | `src/runtime/Services/Runtime.StepRunExecution.cppm` | `runtime` |
 | `Extrinsic.Runtime.StepRuns` | `src/runtime/Services/Runtime.StepRuns.cppm` | `runtime` |
 | `Extrinsic.Runtime.UiHostTypes` | `src/runtime/Services/Runtime.UiHostTypes.cppm` | `runtime` |
 | `Extrinsic.Runtime.LaneVisualizationStyle` | `src/runtime/Visualization/Runtime.LaneVisualizationStyle.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **458**
+Total modules: **463**

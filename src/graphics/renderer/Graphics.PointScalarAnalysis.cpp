@@ -8,6 +8,7 @@ module;
 #include <memory>
 module Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -32,15 +33,18 @@ namespace Extrinsic::Graphics
     struct PointScalarWorkspace::Impl
     {
         RHI::IDevice& Device;
+        RHI::BufferManager& Scratch;
         RHI::PipelineHandle Pipeline{};
-        RHI::BufferHandle Neighbors{}, Means{}, Stats{};
-        std::uint64_t NeighborBytes{}, MeanBytes{};
-        explicit Impl(RHI::IDevice& device) : Device(device) {}
+        RHI::BufferManager::BufferLease Neighbors{}, Means{}, Stats{};
+        // ARCH-023: the scratch addresses, resolved with the scratch (device-owner thread). Prepared: Prepare checked
+        // the device and sized the scratch for PreparedCount x PreparedWidth, so Record of that shape makes no device
+        // call (a method worker records it).
+        std::uint64_t NeighborsAddress{}, MeansAddress{}, StatsAddress{};
+        bool Prepared{};
+        std::uint32_t PreparedCount{}, PreparedWidth{};
+        Impl(RHI::IDevice& device, RHI::BufferManager& scratch) : Device(device), Scratch(scratch) {}
         ~Impl()
         {
-            for (auto b : {Neighbors, Means, Stats})
-                if (b.IsValid())
-                    Device.DestroyBuffer(b);
             if (Pipeline.IsValid())
                 Device.DestroyPipeline(Pipeline);
         }
@@ -51,26 +55,29 @@ namespace Extrinsic::Graphics
             if (!Pipeline.IsValid())
                 Pipeline = CreateComputePipeline(
                     Device, "shaders/point_scalar_analysis.comp.spv", sizeof(Push), "PointScalarAnalysis");
-            const auto allocate = [&](std::uint64_t bytes)
+            const auto desc = [](std::uint64_t bytes)
             {
-                return Device.CreateBuffer({.SizeBytes = bytes,
+                return RHI::BufferDesc{.SizeBytes = bytes,
                     .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                    .DebugName = "PointScalarAnalysis.Scratch"});
+                    .DebugName = "PointScalarAnalysis.Scratch"};
             };
-            const auto grow = [&](RHI::BufferHandle& buffer, std::uint64_t& capacity, std::uint64_t bytes)
-            {
-                if (buffer.IsValid() && capacity >= bytes)
-                    return;
-                if (buffer.IsValid())
-                    Device.DestroyBuffer(buffer);
-                buffer = allocate(bytes);
-                capacity = buffer.IsValid() ? bytes : 0;
-            };
-            grow(Neighbors, NeighborBytes, neighborBytes);
-            grow(Means, MeanBytes, meanBytes);
-            if (!Stats.IsValid())
-                Stats = allocate(sizeof(PointScalarGpuStats));
-            return Pipeline.IsValid() && Neighbors.IsValid() && Means.IsValid() && Stats.IsValid();
+            if (!Pipeline.IsValid() || !Scratch.EnsureScratch(Neighbors, desc(neighborBytes)) ||
+                !Scratch.EnsureScratch(Means, desc(meanBytes)) ||
+                !Scratch.EnsureScratch(Stats, desc(sizeof(PointScalarGpuStats))))
+                return false;
+            NeighborsAddress = Device.GetBufferDeviceAddress(Neighbors.GetHandle());
+            MeansAddress = Device.GetBufferDeviceAddress(Means.GetHandle());
+            StatsAddress = Device.GetBufferDeviceAddress(Stats.GetHandle());
+            return true;
+        }
+        // A run of `count` rows and `width` neighbours may record: prepared for that shape (no device call), or the
+        // device checked and the scratch ensured now (device-owner thread).
+        bool Ready(const std::uint32_t count, const std::uint32_t width)
+        {
+            if (Prepared)
+                return count == PreparedCount && width == PreparedWidth;
+            return Device.IsOperational() && Device.SupportsShaderFloat64() &&
+                Ensure(std::uint64_t(count) * width * 8, std::uint64_t(count) * 16);
         }
     };
     std::uint32_t PointScalarNeighborWidth(const PointScalarGpuParams& p, std::uint32_t count)
@@ -81,8 +88,31 @@ namespace Extrinsic::Graphics
             return std::min(std::max(1u, p.Capacity), count);
         return std::uint32_t(std::min(std::uint64_t(count), std::uint64_t(std::max(p.K, p.Method == 0 ? 2u : 1u)) + 1));
     }
-    PointScalarWorkspace::PointScalarWorkspace(RHI::IDevice& device) : m_Impl(std::make_unique<Impl>(device)) {}
+    PointScalarWorkspace::PointScalarWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch)
+        : m_Impl(std::make_unique<Impl>(device, scratch))
+    {
+    }
     PointScalarWorkspace::~PointScalarWorkspace() = default;
+    void PointScalarWorkspace::ReleaseScratch()
+    {
+        m_Impl->Neighbors = {};
+        m_Impl->Means = {};
+        m_Impl->Stats = {};
+        m_Impl->Prepared = false;
+    }
+    bool PointScalarWorkspace::Prepare(const PointScalarGpuParams& p, const std::uint32_t liveCount)
+    {
+        auto& s = *m_Impl;
+        s.Prepared = false;
+        const auto width = PointScalarNeighborWidth(p, liveCount);
+        if (!width || !liveCount || liveCount > (1u << 20) || width > 4096 ||
+            std::uint64_t(liveCount) * width > (1u << 24) || !s.Ready(liveCount, width))
+            return false;
+        s.PreparedCount = liveCount;
+        s.PreparedWidth = width;
+        s.Prepared = true;
+        return true;
+    }
     RHI::BufferHandle PointScalarWorkspace::Record(
         RHI::ICommandContext& cmd, const PointScalarGpuParams& p, const PointScalarResidentIo& io)
     {
@@ -90,9 +120,9 @@ namespace Extrinsic::Graphics
         const auto count = io.LiveCount;
         const auto width = PointScalarNeighborWidth(p, count);
         if (!width || !count || count > (1u << 20) || width > 4096 || std::uint64_t(count) * width > (1u << 24) ||
-            !io.Positions.Address || !io.Nodes || !io.LiveSlots || !io.Output.Address || !s.Device.IsOperational() ||
-            !s.Device.SupportsShaderFloat64() || !s.Ensure(std::uint64_t(count) * width * 8, std::uint64_t(count) * 16))
+            !io.Positions.Address || !io.Nodes || !io.LiveSlots || !io.Output.Address || !s.Ready(count, width))
             return {};
+        const auto neighbors = s.Neighbors.GetHandle(), means = s.Means.GetHandle(), stats = s.Stats.GetHandle();
         const auto shader = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite;
         cmd.BufferBarrier(
             io.Positions.Buffer, RHI::MemoryAccess::TransferWrite | shader, RHI::MemoryAccess::ShaderRead);
@@ -106,21 +136,21 @@ namespace Extrinsic::Graphics
         else
             cmd.FillBuffer(io.Output.Buffer, 0, io.Output.Bytes, 0);
         cmd.BufferBarrier(io.Output.Buffer, RHI::MemoryAccess::TransferWrite, shader);
-        cmd.BufferBarrier(s.Stats, shader | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::TransferWrite);
-        cmd.FillBuffer(s.Stats, 0, sizeof(PointScalarGpuStats), 0);
-        cmd.BufferBarrier(s.Stats, RHI::MemoryAccess::TransferWrite, shader);
+        cmd.BufferBarrier(stats, shader | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::TransferWrite);
+        cmd.FillBuffer(stats, 0, sizeof(PointScalarGpuStats), 0);
+        cmd.BufferBarrier(stats, RHI::MemoryAccess::TransferWrite, shader);
         // A reused workspace: the previous run's scratch reads precede these writes.
-        for (auto b : {s.Neighbors, s.Means})
+        for (auto b : {neighbors, means})
             cmd.BufferBarrier(b, shader, RHI::MemoryAccess::ShaderWrite);
         Push push{.Positions = io.Positions.Address,
             .Nodes = io.Nodes,
             .Slots = io.LiveSlots,
-            .Neighbors = s.Device.GetBufferDeviceAddress(s.Neighbors),
-            .Nearest = s.Device.GetBufferDeviceAddress(s.Means),
+            .Neighbors = s.NeighborsAddress,
+            .Nearest = s.MeansAddress,
             // Distinct float coordinates cannot lie inside a double-subnormal support.
             // The shader handles coincident points before testing this zero support.
             .Output = io.Output.Address,
-            .Stats = s.Device.GetBufferDeviceAddress(s.Stats),
+            .Stats = s.StatsAddress,
             .SupportRadius = p.SupportRadius < std::numeric_limits<double>::min() ? 0.0 : p.SupportRadius,
             .Count = count,
             .Width = width,
@@ -145,20 +175,20 @@ namespace Extrinsic::Graphics
             }
         };
         dispatch(0, count);
-        for (auto b : {s.Neighbors, s.Means, io.Output.Buffer, s.Stats})
+        for (auto b : {neighbors, means, io.Output.Buffer, stats})
             cmd.BufferBarrier(b, shader, shader);
         dispatch(1, 1);
-        for (auto b : {s.Stats, io.Output.Buffer})
+        for (auto b : {stats, io.Output.Buffer})
             cmd.BufferBarrier(b, shader, shader);
         if (p.Method == 0)
         {
             dispatch(2, count);
-            for (auto b : {s.Means, io.Output.Buffer, s.Stats})
+            for (auto b : {means, io.Output.Buffer, stats})
                 cmd.BufferBarrier(b, shader, shader);
         }
         dispatch(3, 1);
-        for (auto b : {io.Output.Buffer, s.Stats})
+        for (auto b : {io.Output.Buffer, stats})
             cmd.BufferBarrier(b, shader, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::TransferRead);
-        return s.Stats;
+        return stats;
     }
 }

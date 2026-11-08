@@ -579,6 +579,49 @@ RULES: list[Rule] = [
     Rule("RuntimeEnginePrivateGlue", "ClusteringServiceIsTheSoleKMeansRuntimeRoute/files",
          absent=("src/runtime/Runtime.KMeansBackend.cppm", "src/runtime/Runtime.KMeansGpuBackend.cppm",
                  "src/runtime/Runtime.KMeansGpuJobQueue.Internal.hpp", "src/runtime/Runtime.KMeansGpuJobQueue.cpp")),
+
+    # Editor attachment stays editor-owned. WorkspaceLease is a distinct, target-private
+    # engine facility whose visibility is enforced by its PRIVATE CXX_MODULES file set.
+    Rule("SandboxEditorPresentation", "RuntimeFeatureModulesCompileSeparatelyFromEditorShell/private-attachment",
+         trees=("src/runtime",),
+         owners=(("import Extrinsic.Runtime.Private.EditorWorkspaceAttachment", (
+                     "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.NormalOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.PointConstructionOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.PointSetOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.RegistrationOperations.Frame.cpp",
+                     "src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp",
+                     "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp",
+                     "src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp",
+                     "src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cpp",
+                     "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp",
+                     "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+                 )),)),
+
+    # --- RuntimeReuseDriftGuard (ARCH-023) ------------------------------------------
+    # GPU kNN/radius rows run in a worker query session (SpatialIndexCache::PrepareQuerySession, stepped by a step
+    # run's worker), not through the frame-paced QueueGpu* jobs. The retired pager has no remaining owner.
+    Rule("RuntimeReuseDriftGuard", "GpuNeighbourQueriesUseWorkerQuerySessions",
+         trees=("src", "plugins", "methods", "benchmarks"),
+         forbid=("struct GpuRowPages", "AdvanceGpuRowPages("),
+         owners=(("QueueGpuKNearest(", (
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")),
+                 ("QueueGpuRadius(", (
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")),
+                 ("QueueGpuNearest(", (
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")),
+                 ("QueueGpuNearestTransformed(", (
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
+                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")))),
 ]
 
 RULES += ENGINE_LAYERING_RULES

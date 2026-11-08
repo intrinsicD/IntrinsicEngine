@@ -232,10 +232,17 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool EditorGpuPositionRunCurrent(const EditorProcessingCommands&, const EditorGpuPositionRunHandle&);
     // Pending while the readback and publication are under way; `onComplete` receives the
     // final result. `frontForTest` (every row) replaces the device readback on a null device.
-    [[nodiscard]] EditorGpuPositionAcceptResult AcceptEditorGpuPositionRun(
-        const EditorProcessingCommands&, const EditorGpuPositionRunHandle&, Graphics::GpuPropertyResidency&,
-        std::string label, std::function<void(EditorGpuPositionAcceptResult)> onComplete,
-        std::span<const glm::vec3> frontForTest = {});
+    // `publishing` (optional): the producer's run control, asked once the readback landed and
+    // right before the rows are written (resident LOP passes its StepRunDriver::Publishing). False:
+    // that run ended first (a discard won), nothing is written and the run ends Discarded; true:
+    // from here the publication decides, a later discard is refused.
+    [[nodiscard]] EditorGpuPositionAcceptResult AcceptEditorGpuPositionRun(const EditorProcessingCommands&,
+        const EditorGpuPositionRunHandle&,
+        Graphics::GpuPropertyResidency&,
+        std::string label,
+        std::function<void(EditorGpuPositionAcceptResult)> onComplete,
+        std::span<const glm::vec3> frontForTest = {},
+        std::function<bool()> publishing = {});
     void DiscardEditorGpuPositionRun(const EditorProcessingCommands&, const EditorGpuPositionRunHandle&,
                                      Graphics::GpuPropertyResidency&);
 }

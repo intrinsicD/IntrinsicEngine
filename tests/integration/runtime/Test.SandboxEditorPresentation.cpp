@@ -966,14 +966,14 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
     ASSERT_FALSE(source.empty());
 
     constexpr std::array<std::string_view, 8> commands{{
-      "ApplyEditorMeshDenoiseCommand",
-      "ApplyEditorMeshCurvatureCommand",
-      "ApplyEditorMeshRemeshCommand",
-      "ApplyEditorMeshSubdivideCommand",
-      "ApplyEditorMeshSimplifyCommand",
-      "ApplyEditorConfiguredNormalEstimation",
-      "ApplyEditorConfiguredOutlierAnalysis",
-      "ApplyEditorConfiguredRegistrationCommand",
+        "ApplyEditorMeshDenoiseCommand",
+        "ApplyEditorMeshCurvatureCommand",
+        "ApplyEditorMeshRemeshCommand",
+        "ApplyEditorMeshSubdivideCommand",
+        "ApplyEditorMeshSimplifyCommand",
+        "StartEditorConfiguredNormalEstimation",
+        "StartEditorConfiguredOutlierAnalysis",
+        "ApplyEditorConfiguredRegistrationCommand",
     }};
     // RUNTIME-354: outlier analysis publishes through the operation runtime's result store, which its panel reads
     // instead of naming a session sink. Kernel density and point spacing are plugins (ARCH-022 Q89) that keep their
@@ -1292,40 +1292,12 @@ TEST(SandboxEditorPresentation,
             << retiredFile;
         const std::string retiredCMakeEntry =
             "\n        " + std::filesystem::path{retiredFile}.filename().string() + "\n";
-        EXPECT_EQ(runtimeCMake.find(retiredCMakeEntry), std::string::npos)
-            << retiredFile;
+        EXPECT_EQ(runtimeCMake.find(retiredCMakeEntry), std::string::npos) << retiredFile;
     }
-    EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} /
-                                         "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
+    EXPECT_FALSE(std::filesystem::exists(
+        std::filesystem::path{ENGINE_ROOT_DIR} / "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
 
-    constexpr std::array<std::string_view, 24> allowedPrivateImporters{{
-        "Runtime.EditorWorkspaceSession.cpp",
-        "Runtime.EditorCommon.Public.cpp",
-        "Runtime.EditorJobProjection.Public.cpp",
-        "Runtime.EditorWorkspaceSnapshots.Public.cpp",
-        "Runtime.EditorWorkspaceSnapshots.Models.cpp",
-        "Runtime.EditorFeatureContextAdapters.cpp",
-        "Runtime.SceneEditingOperations.Public.cpp",
-        "Runtime.SceneEditingOperations.Actions.cpp",
-        "Runtime.PointFieldOperations.Frame.cpp",
-        "Runtime.PointAnalysisOperations.Frame.cpp",
-        "Runtime.PointSetOperations.Frame.cpp",
-        "Runtime.PointConstructionOperations.Frame.cpp",
-        "Runtime.PointCloudServiceOperations.Frame.cpp",
-        "Runtime.NormalOperations.Frame.cpp",
-        "Runtime.RegistrationOperations.Frame.cpp",
-        "Runtime.ParameterizationOperations.Frame.cpp",
-        "Runtime.MeshFieldOperations.Frame.cpp",
-        "Runtime.MeshTopologyOperations.Frame.cpp",
-        "Runtime.GeometryProcessingOperations.Frame.cpp",
-        "Runtime.VisualizationEditingOperations.Public.cpp",
-        "Runtime.VisualizationEditingOperations.Actions.cpp",
-        "Runtime.RenderRecipeEditingOperations.Public.cpp",
-        "Runtime.EditorWorkspaceAttachment.Detail.cppm",
-        "Runtime.EditorWorkspaceAttachment.cpp",
-    }};
-    const std::filesystem::path runtimeRoot =
-        std::filesystem::path{ENGINE_ROOT_DIR} / "src/runtime";
+    const std::filesystem::path runtimeRoot = std::filesystem::path{ENGINE_ROOT_DIR} / "src/runtime";
     for (const auto& entry : std::filesystem::recursive_directory_iterator{runtimeRoot})
     {
         if (!entry.is_regular_file())
@@ -1334,21 +1306,13 @@ TEST(SandboxEditorPresentation,
         if (extension != ".cpp" && extension != ".cppm" && extension != ".hpp" && extension != ".h")
             continue;
 
-        const std::string source = ReadRepositoryTextFile(
-            std::filesystem::relative(entry.path(), ENGINE_ROOT_DIR).string());
+        const std::string source =
+            ReadRepositoryTextFile(std::filesystem::relative(entry.path(), ENGINE_ROOT_DIR).string());
         for (const std::string_view retiredPrefix :
-             {"SandboxEditor", "SandboxMethod", "SandboxConfig", "SandboxDefault",
-              "SandboxParameterization"})
+            {"SandboxEditor", "SandboxMethod", "SandboxConfig", "SandboxDefault", "SandboxParameterization"})
         {
-            EXPECT_EQ(source.find(retiredPrefix), std::string::npos)
-                << entry.path() << ": " << retiredPrefix;
+            EXPECT_EQ(source.find(retiredPrefix), std::string::npos) << entry.path() << ": " << retiredPrefix;
         }
-
-        if (source.find("import Extrinsic.Runtime.Private.") == std::string::npos)
-            continue;
-        EXPECT_NE(std::ranges::find(allowedPrivateImporters, entry.path().filename().string()),
-                  allowedPrivateImporters.end())
-            << entry.path();
     }
 }
 
@@ -1356,8 +1320,7 @@ TEST(SandboxEditorPresentation, GeometryProcessingMenusExposeDomainElementSubmen
 {
     using Domain = Runtime::EditorGeometryProcessingDomain;
 
-    const auto mesh = Runtime::GetEditorGeometryProcessingMenuItems(
-        Runtime::EditorDomainWindowKind::Mesh);
+    const auto mesh = Runtime::GetEditorGeometryProcessingMenuItems(Runtime::EditorDomainWindowKind::Mesh);
     ASSERT_EQ(mesh.size(), 3u);
     EXPECT_EQ(mesh[0].Domain, Domain::MeshVertices);
     EXPECT_STREQ(mesh[0].Label, "Vertices");

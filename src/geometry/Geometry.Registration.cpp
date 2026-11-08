@@ -5,6 +5,7 @@ module;
 #include <cstddef>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <span>
 #include <vector>
@@ -499,22 +500,30 @@ namespace Geometry::Registration
         const RegistrationParams& params,
         const IterationObserver& observer)
     {
-        KDTree targetTree;
-        KDTreeBuildParams kdParams;
-        kdParams.LeafSize = static_cast<uint32_t>(params.KDTreeLeafSize);
-        if (!targetTree.BuildFromPoints(targetPoints, kdParams))
+        const NearestQuery query = MakeKDTreeNearestQuery(targetPoints, params.KDTreeLeafSize);
+        if (!query)
             return {};
-        return AlignICPWithQueries(sourcePoints, targetPoints, targetNormals, params,
-            [&](std::span<const glm::vec3> queries, std::span<std::uint32_t> indices) {
-                std::vector<KDTree::ElementIndex> neighbors;
-                for (std::size_t i = 0; i < queries.size(); ++i)
-                {
-                    if (!targetTree.QueryKNN(queries[i], 1, neighbors))
-                        return false;
-                    if (!neighbors.empty())
-                        indices[i] = neighbors.front();
-                }
-                return true;
-            }, observer);
+        return AlignICPWithQueries(sourcePoints, targetPoints, targetNormals, params, query, observer);
+    }
+
+    NearestQuery MakeKDTreeNearestQuery(std::span<const glm::vec3> target, const std::size_t leafSize)
+    {
+        auto tree = std::make_shared<KDTree>();
+        KDTreeBuildParams kdParams;
+        kdParams.LeafSize = static_cast<uint32_t>(leafSize);
+        if (!tree->BuildFromPoints(target, kdParams))
+            return {};
+        return [tree](std::span<const glm::vec3> queries, std::span<std::uint32_t> indices)
+        {
+            std::vector<KDTree::ElementIndex> neighbors;
+            for (std::size_t i = 0; i < queries.size(); ++i)
+            {
+                if (!tree->QueryKNN(queries[i], 1, neighbors))
+                    return false;
+                if (!neighbors.empty())
+                    indices[i] = neighbors.front();
+            }
+            return true;
+        };
     }
 } // namespace Geometry::Registration

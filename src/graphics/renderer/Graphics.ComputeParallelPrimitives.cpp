@@ -631,25 +631,25 @@ namespace Extrinsic::Graphics
 
         // Shared tail of every Record*: acquires (or checks) the scratch buffer, binds it,
         // validates the plan's resources and records its dispatches.
-        [[nodiscard]] GpuParallelPrimitiveRecordResult RecordPlanWithScratch(
-            RHI::IDevice& device,
+        [[nodiscard]] GpuParallelPrimitiveRecordResult RecordPlanWithScratch(RHI::IDevice& device,
             RHI::ICommandContext& cmd,
             RHI::BufferManager* buffers,
             const ParallelPrimitivePipelineSet& pipelines,
             RHI::BufferHandle scratch,
             ParallelPrimitiveDispatchPlan plan,
             RoleBindings bindings,
-            GpuParallelPrimitiveRecordResult result)
+            GpuParallelPrimitiveRecordResult result,
+            const bool resolved = false)
         {
             const ParallelPrimitiveKind kind = result.Kind;
             const std::uint32_t count = result.Diagnostics.ElementCount;
             if (plan.ScratchBytes > 0u && !scratch.IsValid())
             {
-                if (buffers == nullptr)
+                if (buffers == nullptr || resolved) // a resolved recording leases nothing
                 {
                     return StatusResult(ParallelPrimitiveStatus::InvalidInput, kind, count);
                 }
-                auto scratchOr = buffers->Create(BuildParallelPrimitiveScratchBufferDesc(plan));
+                auto scratchOr = buffers->CreateScratch(BuildParallelPrimitiveScratchBufferDesc(plan));
                 if (!scratchOr.has_value())
                 {
                     return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource, kind, count);
@@ -664,7 +664,8 @@ namespace Extrinsic::Graphics
             }
 
             bindings.Scratch = scratch;
-            bindings.ScratchBDA = scratch.IsValid() ? device.GetBufferDeviceAddress(scratch) : 0u;
+            if (!resolved)
+                bindings.ScratchBDA = scratch.IsValid() ? device.GetBufferDeviceAddress(scratch) : 0u;
             if (!PlanResourcesAreRecordable(plan, bindings, pipelines))
             {
                 return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource, kind, count);
@@ -1377,7 +1378,9 @@ namespace Extrinsic::Graphics
                                 desc.ElementCount);
         }
 
-        if (!desc.Device->IsOperational())
+        // ARCH-023: resolved addresses record without any device call (a method worker records the scan).
+        const bool resolved = desc.InputAddress != 0u;
+        if (!resolved && !desc.Device->IsOperational())
         {
             return DeviceUnavailableResult(ParallelPrimitiveKind::PrefixScan,
                                            desc.ElementCount);
@@ -1415,7 +1418,8 @@ namespace Extrinsic::Graphics
                                 desc.ElementCount);
         }
 
-        if (!desc.Input.IsValid() || !desc.Output.IsValid())
+        if (!desc.Input.IsValid() || !desc.Output.IsValid() ||
+            (resolved && (desc.OutputAddress == 0u || (desc.Scratch.IsValid() && desc.ScratchAddress == 0u))))
         {
             return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
                                 ParallelPrimitiveKind::PrefixScan,
@@ -1433,18 +1437,20 @@ namespace Extrinsic::Graphics
         RoleBindings bindings{
             .Input = desc.Input,
             .Output = desc.Output,
-            .InputBDA = desc.Device->GetBufferDeviceAddress(desc.Input),
-            .OutputBDA = desc.Device->GetBufferDeviceAddress(desc.Output),
+            .InputBDA = resolved ? desc.InputAddress : desc.Device->GetBufferDeviceAddress(desc.Input),
+            .OutputBDA = resolved ? desc.OutputAddress : desc.Device->GetBufferDeviceAddress(desc.Output),
+            .ScratchBDA = resolved && desc.Scratch.IsValid() ? desc.ScratchAddress : 0u,
         };
 
         return RecordPlanWithScratch(*desc.Device,
-                                     *desc.CommandContext,
-                                     desc.Buffers,
-                                     desc.Pipelines,
-                                     desc.Scratch,
-                                     std::move(plan),
-                                     bindings,
-                                     std::move(result));
+            *desc.CommandContext,
+            desc.Buffers,
+            desc.Pipelines,
+            desc.Scratch,
+            std::move(plan),
+            bindings,
+            std::move(result),
+            resolved);
     }
 
     GpuParallelPrimitiveRecordResult RecordGpuStreamCompaction(
@@ -1630,7 +1636,8 @@ namespace Extrinsic::Graphics
         {
             return StatusResult(ParallelPrimitiveStatus::InvalidInput, kind, desc.ElementCount);
         }
-        if (!desc.Device->IsOperational())
+        const bool resolved = desc.ElementsAddress != 0u;
+        if (!resolved && !desc.Device->IsOperational())
         {
             return DeviceUnavailableResult(kind, desc.ElementCount);
         }
@@ -1655,21 +1662,26 @@ namespace Extrinsic::Graphics
         {
             return StatusResult(ParallelPrimitiveStatus::InvalidInput, kind, desc.ElementCount);
         }
-        const std::uint64_t elements =
-            desc.Elements.IsValid() ? desc.Device->GetBufferDeviceAddress(desc.Elements) : 0u;
-        if (elements == 0u || desc.ElementsOffsetBytes % sizeof(std::uint32_t) != 0u)
+        const std::uint64_t elements = !desc.Elements.IsValid() ? 0u
+            : resolved                                          ? desc.ElementsAddress
+                                                                : desc.Device->GetBufferDeviceAddress(desc.Elements);
+        if (elements == 0u || desc.ElementsOffsetBytes % sizeof(std::uint32_t) != 0u ||
+            (resolved && desc.Scratch.IsValid() && desc.ScratchAddress == 0u))
         {
             return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource, kind, desc.ElementCount);
         }
-        const RoleBindings bindings{.Keys = desc.Elements, .KeysBDA = elements + desc.ElementsOffsetBytes};
+        const RoleBindings bindings{.Keys = desc.Elements,
+            .KeysBDA = elements + desc.ElementsOffsetBytes,
+            .ScratchBDA = resolved && desc.Scratch.IsValid() ? desc.ScratchAddress : 0u};
         return RecordPlanWithScratch(*desc.Device,
-                                     *desc.CommandContext,
-                                     desc.Buffers,
-                                     desc.Pipelines,
-                                     desc.Scratch,
-                                     std::move(plan),
-                                     bindings,
-                                     std::move(result));
+            *desc.CommandContext,
+            desc.Buffers,
+            desc.Pipelines,
+            desc.Scratch,
+            std::move(plan),
+            bindings,
+            std::move(result),
+            resolved);
     }
 
     GpuCompactionCountPublicationResult RecordCompactionCountPublication(

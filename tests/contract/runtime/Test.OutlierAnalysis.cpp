@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "OneShotLifecycleScript.hpp"
 #include "PointDomainFixture.hpp"
 
 import Extrinsic.Runtime.PointAnalysisOperations;
@@ -1099,4 +1100,91 @@ TEST(PointIndexAdmission, MismatchedSnapshotExplainsItself)
                   cache, world, entity, config.Positions, slots, points, handle, snapshot, reused, diagnostic),
         R::GeometryProcessingDetail::PointIndexState::Mismatched);
     EXPECT_EQ(diagnostic, "Spatial index snapshot does not match the selected samples.");
+}
+// ARCH-023: a CPU outlier run started with the section's one-shot options follows the common lifecycle on the session's
+// step runs (ready computes nothing, Step 1 exactly one step, Restart from the same capture, Run, one Accept); nothing
+// is published or delivered before Accept, and the accepted output equals a batch Apply's over the same input.
+TEST(OutlierAnalysisOperations, ACpuStartFollowsTheCommonOneShotLifecycle)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = &scene;
+    R::EditorCommandHistory history;
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    const auto commands = R::BindEditorProcessingCommands(context);
+    auto batch = Config(entity, D::MeshVertex);
+    batch.Mask.Name = "batch_outliers";
+    batch.Score.Name = "batch_scores";
+    ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(commands, batch).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(props.Exists("batch_scores")) << "Apply is a batch: it runs at once and accepts at its end";
+    auto config = Config(entity, D::MeshVertex);
+    config.Execution.Start = R::StepRunStart::Ready;
+    std::optional<R::EditorOutlierAnalysisResult> delivered;
+    const auto started = R::StartEditorOutlierAnalysisRun(commands,
+        config,
+        [&](R::EditorOutlierAnalysisResult r)
+        {
+            delivered = std::move(r);
+        });
+    ASSERT_EQ(started.Status, R::EditorCommandStatus::Pending) << started.Message;
+    ASSERT_NE(started.StepRun, 0u) << "the answer names the run";
+    const auto nothing = [&]
+    {
+        EXPECT_FALSE(props.Exists("scores"));
+        EXPECT_FALSE(delivered.has_value());
+    };
+    Intrinsic::Tests::OneShotLifecycleScript script{
+        .OnReadyHeld = nothing, .OnFirstResult = nothing, .OnRestartedReady = nothing, .OnRestartedResult = nothing};
+    for (int frame = 0; frame < 2000 && !script.Advance(jobs.StepRuns(), started.StepRun); ++frame)
+        jobs.Pump();
+    EXPECT_EQ(script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered.has_value());
+    EXPECT_TRUE(delivered->Succeeded()) << delivered->Message;
+    EXPECT_EQ(delivered->StepRun, started.StepRun);
+    EXPECT_EQ(
+        std::as_const(props).Get<float>("scores").Vector(), std::as_const(props).Get<float>("batch_scores").Vector());
+    EXPECT_EQ(std::as_const(props).Get<std::uint32_t>("outliers").Vector(),
+        std::as_const(props).Get<std::uint32_t>("batch_outliers").Vector());
+    EXPECT_EQ(history.UndoCount(), 2u) << "one undo entry per Accept";
+}
+
+// ARCH-023: the one-shot options are the section's rows (auto_accept, start): they round-trip, refuse an unknown token
+// and have no cap or preview row; without the session's step runs only a batch runs (a start is refused, nothing runs).
+TEST(OutlierAnalysisConfig, TheOneShotOptionsPersistAndAStartNeedsTheStepRuns)
+{
+    auto config = Config(entt::entity{}, D::MeshVertex);
+    config.Execution.Start = R::StepRunStart::Run; // not the default (ready): the codec must keep it
+    config.Execution.AutoAccept = R::StepRunAutoAccept::End;
+    Extrinsic::Core::Config::EngineConfig document{};
+    R::SetDerivedSection<R::kOutlierAnalysisSection>(document, config);
+    const auto decoded = R::GetDerivedSection<R::kOutlierAnalysisSection>(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Execution, config.Execution);
+    const auto usable = [](const char* payload)
+    {
+        return R::ValidateDerivedSection<R::kOutlierAnalysisSection>(payload, {}, "test").Usable();
+    };
+    EXPECT_TRUE(usable(R"({"start":"ready","auto_accept":"never"})"));
+    EXPECT_FALSE(usable(R"({"start":"later"})"));
+    EXPECT_FALSE(usable(R"({"max_iterations":2})"));
+
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::MeshVertex);
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = &scene;
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    context.StepRuns = nullptr; // a lane without the step-run service
+    auto ready = Config(entity, D::MeshVertex);
+    ready.Execution.Start = R::StepRunStart::Ready;
+    const auto refused = R::StartEditorOutlierAnalysisRun(R::BindEditorProcessingCommands(context), ready);
+    EXPECT_EQ(refused.Status, R::EditorCommandStatus::InvalidProcessingParameters) << refused.Message;
+    EXPECT_EQ(refused.StepRun, 0u);
+    EXPECT_TRUE(jobs.Snapshot().Entries.empty()) << "nothing was queued";
 }

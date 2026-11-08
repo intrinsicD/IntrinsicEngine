@@ -11,6 +11,7 @@ export module Extrinsic.Runtime.CoherentPointDriftConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Extrinsic.Runtime.ConfigFieldSpec;
 export import Extrinsic.Runtime.PointSamplingConfig;
+export import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
@@ -36,6 +37,11 @@ export namespace Extrinsic::Runtime
     enum class CoherentPointDriftNystromSchedule : std::uint8_t { Mixed = 0, Fixed, Resampled };
     enum class CoherentPointDriftNystromBoxPattern : std::uint8_t { Random = 0, Halton };
 
+    inline constexpr std::uint32_t kMaxCoherentPointDriftIterations = 10000u;
+    // One step is one EM iteration. A configured run starts ready and waits for Accept (the panel's step mode);
+    // the one-shot command runs at once and accepts at its end.
+    inline constexpr StepRunExecution kDefaultCoherentPointDriftExecution{.IterationCap = 150u};
+
     inline constexpr std::uint32_t kCoherentPointDriftAutoLowRankPoints = 1024u;
     inline constexpr std::uint32_t kCoherentPointDriftAutoLowRank = 100u;
 
@@ -48,7 +54,7 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef TargetPositions{GeometryElementDomain::Unknown, "v:position", Geometry::PropertyValueKind::Vec3};
         CoherentPointDriftMethod Method{CoherentPointDriftMethod::Rigid};
         double OutlierWeight{0.1};
-        std::uint32_t MaxIterations{150u};
+        StepRunExecution Execution{kDefaultCoherentPointDriftExecution};
         double Tolerance{1.0e-5};
         double InitialSigma2{0.0};
         double Sigma2Floor{1.0e-10};

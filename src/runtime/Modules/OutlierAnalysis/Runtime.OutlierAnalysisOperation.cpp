@@ -1,6 +1,9 @@
 // It reaches the editor only through Extrinsic.Runtime.OperationRuntime (ADR 0031 Decision 7).
 module;
+#include <atomic>
+#include <chrono>
 #include <functional>
+#include <mutex>
 #include <cstring>
 #include <algorithm>
 #include <array>
@@ -22,6 +25,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Private.WorkspaceLease;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
@@ -37,10 +41,16 @@ import Extrinsic.Graphics.OutlierAnalysis;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.OperationRuntime;
+import Extrinsic.Runtime.StepRuns; // the worker step's types
+#include "Services/Runtime.WorkerGpuPages.hpp"
 
 namespace Extrinsic::Runtime
 {
+    template std::shared_ptr<Graphics::OutlierWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::OutlierWorkspace>();
+
     template std::string SerializeDerivedSection<kOutlierAnalysisSection>(const OutlierAnalysisConfig&);
     template Core::Config::EngineConfigSectionValidationResult ValidateDerivedSection<kOutlierAnalysisSection>(
         std::string_view, std::string_view, std::string_view);
@@ -149,7 +159,7 @@ namespace Extrinsic::Runtime
                 const std::shared_ptr<Work>&,
                 Result&,
                 std::function<void(Result)> sink,
-                bool automatic,
+                const StepRunExecution& execution,
                 std::function<void(Result)> retain,
                 bool& busy);
             static EditorOutlierTransactionHandle MakeTestGpu(const EditorProcessingContext&,
@@ -235,6 +245,9 @@ namespace Extrinsic::Runtime
             const auto started = std::chrono::steady_clock::now();
             const auto& c = w.Config;
             auto& r = w.Result;
+            // A restarted step computes again from the capture: the scratch rows start empty.
+            w.Values.NeighborIds.clear();
+            w.Values.Counts.clear();
             r.Status = EditorCommandStatus::GeometryProcessingFailed;
             r.ActualBackend = ToString(c.Backend);
             PC::OutlierAnalysisResult analysis;
@@ -515,6 +528,17 @@ namespace Extrinsic::Runtime
         std::array<std::optional<Graphics::GpuPropertyView>, 2> Base{};
         // Leased from the spatial cache; the recorder closure keeps it while its work may run.
         std::shared_ptr<Graphics::OutlierWorkspace> Workspace{};
+        // ARCH-023: the kernel runs on the step run's worker: the retained index view (Init) and what the worker
+        // records with (its own references, the views without their leases) and writes (the pulled statistics).
+        std::shared_ptr<SpatialGpuIndexLease> IndexView{};
+        struct WorkerView
+        {
+            std::shared_ptr<Graphics::OutlierWorkspace> Workspace{};
+            std::shared_ptr<SpatialGpuIndexLease> Index{};
+            Graphics::OutlierResidentIo Io{};
+            Graphics::OutlierGpuStats Stats{};
+        } Worker{};
+        EditorOutlierAnalysisResult Initial{}; // the result as queued: a restart's new generation begins here
         std::function<void(EditorOutlierAnalysisResult)> Sink{};
         // The session store's retention (RUNTIME-354), before the sink; Accept's sink cannot replace it.
         std::function<void(EditorOutlierAnalysisResult)> Retain{};
@@ -567,78 +591,97 @@ namespace Extrinsic::Runtime
                     return false;
             return true;
         }
-        bool Poll(const Run& w)
+        Graphics::GpuPropertyView Stripped(Graphics::GpuPropertyView view)
+        {
+            view.Lease.reset(); // the owner keeps the lease
+            return view;
+        }
+        Graphics::OutlierGpuParams ParamsOf(const OutlierAnalysisConfig& c)
+        {
+            return {.Method = std::uint32_t(c.Method),
+                .K = c.KNeighbors,
+                .MinimumNeighbors = c.MinimumNeighbors,
+                .Radius = c.Radius,
+                .Multiplier = c.StdDevMultiplier,
+                .ScoreThreshold = c.ScoreThreshold};
+        }
+        // The Init (main thread, once the run computes): inputs and write slots, the workspace prepared for this
+        // capture, the retained index view, and the immutable recording view.
+        GP::GpuTransactionPrepare Prepare(const Run& w, std::string& why)
         {
             auto& t = w->Core;
-            if (!t.Gpu)
+            if (!Acquire(w))
             {
-                if (!Acquire(w))
-                {
-                    if (!GP::GpuTransactionDeferralsExhausted(t))
-                        return false;
-                    Fail(w, "The residency refused an input or output slot.");
-                    return true;
-                }
-                auto& ctx = t.Context;
-                w->Workspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::OutlierWorkspace>();
-                if (!w->Workspace)
-                {
-                    Fail(w, "Outlier device workspace unavailable.");
-                    return true;
-                }
-                w->Work->Result.GpuQueryBatches = 1;
-                t.Gpu = ctx.SpatialIndices->QueueGpuCompute(
-                    w->Work->GpuIndex,
-                    sizeof(Graphics::OutlierGpuStats),
-                    // The recorder owns its workspace lease; the cache keeps it until the readback is safe.
-                    [w, workspace = w->Workspace](
-                        RHI::ICommandContext& cmd, const SpatialGpuIndexView& index) -> RHI::BufferHandle
-                    {
-                        const auto& rings = w->Core.Rings;
-                        if (!Current(w) || !w->Input || !rings[0].Back || !rings[1].Back || !rings[2].Back)
-                            return {};
-                        auto& residency = *w->Core.Residency;
-                        const auto frame = w->Core.Context.Device->GetGlobalFrameNumber();
-                        residency.NoteUse(w->Input->Buffer, frame);
-                        for (std::size_t i = 0; i < 3; ++i)
-                            residency.NoteUse(rings[i].Back->Buffer, frame);
-                        for (const auto& v : w->Base)
-                            if (v)
-                                residency.NoteUse(v->Buffer, frame);
-                        const auto& c = w->Work->Config;
-                        return workspace->Record(cmd,
-                            {.Method = std::uint32_t(c.Method),
-                                .K = c.KNeighbors,
-                                .MinimumNeighbors = c.MinimumNeighbors,
-                                .Radius = c.Radius,
-                                .Multiplier = c.StdDevMultiplier,
-                                .ScoreThreshold = c.ScoreThreshold},
-                            {.Positions = *w->Input,
-                                .Score = *rings[0].Back,
-                                .Mask = *rings[1].Back,
-                                .Presentation = *rings[2].Back,
-                                .ScoreBase = w->Base[0].value_or(Graphics::GpuPropertyView{}),
-                                .MaskBase = w->Base[1].value_or(Graphics::GpuPropertyView{}),
-                                .Nodes = index.NodesBDA,
-                                .LiveSlots = index.OriginalSlotsBDA,
-                                .LiveCount = index.Count});
-                    },
-                    SpatialGpuLatency::Immediate);
+                if (!GP::GpuTransactionDeferralsExhausted(t))
+                    return GP::GpuTransactionPrepare::Pending;
+                why = "The residency refused an input or output slot.";
+                return GP::GpuTransactionPrepare::Failed;
             }
-            return t.Gpu->State == SpatialQueryState::Ready || t.Gpu->State == SpatialQueryState::Failed;
+            auto& ctx = t.Context;
+            if (!w->Workspace)
+                w->Workspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::OutlierWorkspace>();
+            if (!w->IndexView)
+                w->IndexView = ctx.SpatialIndices->PrepareGpuIndex(w->Work->GpuIndex, why);
+            if (!w->IndexView)
+                return GP::GpuTransactionPrepare::Failed;
+            const auto& index = w->IndexView->View();
+            const auto& rings = t.Rings;
+            const auto refusals = ctx.SpatialIndices->Stats().ScratchRefusals;
+            if (!w->Workspace || !w->Workspace->Prepare(ParamsOf(w->Work->Config), index.Count, rings[0].Back->Bytes))
+            {
+                why = ctx.SpatialIndices->MethodScratchDiagnostic(refusals, "Outlier device workspace unavailable.");
+                return GP::GpuTransactionPrepare::Failed;
+            }
+            w->Worker.Workspace = w->Workspace;
+            w->Worker.Index = w->IndexView;
+            w->Worker.Io = {.Positions = Stripped(*w->Input),
+                .Score = Stripped(*rings[0].Back),
+                .Mask = Stripped(*rings[1].Back),
+                .Presentation = Stripped(*rings[2].Back),
+                .ScoreBase = w->Base[0] ? Stripped(*w->Base[0]) : Graphics::GpuPropertyView{},
+                .MaskBase = w->Base[1] ? Stripped(*w->Base[1]) : Graphics::GpuPropertyView{},
+                .Nodes = index.NodesBDA,
+                .LiveSlots = index.OriginalSlotsBDA,
+                .LiveCount = index.Count};
+            w->Work->Result.GpuQueryBatches = 1;
+            return GP::GpuTransactionPrepare::Ready;
+        }
+        // The step run's Step, on a worker: the kernel's one page against the retained index, its statistics pulled.
+        StepOutcome Step(EditorOutlierTransaction& w)
+        {
+            auto& worker = w.Worker;
+            const auto params = ParamsOf(w.Work->Config);
+            switch (w.Core.Pages->Run(
+                [&](RHI::ICommandContext& cmd)
+                {
+                    for (const auto buffer : worker.Index->Barriers())
+                        cmd.BufferBarrier(buffer,
+                            RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferWrite,
+                            RHI::MemoryAccess::ShaderRead);
+                    return worker.Workspace->Record(cmd, params, worker.Io);
+                },
+                std::as_writable_bytes(std::span{&worker.Stats, 1u})))
+            {
+            case WorkerGpuPageStatus::Complete: return StepOutcome::Converged;
+            case WorkerGpuPageStatus::Aborted:  return StepOutcome::Failed;
+            case WorkerGpuPageStatus::Refused:
+                w.Core.WorkerFailure = "Outlier compute failed.";
+                return StepOutcome::Failed;
+            case WorkerGpuPageStatus::Failed:
+            case WorkerGpuPageStatus::TimedOut: break;
+            }
+            w.Core.WorkerFailure = "Outlier compute did not complete: the device was lost.";
+            return StepOutcome::Failed;
+        }
+        // The owner's side: ready once the step completed (its statistics are written).
+        bool Poll(const Run& w)
+        {
+            return GP::GpuTransactionStepCompleted(w->Core);
         }
         void CompleteRun(const Run& w)
         {
             auto& t = w->Core;
-            if (!t.Gpu || t.Gpu->State != SpatialQueryState::Ready ||
-                t.Gpu->Data.size() != sizeof(Graphics::OutlierGpuStats))
-            {
-                Fail(w, t.Gpu ? t.Gpu->Diagnostic : "Outlier compute failed.");
-                return;
-            }
-            Graphics::OutlierGpuStats stats{};
-            std::memcpy(&stats, t.Gpu->Data.data(), sizeof(stats));
-            w->Workspace.reset();
+            const auto stats = w->Worker.Stats; // the step's pulled statistics (no step runs now)
             if (stats.Invalid)
             {
                 Fail(w, "Unrepresentable device outlier score.");
@@ -653,9 +696,8 @@ namespace Extrinsic::Runtime
                     return;
                 }
             }
-            w->Input.reset();
-            for (auto& base : w->Base)
-                base.reset();
+            // The input views and the workspace stay until Accept, Discard or the run's end (Release), so a restart
+            // records again without resolving or leasing anything.
             auto& r = w->Work->Result;
             r.RejectedCount = stats.Rejected;
             r.MeanDistance = stats.Mean;
@@ -768,6 +810,34 @@ namespace Extrinsic::Runtime
                 {
                     CompleteAccept(self());
                 },
+                // A restart records the kernel again from the capture: the inputs, workspace and index view stay (the
+                // capture is current); the Init acquires fresh write slots; counters as queued.
+                .Restart =
+                    [raw](std::string&)
+                {
+                    raw->Worker.Stats = {};
+                    raw->Work->Result = raw->Initial;
+                    return true;
+                },
+                .Prepare =
+                    [self](std::string& diagnostic)
+                {
+                    return Prepare(self(), diagnostic);
+                },
+                .Step =
+                    [raw](StepRunMetric&)
+                {
+                    return Step(*raw);
+                },
+                .Uses =
+                    [raw](std::vector<RHI::BufferHandle>& buffers)
+                {
+                    if (raw->Input)
+                        buffers.push_back(raw->Input->Buffer);
+                    for (const auto& v : raw->Base)
+                        if (v)
+                            buffers.push_back(v->Buffer);
+                },
                 .Release =
                     [raw]
                 {
@@ -775,13 +845,17 @@ namespace Extrinsic::Runtime
                     for (auto& v : raw->Base)
                         v.reset();
                     raw->Workspace.reset();
+                    raw->IndexView.reset();
+                    raw->Worker = {}; // no step runs any more (the core waits for that)
                 },
+
                 .Deliver =
                     [raw](EditorCommandStatus status, std::string message)
                 {
                     auto& r = raw->Work->Result;
                     r.Status = status;
                     r.Message = std::move(message);
+                    r.StepRun = raw->Core.StepRun;
                     if (auto retain = std::move(raw->Retain))
                         retain(r);
                     if (auto sink = std::move(raw->Sink))
@@ -811,14 +885,14 @@ namespace Extrinsic::Runtime
             const std::shared_ptr<OutlierWork>& work,
             EditorOutlierAnalysisResult& result,
             std::function<void(EditorOutlierAnalysisResult)> sink,
-            bool automatic,
+            const StepRunExecution& execution,
             std::function<void(EditorOutlierAnalysisResult)> retain,
             bool& busy)
         {
             namespace GP = OperationSupport;
             auto w = OutlierTransactionDetail::Make(
                 ctx, work, ctx.SpatialIndices ? ctx.SpatialIndices->PropertyResidency() : nullptr);
-            w->Core.AutoAccept = automatic;
+            w->Core.Execution = OneShotExecution(execution);
             if (auto refused = GP::GpuTransactionStartRefusal(w->Core))
             {
                 result.Status = refused->Status;
@@ -836,7 +910,8 @@ namespace Extrinsic::Runtime
                 work->GpuIndex,
                 work->Index,
                 work->Result.IndexReused,
-                why);
+                why,
+                false);
             if (acquired != GP::PointIndexState::Ready)
             {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
@@ -846,8 +921,11 @@ namespace Extrinsic::Runtime
             work->Result.Status = EditorCommandStatus::Pending;
             work->Result.ActualBackend = "vulkan_lbvh";
             work->Result.Message = "Device outlier analysis queued.";
+            w->Initial = work->Result;
             w->Sink = OperationSupport::GuardEditorProcessingResult(ctx, std::move(sink));
             w->Retain = std::move(retain);
+            w->Core.Pages =
+                std::make_shared<WorkerGpuPages>(*ctx.Device); // the kernel's page runs on the step's worker
             if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Device outlier analysis").IsValid())
             {
                 result = work->Result;
@@ -893,6 +971,7 @@ namespace Extrinsic::Runtime
         const OutlierAnalysisConfig& config,
         EditorOutlierAnalysisResult& failure)
     {
+        const auto& execution = config.Execution;
         failure = {.Status = EditorCommandStatus::InvalidProcessingParameters,
             .Method = config.Method,
             .RequestedBackend = config.Backend};
@@ -903,7 +982,7 @@ namespace Extrinsic::Runtime
             OutlierRuntime::Refuse(commands, failure);
             return {};
         }
-        return OutlierRuntime::StartTransaction(commands, config, failure);
+        return OutlierRuntime::StartTransaction(commands, config, failure, execution);
     }
     EditorOutlierTransactionSnapshot SnapshotEditorOutlierAnalysis(
         const EditorProcessingCommands&, const EditorOutlierTransactionHandle& w)
@@ -913,6 +992,7 @@ namespace Extrinsic::Runtime
             return s;
         s.Phase = w->Core.Phase;
         s.Result = w->Work->Result;
+        s.Result.StepRun = w->Core.StepRun;
         if (s.Phase == EditorGpuTransactionPhase::ReadyToAccept)
         {
             s.CanAccept = OutlierTransactionDetail::Current(w);
@@ -997,5 +1077,19 @@ namespace Extrinsic::Runtime
     {
         return OutlierRuntime::ApplyConfigured(
             commands, GetEditorOutlierAnalysisConfig(commands), std::move(onComplete));
+    }
+    EditorOutlierAnalysisResult StartEditorOutlierAnalysisRun(const EditorProcessingCommands& commands,
+        const OutlierAnalysisConfig& config,
+        std::function<void(EditorOutlierAnalysisResult)> onComplete)
+    {
+        return OutlierRuntime::StartRun(commands, config, std::move(onComplete));
+    }
+    EditorOutlierAnalysisResult StartEditorConfiguredOutlierAnalysis(
+        const EditorProcessingCommands& commands, std::function<void(EditorOutlierAnalysisResult)> onComplete)
+    {
+        const auto config = GetEditorOutlierAnalysisConfig(commands);
+        if (!config)
+            return OutlierRuntime::ApplyConfigured(commands, config, std::move(onComplete)); // the stored refusal
+        return OutlierRuntime::StartRun(commands, *config, std::move(onComplete));
     }
 } // namespace Extrinsic::Runtime

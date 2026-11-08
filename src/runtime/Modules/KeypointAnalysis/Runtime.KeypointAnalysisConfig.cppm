@@ -7,6 +7,7 @@ module;
 #include <string_view>
 export module Extrinsic.Runtime.KeypointAnalysisConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+export import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -27,6 +28,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t MinimumNeighbors{5}, GpuQueryBatchSize{4096}, GpuRadiusCapacity{256};
         float SalientRadius{}, NonMaxRadius{};
         double Gamma21{.975}, Gamma32{.975};
+        // ARCH-023: the shared execution options auto_accept and start (one-shot: one step, no cap or live preview
+        // rows; by default every one-shot's, ready and waiting for Accept). The resident Vulkan transaction and the
+        // CPU worker run honour them on an interactive start; the batch command runs at once and accepts at its end.
+        StepRunExecution Execution{kOneShotStepRunExecution};
     };
     extern "C++" [[nodiscard]] std::string SerializeKeypointAnalysisConfig(const KeypointAnalysisConfig&);
     extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateKeypointAnalysisConfigSection(

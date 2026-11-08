@@ -168,7 +168,17 @@ TEST_P(PointScalarTransaction, SuccessiveEditsReplayAndRejectForeignOutputChange
     sampling.Positions = Density.Positions;
     sampling.RankName = "result";
     sampling.Count = 2;
-    ASSERT_TRUE(R::ApplyEditorPointSamplingCommand(Commands(), sampling).Succeeded());
+    std::optional<R::EditorPointSamplingResult> samplingResult;
+    const auto pendingSampling = R::ApplyEditorPointSamplingCommand(Commands(),
+        sampling,
+        [&](R::EditorPointSamplingResult result)
+        {
+            samplingResult = std::move(result);
+        });
+    ASSERT_EQ(pendingSampling.Status, R::EditorCommandStatus::Pending) << pendingSampling.Message;
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    ASSERT_TRUE(samplingResult.has_value());
+    ASSERT_TRUE(samplingResult->Succeeded()) << samplingResult->Message;
     const auto sampled = std::as_const(Rows()).Get<float>("result").Vector();
     const auto sampledId = Rows().Registry().Find("result");
     const auto run = Ready(17.0f);

@@ -3,6 +3,7 @@
 // the 1:1 render commit that keeps the copied front in the block instead of uploading it again.
 module;
 #include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -34,6 +35,8 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRunExecution;
+import Extrinsic.Runtime.StepRuns; // the worker-step hooks of Runtime.GpuTransactionLifecycle.hpp
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.GpuPropertyBinding;
@@ -468,10 +471,13 @@ namespace Extrinsic::Runtime
         return run && !run->Core.Abandoned && GP::PointPositionFieldCurrent(run->Core.Context, run->Entity, run->Capture);
     }
 
-    EditorGpuPositionAcceptResult AcceptEditorGpuPositionRun(
-        const EditorProcessingCommands&, const EditorGpuPositionRunHandle& w, Graphics::GpuPropertyResidency&,
-        std::string label, std::function<void(EditorGpuPositionAcceptResult)> onComplete,
-        const std::span<const glm::vec3> frontForTest)
+    EditorGpuPositionAcceptResult AcceptEditorGpuPositionRun(const EditorProcessingCommands&,
+        const EditorGpuPositionRunHandle& w,
+        Graphics::GpuPropertyResidency&,
+        std::string label,
+        std::function<void(EditorGpuPositionAcceptResult)> onComplete,
+        const std::span<const glm::vec3> frontForTest,
+        std::function<bool()> publishing)
     {
         const auto refuse = [&](const EditorCommandStatus status, std::string message) {
             return EditorGpuPositionAcceptResult{.Status = status, .Message = std::move(message)};
@@ -503,6 +509,8 @@ namespace Extrinsic::Runtime
             Fail(w, EditorCommandStatus::GeometryProcessingFailed, "The GPU result is no longer resident; previous positions retained.");
             return w->Result;
         }
+        // The producer's run decides at the publication boundary, as a transaction's own step run does.
+        t.Hooks.Publishing = std::move(publishing);
         // The publication runs from a completion drain like every other editor result.
         (void)GP::BeginGpuTransactionAccept(GP::GpuTransactionOf(w));
         return w->Result;

@@ -10,6 +10,7 @@ picking backlog work; theme priorities and rationale live in
 
 - `ARCH-022` — Engine and feature modules: the architecture target (tasks/active/ARCH-022-engine-and-feature-modules-target.md)
 - `ARCH-023` — Shared GPU method execution (tasks/active/ARCH-023-unified-gpu-method-runs.md)
+- `BUG-258` — Historical density-weight proof cites a retired test path (tasks/active/BUG-258-historical-density-weight-proof.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 
@@ -63,6 +64,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-324` — Octree split point Center/Mean/Median selectable in point spacing (tasks/backlog/runtime/RUNTIME-324-octree-median-split-selectable-variant.md)
 - unblocked: `RUNTIME-325` — Coroutine waits in JobService, or delete the coroutine path (tasks/backlog/runtime/RUNTIME-325-coroutine-waits-in-jobservice.md)
 - unblocked: `RUNTIME-352` — Clustering and consolidation modules reach the editor only through the framework module (tasks/backlog/runtime/RUNTIME-352-editor-internals-out-of-service-modules.md)
+- unblocked: `RUNTIME-355` — Retire method execution leftovers and align optional controls (tasks/backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md)
 - blocked by `RUNTIME-280`: `UI-061` — Select-by-query controls and "use selection as mask/source" (tasks/backlog/ui/UI-061-select-by-query-controls.md)
 - blocked by `RUNTIME-283`: `UI-063` — File > Properties import/export window (tasks/backlog/ui/UI-063-properties-import-export-window.md)
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)

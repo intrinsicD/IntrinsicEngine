@@ -5,18 +5,24 @@
 // abandoned run that revalidates as Cancelled and delivers exactly once.
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <utility>
 #include <iterator>
+#include <map>
+#include <mutex>
 #include <sstream>
 #include <optional>
 #include <regex>
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -110,6 +116,7 @@ namespace
         }
         void TearDown() override
         {
+            ReleaseFirstPage = true; // never leave a held page's worker blocked
             Queued.clear();
             Jobs.Jobs().CancelAndDrain();
             R::RuntimeModuleShutdownContext shutdown{Bus, Events, Jobs.Jobs(), Worlds, Services};
@@ -122,6 +129,105 @@ namespace
         }
         [[nodiscard]] R::GeometryPropertyRef Positions() const { return Ref("samples", Geometry::PropertyValueKind::Vec3); }
         [[nodiscard]] R::GeometryPropertyRef Normals() const { return Ref("directions", Geometry::PropertyValueKind::Vec3); }
+
+        // ARCH-023: the mock compute lane of a construction run's prepared kNN session, without frames. The
+        // preparation (0 bytes) is accepted; every page answers the `width` exact nearest samples (CPU float
+        // distance, then source ID) of the rows it queries, the active prefix of the page's mapped upload, and its
+        // pulled bytes complete at once. `CorruptPage` names an unknown source slot in that page; with `HoldFirstPage`
+        // the first page's wait blocks until `ReleaseFirstPage` and then completes (it never reports Pending).
+        struct PackedNeighbor
+        {
+            std::uint32_t Index;
+            float SquaredDistance;
+        };
+        std::mutex Gpu;
+        std::map<std::uint64_t, std::vector<std::byte>> Pulled;
+        std::vector<std::size_t> Pages; // the query count of every page submitted
+        std::uint64_t LaneTokens{}, HeldToken{};
+        std::size_t CorruptPage{~std::size_t{0}};
+        std::atomic<bool> HoldFirstPage{false}, ReleaseFirstPage{false};
+        [[nodiscard]] std::size_t PageCount()
+        {
+            std::scoped_lock lock{Gpu};
+            return Pages.size();
+        }
+        [[nodiscard]] std::size_t MappedUploads()
+        {
+            std::scoped_lock writes{Device.MappedWriteMutex};
+            return Device.MappedWrites.size();
+        }
+        void UseConstructionLane(const std::uint32_t width)
+        {
+            const auto samples =
+                std::as_const(Scene.Raw().get<GS::Vertices>(Entity).Properties).Get<glm::vec3>("samples").Vector();
+            Device.TransferQueue.ComputeWait = [this](Extrinsic::RHI::ReadbackToken token, std::uint64_t)
+            {
+                while (HoldFirstPage && token.IsValid() && token.Value == HeldToken && !ReleaseFirstPage)
+                    std::this_thread::sleep_for(std::chrono::microseconds(100));
+                return Extrinsic::RHI::ComputeWaitStatus::Complete;
+            };
+            Device.TransferQueue.TakeReadback = [this](Extrinsic::RHI::ReadbackToken token, std::span<std::byte> out)
+            {
+                std::scoped_lock lock{Gpu};
+                const auto found = Pulled.find(token.Value);
+                if (found == Pulled.end() || found->second.size() != out.size())
+                    return false;
+                std::ranges::copy(found->second, out.begin());
+                Pulled.erase(found);
+                return true;
+            };
+            Device.ComputeReadback = [this, samples, width](
+                                         auto record, std::uint64_t bytes, Extrinsic::RHI::ReadbackSink)
+            {
+                std::scoped_lock lock{Gpu};
+                if (!record(Device.AsyncComputeContext).IsValid())
+                    return Extrinsic::RHI::ReadbackToken{};
+                const Extrinsic::RHI::ReadbackToken token{(1ull << 63u) | ++LaneTokens};
+                if (bytes == 0u)
+                    return token; // the session's preparation (its sink reads nothing)
+                const auto count = bytes / (width * sizeof(PackedNeighbor) + 2u * sizeof(std::uint32_t));
+                std::vector<glm::vec3> queries(count);
+                {
+                    std::scoped_lock writes{Device.MappedWriteMutex};
+                    const auto& upload = Device.MappedWrites.back().Data;
+                    EXPECT_GE(upload.size(), count * sizeof(glm::vec3));
+                    std::memcpy(queries.data(), upload.data(), count * sizeof(glm::vec3));
+                }
+                std::vector<PackedNeighbor> rows;
+                for (const auto query : queries)
+                {
+                    std::vector<std::uint32_t> order(samples.size());
+                    for (std::uint32_t i = 0; i < order.size(); ++i)
+                        order[i] = i;
+                    const auto distance = [&](std::uint32_t i)
+                    {
+                        const auto d = samples[i] - query;
+                        return glm::dot(d, d);
+                    };
+                    std::ranges::sort(order,
+                        [&](auto a, auto b)
+                        {
+                            return distance(a) < distance(b) || (distance(a) == distance(b) && a < b);
+                        });
+                    for (std::uint32_t j = 0; j < width; ++j)
+                        rows.push_back({order[j], distance(order[j])});
+                }
+                if (Pages.size() == CorruptPage)
+                    rows.front().Index = 99u;
+                std::vector<std::uint32_t> headers(count * 2u, 0u);
+                for (std::size_t i = 0; i < count; ++i)
+                    headers[2u * i] = width;
+                const auto rowBytes = std::as_bytes(std::span(rows)), headerBytes = std::as_bytes(std::span(headers));
+                auto& data = Pulled[token.Value];
+                data.assign(rowBytes.begin(), rowBytes.end());
+                data.insert(data.end(), headerBytes.begin(), headerBytes.end());
+                EXPECT_EQ(data.size(), bytes);
+                if (Pages.empty())
+                    HeldToken = token.Value;
+                Pages.push_back(count);
+                return token;
+            };
+        }
 
         // Every queued point operation, by its shared label.
         template <class Check>
@@ -203,62 +309,52 @@ TEST_F(QueuedEditorJobContract, AbandonedRunRevalidatesAsCancelledAndDeliversOnc
     });
 }
 
-// A multi-stage (Vulkan) run whose later stage the lane rejects: the rejection is the
-// immediate answer only, and the stage already queued is abandoned (revalidates as
-// Cancelled, its finalizer delivers nothing).
-TEST_F(QueuedEditorJobContract, RejectedLaterStageAbandonsTheQueuedStagesWithoutACallback)
+// ARCH-023: Vulkan construction is a worker step run (its kNN rows paged by the step through a prepared query session,
+// no frame); a composition without the session's step runs refuses it at capture with that reason, queues nothing and
+// calls no sink: there is no frame-paced chain to fall back to. Mutation: restoring the chain queues stages here and
+// answers Pending.
+TEST_F(QueuedEditorJobContract, VulkanConstructionWithoutStepRunsIsRefusedNotChained)
 {
-    const auto commands = Commands();
-    const auto check = [&](const std::string& label, auto apply) {
-        SCOPED_TRACE(label);
-        Queued.clear();
-        AcceptSubmissions = 1u;
-        unsigned calls{0u};
-        const auto result = apply([&](auto) { ++calls; });
-        EXPECT_EQ(result.Status, R::EditorCommandStatus::GeometryProcessingFailed) << result.Message;
-        EXPECT_EQ(result.Message.rfind(label + " job submission was rejected (", 0), 0u) << result.Message;
-        ASSERT_EQ(Queued.size(), 1u) << result.Message;
-        EXPECT_EQ(Queued.front().ValidateBeforeApply(), R::JobApplyValidation::Cancelled);
-        Queued.front().FinalizeUnpublishedOnMainThread();
-        EXPECT_EQ(calls, 0u);
-    };
-    check("Keypoint analysis", [&](auto done) {
-        return R::ApplyEditorKeypointAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-            .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
-            .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1,
-            .Backend = R::KeypointAnalysisBackend::VulkanLBVH}, done); });
-    check("Point construction", [&](auto done) {
-        return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-            .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
-            .Backend = R::PointConstructionBackend::VulkanLBVH}, done); });
+    Queued.clear();
+    unsigned calls{0u};
+    const auto result = R::ApplyEditorPointConstructionCommand(Commands(),
+        {.StableEntityId = Id,
+            .Method = R::PointConstructionMethod::KnnGraph,
+            .Backend = R::PointConstructionBackend::VulkanLBVH,
+            .Positions = Positions(),
+            .KNeighbors = 2},
+        [&](auto)
+        {
+            ++calls;
+        });
+    EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters) << result.Message;
+    EXPECT_EQ(result.Message, "Vulkan construction requires the session's step runs.");
+    EXPECT_TRUE(Queued.empty());
+    EXPECT_EQ(calls, 0u);
 }
 
-// Every later stage of a chain carries the run's first job token as EditorJobIdentity::Run, so a
-// run's cancel reaches it and never another run on the same output.
-TEST_F(QueuedEditorJobContract, LaterStagesOfAChainJoinTheFirstJobsRun)
+// ARCH-023: Vulkan LBVH keypoints are a worker step run (their radius rows paged by the step, no frame); a composition
+// without the session's step runs refuses them with that reason, queues nothing and calls no sink: there is no
+// frame-paced chain to fall back to. Mutation: restoring the chain queues stages here and answers Pending.
+TEST_F(QueuedEditorJobContract, VulkanKeypointsWithoutStepRunsAreRefusedNotChained)
 {
-    const auto commands = Commands();
-    const auto check = [&](const std::string& label, auto apply) {
-        SCOPED_TRACE(label);
-        Queued.clear();
-        Identities.clear();
-        const auto result = apply([](auto) {});
-        ASSERT_EQ(result.Status, R::EditorCommandStatus::Pending) << result.Message;
-        ASSERT_GE(Identities.size(), 2u) << "a chain";
-        EXPECT_FALSE(Identities.front().Run.IsValid()) << "the first job names its run by its own token";
-        for (std::size_t i = 1; i < Identities.size(); ++i)
-            EXPECT_EQ(Identities[i].Run, (R::JobToken{1u, 1u})) << "stage " << i;
-        Queued.front().FinalizeUnpublishedOnMainThread();
-    };
-    check("Keypoint analysis", [&](auto done) {
-        return R::ApplyEditorKeypointAnalysisCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
+    Queued.clear();
+    unsigned calls{0u};
+    const auto result = R::ApplyEditorKeypointAnalysisCommand(Commands(),
+        {.StableEntityId = Id,
+            .Positions = Positions(),
             .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
-            .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1,
-            .Backend = R::KeypointAnalysisBackend::VulkanLBVH}, done); });
-    check("Point construction", [&](auto done) {
-        return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-            .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2,
-            .Backend = R::PointConstructionBackend::VulkanLBVH}, done); });
+            .Score = Ref("saliency", Geometry::PropertyValueKind::Float),
+            .MinimumNeighbors = 1,
+            .Backend = R::KeypointAnalysisBackend::VulkanLBVH},
+        [&](auto)
+        {
+            ++calls;
+        });
+    EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters) << result.Message;
+    EXPECT_NE(result.Message.find("step runs"), std::string::npos) << result.Message;
+    EXPECT_TRUE(Queued.empty());
+    EXPECT_EQ(calls, 0u);
 }
 
 // RUNTIME-317: a queued job reports the backend domain its config requested (at submit) and,
@@ -280,13 +376,22 @@ TEST_F(QueuedEditorJobContract, CpuRunReportsTheRequestedAndResolvedDomainAndIts
     ASSERT_TRUE(Jobs.DrainUntilTerminal());
     ASSERT_TRUE(delivered.has_value());
     ASSERT_TRUE(delivered->Succeeded()) << delivered->Message;
+    // ARCH-023: the CPU run is a one-shot step run: its holder (the run's row, which names the output and takes the
+    // outcome) and the job of its one step, which joins it.
     const auto rows = Context.JobCommands.SnapshotAll();
-    ASSERT_EQ(rows.size(), 1u);
-    EXPECT_EQ(rows[0].State, R::JobState::Published);
-    EXPECT_EQ(rows[0].RequestedJobDomain, R::EditorJobDomain::Cpu);
-    EXPECT_EQ(rows[0].ResolvedJobDomain, R::EditorJobDomain::Cpu);
-    EXPECT_EQ(rows[0].Diagnostic, delivered->Message);
-    EXPECT_FALSE(rows[0].Diagnostic.empty());
+    ASSERT_EQ(rows.size(), 2u);
+    const auto holder = std::ranges::find_if(rows,
+        [&](const auto& row)
+        {
+            return row.Token == submitted[0].Token;
+        });
+    ASSERT_NE(holder, rows.end());
+    EXPECT_EQ(holder->State, R::JobState::Published);
+    EXPECT_EQ(holder->RequestedJobDomain, R::EditorJobDomain::Cpu);
+    EXPECT_EQ(holder->ResolvedJobDomain, R::EditorJobDomain::Cpu);
+    EXPECT_EQ(holder->Diagnostic, delivered->Message);
+    EXPECT_FALSE(holder->Diagnostic.empty());
+    EXPECT_NE(delivered->StepRun, 0u) << "the delivered result names its run";
 }
 
 // A Vulkan request that cannot run on the device falls back to the CPU reference: the job keeps
@@ -314,77 +419,57 @@ TEST_F(QueuedEditorJobContract, GpuRequestThatFellBackReportsTheCpuItRanAndWhy)
     EXPECT_EQ(rows[0].Diagnostic, delivered->BackendFallbackReason);
 }
 
-// RUNTIME-314: Vulkan construction pages its kNN queries through the shared GpuRowPages cursor.
-// The mock answers each framed page with the exact neighbors, so the run publishes the CPU
-// reference graph; it counts consumed pages, reuses one completed batch for every page
-// (GRAPHICS-153) and stops at the first page that names an unknown source slot.
-TEST_F(QueuedEditorJobContract, VulkanConstructionPagesThroughTheSharedRowCursor)
+// ARCH-023 (formerly RUNTIME-314's frame cursor): Vulkan construction is a one-shot step run whose worker step pages
+// its kNN rows through one prepared query session (an Uploads session of one fixed page), with no frame. The mock
+// lane answers each page with the exact neighbours of the rows that page uploaded, so the run publishes the CPU
+// reference graph. Predictions, pages of 3 over 8 samples (width 3): pages {3, 3, 2}; every page uploads the full
+// fixed page of 3 rows (36 B, the last page's unused tail included) and reads back count * (3 + 1) * 8 B; the reported
+// traffic excludes the session's 36 B of initial zero rows; batches count this run's consumed pages; the pages allocate
+// nothing after the start; a page naming an unknown source slot stops the run with the existing decoder's message
+// after pages {3, 3}, only the consumed first page counted. Mutations: decoding or consuming the whole fixed page (the
+// last partial page fails the layout check); counting Session->Pages() (2 when corrupt); reporting the session's
+// totals (+36 B); the frame pager (no frame is recorded here: nothing is delivered).
+TEST_F(QueuedEditorJobContract, VulkanConstructionPagesItsQuerySessionOnTheWorker)
 {
-    struct PackedNeighbor { std::uint32_t Index; float SquaredDistance; };
     constexpr std::uint32_t width = 3u; // two neighbors plus the query sample itself
-    const auto samples = std::as_const(Scene.Raw().get<GS::Vertices>(Entity).Properties).Get<glm::vec3>("samples").Vector();
-    R::PointConstructionConfig config{.StableEntityId = Id, .Positions = Positions(),
-        .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2};
+    R::PointConstructionConfig config{.StableEntityId = Id,
+        .Method = R::PointConstructionMethod::KnnGraph,
+        .Positions = Positions(),
+        .KNeighbors = 2};
     config.GpuQueryBatchSize = 3u;
-    auto reference = config;
-    reference.Backend = R::PointConstructionBackend::CpuReference;
     auto synchronous = Context;
     synchronous.JobCommands = {};
-    const auto expected = R::ApplyEditorPointConstructionCommand(R::BindEditorProcessingCommands(synchronous), reference);
+    const auto expected = R::ApplyEditorPointConstructionCommand(R::BindEditorProcessingCommands(synchronous), config);
     ASSERT_TRUE(expected.Succeeded()) << expected.Message;
     config.Backend = R::PointConstructionBackend::VulkanLBVH;
     Jobs.Attach(Context);
+    UseConstructionLane(width);
     for (const bool corruptSecondPage : {false, true})
     {
         SCOPED_TRACE(corruptSecondPage);
-        std::size_t nextQuery = 0u, downloads = 0u;
-        std::vector<std::size_t> pages;
-        Device.TransferQueue.BufferDownload = [&](auto, std::uint64_t bytes, auto, Extrinsic::RHI::ReadbackSink sink) {
-            if (downloads++ % 2u == 0u) // the neighbor rows precede the headers of a page
-            {
-                const auto count = bytes / (width * sizeof(PackedNeighbor));
-                std::vector<PackedNeighbor> rows;
-                for (std::size_t q = nextQuery; q < nextQuery + count; ++q)
-                {
-                    std::vector<std::uint32_t> order(samples.size());
-                    for (std::uint32_t i = 0; i < order.size(); ++i) order[i] = i;
-                    const auto distance = [&](std::uint32_t i) { const auto d = samples[i] - samples[q]; return glm::dot(d, d); };
-                    std::ranges::sort(order, [&](auto a, auto b) { return distance(a) < distance(b) || (distance(a) == distance(b) && a < b); });
-                    for (std::uint32_t j = 0; j < width; ++j) rows.push_back({order[j], distance(order[j])});
-                }
-                if (corruptSecondPage && pages.size() == 1u) rows.front().Index = 99u;
-                sink.Deliver(std::as_bytes(std::span(rows)));
-            }
-            else
-            {
-                const auto count = bytes / (2u * sizeof(std::uint32_t));
-                std::vector<std::uint32_t> headers(count * 2u, 0u);
-                for (std::size_t i = 0; i < count; ++i) headers[2u * i] = width;
-                sink.Deliver(std::as_bytes(std::span(headers)));
-                nextQuery += count;
-                pages.push_back(count);
-            }
-            return Extrinsic::RHI::ReadbackToken{downloads};
-        };
-        const auto allocations = Cache.Stats().GpuBatchAllocations;
+        {
+            std::scoped_lock lock{Gpu};
+            Pages.clear();
+            CorruptPage = corruptSecondPage ? 1u : ~std::size_t{0};
+        }
         const std::size_t earlierJobs = Context.JobCommands.SnapshotAll().size();
         std::optional<R::EditorPointConstructionResult> delivered;
         const auto queued = R::ApplyEditorPointConstructionCommand(Commands(), config, [&](auto result) { delivered = result; });
         ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
-        for (int frame = 0; frame < 200 && !delivered; ++frame)
-        {
-            Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
-            (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
-            Device.GlobalFrameNumber += Device.FramesInFlight + 1u;
+        EXPECT_NE(queued.StepRun, 0u) << "the batch is a step run";
+        // The session was prepared before the start: whatever the pages need exists already.
+        const auto allocations = Cache.Stats().GpuBatchAllocations, scratch = Cache.Stats().ScratchMisses;
+        const auto buffers = Device.CreateBufferCount;
+        for (int drain = 0; drain < 400 && !delivered; ++drain)
             (void)Jobs.DrainUntilTerminal(std::chrono::milliseconds{2});
-        }
         ASSERT_TRUE(delivered);
+        ASSERT_TRUE(Jobs.DrainUntilTerminal()); // the run retired: the next one may hold the output
         EXPECT_EQ(delivered->ActualBackend, "vulkan_lbvh");
-        // RUNTIME-317: every stage of the run (scale, Vulkan support, build) requested the GPU and,
-        // once it produced its result, resolved to it; a failed run resolved to nothing. The run's
-        // terminal message is the diagnostic either way.
+        EXPECT_EQ(delivered->StepRun, queued.StepRun);
+        // RUNTIME-317: every job of the run (its holder and its step) requested the GPU and, once it produced its
+        // result, resolved to it; a failed run resolved to nothing. The run's terminal message is the diagnostic.
         const auto rows = Context.JobCommands.SnapshotAll();
-        ASSERT_GT(rows.size(), earlierJobs + 1u) << "a multi-stage run";
+        ASSERT_GT(rows.size(), earlierJobs);
         for (std::size_t i = earlierJobs; i < rows.size(); ++i)
         {
             SCOPED_TRACE(rows[i].Name);
@@ -393,50 +478,122 @@ TEST_F(QueuedEditorJobContract, VulkanConstructionPagesThroughTheSharedRowCursor
                       corruptSecondPage ? std::nullopt : std::optional{R::EditorJobDomain::GpuCompute});
             EXPECT_EQ(rows[i].Diagnostic, delivered->Message);
         }
+        const auto pages = [&]
+        {
+            std::scoped_lock lock{Gpu};
+            return Pages;
+        }();
         if (corruptSecondPage)
         {
             EXPECT_EQ(delivered->Status, R::EditorCommandStatus::GeometryProcessingFailed);
             EXPECT_EQ(delivered->Message, "Vulkan construction returned an unknown source slot.");
             EXPECT_EQ(delivered->GpuQueryBatches, 1u) << "only the consumed first page counts";
             EXPECT_EQ(pages, (std::vector<std::size_t>{3u, 3u}));
+            EXPECT_EQ(delivered->CpuStageUploadBytes, 2u * 3u * 12u);
+            EXPECT_EQ(delivered->CpuStageReadbackBytes, 6u * (width + 1u) * 8u);
             continue;
         }
         ASSERT_TRUE(delivered->Succeeded()) << delivered->Message;
         EXPECT_EQ(pages, (std::vector<std::size_t>{3u, 3u, 2u}));
         EXPECT_EQ(delivered->GpuQueryBatches, 3u);
-        EXPECT_EQ(Cache.Stats().GpuBatchAllocations - allocations, 1u) << "every page reuses the completed batch";
+        EXPECT_EQ(delivered->CpuStageUploadBytes, 3u * 3u * 12u)
+            << "every page uploads the full fixed page; the session's initial rows are not counted";
+        EXPECT_EQ(delivered->CpuStageReadbackBytes, 8u * (width + 1u) * 8u);
+        EXPECT_EQ(Cache.Stats().GpuBatchAllocations, allocations) << "the pages allocate no query batch";
+        EXPECT_EQ(Cache.Stats().ScratchMisses, scratch) << "nor method scratch";
+        EXPECT_EQ(Device.CreateBufferCount, buffers) << "nor any device buffer";
         EXPECT_EQ(delivered->OutputVertexCount, expected.OutputVertexCount);
         EXPECT_EQ(delivered->OutputEdgeCount, expected.OutputEdgeCount);
     }
 }
 
-// A page of Hoppe grid queries outside the shared LBVH coordinate range is refused by the queue
-// callback before any submission: the cursor reports its diagnostic and no page is consumed.
+// ARCH-023: a discard while a page is on the device stops the run at the next page boundary. The first page's wait is
+// held, the run discarded and its owner pump delivers Abort, then that page completes. Predictions: one page submitted and one
+// mapped upload (the boundary stops before the second page's upload), the run Discarded, the shared cancelled result
+// at its settled end, no new entity. Mutation: without the run's Abort signal all three pages are uploaded and
+// submitted, despite the discard; the result still must not publish.
+TEST_F(QueuedEditorJobContract, VulkanConstructionDiscardStopsAtThePageBoundary)
+{
+    R::PointConstructionConfig config{.StableEntityId = Id,
+        .Method = R::PointConstructionMethod::KnnGraph,
+        .Backend = R::PointConstructionBackend::VulkanLBVH,
+        .Positions = Positions(),
+        .KNeighbors = 2};
+    config.GpuQueryBatchSize = 3u;
+    config.Execution.Start = R::StepRunStart::Run; // computes at once, then waits for Accept
+    Jobs.Attach(Context);
+    UseConstructionLane(3u);
+    HoldFirstPage = true; // TearDown releases it whatever fails
+    const auto uploads = MappedUploads();
+    std::optional<R::EditorPointConstructionResult> delivered;
+    const auto started = R::StartEditorPointConstructionRun(Commands(),
+        config,
+        [&](auto result)
+        {
+            delivered = result;
+        });
+    ASSERT_EQ(started.Status, R::EditorCommandStatus::Pending) << started.Message;
+    // Only the lane's completions drain here: a pump waits for the workers, and this one is held.
+    for (int i = 0; i < 5000 && PageCount() == 0u; ++i)
+    {
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    const auto waiting = Jobs.StepRuns().Observe(started.StepRun);
+    EXPECT_EQ(PageCount(), 1u) << "start=" << started.Message
+                               << "; observation=" << (waiting ? waiting->Diagnostic : "missing")
+                               << "; delivered=" << (delivered ? delivered->Message : "pending");
+    std::string refusal;
+    EXPECT_TRUE(Jobs.StepRuns().Control(started.StepRun, R::StepRunAction::Discard, 1u, refusal)) << refusal;
+    (void)Jobs.Jobs().DrainCompletions(Jobs.Events()); // the owner pump delivers Discard before the page returns
+    ReleaseFirstPage = true;
+    for (int drain = 0; drain < 400 && !delivered; ++drain)
+        (void)Jobs.DrainUntilTerminal(std::chrono::milliseconds{2});
+    ASSERT_TRUE(delivered);
+    ASSERT_TRUE(Jobs.DrainUntilTerminal());
+    EXPECT_EQ(delivered->Status, R::EditorCommandStatus::StaleEntity) << delivered->Message;
+    EXPECT_EQ(delivered->Message, "Point construction was cancelled or its source became stale; nothing was applied.");
+    EXPECT_EQ(delivered->OutputEntityId, 0u);
+    EXPECT_EQ(PageCount(), 1u);
+    EXPECT_EQ(MappedUploads() - uploads, 1u) << "the page boundary stopped before the second page's upload";
+    const auto run = Jobs.StepRuns().Observe(started.StepRun);
+    ASSERT_TRUE(run);
+    EXPECT_EQ(run->Phase, R::StepRunPhase::Discarded);
+    EXPECT_EQ(Scene.Raw().view<GS::Vertices>().size(), 1u) << "no generated entity";
+}
+
+// A page of Hoppe grid queries outside the shared LBVH coordinate range is refused on the worker before its upload:
+// the session's preparation is the only submission, the run reports the existing per-page message (UploadQueries
+// would word its own refusal differently) and no page is consumed. Mutation: dropping the per-page GpuPoint check
+// delivers UploadQueries' "GPU query rows must keep the session's count and be finite within +/-1e18." instead.
 TEST_F(QueuedEditorJobContract, VulkanConstructionRefusesGridQueriesOutsideTheCoordinateRange)
 {
     auto samples = Scene.Raw().get<GS::Vertices>(Entity).Properties.Get<glm::vec3>("samples");
-    for (auto& sample : samples.Vector()) sample *= 9.5e17f; // padding puts the far grid corner past 1e18
-    std::size_t downloads = 0u;
-    Device.TransferQueue.BufferDownload = [&](auto, auto, auto, auto) { ++downloads; return Extrinsic::RHI::ReadbackToken{}; };
+    for (auto& sample : samples.Vector())
+        sample *= 9.5e17f; // padding puts the far grid corner past 1e18
     R::PointConstructionConfig config{.StableEntityId = Id, .Method = R::PointConstructionMethod::Hoppe,
         .Backend = R::PointConstructionBackend::VulkanLBVH, .Positions = Positions(), .Normals = Normals(),
         .EstimateNormals = false, .Resolution = 4u};
     Jobs.Attach(Context);
+    UseConstructionLane(8u);
     std::optional<R::EditorPointConstructionResult> delivered;
     const auto queued = R::ApplyEditorPointConstructionCommand(Commands(), config, [&](auto result) { delivered = result; });
     ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
-    for (int frame = 0; frame < 50 && !delivered; ++frame)
-    {
-        Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
-        (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
-        Device.GlobalFrameNumber += Device.FramesInFlight + 1u;
+    EXPECT_EQ(
+        [&]
+        {
+            std::scoped_lock lock{Gpu};
+            return LaneTokens;
+        }(),
+        1u)
+        << "the session's preparation";
+    for (int drain = 0; drain < 400 && !delivered; ++drain)
         (void)Jobs.DrainUntilTerminal(std::chrono::milliseconds{2});
-    }
     ASSERT_TRUE(delivered);
     EXPECT_EQ(delivered->Status, R::EditorCommandStatus::GeometryProcessingFailed);
     EXPECT_EQ(delivered->Message, "Vulkan grid queries require normal-or-zero components within 1e18.");
     EXPECT_EQ(delivered->GpuQueryBatches, 0u);
-    EXPECT_EQ(downloads, 0u);
+    EXPECT_EQ(PageCount(), 0u) << "no page submitted";
 }
 
 // Drift guard: a queued editor operation reuses the shared helper instead of hand-writing the
@@ -458,27 +615,24 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
                                                      "Runtime.GeometryProcessingOperations.JobFailure.hpp"};
     // Files that own a job lifecycle the helper does not cover (keep this list short; a new
     // queued operation belongs on `QueuedJobDelivery`).
-    constexpr std::array<std::string_view, 7> handWritten{
+    constexpr std::array<std::string_view, 6> handWritten{
         // The resident keypoint run guards the sink of the scalar publication it drives
         // (the GPU Run/Accept transactions themselves are on Runtime.GpuTransactionLifecycle).
         "Runtime.PointAnalysisOperations.Keypoints.cpp",
         // Mesh-family jobs that keep their result in a typed state struct with the shared
         // `BuildUnpublishedEditorJobFailure` wording and `ActiveOutputJobRefusal`.
         "Runtime.PointSetOperations.Processing.cpp",
-        "Runtime.RegistrationOperations.Processing.cpp",
         "Runtime.ParameterizationOperations.Processing.cpp",
         "Runtime.MeshFieldOperations.Curvature.cpp",
         "Runtime.MeshTopologyOperations.Topology.cpp",
         // A run object with interactive steps (Busy flag, optional completion).
         "Runtime.RegistrationOperations.CoherentPointDrift.cpp",
     };
-    constexpr std::string_view deliverOnceAllowed = "Runtime.RegistrationOperations.CoherentPointDrift.cpp";
     // RUNTIME-311: Accept front readbacks belong to the shared GPU transaction lifecycle, which
     // defines the readback primitive its header declares.
     constexpr std::array<std::string_view, 2> frontReadbackOwners{"Runtime.GpuTransactionLifecycle.cpp",
                                                                   "Runtime.GeometryProcessingOperations.GpuFront.hpp"};
     std::size_t scanned = 0, matched = 0;
-    bool deliverOnceMatched = false;
     for (const auto& entry : fs::directory_iterator(root))
     {
         const auto name = entry.path().filename().string();
@@ -509,10 +663,7 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
                 EXPECT_TRUE(device) << "hand-written job submission rejection near: " << text.substr(at >= 40 ? at - 40 : 0, 60);
             }
         const bool deliverOnce = text.find("make_shared<bool>") != std::string::npos;
-        if (name == deliverOnceAllowed)
-            deliverOnceMatched = deliverOnce;
-        else
-            EXPECT_FALSE(deliverOnce) << "deliver-once state belongs to MeshSupport::QueuedJobDelivery";
+        EXPECT_FALSE(deliverOnce) << "deliver-once state belongs to MeshSupport::QueuedJobDelivery";
         // A transaction on the shared lifecycle guards its typed sink; the lifecycle finalizes.
         const bool onLifecycle = text.find("GpuTransactionCore") != std::string::npos;
         const bool handWrites = !onLifecycle && text.find("GuardEditorProcessingResult(") != std::string::npos &&
@@ -530,12 +681,12 @@ TEST(QueuedEditorJobDriftGuard, OperationsUseTheSharedQueuedJobHelper)
     }
     EXPECT_GT(scanned, 20u);
     EXPECT_EQ(matched, handWritten.size()) << "an allowlisted file is missing";
-    EXPECT_TRUE(deliverOnceMatched) << "stale allowance: " << deliverOnceAllowed << " no longer keeps its own deliver-once flag";
 }
 
 // RUNTIME-314 drift guard: runtime sources reuse `Geometry::Validation::IsFinite` for glm vectors,
-// the canonical `GeometrySources::PropertyNames::kPosition`, the shared GPU row cursor and the
-// undoable scalar publisher instead of re-writing them locally.
+// the canonical `GeometrySources::PropertyNames::kPosition` and the undoable scalar publisher
+// instead of re-writing them locally. (GPU neighbour queries: the source rule
+// RuntimeReuseDriftGuard.GpuNeighbourQueriesUseWorkerQuerySessions in tools/repo/source_rules.py.)
 TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
 {
     namespace fs = std::filesystem;
@@ -600,13 +751,6 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
     const std::regex handWrittenFinite{
         R"((?:std::isfinite|\bIsFinite)\(([\w.\[\]>-]+)\.x\)\s*(?:&&|\|\|)\s*!?\s*(?:std::isfinite|\bIsFinite)\(\1\.y\))"};
     const std::regex executesHistory{R"(CommandHistory\s*->\s*Execute\s*\()"};
-    // Paged kNN/radius queries advance through GpuRowPages/AdvanceGpuRowPages; these files may
-    // queue them without it.
-    constexpr std::array<std::string_view, 3> allowedUnpagedQueries{
-        "GeometryIntegration/Runtime.SpatialIndexCache.cppm", // the query API itself
-        "GeometryIntegration/Runtime.SpatialIndexCache.cpp",
-        "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp", // own cursor, see RUNTIME-314 note
-    };
     // Undoable scalar outputs publish through PublishPointScalarField; these files may prepare
     // scalar snapshots and execute history themselves.
     constexpr std::array<std::string_view, 4> allowedScalarPublishers{
@@ -618,7 +762,6 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
     std::size_t scanned = 0;
     std::size_t finiteMatched = 0;
     std::size_t positionMatched = 0;
-    std::size_t unpagedMatched = 0;
     std::size_t publisherMatched = 0;
     for (const auto& entry : fs::recursive_directory_iterator(root))
     {
@@ -644,16 +787,6 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
         }
         else
             EXPECT_FALSE(finite) << "use Geometry::Validation::IsFinite for glm vectors";
-        const bool unpaged = (text.find("QueueGpuKNearest(") != std::string::npos ||
-                              text.find("QueueGpuRadius(") != std::string::npos) &&
-                             text.find("AdvanceGpuRowPages(") == std::string::npos;
-        if (std::find(allowedUnpagedQueries.begin(), allowedUnpagedQueries.end(), name) != allowedUnpagedQueries.end())
-        {
-            EXPECT_TRUE(unpaged) << "stale allowlist entry: the file no longer queues unpaged queries; remove it";
-            ++unpagedMatched;
-        }
-        else
-            EXPECT_FALSE(unpaged) << "page GPU kNN/radius queries through GpuRowPages/AdvanceGpuRowPages";
         const bool publishes = text.find("PrepareGeometryScalarProperty(") != std::string::npos &&
             std::regex_search(text, executesHistory);
         if (std::find(allowedScalarPublishers.begin(), allowedScalarPublishers.end(), name) != allowedScalarPublishers.end())
@@ -665,7 +798,6 @@ TEST(RuntimeReuseDriftGuard, RuntimeUsesTheSharedFiniteCheckAndPositionName)
             EXPECT_FALSE(publishes) << "publish undoable scalar outputs through PublishPointScalarField";
     }
     EXPECT_GT(scanned, 100u);
-    EXPECT_EQ(unpagedMatched, allowedUnpagedQueries.size()) << "an allowlisted unpaged-query file is missing";
     EXPECT_EQ(publisherMatched, allowedScalarPublishers.size()) << "an allowlisted scalar publisher is missing";
     EXPECT_EQ(positionMatched, allowedPositionLiterals.size()) << "an allowlisted position-literal file is missing";
     EXPECT_EQ(finiteMatched, allowedFiniteChecks.size()) << "an allowlisted finite-check file is missing";

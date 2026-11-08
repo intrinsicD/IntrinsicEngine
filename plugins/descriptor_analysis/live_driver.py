@@ -45,7 +45,7 @@ GOLDEN = json.loads((REPO / "tests/data/descriptor_golden_cloud.json").read_text
 class Session(bilateral.Session):
     def configure(self, entity: int, positions: str, normals: str, prefix: str, backend: str, **values) -> bool:
         payload = {"entity": entity, "backend": backend, "feature_radius": 0, "max_neighbors": 0,
-                   "gpu_query_batch_size": 4096, "gpu_radius_capacity": 256,
+                   "gpu_query_batch_size": 4096, "gpu_radius_capacity": 256, "auto_accept": "never", "start": "run",
                    "positions": {"domain": DOMAIN, "name": positions, "kind": "vec3"},
                    "normals": {"domain": DOMAIN, "name": normals, "kind": "vec3"},
                    "outputs": outputs(prefix)} | values
@@ -81,7 +81,7 @@ def steps(agent: bilateral.Agent, checks: s1.Checks, out: Path, build: Path, met
     checks.check("startup: the descriptor analysis plugin is loaded beside the bilateral filter",
                  {"descriptor_analysis", "bilateral_filter"} <= set(loaded), listed)
     names = {tool["name"] for tool in agent.request("tools/list", {}).get("result", {}).get("tools", [])}
-    checks.check("startup: its tools are registered", {"descriptor_analysis", "descriptor_analysis_preview"} <= names)
+    checks.check("startup: its tools are registered", {"descriptor_analysis", "descriptor_analysis_start", "descriptor_analysis_preview"} <= names)
     ok, sections, _ = session.call("config_sections")
     checks.check("startup: its section is registered",
                  ok and any(s.get("section") == SECTION for s in (s1.find(sections, "sections") or [])))

@@ -4,12 +4,14 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -27,27 +29,29 @@ import Geometry.Validation;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
-import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.PointSamplingGpu;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.PointCloud.Consolidation;
+import Geometry.KDTree;
 import Geometry.PointCloud.Kernels;
 import Geometry.SpatialQueries;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Utils;
 import Geometry.PointSampling;
@@ -76,6 +80,132 @@ namespace Extrinsic::Runtime
         };
         // Only the currently requested position and normal properties are retained.
         std::array<std::shared_ptr<Entry>, 2> Entries{};
+    };
+
+    // A CPU-made live preview of an in-place output of the same cardinality: the positions' ring front, which the
+    // renderer draws (the scene and the history do not change). Without a residency and an operational device, or
+    // for another output, nothing is shown.
+    struct ConsolidationProjectionPreview
+    {
+        Graphics::GpuPropertyResidency* Residency{};
+        RHI::IDevice* Device{};
+        Graphics::GpuPropertyKey Key{};
+        std::uint32_t Count{};
+        std::uint64_t Ring{}; // the ring this run's previews made; 0: none
+
+        [[nodiscard]] bool Possible() const noexcept
+        {
+            return Residency != nullptr && Device != nullptr;
+        }
+        StepRunShow Show(const std::span<const float> values)
+        {
+            if (!Possible() || values.size() != std::size_t{Count} * 3u || !Device->IsOperational())
+                return StepRunShow::Never;
+            if (Residency->HasRing(Key) && Residency->RingGeneration(Key) != Ring)
+                return StepRunShow::Later; // another result holds these positions' ring
+            const auto layout = MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, Count);
+            if (!layout)
+                return StepRunShow::Never;
+            if (!UploadGpuPropertyFront(*Residency, *Device, Key, *layout, 2u, std::as_bytes(values)))
+                return StepRunShow::Later; // no free slot this frame
+            Ring = Residency->RingGeneration(Key);
+            return StepRunShow::Shown;
+        }
+        void Discard()
+        {
+            if (const auto ring = std::exchange(Ring, 0u); ring != 0u && Residency != nullptr)
+                (void)Residency->Discard(Key, ring);
+        }
+    };
+
+    // ARCH-023: a CPU or hybrid consolidation run, the owner of its NeighborhoodProjection. One step is one complete
+    // projection iteration (attraction, repulsion and, for the anisotropic strategies, normal refinement); Init (the
+    // projection with its initial samples, the source density and the L2 initialization) is not a step. CPU
+    // backends step on a worker with rows of CPU indices; the hybrid backend steps on a worker too, its rows Vulkan
+    // LBVH radius pages of query sessions its Init prepared (ARCH-023: recorded, submitted and read back as arrays on
+    // that worker, no frame or main-thread queue). The snapshot owns the source rows the projection reads.
+    struct PointCloudConsolidationProjectionRun
+    {
+        struct Rows
+        {
+            std::vector<std::uint32_t> Offsets{0}, Indices{};
+            std::size_t Next{};
+            [[nodiscard]] Geometry::PointNeighborhoods View() const
+            {
+                return {Offsets, Indices};
+            }
+            void Restart()
+            {
+                Offsets.assign(1, 0u);
+                Indices.clear();
+                Next = 0;
+            }
+        };
+
+        PointCloudConsolidationSnapshot Snapshot{};
+        std::unique_ptr<Geometry::PointCloud::Consolidation::NeighborhoodProjection> Projection{};
+        PointCloudConsolidationBackend Backend{PointCloudConsolidationBackend::CpuReference};
+        Geometry::KDTree SourceTree{}; // the CPU reference's source index (the cached LOP backend's is the LBVH)
+        Rows Source{}, Projected{};
+        // Written by a step (worker), read on the main thread once that step is done; Restart sets Reinitialize.
+        bool Reinitialize{}; // Init again before the next step
+        Geometry::PointCloud::Consolidation::Status RowFailure{Geometry::PointCloud::Consolidation::Status::Success};
+        // Hybrid (ARCH-023): the run's query sessions, prepared by its Init on the owner and paged by its steps on the
+        // worker (the source density's fixed queries; the moving samples against the source and against themselves),
+        // the abort a discard sets, and a failure of a page or of the source (written by a failing step, read once it
+        // ended). The traffic is the sessions' own counters.
+        std::shared_ptr<SpatialQuerySession> DensityRows{}, AttractionRows{}, MovingRows{};
+        std::atomic<bool> Abort{false};
+        bool Abandoned{};
+        std::optional<PointCloudConsolidationResult> Failure{};
+        [[nodiscard]] std::uint64_t QueryBatches() const noexcept
+        {
+            std::uint64_t pages = 0u;
+            for (const auto* session : {DensityRows.get(), AttractionRows.get(), MovingRows.get()})
+                pages += session ? session->Pages() : 0u;
+            return pages;
+        }
+        [[nodiscard]] std::uint64_t QueryUploadBytes() const noexcept
+        {
+            std::uint64_t bytes = 0u;
+            for (const auto* session : {DensityRows.get(), AttractionRows.get(), MovingRows.get()})
+                bytes += session ? session->UploadBytes() : 0u;
+            return bytes;
+        }
+        [[nodiscard]] std::uint64_t QueryReadbackBytes() const noexcept
+        {
+            std::uint64_t bytes = 0u;
+            for (const auto* session : {DensityRows.get(), AttractionRows.get(), MovingRows.get()})
+                bytes += session ? session->ReadbackBytes() : 0u;
+            return bytes;
+        }
+        // Main thread.
+        PointCloudConsolidationResult Prepared{}; // the preparation's completion, the result's template
+        std::uint64_t Run{};
+        StepRunDriver Driver{};
+        bool Delivered{}; // its one completion was published
+        ConsolidationProjectionPreview Preview{};
+    };
+
+    // The runs of this module's projection paths by correlation, for their observation and shutdown.
+    struct PointCloudConsolidationRunTable
+    {
+        std::map<std::uint64_t, std::shared_ptr<PointCloudConsolidationProjectionRun>> Runs{};
+    };
+
+    // The module's services a run uses after its start (main thread). They outlive every run: the host drains the
+    // jobs first and the module's shutdown abandons the runs.
+    struct PointCloudConsolidationRunContext
+    {
+        JobService* Jobs{};
+        WorldRegistry* Worlds{};
+        KernelEventBus* Events{};
+        EditorCommandHistory* History{};
+        PointCloudConsolidationModuleStats* Stats{};
+        SpatialIndexCache* Cache{};
+        RHI::IDevice* Device{};
+        StepRunsService* Steps{};
+        PointCloudConsolidationRunTable* Runs{};
     };
 
     namespace
@@ -218,9 +348,12 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
 
             if (config.Backend == PointCloudConsolidationBackend::VulkanLBVH &&
-                (config.MaxIterations > 64 || config.GpuQueryBatchSize == 0 || config.GpuQueryBatchSize > 16384 ||
-                 config.GpuRadiusCapacity == 0 || config.GpuRadiusCapacity > 1024)) return std::nullopt;
-            if (config.GpuPreviewInterval == 0u || config.GpuPreviewInterval > 1000000u) return std::nullopt;
+                (config.Execution.IterationCap > 64 || config.GpuQueryBatchSize == 0 ||
+                    config.GpuQueryBatchSize > 16384 || config.GpuRadiusCapacity == 0 ||
+                    config.GpuRadiusCapacity > 1024))
+                return std::nullopt;
+            if (!StepRunExecutionRefusal(config.Execution, kMaxPointCloudConsolidationIterations).empty())
+                return std::nullopt;
             double resolvedRadius = 1.0;
             switch (config.SupportRadiusMode)
             {
@@ -232,41 +365,24 @@ namespace Extrinsic::Runtime
             default: return std::nullopt;
             }
 
-            if (!std::isfinite(config.SupportRadius) ||
-                config.SupportRadius <= 0.0 ||
-                !std::isfinite(resolvedRadius) ||
-                resolvedRadius <= 0.0 ||
-                config.MaxSupportNeighbors == 0u ||
-                config.MaxSupportNeighbors > kMaximumSupportNeighbors ||
-                config.MaxPredictedContributions == 0u ||
-                config.MaxPredictedContributions >
-                    kMaximumPredictedContributions ||
-                !std::isfinite(config.RepulsionWeight) ||
-                config.RepulsionWeight < 0.0 ||
-                config.RepulsionWeight >= 0.5 ||
-                config.MaxIterations == 0u ||
-                config.MaxIterations > 4096u ||
-                !std::isfinite(config.ConvergenceTolerance) ||
-                config.ConvergenceTolerance < 0.0 ||
-                config.TargetPointCount == 1u ||
-                config.TargetPointCount > kMaximumPointCount ||
-                !std::isfinite(config.NormalAngleRadians) ||
-                config.NormalAngleRadians <= 0.0 ||
-                config.NormalAngleRadians >= 3.14159265358979323846 ||
+            if (!std::isfinite(config.SupportRadius) || config.SupportRadius <= 0.0 || !std::isfinite(resolvedRadius) ||
+                resolvedRadius <= 0.0 || config.MaxSupportNeighbors == 0u ||
+                config.MaxSupportNeighbors > kMaximumSupportNeighbors || config.MaxPredictedContributions == 0u ||
+                config.MaxPredictedContributions > kMaximumPredictedContributions ||
+                !std::isfinite(config.RepulsionWeight) || config.RepulsionWeight < 0.0 ||
+                config.RepulsionWeight >= 0.5 || !std::isfinite(config.ConvergenceTolerance) ||
+                config.ConvergenceTolerance < 0.0 || config.TargetPointCount == 1u ||
+                config.TargetPointCount > kMaximumPointCount || !std::isfinite(config.NormalAngleRadians) ||
+                config.NormalAngleRadians <= 0.0 || config.NormalAngleRadians >= 3.14159265358979323846 ||
                 config.NormalRefinementRounds == 0u ||
                 ((config.Strategy == PointCloudConsolidationStrategy::Ear ||
-                  (config.Strategy == PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic)) &&
-                 config.NormalRefinementRounds > config.MaxIterations) ||
-                config.ClopMixtureComponentCount == 0u ||
-                config.ClopMixtureComponentCount > kMaximumPointCount ||
-                config.ClopMixtureMaxIterations == 0u ||
-                config.ClopMixtureMaxIterations > 4096u ||
-                !std::isfinite(config.ClopMixtureRelativeTolerance) ||
-                config.ClopMixtureRelativeTolerance < 0.0 ||
-                config.ClopMixtureRelativeTolerance > 1.0 ||
-                !std::isfinite(config.ClopCovarianceFloor) ||
-                config.ClopCovarianceFloor <= 0.0 ||
-                !std::isfinite(config.EarEdgeSensitivity) ||
+                     (config.Strategy == PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic)) &&
+                    config.NormalRefinementRounds > config.Execution.IterationCap) ||
+                config.ClopMixtureComponentCount == 0u || config.ClopMixtureComponentCount > kMaximumPointCount ||
+                config.ClopMixtureMaxIterations == 0u || config.ClopMixtureMaxIterations > 4096u ||
+                !std::isfinite(config.ClopMixtureRelativeTolerance) || config.ClopMixtureRelativeTolerance < 0.0 ||
+                config.ClopMixtureRelativeTolerance > 1.0 || !std::isfinite(config.ClopCovarianceFloor) ||
+                config.ClopCovarianceFloor <= 0.0 || !std::isfinite(config.EarEdgeSensitivity) ||
                 config.EarEdgeSensitivity <= 0.0)
             {
                 return std::nullopt;
@@ -280,7 +396,7 @@ namespace Extrinsic::Runtime
             Consolidation::Params params{
                 .SupportRadius = resolvedRadius,
                 .RepulsionWeight = config.RepulsionWeight,
-                .MaxIterations = config.MaxIterations,
+                .MaxIterations = config.Execution.IterationCap,
                 .ConvergenceTolerance = config.ConvergenceTolerance,
                 .TargetPointCount = config.TargetPointCount,
                 .Seed = config.Seed,
@@ -539,14 +655,11 @@ namespace Extrinsic::Runtime
                 ? input
                 : snapshot.Params.TargetPointCount;
             const std::uint64_t projected = std::min(input, requested);
-            const std::uint64_t iterations =
-                snapshot.Request.Config.Strategy ==
-                        PointCloudConsolidationStrategy::Ear ||
-                    (snapshot.Request.Config.Strategy ==
-                         PointCloudConsolidationStrategy::Wlop &&
-                     snapshot.Request.Config.WlopAnisotropic)
+            const std::uint64_t iterations = snapshot.Request.Config.Strategy == PointCloudConsolidationStrategy::Ear ||
+                    (snapshot.Request.Config.Strategy == PointCloudConsolidationStrategy::Wlop &&
+                        snapshot.Request.Config.WlopAnisotropic)
                 ? snapshot.Request.Config.NormalRefinementRounds
-                : snapshot.Request.Config.MaxIterations;
+                : snapshot.Request.Config.Execution.IterationCap;
 
             std::uint64_t queries = projected;
             std::uint64_t fixed = 0u;
@@ -1338,6 +1451,172 @@ namespace Extrinsic::Runtime
                 consolidated.Diagnostics.InsertedPointCount);
         }
 
+        using ProjectionRun = PointCloudConsolidationProjectionRun;
+
+        // Rows within the conservative support radius, ascending: the reference's own candidate sets (strict
+        // support is the projection's filter), of the CPU reference's KD-tree or of an LBVH.
+        [[nodiscard]] bool CollectCpuRows(const Geometry::KDTree* tree,
+            const Geometry::PointLBVH::Index* lbvh,
+            const std::span<const glm::vec3> queries,
+            const float radius,
+            ProjectionRun::Rows& rows)
+        {
+            rows.Restart();
+            std::vector<std::uint32_t> row;
+            for (const glm::vec3 query : queries)
+            {
+                row.clear();
+                if (tree != nullptr)
+                {
+                    if (!tree->QueryRadius(query, radius, row).has_value())
+                        return false;
+                }
+                else
+                {
+                    if (!Geometry::PointLBVH::ValidPoint(query))
+                        return false;
+                    const auto hits = lbvh->Radius(query, radius, static_cast<std::uint32_t>(lbvh->Points().size()));
+                    if (hits.Overflowed())
+                        return false;
+                    for (const auto hit : hits.Neighbors)
+                        row.push_back(hit.Index);
+                }
+                std::sort(row.begin(), row.end());
+                if (row.size() > std::numeric_limits<std::uint32_t>::max() - rows.Indices.size())
+                    return false;
+                rows.Indices.insert(rows.Indices.end(), row.begin(), row.end());
+                rows.Offsets.push_back(static_cast<std::uint32_t>(rows.Indices.size()));
+            }
+            return true;
+        }
+
+        // One Advance with CPU rows (SourceDensity, Initialize or one iteration); false when a query failed. The
+        // moving samples' index is rebuilt for every iteration, as the reference does.
+        [[nodiscard]] bool AdvanceCpuProjection(ProjectionRun& w)
+        {
+            auto& projection = *w.Projection;
+            const auto radius = Geometry::PointCloud::Kernels::ConservativeQueryRadius(w.Snapshot.Params.SupportRadius);
+            if (!radius)
+                return false;
+            const Geometry::PointLBVH::Index* const lbvh = w.Snapshot.SourceIndex.get();
+            const Geometry::KDTree* const tree = lbvh != nullptr ? nullptr : &w.SourceTree;
+            w.Source.Restart();
+            w.Projected.Restart();
+            if (projection.Phase() == Consolidation::ProjectionPhase::SourceDensity)
+            {
+                if (!CollectCpuRows(tree, lbvh, w.Snapshot.Positions, *radius, w.Source))
+                    return false;
+            }
+            else if (projection.NeedsAttraction() &&
+                !CollectCpuRows(tree, lbvh, projection.Positions(), *radius, w.Source))
+                return false;
+            if (projection.NeedsRepulsion())
+            {
+                Geometry::KDTree movingTree{};
+                Geometry::PointLBVH::Index movingLbvh{};
+                const bool built = lbvh != nullptr ? movingLbvh.Build(projection.Positions())
+                                                   : movingTree.BuildFromPoints(projection.Positions()).has_value();
+                if (!built ||
+                    !CollectCpuRows(lbvh != nullptr ? nullptr : &movingTree,
+                        lbvh != nullptr ? &movingLbvh : nullptr,
+                        projection.Positions(),
+                        *radius,
+                        w.Projected))
+                    return false;
+            }
+            projection.Advance(w.Source.View(), w.Projected.View());
+            return true;
+        }
+
+        // Init of a CPU run on its worker: the projection (initial samples; CLOP fits its mixture), the source index
+        // and the Advances up to the first iteration. False: Init failed (the result says why).
+        [[nodiscard]] bool InitializeCpuProjection(ProjectionRun& w)
+        {
+            w.RowFailure = Consolidation::Status::Success;
+            w.Projection = std::make_unique<Consolidation::NeighborhoodProjection>(
+                w.Snapshot.Positions, w.Snapshot.Normals, w.Snapshot.Params);
+            auto& projection = *w.Projection;
+            const bool needsSourceRows =
+                projection.Phase() == Consolidation::ProjectionPhase::SourceDensity || projection.NeedsAttraction();
+            if (needsSourceRows && !w.Snapshot.SourceIndex && w.SourceTree.ElementIndices().empty() &&
+                !w.SourceTree.BuildFromPoints(w.Snapshot.Positions).has_value())
+            {
+                w.RowFailure = Consolidation::Status::SpatialIndexBuildFailed;
+                return false;
+            }
+            while (projection.Phase() == Consolidation::ProjectionPhase::SourceDensity ||
+                projection.Phase() == Consolidation::ProjectionPhase::Initialize)
+            {
+                if (!AdvanceCpuProjection(w))
+                {
+                    w.RowFailure = Consolidation::Status::SpatialQueryFailed;
+                    return false;
+                }
+            }
+            return projection.Phase() == Consolidation::ProjectionPhase::Iterate;
+        }
+
+        // The step's metric (maximum and average displacement) and outcome: the projection's own end is convergence
+        // (or its fixed rounds) or, not converged, the iteration cap the run ends at the same step.
+        [[nodiscard]] StepOutcome ProjectionOutcome(const ProjectionRun& w, StepRunMetric& metric)
+        {
+            const auto& projection = *w.Projection;
+            const auto& diagnostics = projection.CurrentDiagnostics();
+            metric.Values = {diagnostics.MaxDisplacement, diagnostics.AverageDisplacement, 0.0, 0.0};
+            if (projection.Phase() != Consolidation::ProjectionPhase::Finished)
+                return StepOutcome::Continue;
+            switch (projection.State())
+            {
+            case Consolidation::Status::Success:      return StepOutcome::Converged;
+            case Consolidation::Status::NotConverged: return StepOutcome::Continue;
+            default:                                  return StepOutcome::Failed;
+            }
+        }
+
+        // A CPU run's step on its worker: Init again after a restart, then one iteration.
+        [[nodiscard]] StepOutcome StepCpuProjection(ProjectionRun& w, StepRunMetric& metric)
+        {
+            if (std::exchange(w.Reinitialize, false) && !InitializeCpuProjection(w))
+                return StepOutcome::Failed;
+            if (!AdvanceCpuProjection(w))
+            {
+                w.RowFailure = Consolidation::Status::SpatialQueryFailed;
+                return StepOutcome::Failed;
+            }
+            return ProjectionOutcome(w, metric);
+        }
+
+        // The run's result: the projection's terminal one, a failure, or (stopped between iterations) the last
+        // iteration's finite positions as a non-converged result.
+        [[nodiscard]] Consolidation::Result TakeProjectionResult(ProjectionRun& w)
+        {
+            Consolidation::Result result{};
+            if (!w.Projection)
+                result.State = Consolidation::Status::InvalidProjectionState;
+            else if (w.RowFailure != Consolidation::Status::Success)
+            {
+                result.State = w.RowFailure;
+                result.Diagnostics = w.Projection->CurrentDiagnostics();
+            }
+            else if (w.Projection->Phase() == Consolidation::ProjectionPhase::Finished)
+                result = w.Projection->TakeResult();
+            else
+            {
+                result.State = Consolidation::Status::NotConverged;
+                const auto positions = w.Projection->Positions();
+                const auto normals = w.Projection->Normals();
+                result.Positions.assign(positions.begin(), positions.end());
+                result.Normals.assign(normals.begin(), normals.end());
+                result.Diagnostics = w.Projection->CurrentDiagnostics();
+                result.Diagnostics.OutputPointCount = result.Positions.size();
+            }
+            if (w.Backend == PointCloudConsolidationBackend::CpuLBVH)
+                result.Diagnostics.Implementation = "cpu_lbvh";
+            else if (w.Backend == PointCloudConsolidationBackend::VulkanLBVH)
+                result.Diagnostics.Implementation = "vulkan_lbvh_cpu_projection";
+            return result;
+        }
+
         [[nodiscard]] bool PrepareGpuInitialPositions(
             PointCloudConsolidationSnapshot& snapshot)
         {
@@ -1591,37 +1870,39 @@ namespace Extrinsic::Runtime
                     "Vulkan initialization could not build the deterministic projection seed; the CPU reference completed the request.";
             }
 
-            const auto actualBackend = snapshot.SourceIndex
-                ? PointCloudConsolidationBackend::CpuLBVH : PointCloudConsolidationBackend::CpuReference;
-            Consolidation::Result consolidated = snapshot.SourceIndex
-                ? Consolidation::ConsolidateLopWithIndex(snapshot.Positions, *snapshot.SourceIndex, snapshot.Params)
-                : snapshot.Normals.empty()
-                ? Consolidation::Consolidate(
-                      std::span<const glm::vec3>{snapshot.Positions},
-                      snapshot.Params)
-                : Consolidation::Consolidate(
-                      std::span<const glm::vec3>{snapshot.Positions},
-                      std::span<const glm::vec3>{snapshot.Normals},
-                      snapshot.Params);
-
-            if (cancellation.IsCancelled())
+            // Init on this worker (the projection, its source density and L2 initialization); its iterations are
+            // the steps of the run that starts from it.
+            auto run = std::make_shared<PointCloudConsolidationProjectionRun>();
+            run->Backend = snapshot.SourceIndex ? PointCloudConsolidationBackend::CpuLBVH
+                                                : PointCloudConsolidationBackend::CpuReference;
+            run->Snapshot = std::move(snapshot);
+            const bool initialized = InitializeCpuProjection(*run);
+            if (!initialized || cancellation.IsCancelled())
             {
-                PointCloudConsolidationJobResult cancelled =
-                    BuildConsolidationJobResult(
-                        std::move(snapshot),
-                        std::move(consolidated),
-                        actualBackend);
-                cancelled.Completion.Status =
-                    PointCloudConsolidationRunStatus::Cancelled;
-                cancelled.Completion.Error = Core::ErrorCode::InvalidState;
-                cancelled.Completion.Message =
-                    "Point-set consolidation was cancelled before publication.";
-                return cancelled;
+                const auto backend = run->Backend;
+                auto consolidated = TakeProjectionResult(*run);
+                PointCloudConsolidationJobResult ended =
+                    BuildConsolidationJobResult(std::move(run->Snapshot), std::move(consolidated), backend);
+                if (initialized)
+                {
+                    ended.Completion.Status = PointCloudConsolidationRunStatus::Cancelled;
+                    ended.Completion.Error = Core::ErrorCode::InvalidState;
+                    ended.Completion.Message = "Point-set consolidation was cancelled before its first step.";
+                    ended.AfterOutputs.reset();
+                    ended.PointCloudReplacementAfter.reset();
+                }
+                return ended;
             }
-            return BuildConsolidationJobResult(
-                std::move(snapshot),
-                std::move(consolidated),
-                actualBackend);
+            PointCloudConsolidationJobResult prepared{};
+            prepared.Completion = MakeCompletion(run->Snapshot.Request,
+                run->Snapshot.World,
+                run->Snapshot.Correlation,
+                PointCloudConsolidationRunStatus::Queued,
+                Core::ErrorCode::Success,
+                "Initialized; the iterations are the run's steps.");
+            CopySupportRadiusAnalysis(prepared.Completion, radiusAnalysis);
+            prepared.Projection = std::move(run);
+            return prepared;
         }
 
         // Every worker entry: adopts a device initial order (RUNTIME-289), runs the stages, and
@@ -1639,7 +1920,7 @@ namespace Extrinsic::Runtime
                 snapshot.InitialOrderJob = {};
             }
             auto result = RunStages(std::move(snapshot), cancellation);
-            ReportInitialSampling(result.Completion, result.Snapshot);
+            ReportInitialSampling(result.Completion, result.Projection ? result.Projection->Snapshot : result.Snapshot);
             return result;
         }
 
@@ -2032,19 +2313,51 @@ namespace Extrinsic::Runtime
             PointCloudConsolidationSnapshot snapshot,
             PointCloudConsolidationModuleStats& stats);
 
-        void HandleJobCompleted(
-            const PointCloudConsolidationJobCompleted& event,
-            JobService* jobs,
-            PointCloudConsolidationGpuState* gpuState,
-            WorldRegistry* worlds,
-            KernelEventBus* events,
-            EditorCommandHistory* history,
-            PointCloudConsolidationModuleStats& stats,
-            SpatialIndexCache* spatialIndices = nullptr, RHI::IDevice* device = nullptr)
+        // A run's jobs through the module's job lane: the history label prefix of the call that queued it and its
+        // correlation id; a cancel cancels the job.
+        [[nodiscard]] EditorJobCommandSurface RunJobCommands(
+            const PointCloudConsolidationRunContext& ctx, const PointCloudConsolidationSnapshot& snapshot)
+        {
+            EditorJobCommandSurface surface{};
+            surface.Submit = [jobs = ctx.Jobs,
+                                 history = ctx.History,
+                                 prefix = snapshot.Request.LabelPrefix,
+                                 correlation = snapshot.Correlation.Value](JobDesc desc, EditorJobIdentity)
+            {
+                CarryEditorLabelPrefix(desc, history, prefix); // the run publishes after the call that queued it
+                desc.CorrelationId = correlation;
+                return jobs ? jobs->Submit(std::move(desc)) : JobToken{};
+            };
+            surface.Cancel = [jobs = ctx.Jobs](const JobToken token)
+            {
+                return jobs && jobs->Cancel(token) ? EditorJobCancelStatus::Requested
+                                                   : EditorJobCancelStatus::NotActive;
+            };
+            return surface;
+        }
+
+        [[nodiscard]] bool PublishJobResult(
+            const PointCloudConsolidationRunContext& ctx, PointCloudConsolidationJobResult& job);
+        void StartProjectionRun(const PointCloudConsolidationRunContext& ctx,
+            std::shared_ptr<ProjectionRun> w,
+            PointCloudConsolidationResult prepared);
+
+        void HandleJobCompleted(const PointCloudConsolidationJobCompleted& event,
+            const PointCloudConsolidationRunContext& ctx,
+            PointCloudConsolidationGpuState* gpuState)
         {
             if (event.Result == nullptr)
                 return;
             PointCloudConsolidationJobResult& job = *event.Result;
+            JobService* const jobs = ctx.Jobs;
+            WorldRegistry* const worlds = ctx.Worlds;
+            KernelEventBus* const events = ctx.Events;
+            auto& stats = *ctx.Stats;
+            if (job.Projection)
+            {
+                StartProjectionRun(ctx, std::move(job.Projection), std::move(job.Completion));
+                return;
+            }
             if (job.GpuPrepared)
             {
                 auto* currentScene = worlds ? worlds->Get(job.Snapshot.World) : nullptr;
@@ -2062,19 +2375,15 @@ namespace Extrinsic::Runtime
                 EditorProcessingContext processing{};
                 processing.Scene = worlds ? worlds->Get(job.Snapshot.World) : nullptr;
                 processing.World = job.Snapshot.World;
-                processing.CommandHistory = history;
-                processing.SpatialIndices = spatialIndices;
-                processing.Device = device;
+                processing.CommandHistory = ctx.History;
+                processing.SpatialIndices = ctx.Cache;
+                processing.Device = ctx.Device;
                 processing.AttachmentActive = [worlds, world = job.Snapshot.World,
                     scene = processing.Scene, attached = job.Snapshot.Request.AttachmentActive] {
                     return worlds && worlds->ActiveWorld() == world && worlds->Get(world) == scene && (!attached || attached());
                 };
-                processing.JobCommands.Submit = [jobs, history, prefix = job.Snapshot.Request.LabelPrefix,
-                                                 correlation = job.Snapshot.Correlation.Value](JobDesc desc, EditorJobIdentity) {
-                    CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
-                    desc.CorrelationId = correlation;
-                    return jobs ? jobs->Submit(std::move(desc)) : JobToken{};
-                };
+                // The step run's holder ends through a cancel of its job.
+                processing.JobCommands = RunJobCommands(ctx, job.Snapshot);
                 const PointCloudConsolidationGpuSubmission submission =
                     gpuState != nullptr
                     ? gpuState->Start(job.Snapshot, processing, job.Completion)
@@ -2126,12 +2435,24 @@ namespace Extrinsic::Runtime
                 return;
             }
 
+            (void)PublishJobResult(ctx, job);
+        }
+
+        // The one publication of a finished result (a run's Commit, or a failed preparation): its undoable mutation
+        // of the selected domain's properties or the point-cloud replacement, after the world, entity and source
+        // checks, then its completion. True when the result was applied.
+        bool PublishJobResult(const PointCloudConsolidationRunContext& ctx, PointCloudConsolidationJobResult& job)
+        {
+            WorldRegistry* const worlds = ctx.Worlds;
+            KernelEventBus* const events = ctx.Events;
+            EditorCommandHistory* const history = ctx.History;
+            auto& stats = *ctx.Stats;
             stats.CompletionEvents += 1u;
             if (!job.Completion.Succeeded())
             {
                 stats.CommitsDropped += 1u;
                 PublishCompletion(events, job.Completion);
-                return;
+                return false;
             }
 
             if (worlds == nullptr || !job.Snapshot.World.IsValid() ||
@@ -2145,7 +2466,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "Point-set consolidation result was dropped because its world is no longer active.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             ECS::Scene::Registry* scene = worlds->Get(job.Snapshot.World);
@@ -2164,7 +2485,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "Scene registry or the typed consolidation publication payload is unavailable.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             entt::registry& raw = scene->Raw();
@@ -2201,7 +2522,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "Point-set consolidation result was dropped because its selected element-domain properties changed before commit.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             EditorCommandHistoryStatus commit =
@@ -2249,7 +2570,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "Point-set consolidation publication failed during the editor mutation transaction.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             PointCloudConsolidationResult completed = job.Completion;
@@ -2263,86 +2584,63 @@ namespace Extrinsic::Runtime
                 ":" + completed.Properties.OutputPositions.Name +
                 " after " + std::to_string(completed.Iterations) +
                 " iterations.";
-            if (completed.GeometryStatus ==
-                Consolidation::Status::NotConverged)
+            if (job.Stopped)
+                completed.Message += " The run was stopped before convergence; this is its last iteration's result.";
+            else if (completed.GeometryStatus == Consolidation::Status::NotConverged)
             {
                 completed.Message +=
                     " The iteration limit was reached, so this publication is the method's last finite non-converged preview.";
             }
             stats.ResultsCommitted += 1u;
             PublishCompletion(events, std::move(completed));
+            return true;
         }
 
-        void HandleGpuResult(
-            PointCloudConsolidationGpuResult result,
-            JobService* jobs,
-            WorldRegistry* worlds,
-            KernelEventBus* events,
-            EditorCommandHistory* history,
-            PointCloudConsolidationModuleStats& stats)
+        // A finished resident run: its own end, or a new output's read-back positions published here as the run's
+        // pending Commit (the step run decides at that boundary: a discard that won first publishes nothing).
+        void HandleGpuResult(PointCloudConsolidationGpuResult result, const PointCloudConsolidationRunContext& ctx)
         {
+            auto& stats = *ctx.Stats;
             if (result.Published)
             {
                 ++stats.GpuCompletions;
                 ++stats.CompletionEvents;
                 if (result.Published->Succeeded()) ++stats.ResultsCommitted;
                 else ++stats.CommitsDropped;
-                PublishCompletion(events, std::move(*result.Published));
+                PublishCompletion(ctx.Events, std::move(*result.Published));
                 return;
             }
-            if (result.HasGpuResult())
+            if (!result.Consolidated)
+                return;
+            stats.GpuCompletions += 1u;
+            if (!result.Driver.Publishing())
             {
-                stats.GpuCompletions += 1u;
-                result.Snapshot.BackendDiagnostic = result.Diagnostic;
-                auto completed = std::make_shared<
-                    PointCloudConsolidationJobResult>(
-                        BuildConsolidationJobResult(
-                            std::move(result.Snapshot),
-                            std::move(*result.Consolidated),
-                            PointCloudConsolidationBackend::VulkanCompute));
-                completed->Completion.GpuInputUploadBytes = result.Metrics.GpuInputUploadBytes;
-                completed->Completion.GpuInputCacheHits = result.Metrics.GpuInputCacheHits;
-                completed->Completion.CpuStageUploadBytes = result.Metrics.CpuStageUploadBytes;
-                completed->Completion.CpuStageReadbackBytes = result.Metrics.CpuStageReadbackBytes;
-                completed->Completion.GpuSubmissions = result.Metrics.GpuSubmissions;
-                completed->Completion.GpuPreviews = result.Metrics.GpuPreviews;
-                if (!result.Metrics.BackendDiagnostic.empty()) completed->Completion.BackendDiagnostic = result.Metrics.BackendDiagnostic;
-                HandleJobCompleted(
-                    PointCloudConsolidationJobCompleted{
-                        .Result = std::move(completed)},
-                    jobs,
-                    nullptr,
-                    worlds,
-                    events,
-                    history,
-                    stats);
+                ++stats.CommitsDropped;
+                auto cancelled = result.Metrics;
+                cancelled.Status = PointCloudConsolidationRunStatus::Cancelled;
+                cancelled.Error = Core::ErrorCode::InvalidState;
+                cancelled.Message = "GPU consolidation discarded; previous output retained.";
+                PublishCompletion(ctx.Events, std::move(cancelled));
                 return;
             }
-
-            stats.GpuFallbacks += 1u;
-            result.Snapshot.ForceCpu = true;
-            result.Snapshot.BackendDiagnostic = result.Diagnostic.empty()
-                ? "Vulkan execution could not produce a transport-valid result; the CPU reference completed the request."
-                : result.Diagnostic +
-                      " The CPU reference completed the request.";
-            if (jobs != nullptr)
-            {
-                (void)SubmitSnapshot(
-                    *jobs,
-                    events,
-                    std::move(result.Snapshot),
-                    stats);
-                return;
-            }
-
-            PointCloudConsolidationResult failed = MakeCompletion(
-                result.Snapshot.Request,
-                result.Snapshot.World,
-                result.Snapshot.Correlation,
-                PointCloudConsolidationRunStatus::GeometryProcessingFailed,
-                Core::ErrorCode::InvalidState,
-                "Vulkan execution failed and JobService is unavailable for CPU fallback.");
-            PublishCompletion(events, std::move(failed));
+            const bool partial = result.Consolidated->State == Consolidation::Status::NotConverged &&
+                !result.Metrics.Converged && result.Metrics.Iterations < result.Snapshot.Params.MaxIterations;
+            PointCloudConsolidationJobResult completed = BuildConsolidationJobResult(std::move(result.Snapshot),
+                std::move(*result.Consolidated),
+                PointCloudConsolidationBackend::VulkanCompute);
+            completed.Stopped = partial;
+            completed.Completion.GpuInputUploadBytes = result.Metrics.GpuInputUploadBytes;
+            completed.Completion.GpuInputCacheHits = result.Metrics.GpuInputCacheHits;
+            completed.Completion.CpuStageUploadBytes = result.Metrics.CpuStageUploadBytes;
+            completed.Completion.CpuStageReadbackBytes = result.Metrics.CpuStageReadbackBytes;
+            completed.Completion.GpuSubmissions = result.Metrics.GpuSubmissions;
+            completed.Completion.GpuPreviews = result.Metrics.GpuPreviews;
+            completed.Completion.StepRun = result.Metrics.StepRun;
+            if (!result.Metrics.BackendDiagnostic.empty())
+                completed.Completion.BackendDiagnostic = result.Metrics.BackendDiagnostic;
+            const bool applied = PublishJobResult(ctx, completed);
+            result.Driver.CommitFinished(
+                applied, applied ? std::string{} : "the consolidation result was not published");
         }
 
         [[nodiscard]] CommandOutcome SubmitSnapshot(
@@ -2410,235 +2708,522 @@ namespace Extrinsic::Runtime
             return CommandOutcome::Ok();
         }
 
-        struct ProjectionGpuRows
-        {
-            std::vector<std::uint32_t> Offsets{0}, Indices{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
-            // GRAPHICS-153: the last completed batch, reused by the next iteration's first page.
-            std::shared_ptr<SpatialNearestBatch> Spare{};
-            std::size_t Next{};
-            Geometry::PointNeighborhoods View() const { return {Offsets, Indices}; }
-            void Restart() { Offsets.assign(1, 0u); Indices.clear(); Next = 0; }
-        };
-        struct ProjectionGpuWork
-        {
-            PointCloudConsolidationSnapshot Snapshot{};
-            std::unique_ptr<Consolidation::NeighborhoodProjection> Projection{};
-            SpatialIndexWorkspace Moving{};
-            bool MovingStale{}; // the moving points changed since Moving was built or updated
-            ProjectionGpuRows Source{}, Projected{};
-            std::optional<PointCloudConsolidationResult> Failure{};
-            bool Abandoned{}, Delivered{};
-            std::uint32_t WorkspaceBuilds{}, QueryBatches{};
-        };
         bool ValidProjectionGpuPoint(glm::vec3 p)
         {
             if (!Geometry::PointLBVH::ValidPoint(p)) return false;
             for (int i=0;i<3;++i) if (std::fpclassify(p[i])==FP_SUBNORMAL) return false;
             return true;
         }
-        enum class ProjectionRowState { Pending, Ready, Failed };
-        ProjectionRowState AdvanceProjectionRows(SpatialIndexCache& cache, SpatialIndexHandle index,
-            std::span<const glm::vec3> points, std::uint32_t sourceCount,
-            float radius, bool selfExcluded, ProjectionGpuRows& rows, ProjectionGpuWork& w, std::string& diagnostic)
+        // ARCH-023: the hybrid backend's rows come from query sessions the run's Init prepared on the owner; a page is
+        // recorded, submitted and waited for on the step's worker (no frame, no main-thread queue, no cache call).
+        // A session's rows [0, rows) in pages of its PageQueries; false with the reason (or an abandoned run). The
+        // decode keeps the batch path's checks: capacity, identity range, self exclusion, sorted unique rows.
+        bool CollectSessionRows(ProjectionRun& w,
+            SpatialQuerySession& session,
+            const std::size_t rows,
+            const std::uint32_t targetCount,
+            const float radius,
+            const bool selfExcluded,
+            ProjectionRun::Rows& out,
+            std::string& diagnostic)
         {
-            const auto fail=[&](std::string why){diagnostic=std::move(why);rows.Batch.reset();return ProjectionRowState::Failed;};
-            if(rows.Next==points.size())return ProjectionRowState::Ready;
-            const auto batchSize=w.Snapshot.Request.Config.GpuQueryBatchSize;
-            if(rows.Batch)
+            SpatialNearestBatch page;
+            std::vector<std::uint32_t> row;
+            for (std::size_t first = 0; first < rows; first += session.PageQueries())
             {
-                if(rows.Batch->State==SpatialQueryState::Failed)return fail(rows.Batch->Diagnostic);
-                if(rows.Batch->State!=SpatialQueryState::Ready)return ProjectionRowState::Pending;
-                const auto expected=std::min<std::size_t>(batchSize,points.size()-rows.Next);
-                if(rows.Batch->Counts.size()!=expected || rows.Batch->Neighbors.size()!=expected*rows.Batch->Capacity)
-                    return fail("Incomplete consolidation Vulkan radius batch.");
-                std::vector<std::uint32_t> row;
-                for(std::size_t i=0;i<expected;++i)
+                const auto count = std::uint32_t(std::min<std::size_t>(session.PageQueries(), rows - first));
+                switch (session.Query(std::uint32_t(first), count, radius, nullptr, w.Abort, page))
                 {
-                    const auto count=rows.Batch->Counts[i];
-                    if(count>rows.Batch->Capacity)return fail("Consolidation Vulkan radius support exceeds capacity; no output was published.");
-                    if(count>std::numeric_limits<std::uint32_t>::max()-rows.Indices.size())return fail("Consolidation candidate storage exceeds the packed range.");
-                    row.clear();
-                    for(std::uint32_t j=0;j<count;++j)
-                    {
-                        const auto id=rows.Batch->Neighbors[i*rows.Batch->Capacity+j].Index;
-                        if(id>=sourceCount || (selfExcluded && id==rows.Next+i))return fail("Invalid consolidation Vulkan neighbor identity.");
-                        row.push_back(id);
-                    }
-                    std::sort(row.begin(),row.end());
-                    if(std::adjacent_find(row.begin(),row.end())!=row.end())return fail("Duplicate consolidation Vulkan neighbor identity.");
-                    rows.Indices.insert(rows.Indices.end(),row.begin(),row.end());
-                    rows.Offsets.push_back(static_cast<std::uint32_t>(rows.Indices.size()));
+                case SpatialPageStatus::Ready:     break;
+                case SpatialPageStatus::Abandoned: diagnostic = "The consolidation run ended."; return false;
+                case SpatialPageStatus::Failed:    diagnostic = page.Diagnostic; return false;
                 }
-                rows.Next+=expected;
-                if(rows.Next==points.size()){rows.Spare=std::move(rows.Batch);return ProjectionRowState::Ready;}
-            }
-            const auto count=std::min<std::size_t>(batchSize,points.size()-rows.Next);
-            // A completed batch serves any page that fits it (shorter last pages included).
-            if(!rows.Batch)rows.Batch=std::move(rows.Spare);
-            std::vector<std::uint32_t> exclusions;
-            if(selfExcluded)for(std::size_t i=0;i<count;++i)exclusions.push_back(static_cast<std::uint32_t>(rows.Next+i));
-            const auto capacity=std::max(1u,std::min(w.Snapshot.Request.Config.GpuRadiusCapacity,sourceCount-(selfExcluded?1u:0u)));
-            rows.Batch=cache.QueueGpuRadius(index,points.subspan(rows.Next,count),radius,capacity,exclusions,std::move(rows.Batch));
-            ++w.QueryBatches;
-            if(rows.Batch->State==SpatialQueryState::Failed)return fail(rows.Batch->Diagnostic);
-            return ProjectionRowState::Pending;
-        }
-        bool AdvanceProjectionGpu(SpatialIndexCache& cache,ProjectionGpuWork& w)
-        {
-            if(w.Abandoned || w.Failure || !w.Projection ||
-                w.Projection->Phase()==Consolidation::ProjectionPhase::Finished)return true;
-            const auto fail=[&](std::string why, PointCloudConsolidationRunStatus status = PointCloudConsolidationRunStatus::GeometryProcessingFailed)
-            {
-                w.Failure=MakeCompletion(w.Snapshot.Request,w.Snapshot.World,w.Snapshot.Correlation,
-                    status,Core::ErrorCode::InvalidState,std::move(why));
-                return true;
-            };
-            if(!cache.Snapshot({w.Snapshot.GpuSourceHandle}))
-                return fail("Consolidation source changed before the next Vulkan stage.",PointCloudConsolidationRunStatus::StaleSource);
-            const auto points=w.Projection->Positions();
-            if(!std::all_of(points.begin(),points.end(),ValidProjectionGpuPoint))
-                return fail("Consolidation Vulkan requires finite normal-or-zero coordinates within LBVH limits, including moving samples.");
-            const auto radius=Geometry::PointCloud::Kernels::ConservativeQueryRadius(w.Snapshot.Params.SupportRadius);
-            if(!radius || *radius>Geometry::PointLBVH::CoordinateLimit)return fail("Consolidation Vulkan support radius exceeds LBVH limits.");
-            std::string diagnostic;
-            const bool sourceDensity=w.Projection->Phase()==Consolidation::ProjectionPhase::SourceDensity;
-            if(sourceDensity || w.Projection->NeedsAttraction())
-            {
-                const auto queries=sourceDensity ? std::span<const glm::vec3>{w.Snapshot.Positions} : points;
-                const auto state=AdvanceProjectionRows(cache,{w.Snapshot.GpuSourceHandle},queries,
-                    static_cast<std::uint32_t>(w.Snapshot.Positions.size()),*radius,false,w.Source,w,diagnostic);
-                if(state==ProjectionRowState::Failed)return fail(diagnostic);
-                if(state==ProjectionRowState::Pending)return false;
-            }
-            if(!w.Projection->NeedsRepulsion())return true;
-            // The moving points change every iteration: update the index in place (its buffers,
-            // device workspace and pipelines stay) and build a new one only when that is refused.
-            if(w.Moving.Ready() && w.MovingStale && !cache.UpdateWorkspace(w.Moving,points))w.Moving={};
-            w.MovingStale=false;
-            if(!w.Moving.Ready())
-            {
-                w.Moving=cache.CreateWorkspace(points);
-                if(!w.Moving.Ready())return fail(w.Moving.Diagnostic);
-                ++w.WorkspaceBuilds;
-            }
-            const auto state=AdvanceProjectionRows(cache,w.Moving.Handle,points,static_cast<std::uint32_t>(points.size()),
-                *radius,!w.Projection->IncludesSelf(),w.Projected,w,diagnostic);
-            if(state==ProjectionRowState::Failed)return fail(diagnostic);
-            return state==ProjectionRowState::Ready;
-        }
-        CommandOutcome SubmitProjectionGpu(JobService& jobs,KernelEventBus* events,SpatialIndexCache& cache,
-            PointCloudConsolidationSnapshot snapshot,PointCloudConsolidationModuleStats& stats)
-        {
-            auto orderingReport=InitialSamplingReportOf(snapshot);
-            auto w=std::make_shared<ProjectionGpuWork>();w->Snapshot=std::move(snapshot);
-            const auto request=w->Snapshot.Request;const auto world=w->Snapshot.World;const auto correlation=w->Snapshot.Correlation;
-            const auto fallback=MakeCompletion(request,world,correlation,PointCloudConsolidationRunStatus::Cancelled,
-                Core::ErrorCode::InvalidState,"Consolidation Vulkan sequence cancelled; previous output retained.");
-            auto finalize=[events,w,fallback,orderingReport=std::move(orderingReport)]()mutable
-            {
-                w->Abandoned=true;
-                if(!w->Delivered)
+                if (page.Counts.size() != count || page.Neighbors.size() != std::size_t(count) * page.Capacity)
                 {
-                    w->Delivered=true;
-                    auto completion=w->Failure?*w->Failure:fallback;
-                    ReportInitialSampling(completion,orderingReport); // the worker may still own w->Snapshot
-                    PublishCompletion(events,std::move(completion));
-                }
-            };
-            auto validate=[w]{return w->Abandoned?JobApplyValidation::Cancelled:JobApplyValidation::Current;};
-            auto check=[w](KernelEventBus&,const JobResultEnvelope&)
-            {
-                if(w->Failure)return false;
-                if(!w->Projection)
-                {
-                    w->Failure=MakeCompletion(w->Snapshot.Request,w->Snapshot.World,w->Snapshot.Correlation,
-                        PointCloudConsolidationRunStatus::GeometryProcessingFailed,Core::ErrorCode::InvalidState,
-                        "Consolidation CPU projection preparation failed.");
+                    diagnostic = "Incomplete consolidation Vulkan radius batch.";
                     return false;
                 }
-                return true;
-            };
-            JobToken previous=w->Snapshot.InitialOrderJob; // RUNTIME-289: a device initial order runs first
-            auto submit=[&](JobDesc job)
-            {
-                if(previous.IsValid())job.DependsOn.push_back({previous,"Complete previous consolidation stage before using its points"});
-                job.CorrelationId=correlation.Value;
-                previous=jobs.Submit(std::move(job));
-                if(previous.IsValid()){++stats.JobsSubmitted;return true;}
-                ++stats.JobSubmissionFailures;return false;
-            };
-            bool accepted=submit({.DebugName="Consolidation Vulkan support preparation",.Scope=world,
-                .Work=[w](const JobCancellation& cancellation)
+                for (std::uint32_t i = 0; i < count; ++i)
                 {
-                    auto prepared=RunWorker(std::move(w->Snapshot),cancellation);
-                    w->Snapshot=std::move(prepared.Snapshot);
-                    if(!prepared.GpuPrepared)return JobResultEnvelope::Make(prepared.Completion);
-                    w->Projection=std::make_unique<Consolidation::NeighborhoodProjection>(
-                        w->Snapshot.Positions,w->Snapshot.Normals,w->Snapshot.Params);
-                    w->Snapshot.BackendDiagnostic =
-                        "Framed Vulkan LBVH neighborhoods; CPU support-radius analysis and projection arithmetic.";
-                    const auto& config=w->Snapshot.Request.Config;
-                    if(config.Strategy==PointCloudConsolidationStrategy::Clop)
-                        w->Snapshot.BackendDiagnostic += " Gaussian-mixture fitting and dense continuous attraction remain on CPU.";
-                    if(config.Strategy==PointCloudConsolidationStrategy::Ear ||
-                        (config.Strategy==PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic))
-                        w->Snapshot.BackendDiagnostic += " Initial normal estimation remains on CPU; moving normal refinement uses supplied neighborhoods.";
-                    if(config.Strategy==PointCloudConsolidationStrategy::Ear)
+                    const auto hits = page.Counts[i];
+                    if (hits > page.Capacity)
+                    {
+                        diagnostic = "Consolidation Vulkan radius support exceeds capacity; no output was published.";
+                        return false;
+                    }
+                    if (hits > std::numeric_limits<std::uint32_t>::max() - out.Indices.size())
+                    {
+                        diagnostic = "Consolidation candidate storage exceeds the packed range.";
+                        return false;
+                    }
+                    row.clear();
+                    for (std::uint32_t j = 0; j < hits; ++j)
+                    {
+                        const auto id = page.Neighbors[std::size_t(i) * page.Capacity + j].Index;
+                        if (id >= targetCount || (selfExcluded && id == first + i))
+                        {
+                            diagnostic = "Invalid consolidation Vulkan neighbor identity.";
+                            return false;
+                        }
+                        row.push_back(id);
+                    }
+                    std::sort(row.begin(), row.end());
+                    if (std::adjacent_find(row.begin(), row.end()) != row.end())
+                    {
+                        diagnostic = "Duplicate consolidation Vulkan neighbor identity.";
+                        return false;
+                    }
+                    out.Indices.insert(out.Indices.end(), row.begin(), row.end());
+                    out.Offsets.push_back(static_cast<std::uint32_t>(out.Indices.size()));
+                }
+            }
+            return true;
+        }
+        // One Advance of a hybrid run on its worker (SourceDensity, Initialize or one iteration) with device rows: the
+        // source density's fixed queries, the moving samples against the source (uploaded on the compute lane), and
+        // the moving samples against themselves (their hierarchy rebuilt on the device). False: the run fails
+        // (Failure says why).
+        bool AdvanceGpuProjection(ProjectionRun& w)
+        {
+            auto& projection = *w.Projection;
+            const auto fail = [&](std::string why,
+                                  PointCloudConsolidationRunStatus status =
+                                      PointCloudConsolidationRunStatus::GeometryProcessingFailed)
+            {
+                w.RowFailure = Consolidation::Status::SpatialQueryFailed;
+                auto failure = w.Prepared;
+                failure.Status = status;
+                failure.Error = Core::ErrorCode::InvalidState;
+                failure.Message = std::move(why);
+                w.Failure = std::move(failure);
+                return false;
+            };
+            const auto points = projection.Positions();
+            if (!std::all_of(points.begin(), points.end(), ValidProjectionGpuPoint))
+                return fail("Consolidation Vulkan requires finite normal-or-zero coordinates within LBVH limits, including moving samples.");
+            const auto radius = Geometry::PointCloud::Kernels::ConservativeQueryRadius(w.Snapshot.Params.SupportRadius);
+            if (!radius || *radius > Geometry::PointLBVH::CoordinateLimit)
+                return fail("Consolidation Vulkan support radius exceeds LBVH limits.");
+            const auto sourceCount = static_cast<std::uint32_t>(w.Snapshot.Positions.size());
+            std::string diagnostic;
+            w.Source.Restart();
+            w.Projected.Restart();
+            if (projection.Phase() == Consolidation::ProjectionPhase::SourceDensity)
+            {
+                if (!CollectSessionRows(
+                        w, *w.DensityRows, sourceCount, sourceCount, *radius, false, w.Source, diagnostic))
+                    return fail(diagnostic);
+            }
+            else if (projection.NeedsAttraction())
+            {
+                if (!w.AttractionRows->UploadQueries(points, diagnostic) ||
+                    !CollectSessionRows(
+                        w, *w.AttractionRows, points.size(), sourceCount, *radius, false, w.Source, diagnostic))
+                    return fail(diagnostic);
+            }
+            if (projection.NeedsRepulsion())
+            {
+                if (!w.MovingRows->UploadQueries(points, diagnostic) ||
+                    !CollectSessionRows(w,
+                        *w.MovingRows,
+                        points.size(),
+                        static_cast<std::uint32_t>(points.size()),
+                        *radius,
+                        !projection.IncludesSelf(),
+                        w.Projected,
+                        diagnostic))
+                    return fail(diagnostic);
+            }
+            projection.Advance(w.Source.View(), w.Projected.View());
+            return true;
+        }
+        // A hybrid run's step on its worker: Init again after a restart (CLOP refits its mixture), the Init Advances
+        // before the first iteration (not a step), then one iteration with device rows.
+        [[nodiscard]] StepOutcome StepGpuProjection(ProjectionRun& w, StepRunMetric& metric)
+        {
+            if (std::exchange(w.Reinitialize, false))
+            {
+                w.RowFailure = Consolidation::Status::Success;
+                w.Failure.reset();
+                w.Projection = std::make_unique<Consolidation::NeighborhoodProjection>(
+                    w.Snapshot.Positions, w.Snapshot.Normals, w.Snapshot.Params);
+            }
+            auto& projection = *w.Projection;
+            while (projection.Phase() == Consolidation::ProjectionPhase::SourceDensity ||
+                projection.Phase() == Consolidation::ProjectionPhase::Initialize)
+                if (!AdvanceGpuProjection(w))
+                    return StepOutcome::Failed;
+            if (projection.Phase() != Consolidation::ProjectionPhase::Iterate || !AdvanceGpuProjection(w))
+                return StepOutcome::Failed;
+            return ProjectionOutcome(w, metric);
+        }
+        // The hybrid run's Init (main thread, at its start): three query sessions over the cached source index (the
+        // source density's fixed queries, the moving samples' uploaded queries) and over the moving samples
+        // themselves, every buffer, pipeline and address prepared here. False with the reason.
+        bool PrepareProjectionSessions(const PointCloudConsolidationRunContext& ctx, ProjectionRun& w, std::string& why)
+        {
+            if (ctx.Cache == nullptr || !w.Projection)
+            {
+                why = "Consolidation Vulkan requires the spatial cache and a prepared projection.";
+                return false;
+            }
+            const auto& config = w.Snapshot.Request.Config;
+            const auto points = w.Projection->Positions();
+            const auto sourceCount = static_cast<std::uint32_t>(w.Snapshot.Positions.size());
+            const auto targetCount = static_cast<std::uint32_t>(points.size());
+            const bool selfExcluded = !w.Projection->IncludesSelf();
+            const SpatialIndexHandle source{w.Snapshot.GpuSourceHandle};
+            const std::uint32_t sourceCapacity = std::max(1u, std::min(config.GpuRadiusCapacity, sourceCount));
+            w.DensityRows = ctx.Cache->PrepareQuerySession(source,
+                {.Radius = true,
+                    .Capacity = sourceCapacity,
+                    .PageQueries = config.GpuQueryBatchSize,
+                    .Queries = w.Snapshot.Positions},
+                why);
+            if (!w.DensityRows)
+                return false;
+            w.AttractionRows = ctx.Cache->PrepareQuerySession(source,
+                {.Radius = true,
+                    .Capacity = sourceCapacity,
+                    .PageQueries = config.GpuQueryBatchSize,
+                    .Queries = points,
+                    .Uploads = true},
+                why);
+            if (!w.AttractionRows)
+                return false;
+            std::vector<std::uint32_t> self;
+            if (selfExcluded)
+                for (std::uint32_t row = 0; row < targetCount; ++row)
+                    self.push_back(row);
+            w.MovingRows = ctx.Cache->PrepareQuerySession({},
+                {.Radius = true,
+                    .Capacity =
+                        std::max(1u, std::min(config.GpuRadiusCapacity, targetCount - (selfExcluded ? 1u : 0u))),
+                    .PageQueries = config.GpuQueryBatchSize,
+                    .Queries = points,
+                    .Excluded = self,
+                    .Moving = true},
+                why);
+            return bool(w.MovingRows);
+        }
+
+        // The run's metrics in its result: its step run and, hybrid, the batches and their traffic.
+        void ReportProjectionRun(const ProjectionRun& w, PointCloudConsolidationResult& completion)
+        {
+            completion.StepRun = w.Run;
+            if (w.Backend != PointCloudConsolidationBackend::VulkanLBVH)
+                return;
+            completion.GpuQueryBatches = static_cast<std::uint32_t>(w.QueryBatches());
+            // GRAPHICS-153: the moving samples' one workspace, the session Init prepared (a Restart keeps it); each
+            // iteration rebuilds its device hierarchy into that reserved storage.
+            completion.SpatialWorkspaceBuilds = w.MovingRows ? 1u : 0u;
+            completion.CpuStageUploadBytes = w.QueryUploadBytes();
+            completion.CpuStageReadbackBytes = w.QueryReadbackBytes();
+        }
+
+        // A CPU or hybrid run's step run: Commit publishes its result once (undoable), Discard publishes why it
+        // ended without one, Restart initializes the projection again (a CPU run before its next step on the
+        // worker, a hybrid run in its tick), live preview shows an in-place output of the same cardinality.
+        void StartProjectionRun(const PointCloudConsolidationRunContext& ctx,
+            std::shared_ptr<ProjectionRun> w,
+            PointCloudConsolidationResult prepared)
+        {
+            auto& r = *w;
+            r.Prepared = std::move(prepared);
+            const bool hybrid = r.Backend == PointCloudConsolidationBackend::VulkanLBVH;
+            const auto& request = r.Snapshot.Request;
+            const auto entity = SelectionController::ToEntityHandle(request.StableEntityId);
+            const bool inPlace = request.Properties.InputPositions == request.Properties.OutputPositions &&
+                r.Snapshot.Params.TargetPointCount == 0u &&
+                r.Snapshot.Positions.size() == r.Snapshot.SourceState.ElementCount;
+            if (inPlace && ctx.Cache != nullptr && ctx.Device != nullptr && ctx.Cache->PropertyResidency() != nullptr)
+                r.Preview = {.Residency = ctx.Cache->PropertyResidency(),
+                    .Device = ctx.Device,
+                    .Key = MakeGpuPropertyKey(r.Snapshot.World, entity, request.Properties.OutputPositions),
+                    .Count = static_cast<std::uint32_t>(r.Snapshot.Positions.size())};
+            else if (request.Config.Execution.PreviewEvery != 0u)
+                r.Snapshot.BackendDiagnostic += std::string{r.Snapshot.BackendDiagnostic.empty() ? "" : " "} +
+                    "Live preview shows only an in-place output of the same cardinality on an operational device; "
+                    "this run shows its result at Accept.";
+            StepRunCallbacks callbacks{.Commit =
+                                           [ctx, w](std::string& diagnostic)
+                {
+                    auto& run = *w;
+                    run.Preview.Discard(); // the canonical publication shows next
+                    const bool stopped = run.Projection && run.RowFailure == Consolidation::Status::Success &&
+                        run.Projection->Phase() != Consolidation::ProjectionPhase::Finished;
+                    auto consolidated = TakeProjectionResult(run);
+                    run.Projection.reset(); // it reads the snapshot's rows
+                    const auto backend = run.Backend;
+                    run.Delivered = true;
+                    ctx.Runs->Runs.erase(run.Snapshot.Correlation.Value);
+                    PointCloudConsolidationJobResult job =
+                        BuildConsolidationJobResult(std::move(run.Snapshot), std::move(consolidated), backend);
+                    job.Stopped = stopped;
+                    ReportProjectionRun(run, job.Completion);
+                    if (backend == PointCloudConsolidationBackend::VulkanLBVH)
+                        ++ctx.Stats->GpuCompletions;
+                    if (PublishJobResult(ctx, job))
+                        return StepRunCommit::Committed;
+                    diagnostic = "the consolidation result was not published (its source or world changed)";
+                    return StepRunCommit::Refused;
+                },
+                .Discard =
+                    [ctx, w]
+                {
+                    auto& run = *w;
+                    run.Abort.store(true, std::memory_order_release); // a waiting page gives up
+                    if (std::exchange(run.Delivered, true))
+                        return;
+                    run.Preview.Discard();
+                    ctx.Runs->Runs.erase(run.Snapshot.Correlation.Value);
+                    const auto observed = ctx.Steps->Observe(run.Run);
+                    const bool failed = observed && observed->Phase == StepRunPhase::Failed;
+                    auto completion = run.Prepared;
+                    // A discard while a worker step runs reads nothing the step writes (its failure, rows, projection):
+                    // the step gives up at its next page (Abort) and this owner-only result is the run's. A failed run
+                    // reached Discard only after its step returned, so its failure is safe to read.
+                    if (observed && observed->WorkerInFlight)
+                    {
+                        completion.Status = PointCloudConsolidationRunStatus::Cancelled;
+                        completion.Error = Core::ErrorCode::InvalidState;
+                        completion.Message = "Point-set consolidation discarded; previous output retained.";
+                    }
+                    else if (run.Failure)
+                        completion = *run.Failure;
+                    else
+                    {
+                        // A failed step left its projection idle; a discard may come while a step runs.
+                        const auto state = run.RowFailure != Consolidation::Status::Success ? run.RowFailure
+                            : run.Projection                                                ? run.Projection->State()
+                                             : Consolidation::Status::NumericalFailure;
+                        completion.Status = failed ? PointCloudConsolidationRunStatus::GeometryProcessingFailed
+                                                   : PointCloudConsolidationRunStatus::Cancelled;
+                        completion.Error = Core::ErrorCode::InvalidState;
+                        completion.Message = failed
+                            ? "Geometry.PointCloud.Consolidation failed with status " +
+                                std::string{Consolidation::DebugName(state)} + "."
+                            : std::string{"Point-set consolidation discarded; previous output retained."};
+                    }
+                    ReportProjectionRun(run, completion);
+                    ++ctx.Stats->CompletionEvents;
+                    ++ctx.Stats->CommitsDropped;
+                    PublishCompletion(ctx.Events, std::move(completion));
+                },
+                // Restart initializes the projection again before the next step on the worker; a hybrid run's
+                // sessions (their buffers and pipelines) stay.
+                .Restart =
+                    [w](std::string&)
+                {
+                    auto& run = *w;
+                    run.Preview.Discard();
+                    run.RowFailure = Consolidation::Status::Success;
+                    run.Failure.reset();
+                    run.Reinitialize = true;
+                    return true;
+                }};
+            if (hybrid)
+            {
+                std::string why;
+                if (!PrepareProjectionSessions(ctx, r, why))
+                {
+                    auto failed = r.Prepared;
+                    failed.Status = PointCloudConsolidationRunStatus::GeometryProcessingFailed;
+                    failed.Error = Core::ErrorCode::InvalidState;
+                    failed.Message = "Consolidation Vulkan query sessions unavailable: " + why;
+                    ++ctx.Stats->CommitsDropped;
+                    PublishCompletion(ctx.Events, std::move(failed));
+                    return;
+                }
+                callbacks.Step = [w](StepRunMetric& metric)
+                {
+                    return StepGpuProjection(*w, metric);
+                };
+            }
+            else
+                callbacks.Step = [w](StepRunMetric& metric)
+                {
+                    return StepCpuProjection(*w, metric);
+                };
+            if (r.Preview.Possible())
+            {
+                callbacks.Preview = [w](StepPreview& preview)
+                {
+                    auto& values = preview.Values;
+                    values.clear();
+                    if (!w->Projection || w->Reinitialize)
+                        return true; // nothing of an older generation shows
+                    for (const glm::vec3 point : w->Projection->Positions())
+                        values.insert(values.end(), {point.x, point.y, point.z});
+                    return true;
+                };
+                callbacks.Show = [w](const StepPreview& preview)
+                {
+                    return w->Preview.Show(preview.Values);
+                };
+            }
+            const std::string label = std::string{StableToken(request.Config.Strategy)} +
+                (hybrid                                                        ? " (Vulkan LBVH, CPU projection)"
+                        : r.Backend == PointCloudConsolidationBackend::CpuLBVH ? " (CPU LBVH)"
+                                                                               : " (CPU)");
+            const EditorJobIdentity identity{.EntityId = request.StableEntityId,
+                .Scope = ToEditorJobScope(request.Properties.OutputPositions.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
+                .OutputName = request.Properties.OutputPositions.Name,
+                .RequestedDomain = hybrid ? EditorJobDomain::GpuCompute : EditorJobDomain::Cpu};
+            std::string refusal;
+            r.Run = ctx.Steps->Start({.Label = label,
+                                         .Owner = "Runtime.PointCloudConsolidationModule",
+                                         .Output = {.StableEntityId = request.StableEntityId,
+                                             .Property = request.Properties.OutputPositions},
+                                         .Execution = request.Config.Execution,
+                                         .MetricNames = {"max_displacement", "average_displacement", "", ""}},
+                std::move(callbacks),
+                EditorStepRunJobs(RunJobCommands(ctx, r.Snapshot), identity, std::make_shared<JobToken>()),
+                refusal);
+            if (r.Run == 0u)
+            {
+                auto failed = r.Prepared;
+                failed.Status = PointCloudConsolidationRunStatus::GeometryProcessingFailed;
+                failed.Error = Core::ErrorCode::InvalidState;
+                failed.Message = "Point-set consolidation run refused: " + refusal;
+                ++ctx.Stats->CommitsDropped;
+                PublishCompletion(ctx.Events, std::move(failed));
+                return;
+            }
+            r.Driver = ctx.Steps->Driver(r.Run);
+            ctx.Runs->Runs[r.Snapshot.Correlation.Value] = w;
+        }
+
+        PointCloudConsolidationGpuObservation ObserveProjectionRun(const PointCloudConsolidationRunContext& ctx,
+            const CommandCorrelationId correlation,
+            const PointCloudConsolidationGpuAction action)
+        {
+            const auto found = ctx.Runs->Runs.find(correlation.Value);
+            if (found == ctx.Runs->Runs.end() || ctx.Steps == nullptr)
+                return {};
+            const auto w = found->second; // a discard below may erase the entry
+            std::string refusal;
+            if (action == PointCloudConsolidationGpuAction::Stop)
+                (void)ctx.Steps->Control(w->Run, StepRunAction::Stop, 1u, refusal);
+            else if (action == PointCloudConsolidationGpuAction::Accept)
+                (void)ctx.Steps->Control(w->Run, StepRunAction::Accept, 1u, refusal);
+            else if (action == PointCloudConsolidationGpuAction::Discard)
+                (void)ctx.Steps->Control(w->Run, StepRunAction::Discard, 1u, refusal);
+            const auto run = ctx.Steps->Observe(w->Run);
+            if (!run)
+                return {};
+            const bool accepting = run->Phase == StepRunPhase::Accepting;
+            const bool ready = run->Phase == StepRunPhase::Paused && run->Steps > 0u && !run->SegmentInFlight;
+            return {.Correlation = correlation,
+                .Running = !IsTerminal(run->Phase) && !ready && !accepting,
+                .ReadyToAccept = ready,
+                .Accepting = accepting,
+                .CanAccept = ready,
+                .Message = accepting ? "Publishing the result."
+                    : ready          ? "Ready to Accept or Discard."
+                                     : std::string{ToString(run->Phase)},
+                .StepRun = w->Run,
+                .Iterations = run->Steps,
+                .Submissions = static_cast<std::uint32_t>(w->QueryBatches()),
+                .Previews = static_cast<std::uint32_t>(run->PreviewCopies),
+                .CpuStageUploadBytes = w->QueryUploadBytes(),
+                .CpuStageReadbackBytes = w->QueryReadbackBytes()};
+        }
+
+        // The hybrid backend: Vulkan LBVH radius batches for every neighbourhood, the projection's arithmetic on
+        // workers. Preparation (support radius, initial samples, the projection) runs in one worker job.
+        CommandOutcome SubmitProjectionGpu(
+            const PointCloudConsolidationRunContext& ctx, PointCloudConsolidationSnapshot snapshot)
+        {
+            auto w = std::make_shared<ProjectionRun>();
+            w->Backend = PointCloudConsolidationBackend::VulkanLBVH;
+            w->Snapshot = std::move(snapshot);
+            const auto request = w->Snapshot.Request;
+            const auto world = w->Snapshot.World;
+            const auto correlation = w->Snapshot.Correlation;
+            auto orderingReport = InitialSamplingReportOf(w->Snapshot);
+            JobDesc job{.DebugName = "Consolidation Vulkan support preparation",
+                .Scope = world,
+                .CorrelationId = correlation.Value,
+                .Work =
+                    [w](const JobCancellation& cancellation)
+                {
+                    auto prepared = RunWorker(std::move(w->Snapshot), cancellation);
+                    w->Snapshot = std::move(prepared.Snapshot);
+                    if (!prepared.GpuPrepared)
+                        return JobResultEnvelope::Make(prepared.Completion);
+                    w->Projection = std::make_unique<Consolidation::NeighborhoodProjection>(
+                        w->Snapshot.Positions, w->Snapshot.Normals, w->Snapshot.Params);
+                    w->Snapshot.BackendDiagnostic = "Hybrid: Vulkan LBVH neighborhoods, each iteration's rows read "
+                                                    "back; CPU support-radius analysis and projection arithmetic.";
+                    const auto& config = w->Snapshot.Request.Config;
+                    if (config.Strategy == PointCloudConsolidationStrategy::Clop)
+                        w->Snapshot.BackendDiagnostic +=
+                            " Gaussian-mixture fitting and dense continuous attraction remain on CPU.";
+                    if (config.Strategy == PointCloudConsolidationStrategy::Ear ||
+                        (config.Strategy == PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic))
+                        w->Snapshot.BackendDiagnostic += " Initial normal estimation remains on CPU; moving normal "
+                                                         "refinement uses supplied neighborhoods.";
+                    if (config.Strategy == PointCloudConsolidationStrategy::Ear)
                         w->Snapshot.BackendDiagnostic += " Progressive insertion remains on CPU.";
                     return JobResultEnvelope::Make(prepared.Completion);
-                },.ValidateBeforeApply=validate,
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope& envelope)
+                },
+                .PublishCompletion =
+                    [ctx, w](KernelEventBus&, const JobResultEnvelope& envelope)
                 {
-                    if(!w->Projection)
-                    {if(const auto* result=envelope.TryGet<PointCloudConsolidationResult>())w->Failure=*result;return false;}
-                    return true;
-                },.FinalizeUnpublishedOnMainThread=finalize});
-            // Source density and L2 initialization precede at most MaxIterations updates.
-            for(std::uint32_t stage=0;accepted && stage<request.Config.MaxIterations+2;++stage)
-            {
-                accepted=submit({.DebugName="Consolidation Vulkan neighborhoods",.Scope=world,
-                    .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
-                    .IsReadyToApply=[&cache,w]{return AdvanceProjectionGpu(cache,*w);},.ValidateBeforeApply=validate,
-                    .PublishCompletion=check,.FinalizeUnpublishedOnMainThread=finalize});
-                if(!accepted)break;
-                const bool last=stage==request.Config.MaxIterations+1;
-                JobDesc step{.DebugName="Consolidation projection update",.Scope=world,
-                    .Work=[w](const JobCancellation&)
+                    const auto* result = envelope.TryGet<PointCloudConsolidationResult>();
+                    auto completion = result != nullptr
+                        ? *result
+                        : MakeCompletion(w->Snapshot.Request,
+                              w->Snapshot.World,
+                              w->Snapshot.Correlation,
+                              PointCloudConsolidationRunStatus::GeometryProcessingFailed,
+                              Core::ErrorCode::InvalidState,
+                              "Consolidation CPU projection preparation failed.");
+                    if (!w->Projection)
                     {
-                        if(w->Projection->Phase()!=Consolidation::ProjectionPhase::Finished)
-                            w->Projection->Advance(w->Source.View(),w->Projected.View());
-                        return JobResultEnvelope::Make(true);
-                    },.ValidateBeforeApply=validate,.FinalizeUnpublishedOnMainThread=finalize};
-                if(last)step.PublishCompletion=[w,&stats](KernelEventBus& bus,const JobResultEnvelope&)
+                        if (completion.Status == PointCloudConsolidationRunStatus::Queued)
+                        {
+                            completion.Status = PointCloudConsolidationRunStatus::GeometryProcessingFailed;
+                            completion.Error = Core::ErrorCode::InvalidState;
+                        }
+                        ++ctx.Stats->CommitsDropped;
+                        PublishCompletion(ctx.Events, std::move(completion));
+                        return true;
+                    }
+                    StartProjectionRun(ctx, w, std::move(completion));
+                    return true;
+                },
+                .FinalizeUnpublishedOnMainThread =
+                    [events = ctx.Events, request, world, correlation, orderingReport = std::move(orderingReport)]
                 {
-                    auto consolidated=w->Projection->TakeResult();
-                    consolidated.Diagnostics.Implementation="vulkan_lbvh_cpu_projection";
-                    w->Projection.reset();
-                    auto result=std::make_shared<PointCloudConsolidationJobResult>(BuildConsolidationJobResult(
-                        std::move(w->Snapshot),std::move(consolidated),PointCloudConsolidationBackend::VulkanLBVH));
-                    result->Completion.GpuQueryBatches=w->QueryBatches;result->Completion.SpatialWorkspaceBuilds=w->WorkspaceBuilds;
-                    w->Delivered=true;++stats.GpuCompletions;bus.Publish(PointCloudConsolidationJobCompleted{result});return true;
-                };
-                else step.PublishCompletion=[w,check](KernelEventBus& bus,const JobResultEnvelope& result)
-                {
-                    if(!check(bus,result))return false;
-                    w->Source.Restart();w->Projected.Restart();w->MovingStale=true;return true;
-                };
-                accepted=submit(std::move(step));
-            }
-            if(!accepted)
+                    auto completion = MakeCompletion(request,
+                        world,
+                        correlation,
+                        PointCloudConsolidationRunStatus::Cancelled,
+                        Core::ErrorCode::InvalidState,
+                        "Consolidation Vulkan sequence cancelled; previous output retained.");
+                    ReportInitialSampling(completion, orderingReport); // the worker may still own the snapshot
+                    PublishCompletion(events, std::move(completion));
+                }};
+            if (w->Snapshot.InitialOrderJob.IsValid()) // RUNTIME-289: a device initial order runs first
+                job.DependsOn.push_back({w->Snapshot.InitialOrderJob, "Order the initial samples on the device first"});
+            if (!ctx.Jobs->Submit(std::move(job)).IsValid())
             {
-                w->Abandoned=true;
-                if(!w->Delivered)
-                {
-                    w->Delivered=true;
-                    PublishCompletion(events,MakeCompletion(request,world,correlation,PointCloudConsolidationRunStatus::GeometryProcessingFailed,
-                        Core::ErrorCode::InvalidState,"Consolidation Vulkan job sequence submission rejected; previous output retained."));
-                }
-                return CommandOutcome::Fail("Consolidation Vulkan job sequence submission rejected.");
+                ++ctx.Stats->JobSubmissionFailures;
+                PublishCompletion(ctx.Events,
+                    MakeCompletion(request,
+                        world,
+                        correlation,
+                        PointCloudConsolidationRunStatus::GeometryProcessingFailed,
+                        Core::ErrorCode::InvalidState,
+                        "Consolidation Vulkan job submission rejected; previous output retained."));
+                return CommandOutcome::Fail("Consolidation Vulkan job submission rejected.");
             }
-            ++stats.GpuRequestsAccepted;return CommandOutcome::Ok();
+            ++ctx.Stats->JobsSubmitted;
+            ++ctx.Stats->GpuRequestsAccepted;
+            return CommandOutcome::Ok();
         }
 
         // RUNTIME-289: farthest-point initial samples asked on Vulkan are ordered by a framed device
@@ -2711,19 +3296,33 @@ namespace Extrinsic::Runtime
             snapshot.InitialOrderJob = token;
         }
 
-        [[nodiscard]] CommandOutcome HandleRunCommand(
-            CommandContext& context,
+        [[nodiscard]] CommandOutcome HandleRunCommand(CommandContext& context,
             const PointCloudConsolidationRequest& request,
-            PointCloudConsolidationModuleStats& stats,
-            SpatialIndexCache* spatialIndices,
-            RHI::IDevice* device)
+            const PointCloudConsolidationRunContext& ctx)
         {
+            auto& stats = *ctx.Stats;
+            SpatialIndexCache* const spatialIndices = ctx.Cache;
+            RHI::IDevice* const device = ctx.Device;
             stats.CommandsHandled += 1u;
             if (context.Jobs == nullptr || context.Worlds == nullptr ||
                 context.Events == nullptr)
             {
                 return CommandOutcome::Fail(
                     "Point-set consolidation requires JobService, WorldRegistry, and KernelEventBus.");
+            }
+            // Every backend runs as a step run (run, step n, pause, stop, accept, discard, restart).
+            if (ctx.Steps == nullptr)
+            {
+                constexpr std::string_view message =
+                    "Point-set consolidation requires the step-run service (Runtime.Services.StepRuns).";
+                PublishCompletion(context.Events,
+                    MakeCompletion(request,
+                        context.Worlds->ActiveWorld(),
+                        context.Correlation,
+                        PointCloudConsolidationRunStatus::ModuleUnavailable,
+                        Core::ErrorCode::InvalidState,
+                        std::string{message}));
+                return CommandOutcome::Fail(std::string{message});
             }
 
             const WorldHandle world = context.Worlds->ActiveWorld();
@@ -2786,7 +3385,7 @@ namespace Extrinsic::Runtime
             }
             SubmitInitialOrdering(context, world, spatialIndices, device, *snapshot);
             if (request.Config.Backend == PointCloudConsolidationBackend::VulkanLBVH)
-                return SubmitProjectionGpu(*context.Jobs,context.Events,*spatialIndices,std::move(*snapshot),stats);
+                return SubmitProjectionGpu(ctx, std::move(*snapshot));
             return SubmitSnapshot(
                 *context.Jobs,
                 context.Events,
@@ -2815,12 +3414,27 @@ namespace Extrinsic::Runtime
         return "Runtime.PointCloudConsolidationModule";
     }
 
+    // The services as resolved now (the history, cache and step runs resolve after registration).
+    PointCloudConsolidationRunContext PointCloudConsolidationModule::RunContext() noexcept
+    {
+        return {.Jobs = m_Jobs,
+            .Worlds = m_Worlds,
+            .Events = m_Events,
+            .History = m_History,
+            .Stats = &m_Stats,
+            .Cache = m_SpatialIndices,
+            .Device = m_Device,
+            .Steps = m_StepRuns,
+            .Runs = m_Runs.get()};
+    }
+
     Core::Result PointCloudConsolidationModule::OnRegister(EngineSetup& setup)
     {
         m_Events = &setup.Events();
         m_Jobs = &setup.Jobs();
         m_Worlds = &setup.Worlds();
         m_Readiness = std::make_unique<PointCloudConsolidationReadinessState>();
+        m_Runs = std::make_unique<PointCloudConsolidationRunTable>();
         m_Service.Bind(&setup.Commands(), m_Events, &m_Stats,
             [this, commands = &setup.Commands()](WorldHandle world,
                 const PointCloudConsolidationRequest& request)
@@ -2856,11 +3470,7 @@ namespace Extrinsic::Runtime
             setup.Services().Find<Graphics::IRenderer>();
         if (m_Device != nullptr && renderer != nullptr)
         {
-            m_GpuState =
-                std::make_unique<PointCloudConsolidationGpuState>(
-                    *m_Device,
-                    renderer->GetBufferManager(),
-                    m_Device->GetTransferQueue());
+            m_GpuState = std::make_unique<PointCloudConsolidationGpuState>(*m_Device);
             m_GpuParticipant = m_Jobs->RegisterGpuQueueParticipant(
                 GpuQueueParticipantDesc{
                     .DebugName =
@@ -2884,13 +3494,7 @@ namespace Extrinsic::Runtime
                                    result =
                                    m_GpuState->ConsumeCompleted())
                         {
-                            HandleGpuResult(
-                                std::move(*result),
-                                m_Jobs,
-                                m_Worlds,
-                                m_Events,
-                                m_History,
-                                m_Stats);
+                            HandleGpuResult(std::move(*result), RunContext());
                         }
                     },
                     .HasInFlightWork = [this]() -> bool
@@ -2908,30 +3512,25 @@ namespace Extrinsic::Runtime
                 m_GpuState.reset();
         }
 
-        m_Service.m_GpuRun = [this](CommandCorrelationId correlation, PointCloudConsolidationGpuAction action) {
-            return m_GpuState ? m_GpuState->GpuRun(correlation, action) : PointCloudConsolidationGpuObservation{};
+        // Every run is observable here: a resident one through its GPU state, a CPU or hybrid one through its table.
+        m_Service.m_GpuRun = [this](CommandCorrelationId correlation, PointCloudConsolidationGpuAction action)
+        {
+            if (m_GpuState)
+                if (auto observed = m_GpuState->GpuRun(correlation, action); observed.Correlation.IsValid())
+                    return observed;
+            return ObserveProjectionRun(RunContext(), correlation, action);
         };
         m_Service.m_GpuBusy = [this] { return m_GpuState && m_GpuState->HasPendingRun(); };
         setup.RegisterCommandHandler<PointCloudConsolidationRequest>(
-            [this](
-                CommandContext& context,
-                const PointCloudConsolidationRequest& request)
+            [this](CommandContext& context, const PointCloudConsolidationRequest& request)
             {
-                return HandleRunCommand(context, request, m_Stats, m_SpatialIndices, m_Device);
+                return HandleRunCommand(context, request, RunContext());
             });
-        m_JobCompletedSubscription =
-            setup.Subscribe<PointCloudConsolidationJobCompleted>(
-                [this](const PointCloudConsolidationJobCompleted& event)
-                {
-                    HandleJobCompleted(
-                        event,
-                        m_Jobs,
-                        m_GpuState.get(),
-                        m_Worlds,
-                        m_Events,
-                        m_History,
-                        m_Stats, m_SpatialIndices, m_Device);
-                });
+        m_JobCompletedSubscription = setup.Subscribe<PointCloudConsolidationJobCompleted>(
+            [this](const PointCloudConsolidationJobCompleted& event)
+            {
+                HandleJobCompleted(event, RunContext(), m_GpuState.get());
+            });
         return Core::Ok();
     }
 
@@ -2939,6 +3538,9 @@ namespace Extrinsic::Runtime
     {
         m_History = setup.Services().Find<EditorCommandHistory>();
         m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
+        m_StepRuns = setup.Services().Find<StepRunsService>();
+        if (m_GpuState != nullptr)
+            m_GpuState->UseStepRuns(m_StepRuns);
         return Core::Ok();
     }
 
@@ -2954,6 +3556,15 @@ namespace Extrinsic::Runtime
         }
         m_GpuParticipant = {};
         m_GpuState.reset();
+        // CPU and hybrid runs end discarded here and drop their callables (they capture this module's services).
+        if (m_Runs)
+            for (auto& [correlation, run] : std::exchange(m_Runs->Runs, {}))
+            {
+                run->Abandoned = true;
+                run->Abort.store(true, std::memory_order_release); // a waiting hybrid page gives up
+                run->Delivered = true;
+                run->Driver.Abandon();
+            }
         if (m_JobCompletedSubscription.IsValid())
             context.Events.Unsubscribe(m_JobCompletedSubscription);
         m_JobCompletedSubscription = {};
@@ -2966,6 +3577,7 @@ namespace Extrinsic::Runtime
         m_Worlds = nullptr;
         m_History = nullptr;
         m_SpatialIndices = nullptr;
+        m_StepRuns = nullptr;
         m_Device = nullptr;
     }
     }

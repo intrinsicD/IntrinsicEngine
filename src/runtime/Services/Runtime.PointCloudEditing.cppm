@@ -1,7 +1,7 @@
 // ARCH-022: point-cloud edits for plugins. Captures an entity's live points and normals, gives neighbourhood rows
 // (k nearest or within a radius) on the CPU or the GPU, and publishes new positions into a vec3 output, or values
 // into several scalar outputs, with one undo entry; or runs a point scalar method on the GPU with a resident preview
-// until Accept or Discard. It wraps the editor's shared point helpers, so a plugin imports no editor module, and it
+// until Accept or Discard, a one-shot step run the host's shared run controls drive. It wraps the editor's shared point helpers, so a plugin imports no editor module, and it
 // holds no plugin callable: undo entries hold host data, so they work after the plugin that recorded them is unloaded.
 module;
 
@@ -13,6 +13,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -24,9 +25,12 @@ export module Extrinsic.Runtime.PointCloudEditing;
 export import Extrinsic.Runtime.GeometryAvailability;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.PointLBVH;
+export import Extrinsic.Graphics.PointQuery;
 export import Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.GpuPropertyResidency;
 export import Extrinsic.Runtime.PluginContract;
+export import Extrinsic.Runtime.StepRunControls; // the host's run-control row and the shared execution options
+import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.ModuleLifecycle;
 
@@ -46,6 +50,9 @@ export namespace Extrinsic::Runtime
         std::string Noun{}; // a missing entity answers "<Noun> target entity is stale or missing." (default "The")
         bool CopyValues{true};    // false: readiness only, nothing copied
         bool AcquireIndex{false}; // the cached spatial index of the points (CPU and GPU neighbourhoods)
+        // With AcquireIndex: also its CPU hierarchy. False (ARCH-023: a capture only GPU rows read): none is built for
+        // it; CpuIndex answers null and CpuRadiusRows refuses.
+        bool CpuIndex{true};
         // The entity's local Transform (an unparented entity only): its matrix in the view, and the capture is stale
         // once the entity gets a parent or its Transform changes, appears or goes.
         bool CaptureTransform{false};
@@ -76,11 +83,50 @@ export namespace Extrinsic::Runtime
 
     enum class PointRowsState : std::uint8_t { Pending, Ready, Failed };
 
+    // Cumulative over a capture's GPU rows (ARCH-023: a hybrid method's per-pass traffic): host bytes written for the
+    // queries and for the private moving workspace's points (its row map once, at creation), and the packed results
+    // read back.
     struct PointGpuRowStats
     {
         std::size_t QueryBatches{0u}, WorkspaceBuilds{0u};
         double Milliseconds{0.0};
+        std::uint64_t QueryUploadBytes{0u}, WorkspaceUploadBytes{0u}, ReadbackBytes{0u};
     };
+
+    // ARCH-023: a capture's GPU neighbour rows computed by its run's worker step, with no frame, owner callback or
+    // render thread (PointCloudEditingService::PrepareGpuRows on the main thread at the run's start, then the Compute
+    // functions below on the worker, one call at a time). It holds the prepared device query sessions and the
+    // capture's source rows only (no capture, ECS or cache state); dropping it (any thread) releases the sessions once
+    // their last page completed.
+    struct PointGpuRows;
+    struct PointGpuRowsRequest
+    {
+        // kNN rows: either strategy; radius rows: Lbvh only (brute force is refused).
+        Graphics::PointQueryStrategy Strategy{Graphics::PointQueryStrategy::Lbvh};
+        std::uint32_t BatchSize{1u}; // queries per page
+        // kNN rows: neighbours per point, self included (1..64). 0 selects radius rows.
+        std::uint32_t Width{0u};
+        // kNN: later passes query the moved points (a private target over them, rebuilt on the worker); without it
+        // every pass queries the cached index with the captured points.
+        bool Moving{false};
+        // Radius rows: candidates kept per query, and a positive lowest-ID limit (0: the complete support).
+        std::uint32_t Capacity{0u}, LowestIdLimit{0u};
+    };
+    // Worker: one pass of kNN rows (`width` compact indices per point of `points`, self included): the first pass
+    // queries the cached index with the captured points, later passes (a Moving request) the moved `points`. Ready;
+    // Failed with the reason; Pending when AbortGpuRows ended it first (the run ended; nothing to report).
+    [[nodiscard]] PointRowsState ComputeGpuKnnRows(PointGpuRows& rows,
+        std::span<const glm::vec3> points,
+        std::vector<std::uint32_t>& out,
+        std::string& diagnostic);
+    // Worker: every radius row of the captured points (self excluded, lowest-ID limit as requested), as
+    // CpuRadiusRows gives them. Ready, Failed with the reason, or Pending (aborted).
+    [[nodiscard]] PointRowsState ComputeGpuRadiusRows(
+        PointGpuRows& rows, float radius, PointNeighbourRows& out, std::string& diagnostic);
+    // Any thread (the run's Discard): a waiting or later Compute returns Pending.
+    void AbortGpuRows(PointGpuRows& rows) noexcept;
+    // Any thread: the traffic so far (QueryBatches: pages).
+    [[nodiscard]] PointGpuRowStats GpuRowStats(const PointGpuRows& rows) noexcept;
 
     // Unrepresentable: a value does not fit a scalar output's storage exactly (nothing is written).
     enum class PointPublishStatus : std::uint8_t { Applied, Stale, Rejected, Unrepresentable };
@@ -118,6 +164,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t GpuInputUploadBytes{0u}, GpuInputCacheHits{0u}, CpuStageReadbackBytes{0u};
         std::uint32_t GpuQueryBatches{0u};
         Graphics::PointScalarGpuStats Statistics{};
+        std::uint64_t StepRun{0u}; // the run's step run (run_control, run_observe)
     };
 
     // A refused start: why, and whether another run owns the output (then that run's result answers, not this one).
@@ -150,6 +197,8 @@ export namespace Extrinsic::Runtime
         ScalarAnalysisState Accept();
         // Releases the preview; the output and the history stay unchanged.
         void Discard();
+        // The step-run service its one-shot step run belongs to (run id: Poll().StepRun); null without a run.
+        [[nodiscard]] StepRunsService* StepRuns() const noexcept;
 
     private:
         std::shared_ptr<Run> m_Run; // the only owner; the service keeps a weak reference to end it
@@ -168,6 +217,37 @@ export namespace Extrinsic::Runtime
     // A plugin window's scalar output (ImGui): its name and storage (bool, int32, uint32, uint64, float, double);
     // true when either changed.
     bool PointScalarOutputInput(const char* label, GeometryPropertyRef& ref);
+    // A plugin window's controls of a scalar run not yet ended (ImGui): the host's step-run row of a GPU run
+    // (`analysis`) or of a CPU run (`stepRun`, its ScalarCpuRun's id), the actions MCP run_control issues: run or step
+    // its one step, pause, stop, restart, Accept with one undo entry, Discard.
+    void DrawScalarAnalysisControls(
+        ScalarAnalysis& analysis, std::uint64_t stepRun, std::string_view idSuffix, StepRunControlsState& row);
+
+    // A scalar plugin's CPU run (ARCH-023; kernel density, point spacing and density weights): a one-shot worker run
+    // of the host's step runs (StartOneShotWorkerRun), so it takes the run controls and the execution options a GPU
+    // run takes. Its one step computes the column (one value per captured point) on a worker; Accept publishes it
+    // into the capture's scalar output with one undo entry, nothing before. Its holder job names `Output` (a second
+    // run there is refused). It is valid while `Session` and the capture are current: an edit of an input or
+    // the output, a detach or a workspace switch discards it.
+    struct ScalarCpuRun
+    {
+        std::shared_ptr<PointEdit> Edit{};
+        PointSession Session{};
+        PluginJobOutput Output{};
+        // The Jobs row ("Radii estimation"), the undo entry, the output's noun ("Radii") and the method in a sentence
+        // ("point spacing").
+        std::string Label{}, History{}, Noun{}, Method{};
+        StepRunExecution Execution{}; // its auto_accept and start apply
+        // Worker: the column into `values`; false when it failed (the plugin keeps the reason).
+        std::function<bool(std::vector<float>& values)> Compute{};
+        // Main thread, once, at the settled end (StepRunCallbacks::Finished; at Accept for a publication): the step has
+        // returned and the holder released the output, so Compute's state may be read or freed and a new run on the
+        // output is admitted (once Finish returns, for a publication). Status applied, stale, invalid, failed,
+        // discarded or cancelled, with the host's reason (empty for applied and for a failed step, which the plugin
+        // words). `ownResult`: the run's own step decided it (a publication's answer, or Compute failing), so
+        // Compute's result describes it; otherwise it ended before (discard, cancel, stale, a refused step).
+        std::function<void(std::string_view status, std::string message, bool ownResult)> Finish{};
+    };
 
     class PointCloudEditingService
     {
@@ -187,25 +267,17 @@ export namespace Extrinsic::Runtime
         // Main thread: the cached spatial index of a capture made without AcquireIndex, as AcquireIndex would have
         // acquired it, so a caller can check its own limits first; false with the reason.
         [[nodiscard]] bool AcquireIndex(PointEdit& edit, std::string& diagnostic);
-        // Main thread: GPU neighbourhood queries can run (framed spatial cache and job service).
+        // Main thread: GPU neighbourhood queries can run (the spatial cache's device and the job service).
         [[nodiscard]] bool GpuQueriesAvailable();
-        // Main thread, once per frame until Ready or Failed: appends `width` compact neighbour indices (self
-        // included) per point of `points`. The first pass queries the cached index; after RestartGpuKnnRows a
-        // pass queries a private index over the moved `points`.
-        [[nodiscard]] PointRowsState AdvanceGpuKnnRows(PointEdit& edit, std::span<const glm::vec3> points,
-                                                       std::uint32_t width, std::uint32_t batchSize,
-                                                       std::vector<std::uint32_t>& rows, std::string& diagnostic);
-        void RestartGpuKnnRows(PointEdit& edit);
-        // Rows within `radius` (with AcquireIndex). A positive `lowestIdLimit` keeps a point's lowest-ID neighbours
-        // up to that many; 0 requires the complete support. CPU: from the cached index, any thread. GPU: main thread,
-        // once per frame until Ready or Failed, pages of `batchSize` queries with `capacity` candidates each; Failed
-        // when the inputs changed. False or Failed with a diagnostic when a support is incomplete.
+        // Rows within `radius` from the cached CPU index (with AcquireIndex and CpuIndex), any thread. A positive
+        // `lowestIdLimit` keeps a point's lowest-ID neighbours up to that many; 0 requires the complete support. False
+        // with a diagnostic when a support is incomplete. GPU rows: PrepareGpuRows, then ComputeGpuRadiusRows.
         [[nodiscard]] bool CpuRadiusRows(const PointEdit& edit, float radius, std::uint32_t lowestIdLimit,
                                          PointNeighbourRows& rows, std::string& diagnostic) const;
-        [[nodiscard]] PointRowsState AdvanceGpuRadiusRows(PointEdit& edit, float radius, std::uint32_t batchSize,
-                                                          std::uint32_t capacity, std::uint32_t lowestIdLimit,
-                                                          PointNeighbourRows& rows, std::string& diagnostic);
-        [[nodiscard]] PointGpuRowStats GpuRowStats(const PointEdit& edit) const;
+        // Main thread, a run's start (ARCH-023): the worker rows of a capture made with AcquireIndex (see
+        // PointGpuRows), under the device batches' admission. Null with the reason.
+        [[nodiscard]] std::shared_ptr<PointGpuRows> PrepareGpuRows(
+            PointEdit& edit, const PointGpuRowsRequest& request, std::string& diagnostic);
         // Main thread: writes `live` (one position per captured point) into the output for the live slots, records
         // one undo entry named `label` and marks the entity dirty. Stale when an input or the output changed;
         // Rejected (nothing written) for a non-finite position.
@@ -222,6 +294,10 @@ export namespace Extrinsic::Runtime
         // none, as one undo entry named `label`. Deleted slots keep their values.
         [[nodiscard]] PointPublishStatus PublishScalars(PointEdit& edit, std::span<const std::vector<float>> columns,
                                                         std::string label);
+        // Main thread: starts `run` (a ScalarCpuRun) on the step runs of its capture's session, its jobs submitted
+        // through `jobs` (a plugin: PluginStepRunJobs(holder), whose holder becomes the plugin run's Handle); its step
+        // run's id, or 0 with the reason.
+        [[nodiscard]] std::uint64_t StartScalarCpuRun(ScalarCpuRun run, StepRunJobs jobs, std::string& refusal);
         // Main thread, side-effect free: empty when the method can run on `backend`, else why (the target, the
         // capture, fewer than MinimumLiveCount live samples, the LBVH limits; on the GPU its admission: a float output, normal
         // coordinates and parameters, k <= 63 for methods 0 and 1, row and workspace limits, an operational float64
@@ -230,10 +306,12 @@ export namespace Extrinsic::Runtime
         // may still be pending).
         [[nodiscard]] std::string ScalarAnalysisReadiness(const ScalarAnalysisRequest& request,
                                                           ScalarAnalysisBackend backend, bool current = false);
-        // Main thread: the GPU run after the same checks. The output shows its preview until Accept or Discard; an
-        // `autoAccept` run accepts as soon as it is ready. Empty with the reason in `refusal` otherwise.
-        [[nodiscard]] ScalarAnalysis StartScalarAnalysis(const ScalarAnalysisRequest& request, bool autoAccept,
-                                                         ScalarAnalysisRefusal& refusal);
+        // Main thread: the GPU run after the same checks, a one-shot step run (kOneShotStepRunExecution): of
+        // `execution` only its start (ready: nothing computed before run or step n) and automatic Accept (any but
+        // never: as soon as the one step ended, unless stopped) apply. The output shows its preview until Accept or
+        // Discard. Empty with the reason in `refusal` otherwise.
+        [[nodiscard]] ScalarAnalysis StartScalarAnalysis(
+            const ScalarAnalysisRequest& request, const StepRunExecution& execution, ScalarAnalysisRefusal& refusal);
         // A run over given values (one per slot) on a test residency, captured as a CPU run is; no device work.
         [[nodiscard]] ScalarAnalysis StartScalarAnalysisForTest(const ScalarAnalysisRequest& request,
                                                                 std::vector<float> values,
@@ -275,6 +353,8 @@ export namespace Extrinsic::Runtime
         const auto state = run.Analysis.Poll();
         auto r = run.Pending;
         fold(r, state);
+        if constexpr (requires { r.StepRun; })
+            r.StepRun = state.StepRun;
         switch (state.Phase)
         {
         case ScalarAnalysisPhase::Running:
@@ -289,7 +369,8 @@ export namespace Extrinsic::Runtime
         }
         book.Finish(run, std::move(r));
     }
-    // Publishes a ready preview; a refused Accept leaves its reason in Pending.
+    // Publishes a ready preview (the plugin's own Accept, as run_control's Accept does); a refused Accept leaves its
+    // reason in Pending.
     template <class Run, class Fold>
     void AcceptScalarPluginRun(PluginRunBook<Run>& book, Run& run, Fold&& fold)
     {
@@ -298,7 +379,7 @@ export namespace Extrinsic::Runtime
         if (state.Phase == ScalarAnalysisPhase::ReadyToAccept) run.Pending.Message = state.Message; // why not
         RefreshScalarPluginRun(book, run, fold);
     }
-    // Discards a GPU run's preview, or cancels a CPU run's jobs; false when nothing was active.
+    // Discards a GPU run's preview, or cancels a CPU run's step run (its holder job); false when nothing was active.
     template <class Run, class Fold>
     bool CancelScalarPluginRun(PluginRunBook<Run>& book, Run& run, Fold&& fold)
     {
@@ -308,6 +389,69 @@ export namespace Extrinsic::Runtime
         RefreshScalarPluginRun(book, run, fold);
         return true;
     }
+    // A scalar plugin CPU run's end (its ScalarCpuRun::Finish): `r` (the plugin's result) takes the status, the
+    // host's reason unless empty and the run's id, the Jobs row its outcome, and becomes the run's Final.
+    template <class Run, class Result>
+    void FinishScalarCpuPluginRun(
+        PluginRunBook<Run>& book, Run& run, Result r, const std::string_view status, std::string message)
+    {
+        if (run.Final)
+            return;
+        r.Status = std::string{status};
+        if (!message.empty())
+            r.Message = std::move(message);
+        r.StepRun = run.Pending.StepRun;
+        if (run.Handle.IsValid())
+            ReportPluginJobOutcome(run.Handle, PluginJobDomain::Cpu, r.Message);
+        book.Finish(run, std::move(r));
+    }
+    // A scalar plugin tool's input schema: the one-shot execution arguments auto_accept and start.
+    [[nodiscard]] inline std::string ScalarToolSchemaJson()
+    {
+        return R"({"type":"object","properties":{)" + StepRunExecutionSchemaProperties(1u) +
+            R"(},"additionalProperties":false})";
+    }
+
+    // A scalar plugin tool's run (MCP), on every backend. Without execution arguments it is a batch
+    // (kOneShotBatchExecution) that waits for the run's end (WaitForPluginRun). With auto_accept or start (its schema:
+    // StepRunExecutionSchemaProperties(1)) the arguments layer over the section's own options (`section`), as every
+    // agent start does; a result that does not compute at once and accept at its end answers at once with the run's
+    // state, whose "run" run_control and run_observe drive. `start(execution)` starts the plugin's run with the
+    // section's other settings and these options; `text` renders a Result; `refresh`/`cancel` take the run.
+    template <class Start, class Text, class Refresh, class Cancel>
+    [[nodiscard]] AgentOperationOutcome RunScalarPluginTool(const std::string_view arguments,
+        const StepRunExecution& section,
+        Start start,
+        Text text,
+        Refresh refresh,
+        Cancel cancel)
+    {
+        StepRunExecution execution =
+            NamesStepRunExecutionArguments(arguments, 1u) ? OneShotExecution(section) : kOneShotBatchExecution;
+        std::string refusal;
+        if (!ReadStepRunExecutionArguments(arguments, 1u, execution, refusal))
+            return {.IsError = true, .Text = refusal, .ErrorCode = "invalid_params"};
+        const bool batch = execution.Start == StepRunStart::Run && execution.AutoAccept != StepRunAutoAccept::Never;
+        const auto run = start(execution);
+        using Result = std::remove_cvref_t<decltype(run->Pending)>;
+        if (batch)
+            return WaitForPluginRun(
+                std::shared_ptr<PluginRun<Result>>(run),
+                text,
+                [run, refresh]
+                {
+                    refresh(*run);
+                },
+                [run, cancel]
+                {
+                    return cancel(*run);
+                });
+        refresh(*run);
+        const Result& result = run->Final ? *run->Final : run->Pending;
+        const bool failed = run->Final && run->Final->Status != "applied";
+        return {.IsError = failed, .Text = text(result), .ErrorCode = failed ? run->Final->Status : std::string{}};
+    }
+
     // The book's latest run while the service still works in its editor session; one of an earlier session is gone.
     template <class Run>
     [[nodiscard]] std::shared_ptr<Run> LatestScalarPluginRun(PluginRunBook<Run>& book)

@@ -6,6 +6,8 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 export module Extrinsic.Runtime.ClusteringModule;
 export import Extrinsic.Runtime.ClusteringTypes;
@@ -23,7 +25,13 @@ import Extrinsic.Runtime.WorldHandle;
 extern "C++"
 {
     namespace Extrinsic::RHI { class IDevice; }
-    namespace Extrinsic::Runtime { class WorldRegistry; class SpatialIndexCache; class EditorWorkspaceSlot; }
+    namespace Extrinsic::Runtime
+    {
+        class WorldRegistry;
+        class SpatialIndexCache;
+        class EditorWorkspaceSlot;
+        class StepRunsService;
+    }
 }
 
 namespace Extrinsic::Runtime
@@ -58,12 +66,13 @@ namespace Extrinsic::Runtime
             bool Replacement{false}; // replaces a run: counted in GpuReplacementsStarted once it starts
         };
         void StartHeld();
+        // Shutdown: the CPU step runs still live end (their callables reach the module's event bus and history).
+        void AbandonCpuRuns();
         void CancelHeld(KMeansRunStatus status, std::string why);
         void ReleaseCapture();
 
         ClusteringService m_Service{};
         std::optional<HeldRequest> m_Held{};
-        KernelEventSubscription m_JobCompletedSubscription{};
         KernelEventSubscription m_ClusterLabelsChangedSubscription{};
         KernelEventSubscription m_ActiveWorldChangedSubscription{};
         KernelEventBus* m_Events{};
@@ -72,6 +81,10 @@ namespace Extrinsic::Runtime
         EditorCommandHistory* m_History{};
         RHI::IDevice* m_Device{};
         SpatialIndexCache* m_SpatialIndices{};
+        StepRunsService* m_StepRuns{};
+        // The CPU step runs this module started (ARCH-023 B8), newest last: request and run id. Every live run stays
+        // listed; ended ones beyond 32 entries go.
+        std::vector<std::pair<CommandCorrelationId, std::uint64_t>> m_CpuRuns{};
         // A GPU run's holder and Accept are editor jobs of this workspace: the app's while it lends one (through the
         // service), else the module's own.
         std::unique_ptr<EditorWorkspaceSlot> m_Workspace;

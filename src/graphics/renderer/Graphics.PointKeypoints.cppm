@@ -6,7 +6,15 @@ export module Extrinsic.Graphics.PointKeypoints;
 import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.GpuPropertyResidency;
 
-extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+        class ICommandContext;
+        class BufferManager;
+    }
+}
 
 export namespace Extrinsic::Graphics
 {
@@ -33,7 +41,8 @@ export namespace Extrinsic::Graphics
     class PointKeypointWorkspace
     {
     public:
-        explicit PointKeypointWorkspace(RHI::IDevice& device);
+        // Device buffers are cached scratch leases of `scratch`, which must outlive the workspace.
+        PointKeypointWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch);
         ~PointKeypointWorkspace();
         // Resident canonical stride-12 positions and output leases stay held through
         // completion. The index maps compact rows to original property slots.
@@ -41,6 +50,13 @@ export namespace Extrinsic::Graphics
             std::uint64_t nodes, const GpuPropertyView& positions, std::uint64_t slots,
             std::uint32_t count, const PointKeypointParams& params, const PointKeypointPage& page,
             const GpuPropertyView& score, const GpuPropertyView& mask);
+        // ARCH-023, device-owner thread (a run's Init): checks the device, creates the pipeline and reserves `count`
+        // rows, resolving their addresses, so pages of up to that count then make no device call (a method worker
+        // records them; the header resets are recorded fills).
+        [[nodiscard]] bool Prepare(std::uint32_t count);
+        // Returns every buffer to its cache (pages of the current run are lost); the pipeline stays.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

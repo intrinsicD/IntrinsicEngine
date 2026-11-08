@@ -26,9 +26,11 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.PointSamplingGpu;
 import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -77,6 +79,13 @@ namespace
             Context.CommandHistory = &History;
             Context.JobCommands.Submit = [this](Runtime::JobDesc desc, Runtime::EditorJobIdentity) {
                 return Kernel().Jobs().Submit(std::move(desc));
+            };
+            // ARCH-023: both backends run as step runs of the composed service.
+            Context.StepRuns = Kernel().Services().Find<Runtime::StepRunsService>();
+            Context.JobCommands.Cancel = [this](const Runtime::JobToken token)
+            {
+                return Kernel().Jobs().Cancel(token) ? Runtime::EditorJobCancelStatus::Requested
+                                                     : Runtime::EditorJobCancelStatus::NotActive;
             };
             Direct = Cloud(40000, 300, 7u);
             Weights.resize(Direct.size());
@@ -154,10 +163,8 @@ namespace
                 Phase = 2;
                 return;
             }
-            if (Phase == 6) {
-                EXPECT_GT(Context.SpatialIndices->Stats().WorkspaceReuses, 0u);
-                Kernel().RequestExit(); return;
-            }
+            if (Phase >= 6)
+                return SteppedFrame();
             if (Phase >= 2 && !Waiting)
             {
                 // 2: CPU backend; 3-5: Vulkan backend three times (rank properties compared).
@@ -178,7 +185,10 @@ namespace
                             const auto& rows = std::as_const(Context.Scene->Raw().get<GS::Vertices>(Entity).Properties);
                             EXPECT_EQ(rows.Get<bool>("v:vulkan_selected").Vector(), rows.Get<bool>("v:cpu_selected").Vector());
                             if (Phase >= 4) { EXPECT_EQ(result.GpuInputUploadBytes, 0u); EXPECT_GT(result.GpuInputCacheHits, 0u); }
-                            EXPECT_EQ(result.CpuStageReadbackBytes, 0u);
+                            // The terminal readback only: no intermediate chunk moves samples to the CPU.
+                            EXPECT_EQ(result.CpuStageReadbackBytes,
+                                Extrinsic::Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(1500u));
+                            EXPECT_EQ(result.Steps, 1500u) << "one step per selected sample";
                         }
                         (vulkan ? EditorVulkan : EditorCpu) = std::move(result);
                         Waiting = false;
@@ -186,6 +196,141 @@ namespace
                     });
                 if (vulkan && pending.Status != Runtime::EditorCommandStatus::Pending && Waiting)
                     ADD_FAILURE() << "expected a queued Vulkan run: " << pending.Message;
+            }
+        }
+
+        // ARCH-023: an interactive Vulkan run (ready, Step(1), Step(9), Accept) publishes exactly the first ten samples
+        // of the CPU order; a run stopped while its one chunk is in flight still counts every sample of it.
+        void SteppedFrame()
+        {
+            auto* runs = Context.StepRuns;
+            const auto observed = [&]
+            {
+                return runs->Observe(StepRun);
+            };
+            const auto settled = [&]
+            {
+                const auto run = observed();
+                return run && run->Phase == Runtime::StepRunPhase::Paused && !run->SegmentInFlight;
+            };
+            const auto control = [&](const Runtime::StepRunAction action, const std::uint32_t count = 1u)
+            {
+                std::string refusal;
+                EXPECT_TRUE(runs->Control(StepRun, action, count, refusal)) << refusal;
+            };
+            const auto start = [&](const Runtime::StepRunStart mode)
+            {
+                Runtime::PointSamplingOperationConfig config{
+                    .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(Entity),
+                    .Count = 1500u,
+                    .Backend = Runtime::PointSamplingBackend::Vulkan,
+                    .RankName = "v:step_rank",
+                    .SelectedName = "v:step_selected"};
+                config.WeightsName = "v:importance";
+                config.Execution.Start = mode;
+                StepResult.reset();
+                const auto started = Runtime::StartEditorPointSampling(Runtime::BindEditorProcessingCommands(Context),
+                    config,
+                    [this](Runtime::EditorPointSamplingResult result)
+                    {
+                        StepResult = std::move(result);
+                    });
+                EXPECT_EQ(started.Status, Runtime::EditorCommandStatus::Pending) << started.Message;
+                StepRun = started.StepRun;
+                StepFrames = 0;
+            };
+            const auto cpuRank = Rank("v:cpu_rank");
+            switch (Phase)
+            {
+            case 6:
+                start(Runtime::StepRunStart::Ready);
+                ++Phase;
+                return;
+            case 7:
+                if (++StepFrames < 5)
+                    return;
+                EXPECT_EQ(observed()->Phase, Runtime::StepRunPhase::Ready);
+                EXPECT_EQ(observed()->Steps, 0u) << "a ready run selects nothing";
+                control(Runtime::StepRunAction::Step, 1u);
+                ++Phase;
+                return;
+            case 8:
+                if (!settled())
+                    return;
+                EXPECT_EQ(observed()->Steps, 1u) << "Step(1) selects one sample";
+                control(Runtime::StepRunAction::Step, 9u);
+                ++Phase;
+                return;
+            case 9:
+                if (!settled())
+                    return;
+                EXPECT_EQ(observed()->Steps, 10u) << "a chunk is capped by the steps left";
+                EXPECT_EQ(observed()->End, Runtime::StepRunEnd::None);
+                control(Runtime::StepRunAction::Accept);
+                ++Phase;
+                return;
+            case 10:
+            {
+                if (!StepResult)
+                    return;
+                ASSERT_TRUE(StepResult->Succeeded()) << StepResult->Message;
+                EXPECT_EQ(StepResult->Steps, 10u);
+                EXPECT_EQ(StepResult->Backend, "gpu_vulkan_compute") << StepResult->BackendDiagnostic;
+                EXPECT_EQ(StepResult->CpuStageReadbackBytes,
+                    Extrinsic::Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(1500u))
+                    << "one readback, at Accept";
+                const auto rank = Rank("v:step_rank");
+                ASSERT_EQ(rank.size(), cpuRank.size());
+                for (std::size_t i = 0; i < rank.size(); ++i)
+                    EXPECT_EQ(rank[i], cpuRank[i] >= 0.0f && cpuRank[i] < 10.0f ? cpuRank[i] : -1.0f) << "row " << i;
+                ASSERT_TRUE(History.Undo().Succeeded()) << "one undo entry";
+                EXPECT_FALSE(
+                    std::as_const(Context.Scene->Raw().get<GS::Vertices>(Entity).Properties).Exists("v:step_rank"));
+                start(Runtime::StepRunStart::Run);
+                ++Phase;
+                return;
+            }
+            case 11: // Stop while the one chunk is in flight.
+            {
+                const auto run = observed();
+                if (run && run->Phase == Runtime::StepRunPhase::Paused && run->End == Runtime::StepRunEnd::IterationCap)
+                {
+                    // The chunk completed between two frames: discard and try again.
+                    control(Runtime::StepRunAction::Discard);
+                    if (++StopAttempts >= 8)
+                    {
+                        ADD_FAILURE() << "no frame saw the chunk in flight";
+                        Phase = 14;
+                        Kernel().RequestExit();
+                        return;
+                    }
+                    start(Runtime::StepRunStart::Run);
+                    return;
+                }
+                if (!run || !run->SegmentInFlight)
+                    return;
+                control(Runtime::StepRunAction::Stop);
+                ++Phase;
+                return;
+            }
+            case 12:
+                if (!settled())
+                    return;
+                EXPECT_EQ(observed()->End, Runtime::StepRunEnd::Stopped);
+                EXPECT_EQ(observed()->Steps, 1500u) << "every sample of the chunk in flight counts after the Stop";
+                control(Runtime::StepRunAction::Accept);
+                ++Phase;
+                return;
+            case 13:
+                if (!StepResult)
+                    return;
+                ASSERT_TRUE(StepResult->Succeeded()) << StepResult->Message;
+                EXPECT_EQ(Rank("v:step_rank"), cpuRank);
+                EXPECT_GT(Context.SpatialIndices->Stats().WorkspaceReuses, 0u);
+                ++Phase;
+                Kernel().RequestExit();
+                return;
+            default: return;
             }
         }
 
@@ -198,6 +343,9 @@ namespace
 
         Runtime::EditorProcessingContext Context{};
         Runtime::EditorCommandHistory History{};
+        std::optional<Runtime::EditorPointSamplingResult> StepResult{};
+        std::uint64_t StepRun{};
+        int StepFrames{}, StopAttempts{};
         std::vector<glm::vec3> Direct{};
         std::vector<double> Weights{};
         entt::entity Entity{entt::null};
@@ -228,6 +376,7 @@ namespace
             Context.SpatialIndices = Kernel().Services().Find<Runtime::SpatialIndexCache>();
             Context.Device = &Kernel().GetDevice();
             Context.CommandHistory = &History;
+            Context.StepRuns = &StepRuns; // ARCH-023: a queued CPD run is a step run of the session's service
             Context.JobCommands.Submit = [this](Runtime::JobDesc desc, Runtime::EditorJobIdentity) {
                 return Kernel().Jobs().Submit(std::move(desc));
             };
@@ -269,9 +418,13 @@ namespace
             Runtime::CoherentPointDriftConfig config{
                 .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(Source),
                 .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(Target),
-                .Method = Runtime::CoherentPointDriftMethod::Bayesian, .OutlierWeight = 0.1, .MaxIterations = 4,
+                .Method = Runtime::CoherentPointDriftMethod::Bayesian,
+                .OutlierWeight = 0.1,
+                .Execution = {.IterationCap = 4u},
                 .Output = Runtime::CoherentPointDriftOutput::DisplacementProperty,
-                .DisplacementName = vulkan ? "v:vulkan_bcpd" : "v:cpu_bcpd", .Subsample = 300, .SubsampleTarget = 400};
+                .DisplacementName = vulkan ? "v:vulkan_bcpd" : "v:cpu_bcpd",
+                .Subsample = 300,
+                .SubsampleTarget = 400};
             config.SubsampleBackend = vulkan ? Runtime::PointSamplingBackend::Vulkan : Runtime::PointSamplingBackend::Cpu;
             Waiting = true;
             (void)Runtime::ApplyEditorCoherentPointDriftCommand(Runtime::BindEditorProcessingCommands(Context), config,
@@ -284,6 +437,7 @@ namespace
 
         void Shutdown() override { Context = {}; }
 
+        Runtime::StepRunsService StepRuns{};
         Runtime::EditorProcessingContext Context{};
         Runtime::EditorCommandHistory History{};
         entt::entity Source{entt::null}, Target{entt::null};
@@ -337,12 +491,13 @@ TEST(RUNTIME290VulkanPointSampling, FarthestPointMatchesTheCpuAcrossChunksAndThr
     auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>();
     engine.Initialize();
     Shutdown shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
     engine.Run();
     ASSERT_TRUE(run->Reason.empty()) << run->Reason;
-    ASSERT_EQ(run->Phase, 6);
+    ASSERT_EQ(run->Phase, 14);
 
     // Direct: several chunks, each observed prefix a prefix of the final order, equal to the CPU.
     ASSERT_GE(run->Prefixes.size(), 2u) << "the run must take more than one chunk";

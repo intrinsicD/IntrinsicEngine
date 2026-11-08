@@ -15,6 +15,7 @@ contracts:
   - runtime.kernel-interface-locality
   - runtime.processing-compilation-locality
   - geometry.property-coherence
+  - geometry.element-domain-sources
   - method.engine-integration
 ---
 # ARCH-023 — Shared GPU method execution
@@ -54,6 +55,69 @@ queries are the shortest path to cheap new methods and responsive existing ones.
    real deterministic GPU paths, CPU parity, stale results, cancellation, preview-off equality,
    unload and buffer reuse. Performance measurements require their own experiment pre-flight.
 
+## Reviewed implementation decisions
+- StepRunsService is the single control owner. GpuTransactionCore supplies resident output,
+  asynchronous Commit/Accept and release hooks to owner-driven step runs; accept-only transactions
+  have no dummy compute step. K-Means does not acquire a second run around its existing driver.
+- Shared execution options cover live preview, cadence, iteration limit and automatic acceptance;
+  backend/strategy availability and method precision remain explicit. Preserve each method's
+  numerical defaults and ranges, the iterative methods' execution defaults and current-format
+  round trips, without compatibility aliases or a universal method-shape registry.
+- One-shot execution defaults (coordinator's implementation choice, 2026-11-08, under the
+  operator's Q6/Q7/Q9 request that every method's lifecycle work and be configured alike; the
+  operator did not choose the value): every one-shot section and interactive start defaults to
+  `kOneShotStepRunExecution` (start `ready`, auto_accept `never`); explicit batches (Apply entry
+  points, waiting agent calls) use `kOneShotBatchExecution` (run, accept at the end). This
+  changes the earlier compute-at-once interactive one-shot default; it is recorded once in
+  `docs/architecture/engine-and-feature-modules.md`. Not a review approval of the task.
+- The compute lane reuses the transfer/readback facade but has its own command pool and timeline.
+  Upload/frame producers, compute/readback, published-preview visibility, deferred deletion,
+  workspace reuse and plugin drain all need actual completion ordering. Existing buffer-family
+  concurrent sharing is reused. No blanket render wait on unfinished method computation.
+- The raw-buffer budget/cache is a separate block after completion-safe queue integration. Host
+  caches may not retain destructors/code from an unloaded plugin. Active storage remains pinned.
+- Brute-force queries share the existing nearest/kNN/radius contract but build no GPU hierarchy.
+  Two real consumers: ICP and a plugin neighborhood path. Preserve float versus double contracts,
+  deterministic ties, original IDs, exclusions and overflow counts. No unmeasured auto selection.
+- Separate queue, common run migration and query strategies are implemented by separate Claude
+  Opus workers in isolated worktrees; Codex integrates and verifies. Independent final reviewers
+  receive the exact combined diff and actual test output. No recursive delegation by reviewers.
+- The accepted proposal also requires Run = repeated logical Step, Pause at a safe boundary,
+  Stop retaining a valid partial result, one revision-safe undoable Accept, Discard with no
+  publication, generation-safe Reset, and optional latest-complete preview that drops rather
+  than stalls. Preview-off must preserve results and avoid intermediate copies. GPU metrics
+  collection must not silently change convergence semantics.
+- All-method scope is the operator's explicit Q9 direction, including one-shot and hybrid
+  entry points; it is not narrowed to the minimum required by AGENTS. Use the ARCH-022 R7
+  inventory plus current plugins, with code-backed exceptions (graphics-only operations remain
+  on graphics; unsupported GPU algorithms remain honestly unsupported). No silent GPU ports.
+- Q9 establishes this work's order ahead of ARCH-022's remaining Q95 blocks. RUNTIME-311's
+  shared transaction owner and pending lifetime proofs, and GRAPHICS-153's residency/cache
+  work, feed this task; those tasks remain open until their own criteria are verified. This
+  task is an ARCH-022 implementation slice, not gated on the umbrella's retirement.
+- Quantitative performance remains unclaimed. A matched baseline can be run from preserved
+  dbe5312f3 in an isolated worktree after pre-flight. Existing numerical behavior and submission
+  page budgets stay fixed until the separately reviewed measurement authorizes a change.
+
+### Render-independent progress (independent counter-review)
+
+Opus review of tree `4893383d4ebf7587713ab038d9480a9e9d29c911` returned **REVISE**:
+separate submissions still advance only after Present; each page also waits for a fresh graphics
+tail. Complete plan step 3 using existing worker StepRuns: wait on actual graphics producer
+transfer tickets, synchronize distinct VkQueues independently, add bounded worker-safe completion/
+readback consumption, support pending worker-run Accept, and transfer optional GPU previews through
+a nonblocking mailbox. Keep ECS, residency mutation and publication on the owner thread. Migrate
+K-Means first, then all resident/paged GPU and hybrid owners through that same substrate. Shared
+native queues retain a truthful hardware limitation. Tests must prove multiple logical steps
+without frames, producer visibility, loose preview, cancellation and shutdown. No measured speedup
+is claimed. Exact review/session/packet are in ignored `compute-progress-plan-review` evidence.
+
+## Spatial acceleration review
+Existing owners are Graphics.PointLBVH and its shared GLSL includes, composed by
+Runtime.SpatialIndexCache. Reuse their checked output ABI and ranking semantics. Add only the
+missing explicit exhaustive GPU strategy and resident recording path; do not merge distinct
+precision contracts or replace K-Means' fused scan. Queries remain composable without CPU readback.
+
 ## Acceptance criteria
 - [ ] Method compute uses a separate available queue and correct GPU-to-GPU ordering; fallback is reported.
 - [ ] All existing method entry points have the common lifecycle or a documented, tested necessary exception.
@@ -90,10 +154,34 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/agents/generate_session_brief.py --check
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(StepRuns|GpuPropertyResidency|GpuTransactionLifecycle|GraphicsCrossQueueTimeline|GraphicsQueueAffinity)\.'
+cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests
 ```
 
 ## State
-Planning and independent counter-review. Clean baseline dbe5312f3; main's ci-linux-clang passes,
-ci-docs run 42406828027 fails at strict markdown links (pre-existing; investigation separate).
-No implementation or GPU/performance evidence yet. Review packets/logs stay in ignored
-tasks/evidence/ARCH-023/. All acceptance boxes describe work still required.
+The shared lifecycle and queue implementation has passed deterministic verification and independent
+review. Before closing the operator’s full Q9 scope, this task now completes render-independent
+initial GPU sampling for consolidation/CPD and worker stepping for runtime CPD with Vulkan subsampling
+(the review’s F3). The accepted core is frozen at tree a85668cebdebad9186cb8643230b94f8ac6c6592;
+the new slice requires its own plan review, focused regression evidence and final review. The [verification/review note](../../docs/reviews/2026-11-08-unified-gpu-method-runs.md)
+records the exact source trees, commands, combined GPU result, corrected fixture, skips and limits.
+The [coverage matrix](../../docs/methods/gpu-method-coverage.md) owns the current family inventory;
+the [method template](../../docs/methods/method-template.md) owns the reusable adapter pattern.
+
+All production GPU/hybrid families and their CPU counterparts use the shared controls. Raster
+texture bake and unsupported GPU requests retain their truthful behavior. Owner-side GPU Init,
+preview collection and Accept still require frame transfer collection; worker iterations do not.
+The other non-blocking internal simplifications are tracked in
+[RUNTIME-355](../backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md).
+
+The factory template is instantiated by nine typed callers in seven engine owner units; one
+private erased entry point preserves the opaque cache implementation. Pool, fence and release
+logic remain shared. CMake enforces the private host boundary, including a negative plugin-import
+probe; the unchanged feature-boundary ceiling passes at 27. No new layer exception is introduced.
+
+The operator's scope includes GPU/hybrid methods and their CPU counterparts. Pure CPU methods
+without a GPU counterpart remain outside this implementation. Existing numerical contracts and
+page budgets are preserved; no quantitative performance claim is made. Pre-existing documentation
+failures are addressed separately by BUG-257 and the operator-approved BUG-258 historical citation
+repair. Temporary evidence remains under ignored `tasks/evidence/ARCH-023/` until final acceptance.

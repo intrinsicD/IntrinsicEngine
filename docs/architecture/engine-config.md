@@ -55,7 +55,9 @@ against independent literal boundaries and wire-format controls.
     "default_recipe_config_path": "config/render-recipe.json",
     "synchronous_extraction": true,
     "gpu_property_idle_evict_seconds": 60,
-    "gpu_property_budget_megabytes": 256
+    "gpu_property_budget_megabytes": 256,
+    "gpu_method_buffer_budget_megabytes": 1024,
+    "method_compute_graphics_queue": false
   },
   "simulation": {
     "worker_thread_count": 0
@@ -172,6 +174,10 @@ against independent literal boundaries and wire-format controls.
           "max_predicted_contributions": 100000000,
           "repulsion_weight": 0.45,
           "max_iterations": 20,
+          "preview_every": 5,
+          "preview_interval_ms": 0,
+          "auto_accept": "never",
+          "start": "run",
           "convergence_tolerance": 0.0001,
           "target_point_count": 0,
           "seed": 42,
@@ -209,6 +215,8 @@ against independent literal boundaries and wire-format controls.
 | `render` | `synchronous_extraction` | Boolean |
 | `render` | `gpu_property_idle_evict_seconds` | Integer in `[0, 86400]`; canonical GPU property slots unused this long are evicted (ADR 0030); `0` disables |
 | `render` | `gpu_property_budget_megabytes` | Integer in `[0, 1048576]`; above this resident size the least recently used canonical slots are evicted, size-weighted; `0` means no budget |
+| `render` | `gpu_method_buffer_budget_megabytes` | Integer in `[1, 1048576]`, boot-only, default `1024`; method scratch buffers (`SpatialIndexCache::MethodScratch`) in use, awaiting GPU completion or idle stay within this many MiB, counted in power-of-two size classes. A run that would exceed it fails with `ResourceBudgetExceeded` and its byte counts; idle buffers are evicted least recently used first. An engineering budget, not a tuned value. Separate from the property budget and from per-entity spatial index storage |
+| `render` | `method_compute_graphics_queue` | Boolean, boot-only; `true` runs method compute (`SubmitComputeReadback`) on the graphics queue instead of the async compute queue. The transfer diagnostics' `ComputeLane` reports the requested and actual queue |
 | `simulation` | `worker_thread_count` | Integer in `[0, 1024]`; `0` keeps scheduler auto-detect |
 | `reference_scene` | `enabled` | Boolean |
 | `reference_scene` | `selector` | `Triangle` |
@@ -283,7 +291,8 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `consolidation` | `max_support_neighbors` | Integer in `[1, 1000000]`; sampled support-occupancy limit |
 | `consolidation` | `max_predicted_contributions` | Integer in `[1, 1000000000000]`; combined neighborhood/analytic work limit |
 | `consolidation` | `repulsion_weight` | Finite number in `[0, 0.499999999999]` |
-| `consolidation` | `max_iterations` | Integer in `[1, 4096]` |
+| `consolidation` | `max_iterations` | Integer in `[1, 4096]`; the shared execution options' iteration cap |
+| `consolidation`, `clustering` | `preview_every`, `preview_interval_ms`, `auto_accept`, `start` | The shared execution options (`StepRunExecutionFields`): live preview every `[0, 1000000]` iterations (0: off) and at least `[0, 60000]` ms apart (0: no limit); `never`, `converged` or `end`; `ready` or `run`. Only step runs (Vulkan K-Means, in-place resident Vulkan LOP) honour them; the other paths refuse `start=ready` |
 | `consolidation` | `convergence_tolerance` | Finite number in `[0, 1e12]` |
 | `consolidation` | `target_point_count` | `0` preserves input count; otherwise integer in `[2, 1000000]` |
 | `consolidation` | `seed` | Unsigned 32-bit integer used by deterministic initialization/subsampling |

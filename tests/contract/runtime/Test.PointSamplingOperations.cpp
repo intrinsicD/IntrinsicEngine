@@ -1,6 +1,12 @@
 // RUNTIME-274: standalone point sampling through the editor command.
 #include <algorithm>
 #include <cstring>
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <span>
+#include <mutex>
+#include <thread>
 #include <cstdlib>
 #include <optional>
 #include <cmath>
@@ -26,6 +32,7 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Geometry.HalfedgeMesh;
 import Geometry.PointSampling;
 import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.SelectionController;
@@ -34,6 +41,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.Runtime.StepRuns;
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace T = Extrinsic::ECS::Components::Transform;
@@ -315,6 +323,97 @@ TEST(PointSamplingOperations, VulkanBackendWithoutADeviceRunsOnTheCpuAndSaysWhy)
               std::string::npos);
 }
 
+// ARCH-023: the CPU counterpart is a worker step run of the same lifecycle: one exact farthest-point sample per
+// step (the reference sieve, extended a sample at a time), restart from the captured input, Accept of the prefix in
+// one undo entry, and the batch command's Run publishing the whole order at its end.
+TEST(PointSamplingOperations, CpuFarthestPointStepsOnAWorkerAndAcceptsItsPrefix)
+{
+    using namespace std::chrono_literals;
+    Scene s;
+    const auto cloud = MakeCloud(s, 200);
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(s.Context);
+    const R::PointSamplingOperationConfig config{.SourceStableEntityId = Id(cloud), .Count = 30};
+    unsigned calls = 0;
+    R::EditorPointSamplingResult last;
+    const auto sink = [&](R::EditorPointSamplingResult result)
+    {
+        ++calls;
+        last = std::move(result);
+    };
+    const auto started = R::StartEditorPointSampling(s.Commands(), config, sink);
+    ASSERT_EQ(started.Status, R::EditorCommandStatus::Pending) << started.Message;
+    ASSERT_NE(started.StepRun, 0u);
+    auto& runs = jobs.StepRuns();
+    const auto observe = [&]
+    {
+        return *runs.Observe(started.StepRun);
+    };
+    const auto pump = [&](const auto& done)
+    {
+        for (int i = 0; i < 4000 && !done(); ++i)
+        {
+            (void)jobs.Jobs().DrainCompletions(jobs.Events());
+            std::this_thread::sleep_for(200us);
+        }
+        return done();
+    };
+    const auto settled = [&]
+    {
+        const auto o = observe();
+        return o.Phase == R::StepRunPhase::Paused && !o.SegmentInFlight;
+    };
+    std::string why;
+    EXPECT_EQ(observe().Phase, R::StepRunPhase::Ready) << "an interactive start computes nothing";
+    ASSERT_TRUE(runs.Control(started.StepRun, R::StepRunAction::Step, 5u, why)) << why;
+    ASSERT_TRUE(pump(settled));
+    EXPECT_EQ(observe().Steps, 5u) << "five steps, five samples";
+    ASSERT_TRUE(runs.Control(started.StepRun, R::StepRunAction::Restart, 1u, why)) << why;
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return observe().Generation == 1u;
+        }));
+    EXPECT_EQ(observe().Phase, R::StepRunPhase::Ready);
+    EXPECT_EQ(observe().Steps, 0u) << "a restart begins from the captured input";
+    ASSERT_TRUE(runs.Control(started.StepRun, R::StepRunAction::Step, 7u, why)) << why;
+    ASSERT_TRUE(pump(settled));
+    EXPECT_EQ(observe().Steps, 7u);
+    ASSERT_TRUE(runs.Control(started.StepRun, R::StepRunAction::Accept, 1u, why)) << why;
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return calls == 1u;
+        }));
+    ASSERT_EQ(last.Status, R::EditorCommandStatus::Applied) << last.Message;
+    EXPECT_EQ(last.Steps, 7u);
+    EXPECT_EQ(last.StepRun, started.StepRun);
+    const auto points =
+        std::as_const(s.Registry.Raw().get<GS::Vertices>(cloud).Properties).Get<glm::vec3>("v:position");
+    const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, 30u);
+    const auto rank = [&]
+    {
+        return std::as_const(s.Registry.Raw().get<GS::Vertices>(cloud).Properties).Get<float>("v:sample_rank").Vector();
+    };
+    for (std::size_t i = 0; i < reference.Order.size(); ++i)
+        EXPECT_EQ(rank()[reference.Order[i]], i < 7u ? float(i) : -1.0f) << "sample " << i;
+    ASSERT_TRUE(s.History.Undo().Succeeded());
+    EXPECT_FALSE(std::as_const(s.Registry.Raw().get<GS::Vertices>(cloud).Properties).Exists("v:sample_rank"));
+    EXPECT_FALSE(s.History.Undo().Succeeded()) << "the Accept was one undo entry";
+    // The batch command: Run at once, accepted at its end: the whole reference order.
+    const auto batch = R::ApplyEditorPointSamplingCommand(s.Commands(), config, sink);
+    ASSERT_EQ(batch.Status, R::EditorCommandStatus::Pending) << batch.Message;
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return calls == 2u;
+        }));
+    ASSERT_EQ(last.Status, R::EditorCommandStatus::Applied) << last.Message;
+    EXPECT_EQ(last.Steps, 30u);
+    for (std::size_t i = 0; i < reference.Order.size(); ++i)
+        EXPECT_EQ(rank()[reference.Order[i]], float(i));
+}
+
 namespace
 {
     class ResidentPointSampling : public ::testing::Test
@@ -327,22 +426,87 @@ namespace
         R::CommandBus Commands;
         R::KernelEventBus Events;
         R::ServiceRegistry Services;
-        std::optional<R::JobDesc> Queued;
         entt::entity Entity{};
         R::PointSamplingOperationConfig Config;
         unsigned Calls{};
         R::EditorPointSamplingResult Last;
+        // ARCH-023: the accepted compute-lane submissions, oldest first, completed only by Complete (a worker step's
+        // pulled page waits for it through WaitCompute and takes its bytes; an owner page's sink is delivered). The
+        // worker submits and waits on its own thread, so the model is guarded by Gpu.
+        struct Page
+        {
+            Extrinsic::RHI::ReadbackToken Token{};
+            Extrinsic::RHI::ReadbackSink Sink{};
+        };
+        std::mutex Gpu;
+        std::vector<Page> InFlight{};
+        std::vector<std::pair<std::uint64_t, std::vector<std::byte>>> Pulled{}; // completed pulled pages' bytes
+        std::uint64_t Submissions{0u};
+        bool Stopping{false}; // teardown: every page completes (a waiting worker step returns)
+        Extrinsic::RHI::ReadbackToken Track(Extrinsic::RHI::ReadbackSink sink)
+        {
+            std::scoped_lock lock{Gpu};
+            const Extrinsic::RHI::ReadbackToken token{(1ull << 63u) | ++Submissions};
+            InFlight.push_back({token, std::move(sink)});
+            return token;
+        }
+        [[nodiscard]] bool HasInFlight()
+        {
+            std::scoped_lock lock{Gpu};
+            return !InFlight.empty();
+        }
         void SetUp() override
         {
             Entity = MakeCloud(S, 12);
             Config = {.SourceStableEntityId = Id(Entity), .Count = 4, .Backend = R::PointSamplingBackend::Vulkan};
             Device.ShaderFloat64 = true;
             Device.TransferQueue.AcceptBufferUploads = true;
+            // ARCH-023: the compute lane accepts and keeps work in flight unless a test installs its own.
+            Device.ComputeReadback = [this](auto record, std::uint64_t, Extrinsic::RHI::ReadbackSink sink)
+            {
+                if (!record(Device.AsyncComputeContext).IsValid())
+                    return Extrinsic::RHI::ReadbackToken{};
+                return Track(std::move(sink));
+            };
+            Device.TransferQueue.ComputeWait = [this](Extrinsic::RHI::ReadbackToken token, std::uint64_t)
+            {
+                {
+                    std::scoped_lock lock{Gpu};
+                    if (Stopping ||
+                        std::ranges::any_of(Pulled,
+                            [&](const auto& page)
+                            {
+                                return page.first == token.Value;
+                            }))
+                        return Extrinsic::RHI::ComputeWaitStatus::Complete;
+                }
+                std::this_thread::sleep_for(std::chrono::microseconds(100));
+                return Extrinsic::RHI::ComputeWaitStatus::Pending;
+            };
+            Device.TransferQueue.TakeReadback =
+                [this](Extrinsic::RHI::ReadbackToken token, std::span<std::byte> destination)
+            {
+                std::scoped_lock lock{Gpu};
+                const auto page = std::ranges::find_if(Pulled,
+                    [&](const auto& p)
+                    {
+                        return p.first == token.Value;
+                    });
+                std::ranges::fill(destination, std::byte{0});
+                if (page != Pulled.end())
+                {
+                    if (page->second.size() != destination.size())
+                        return false;
+                    std::ranges::copy(page->second, destination.begin());
+                }
+                else if (!Stopping)
+                    return false;
+                return true;
+            };
             S.Context.Device = &Device;
             S.Context.SpatialIndices = &Cache;
-            S.Context.JobCommands.Submit = [this](R::JobDesc desc, R::EditorJobIdentity) {
-                Queued = std::move(desc); return R::JobToken{1, 1};
-            };
+            // ARCH-023: the real job lane and the session's step runs (the Vulkan run is a step run).
+            Jobs.Attach(S.Context);
             Services.BeginRegistration();
             ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device, "test").has_value());
             R::EngineSetup setup{Commands, Events, Jobs.Jobs(), S.Worlds, Services, [](R::FramePhase, R::RuntimeFrameHook) {}};
@@ -350,17 +514,75 @@ namespace
         }
         void TearDown() override
         {
-            Queued.reset();
+            {
+                std::scoped_lock lock{Gpu};
+                Stopping = true;
+            }
             Jobs.Jobs().CancelAndDrain();
             R::RuntimeModuleShutdownContext shutdown{Commands, Events, Jobs.Jobs(), S.Worlds, Services};
             Cache.OnShutdown(shutdown);
         }
         auto Start()
         {
-            return R::ApplyEditorPointSamplingCommand(S.Commands(), Config,
-                [this](auto result) { ++Calls; Last = std::move(result); });
+            Started = R::ApplyEditorPointSamplingCommand(S.Commands(),
+                Config,
+                [this](auto result)
+                {
+                    ++Calls;
+                    Last = std::move(result);
+                });
+            return Started;
         }
         auto& Rows() { return S.Registry.Raw().get<GS::Vertices>(Entity).Properties; }
+        // The job lane's frames (the Run job's poll, the run's pump) until `done`; false after a bounded number.
+        bool Pump(const std::function<bool()>& done)
+        {
+            for (int i = 0; i < 400 && !done(); ++i)
+            {
+                (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+                std::this_thread::sleep_for(std::chrono::microseconds(200));
+            }
+            return done();
+        }
+        // Completes the oldest accepted compute submission with `bytes`: a pulled page's are taken by its worker.
+        void Complete(const std::vector<std::byte>& bytes = {})
+        {
+            Page page;
+            {
+                std::scoped_lock lock{Gpu};
+                ASSERT_FALSE(InFlight.empty());
+                page = std::move(InFlight.front());
+                InFlight.erase(InFlight.begin());
+                if (page.Sink.Pulled)
+                {
+                    Pulled.emplace_back(page.Token.Value, bytes);
+                    return;
+                }
+            }
+            page.Sink.Deliver(bytes);
+        }
+        bool Control(const R::StepRunAction action, const std::uint32_t count = 1u)
+        {
+            std::string refusal;
+            const bool accepted = Jobs.StepRuns().Control(Started.StepRun, action, count, refusal);
+            EXPECT_TRUE(accepted) << refusal;
+            return accepted;
+        }
+        R::StepRunObservation Observe()
+        {
+            return *Jobs.StepRuns().Observe(Started.StepRun);
+        }
+        // The reference order of `count` samples as the device result buffer holds it (clearances, then indices).
+        std::vector<std::byte> DeviceBytes(const Geometry::PointSampling::Result& reference) const
+        {
+            std::vector<std::byte> bytes(Config.Count * 12u);
+            std::memcpy(bytes.data(), reference.Clearance.data(), reference.Clearance.size() * sizeof(double));
+            std::memcpy(bytes.data() + Config.Count * sizeof(double),
+                reference.Order.data(),
+                reference.Order.size() * sizeof(std::uint32_t));
+            return bytes;
+        }
+        R::EditorPointSamplingResult Started{};
     };
 }
 
@@ -368,20 +590,29 @@ TEST_F(ResidentPointSampling, SecondAdmissionReusesCanonicalInputAndDiscardKeeps
 {
     auto first = Start();
     ASSERT_EQ(first.Status, R::EditorCommandStatus::Pending) << first.Message;
+    EXPECT_NE(first.StepRun, 0u) << "the result names its step run";
     EXPECT_EQ(first.GpuInputUploadBytes, 12u * 12u);
-    ASSERT_TRUE(Queued);
-    Queued->FinalizeUnpublishedOnMainThread();
-    Queued->FinalizeUnpublishedOnMainThread();
-    EXPECT_EQ(Calls, 1u);
+    ASSERT_TRUE(Control(R::StepRunAction::Discard));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 1u;
+        }));
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity) << Last.Message;
     EXPECT_FALSE(Rows().Exists(Config.RankName));
     EXPECT_FALSE(Rows().Exists(Config.SelectedName));
+    ASSERT_TRUE(Jobs.DrainUntilTerminal()) << "the discarded run must release output admission";
     auto second = Start();
     ASSERT_EQ(second.Status, R::EditorCommandStatus::Pending) << second.Message;
     EXPECT_EQ(second.GpuInputUploadBytes, 0u);
     EXPECT_EQ(second.GpuInputCacheHits, 1u);
     EXPECT_EQ(second.CpuStageReadbackBytes, 0u);
-    Queued->FinalizeUnpublishedOnMainThread();
-    EXPECT_EQ(Calls, 2u);
+    ASSERT_TRUE(Control(R::StepRunAction::Discard));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 2u;
+        }));
 }
 
 TEST_F(ResidentPointSampling, InputOutputAndTransformEditsInvalidateQueuedPublication)
@@ -389,14 +620,27 @@ TEST_F(ResidentPointSampling, InputOutputAndTransformEditsInvalidateQueuedPublic
     for (unsigned edit = 0; edit < 4; ++edit)
     {
         ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
-        ASSERT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::Current);
         if (edit == 0) Rows().Get<glm::vec3>("v:position")[0].x += 1;
         if (edit == 1) Rows().GetOrAdd<float>(Config.RankName)[0] = 2;
         if (edit == 2) Rows().GetOrAdd<bool>(Config.SelectedName)[0] = true;
         if (edit == 3) S.Registry.Raw().get<T::Component>(Entity).Position.x += 1;
-        EXPECT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::StaleGeneration);
-        Queued->FinalizeUnpublishedOnMainThread();
-        EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
+        ASSERT_TRUE(Pump(
+            [&]
+            {
+                return Calls == edit + 1u;
+            }))
+            << "edit " << edit;
+        EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity) << Last.Message;
+        if (edit == 1)
+        {
+            auto rank = Rows().Get<float>(Config.RankName);
+            Rows().Remove(rank);
+        }
+        if (edit == 2)
+        {
+            auto selected = Rows().Get<bool>(Config.SelectedName);
+            Rows().Remove(selected);
+        }
     }
     EXPECT_EQ(Calls, 4u);
 }
@@ -407,7 +651,6 @@ TEST_F(ResidentPointSampling, RefusedUploadAndRejectedJobNotifyExactlyOnceWithou
     const auto refused = Start();
     EXPECT_EQ(refused.Status, R::EditorCommandStatus::GeometryProcessingFailed);
     EXPECT_EQ(Calls, 1u);
-    EXPECT_FALSE(Queued);
     EXPECT_FALSE(Rows().Exists(Config.RankName));
     Device.TransferQueue.AcceptBufferUploads = true;
     S.Context.JobCommands.Submit = [](R::JobDesc, R::EditorJobIdentity) { return R::JobToken{}; };
@@ -421,6 +664,7 @@ TEST_F(ResidentPointSampling, RefusedUploadAndRejectedJobNotifyExactlyOnceWithou
 // with the shared wording.
 TEST_F(ResidentPointSampling, DuplicateOutputIsRefusedAndCancelUsesTheSharedWording)
 {
+    const auto findActive = S.Context.JobCommands.FindActive;
     S.Context.JobCommands.FindActive = [](const R::EditorJobIdentity& identity) {
         return std::optional{R::EditorJobRecord{.Token = R::JobToken{7, 2}, .Identity = identity,
                                                 .State = R::JobState::AwaitingApply}};
@@ -428,7 +672,7 @@ TEST_F(ResidentPointSampling, DuplicateOutputIsRefusedAndCancelUsesTheSharedWord
     const auto duplicate = Start();
     EXPECT_EQ(duplicate.Status, R::EditorCommandStatus::Pending);
     EXPECT_EQ(duplicate.Message, "Point sampling already has an active awaiting-apply job (job 7:2).");
-    EXPECT_FALSE(Queued);
+    EXPECT_EQ(duplicate.StepRun, 0u);
     EXPECT_EQ(duplicate.GpuInputUploadBytes, 0u) << "refused before acquiring device input";
     EXPECT_EQ(Calls, 0u);
     // A CPU run would overwrite the same rank output too.
@@ -437,56 +681,83 @@ TEST_F(ResidentPointSampling, DuplicateOutputIsRefusedAndCancelUsesTheSharedWord
     EXPECT_EQ(cpuDuplicate.Status, R::EditorCommandStatus::Pending);
     EXPECT_FALSE(Rows().Exists(Config.RankName));
     EXPECT_EQ(Calls, 0u);
-    // A point-cloud output creates a new entity per run: nothing to refuse.
-    Config.Output = R::PointSamplingOutput::PointCloud;
-    EXPECT_TRUE(Start().Succeeded());
-    EXPECT_EQ(Calls, 1u);
-    Config.Output = R::PointSamplingOutput::Properties;
+    S.Context.JobCommands.FindActive = findActive;
     Config.Backend = R::PointSamplingBackend::Vulkan;
-    Calls = 0u;
-    S.Context.JobCommands.FindActive = {};
     ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
-    ASSERT_TRUE(Queued);
-    Queued->FinalizeUnpublishedOnMainThread();
-    EXPECT_EQ(Calls, 1u);
+    const auto rows = S.Context.JobCommands.SnapshotAll();
+    const auto run = std::ranges::find_if(rows,
+        [](const auto& row)
+        {
+            return row.Name == "Vulkan point sampling";
+        });
+    ASSERT_NE(run, rows.end());
+    EXPECT_EQ(S.Context.JobCommands.Cancel(run->Token), R::EditorJobCancelStatus::Requested);
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 1u;
+        }));
     EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
-    EXPECT_EQ(Last.Message, "Vulkan point sampling was cancelled or its source became stale; nothing was applied.");
+    EXPECT_EQ(Last.Message, "Vulkan point sampling cancelled or stale; previous output retained.");
 }
 
-// RUNTIME-317: a cancelled Vulkan run keeps its GPU request but resolved to no backend (its
-// result still carries the default "cpu_reference" backend name); the cancellation is its diagnostic.
+// RUNTIME-317: a cancelled Vulkan run keeps its GPU request but resolved to no backend; the cancellation is its
+// diagnostic.
 TEST_F(ResidentPointSampling, CancelledVulkanRunResolvesToNoBackend)
 {
-    Jobs.Attach(S.Context);
     ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
     const auto submitted = S.Context.JobCommands.SnapshotAll();
-    ASSERT_EQ(submitted.size(), 1u);
-    EXPECT_EQ(submitted[0].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
-    EXPECT_EQ(S.Context.JobCommands.Cancel(submitted[0].Token), R::EditorJobCancelStatus::Requested);
+    const auto run = std::ranges::find_if(submitted,
+        [](const auto& row)
+        {
+            return row.Name == "Vulkan point sampling";
+        });
+    ASSERT_NE(run, submitted.end());
+    EXPECT_EQ(run->RequestedJobDomain, R::EditorJobDomain::GpuCompute);
+    const auto token = run->Token;
+    EXPECT_EQ(S.Context.JobCommands.Cancel(token), R::EditorJobCancelStatus::Requested);
     ASSERT_TRUE(Jobs.DrainUntilTerminal());
     ASSERT_EQ(Calls, 1u);
     EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
     const auto rows = S.Context.JobCommands.SnapshotAll();
-    ASSERT_EQ(rows.size(), 1u);
-    EXPECT_EQ(rows[0].State, R::JobState::Cancelled);
-    EXPECT_EQ(rows[0].RequestedJobDomain, R::EditorJobDomain::GpuCompute);
-    EXPECT_FALSE(rows[0].ResolvedJobDomain.has_value());
-    EXPECT_EQ(rows[0].Diagnostic, Last.Message);
+    const auto cancelled = std::ranges::find_if(rows,
+        [&](const auto& row)
+        {
+            return row.Token == token;
+        });
+    ASSERT_NE(cancelled, rows.end());
+    EXPECT_EQ(cancelled->State, R::JobState::Cancelled);
+    EXPECT_FALSE(cancelled->ResolvedJobDomain.has_value());
+    EXPECT_EQ(cancelled->Diagnostic, Last.Message);
 }
 
-TEST_F(ResidentPointSampling, CompletionOnlyFrameWaitsPastFenceReuseWithoutReadback)
+// ARCH-023: a completion-only computation is one compute-lane submission of zero readback bytes. It is
+// Ready when its own sink runs (the device finished), not after a count of graphics frames: however many
+// frames retire before that, it stays Submitted.
+TEST_F(ResidentPointSampling, CompletionOnlyComputeIsReadyWhenItsSubmissionCompletes)
 {
+    std::optional<Extrinsic::RHI::ReadbackSink> sink;
+    Device.ComputeReadback = [&](auto record, std::uint64_t bytes, auto completion)
+    {
+        EXPECT_EQ(bytes, 0u);
+        EXPECT_TRUE(record(Device.AsyncComputeContext).IsValid());
+        sink = std::move(completion);
+        return Extrinsic::RHI::ReadbackToken{(1ull << 63u) | 1u};
+    };
     auto result = Cache.QueueGpuCompute(0u, [](auto&, const auto&) { return Extrinsic::RHI::BufferHandle{1, 1}; });
-    ASSERT_TRUE(result);
-    Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+    ASSERT_TRUE(result && sink);
     EXPECT_EQ(result->State, R::SpatialQueryState::Submitted);
-    Device.GlobalFrameNumber = Device.FramesInFlight;
-    (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+    for (int i = 0; i < 4; ++i)
+    {
+        Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+        Device.GlobalFrameNumber += Device.FramesInFlight + 1u;
+        (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+    }
     EXPECT_EQ(result->State, R::SpatialQueryState::Submitted);
-    ++Device.GlobalFrameNumber;
-    (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+    sink->Deliver({});
     EXPECT_EQ(result->State, R::SpatialQueryState::Ready);
     EXPECT_TRUE(result->Data.empty());
+    EXPECT_EQ(Device.CommandContext.DispatchCalls + Device.CommandContext.FillBufferCalls, 0);
 }
 
 TEST_F(ResidentPointSampling, WorkspaceReadsResidentPropertiesAndUploadsOnlyMetadata)
@@ -497,7 +768,7 @@ TEST_F(ResidentPointSampling, WorkspaceReadsResidentPropertiesAndUploadsOnlyMeta
         {.Domain = D::PointCloudPoint, .Name = "v:position", .ValueKind = Geometry::PropertyValueKind::Vec3});
     ASSERT_TRUE(view);
     const std::vector<std::uint32_t> rows{2, 4, 8};
-    G::FarthestPointSamplingWorkspace workspace(Device);
+    G::FarthestPointSamplingWorkspace workspace(Device, *Cache.MethodScratch());
     ASSERT_TRUE(workspace.Begin({.Positions = *view, .Rows = rows, .Count = 2}));
     Device.BufferWrites.clear();
     ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
@@ -514,30 +785,35 @@ TEST_F(ResidentPointSampling, WorkspaceReadsResidentPropertiesAndUploadsOnlyMeta
 
 TEST_F(ResidentPointSampling, TerminalGpuOrderPublishesAtomicallyAndUndoRestoresBothFields)
 {
-    std::optional<Extrinsic::RHI::ReadbackSink> sink;
-    Device.ComputeReadback = [&](auto record, std::uint64_t bytes, auto completion) {
-        EXPECT_EQ(bytes, Config.Count * 12u);
+    std::vector<std::uint64_t> bytesAsked; // written by the submitting thread before Track publishes the page
+    Device.ComputeReadback = [&](auto record, std::uint64_t bytes, auto completion)
+    {
+        bytesAsked.push_back(bytes);
         EXPECT_TRUE(record(Device.CommandContext).IsValid());
-        sink = std::move(completion);
-        return Extrinsic::RHI::ReadbackToken{1};
+        return Track(std::move(completion));
     };
     const auto& rows = std::as_const(Rows());
     const auto points = rows.Get<glm::vec3>("v:position");
     const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, Config.Count);
     ASSERT_TRUE(reference.Succeeded());
     ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
-    EXPECT_FALSE(Queued->IsReadyToApply());
-    ASSERT_TRUE(sink);
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return HasInFlight();
+        }));
+    ASSERT_EQ(bytesAsked, std::vector<std::uint64_t>{Config.Count * 12u}) << "one chunk, the terminal readback";
     EXPECT_FALSE(Rows().Exists(Config.RankName));
-    std::vector<std::byte> bytes(Config.Count * 12u);
-    std::memcpy(bytes.data(), reference.Clearance.data(), Config.Count * sizeof(double));
-    std::memcpy(bytes.data() + Config.Count * sizeof(double), reference.Order.data(), Config.Count * sizeof(std::uint32_t));
-    sink->Deliver(bytes);
-    ASSERT_TRUE(Queued->IsReadyToApply());
-    ASSERT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::Current);
-    ASSERT_TRUE(Queued->PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
-    EXPECT_EQ(Calls, 1u);
+    Complete(DeviceBytes(reference));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 1u;
+        }));
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::Applied) << Last.Message;
     EXPECT_EQ(Last.Backend, "gpu_vulkan_compute");
+    EXPECT_EQ(Last.Steps, Config.Count) << "one step per selected sample";
+    EXPECT_EQ(Last.StepRun, Started.StepRun);
     for (std::size_t i = 0; i < reference.Order.size(); ++i)
     {
         EXPECT_EQ(rows.Get<float>(Config.RankName)[reference.Order[i]], float(i));
@@ -548,8 +824,160 @@ TEST_F(ResidentPointSampling, TerminalGpuOrderPublishesAtomicallyAndUndoRestores
     EXPECT_FALSE(rows.Exists(Config.SelectedName));
     ASSERT_TRUE(S.History.Redo().Succeeded());
     EXPECT_TRUE(rows.Exists(Config.RankName));
-    Queued->FinalizeUnpublishedOnMainThread();
+    EXPECT_FALSE(S.History.Redo().Succeeded()) << "one history entry";
     EXPECT_EQ(Calls, 1u);
+}
+
+// ARCH-023: one selected sample is one step. A ready run computes nothing; Step(1) selects the first sample and
+// Step(2) two more, each chunk capped by the steps left and read back by none; Accept reads the three samples back
+// once and publishes exactly them; a Pause during a chunk counts every sample of it.
+TEST_F(ResidentPointSampling, StepsSelectExactlyAndAPausedChunkCountsWhole)
+{
+    std::vector<std::uint64_t> bytesAsked; // written by the submitting thread before Track publishes the page
+    Device.ComputeReadback = [&](auto record, std::uint64_t bytes, auto completion)
+    {
+        bytesAsked.push_back(bytes);
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        return Track(std::move(completion));
+    };
+    const auto points = std::as_const(Rows()).Get<glm::vec3>("v:position");
+    const auto reference =
+        Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, Config.Count);
+    Started = R::StartEditorPointSampling(S.Commands(),
+        Config,
+        [this](auto result)
+        {
+            ++Calls;
+            Last = std::move(result);
+        });
+    ASSERT_EQ(Started.Status, R::EditorCommandStatus::Pending) << Started.Message;
+    (void)Pump(
+        []
+        {
+            return false;
+        }); // frames pass
+    EXPECT_TRUE(bytesAsked.empty()) << "ready: nothing is submitted";
+    EXPECT_EQ(Observe().Phase, R::StepRunPhase::Ready);
+    ASSERT_TRUE(Control(R::StepRunAction::Step, 1u));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return HasInFlight();
+        }));
+    Complete();
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Observe().Phase == R::StepRunPhase::Paused && !Observe().SegmentInFlight;
+        }));
+    EXPECT_EQ(Observe().Steps, 1u);
+    ASSERT_TRUE(Control(R::StepRunAction::Step, 2u));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return HasInFlight();
+        }));
+    Complete();
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Observe().Phase == R::StepRunPhase::Paused && !Observe().SegmentInFlight;
+        }));
+    EXPECT_EQ(Observe().Steps, 3u);
+    EXPECT_EQ(bytesAsked, (std::vector<std::uint64_t>{0u, 0u})) << "no chunk before Accept reads samples back";
+    ASSERT_TRUE(Control(R::StepRunAction::Accept));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return HasInFlight();
+        }));
+    EXPECT_EQ(bytesAsked.back(), Config.Count * 12u) << "Accept's one readback";
+    Complete(DeviceBytes(reference)); // the device holds the first three; the rest is not read
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 1u;
+        }));
+    ASSERT_EQ(Last.Status, R::EditorCommandStatus::Applied) << Last.Message;
+    EXPECT_EQ(Last.Steps, 3u);
+    const auto rank = std::as_const(Rows()).Get<float>(Config.RankName);
+    for (std::size_t i = 0; i < reference.Order.size(); ++i)
+        EXPECT_EQ(rank[reference.Order[i]], i < 3u ? float(i) : -1.0f) << "sample " << i;
+    // Run, then Pause while the chunk is in flight: its samples all count.
+    Config.RankName = "v:rank_paused";
+    Config.SelectedName = "v:selected_paused";
+    Started = R::StartEditorPointSampling(S.Commands(),
+        Config,
+        [this](auto result)
+        {
+            ++Calls;
+            Last = std::move(result);
+        });
+    ASSERT_TRUE(Control(R::StepRunAction::Run));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return HasInFlight();
+        }));
+    ASSERT_TRUE(Control(R::StepRunAction::Pause));
+    Complete(DeviceBytes(reference));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Observe().Phase == R::StepRunPhase::Paused && !Observe().SegmentInFlight;
+        }));
+    EXPECT_EQ(Observe().Steps, Config.Count) << "the chunk in flight at the pause selected every sample";
+    EXPECT_EQ(Observe().End, R::StepRunEnd::IterationCap);
+    ASSERT_TRUE(Control(R::StepRunAction::Discard));
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 2u;
+        }));
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(Rows().Exists("v:rank_paused")) << "a discarded run publishes nothing";
+}
+
+// ARCH-023: a batch Run selects its samples on the step run's worker: once its chunk was submitted, the chunk's
+// completion alone (no drain, frame or pump on this thread) counts every sample, the worker taking the order it pulled.
+// Prediction: Steps == Count before any further drain, the chunk asked for a pulled readback of Count * 12 bytes.
+// Mutation: an owner-polled chunk (an ordinary sink) leaves Steps at 0 until a drain runs.
+TEST_F(ResidentPointSampling, ABatchRunCountsItsSamplesOnItsWorkerWithoutDrains)
+{
+    std::vector<std::uint64_t> bytesAsked;
+    bool pulled = false;
+    Device.ComputeReadback = [&](auto record, std::uint64_t bytes, Extrinsic::RHI::ReadbackSink completion)
+    {
+        bytesAsked.push_back(bytes);
+        pulled = completion.Pulled;
+        EXPECT_TRUE(record(Device.CommandContext).IsValid());
+        return Track(std::move(completion));
+    };
+    const auto& rows = std::as_const(Rows());
+    const auto points = rows.Get<glm::vec3>("v:position");
+    const auto reference =
+        Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, Config.Count);
+    ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return HasInFlight();
+        }));
+    EXPECT_EQ(bytesAsked, std::vector<std::uint64_t>{Config.Count * 12u});
+    EXPECT_TRUE(pulled) << "the worker pulls its chunk's order";
+    Complete(DeviceBytes(reference)); // from here on this thread does not drain
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+    while (Observe().Steps < Config.Count && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
+    EXPECT_EQ(Observe().Steps, Config.Count);
+    EXPECT_EQ(Calls, 0u) << "the publication stays the owner's";
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 1u;
+        }));
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::Applied) << Last.Message;
+    EXPECT_EQ(Last.Steps, Config.Count);
 }
 
 TEST_F(ResidentPointSampling, RefusedRecordedSubmissionIsNotReplayedOrPublished)
@@ -561,14 +989,21 @@ TEST_F(ResidentPointSampling, RefusedRecordedSubmissionIsNotReplayedOrPublished)
         return Extrinsic::RHI::ReadbackToken{};
     };
     ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
-    ASSERT_TRUE(Queued->IsReadyToApply());
+    ASSERT_TRUE(Pump(
+        [&]
+        {
+            return Calls == 1u;
+        }));
     Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
-    EXPECT_EQ(records, 1u);
-    EXPECT_FALSE(Queued->PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
-    EXPECT_EQ(Last.Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(Last.Status, R::EditorCommandStatus::GeometryProcessingFailed) << Last.Message;
     EXPECT_FALSE(Rows().Exists(Config.RankName));
-    Queued->FinalizeUnpublishedOnMainThread();
+    (void)Pump(
+        []
+        {
+            return false;
+        });
     EXPECT_EQ(Calls, 1u);
+    EXPECT_EQ(records, 1u) << "a refused submission is not replayed";
 }
 
 TEST_F(ResidentPointSampling, WeightAndDeletionChangesRefusePublication)
@@ -580,8 +1015,12 @@ TEST_F(ResidentPointSampling, WeightAndDeletionChangesRefusePublication)
         ASSERT_EQ(Start().Status, R::EditorCommandStatus::Pending);
         if (edit == 0) Rows().Get<float>(Config.WeightsName)[0] = 2.0f;
         else Rows().GetOrAdd<bool>("v:deleted", false)[0] = true;
-        EXPECT_EQ(Queued->ValidateBeforeApply(), R::JobApplyValidation::StaleGeneration);
-        Queued->FinalizeUnpublishedOnMainThread();
+        ASSERT_TRUE(Pump(
+            [&]
+            {
+                return Calls == edit + 1u;
+            }));
+        EXPECT_EQ(Last.Status, R::EditorCommandStatus::StaleEntity);
         EXPECT_FALSE(Rows().Exists(Config.RankName));
     }
     EXPECT_EQ(Calls, 2u);
@@ -595,7 +1034,7 @@ TEST_F(ResidentPointSampling, WorkspacePagesRoundsWithinTheSubmissionBudget)
         .Usage = Extrinsic::RHI::BufferUsage::Storage});
     const G::GpuPropertyView input{.Buffer = buffer, .Address = Device.GetBufferDeviceAddress(buffer),
         .Bytes = std::uint64_t(count) * 12u, .Layout = {.Channels = 3, .Count = count}};
-    G::FarthestPointSamplingWorkspace workspace(Device);
+    G::FarthestPointSamplingWorkspace workspace(Device, *Cache.MethodScratch());
     ASSERT_TRUE(workspace.Begin({.Positions = input, .Count = count}));
     EXPECT_FALSE(workspace.NextChunkFinishes());
     ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
@@ -608,6 +1047,35 @@ TEST_F(ResidentPointSampling, WorkspacePagesRoundsWithinTheSubmissionBudget)
     for (const auto& dispatch : Device.CommandContext.DispatchRecords) EXPECT_LE(dispatch.X, 65535u);
 }
 
+// ARCH-023: a chunk adds at most the samples its step run allows (the first one's initial sample counts), the count
+// caps it too, and a zero allowance is a readback-only chunk, refused before the first sample.
+TEST_F(ResidentPointSampling, CappedChunksAddExactlyTheAllowedSamples)
+{
+    namespace G = Extrinsic::Graphics;
+    const auto view = R::ResolveGpuPropertyInput(*Cache.PropertyResidency(),
+        S.Registry,
+        S.World,
+        Entity,
+        {.Domain = D::PointCloudPoint, .Name = "v:position", .ValueKind = Geometry::PropertyValueKind::Vec3});
+    ASSERT_TRUE(view);
+    G::FarthestPointSamplingWorkspace workspace(Device, *Cache.MethodScratch());
+    auto& commands = Device.CommandContext;
+    ASSERT_TRUE(workspace.Begin({.Positions = *view, .Count = 5}));
+    EXPECT_EQ(workspace.NextChunkSamples(2u), 2u);
+    EXPECT_FALSE(workspace.NextChunkFinishes(2u));
+    EXPECT_FALSE(workspace.RecordNext(commands, 0u).IsValid()) << "nothing to read before the first sample";
+    ASSERT_TRUE(workspace.RecordNext(commands, 2u).IsValid());
+    EXPECT_EQ(workspace.Produced(), 2u);
+    EXPECT_EQ(workspace.NextChunkSamples(10u), 3u) << "the count caps a chunk too";
+    EXPECT_TRUE(workspace.NextChunkFinishes(10u));
+    ASSERT_TRUE(workspace.RecordNext(commands, 0u).IsValid()) << "a readback-only chunk";
+    EXPECT_EQ(workspace.Produced(), 2u);
+    ASSERT_TRUE(workspace.RecordNext(commands, 3u).IsValid());
+    EXPECT_TRUE(workspace.Finished());
+    EXPECT_TRUE(workspace.RecordNext(commands, 0u).IsValid()) << "after the last sample only a readback";
+    EXPECT_FALSE(workspace.RecordNext(commands).IsValid()) << "no sample left to add";
+}
+
 TEST_F(ResidentPointSampling, WarmWorkspaceKeepsCapacityAndUnbindsPriorRowMap)
 {
     namespace G = Extrinsic::Graphics;
@@ -616,7 +1084,7 @@ TEST_F(ResidentPointSampling, WarmWorkspaceKeepsCapacityAndUnbindsPriorRowMap)
     ASSERT_TRUE(view);
     std::vector<std::uint32_t> rows(view->Layout.Count);
     for (std::uint32_t i = 0; i < rows.size(); ++i) rows[i] = std::uint32_t(rows.size()) - i - 1;
-    G::FarthestPointSamplingWorkspace workspace(Device);
+    G::FarthestPointSamplingWorkspace workspace(Device, *Cache.MethodScratch());
     ASSERT_TRUE(workspace.Begin({.Positions = *view, .Rows = rows, .Count = 3}));
     ASSERT_TRUE(workspace.RecordNext(Device.CommandContext).IsValid());
     const auto buffers = Device.CreateBufferCount;
@@ -641,19 +1109,56 @@ TEST_F(ResidentPointSampling, WarmWorkspaceKeepsCapacityAndUnbindsPriorRowMap)
 }
 
 // RUNTIME-289: a Bayesian CPD run orders its target subsample on the device before the first
-// step. The solver registers exactly the device order once its verified prefix (64 samples)
+// iteration. The solver registers exactly the device order once its verified prefix (64 samples)
 // matches the CPU: a delivered order that differs only after the prefix is what the run uses.
-// A mismatch inside the prefix leaves the CPU order with the reason, and cancelling the run
-// stops the ordering job. The untouched source set reports no backend.
+// A mismatch inside the prefix leaves the CPU order with the reason, and discarding the run (or
+// its first iteration) stops the ordering job. The untouched source set reports no backend.
 TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFirstStep)
 {
     const auto source = MakeCloud(S, 40);
     const auto target = MakeCloud(S, 100);
     std::vector<R::JobDesc> jobs;
-    S.Context.JobCommands.Submit = [&jobs](R::JobDesc desc, R::EditorJobIdentity) {
+    // ARCH-023: the captured lane also lists and cancels its own jobs once a run is discarded, as the real surface does,
+    // so the discarded run's holder is cancelled (its gate answers false) rather than applied. Until then the real
+    // listing answers (the step run copies the surface at its start, so these are installed before it). Shared, so an
+    // early return leaves nothing dangling in the scene's surface.
+    struct CapturedLane
+    {
+        bool List{false};
+        std::vector<R::EditorJobIdentity> Identities{};
+        std::vector<R::JobToken> Cancelled{};
+    };
+    const auto lane = std::make_shared<CapturedLane>();
+    S.Context.JobCommands.Submit = [&jobs, lane](R::JobDesc desc, R::EditorJobIdentity identity)
+    {
         jobs.push_back(std::move(desc));
+        lane->Identities.push_back(std::move(identity));
         return R::JobToken{std::uint32_t(jobs.size()), 1};
     };
+    S.Context.JobCommands.SnapshotAll = [lane, real = S.Context.JobCommands.SnapshotAll]
+    {
+        if (!lane->List)
+            return real ? real() : std::vector<R::EditorJobRecord>{};
+        std::vector<R::EditorJobRecord> records;
+        for (std::size_t i = 0; i < lane->Identities.size(); ++i)
+        {
+            const R::JobToken token{std::uint32_t(i + 1u), 1};
+            records.push_back({.Token = token,
+                .Identity = lane->Identities[i],
+                .State = std::ranges::find(lane->Cancelled, token) != lane->Cancelled.end()
+                    ? R::JobState::Cancelled
+                    : R::JobState::AwaitingApply});
+        }
+        return records;
+    };
+    S.Context.JobCommands.Cancel = [lane, real = S.Context.JobCommands.Cancel](const R::JobToken token)
+    {
+        if (!lane->List)
+            return real ? real(token) : R::EditorJobCancelStatus::Unavailable;
+        lane->Cancelled.push_back(token);
+        return R::EditorJobCancelStatus::Requested;
+    };
+    S.Context.JobCommands.Retire = {}; // the step run's retirement falls back to this lane's Cancel
     std::optional<Extrinsic::RHI::ReadbackSink> sink;
     Device.ComputeReadback = [&](auto record, std::uint64_t, auto completion) {
         EXPECT_TRUE(record(Device.CommandContext).IsValid());
@@ -669,33 +1174,45 @@ TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFir
                                        .Output = R::CoherentPointDriftOutput::DisplacementProperty,
                                        .SubsampleTarget = kCount};
     config.SubsampleBackend = R::PointSamplingBackend::Vulkan;
+    R::StepRunsService runs;
+    S.Context.StepRuns = &runs;
     enum class Delivery { AfterPrefix, InsidePrefix, Cancelled, StepCancelled };
     for (const auto delivery : {Delivery::AfterPrefix, Delivery::InsidePrefix, Delivery::Cancelled, Delivery::StepCancelled})
     {
         jobs.clear();
+        *lane = {};
         sink.reset();
         R::EditorCoherentPointDriftResult failure;
         const auto run = R::StartEditorCoherentPointDrift(S.Commands(), config, failure);
         ASSERT_TRUE(run) << failure.Message;
+        const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
         EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.SubsampleRequestedBackend, "gpu_vulkan_compute");
-        ASSERT_EQ(R::StepEditorCoherentPointDrift(S.Commands(), run, 1u), R::EditorCommandStatus::Pending);
-        ASSERT_EQ(jobs.size(), 2u) << "the device ordering, then the step job";
-        ASSERT_EQ(jobs[1].DependsOn.size(), 1u);
-        EXPECT_EQ(jobs[1].DependsOn[0].Job, (R::JobToken{1, 1}));
-        auto& ordering = jobs[0];
+        ASSERT_EQ(jobs.size(), 3u) << "the step run's holder, the run's pump, the device ordering";
+        std::string refusal;
+        ASSERT_TRUE(runs.Control(id, R::StepRunAction::Step, 1u, refusal)) << refusal;
+        EXPECT_FALSE(jobs[0].IsReadyToApply()); // the step run's pump: running, owner-driven
+        EXPECT_FALSE(jobs[1].IsReadyToApply()); // the run's pump submits the first iteration
+        ASSERT_EQ(jobs.size(), 4u) << "then the first iteration";
+        ASSERT_EQ(jobs[3].DependsOn.size(), 1u);
+        EXPECT_EQ(jobs[3].DependsOn[0].Job, (R::JobToken{3, 1}));
+        auto& ordering = jobs[2];
         EXPECT_FALSE(ordering.IsReadyToApply());
         ASSERT_TRUE(sink);
         if (delivery == Delivery::Cancelled || delivery == Delivery::StepCancelled)
         {
-            // Through the run, or by cancelling the step job itself (job lane / panel).
-            if (delivery == Delivery::Cancelled) R::CancelEditorCoherentPointDrift(run);
-            else jobs[1].FinalizeUnpublishedOnMainThread();
+            // Through the run's controls, or by cancelling its first iteration (job lane / panel).
+            lane->List = true;
+            if (delivery == Delivery::Cancelled)
+                ASSERT_TRUE(runs.Control(id, R::StepRunAction::Discard, 1u, refusal));
+            else
+                jobs[3].FinalizeUnpublishedOnMainThread();
+            EXPECT_FALSE(jobs[0].IsReadyToApply()); // the discarded run settles: its Discard ends the run
             EXPECT_EQ(ordering.ValidateBeforeApply(), R::JobApplyValidation::StaleGeneration);
             ordering.FinalizeUnpublishedOnMainThread();
-            if (delivery == Delivery::Cancelled) jobs[1].FinalizeUnpublishedOnMainThread();
-            const auto cancelled = R::SnapshotEditorCoherentPointDrift(run);
-            EXPECT_EQ(cancelled.Phase, R::EditorCoherentPointDriftPhase::Cancelled);
-            EXPECT_EQ(cancelled.Result.SubsampleRequestedBackend, "gpu_vulkan_compute");
+            if (delivery == Delivery::Cancelled)
+                jobs[3].FinalizeUnpublishedOnMainThread();
+            EXPECT_EQ(runs.Observe(id)->Phase, R::StepRunPhase::Discarded);
+            EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.SubsampleRequestedBackend, "gpu_vulkan_compute");
             continue;
         }
         auto order = reference.Order;
@@ -708,7 +1225,7 @@ TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFir
         ASSERT_TRUE(ordering.IsReadyToApply());
         ASSERT_EQ(ordering.ValidateBeforeApply(), R::JobApplyValidation::Current);
         ASSERT_TRUE(ordering.PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
-        auto& step = jobs[1];
+        auto& step = jobs[3];
         (void)step.Work(R::JobCancellation{});
         ASSERT_TRUE(step.PublishCompletion(Events, R::JobResultEnvelope::Make(true)));
         const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
@@ -718,7 +1235,13 @@ TEST_F(ResidentPointSampling, CpdTargetSubsampleIsOrderedOnTheDeviceBeforeTheFir
         EXPECT_EQ(snapshot.Result.SubsampleSourceBackend, "");
         EXPECT_EQ(snapshot.Result.SubsampleTargetBackend, device ? "gpu_vulkan_compute" : "cpu_reference");
         EXPECT_EQ(snapshot.Result.SubsampleBackendDiagnostic.empty(), device) << snapshot.Result.SubsampleBackendDiagnostic;
+        EXPECT_EQ(runs.Observe(id)->Steps, 1u);
+        lane->List = true;
+        ASSERT_TRUE(runs.Control(id, R::StepRunAction::Discard, 1u, refusal));
+        EXPECT_FALSE(jobs[0].IsReadyToApply()) << "the discarded run's holder is cancelled, not applied";
+        EXPECT_NE(std::ranges::find(lane->Cancelled, R::JobToken{1, 1}), lane->Cancelled.end());
     }
+    S.Context.StepRuns = nullptr;
 }
 
 // UI-081: the arrow order ranks every live element of a mesh domain, starts with the method's

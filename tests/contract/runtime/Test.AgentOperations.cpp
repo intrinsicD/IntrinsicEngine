@@ -773,8 +773,14 @@ TEST(AgentOperations, GpuCapableEditorToolsNeedAPresentedFrame)
 {
     R::AgentOperationRegistry registry;
     R::RegisterEditorAgentOperations(registry);
-    for (const char* name : {"run_registration", "run_point_sampling", "run_keypoint_analysis", "run_kmeans",
-                             "run_point_cloud_consolidation", "run_mesh_operation"})
+    for (const char* name : {"run_registration",
+             "run_point_sampling",
+             "run_keypoint_analysis",
+             "run_kmeans",
+             "start_kmeans",
+             "run_point_cloud_consolidation",
+             "start_point_cloud_consolidation",
+             "run_mesh_operation"})
     {
         ASSERT_NE(registry.Find(name), nullptr) << name;
         EXPECT_TRUE(registry.Find(name)->NeedsPresentedFrame) << name;
@@ -1378,16 +1384,57 @@ TEST(AgentArgumentSchema, EveryRegisteredSchemaIsSupportedAndClosed)
 {
     const auto registry = FullAgentRegistry();
     // Listed from the registration sources (2026-10-27), so a schema refused at registration shows as a missing tool.
-    for (const char* name : {"attribute_bindings", "bind_attribute", "config_apply", "config_get", "config_preview", "config_schema",
-             "config_sections", "device_status", "diagnostics_read", "entity_properties", "history", "import_file", "jobs_cancel",
-             "jobs_list", "jobs_wait", "load_scene", "log", "preview_keypoint_analysis", "preview_kmeans", "preview_mesh_operation",
-             "preview_operation", "preview_point_cloud_consolidation", "preview_point_sampling", "preview_registration", "property_compare",
-             "property_list", "property_stats", "property_values", "redo", "run_keypoint_analysis", "run_kmeans", "run_mesh_operation",
-             "run_operation", "run_point_cloud_consolidation", "run_point_sampling", "run_registration", "save_scene", "scene_entities",
-             "select_entity", "set_camera", "set_visibility", "show_property", "undo", "vector_field", "vector_fields", "view_capture",
+    for (const char* name : {"attribute_bindings",
+             "bind_attribute",
+             "config_apply",
+             "config_get",
+             "config_preview",
+             "config_schema",
+             "config_sections",
+             "device_status",
+             "diagnostics_read",
+             "entity_properties",
+             "history",
+             "import_file",
+             "jobs_cancel",
+             "jobs_list",
+             "jobs_wait",
+             "load_scene",
+             "log",
+             "preview_keypoint_analysis",
+             "preview_kmeans",
+             "preview_mesh_operation",
+             "preview_operation",
+             "preview_point_cloud_consolidation",
+             "preview_point_sampling",
+             "preview_registration",
+             "property_compare",
+             "property_list",
+             "property_stats",
+             "property_values",
+             "redo",
+             "run_keypoint_analysis",
+             "run_kmeans",
+             "run_mesh_operation",
+             "run_operation",
+             "run_point_cloud_consolidation",
+             "run_point_sampling",
+             "run_registration",
+             "save_scene",
+             "scene_entities",
+             "select_entity",
+             "set_camera",
+             "start_kmeans",
+             "start_point_cloud_consolidation",
+             "set_visibility",
+             "show_property",
+             "undo",
+             "vector_field",
+             "vector_fields",
+             "view_capture",
              "view_screenshot"})
         EXPECT_NE(registry.Find(name), nullptr) << name;
-    EXPECT_EQ(registry.Entries().size(), 48u);
+    EXPECT_EQ(registry.Entries().size(), 50u); // ARCH-023: start_point_cloud_consolidation
     for (const auto& spec : registry.Entries())
     {
         SCOPED_TRACE(spec.Name);
@@ -1563,7 +1610,7 @@ TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
         EXPECT_EQ(actual, expected);
     }
     EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
-    EXPECT_EQ(declared, 48u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, 50u) << "declared input schemas of " << registry.Entries().size() << " tools";
     EXPECT_EQ(declared, registry.Entries().size()) << "RUNTIME-342: every tool's input schema is generated";
 }
 

@@ -209,13 +209,17 @@ namespace
         void Request(const std::uint32_t seed)
         {
             R::RunKMeans request{.StableEntityId = R::SelectionController::ToStableEntityId(Entity),
-                                 .Properties = R::MakeKMeansPropertyRefs(R::GeometryElementDomain::PointCloudPoint),
-                                 .Parameters = {.ClusterCount = 8u, .MaxIterations = 50u, .Seed = seed,
-                                                .GpuPreviewInterval = 5u,
-                                                .Initialization = R::KMeansInitialization::Random},
-                                 .Backend = R::ClusteringBackend::VulkanCompute,
-                                 .AutoAccept = false,
-                                 .ReplaceRunning = true};
+                .Properties = R::MakeKMeansPropertyRefs(R::GeometryElementDomain::PointCloudPoint),
+                .Parameters = {.ClusterCount = 8u,
+                    .Seed = seed,
+                    .Initialization = R::KMeansInitialization::Random,
+                    .Execution = {.IterationCap = 50u,
+                        .PreviewEvery = 5u,
+                        .PreviewIntervalMs = 0u,
+                        .AutoAccept = R::StepRunAutoAccept::Never,
+                        .Start = R::StepRunStart::Run}},
+                .Backend = R::ClusteringBackend::VulkanCompute,
+                .ReplaceRunning = true};
             Latest = Service->RunKMeans(std::move(request));
             ++Pending;
             ++Changes;

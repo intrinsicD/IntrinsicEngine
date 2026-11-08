@@ -31,6 +31,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
@@ -1094,6 +1095,7 @@ namespace
             FrameProbe = &Intrinsic::Tests::AddRuntimeTestModule(
                 Engine, std::make_unique<PointReadinessFrameProbe>());
             Engine.EmplaceModule<Runtime::AsyncWorkModule>();
+            Engine.EmplaceModule<Runtime::StepRunsModule>();
             Engine.EmplaceModule<Runtime::SceneInteractionModule>();
             Engine.EmplaceModule<Runtime::SpatialIndexCache>();
             Engine.EmplaceModule<Runtime::PointCloudEditingModule>();
@@ -1727,7 +1729,7 @@ TEST_F(EditorPointReadiness, ConstructionRetainsBackendCoordinateGatesWithoutRes
     Drain();
     ASSERT_TRUE(PreviewConstruction().Ready);
     Construction.Backend = Runtime::PointConstructionBackend::VulkanLBVH;
-    EXPECT_EQ(PreviewConstruction().Diagnostic, "Vulkan construction requires framed GPU queries and editor jobs.");
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Vulkan construction requires GPU queries and editor jobs.");
     Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::denorm_min();
     EXPECT_EQ(PreviewConstruction().Diagnostic, "Checking live point samples. Wait for input validation.");
     Drain();
@@ -3873,6 +3875,18 @@ TEST_F(EditorKeypointAgent, OnlyARequestedCancelRelabelsTheRunsFailure)
     const auto staleAnswer = finish(stale);
     EXPECT_TRUE(staleAnswer.IsError) << staleAnswer.Text;
     EXPECT_NE(staleAnswer.ErrorCode, "cancelled") << staleAnswer.Text;
+    ASSERT_TRUE(WaitFor(
+        [&]
+        {
+            (void)jobs.DrainCompletions(Engine.Events());
+            const auto records = Runtime::GetEditorJobs(Commands);
+            return std::none_of(records.begin(),
+                records.end(),
+                [](const auto& job)
+                {
+                    return Runtime::IsActiveEditorJobState(job.State);
+                });
+        })); // delivery precedes the holder and cancelled worker's retirement
 
     // A job cancelled by the job service itself (not an editor cancel request).
     release.store(false, std::memory_order_release);
@@ -3905,6 +3919,37 @@ TEST_F(EditorKeypointAgent, OnlyARequestedCancelRelabelsTheRunsFailure)
         (void)jobs.DrainCompletions(Engine.Events());
         return jobs.IsComplete(foreign) && jobs.IsComplete(holder) && jobs.IsComplete(holder2);
     }));
+}
+
+// ARCH-023: a step run retiring the jobs of its ended run (here a stale source) cancels its holder,
+// but that is the run's own lifecycle, not a cancel request remembered for the run.
+TEST_F(EditorKeypointAgent, AStepRunRetiringItsEndedRunIsNotACancelRequest)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    ASSERT_EQ(
+        Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints).Status, Runtime::EditorCommandStatus::Pending);
+    Runtime::JobToken holder{};
+    for (const auto& job : Runtime::GetEditorJobs(Commands))
+        if (Runtime::IsActiveEditorJobState(job.State) && !holder.IsValid())
+            holder = job.Identity.Run.IsValid() ? job.Identity.Run : job.Token;
+    ASSERT_TRUE(holder.IsValid());
+    Properties().Get<glm::vec3>("samples")[0].x += 0.5f;
+    ASSERT_TRUE(WaitFor(
+        [&]
+        {
+            (void)jobs.DrainCompletions(Engine.Events());
+            const auto records = Runtime::GetEditorJobs(Commands);
+            return jobs.IsComplete(holder) &&
+                std::none_of(records.begin(),
+                    records.end(),
+                    [](const auto& job)
+                    {
+                        return Runtime::IsActiveEditorJobState(job.State);
+                    });
+        }));
+    EXPECT_EQ(jobs.GetState(holder), Runtime::JobState::Cancelled) << "the ended run's holder is retired";
+    EXPECT_FALSE(Runtime::IsEditorRunCancelRequested(Commands, holder));
 }
 
 // RUNTIME-313: a duplicate of a guarded run reaches the agent as every duplicate does: Pending

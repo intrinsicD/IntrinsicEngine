@@ -145,6 +145,9 @@ export namespace Geometry::Registration
         std::span<const glm::vec3> source, std::span<const glm::vec3> target,
         std::span<const glm::vec3> normals, const RegistrationParams& params,
         const NearestQuery& query, const IterationObserver& observer = {});
+    // AlignICP's correspondence query: a KD-tree over `target` (owned by the returned query) answering the
+    // nearest target index. Empty when the tree cannot be built.
+    [[nodiscard]] NearestQuery MakeKDTreeNearestQuery(std::span<const glm::vec3> target, std::size_t leafSize);
 
     // -------------------------------------------------------------------------
     // ICP Alignment

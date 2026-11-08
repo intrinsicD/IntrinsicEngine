@@ -9,6 +9,7 @@ module;
 module Extrinsic.Graphics.VertexNormals;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -123,14 +124,16 @@ namespace Extrinsic::Graphics
     struct VertexNormalsWorkspace::Impl
     {
         RHI::IDevice& Device;
+        RHI::BufferManager& Scratch;
         RHI::PipelineHandle Pipeline{};
-        RHI::BufferHandle Areas{}, Stats{};
-        std::uint64_t AreaBytes{};
-        explicit Impl(RHI::IDevice& device) : Device(device) {}
+        RHI::BufferManager::BufferLease Areas{}, Stats{};
+        // ARCH-023: the scratch addresses, resolved with it (device-owner thread). Prepared: Prepare checked the
+        // device and sized the area scratch (PreparedAreaBytes), so Record within it makes no device call.
+        std::uint64_t AreasAddress{}, StatsAddress{}, PreparedAreaBytes{};
+        bool Prepared{};
+        Impl(RHI::IDevice& device, RHI::BufferManager& scratch) : Device(device), Scratch(scratch) {}
         ~Impl()
         {
-            for (auto buffer : {Areas, Stats})
-                if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
         }
         bool EnsurePipeline()
@@ -141,23 +144,60 @@ namespace Extrinsic::Graphics
         }
         bool EnsureBuffers(const std::uint64_t areaBytes)
         {
-            if (!Areas.IsValid() || AreaBytes < areaBytes)
-            {
-                if (Areas.IsValid()) Device.DestroyBuffer(Areas);
-                Areas = Device.CreateBuffer({.SizeBytes = std::max<std::uint64_t>(areaBytes, kAreaBytesPerFace),
-                                             .Usage = RHI::BufferUsage::Storage, .DebugName = "VertexNormals.Areas"});
-                AreaBytes = areaBytes;
-            }
-            if (!Stats.IsValid())
-                Stats = Device.CreateBuffer({.SizeBytes = StatsReadbackBytes,
-                                             .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                                             .DebugName = "VertexNormals.Stats"});
-            return Areas.IsValid() && Stats.IsValid();
+            if (!Scratch.EnsureScratch(Areas,
+                    {.SizeBytes = std::max<std::uint64_t>(areaBytes, kAreaBytesPerFace),
+                        .Usage = RHI::BufferUsage::Storage,
+                        .DebugName = "VertexNormals.Areas"}) ||
+                !Scratch.EnsureScratch(Stats,
+                    {.SizeBytes = StatsReadbackBytes,
+                        .Usage =
+                            RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
+                        .DebugName = "VertexNormals.Stats"}))
+                return false;
+            AreasAddress = Device.GetBufferDeviceAddress(Areas.GetHandle());
+            StatsAddress = Device.GetBufferDeviceAddress(Stats.GetHandle());
+            return true;
+        }
+        bool Ready(const std::uint64_t areaBytes)
+        {
+            if (Prepared)
+                return areaBytes <= PreparedAreaBytes;
+            return Device.IsOperational() && Device.SupportsShaderFloat64() && EnsurePipeline() &&
+                EnsureBuffers(areaBytes);
         }
     };
+    namespace
+    {
+        std::uint64_t AreaBytes(const VertexNormalsTopologyLayout& layout)
+        {
+            return layout.Kind == VertexNormalsBundleKind::FaceNormals
+                ? kAreaBytesPerFace
+                : std::uint64_t(std::max(layout.Faces, 1u)) * kAreaBytesPerFace;
+        }
+    }
 
-    VertexNormalsWorkspace::VertexNormalsWorkspace(RHI::IDevice& device) : m_Impl(std::make_unique<Impl>(device)) {}
+    VertexNormalsWorkspace::VertexNormalsWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch)
+        : m_Impl(std::make_unique<Impl>(device, scratch))
+    {
+    }
     VertexNormalsWorkspace::~VertexNormalsWorkspace() = default;
+    void VertexNormalsWorkspace::ReleaseScratch()
+    {
+        m_Impl->Areas = {};
+        m_Impl->Stats = {};
+        m_Impl->Prepared = false;
+    }
+    bool VertexNormalsWorkspace::Prepare(const VertexNormalsTopologyLayout& layout)
+    {
+        auto& s = *m_Impl;
+        s.Prepared = false;
+        const auto bytes = AreaBytes(layout);
+        if (!s.Ready(bytes))
+            return false;
+        s.PreparedAreaBytes = bytes;
+        s.Prepared = true;
+        return true;
+    }
 
     RHI::BufferHandle VertexNormalsWorkspace::Record(RHI::ICommandContext& commands, const VertexNormalsGpuParams& params,
                                                      const VertexNormalsResidentIo& io)
@@ -167,20 +207,21 @@ namespace Extrinsic::Graphics
         const bool faceRows = layout.Kind == VertexNormalsBundleKind::FaceNormals;
         const std::uint32_t outputRows = faceRows ? layout.Faces : layout.Vertices;
         if (!io.Positions.Valid() || !io.Topology.Valid() || !io.Output.Valid() || layout.Words == 0u ||
-            layout.Vertices == 0u || layout.Vertices > VertexNormalsMaxVertices || layout.Faces > VertexNormalsMaxFaces ||
-            layout.Corners > VertexNormalsMaxCorners || layout.LiveRows > outputRows ||
-            io.OutputBytes < std::uint64_t(outputRows) * 3u * sizeof(float) ||
-            !(params.Epsilon > 0.0) || !s.Device.IsOperational() || !s.Device.SupportsShaderFloat64() ||
-            !s.EnsurePipeline() || !s.EnsureBuffers(faceRows ? kAreaBytesPerFace : std::uint64_t(std::max(layout.Faces, 1u)) * kAreaBytesPerFace))
+            layout.Vertices == 0u || layout.Vertices > VertexNormalsMaxVertices ||
+            layout.Faces > VertexNormalsMaxFaces || layout.Corners > VertexNormalsMaxCorners ||
+            layout.LiveRows > outputRows || io.OutputBytes < std::uint64_t(outputRows) * 3u * sizeof(float) ||
+            !(params.Epsilon > 0.0) || !s.Ready(AreaBytes(layout)))
             return {};
+        const auto areas = s.Areas.GetHandle(), stats = s.Stats.GetHandle();
         const auto word = [&](const std::uint32_t at) { return io.Topology.Address + std::uint64_t(at) * 4u; };
         // Inputs uploaded by the transfer queue (positions, bundle) become shader-readable;
         // the stats start at zero; the output starts as the property's published bytes.
         commands.BufferBarrier(io.Positions.Buffer, RHI::MemoryAccess::TransferWrite | kShaderAccess, RHI::MemoryAccess::ShaderRead);
         commands.BufferBarrier(io.Topology.Buffer, RHI::MemoryAccess::TransferWrite | kShaderAccess, RHI::MemoryAccess::ShaderRead);
-        commands.BufferBarrier(s.Stats, kShaderAccess | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::TransferWrite);
-        commands.FillBuffer(s.Stats, 0u, StatsReadbackBytes, 0u);
-        commands.BufferBarrier(s.Stats, RHI::MemoryAccess::TransferWrite, kShaderAccess);
+        commands.BufferBarrier(
+            stats, kShaderAccess | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::TransferWrite);
+        commands.FillBuffer(stats, 0u, StatsReadbackBytes, 0u);
+        commands.BufferBarrier(stats, RHI::MemoryAccess::TransferWrite, kShaderAccess);
         commands.BufferBarrier(io.Output.Buffer, kShaderAccess | RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::TransferWrite);
         if (io.Base.Valid() && io.Base.Buffer != io.Output.Buffer)
         {
@@ -190,14 +231,22 @@ namespace Extrinsic::Graphics
         else
             commands.FillBuffer(io.Output.Buffer, 0u, io.OutputBytes, 0u);
         commands.BufferBarrier(io.Output.Buffer, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderWrite);
-        commands.BufferBarrier(s.Areas, kShaderAccess, RHI::MemoryAccess::ShaderWrite);
+        commands.BufferBarrier(areas, kShaderAccess, RHI::MemoryAccess::ShaderWrite);
         commands.BindPipeline(s.Pipeline);
-        Push push{.Positions = io.Positions.Address, .FaceOffsets = word(layout.FaceOffsetsAt), .Corners = word(layout.CornersAt),
-                  .VertexOffsets = word(layout.VertexOffsetsAt), .Incidence = word(layout.IncidenceAt),
-                  .LiveRows = word(layout.LiveRowsAt), .Areas = s.Device.GetBufferDeviceAddress(s.Areas),
-                  .Result = io.Output.Address, .Stats = s.Device.GetBufferDeviceAddress(s.Stats),
-                  .Weighting = std::uint32_t(params.Weighting), .Epsilon = params.Epsilon,
-                  .FallbackX = params.Fallback[0], .FallbackY = params.Fallback[1], .FallbackZ = params.Fallback[2]};
+        Push push{.Positions = io.Positions.Address,
+            .FaceOffsets = word(layout.FaceOffsetsAt),
+            .Corners = word(layout.CornersAt),
+            .VertexOffsets = word(layout.VertexOffsetsAt),
+            .Incidence = word(layout.IncidenceAt),
+            .LiveRows = word(layout.LiveRowsAt),
+            .Areas = s.AreasAddress,
+            .Result = io.Output.Address,
+            .Stats = s.StatsAddress,
+            .Weighting = std::uint32_t(params.Weighting),
+            .Epsilon = params.Epsilon,
+            .FallbackX = params.Fallback[0],
+            .FallbackY = params.Fallback[1],
+            .FallbackZ = params.Fallback[2]};
         // A pass over more threads than one dispatch may cover (65535 workgroups of 64) is
         // issued in chunks; the shader adds the chunk's first index.
         const auto dispatch = [&](const std::uint32_t mode, const std::uint32_t threads) {
@@ -215,12 +264,12 @@ namespace Extrinsic::Graphics
         else
         {
             dispatch(Mode::Faces, layout.Faces);
-            commands.BufferBarrier(s.Areas, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead);
+            commands.BufferBarrier(areas, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead);
             dispatch(Mode::Vertices, layout.LiveRows);
         }
         // Ready for the Accept readback (and any observer) and the stats copy.
         commands.BufferBarrier(io.Output.Buffer, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::TransferRead);
-        commands.BufferBarrier(s.Stats, kShaderAccess, RHI::MemoryAccess::TransferRead);
-        return s.Stats;
+        commands.BufferBarrier(stats, kShaderAccess, RHI::MemoryAccess::TransferRead);
+        return stats;
     }
 }

@@ -41,10 +41,15 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "selected_name", .Type = FT::String, .Description = "Bool property marking the first `count` samples.", .NonEmpty = true},
         };
 
+        // ARCH-023: the shared rows sampling honours (no cap row: the count is the cap; no live preview).
+        constexpr auto kExecutionFields = StepRunExecutionFields(100000000u);
+
         std::span<const ConfigFieldSpec> Fields()
         {
             static const std::vector<ConfigFieldSpec> fields = [] {
                 std::vector<ConfigFieldSpec> all(kBaseFields.begin(), kBaseFields.end());
+                all.push_back(kExecutionFields[3]);
+                all.push_back(kExecutionFields[4]);
                 const auto block = PointSamplingFieldSpecs("");
                 all.insert(all.end(), block.begin(), block.end());
                 return all;
@@ -54,9 +59,16 @@ namespace Extrinsic::Runtime
 
         Json Encode(const PointSamplingOperationConfig& c)
         {
-            Json doc{{"source", c.SourceStableEntityId}, {"positions", ConfigDetail::EncodePointPropertyRef(c.Positions)},
-                     {"count", c.Count}, {"weights", c.WeightsName}, {"output", unsigned(c.Output)},
-                     {"backend", unsigned(c.Backend)}, {"rank_name", c.RankName}, {"selected_name", c.SelectedName}};
+            Json doc{{"source", c.SourceStableEntityId},
+                {"positions", ConfigDetail::EncodePointPropertyRef(c.Positions)},
+                {"count", c.Count},
+                {"weights", c.WeightsName},
+                {"output", unsigned(c.Output)},
+                {"backend", unsigned(c.Backend)},
+                {"rank_name", c.RankName},
+                {"selected_name", c.SelectedName},
+                {"auto_accept", std::string{ToString(c.Execution.AutoAccept)}},
+                {"start", std::string{ToString(c.Execution.Start)}}};
             ConfigDetail::EncodePointSampling(doc, "", c.Sampling);
             return doc;
         }
@@ -72,6 +84,10 @@ namespace Extrinsic::Runtime
             c.Backend = PointSamplingBackend(doc.at("backend").get<unsigned>());
             c.RankName = doc.at("rank_name").get<std::string>();
             c.SelectedName = doc.at("selected_name").get<std::string>();
+            // The merged document passed the field table: the tokens parse.
+            c.Execution.AutoAccept =
+                ParseStepRunAutoAccept(doc.at("auto_accept").get<std::string>()).value_or(StepRunAutoAccept::Never);
+            c.Execution.Start = ParseStepRunStart(doc.at("start").get<std::string>()).value_or(StepRunStart::Ready);
             ConfigDetail::DecodePointSampling(doc, "", c.Sampling);
             return c;
         }

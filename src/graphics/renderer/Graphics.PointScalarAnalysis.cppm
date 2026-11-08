@@ -5,7 +5,15 @@ module;
 export module Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.RHI.Handles;
-extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+        class ICommandContext;
+        class BufferManager;
+    }
+}
 export namespace Extrinsic::Graphics
 {
     struct PointScalarGpuParams
@@ -31,11 +39,19 @@ export namespace Extrinsic::Graphics
     class PointScalarWorkspace
     {
     public:
-        explicit PointScalarWorkspace(RHI::IDevice&);
+        // Scratch buffers are cached leases of `scratch`, which must outlive the workspace.
+        PointScalarWorkspace(RHI::IDevice&, RHI::BufferManager& scratch);
         ~PointScalarWorkspace();
         // One run per call. Reusable once the previous run's submission completed: the pipeline is
         // kept and only undersized scratch is replaced.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext&, const PointScalarGpuParams&, const PointScalarResidentIo&);
+        // ARCH-023, device-owner thread (a run's Init): checks the device, creates the pipeline and sizes the scratch for
+        // `liveCount` rows of `p`, resolving their addresses, so a Record of that shape then makes no device call (a
+        // method worker records it). Record of another shape fails until the next Prepare or ReleaseScratch.
+        [[nodiscard]] bool Prepare(const PointScalarGpuParams& p, std::uint32_t liveCount);
+        // Returns every scratch buffer to its cache, keeping the pipeline; the next Record reallocates.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

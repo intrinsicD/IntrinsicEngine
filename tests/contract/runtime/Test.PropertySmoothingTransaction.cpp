@@ -2,9 +2,12 @@
 // on a null/mock device: Accept publishes through the undoable transaction and binds the ring
 // front as the canonical slot of the new revision; Discard, cancel, stale-while-pending and undo
 // behave as the ADR says; "Applied" is reported only after the CPU publication.
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <thread>
 #include <string>
 #include <vector>
 #include <entt/entity/registry.hpp>
@@ -32,6 +35,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Geometry.Properties;
+import Extrinsic.Runtime.StepRuns;
 namespace R = Extrinsic::Runtime;
 namespace G = Extrinsic::Graphics;
 using D = R::GeometryElementDomain;
@@ -458,4 +462,181 @@ TEST(PropertySmoothingTransaction, ReentrantDiscardDuringAcceptStillDeliversAppl
     EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Commands(), run).Phase, R::EditorGpuTransactionPhase::Applied);
     EXPECT_TRUE(h.Props().Exists("smooth"));
     EXPECT_FALSE(h.Residency.HasRing(h.Key())) << "the accepted front became the canonical slot";
+}
+
+// ARCH-023: the CPU counterpart is a worker step run of the same lifecycle. Ready computes nothing; Step(n) is n
+// passes; Restart begins again from the captured input; Accept publishes the last complete step once (one undo
+// entry), equal to the inline filter with as many iterations; Discard and a stale input publish nothing; the batch
+// command runs at once and accepts the whole filter at its end.
+TEST(PropertySmoothingTransaction, CpuRunsStepOnAWorkerAndAcceptTheLastCompleteStep)
+{
+    using namespace std::chrono_literals;
+    Harness h;
+    h.Config.Backend = R::PropertySmoothingBackend::Cpu;
+    h.Config.Filter.Iterations = 6;
+    // The inline references (a context without step runs publishes at once).
+    auto inlineContext = h.Context;
+    inlineContext.StepRuns = nullptr;
+    const auto reference = [&](const std::uint32_t iterations, const char* name)
+    {
+        auto c = h.Config;
+        c.Filter.Iterations = iterations;
+        c.Output.Name = name;
+        const auto result =
+            R::ApplyEditorPropertySmoothingCommand(R::BindEditorProcessingCommands(inlineContext), h.Id(), c);
+        EXPECT_EQ(result.Status, R::EditorCommandStatus::Applied) << result.Message;
+        EXPECT_EQ(result.StepRun, 0u) << "an inline run has no run controls";
+        return std::as_const(h.Props()).Get<double>(name).Vector();
+    };
+    const auto three = reference(3u, "reference3");
+    const auto six = reference(6u, "reference6");
+    ASSERT_NE(three, six);
+    auto& runs = h.Jobs.StepRuns();
+    std::vector<R::EditorPropertySmoothingResult> delivered;
+    const auto start = [&]
+    {
+        R::EditorPropertySmoothingResult started;
+        EXPECT_FALSE(R::StartEditorPropertySmoothing(h.Commands(),
+            h.Id(),
+            h.Config,
+            started,
+            [&](R::EditorPropertySmoothingResult r)
+            {
+                delivered.push_back(std::move(r));
+            }))
+            << "the CPU run has no GPU transaction";
+        EXPECT_EQ(started.Status, R::EditorCommandStatus::Pending) << started.Message;
+        EXPECT_NE(started.StepRun, 0u) << started.Message;
+        return started.StepRun;
+    };
+    const auto pump = [&](const std::function<bool()>& done)
+    {
+        for (int i = 0; i < 4000 && !done(); ++i)
+        {
+            (void)h.Jobs.Jobs().DrainCompletions(h.Jobs.Events());
+            std::this_thread::sleep_for(200us);
+        }
+        return done();
+    };
+    const auto control = [&](const std::uint64_t run, const R::StepRunAction action, const std::uint32_t count = 1u)
+    {
+        std::string why;
+        EXPECT_TRUE(runs.Control(run, action, count, why)) << why;
+    };
+    auto run = start();
+    const auto observe = [&]
+    {
+        return *runs.Observe(run);
+    };
+    const auto settled = [&]
+    {
+        const auto o = observe();
+        return o.Phase == R::StepRunPhase::Paused && !o.SegmentInFlight;
+    };
+    (void)pump(
+        []
+        {
+            return false;
+        });
+    EXPECT_EQ(observe().Phase, R::StepRunPhase::Ready);
+    EXPECT_EQ(observe().Steps, 0u) << "ready: no pass ran";
+    control(run, R::StepRunAction::Step, 2u);
+    ASSERT_TRUE(pump(settled));
+    EXPECT_EQ(observe().Steps, 2u);
+    control(run, R::StepRunAction::Restart);
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return observe().Generation == 1u;
+        }));
+    EXPECT_EQ(observe().Steps, 0u);
+    control(run, R::StepRunAction::Step, 3u);
+    ASSERT_TRUE(pump(settled));
+    EXPECT_EQ(observe().Steps, 3u);
+    EXPECT_FALSE(h.Props().Exists("smooth")) << "nothing publishes before Accept";
+    control(run, R::StepRunAction::Accept);
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return delivered.size() == 1u;
+        }));
+    ASSERT_EQ(delivered[0].Status, R::EditorCommandStatus::Applied) << delivered[0].Message;
+    EXPECT_EQ(delivered[0].Steps, 3u);
+    EXPECT_EQ(delivered[0].StepRun, run);
+    EXPECT_EQ(std::as_const(h.Props()).Get<double>("smooth").Vector(), three) << "three passes after the restart";
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_FALSE(h.Props().Exists("smooth")) << "one undo entry";
+    // Discard: nothing publishes.
+    run = start();
+    control(run, R::StepRunAction::Step, 1u);
+    ASSERT_TRUE(pump(settled));
+    control(run, R::StepRunAction::Discard);
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return delivered.size() == 2u;
+        }));
+    EXPECT_EQ(delivered[1].Status, R::EditorCommandStatus::StaleEntity);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal()) << "Discard reports before its holder retires";
+    EXPECT_FALSE(h.Props().Exists("smooth"));
+    // A stale input discards the run.
+    run = start();
+    h.Props().Get<double>("temperature")[0] += 1.0;
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return delivered.size() == 3u;
+        }));
+    EXPECT_EQ(delivered[2].Status, R::EditorCommandStatus::StaleEntity);
+    EXPECT_EQ(observe().Phase, R::StepRunPhase::Discarded);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    h.Props().Get<double>("temperature")[0] -= 1.0;
+    // The batch command: Run at once, accepted at its end.
+    const auto batch = R::ApplyEditorPropertySmoothingCommand(h.Commands(),
+        h.Id(),
+        h.Config,
+        [&](R::EditorPropertySmoothingResult r)
+        {
+            delivered.push_back(std::move(r));
+        });
+    ASSERT_EQ(batch.Status, R::EditorCommandStatus::Pending) << batch.Message;
+    ASSERT_TRUE(pump(
+        [&]
+        {
+            return delivered.size() == 4u;
+        }));
+    ASSERT_EQ(delivered[3].Status, R::EditorCommandStatus::Applied) << delivered[3].Message;
+    EXPECT_EQ(delivered[3].Steps, 6u);
+    EXPECT_EQ(std::as_const(h.Props()).Get<double>("smooth").Vector(), six);
+}
+
+// ARCH-023: an interactive Vulkan start is ready: its Run job polls, but nothing is acquired or queued until the
+// step run allows a step; Step(1) then queues the first chunk. The run's id is the result's.
+TEST(PropertySmoothingTransaction, AReadyVulkanRunQueuesNothingUntilAStep)
+{
+    using namespace std::chrono_literals;
+    AdmittedHarness h;
+    R::EditorPropertySmoothingResult started;
+    const auto run = R::StartEditorPropertySmoothing(h.Cmd(), h.Id(), h.Config, started);
+    ASSERT_TRUE(run) << started.Message;
+    ASSERT_NE(started.StepRun, 0u);
+    auto& runs = h.Jobs.StepRuns();
+    for (int i = 0; i < 20; ++i)
+    {
+        (void)h.Jobs.Jobs().DrainCompletions(h.Jobs.Events());
+        std::this_thread::sleep_for(200us);
+    }
+    EXPECT_EQ(runs.Observe(started.StepRun)->Phase, R::StepRunPhase::Ready);
+    EXPECT_FALSE(R::SnapshotEditorPropertySmoothing(h.Cmd(), run).DeviceWorkQueued) << "ready: no device work";
+    EXPECT_EQ(R::SnapshotEditorPropertySmoothing(h.Cmd(), run).Result.StepRun, started.StepRun);
+    std::string why;
+    ASSERT_TRUE(runs.Control(started.StepRun, R::StepRunAction::Step, 1u, why)) << why;
+    for (int i = 0; i < 400 && !R::SnapshotEditorPropertySmoothing(h.Cmd(), run).DeviceWorkQueued; ++i)
+    {
+        (void)h.Jobs.Jobs().DrainCompletions(h.Jobs.Events());
+        std::this_thread::sleep_for(200us);
+    }
+    EXPECT_TRUE(R::SnapshotEditorPropertySmoothing(h.Cmd(), run).DeviceWorkQueued) << "Step(1) queues the first chunk";
+    R::DiscardEditorPropertySmoothing(h.Cmd(), run);
+    EXPECT_TRUE(h.Jobs.DrainUntilTerminal());
 }

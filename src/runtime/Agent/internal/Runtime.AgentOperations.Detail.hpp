@@ -126,11 +126,16 @@ namespace Extrinsic::Runtime::AgentDetail
         return code;
     }
 
+    // ARCH-023: a result of a step run also names it ("run", as run_control and run_observe do).
     template <class Result>
     inline Json ResultJson(const Result& result)
     {
-        return {{"status", DebugNameForEditorCommandStatus(result.Status)}, {"succeeded", result.Succeeded()},
-                {"message", result.Message}};
+        Json out{{"status", DebugNameForEditorCommandStatus(result.Status)},
+            {"succeeded", result.Succeeded()},
+            {"message", result.Message}};
+        if constexpr (requires { result.StepRun; })
+            out["run"] = result.StepRun;
+        return out;
     }
     // A preview answers like the panel's button: the method's readiness behind the same
     // config-lane gate (ResolveEditorProcessingActionReadiness).

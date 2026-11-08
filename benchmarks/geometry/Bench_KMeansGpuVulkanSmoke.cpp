@@ -56,11 +56,16 @@ namespace
         "builtin.kmeans.separated_clusters_6x2";
     inline constexpr int kWarmupIterations = 1;
     inline constexpr int kMeasuredIterations = 3;
+    // The measured runs accept at their end, as the request default did before ARCH-023 moved it into the options.
     inline constexpr Runtime::KMeansParameters kParameters{
         .ClusterCount = 2u,
-        .MaxIterations = 6u,
         .Seed = 13u,
         .Initialization = Runtime::KMeansInitialization::Hierarchical,
+        .Execution = {.IterationCap = 6u,
+            .PreviewEvery = 5u,
+            .PreviewIntervalMs = 0u,
+            .AutoAccept = Runtime::StepRunAutoAccept::End,
+            .Start = Runtime::StepRunStart::Run},
     };
 
     struct Fixture
@@ -135,7 +140,7 @@ namespace
     {
         GK::KMeansParams params{};
         params.ClusterCount = kParameters.ClusterCount;
-        params.MaxIterations = kParameters.MaxIterations;
+        params.MaxIterations = kParameters.Execution.IterationCap;
         params.Seed = kParameters.Seed;
         params.ConvergenceTolerance = 1.0e-5f;
         params.Init = GK::Initialization::Hierarchical;
@@ -603,8 +608,7 @@ int main(const int argc, char** argv)
     output.setf(std::ios::fixed);
     output.precision(6);
     output << "{\n"
-           << "  \"benchmark_id\": \"" << EscapeJson(kBenchmarkId)
-           << "\",\n"
+           << "  \"benchmark_id\": \"" << EscapeJson(kBenchmarkId) << "\",\n"
            << "  \"method\": \"" << EscapeJson(kMethod) << "\",\n"
            << "  \"backend\": \"gpu_vulkan_compute\",\n"
            << "  \"dataset\": \"" << EscapeJson(kDataset) << "\",\n"
@@ -619,16 +623,13 @@ int main(const int argc, char** argv)
            << "    \"mode\": \"gpu_smoke\",\n"
            << "    \"execution_route\": \"ClusteringService\",\n"
            << "    \"warmup_iterations\": " << kWarmupIterations << ",\n"
-           << "    \"measured_iterations\": " << kMeasuredIterations
-           << ",\n"
+           << "    \"measured_iterations\": " << kMeasuredIterations << ",\n"
            << "    \"point_count\": " << fixture.Points.size() << ",\n"
            << "    \"cluster_count\": " << kParameters.ClusterCount << ",\n"
-           << "    \"max_iterations\": " << kParameters.MaxIterations
-           << ",\n"
+           << "    \"max_iterations\": " << kParameters.Execution.IterationCap << ",\n"
            << "    \"seed\": " << kParameters.Seed << ",\n"
            << "    \"initialization\": \"Hierarchical\",\n"
-           << "    \"cpu_reference_runtime_ms\": "
-           << cpu.RuntimeMilliseconds << ",\n"
+           << "    \"cpu_reference_runtime_ms\": " << cpu.RuntimeMilliseconds << ",\n"
            << "    \"cpu_to_gpu_runtime_ratio\": " << ratio << ",\n"
            << "    \"baseline_comparison\": \"cpu_reference_same_fixture\",\n"
            << "    \"speedup_claimed\": false,\n"
@@ -636,19 +637,13 @@ int main(const int argc, char** argv)
            << "    \"label_mismatch_count\": " << labelMismatches << ",\n"
            << "    \"max_centroid_delta\": " << centroidDelta << ",\n"
            << "    \"inertia_delta\": " << inertiaDelta << ",\n"
-           << "    \"max_distance_index_matches\": "
-           << (maxDistanceIndexMatches ? "true" : "false") << ",\n"
-           << "    \"colors_committed\": "
-           << (gpu.ColorsCommitted ? "true" : "false") << ",\n"
-           << "    \"gpu_requests_accepted\": "
-           << gpu.Stats.GpuRequestsAccepted << ",\n"
+           << "    \"max_distance_index_matches\": " << (maxDistanceIndexMatches ? "true" : "false") << ",\n"
+           << "    \"colors_committed\": " << (gpu.ColorsCommitted ? "true" : "false") << ",\n"
+           << "    \"gpu_requests_accepted\": " << gpu.Stats.GpuRequestsAccepted << ",\n"
            << "    \"gpu_fallbacks\": " << gpu.Stats.GpuFallbacks << ",\n"
-           << "    \"gpu_completions\": " << gpu.Stats.GpuCompletions
-           << ",\n"
-           << "    \"labels_committed\": " << gpu.Stats.LabelsCommitted
-           << ",\n"
-           << "    \"diagnostic\": \"" << EscapeJson(diagnostic)
-           << "\"\n"
+           << "    \"gpu_completions\": " << gpu.Stats.GpuCompletions << ",\n"
+           << "    \"labels_committed\": " << gpu.Stats.LabelsCommitted << ",\n"
+           << "    \"diagnostic\": \"" << EscapeJson(diagnostic) << "\"\n"
            << "  },\n"
            << "  \"status\": \"" << status << "\"\n"
            << "}\n";

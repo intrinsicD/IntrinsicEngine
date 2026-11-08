@@ -12,7 +12,15 @@ module;
 export module Extrinsic.Graphics.PropertyFilter;
 import Extrinsic.RHI.Handles;
 
-extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+        class ICommandContext;
+        class BufferManager;
+    }
+}
 
 export namespace Extrinsic::Graphics
 {
@@ -74,7 +82,8 @@ export namespace Extrinsic::Graphics
     class PropertyFilterWorkspace
     {
     public:
-        explicit PropertyFilterWorkspace(RHI::IDevice& device);
+        // Device buffers are cached scratch leases of `scratch`, which must outlive the workspace.
+        PropertyFilterWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch);
         ~PropertyFilterWorkspace();
         // Dispatches Record would issue; runs above MaxDispatches are refused.
         [[nodiscard]] static std::uint64_t DispatchCount(const PropertyFilterGpuParams& params);
@@ -91,6 +100,23 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext& commands,
             const PropertyFilterGpuInput& input, const PropertyFilterGpuParams& params,
             const PropertyFilterResidentIo* resident = nullptr);
+        // ARCH-023: the same run a range of iterations at a time, over several submissions (Record is Begin, every
+        // iteration and, with `resident`, RecordStoreCurrent in one). Begin starts the run as Record does (uploads,
+        // the resident gather) and records no iteration; false on Record's refusals (the whole run's dispatch count
+        // included). RecordIterations records the next `count` iterations of the run's parameters from its current
+        // values (at most the iterations left) and returns the buffer holding them, ready for transfer reads;
+        // invalid on refusal. RecordStoreCurrent stores the current values into `resident`'s output (the endpoints
+        // Begin was given). Record each submission only after the previous one's recording, in order.
+        [[nodiscard]] bool Begin(RHI::ICommandContext& commands,
+            const PropertyFilterGpuInput& input,
+            const PropertyFilterGpuParams& params,
+            const PropertyFilterResidentIo* resident = nullptr);
+        // ARCH-023: RecordIterations, RecordStoreCurrent and RecordStore make no device call (a method worker records
+        // them): Begin and RecordLoad, on the device-owner thread, check the device and resolve every address.
+        [[nodiscard]] RHI::BufferHandle RecordIterations(RHI::ICommandContext& commands, std::uint32_t count);
+        [[nodiscard]] bool RecordStoreCurrent(RHI::ICommandContext& commands, const PropertyFilterResidentIo& resident);
+        // Iterations recorded since the run's Begin (0 without one).
+        [[nodiscard]] std::uint32_t RecordedIterations() const noexcept;
         // Stores rows x `channels` doubles held elsewhere on the device (element (i, c) at
         // `source` + (i * rowStride + c * channelStride) * 8) into the resident output and
         // presentation, e.g. a conjugate-gradient solution block. Uses the row map and restore
@@ -105,6 +131,10 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] bool RecordLoad(RHI::ICommandContext& commands, const PropertyFilterResidentIo& resident,
             std::uint32_t channels, RHI::BufferHandle target, std::uint64_t targetAddress,
             std::uint32_t rowStride, std::uint32_t channelStride);
+        // Returns every buffer to its cache and ends the run (RecordStore refuses until the next one
+        // starts); the pipeline stays.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

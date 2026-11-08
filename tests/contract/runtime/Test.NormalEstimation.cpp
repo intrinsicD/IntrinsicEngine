@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "OneShotLifecycleScript.hpp"
 #include "PointDomainFixture.hpp"
 
 import Extrinsic.Runtime.NormalOperations;
@@ -1079,4 +1080,84 @@ TEST(NormalEstimation, ExpiredAttachmentSuppressesQueuedCallbacksAfterSceneDestr
         ASSERT_TRUE(jobs.DrainUntilTerminal());
         EXPECT_EQ(callbacks, 0u);
     }
+}
+// ARCH-023: a CPU normals run started with the section's one-shot options follows the common lifecycle on the session's
+// step runs (ready computes nothing, Step 1 exactly one step, Restart from the same capture, Run, one Accept); nothing
+// is published or delivered before Accept, and the accepted output equals a batch Apply's over the same input.
+TEST(NormalEstimation, ACpuStartFollowsTheCommonOneShotLifecycle)
+{
+    for (const auto domain : {D::PointCloudPoint, D::MeshVertex})
+    {
+        SCOPED_TRACE(int(domain));
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, domain);
+        auto& props = PointDomainProperties(scene, entity, domain);
+        Intrinsic::Tests::EditorFeatureTestContext context;
+        context.Scene = &scene;
+        R::EditorCommandHistory history;
+        context.CommandHistory = &history;
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        const auto commands = R::BindEditorProcessingCommands(context);
+        auto batch = Config(entity, domain);
+        batch.Output.Name = "batch_normals";
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(commands, batch).Status, R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(props.Exists("batch_normals")) << "Apply is a batch: it runs at once and accepts at its end";
+        auto config = Config(entity, domain);
+        config.Execution.Start = R::StepRunStart::Ready;
+        std::optional<R::EditorNormalEstimationResult> delivered;
+        const auto started = R::StartEditorNormalEstimationRun(commands,
+            config,
+            [&](R::EditorNormalEstimationResult r)
+            {
+                delivered = std::move(r);
+            });
+        ASSERT_EQ(started.Status, R::EditorCommandStatus::Pending) << started.Message;
+        ASSERT_NE(started.StepRun, 0u) << "the answer names the run";
+        const auto nothing = [&]
+        {
+            EXPECT_FALSE(props.Exists("estimated"));
+            EXPECT_FALSE(delivered.has_value());
+        };
+        Intrinsic::Tests::OneShotLifecycleScript script{.OnReadyHeld = nothing,
+            .OnFirstResult = nothing,
+            .OnRestartedReady = nothing,
+            .OnRestartedResult = nothing};
+        for (int frame = 0; frame < 2000 && !script.Advance(jobs.StepRuns(), started.StepRun); ++frame)
+            jobs.Pump();
+        EXPECT_EQ(script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered.has_value());
+        EXPECT_TRUE(delivered->Succeeded()) << delivered->Message;
+        EXPECT_EQ(delivered->StepRun, started.StepRun);
+        EXPECT_EQ(std::as_const(props).Get<glm::vec3>("estimated").Vector(),
+            std::as_const(props).Get<glm::vec3>("batch_normals").Vector());
+        EXPECT_EQ(history.UndoCount(), 2u) << "one undo entry per Accept";
+    }
+}
+
+// ARCH-023: the normals section's one-shot rows (auto_accept, start) round-trip through its codec and refuse an
+// unknown token; the section has no cap or preview row.
+TEST(NormalEstimation, TheOneShotOptionsPersistThroughTheSection)
+{
+    auto config = Config(entt::entity{}, D::PointCloudPoint);
+    ASSERT_EQ(config.Execution.Start, R::StepRunStart::Ready) << "the one-shot default";
+    config.Execution.Start = R::StepRunStart::Run; // not the default: the codec must keep it
+    config.Execution.AutoAccept = R::StepRunAutoAccept::Converged;
+    Extrinsic::Core::Config::EngineConfig document{};
+    R::SetNormalEstimationConfig(document, config);
+    const auto decoded = R::GetNormalEstimationConfig(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Execution.Start, R::StepRunStart::Run);
+    EXPECT_EQ(decoded->Execution.AutoAccept, R::StepRunAutoAccept::Converged);
+    const auto usable = [](const char* payload)
+    {
+        return R::ValidateNormalEstimationConfigSection(payload, {}, "test").State ==
+            Extrinsic::Core::Config::EngineConfigState::Valid;
+    };
+    EXPECT_TRUE(usable(R"({"start":"ready","auto_accept":"end"})"));
+    EXPECT_FALSE(usable(R"({"start":"later"})"));
+    EXPECT_FALSE(usable(R"({"auto_accept":1})"));
+    EXPECT_FALSE(usable(R"({"preview_every":0})"));
 }

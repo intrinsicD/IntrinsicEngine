@@ -9,6 +9,7 @@ target_sources(${target_name}
         Graphics.Colormap.cppm
         Graphics.CurrentRendererContractAdapter.cppm
         Graphics.ComputeParallelPrimitives.cppm
+        Graphics.PointQuery.cppm
         Graphics.PointLBVH.cppm
         Graphics.PointKeypoints.cppm
         Graphics.CoherentPointDriftEStep.cppm

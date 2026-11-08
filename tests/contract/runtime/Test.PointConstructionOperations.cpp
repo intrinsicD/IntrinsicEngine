@@ -2,6 +2,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
@@ -9,6 +10,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "OneShotLifecycleScript.hpp"
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SpatialIndexCache;
@@ -177,17 +179,43 @@ TEST(PointConstructionConfig, RoundTripPreviewApplyAndRejectMalformedControls)
     ASSERT_TRUE(R::ApplyEditorConfiguredPointConstruction(commands).Succeeded());
     EXPECT_EQ(previews, 1);
     EXPECT_EQ(applies, 1);
-    for (auto payload :
-         {R"({"backend":"vulkan"})", R"({"resolution":0})", R"({"resolution":513})",
-          R"({"method":"poisson"})", R"({"k_neighbors":64})", R"({"k_neighbors":-1})",
-          R"({"normal_k_neighbors":2})", R"({"gpu_query_batch_size":0})",
-          R"({"max_grid_vertices":7})", R"({"output_name":""})", R"({"estimate_normals":1})",
-          R"({"kernel_sigma_scale":0})", R"({"kernel_sigma_scale":1e-310})", R"({"unknown":1})"})
+    for (auto payload : {R"({"backend":"vulkan"})",
+             R"({"resolution":0})",
+             R"({"resolution":513})",
+             R"({"method":"poisson"})",
+             R"({"k_neighbors":64})",
+             R"({"k_neighbors":-1})",
+             R"({"normal_k_neighbors":2})",
+             R"({"gpu_query_batch_size":0})",
+             R"({"max_grid_vertices":7})",
+             R"({"output_name":""})",
+             R"({"estimate_normals":1})",
+             R"({"kernel_sigma_scale":0})",
+             R"({"kernel_sigma_scale":1e-310})",
+             R"({"unknown":1})",
+             R"({"auto_accept":"later"})",
+             R"({"auto_accept":1})",
+             R"({"start":"paused"})",
+             R"({"preview_every":0})"})
         EXPECT_FALSE(R::ValidatePointConstructionConfigSection(payload, {}, "test").Usable())
             << payload;
     c.KNeighbors = 0;
     EXPECT_FALSE(R::ApplyEditorPointConstructionConfig(commands, c).Succeeded());
     EXPECT_EQ(applies, 1);
+    // ARCH-023: the one-shot rows (auto_accept, start) default to ready/never and round-trip; no cap or preview row.
+    R::PointConstructionConfig execution;
+    EXPECT_EQ(execution.Execution.Start, R::StepRunStart::Ready);
+    EXPECT_EQ(execution.Execution.AutoAccept, R::StepRunAutoAccept::Never);
+    execution.Execution.Start = R::StepRunStart::Run;
+    execution.Execution.AutoAccept = R::StepRunAutoAccept::End;
+    C::EngineConfig document{};
+    R::SetPointConstructionConfig(document, execution);
+    const auto decoded = R::GetPointConstructionConfig(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Execution.Start, R::StepRunStart::Run);
+    EXPECT_EQ(decoded->Execution.AutoAccept, R::StepRunAutoAccept::End);
+    EXPECT_TRUE(
+        R::ValidatePointConstructionConfigSection(R"({"start":"run","auto_accept":"converged"})", {}, "test").Usable());
 }
 TEST(PointConstructionOperations, EveryDomainPreservesSourceAndCachedOutputMatchesReference)
 {
@@ -375,6 +403,81 @@ TEST(PointConstructionOperations, JobsRejectChangedInputsTransformsDetachAndCanc
             EXPECT_EQ(delivered->Succeeded(), change == 0) << delivered->Message;
         EXPECT_EQ(history.CanUndo(), change == 0);
         EXPECT_EQ(scene.Raw().view<EC::StableId>().empty(), change != 0);
+    }
+}
+// ARCH-023: a CPU construction started with the section's one-shot options follows the common lifecycle on the
+// session's step runs (ready computes nothing, Step 1 exactly one step, Restart from the same capture, Run, one
+// Accept). Predictions: no entity, undo entry or delivered result before Accept; then exactly one new entity and one
+// undo entry, equal to a batch Apply's output (Hoppe: same vertex positions and faces; graph: same edges); without the
+// step runs an interactive start is refused. Mutations: a step that keeps the previous generation's rows (no
+// free/reset in Compute) fails the restarted Run (a graph's offsets double; a Hoppe field overruns its grid); a
+// Publish outside Accept fails `nothing`; a start that ignores `start: ready` fails the script's hold-ready stage.
+TEST(PointConstructionOperations, ACpuStartFollowsTheCommonOneShotLifecycle)
+{
+    for (const auto method : {R::PointConstructionMethod::Hoppe, R::PointConstructionMethod::KnnGraph})
+    {
+        SCOPED_TRACE(int(method));
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto source = Make(scene, D::PointCloudPoint);
+        Intrinsic::Tests::EditorFeatureTestContext context;
+        context.Scene = &scene;
+        R::EditorCommandHistory history;
+        context.CommandHistory = &history;
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        const auto commands = R::BindEditorProcessingCommands(context);
+        const auto config = Config(source, D::PointCloudPoint, method);
+        std::optional<R::EditorPointConstructionResult> batch;
+        ASSERT_EQ(R::ApplyEditorPointConstructionCommand(commands,
+                      config,
+                      [&](auto r)
+                      {
+                          batch = std::move(r);
+                      })
+                      .Status,
+            R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(batch.has_value()) << "Apply is a batch: it runs at once and accepts at its end";
+        ASSERT_TRUE(batch->Succeeded()) << batch->Message;
+        const auto expected = OutputPoints(scene, batch->OutputEntityId);
+        const auto entities = scene.Raw().view<EC::StableId>().size();
+        ASSERT_EQ(history.UndoCount(), 1u);
+        ASSERT_EQ(config.Execution.Start, R::StepRunStart::Ready) << "the section's one-shot default";
+        std::optional<R::EditorPointConstructionResult> delivered;
+        const auto started = R::StartEditorPointConstructionRun(commands,
+            config,
+            [&](R::EditorPointConstructionResult r)
+            {
+                delivered = std::move(r);
+            });
+        ASSERT_EQ(started.Status, R::EditorCommandStatus::Pending) << started.Message;
+        ASSERT_NE(started.StepRun, 0u) << "the answer names the run";
+        const auto nothing = [&]
+        {
+            EXPECT_EQ(scene.Raw().view<EC::StableId>().size(), entities) << "no entity before Accept";
+            EXPECT_EQ(history.UndoCount(), 1u);
+            EXPECT_FALSE(delivered.has_value());
+        };
+        Intrinsic::Tests::OneShotLifecycleScript script{.OnReadyHeld = nothing,
+            .OnFirstResult = nothing,
+            .OnRestartedReady = nothing,
+            .OnRestartedResult = nothing};
+        for (int frame = 0; frame < 2000 && !script.Advance(jobs.StepRuns(), started.StepRun); ++frame)
+            jobs.Pump();
+        EXPECT_EQ(script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered.has_value());
+        ASSERT_TRUE(delivered->Succeeded()) << delivered->Message;
+        EXPECT_EQ(delivered->StepRun, started.StepRun);
+        EXPECT_EQ(scene.Raw().view<EC::StableId>().size(), entities + 1u) << "Accept created exactly one entity";
+        EXPECT_EQ(history.UndoCount(), 2u) << "one undo entry per Accept";
+        EXPECT_EQ(OutputPoints(scene, delivered->OutputEntityId), expected);
+        EXPECT_EQ(delivered->OutputEdgeCount, batch->OutputEdgeCount);
+        EXPECT_EQ(delivered->OutputFaceCount, batch->OutputFaceCount);
+        context.StepRuns = nullptr;
+        EXPECT_EQ(R::StartEditorPointConstructionRun(R::BindEditorProcessingCommands(context), config).Status,
+            R::EditorCommandStatus::InvalidProcessingParameters)
+            << "an interactive start needs the session's step runs";
     }
 }
 TEST(PointConstructionOperations, UnavailableGpuAndInvalidPreparationPublishNothing)

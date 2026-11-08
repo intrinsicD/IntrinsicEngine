@@ -1,16 +1,22 @@
-// ARCH-022: the FPFH descriptor plugin's Vulkan chain (scale, then gated GPU radius pages, then the CPU histograms)
-// in a Vulkan engine composed as the Sandbox composes it. Eight domains with deleted slots agree with the CPU k-d
-// tree within 1e-5, cold, warm (the cached index reused) and with an automatic radius, one undo entry each; inputs
-// changed before GPU recording end the run stale, a cancel between stages ends it cancelled, an uncapped support
-// beyond the radius capacity fails with overflow, all writing nothing; a lowest-ID cap serves a dense radius; an
-// unload during a chain ends the run once and completes, and a reload runs again. Replaces the built-in's PointLBVHGpuSmoke.Descriptor*
-// cases and produces the benchmark JSON of geometry.point_lbvh.descriptor_runtime_smoke.
+// ARCH-022: the FPFH descriptor plugin's Vulkan step (ARCH-023: one worker step: the scale, the GPU radius pages
+// through the prepared query session, then the CPU histograms) in a Vulkan engine composed as the Sandbox composes
+// it. Eight domains with deleted slots agree with the CPU k-d tree within 1e-5, cold, warm (the cached index reused)
+// and with an automatic radius, one undo entry each; inputs changed before the start end the run stale, a cancel
+// with a page held on the device ends it cancelled, an uncapped support beyond the radius capacity fails with
+// overflow, all writing nothing; a lowest-ID cap serves a dense radius; an unload with a page held ends the run once
+// and completes, and a reload runs again. ARCH-023: the hybrid is one step of
+// a step run: ready computes nothing, a restart after convergence computes again, and Accept writes what the batch
+// run writes. Replaces the built-in's PointLBVHGpuSmoke.Descriptor* cases and produces the benchmark JSON of
+// geometry.point_lbvh.descriptor_runtime_smoke.
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
+#include <thread>
+#include <utility>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -25,6 +31,9 @@
 #include "DescriptorAnalysisHarness.hpp"
 #include "PluginGpuSmoke.hpp"
 
+import Extrinsic.Backends.Vulkan;
+import Extrinsic.RHI.Device;
+#include "HeldFramesProgress.hpp"
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Platform.Backend.Glfw;
@@ -39,6 +48,20 @@ namespace
     namespace GS = Extrinsic::ECS::Components::GeometrySources;
     using Gpu = Intrinsic::Tests::Plugins::Gpu<Harness>;
     using Columns = std::array<std::vector<float>, DA::kBins>;
+
+    // ARCH-023: holds the separate method queue so the worker step's radius page stays in flight (empty without one).
+    std::function<bool()> HoldMethodQueue(Gpu& gpu)
+    {
+        namespace Vk = Extrinsic::Backends::Vulkan;
+        return Vk::HoldVulkanQueue(&gpu.H->Engine.GetDevice(), Vk::VulkanGatedQueue::MethodCompute);
+    }
+    // The run's step is in flight (its page held), or no hold is possible.
+    bool StepHeld(Gpu& gpu, const DA::Run& run, const bool held)
+    {
+        auto* steps = gpu.H->Engine.Services().Find<R::StepRunsService>();
+        const auto o = steps ? steps->Observe(run.Pending.StepRun) : std::nullopt;
+        return !held || (o && o->SegmentInFlight);
+    }
 
     Geometry::PropertySet& Props(Extrinsic::ECS::Scene::Registry& scene, const entt::entity entity, const D domain)
     {
@@ -109,13 +132,18 @@ namespace
     DA::Config Settings(const entt::entity entity, const D domain, const char* prefix, const bool automatic)
     {
         return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
-                .Backend = DA::DescriptorBackend::VulkanLBVH,
-                .Positions = {.Domain = domain, .Name = "samples", .ValueKind = Geometry::PropertyValueKind::Vec3},
-                .Normals = {.Domain = domain, .Name = "directions", .ValueKind = Geometry::PropertyValueKind::Vec3},
-                .Outputs = DA::MakeOutputs(domain, prefix),
-                .MaxNeighbors = automatic ? 0u : 8u,
-                .GpuQueryBatchSize = 128,
-                .FeatureRadius = automatic ? 0.f : 2.f};
+            .Backend = DA::DescriptorBackend::VulkanLBVH,
+            .Positions = {.Domain = domain, .Name = "samples", .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .Normals = {.Domain = domain, .Name = "directions", .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .Outputs = DA::MakeOutputs(domain, prefix),
+            .MaxNeighbors = automatic ? 0u : 8u,
+            .GpuQueryBatchSize = 128,
+            .FeatureRadius = automatic ? 0.f : 2.f,
+            .Execution = {.IterationCap = 1u,
+                .PreviewEvery = 0u,
+                .PreviewIntervalMs = 0u,
+                .AutoAccept = R::StepRunAutoAccept::End,
+                .Start = R::StepRunStart::Run}};
     }
 
     Columns Read(Geometry::PropertySet& props, const DA::Config& config)
@@ -255,27 +283,26 @@ TEST(DescriptorAnalysisPluginGpuSmoke, StaleInputsACancelBetweenStagesAndRadiusO
     auto& props = Props(scene, entity, D::PointCloudPoint);
     const auto settings = [&](const char* prefix) { return Settings(entity, D::PointCloudPoint, prefix, false); };
     std::shared_ptr<DA::Run> stale, cancelled, overflow;
-    bool cancelRequested = false;
+    std::function<bool()> release;
+    bool cancelRequested = false, held = false;
     ASSERT_TRUE(gpu.Run([&]
     {
         if (!stale)
         {
             stale = DA::Start(settings("stale"));
-            props.Get<glm::vec3>("directions")[0] += .1f; // before any GPU recording
+            props.Get<glm::vec3>("directions")[0] += .1f; // before its first frame: the run's Valid ends it stale
         }
-        if (stale->Final && !cancelled) cancelled = DA::Start(settings("cancelled"));
-        if (cancelled && !cancelRequested)
+        if (stale->Final && !cancelled)
         {
-            // Between stages: once this run's GPU stage is active, its scale stage has completed.
-            const auto jobs = gpu.H->Jobs();
-            if (std::ranges::any_of(jobs, [&](const auto& job)
-                {
-                    return job.Name == "Descriptor radius support (Vulkan)" &&
-                        job.Identity.Run == cancelled->Handle.Token && R::IsActiveEditorJobState(job.State);
-                }))
-                cancelRequested = R::CancelPluginRun(*cancelled);
+            release = HoldMethodQueue(gpu); // the run's radius page stays on the device
+            held = bool(release);
+            cancelled = DA::Start(settings("cancelled"));
         }
+        if (cancelled && !cancelRequested && StepHeld(gpu, *cancelled, held))
+            cancelRequested = R::CancelPluginRun(*cancelled);
         if (!cancelled || !cancelled->Final) return false;
+        if (release)
+            (void)std::exchange(release, {})();
         if (!overflow)
         {
             // 1029 coincident samples and one far one: an uncapped support of 1028 exceeds the capacity of 1024.
@@ -290,6 +317,8 @@ TEST(DescriptorAnalysisPluginGpuSmoke, StaleInputsACancelBetweenStagesAndRadiusO
         }
         return overflow->Final.has_value();
     })) << "the frames ran out";
+    if (release)
+        (void)release();
     EXPECT_EQ(stale->Final->Status, "stale") << stale->Final->Message;
     EXPECT_TRUE(cancelRequested);
     EXPECT_EQ(cancelled->Final->Status, "cancelled") << cancelled->Final->Message;
@@ -366,7 +395,8 @@ TEST(DescriptorAnalysisPluginGpuSmoke, AnUnloadDuringAChainEndsTheRunOnceAndARel
     std::shared_ptr<DA::Run> run, again;
     std::optional<R::AgentOperationOutcome> unload, load;
     R::AgentOperationOutcome unloaded{}, loaded{};
-    bool unloadFinished = false, loadFinished = false, toolsGone = false;
+    bool unloadFinished = false, loadFinished = false, toolsGone = false, held = false;
+    std::function<bool()> release;
     const auto poll = [&](std::optional<R::AgentOperationOutcome>& call, R::AgentOperationOutcome& result)
     {
         if (!call->Continuation)
@@ -376,41 +406,51 @@ TEST(DescriptorAnalysisPluginGpuSmoke, AnUnloadDuringAChainEndsTheRunOnceAndARel
         }
         return call->Continuation(gpu.H->Context, result);
     };
-    ASSERT_TRUE(gpu.Run([&]
-    {
-        if (!run) run = DA::Start(c);
-        if (!unload)
+    ASSERT_TRUE(gpu.Run(
+        [&]
         {
-            const auto jobs = gpu.H->Jobs();
-            if (std::ranges::any_of(jobs, [&](const auto& job)
-                {
-                    return job.Name == "Descriptor radius support (Vulkan)" && job.Identity.Run == run->Handle.Token &&
-                        R::IsActiveEditorJobState(job.State);
-                }))
-                unload = R::InvokeAgentOperation(gpu.H->Registry, "plugin_unload", gpu.H->Context, "{}", false);
-            return false;
-        }
-        if (!unloadFinished)
-        {
-            unloadFinished = poll(unload, unloaded);
-            toolsGone = unloadFinished && gpu.H->Registry.Find("descriptor_analysis") == nullptr;
-            if (unloadFinished) unload->Continuation = {}; // answered: released, as the agent server does
-            return false;
-        }
-        if (!run->Final) return false;
-        // Then a reload, and the same settings run again on Vulkan.
-        if (!load)
-            load = R::InvokeAgentOperation(gpu.H->Registry, "plugin_load", gpu.H->Context,
-                                           R"({"path":"descriptor_analysis"})", false);
-        if (!loadFinished)
-        {
-            loadFinished = poll(load, loaded);
-            if (loadFinished) load->Continuation = {};
-            return false;
-        }
-        if (!again) again = DA::Start(c);
-        return again->Final.has_value();
-    })) << "the frames ran out";
+            if (!run)
+            {
+                release = HoldMethodQueue(gpu); // the step's radius page stays on the device until the run ended
+                held = bool(release);
+                run = DA::Start(c);
+            }
+            if (!unload)
+            {
+                if (StepHeld(gpu, *run, held))
+                    unload = R::InvokeAgentOperation(gpu.H->Registry, "plugin_unload", gpu.H->Context, "{}", false);
+                return false;
+            }
+            if (!unloadFinished)
+            {
+                unloadFinished = poll(unload, unloaded);
+                toolsGone = unloadFinished && gpu.H->Registry.Find("descriptor_analysis") == nullptr;
+                if (unloadFinished)
+                    unload->Continuation = {}; // answered: released, as the agent server does
+                return false;
+            }
+            if (!run->Final)
+                return false;
+            if (release)
+                (void)std::exchange(release, {})(); // the abandoned page completes; the cache then retires its session
+            // Then a reload, and the same settings run again on Vulkan.
+            if (!load)
+                load = R::InvokeAgentOperation(
+                    gpu.H->Registry, "plugin_load", gpu.H->Context, R"({"path":"descriptor_analysis"})", false);
+            if (!loadFinished)
+            {
+                loadFinished = poll(load, loaded);
+                if (loadFinished)
+                    load->Continuation = {};
+                return false;
+            }
+            if (!again)
+                again = DA::Start(c);
+            return again->Final.has_value();
+        }))
+        << "the frames ran out";
+    if (release)
+        (void)release();
     EXPECT_FALSE(unloaded.IsError) << unloaded.Text;
     EXPECT_TRUE(toolsGone) << "the plugin's tools went with it";
     ASSERT_TRUE(run->Final);
@@ -421,4 +461,168 @@ TEST(DescriptorAnalysisPluginGpuSmoke, AnUnloadDuringAChainEndsTheRunOnceAndARel
     EXPECT_EQ(again->Final->ActualBackend, "vulkan_lbvh");
     EXPECT_EQ(gpu.H->History().UndoCount(), 1u) << "only the run after the reload wrote";
     for (const auto& output : c.Outputs) EXPECT_TRUE(props.Exists(output.Name)) << output.Name;
+}
+
+TEST(DescriptorAnalysisPluginGpuSmoke, AReadyHybridRunStepsOnceRestartsAfterConvergenceAndAcceptsTheBatchColumns)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    Gpu gpu;
+    auto& scene = gpu.H->Scene();
+    const auto entity = MakeDomains(scene).back();
+    auto& props = Props(scene, entity, D::PointCloudPoint);
+    auto* steps = gpu.H->Engine.Services().Find<R::StepRunsService>();
+    auto* cache = gpu.H->Engine.Services().Find<R::SpatialIndexCache>();
+    ASSERT_NE(steps, nullptr);
+    ASSERT_NE(cache, nullptr);
+    const auto batchConfig = Settings(entity, D::PointCloudPoint, "batch", false);
+    auto readyConfig = Settings(entity, D::PointCloudPoint, "stepped", false);
+    readyConfig.Execution.Start = R::StepRunStart::Ready;
+    readyConfig.Execution.AutoAccept = R::StepRunAutoAccept::Never;
+    const auto control = [&](const std::uint64_t run, const R::StepRunAction action)
+    {
+        std::string refusal;
+        return steps->Control(run, action, 1u, refusal);
+    };
+    const auto ended = [&](const std::uint64_t run, const std::uint64_t generation)
+    {
+        const auto o = steps->Observe(run);
+        return o && o->Generation == generation && o->End == R::StepRunEnd::Converged && !o->SegmentInFlight;
+    };
+    std::shared_ptr<DA::Run> batch, stepped;
+    std::uint64_t submissionsAtReady = 0, batchesAfterFirst = 0;
+    int stage = 0, readyFrames = 0;
+    ASSERT_TRUE(gpu.Run(
+        [&]
+        {
+            if (!batch)
+                batch = DA::Start(batchConfig);
+            if (!batch->Final)
+                return false;
+            if (!stepped)
+            {
+                stepped = DA::Start(readyConfig);
+                submissionsAtReady = cache->Stats().GpuQuerySubmissions;
+                return stepped->Final.has_value();
+            }
+            const auto id = stepped->Pending.StepRun;
+            if (stage == 0 && ++readyFrames < 10)
+                return false;
+            if (stage == 0)
+            {
+                EXPECT_EQ(cache->Stats().GpuQuerySubmissions, submissionsAtReady) << "a ready run queries nothing";
+                stage = control(id, R::StepRunAction::Step) ? 1 : 9;
+            }
+            if (stage == 1 && ended(id, 0u))
+            {
+                batchesAfterFirst = cache->Stats().GpuQuerySubmissions;
+                stage = control(id, R::StepRunAction::Restart) ? 2 : 9;
+            }
+            if (stage == 2)
+                if (const auto o = steps->Observe(id); o && o->Generation == 1u)
+                    stage = control(id, R::StepRunAction::Run) ? 3 : 9;
+            if (stage == 3 && ended(id, 1u))
+                stage = control(id, R::StepRunAction::Accept) ? 4 : 9;
+            return stage == 9 || (stage == 4 && stepped->Final.has_value());
+        }))
+        << "the frames ran out";
+    ASSERT_NE(stage, 9) << "a control was refused";
+    ASSERT_EQ(batch->Final->Status, "applied") << batch->Final->Message;
+    ASSERT_EQ(stepped->Final->Status, "applied") << stepped->Final->Message;
+    EXPECT_GT(cache->Stats().GpuQuerySubmissions, batchesAfterFirst) << "the restarted step queried its rows again";
+    EXPECT_GT(stepped->Final->GpuQueryUploadBytes, 0u);
+    EXPECT_GT(stepped->Final->GpuReadbackBytes, 0u);
+    const auto expected = Read(props, batchConfig), actual = Read(props, readyConfig);
+    for (std::size_t b = 0; b < DA::kBins; ++b)
+        EXPECT_EQ(actual[b], expected[b]) << b;
+    EXPECT_EQ(gpu.H->History().UndoCount(), 2u) << "one entry per accepted run";
+}
+
+// ARCH-023 consumer no-frame progress (the plugin adapter): a Vulkan descriptor run (one step: the scale, five radius
+// pages of 16 queries over 66 live samples, the histograms) is started with the method queue held, so its worker step
+// waits on a page; then graphics is held and the owner thread blocks (no frame, maintenance, collection or plugin
+// callback) while the worker submits at least three more pages. The run then rests converged with nothing written for
+// ten frames, and its Accept writes what the batch run writes. Predictions: PagesWithoutFrames >= 3; no output column
+// before Accept; columns equal the batch run's bit for bit. Mutation: the former main-thread driver job (0 pages
+// while frames are held).
+TEST(DescriptorAnalysisPluginGpuSmoke, RadiusPagesAdvanceWithoutFramesAndAcceptLikeTheBatchRun)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    Gpu gpu;
+    auto& scene = gpu.H->Scene();
+    const auto entity = MakeDomains(scene).back();
+    auto& props = Props(scene, entity, D::PointCloudPoint);
+    auto* steps = gpu.H->Engine.Services().Find<R::StepRunsService>();
+    auto* cache = gpu.H->Engine.Services().Find<R::SpatialIndexCache>();
+    ASSERT_NE(steps, nullptr);
+    ASSERT_NE(cache, nullptr);
+    auto batchConfig = Settings(entity, D::PointCloudPoint, "batch", false);
+    batchConfig.GpuQueryBatchSize = 16;
+    auto heldConfig = Settings(entity, D::PointCloudPoint, "held", false);
+    heldConfig.GpuQueryBatchSize = 16;
+    heldConfig.Execution.AutoAccept = R::StepRunAutoAccept::Never;
+    std::shared_ptr<DA::Run> batch, held;
+    std::function<bool()> release;
+    int stage = 0;
+    bool gated = false, noLane = false, unwrittenAtRest = false;
+    std::uint64_t pagesWithoutFrames = 0u;
+    std::uint32_t restFrames = 0u;
+    ASSERT_TRUE(gpu.Run(
+        [&]
+        {
+            if (!batch)
+                batch = DA::Start(batchConfig);
+            if (!batch->Final)
+                return false;
+            if (stage == 0)
+            {
+                release = HoldMethodQueue(gpu);
+                noLane = !release;
+                held = DA::Start(heldConfig);
+                stage = 1;
+                return held->Final.has_value() || noLane;
+            }
+            const auto id = held->Pending.StepRun;
+            const auto o = steps->Observe(id);
+            if (!o)
+                return false;
+            if (stage == 1 && o->SegmentInFlight)
+            {
+                const auto before = cache->Stats().GpuQuerySubmissions;
+                const auto outcome = Intrinsic::Tests::ProgressWithoutFrames(gpu.H->Engine.GetDevice(),
+                    release,
+                    [&]
+                    {
+                        const auto now = steps->Observe(id);
+                        return cache->Stats().GpuQuerySubmissions >= before + 3u ||
+                            (now && now->End != R::StepRunEnd::None);
+                    });
+                gated = outcome.Gated;
+                pagesWithoutFrames = cache->Stats().GpuQuerySubmissions - before;
+                stage = 2;
+                return false;
+            }
+            if (stage == 2 && o->End != R::StepRunEnd::None && !o->SegmentInFlight)
+            {
+                if (++restFrames == 1u)
+                    unwrittenAtRest = !props.Exists(heldConfig.Outputs[0].Name);
+                if (restFrames < 10u)
+                    return false;
+                std::string refusal;
+                EXPECT_TRUE(steps->Control(id, R::StepRunAction::Accept, 1u, refusal)) << refusal;
+                stage = 3;
+            }
+            return held->Final.has_value();
+        }))
+        << "the frames ran out";
+    if (release)
+        (void)release();
+    if (noLane || !gated)
+        GTEST_SKIP() << "No separate method queue: graphics cannot be held while method compute proceeds.";
+    ASSERT_EQ(batch->Final->Status, "applied") << batch->Final->Message;
+    ASSERT_EQ(held->Final->Status, "applied") << held->Final->Message;
+    EXPECT_GE(pagesWithoutFrames, 3u) << "radius pages with graphics held and no owner frame";
+    EXPECT_TRUE(unwrittenAtRest) << "nothing is written before Accept";
+    EXPECT_EQ(Read(props, heldConfig), Read(props, batchConfig)) << "the driven run equals the batch run";
 }

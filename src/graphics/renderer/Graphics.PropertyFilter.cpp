@@ -11,6 +11,7 @@ module;
 module Extrinsic.Graphics.PropertyFilter;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -55,39 +56,65 @@ namespace Extrinsic::Graphics
             "PropertyFilter.Weights", "PropertyFilter.Offsets", "PropertyFilter.Incidences", "PropertyFilter.Degree",
             "PropertyFilter.Fixed", "PropertyFilter.Slots", "PropertyFilter.Restore"};
         RHI::IDevice& Device;
+        RHI::BufferManager& Scratch;
         RHI::PipelineHandle Pipeline{};
-        std::array<RHI::BufferHandle, SlotCount> Buffers{};
-        std::array<std::uint64_t, SlotCount> Capacity{};
+        std::array<RHI::BufferManager::BufferLease, SlotCount> Leases{};
+        // ARCH-023: each lease's device address, resolved when the lease is ensured (device-owner thread), so the
+        // recording paths a method worker calls (RecordIterations, RecordStore, RecordStoreCurrent) make no device
+        // call.
+        std::array<std::uint64_t, SlotCount> Addresses{};
         // The resident row map and restore mask of the current run (Record or RecordLoad starts
         // one), uploaded once and shared by its later stores; 0: none.
         bool RunStarted{};
         std::uint64_t SlotsAddress{}, RestoreAddress{};
         std::size_t SlotRows{}, RestoreRows{};
-        explicit Impl(RHI::IDevice& device) : Device(device) {}
+        // ARCH-023: the iterating run Begin started (IterationsBegun: Begin succeeded since the last refusal): its
+        // parameters, the push constants every dispatch shares, the buffers that hold the current values and the
+        // ping-pong partners, and the iterations recorded so far.
+        bool IterationsBegun{};
+        PropertyFilterGpuParams Params{};
+        Push Base{};
+        std::size_t RunRows{}, EdgeCount{}, Channels{};
+        RHI::BufferHandle Current{}, NextValues{}, TermValues{}, SumValues{}, WeightBuffer{}, DegreeBuffer{};
+        std::uint32_t Recorded{};
+        Impl(RHI::IDevice& device, RHI::BufferManager& scratch) : Device(device), Scratch(scratch) {}
         ~Impl()
         {
-            for (auto buffer : Buffers)
-                if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
+        }
+        RHI::BufferHandle Buffer(const Slot slot) const
+        {
+            return Leases[slot].GetHandle();
         }
         bool Ensure(const Slot slot, const std::uint64_t bytes)
         {
-            const auto size = std::max<std::uint64_t>(bytes, 8);
-            if (Buffers[slot].IsValid() && Capacity[slot] >= size) return true;
-            if (Buffers[slot].IsValid()) Device.DestroyBuffer(Buffers[slot]);
-            Buffers[slot] = Device.CreateBuffer({.SizeBytes = size,
-                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                .HostVisible = true, .DebugName = kNames[slot]});
-            Capacity[slot] = Buffers[slot].IsValid() ? size : 0u;
-            return Buffers[slot].IsValid();
+            const bool ensured = Scratch.EnsureScratch(Leases[slot],
+                {.SizeBytes = std::max<std::uint64_t>(bytes, 8),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
+                    .HostVisible = true,
+                    .DebugName = kNames[slot]});
+            Addresses[slot] = ensured ? Device.GetBufferDeviceAddress(Buffer(slot)) : 0u;
+            return ensured;
         }
         bool Write(const Slot slot, const void* data, const std::size_t bytes)
         {
             if (!Ensure(slot, bytes)) return false;
-            if (data && bytes) Device.WriteBuffer(Buffers[slot], data, bytes, 0u);
+            if (data && bytes)
+                Device.WriteBuffer(Buffer(slot), data, bytes, 0u);
             return true;
         }
-        std::uint64_t Address(const Slot slot) const { return Device.GetBufferDeviceAddress(Buffers[slot]); }
+        std::uint64_t Address(const Slot slot) const
+        {
+            return Addresses[slot];
+        }
+        // The resolved address of one of the leases (the ping-pong buffers, the weights, the degree); 0 otherwise.
+        std::uint64_t AddressOf(const RHI::BufferHandle buffer) const
+        {
+            for (std::size_t slot = 0; slot < SlotCount; ++slot)
+                if (Leases[slot].IsValid() && Leases[slot].GetHandle() == buffer)
+                    return Addresses[slot];
+            return 0u;
+        }
         bool EnsurePipeline()
         {
             if (!Pipeline.IsValid())
@@ -147,8 +174,8 @@ namespace Extrinsic::Graphics
             const auto rows = Rows(io);
             const auto& property = store ? io.Output : io.Input;
             if (!RunStarted || io.Slots.size() != SlotRows || io.RestoreMask.size() != RestoreRows ||
-                !property.Valid() || rows == 0u || channels < 1u || channels > 4u || !working.IsValid() || !workingAddress ||
-                !Device.IsOperational() || !EnsurePipeline())
+                !property.Valid() || rows == 0u || channels < 1u || channels > 4u || !working.IsValid() ||
+                !workingAddress || !EnsurePipeline())
                 return false;
             const bool restore = store && RestoreAddress && io.Input.Valid();
             if (store)
@@ -165,9 +192,13 @@ namespace Extrinsic::Graphics
                 commands.BufferBarrier(working, RHI::MemoryAccess::TransferWrite | kShaderAccess, RHI::MemoryAccess::ShaderWrite);
             }
             if (SlotsAddress)
-                commands.BufferBarrier(Buffers[SlotMap], RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead, RHI::MemoryAccess::ShaderRead);
+                commands.BufferBarrier(Buffer(SlotMap),
+                    RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
+                    RHI::MemoryAccess::ShaderRead);
             if (restore)
-                commands.BufferBarrier(Buffers[RestoreMap], RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead, RHI::MemoryAccess::ShaderRead);
+                commands.BufferBarrier(Buffer(RestoreMap),
+                    RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
+                    RHI::MemoryAccess::ShaderRead);
             commands.BindPipeline(Pipeline);
             Push push{.Src = store ? workingAddress : io.Input.Address, .Dst = store ? io.Output.Address : workingAddress,
                       .Degree = restore ? io.Input.Address : 0u, .Fixed = restore ? RestoreAddress : 0u, .Slots = SlotsAddress,
@@ -192,8 +223,21 @@ namespace Extrinsic::Graphics
         }
     };
 
-    PropertyFilterWorkspace::PropertyFilterWorkspace(RHI::IDevice& device) : m_Impl(std::make_unique<Impl>(device)) {}
+    PropertyFilterWorkspace::PropertyFilterWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch)
+        : m_Impl(std::make_unique<Impl>(device, scratch))
+    {
+    }
     PropertyFilterWorkspace::~PropertyFilterWorkspace() = default;
+    void PropertyFilterWorkspace::ReleaseScratch()
+    {
+        auto& s = *m_Impl;
+        s.Leases = {};
+        s.Addresses = {};
+        s.RunStarted = false;
+        s.IterationsBegun = false;
+        s.SlotsAddress = s.RestoreAddress = 0u;
+        s.SlotRows = s.RestoreRows = 0u;
+    }
 
     std::uint64_t PropertyFilterWorkspace::DispatchCount(const PropertyFilterGpuParams& p)
     {
@@ -215,33 +259,56 @@ namespace Extrinsic::Graphics
         const std::uint32_t channels, const RHI::BufferHandle target, const std::uint64_t targetAddress,
         const std::uint32_t rowStride, const std::uint32_t channelStride)
     {
-        return m_Impl->BeginRun(resident) &&
-               m_Impl->Move(commands, resident, channels, target, targetAddress, rowStride, channelStride, false);
+        return m_Impl->Device.IsOperational() && m_Impl->BeginRun(resident) &&
+            m_Impl->Move(commands, resident, channels, target, targetAddress, rowStride, channelStride, false);
     }
 
     RHI::BufferHandle PropertyFilterWorkspace::Record(RHI::ICommandContext& commands,
         const PropertyFilterGpuInput& input, const PropertyFilterGpuParams& p, const PropertyFilterResidentIo* resident)
     {
+        if (resident && !resident->Output.Valid())
+        {
+            m_Impl->RunStarted = m_Impl->IterationsBegun = false; // a refused run leaves no earlier run's row map
+            return {};
+        }
+        if (!Begin(commands, input, p, resident))
+            return {};
+        const auto current = RecordIterations(commands, p.Iterations);
+        if (!current.IsValid() || (resident && !RecordStoreCurrent(commands, *resident)))
+            return {};
+        return current;
+    }
+
+    bool PropertyFilterWorkspace::Begin(RHI::ICommandContext& commands,
+        const PropertyFilterGpuInput& input,
+        const PropertyFilterGpuParams& p,
+        const PropertyFilterResidentIo* resident)
+    {
         auto& s = *m_Impl;
         s.RunStarted = false; // a refused run leaves no earlier run's row map for RecordStore
+        s.IterationsBegun = false;
         const std::size_t C = input.Channels;
-        if (C < 1 || C > 4 || input.Values.size() % C) return {};
+        if (C < 1 || C > 4 || input.Values.size() % C)
+            return false;
         const bool residentInput = resident && resident->Input.Valid();
         const std::size_t rows = residentInput ? Impl::Rows(*resident) : input.Values.size() / C;
         const std::size_t edgeCount = input.Weights.size();
-        if (rows == 0 || (residentInput ? !input.Values.empty() && input.Values.size() != rows * C : input.Values.empty()) ||
-            (resident && !resident->Output.Valid()))
-            return {};
+        // A stepped run may begin without a write slot (it stores only when one is held).
+        if (rows == 0 ||
+            (residentInput ? !input.Values.empty() && input.Values.size() != rows * C : input.Values.empty()))
+            return false;
         if (rows > (1u << 24) || edgeCount > (1u << 26) || input.Edges.size() != 2 * edgeCount ||
             input.Degree.size() != rows || input.Fixed.size() != rows ||
             DispatchCount(p) > MaxDispatches || !s.Device.IsOperational() || !s.Device.SupportsShaderFloat64())
-            return {};
-        if (!s.EnsurePipeline()) return {};
+            return false;
+        if (!s.EnsurePipeline())
+            return false;
         // Incidences per row in ascending edge order, the order the CPU reference scatters them.
         std::vector<std::uint32_t> offsets(rows + 1, 0), incidences(2 * edgeCount);
         for (std::size_t e = 0; e < edgeCount; ++e)
         {
-            if (input.Edges[2 * e] >= rows || input.Edges[2 * e + 1] >= rows) return {};
+            if (input.Edges[2 * e] >= rows || input.Edges[2 * e + 1] >= rows)
+                return false;
             ++offsets[input.Edges[2 * e] + 1];
             ++offsets[input.Edges[2 * e + 1] + 1];
         }
@@ -267,39 +334,83 @@ namespace Extrinsic::Graphics
             !s.Write(I::Degree, bilateral ? nullptr : input.Degree.data(), input.Degree.size_bytes()) ||
             !s.Write(I::Fixed, input.Fixed.data(), input.Fixed.size_bytes()) ||
             (resident && !s.BeginRun(*resident)))
-            return {};
-        const auto address = [&](RHI::BufferHandle b) { return s.Device.GetBufferDeviceAddress(b); };
-        const auto weights = s.Buffers[bilateral ? I::Weights : I::BaseWeights], degree = s.Buffers[I::Degree];
-        Push push{.Edges = s.Address(I::Edges), .Weights = address(weights), .BaseWeights = s.Address(I::BaseWeights),
-                  .Offsets = s.Address(I::Offsets), .Incidences = s.Address(I::Incidences), .Degree = address(degree),
-                  .Fixed = s.Address(I::Fixed), .Rows = std::uint32_t(rows), .Channels = std::uint32_t(C),
-                  .EdgeCount = std::uint32_t(edgeCount), .RandomWalk = p.RandomWalk ? 1u : 0u};
+            return false;
+        const auto address = [&](RHI::BufferHandle b)
+        {
+            return s.AddressOf(b);
+        };
+        s.WeightBuffer = s.Buffer(bilateral ? I::Weights : I::BaseWeights);
+        s.DegreeBuffer = s.Buffer(I::Degree);
+        s.Base = {.Edges = s.Address(I::Edges),
+            .Weights = address(s.WeightBuffer),
+            .BaseWeights = s.Address(I::BaseWeights),
+            .Offsets = s.Address(I::Offsets),
+            .Incidences = s.Address(I::Incidences),
+            .Degree = address(s.DegreeBuffer),
+            .Fixed = s.Address(I::Fixed),
+            .Rows = std::uint32_t(rows),
+            .Channels = std::uint32_t(C),
+            .EdgeCount = std::uint32_t(edgeCount),
+            .RandomWalk = p.RandomWalk ? 1u : 0u};
         // A reused buffer's previous reads (an earlier run's readback included) precede this run.
         for (std::size_t slot = I::Values; slot <= I::Fixed; ++slot)
-            if (s.Buffers[slot].IsValid() && (slot != I::Weights || bilateral))
-                commands.BufferBarrier(s.Buffers[slot], RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::TransferRead | kShaderAccess,
-                                       kShaderAccess);
-        const std::array values{s.Buffers[I::Values], s.Buffers[I::Next], s.Buffers[I::Term], s.Buffers[I::Sum]};
+            if (s.Leases[slot].IsValid() && (slot != I::Weights || bilateral))
+                commands.BufferBarrier(s.Buffer(I::Slot(slot)),
+                    RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::TransferRead | kShaderAccess,
+                    kShaderAccess);
+        // current and next ping-pong between the first two value buffers; spectral heat also uses
+        // a term pair (term, next) and a running sum.
+        s.Current = s.Buffer(I::Values);
+        s.NextValues = s.Buffer(I::Next);
+        s.TermValues = s.Buffer(I::Term);
+        s.SumValues = s.Buffer(I::Sum);
         // Resident input: gathered on the device into the working layout (uploaded once per revision).
-        if (residentInput && !s.Move(commands, *resident, std::uint32_t(C), values[0], address(values[0]), std::uint32_t(C), 1u, false))
+        if (residentInput &&
+            !s.Move(commands, *resident, std::uint32_t(C), s.Current, address(s.Current), std::uint32_t(C), 1u, false))
+            return false;
+        s.Params = p;
+        s.RunRows = rows;
+        s.EdgeCount = edgeCount;
+        s.Channels = C;
+        s.Recorded = 0u;
+        s.IterationsBegun = true;
+        return true;
+    }
+
+    RHI::BufferHandle PropertyFilterWorkspace::RecordIterations(
+        RHI::ICommandContext& commands, const std::uint32_t count)
+    {
+        auto& s = *m_Impl;
+        const auto& p = s.Params;
+        // ARCH-023: no device call (a method worker records this); Begin checked the device and resolved addresses.
+        if (!s.IterationsBegun || count > p.Iterations - std::min(p.Iterations, s.Recorded))
             return {};
+        const auto address = [&](RHI::BufferHandle b)
+        {
+            return s.AddressOf(b);
+        };
+        // An earlier submission's transfer read of the current values precedes this one's passes.
+        for (const auto buffer : {s.Current, s.NextValues, s.TermValues, s.SumValues})
+            commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferRead | kShaderAccess, kShaderAccess);
         commands.BindPipeline(s.Pipeline);
+        Push push = s.Base;
         const auto dispatch = [&](std::uint32_t mode, RHI::BufferHandle src, RHI::BufferHandle dst, double scalar) {
             push.Mode = mode;
             push.Src = address(src);
             push.Dst = address(dst);
             push.Scalar = scalar;
             commands.PushConstants(&push, sizeof(push), 0);
-            const auto threads = mode == BilateralWeights ? edgeCount : rows;
-            DispatchLinear(commands, threads);
-            for (auto buffer : {dst, weights, degree})
+            const auto threads = mode == BilateralWeights ? s.EdgeCount : s.RunRows;
+            DispatchLinear(commands, std::uint32_t(threads));
+            for (auto buffer : {dst, s.WeightBuffer, s.DegreeBuffer})
                 commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
                                        RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
         };
-        // current and next ping-pong between the first two value buffers; spectral heat also uses
-        // a term pair (term, next) and a running sum.
-        RHI::BufferHandle current = values[0], next = values[1], term = values[2], sum = values[3];
-        for (std::uint32_t iteration = 0; iteration < p.Iterations; ++iteration)
+        auto& current = s.Current;
+        auto& next = s.NextValues;
+        auto& term = s.TermValues;
+        const auto sum = s.SumValues;
+        for (std::uint32_t iteration = 0; iteration < count; ++iteration)
         {
             if (p.Method == PropertyFilterGpuMethod::SpectralHeat)
             {
@@ -319,8 +430,8 @@ namespace Extrinsic::Graphics
             }
             if (p.Method == PropertyFilterGpuMethod::Bilateral)
             {
-                dispatch(BilateralWeights, current, weights, p.RangeSigma);
-                dispatch(BilateralDegree, current, degree, 0.0);
+                dispatch(BilateralWeights, current, s.WeightBuffer, p.RangeSigma);
+                dispatch(BilateralDegree, current, s.DegreeBuffer, 0.0);
             }
             dispatch(Apply, current, next, p.Step);
             std::swap(current, next);
@@ -330,10 +441,29 @@ namespace Extrinsic::Graphics
                 std::swap(current, next);
             }
         }
-        commands.BufferBarrier(current, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
-                               RHI::MemoryAccess::TransferRead);
-        if (resident && !s.Move(commands, *resident, std::uint32_t(C), current, address(current), std::uint32_t(C), 1u, true))
-            return {};
+        s.Recorded += count;
+        commands.BufferBarrier(
+            current, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::TransferRead);
         return current;
+    }
+
+    bool PropertyFilterWorkspace::RecordStoreCurrent(
+        RHI::ICommandContext& commands, const PropertyFilterResidentIo& resident)
+    {
+        auto& s = *m_Impl;
+        return s.IterationsBegun &&
+            s.Move(commands,
+                resident,
+                std::uint32_t(s.Channels),
+                s.Current,
+                s.AddressOf(s.Current),
+                std::uint32_t(s.Channels),
+                1u,
+                true);
+    }
+
+    std::uint32_t PropertyFilterWorkspace::RecordedIterations() const noexcept
+    {
+        return m_Impl->IterationsBegun ? m_Impl->Recorded : 0u;
     }
 }

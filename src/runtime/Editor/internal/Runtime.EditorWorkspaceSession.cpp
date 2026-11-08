@@ -73,6 +73,7 @@ import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 import Extrinsic.Runtime.EditorCommon;
@@ -157,6 +158,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         EditorParameterizationUvViewCommandSurface m_ParameterizationUvViewCommands{};
         EditorPointCloudServiceBorrowedServices m_PointCloudServices{};
         SpatialIndexCache* m_SpatialIndices{};
+        StepRunsService* m_StepRuns{};
         ClusteringService* m_ClusteringService{};
         KernelEventSubscription m_KMeansCompletionSubscription{};
         PointCloudConsolidationService* m_PointCloudConsolidationService{};
@@ -530,6 +532,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_PointInputReadiness = MakeEditorPointInputReadiness(
             worlds, services.Find<CommandBus>(), m_Jobs);
         m_SpatialIndices = services.Find<SpatialIndexCache>();
+        m_StepRuns = services.Find<StepRunsService>();
         m_ClusteringService = services.Find<ClusteringService>();
         if (m_ClusteringService != nullptr &&
             m_ClusteringService->Available())
@@ -686,24 +689,34 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 };
             // Only tokens this session submitted (the identity index) reach
             // `JobService::Cancel`; asset, scene-file and service jobs never do.
-            context.JobCommands.Cancel =
-                [epoch = m_AttachmentEpoch, this](const JobToken token) -> EditorJobCancelStatus
+            const auto cancel = [epoch = m_AttachmentEpoch, this](
+                                    const JobToken token, const bool request) -> EditorJobCancelStatus
+            {
+                if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                    return EditorJobCancelStatus::Unavailable;
+                const auto identity = m_JobIdentities.find(token);
+                if (identity == m_JobIdentities.end())
+                    return EditorJobCancelStatus::NotEditorJob;
+                if (!m_Jobs->Cancel(token))
+                    return EditorJobCancelStatus::NotActive;
+                const JobToken run = identity->second.Run.IsValid() ? identity->second.Run : token;
+                if (request && !identity->second.Auxiliary &&
+                    std::find(m_CancelledRuns.begin(), m_CancelledRuns.end(), run) == m_CancelledRuns.end())
                 {
-                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
-                        return EditorJobCancelStatus::Unavailable;
-                    const auto identity = m_JobIdentities.find(token);
-                    if (identity == m_JobIdentities.end())
-                        return EditorJobCancelStatus::NotEditorJob;
-                    if (!m_Jobs->Cancel(token))
-                        return EditorJobCancelStatus::NotActive;
-                    const JobToken run = identity->second.Run.IsValid() ? identity->second.Run : token;
-                    if (!identity->second.Auxiliary && std::find(m_CancelledRuns.begin(), m_CancelledRuns.end(), run) == m_CancelledRuns.end())
-                    {
-                        m_CancelledRuns.push_back(run);
-                        if (m_CancelledRuns.size() > kCancelledRunMemory) m_CancelledRuns.pop_front();
-                    }
-                    return EditorJobCancelStatus::Requested;
-                };
+                    m_CancelledRuns.push_back(run);
+                    if (m_CancelledRuns.size() > kCancelledRunMemory)
+                        m_CancelledRuns.pop_front();
+                }
+                return EditorJobCancelStatus::Requested;
+            };
+            context.JobCommands.Cancel = [cancel](const JobToken token)
+            {
+                return cancel(token, true);
+            };
+            context.JobCommands.Retire = [cancel](const JobToken token)
+            {
+                return cancel(token, false);
+            };
             context.JobCommands.Stats =
                 [epoch = m_AttachmentEpoch, this]() -> JobServiceStats
                 {
@@ -755,6 +768,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             };
         }
         context.SpatialIndices = m_SpatialIndices;
+        context.StepRuns = m_StepRuns;
         m_PointCloudServices.Clustering = m_ClusteringService;
         m_PointCloudServices.PointCloudConsolidation =
             m_PointCloudConsolidationService;

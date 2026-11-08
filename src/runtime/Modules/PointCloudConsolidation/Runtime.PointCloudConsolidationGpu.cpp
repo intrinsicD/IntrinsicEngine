@@ -1,6 +1,8 @@
 module;
 #include <functional>
 #include <chrono>
+#include <atomic>
+#include <mutex>
 #include "Modules/PointCloudConsolidation/Runtime.LopPaging.TestSupport.hpp"
 
 #include <algorithm>
@@ -29,6 +31,9 @@ import Geometry.Validation;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.SpatialIndexCache;
@@ -50,6 +55,7 @@ import Geometry.SupportRadius;
 import Geometry.PointLBVH;
 
 #include "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp"
+#include "Services/Runtime.WorkerGpuPages.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -230,24 +236,6 @@ namespace Extrinsic::Runtime
         };
 
         using LopBufferRole = RHI::BufferHandle LopGpuResources::*;
-        constexpr LopBufferRole kLopBufferRoles[] = {
-            &LopGpuResources::State, &LopGpuResources::SourcePositions,
-            &LopGpuResources::SourceWeights, &LopGpuResources::ProjectedA,
-            &LopGpuResources::ProjectedB, &LopGpuResources::ProjectedWeights,
-            &LopGpuResources::Displacements, &LopGpuResources::SourceCounts,
-            &LopGpuResources::SourceOffsets, &LopGpuResources::SourceCursors,
-            &LopGpuResources::SourceIndices, &LopGpuResources::ProjectedCounts,
-            &LopGpuResources::ProjectedOffsets, &LopGpuResources::ProjectedCursors,
-            &LopGpuResources::ProjectedIndices, &LopGpuResources::Diagnostics,
-            &LopGpuResources::ScanScratch, &LopGpuResources::SeedRows,
-        };
-
-        [[nodiscard]] std::vector<RHI::BufferManager::BufferLease>::iterator FindLease(
-            LopGpuResources& resources, const RHI::BufferHandle handle)
-        {
-            return std::ranges::find_if(resources.Leases,
-                [handle](const auto& lease) { return lease.GetHandle() == handle; });
-        }
 
         [[nodiscard]] bool CheckedAdd(
             std::uint64_t& total,
@@ -414,7 +402,7 @@ namespace Extrinsic::Runtime
         {
             if (desc.SizeBytes == 0u)
                 return false;
-            auto leaseOr = buffers.Create(desc);
+            auto leaseOr = buffers.CreateScratch(desc);
             if (!leaseOr.has_value())
                 return false;
             RHI::BufferManager::BufferLease lease =
@@ -424,54 +412,11 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        // Moves the spare buffer of `role` into `resources` when its capacity
-        // still covers `desc`, otherwise releases it and creates a new one. Spare
-        // buffers come only from completed runs, so no GPU work references them.
-        [[nodiscard]] bool AcquireBuffer(
-            RHI::BufferManager& buffers,
-            LopGpuResources& spare,
-            const LopBufferRole role,
-            const RHI::BufferDesc& desc,
-            LopGpuResources& resources)
-        {
-            const RHI::BufferHandle retained = std::exchange(spare.*role, RHI::BufferHandle{});
-            if (const auto lease = FindLease(spare, retained); lease != spare.Leases.end())
-            {
-                const RHI::BufferDesc* current = buffers.GetDesc(retained);
-                const bool fits = current != nullptr && desc.SizeBytes > 0u &&
-                    current->SizeBytes >= desc.SizeBytes;
-                if (fits)
-                {
-                    resources.*role = retained;
-                    resources.Leases.push_back(std::move(*lease));
-                }
-                spare.Leases.erase(lease);
-                if (fits)
-                    return true;
-            }
-            return CreateBuffer(buffers, desc, resources.*role, resources.Leases);
-        }
-
-        // Returns a completed run's owned buffers to the spare set. A resident
-        // input view has no lease here, so its address is never kept as scratch.
-        void RecycleResources(LopGpuResources&& done, LopGpuResources& spare)
-        {
-            for (const LopBufferRole role : kLopBufferRoles)
-            {
-                const auto lease = FindLease(done, done.*role);
-                if (!(done.*role).IsValid() || lease == done.Leases.end() || (spare.*role).IsValid())
-                    continue;
-                spare.*role = done.*role;
-                spare.Leases.push_back(std::move(*lease));
-                done.Leases.erase(lease);
-            }
-        }
-
-        [[nodiscard]] bool AllocateResources(
-            RHI::BufferManager& buffers,
+        // Every buffer is a method scratch lease; releasing `resources` returns them to the cache.
+        [[nodiscard]] bool AllocateResources(RHI::BufferManager& buffers,
             const LopGpuPlan& plan,
-            LopGpuResources& spare,
-            LopGpuResources& resources, RHI::BufferHandle resident = {})
+            LopGpuResources& resources,
+            RHI::BufferHandle resident = {})
         {
             const std::uint64_t sourceVec4Bytes =
                 static_cast<std::uint64_t>(plan.SourceCount) *
@@ -499,12 +444,11 @@ namespace Extrinsic::Runtime
             allocated.SourcePositions = resident;
             const auto acquire = [&](const LopBufferRole role, const std::uint64_t bytes, const char* name)
             {
-                return AcquireBuffer(buffers, spare, role, StorageBufferDesc(bytes, name), allocated);
+                return CreateBuffer(buffers, StorageBufferDesc(bytes, name), allocated.*role, allocated.Leases);
             };
-            const bool created =
-                acquire(&LopGpuResources::State, sizeof(LopGpuStateBufferRecord), "LopGpu.State") &&
+            const bool created = acquire(&LopGpuResources::State, sizeof(LopGpuStateBufferRecord), "LopGpu.State") &&
                 (resident.IsValid() ||
-                 acquire(&LopGpuResources::SourcePositions, sourceVec4Bytes, "LopGpu.SourcePositions")) &&
+                    acquire(&LopGpuResources::SourcePositions, sourceVec4Bytes, "LopGpu.SourcePositions")) &&
                 acquire(&LopGpuResources::SourceWeights, sourceFloatBytes, "LopGpu.SourceWeights") &&
                 acquire(&LopGpuResources::ProjectedA, targetVec4Bytes, "LopGpu.ProjectedA") &&
                 acquire(&LopGpuResources::ProjectedB, targetVec4Bytes, "LopGpu.ProjectedB") &&
@@ -520,9 +464,10 @@ namespace Extrinsic::Runtime
                 acquire(&LopGpuResources::ProjectedIndices, targetIndexBytes, "LopGpu.ProjectedIndices") &&
                 acquire(&LopGpuResources::Diagnostics, sizeof(LopGpuDiagnosticsRecord), "LopGpu.Diagnostics") &&
                 (plan.ScanPlan.ScratchBytes == 0u ||
-                 AcquireBuffer(buffers, spare, &LopGpuResources::ScanScratch,
-                     Graphics::BuildParallelPrimitiveScratchBufferDesc(plan.ScanPlan, "LopGpu.ScanScratch"),
-                     allocated));
+                    CreateBuffer(buffers,
+                        Graphics::BuildParallelPrimitiveScratchBufferDesc(plan.ScanPlan, "LopGpu.ScanScratch"),
+                        allocated.ScanScratch,
+                        allocated.Leases));
             if (!created || !allocated.IsValid())
                 return false;
             resources = std::move(allocated);
@@ -568,9 +513,23 @@ namespace Extrinsic::Runtime
 
     struct PointCloudConsolidationGpuState::Impl
     {
-        // Publish is a host-only step: the preview copy rides the next Grid or Reduce
-        // page, and the last Project page of an iteration also records Finalize.
-        enum class LopPhase { Upload, Initialize, Grid, Project, Publish, Reduce, Readback };
+        // Publish is a host-only step of the terminal pages: the front's copy rides the first
+        // Reduce page; the last Project page of an iteration also records Finalize. A live
+        // preview is a copy of its own (WorkerPreview) into a slot the owner offers. WLOP adds row
+        // pages of density weights: the sources' after Upload (Init), the projected samples'
+        // after every Grid page (part of the iteration).
+        enum class LopPhase
+        {
+            Upload,
+            SourceDensity,
+            Initialize,
+            Grid,
+            ProjectedDensity,
+            Project,
+            Publish,
+            Reduce,
+            Readback
+        };
 
         struct ActiveOperation
         {
@@ -584,31 +543,59 @@ namespace Extrinsic::Runtime
             LopPhase Phase{LopPhase::Upload};
             std::uint32_t Row{}, Iteration{}, MaximumCandidates{1u}, SubmittedRows{};
             LopPagingLimits Paging{LopPagingForTesting};
-            bool Stop{}, Discarded{}, Ready{}, Accepting{}, TerminalPage{}, PageRecorded{}, PublishPending{};
+            bool Discarded{}, Ready{}, Accepting{}, TerminalPage{}, PageRecorded{}, PublishPending{};
+            // ARCH-023: every run is a step run (as K-Means) whose controls decide each next iteration. It rests
+            // (`Resting`: no step or page) at an iteration boundary until it may go on, is stopped or accepted. One
+            // logical step is a whole iteration, however many pages it takes. `Partial`: the last iteration left the
+            // device active (stopped or accepted from a rest), so the result is not converged. `CommitRequested`:
+            // Accept (the run's Commit) prepares and reads positions:
+            // in place through the GPU-positions Accept, else a readback published by the module.
+            // `BudgetDiagnostic`: the method scratch budget refused the working set (the run fails, no fallback).
+            std::string Label{}, BudgetDiagnostic{};
+            StepRunsService* Steps{};
+            std::uint64_t Run{};
+            StepRunDriver Driver{};
+            bool Resting{}, CommitRequested{}, Partial{};
             LopGpuPlan Plan{};
             LopGpuResources Resources{};
-            std::uint64_t ProducerCompletedFrame{0u};
-            bool ProducerSubmitted{false};
-            bool ReadbackSubmitted{false};
-            std::vector<Graphics::GpuTransferReadbackRangeDesc> Ranges{};
-            Graphics::GpuTransferReadbackBatchTicket Ticket{};
+            // ARCH-023: the iterations run as the step run's worker Step (WorkerStep), each waiting for its own
+            // pages; the owner (main thread) keeps live ECS, residency, publication, the terminal pages, Accept and
+            // every allocation and release. Init (the first drain, before any segment: Initialized) allocates the
+            // working set and uploads its initial values; while a worker segment runs only the worker touches the
+            // page planner (Phase, Row, Iteration, SubmittedRows, MaximumCandidates, Partial) and records with the
+            // Device, Buffers and Pipelines captured at Init (never this module's state). Iterations mirrors
+            // Iteration for observation; an end decided while a segment runs (Ending) applies once it returned.
+            std::shared_ptr<WorkerGpuPages> Pages{};
+            RHI::IDevice* Device{};
+            RHI::BufferManager* Buffers{};
+            LopGpuPipelineSet Pipelines{};
+            // Resolved at Init (pages make no device call): the state record's address and the grid scans'.
+            std::uint64_t StateAddress{};
+            std::uint64_t SourceCountsAddress{}, SourceOffsetsAddress{}, ProjectedCountsAddress{},
+                ProjectedOffsetsAddress{}, ScanScratchAddress{};
+            bool Initialized{}, RecordedFailure{}, PreviewFailed{};
+            std::string WorkerDiagnostic{};
+            std::atomic<std::uint32_t> Iterations{};
+            std::uint32_t FoldedSubmissions{};
+            std::uint64_t FoldedReadbackBytes{};
+            std::optional<std::pair<PointCloudConsolidationRunStatus, std::string>> Ending{};
+            // The live preview's write slot of an in-place run, offered by the owner and borrowed by a preview copy.
+            StepPreviewMailbox<Graphics::GpuPropertyView> Mailbox{};
         };
 
-        Impl(
-            RHI::IDevice& device,
-            RHI::BufferManager& buffers,
-            RHI::ITransferQueue& transferQueue)
-            : Device(&device)
-            , Buffers(&buffers)
-            , Transfer(transferQueue)
-        {
-        }
+        explicit Impl(RHI::IDevice& device) : Device(&device) {}
 
         ~Impl()
         {
             *Alive = false;
-            if (Active.has_value() && Active->Ticket.IsValid())
-                (void)Transfer.CancelReadbackBatch(Active->Ticket);
+            // The run's step run ends discarded and drops its callables (they capture this state), also with a page
+            // in flight (its recorder no longer records, Alive). A worker step submits nothing more before the
+            // pipelines go (its wait gives up).
+            if (Active)
+            {
+                Active->Pages->Seal();
+                Active->Driver.Abandon();
+            }
             if (Active && Active->PositionRun)
                 DiscardEditorGpuPositionRun(Active->Commands, Active->PositionRun, Residency());
             DestroyPipelines();
@@ -616,7 +603,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool HasBusyState() const noexcept
         {
-            return Active.has_value() || Completed.has_value();
+            return bool(Active) || Completed.has_value();
         }
 
         [[nodiscard]] PointCloudConsolidationGpuSubmission Start(
@@ -638,6 +625,8 @@ namespace Extrinsic::Runtime
                         "A prior point-cloud consolidation Vulkan recording failure retained in-flight resources until shutdown; further requests use the CPU reference.",
                 };
             }
+            // Every run allocates from the context's method scratch cache.
+            Buffers = context.SpatialIndices ? context.SpatialIndices->MethodScratch() : nullptr;
             if (Device == nullptr || Buffers == nullptr ||
                 !Device->IsOperational())
             {
@@ -654,85 +643,314 @@ namespace Extrinsic::Runtime
                         "The point-cloud consolidation Vulkan grid/resource plan exceeded its bounded cell, counter, or memory contract.",
                 };
             }
+            if (StepRuns == nullptr)
+                return {.Diagnostic = "Point-cloud consolidation step runs are unavailable."};
             const bool lop = snapshot.Request.Config.Strategy == PointCloudConsolidationStrategy::Lop;
-            std::optional<Graphics::GpuPropertyView> input;
+            const char* const label = lop ? "LOP" : "WLOP";
             EditorGpuPositionRunHandle run;
             auto commands = BindEditorProcessingCommands(context);
             PointCloudConsolidationResult result = prepared;
-            if (lop)
+            // LOP and isotropic WLOP read the canonical resident positions; an in-place run of the same cardinality
+            // publishes through the GPU-positions Accept, any other output through a readback the module publishes.
+            auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
+            if (!residency || !context.Scene)
+                return {.Diagnostic = "Resident consolidation requires an operational property residency."};
+            const auto entity = SelectionController::ToEntityHandle(snapshot.Request.StableEntityId);
+            const auto before = residency->Stats();
+            std::optional<Graphics::GpuPropertyView> input = ResolveGpuPropertyInput(
+                *residency, *context.Scene, context.World, entity, snapshot.Request.Properties.InputPositions);
+            result.GpuInputUploadBytes = residency->Stats().UploadBytes - before.UploadBytes;
+            result.GpuInputCacheHits = residency->Stats().Hits - before.Hits;
+            if (!input || input->Layout.Count != plan->SourceCount)
+                return {.Refused = true,
+                    .Diagnostic =
+                        std::string{"Resident "} + label + " input acquisition refused; previous positions retained."};
+            if (plan->SourceCount == plan->TargetCount &&
+                snapshot.Request.Properties.InputPositions == snapshot.Request.Properties.OutputPositions)
             {
-                auto* residency = context.SpatialIndices ? context.SpatialIndices->PropertyResidency() : nullptr;
-                if (!residency || !context.Scene)
-                    return {.Diagnostic = "Resident LOP requires an operational property residency."};
-                const auto entity = SelectionController::ToEntityHandle(snapshot.Request.StableEntityId);
-                const auto before = residency->Stats();
-                input = ResolveGpuPropertyInput(*residency, *context.Scene, context.World, entity,
-                                                snapshot.Request.Properties.InputPositions);
-                result.GpuInputUploadBytes = residency->Stats().UploadBytes - before.UploadBytes;
-                result.GpuInputCacheHits = residency->Stats().Hits - before.Hits;
-                if (!input || input->Layout.Count != plan->SourceCount)
-                    return {.Refused = true, .Diagnostic = "Resident LOP input acquisition refused; previous positions retained."};
                 std::string why;
-                if (plan->SourceCount == plan->TargetCount &&
-                    snapshot.Request.Properties.InputPositions == snapshot.Request.Properties.OutputPositions)
-                {
-                    run = BeginEditorGpuPositionRun(commands, snapshot.Request.StableEntityId,
-                        snapshot.Request.Properties.OutputPositions, *residency, why);
-                    if (!run) return {.Refused = true, .Diagnostic = std::move(why)};
-                }
+                run = BeginEditorGpuPositionRun(commands,
+                    snapshot.Request.StableEntityId,
+                    snapshot.Request.Properties.OutputPositions,
+                    *residency,
+                    why);
+                if (!run)
+                    return {.Refused = true, .Diagnostic = std::move(why)};
             }
-            Active = ActiveOperation{.Snapshot = std::move(snapshot), .Context = context,
-                .Commands = std::move(commands), .PositionRun = std::move(run), .Input = std::move(input),
-                .Result = std::move(result), .Plan = std::move(*plan)};
-            if (lop)
+            Active = std::make_shared<ActiveOperation>();
+            Active->Snapshot = std::move(snapshot);
+            Active->Context = context;
+            Active->Commands = std::move(commands);
+            Active->PositionRun = std::move(run);
+            Active->Input = std::move(input);
+            Active->Result = std::move(result);
+            Active->Label = label;
+            Active->Plan = std::move(*plan);
+            Active->Pages = std::make_shared<WorkerGpuPages>(*Device);
+            // Preparation and CPU fallback need these rows only before GPU admission; a new output keeps the
+            // snapshot's output state for the module's publication.
+            std::vector<glm::vec3>{}.swap(Active->Snapshot.Positions);
+            std::vector<glm::vec3>{}.swap(Active->Snapshot.GpuInitialPositions);
+            if (Active->PositionRun)
+                Active->Back = EditorGpuPositionRunFirstBack(Active->PositionRun);
+            auto& r = Active->Result;
+            const auto& a = *Active;
+            r.Correlation = a.Snapshot.Correlation;
+            r.World = a.Snapshot.World;
+            r.StableEntityId = a.Snapshot.Request.StableEntityId;
+            r.Properties = a.Snapshot.Request.Properties;
+            r.Config = a.Snapshot.Request.Config;
+            r.RequestedBackend = r.ActualBackend = PointCloudConsolidationBackend::VulkanCompute;
+            r.StrategyToken = std::string{StableToken(a.Snapshot.Request.Config.Strategy)};
+            r.ImplementationId = std::string(kLopGpuImplementation);
+            r.InputPointCount = a.Plan.SourceCount;
+            r.OutputPointCount = a.Plan.TargetCount;
+            r.ResolvedSupportRadius = a.Snapshot.Params.SupportRadius;
+            if (!Active->PositionRun)
+                r.BackendDiagnostic =
+                    "Live preview shows only an in-place output; this run shows its result at Accept.";
+            if (std::string refusal; !StartStepRun(refusal))
             {
-                // Preparation and CPU fallback need these rows only before GPU admission.
-                std::vector<glm::vec3>{}.swap(Active->Snapshot.Positions);
-                std::vector<glm::vec3>{}.swap(Active->Snapshot.GpuInitialPositions);
-                if (Active->PositionRun) Active->Back = EditorGpuPositionRunFirstBack(Active->PositionRun);
-                auto& r = Active->Result;
-                const auto& a = *Active;
-                r.Correlation = a.Snapshot.Correlation;
-                r.World = a.Snapshot.World;
-                r.StableEntityId = a.Snapshot.Request.StableEntityId;
-                r.Properties = a.Snapshot.Request.Properties;
-                r.Config = a.Snapshot.Request.Config;
-                r.RequestedBackend = r.ActualBackend = PointCloudConsolidationBackend::VulkanCompute;
-                r.StrategyToken = "lop";
-                r.ImplementationId = std::string(kLopGpuImplementation);
-                r.InputPointCount = a.Plan.SourceCount;
-                r.OutputPointCount = a.Plan.TargetCount;
-                r.ResolvedSupportRadius = a.Snapshot.Params.SupportRadius;
+                const auto refused = std::move(Active);
+                if (refused->PositionRun)
+                    DiscardEditorGpuPositionRun(
+                        refused->Commands, refused->PositionRun, *refused->Context.SpatialIndices->PropertyResidency());
+                return {.Refused = true, .Diagnostic = std::move(refusal)};
             }
             return PointCloudConsolidationGpuSubmission{.Accepted = true};
         }
 
+        // The run's step run: its holder is a job of the run's lane; each step is one whole projection iteration on a
+        // worker (the first one also records the Init pages), its pages waited for there; its Commit prepares the
+        // terminal positions and accepts them (answered through the driver), its Discard ends the run once no step or
+        // page is in flight, its Restart initializes again once nothing is in flight. It starts as its execution
+        // options say (running, or ready for a first step); no segment starts before the owner's Init.
+        bool StartStepRun(std::string& refusal)
+        {
+            auto& a = *Active;
+            const std::weak_ptr<ActiveOperation> weak = Active;
+            const auto& request = a.Snapshot.Request;
+            const EditorJobIdentity identity{.EntityId = request.StableEntityId,
+                .Scope = ToEditorJobScope(request.Properties.OutputPositions.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
+                .OutputName = request.Properties.OutputPositions.Name,
+                .RequestedDomain = EditorJobDomain::GpuCompute};
+            const auto mine = [this, alive = Alive, correlation = a.Snapshot.Correlation]
+            {
+                return *alive && Active && Active->Snapshot.Correlation == correlation;
+            };
+            a.Steps = StepRuns;
+            a.Run =
+                StepRuns->Start({.Label = a.Label,
+                                    .Owner = "Runtime.PointCloudConsolidationModule",
+                                    .Output = {.StableEntityId = request.StableEntityId,
+                                        .Property = request.Properties.OutputPositions},
+                                    // ARCH-023: no frame paces the iterations; previews PreviewEvery iterations apart
+                                    // when the owner offered a free slot (an in-place run only).
+                                    .Execution = request.Config.Execution,
+                                    .MetricNames = {"max_displacement", "", "", ""}},
+                    {.Step =
+                            [op = Active](StepRunMetric& metric)
+                        {
+                            return WorkerStep(*op, metric);
+                        },
+                        .Preview =
+                            [op = Active](StepPreview& preview)
+                        {
+                            return WorkerPreview(*op, preview);
+                        },
+                        .Show =
+                            [this, alive = Alive, weak](const StepPreview& preview)
+                        {
+                            const auto op = weak.lock();
+                            return *alive && op && Active == op ? Show(*op, preview) : StepRunShow::Never;
+                        },
+                        .Commit =
+                            [this, mine](std::string& diagnostic)
+                        {
+                            if (!mine())
+                            {
+                                diagnostic = "The consolidation run ended.";
+                                return StepRunCommit::Refused;
+                            }
+                            Active->CommitRequested = true; // AdvanceLop prepares the terminal front, then accepts it
+                            return StepRunCommit::Pending;
+                        },
+                        .Discard =
+                            [this, mine]
+                        {
+                            if (!mine())
+                                return;
+                            Active->Discarded = true; // ends once no page is in flight
+                            AdvanceResident();
+                        },
+                        // run_control restart, called once no page is in flight: the working set stays leased and the
+                        // next page initializes it again from the resident input (weights, grid, density, samples), so
+                        // iteration 1 follows; the preview shown stays until the new computation replaces it.
+                        .Restart =
+                            [this, mine](std::string& diagnostic)
+                        {
+                            if (!mine())
+                            {
+                                diagnostic = "The consolidation run ended.";
+                                return false;
+                            }
+                            auto& r = *Active;
+                            if (r.Accepting || r.CommitRequested || r.Page)
+                            {
+                                diagnostic = "The consolidation run is being accepted.";
+                                return false;
+                            }
+                            ClearMailbox(r);
+                            r.Phase = LopPhase::Upload;
+                            r.Row = r.Iteration = r.SubmittedRows = 0u;
+                            r.Iterations.store(0u);
+                            r.MaximumCandidates = 1u;
+                            r.Ready = r.TerminalPage = r.PublishPending = r.Partial = r.Resting = false;
+                            r.Result.Iterations = 0u;
+                            r.Result.Converged = false;
+                            // The working set's initial values again (the next step's Upload page copies the input).
+                            if (r.Initialized)
+                                UploadInputs(r);
+                            r.Pages->ClearAbort();
+                            return true;
+                        },
+                        .Prepared =
+                            [weak]
+                        {
+                            const auto op = weak.lock();
+                            return op && op->Initialized;
+                        }},
+                    EditorStepRunJobs(a.Context.JobCommands, identity, std::make_shared<JobToken>()),
+                    refusal);
+            if (a.Run == 0u)
+                return false;
+            a.Driver = StepRuns->Driver(a.Run);
+            a.Result.StepRun = a.Run;
+            return true;
+        }
+
+        // The step run ended discarded (a discard or cancel won over a pending Accept).
+        [[nodiscard]] static bool StepRunDiscarded(const ActiveOperation& a)
+        {
+            if (!a.Steps)
+                return false;
+            const auto run = a.Steps->Observe(a.Run);
+            return run && run->Phase == StepRunPhase::Discarded;
+        }
+
+        // Stop, the iteration cap or convergence ended the step run (it is not discarded).
+        [[nodiscard]] static bool Ended(const ActiveOperation& a)
+        {
+            if (!a.Steps)
+                return false;
+            const auto run = a.Steps->Observe(a.Run);
+            return run && run->End != StepRunEnd::None && !IsTerminal(run->Phase);
+        }
+
+        // The run's end as its step run sees it: an accepted publication answers the pending Commit; a cancel or a
+        // stale source discards it; a failure fails its Commit or its iteration. Ignored by an ended step run.
+        static void Tell(ActiveOperation& a, const PointCloudConsolidationRunStatus status, const std::string& message)
+        {
+            if (!a.Steps)
+                return;
+            std::string refusal;
+            if (status == PointCloudConsolidationRunStatus::Applied)
+                a.Driver.CommitFinished(true);
+            else if (a.CommitRequested && status != PointCloudConsolidationRunStatus::Cancelled)
+                a.Driver.CommitFinished(false, message);
+            else if (status == PointCloudConsolidationRunStatus::GeometryProcessingFailed)
+                (void)a.Driver.Stepped({}, StepOutcome::Failed);
+            else
+                (void)a.Steps->Control(a.Run, StepRunAction::Discard, 1u, refusal);
+            a.Driver.Recording(false); // every page completed; a terminal step run retires
+        }
+
         Graphics::GpuPropertyResidency& Residency() { return *Active->Context.SpatialIndices->PropertyResidency(); }
+
+        // A worker step of the run may be running (it touches the planner and the working set).
+        [[nodiscard]] static bool WorkerBusy(const ActiveOperation& a)
+        {
+            const auto run = a.Steps ? a.Steps->Observe(a.Run) : std::nullopt;
+            return run && run->WorkerInFlight;
+        }
+
+        // The worker's page and readback counts, folded into the result (owner).
+        static void Fold(ActiveOperation& a)
+        {
+            const std::uint32_t submissions = a.Pages->Submitted();
+            a.Result.GpuSubmissions += submissions - a.FoldedSubmissions;
+            a.FoldedSubmissions = submissions;
+            const std::uint64_t bytes = a.Pages->ReadbackBytes();
+            a.Result.CpuStageReadbackBytes += bytes - a.FoldedReadbackBytes;
+            a.FoldedReadbackBytes = bytes;
+        }
+
+        // Residency slots worker pages read or wrote, stamped with every compute submission so far before their
+        // views (and leases) go.
+        void StampAndRelease(ActiveOperation& a, std::optional<Graphics::GpuPropertyView> view = {})
+        {
+            auto* residency = a.Context.SpatialIndices ? a.Context.SpatialIndices->PropertyResidency() : nullptr;
+            if (residency == nullptr)
+                return;
+            const auto frame = Device->GetGlobalFrameNumber();
+            residency->BeginSubmission();
+            for (const auto* used : {a.Input ? &*a.Input : nullptr, view ? &*view : nullptr})
+                if (used != nullptr)
+                    residency->NoteUse(used->Buffer, frame);
+            residency->EndSubmission(Device->GetTransferQueue().ComputeFence());
+        }
+
+        // Empties the preview mailbox (owner, no worker step running), stamping its slot first.
+        void ClearMailbox(ActiveOperation& a)
+        {
+            if (auto slot = a.Mailbox.Clear())
+                StampAndRelease(a, std::move(slot->first));
+        }
 
         void FinishLop(PointCloudConsolidationRunStatus status, std::string message)
         {
             if (!Active) return;
-            auto finished = std::move(*Active);
-            Active.reset(); // Discard may synchronously deliver the pending Accept sink.
+            // A worker step may still record: its pages stop now (its wait gives up), the end applies once the
+            // segment returned (AdvanceLop).
+            if (WorkerBusy(*Active))
+            {
+                Active->Pages->Abort();
+                if (!Active->Ending)
+                    Active->Ending.emplace(status, std::move(message));
+                return;
+            }
+            const auto finishedRun = std::move(Active); // Discard may synchronously deliver the pending Accept sink.
+            auto& finished = *finishedRun;
+            finished.Pages->Seal();
+            Fold(finished);
+            ClearMailbox(finished);
+            StampAndRelease(finished, finished.Back);
             auto result = finished.Result;
             result.Status = status;
             result.Message = std::move(message);
-            result.Error = status == PointCloudConsolidationRunStatus::Applied && !finished.Stop
-                ? Core::ErrorCode::Success : Core::ErrorCode::InvalidState;
-            if (finished.Stop && status == PointCloudConsolidationRunStatus::Applied)
-                result.Message = "GPU LOP stopped before convergence; completed positions accepted.";
+            result.Error = status == PointCloudConsolidationRunStatus::Applied && !finished.Partial
+                ? Core::ErrorCode::Success
+                : !finished.BudgetDiagnostic.empty() ? Core::ErrorCode::ResourceBudgetExceeded
+                                                     : Core::ErrorCode::InvalidState;
+            if (finished.Partial && status == PointCloudConsolidationRunStatus::Applied)
+                result.Message = "GPU " + finished.Label + " stopped before convergence; completed positions accepted.";
+            Tell(finished, status, result.Message);
             // A failed recorder may already have appended commands. Keep the existing
             // retirement policy: neither pool buffers nor resident leases can recycle
             // before the participant's device-idle shutdown.
-            if (finished.PageRecorded && finished.Page && finished.Page->State == SpatialQueryState::Failed &&
+            if (((finished.PageRecorded && finished.Page && finished.Page->State == SpatialQueryState::Failed) ||
+                    finished.RecordedFailure) &&
                 !finished.Resources.Leases.empty())
             {
                 RetiredResources.push_back(std::move(finished.Resources));
                 if (finished.Input) RetiredViews.push_back(*finished.Input);
                 if (finished.Back) RetiredViews.push_back(*finished.Back);
             }
-            // Pages are serial, so every recorded page has completed here.
-            else RecycleResources(std::move(finished.Resources), Spare);
+            // Pages are serial and an abandoned worker page was given up: the buffers return to the cache, which
+            // reuses them only after the compute fence and the frames in flight retired.
+            else
+                finished.Resources = {};
             // Discard is idempotent after Accept bound the front to the CPU revision.
             if (finished.PositionRun) DiscardEditorGpuPositionRun(finished.Commands, finished.PositionRun, *finished.Context.SpatialIndices->PropertyResidency());
             Completed = PointCloudConsolidationGpuResult{.Published = std::move(result)};
@@ -749,96 +967,142 @@ namespace Extrinsic::Runtime
         void AcceptLop()
         {
             if (!Active || !Active->Ready || Active->Accepting) return;
+            if (!Active->PositionRun)
+            {
+                // A new output: the next page reads the positions back for the module's publication.
+                Active->Accepting = true;
+                Active->Phase = LopPhase::Readback;
+                return;
+            }
             if (!EditorGpuPositionRunCurrent(Active->Commands, Active->PositionRun)) return;
             Active->Accepting = true;
             // The completion sink may synchronously destroy Active on rejection.
             const auto commands = Active->Commands;
             const auto run = Active->PositionRun;
-            const auto accepted = AcceptEditorGpuPositionRun(commands, run,
-                Residency(), "Consolidate point set", [this, alive = Alive, run](EditorGpuPositionAcceptResult accepted) {
-                    if (!*alive || !Active || Active->PositionRun != run) return;
+            // The step run decides at the real publication boundary (after the readback, before the rows are
+            // written), as K-Means' and the shared transactions' do: a discard that won before it publishes nothing.
+            const auto accepted = AcceptEditorGpuPositionRun(
+                commands,
+                run,
+                Residency(),
+                "Consolidate point set",
+                [this, alive = Alive, run](EditorGpuPositionAcceptResult accepted)
+                {
+                    if (!*alive || !Active || Active->PositionRun != run)
+                        return;
                     if (accepted.Status == EditorCommandStatus::Applied || accepted.Status == EditorCommandStatus::NoChange)
                     {
-                        FinishLop(PointCloudConsolidationRunStatus::Applied, "GPU LOP positions accepted.");
+                        FinishLop(
+                            PointCloudConsolidationRunStatus::Applied, "GPU " + Active->Label + " positions accepted.");
                     }
-                    else FinishLop(AcceptFailureStatus(accepted.Status), accepted.Message);
+                    else if (StepRunDiscarded(*Active))
+                        FinishLop(PointCloudConsolidationRunStatus::Cancelled,
+                            "GPU " + Active->Label + " discarded; previous positions retained.");
+                    else
+                        FinishLop(AcceptFailureStatus(accepted.Status), accepted.Message);
+                },
+                {},
+                [driver = Active->Driver]() mutable
+                {
+                    return driver.Publishing();
                 });
             if (Active && Active->PositionRun == run && accepted.Status != EditorCommandStatus::Pending)
                 FinishLop(AcceptFailureStatus(accepted.Status), accepted.Message);
         }
 
+        // The panel's buttons are the step run's controls (they change only the step run's state here; a discard
+        // ends the run on the next pump). Accept only while it can publish now; a new output's staleness is
+        // checked when the module publishes it.
         PointCloudConsolidationGpuObservation GpuRun(CommandCorrelationId correlation, PointCloudConsolidationGpuAction action)
         {
-            if (!Active || !Active->PositionRun || Active->Snapshot.Correlation != correlation) return {};
-            if (action == PointCloudConsolidationGpuAction::Stop && !Active->Ready) Active->Stop = true;
+            if (!Active || Active->Snapshot.Correlation != correlation)
+                return {};
+            auto& a = *Active;
+            Fold(a);
+            const std::uint32_t iterations = a.Iterations.load(std::memory_order_acquire);
+            const bool resting = a.Resting && !a.Ready && iterations > 0u;
+            const bool accepting = a.Accepting || a.CommitRequested;
+            const bool ready = a.Ready || resting;
+            const bool current = !a.PositionRun || EditorGpuPositionRunCurrent(a.Commands, a.PositionRun);
+            const bool canAccept = ready && !accepting && current;
+            std::string refusal;
+            if (action == PointCloudConsolidationGpuAction::Stop)
+                (void)a.Steps->Control(a.Run, StepRunAction::Stop, 1u, refusal);
             if (action == PointCloudConsolidationGpuAction::Discard)
-            {
-                Active->Discarded = true;
-                AdvanceLop();
-            }
-            if (action == PointCloudConsolidationGpuAction::Accept) AcceptLop();
-            if (!Active) return {};
-            const auto& a = *Active;
-            const bool current = EditorGpuPositionRunCurrent(a.Commands, a.PositionRun);
-            return {.Correlation = correlation, .Running = !a.Ready && !a.Discarded,
-                .ReadyToAccept = a.Ready && !a.Discarded, .Accepting = a.Accepting,
-                .CanAccept = a.Ready && !a.Accepting && current && !a.Discarded,
-                .Message = !current ? "Positions changed or attachment ended; discard this result." :
-                    a.Accepting ? "Reading the GPU positions back." :
-                    a.Ready ? (a.Stop ? "GPU LOP stopped before convergence; preview ready to Accept or Discard."
-                                      : "GPU preview ready to Accept or Discard.") : "GPU LOP pages running.",
-                .Iterations = a.Iteration, .Submissions = a.Result.GpuSubmissions, .Previews = a.Result.GpuPreviews,
-                .InputUploadBytes = a.Result.GpuInputUploadBytes, .InputCacheHits = a.Result.GpuInputCacheHits,
-                .CpuStageUploadBytes = a.Result.CpuStageUploadBytes, .CpuStageReadbackBytes = a.Result.CpuStageReadbackBytes};
+                (void)a.Steps->Control(a.Run, StepRunAction::Discard, 1u, refusal);
+            if (action == PointCloudConsolidationGpuAction::Accept && canAccept)
+                (void)a.Steps->Control(a.Run, StepRunAction::Accept, 1u, refusal);
+            return {.Correlation = correlation,
+                .Running = !ready && !accepting,
+                .ReadyToAccept = ready,
+                .Accepting = accepting,
+                .CanAccept = canAccept,
+                .Message = !current ? "Positions changed or attachment ended; discard this result."
+                    : accepting     ? "Reading the GPU positions back."
+                    : a.Ready
+                    ? (a.Partial ? "GPU " + a.Label + " stopped before convergence; ready to Accept or Discard."
+                                 : std::string{"GPU result ready to Accept or Discard."})
+                    : resting   ? "Paused at an iteration boundary; Accept prepares its positions."
+                    : a.Resting ? "Paused before its first iteration."
+                                : "GPU " + a.Label + " pages running.",
+                .StepRun = a.Run,
+                .Iterations = iterations,
+                .Submissions = a.Result.GpuSubmissions,
+                .Previews = a.Result.GpuPreviews,
+                .InputUploadBytes = a.Result.GpuInputUploadBytes,
+                .InputCacheHits = a.Result.GpuInputCacheHits,
+                .CpuStageUploadBytes = a.Result.CpuStageUploadBytes,
+                .CpuStageReadbackBytes = a.Result.CpuStageReadbackBytes};
         }
 
-        std::uint32_t LopPageRows() const
+        static std::uint32_t LopPageRows(const ActiveOperation& a)
         {
-            return std::max(1u, Active->Paging.PagePairs / Active->MaximumCandidates);
+            return std::max(1u, a.Paging.PagePairs / a.MaximumCandidates);
+        }
+
+        // The rows the current row phase covers: the sources' density, else every projected sample.
+        [[nodiscard]] static std::uint32_t PhaseRows(const ActiveOperation& a) noexcept
+        {
+            return a.Phase == LopPhase::SourceDensity ? a.Plan.SourceCount : a.Plan.TargetCount;
+        }
+
+        [[nodiscard]] static bool RowPhase(const LopPhase phase) noexcept
+        {
+            return phase == LopPhase::SourceDensity || phase == LopPhase::Initialize ||
+                phase == LopPhase::ProjectedDensity || phase == LopPhase::Project;
         }
 
         // True for the Project page covering the last rows of the current iteration.
-        [[nodiscard]] bool FinalizesIteration() const noexcept
+        [[nodiscard]] static bool FinalizesIteration(const ActiveOperation& a) noexcept
         {
-            const auto& a = *Active;
             return a.Phase == LopPhase::Project && a.Plan.TargetCount - a.Row == a.SubmittedRows;
         }
 
-        void RecordPublishCopy(RHI::ICommandContext& commands)
+        // The current positions into `back` (a live preview's slot, or the terminal front). Commands only.
+        static void RecordPublishCopy(
+            const ActiveOperation& a, RHI::ICommandContext& commands, const Graphics::GpuPropertyView& back)
         {
-            auto& a = *Active;
-            if (!a.PublishPending || !a.Back) return;
             const auto rw = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite;
             const auto source = (a.Iteration & 1u) ? a.Resources.ProjectedB : a.Resources.ProjectedA;
             commands.BufferBarrier(source, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::TransferRead);
-            commands.CopyBuffer(source, a.Back->Buffer, 0u, 0u, a.Back->Bytes);
+            commands.CopyBuffer(source, back.Buffer, 0u, 0u, back.Bytes);
             commands.BufferBarrier(source, RHI::MemoryAccess::TransferRead, rw);
-            commands.BufferBarrier(a.Back->Buffer, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderRead);
-            Residency().NoteUse(a.Back->Buffer, Device->GetGlobalFrameNumber());
+            commands.BufferBarrier(back.Buffer, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderRead);
         }
 
-        RHI::BufferHandle RecordLopPage(RHI::ICommandContext& commands)
+        // Records the page the planner (Phase, Row, SubmittedRows) names. Commands only, with the device, buffers and
+        // pipelines captured at Init, so the worker's iteration pages and the owner's terminal pages record here
+        // alike (the owner's recorder notes the residency slots it uses). The working set exists (Init).
+        static RHI::BufferHandle RecordLopPage(ActiveOperation& a, RHI::ICommandContext& commands)
         {
-            if (!Active || Active->Discarded) return {};
-            auto& a = *Active;
             a.PageRecorded = true;
             auto& r = a.Resources;
             const auto rw = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite;
             if (a.Phase != LopPhase::Upload) commands.BufferBarrier(r.Diagnostics, rw | RHI::MemoryAccess::TransferRead, rw);
             if (a.Phase == LopPhase::Upload)
             {
-                if (!EnsurePipelines() || !AllocateResources(*Buffers, a.Plan, Spare, r, a.Input->Buffer)) return {};
-                if (a.Plan.TargetCount != a.Plan.SourceCount)
-                {
-                    const auto bytes = a.Snapshot.GpuSeedRows.size() * sizeof(std::uint32_t);
-                    if (!AcquireBuffer(*Buffers, Spare, &LopGpuResources::SeedRows,
-                            StorageBufferDesc(bytes, "LopGpu.SeedRows"), r)) return {};
-                    if (!Graphics::SubmitBufferUpload(*Device, r.SeedRows, a.Snapshot.GpuSeedRows.data(), bytes).Accepted()) return {};
-                    a.Result.CpuStageUploadBytes += bytes;
+                if (r.SeedRows.IsValid())
                     commands.BufferBarrier(r.SeedRows, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderRead);
-                }
-                std::vector<std::uint32_t>{}.swap(a.Snapshot.GpuSeedRows);
-                UploadInputs();
                 for (const auto buffer : {r.State, r.SourcePositions, r.SourceWeights, r.ProjectedWeights,
                                          r.Displacements, r.Diagnostics})
                     commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite, rw);
@@ -849,44 +1113,65 @@ namespace Extrinsic::Runtime
                 commands.CopyBuffer(r.SourcePositions, r.ProjectedA, 0u, 0u, std::uint64_t(a.Plan.TargetCount) * 12u);
                 commands.BufferBarrier(r.SourcePositions, RHI::MemoryAccess::TransferRead, RHI::MemoryAccess::ShaderRead);
                 commands.BufferBarrier(r.ProjectedA, RHI::MemoryAccess::TransferWrite, rw);
-                if (!RecordGrid(commands, true, 0u)) return {};
+                if (!RecordGrid(a, commands, true, 0u))
+                    return {};
+            }
+            else if (a.Phase == LopPhase::SourceDensity || a.Phase == LopPhase::ProjectedDensity)
+            {
+                // WLOP density weights in row pages: the sources' (Init) and the projected samples' (iteration).
+                const bool source = a.Phase == LopPhase::SourceDensity;
+                for (std::uint32_t offset = 0u; offset < a.SubmittedRows;)
+                {
+                    auto push = Push(a, source ? 0u : a.Iteration, source ? 0u : 1u);
+                    push.Reserved0 = a.Row + offset;
+                    push.PageCount = std::min(LopPageRows(a), a.SubmittedRows - offset);
+                    Dispatch(commands, a.Pipelines.Density, push, push.PageCount);
+                    offset += push.PageCount;
+                }
+                for (const auto buffer : {source ? r.SourceWeights : r.ProjectedWeights, r.Diagnostics})
+                    commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderWrite, rw);
             }
             else if (a.Phase == LopPhase::Initialize || a.Phase == LopPhase::Project)
             {
                 const auto rows = a.SubmittedRows;
                 for (std::uint32_t offset = 0u; offset < rows;)
                 {
-                    auto push = Push(a.Iteration, a.Phase == LopPhase::Initialize ? 0u : 1u);
+                    auto push = Push(a, a.Iteration, a.Phase == LopPhase::Initialize ? 0u : 1u);
                     push.Reserved0 = a.Row + offset;
-                    push.PageCount = std::min(LopPageRows(), rows - offset);
+                    push.PageCount = std::min(LopPageRows(a), rows - offset);
                     push.Reserved1 = a.Paging.SubmissionPairs;
-                    Dispatch(commands, a.Phase == LopPhase::Initialize ? Pipelines.Initialize : Pipelines.Project, push, push.PageCount);
+                    Dispatch(commands,
+                        a.Phase == LopPhase::Initialize ? a.Pipelines.Initialize : a.Pipelines.Project,
+                        push,
+                        push.PageCount);
                     offset += push.PageCount;
                 }
                 for (const auto buffer : {r.ProjectedA, r.ProjectedB, r.Displacements, r.Diagnostics})
                     commands.BufferBarrier(buffer, RHI::MemoryAccess::ShaderWrite, rw);
                 // Finalize reads only the iteration's diagnostics record (one invocation),
                 // so it closes the last projection page instead of costing its own round trip.
-                if (FinalizesIteration())
+                if (FinalizesIteration(a))
                 {
-                    Dispatch(commands, Pipelines.IterationFinalize, Push(a.Iteration, 1u), 1u);
+                    Dispatch(commands, a.Pipelines.IterationFinalize, Push(a, a.Iteration, 1u), 1u);
                     commands.BufferBarrier(r.Diagnostics, RHI::MemoryAccess::ShaderWrite, rw);
                 }
             }
             else if (a.Phase == LopPhase::Grid)
             {
-                RecordPublishCopy(commands);
-                Dispatch(commands, Pipelines.IterationReset, Push(a.Iteration, 1u), 1u);
+                Dispatch(commands, a.Pipelines.IterationReset, Push(a, a.Iteration, 1u), 1u);
                 commands.BufferBarrier(r.Diagnostics, RHI::MemoryAccess::ShaderWrite, rw);
-                if (!RecordGrid(commands, false, a.Iteration)) return {};
+                if (!RecordGrid(a, commands, false, a.Iteration))
+                    return {};
             }
             else if (a.Phase == LopPhase::Reduce)
             {
-                RecordPublishCopy(commands);
-                auto push = Push(a.Iteration - 1u, 1u);
+                // The terminal front rides the first Reduce page of an in-place run.
+                if (a.PublishPending && a.Back)
+                    RecordPublishCopy(a, commands, *a.Back);
+                auto push = Push(a, a.Iteration - 1u, 1u);
                 push.Reserved0 = a.Row;
                 push.PageCount = std::min(a.Paging.ReduceRows, a.Plan.TargetCount - a.Row);
-                Dispatch(commands, Pipelines.FinalReduce, push, 1u);
+                Dispatch(commands, a.Pipelines.FinalReduce, push, 1u);
                 commands.BufferBarrier(r.Diagnostics, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::TransferRead);
             }
             else if (a.Phase == LopPhase::Readback)
@@ -896,86 +1181,286 @@ namespace Extrinsic::Runtime
                 return output;
             }
             commands.BufferBarrier(r.Diagnostics, rw, RHI::MemoryAccess::TransferRead);
-            Residency().NoteUse(a.Input->Buffer, Device->GetGlobalFrameNumber());
             return r.Diagnostics;
         }
 
+        // The worker's diagnostics check: an algorithm error other than "not converged" fails the run.
+        [[nodiscard]] static bool DiagnosticsFailed(const LopGpuDiagnosticsRecord& diagnostic) noexcept
+        {
+            return diagnostic.ErrorCode != 0u &&
+                diagnostic.ErrorCode != std::uint32_t(LopGpuAlgorithmError::NotConverged);
+        }
+
+        // The step run's Step, on a worker: one whole projection iteration (the first one after Init or a restart
+        // also records the Init pages: the input upload copy and source grid, WLOP's source density, the samples'
+        // initialization), its bounded pages submitted and waited for here in the existing page shape and order.
+        // Only the boundary pages' diagnostics come back (row pages request completion only). Owner state is never
+        // touched.
+        static StepOutcome WorkerStep(ActiveOperation& a, StepRunMetric& metric)
+        {
+            const auto fail = [&a](std::string why)
+            {
+                a.WorkerDiagnostic = std::move(why);
+                return StepOutcome::Failed;
+            };
+            for (;;)
+            {
+                if (a.Pages->Aborted())
+                    return StepOutcome::Failed; // discarded, stale or shut down: the owner ends the run
+                if (RowPhase(a.Phase))
+                    a.SubmittedRows =
+                        std::min(PhaseRows(a) - a.Row, std::max(1u, a.Paging.SubmissionPairs / a.MaximumCandidates));
+                const bool finalizes = FinalizesIteration(a);
+                const bool diagnostics = a.Phase == LopPhase::Upload || a.Phase == LopPhase::Grid || finalizes;
+                LopGpuDiagnosticsRecord diagnostic{};
+                a.PageRecorded = false;
+                switch (a.Pages->Run(
+                    [&a](RHI::ICommandContext& commands)
+                    {
+                        return RecordLopPage(a, commands);
+                    },
+                    diagnostics ? std::as_writable_bytes(std::span{&diagnostic, 1u}) : std::span<std::byte>{}))
+                {
+                case WorkerGpuPageStatus::Complete: break;
+                case WorkerGpuPageStatus::Aborted:  return StepOutcome::Failed;
+                case WorkerGpuPageStatus::Refused:
+                    a.RecordedFailure = a.PageRecorded; // a recorder that appended commands keeps the working set
+                    return fail("Point-cloud consolidation Vulkan page submission rejected.");
+                case WorkerGpuPageStatus::Failed:
+                case WorkerGpuPageStatus::TimedOut:
+                    return fail("Point-cloud consolidation Vulkan page did not complete: the device was lost.");
+                }
+                if (diagnostics)
+                {
+                    if (DiagnosticsFailed(diagnostic))
+                        return fail("LOP GPU numerical or neighborhood failure; previous positions retained.");
+                    a.MaximumCandidates = std::max(1u, diagnostic.MaximumCandidates);
+                }
+                if (finalizes)
+                {
+                    // An iteration completed (its Finalize diagnostics). The device's own end (convergence, or
+                    // MaxIterations, which is the step run's cap: Active 0) ends the run; a stop or pause applies
+                    // here, at the boundary.
+                    a.Row = 0u;
+                    ++a.Iteration;
+                    a.Iterations.store(a.Iteration, std::memory_order_release);
+                    a.Partial = diagnostic.Active != 0u;
+                    a.Phase = LopPhase::Grid;
+                    metric.Values = {double(std::bit_cast<float>(diagnostic.MaxDisplacementBits)), 0.0, 0.0, 0.0};
+                    return diagnostic.Converged != 0u ? StepOutcome::Converged : StepOutcome::Continue;
+                }
+                if (a.Phase == LopPhase::Upload)
+                    a.Phase = a.Plan.DensityWeighted ? LopPhase::SourceDensity : LopPhase::Initialize;
+                else if (a.Phase == LopPhase::Grid)
+                    a.Phase = a.Plan.DensityWeighted ? LopPhase::ProjectedDensity : LopPhase::Project;
+                else if (RowPhase(a.Phase) && (a.Row += a.SubmittedRows) == PhaseRows(a))
+                {
+                    a.Row = 0u;
+                    a.Phase = a.Phase == LopPhase::SourceDensity ? LopPhase::Initialize
+                        : a.Phase == LopPhase::ProjectedDensity  ? LopPhase::Project
+                                                                 : LopPhase::Grid; // Init done: iteration 1 follows
+                }
+            }
+        }
+
+        // The step run's Preview, after a step on the worker (or at a rest on the owner): the current positions into
+        // the slot the owner offered (an in-place run's), as its own submission, not waited for; Show publishes it
+        // once the fence completed. No slot offered: no copy (the run goes on).
+        static bool WorkerPreview(ActiveOperation& a, StepPreview& preview)
+        {
+            // The iteration that ends the run (the device's end, or the cap) shows through its terminal front.
+            if (!a.Partial || a.Iteration >= a.Snapshot.Request.Config.Execution.IterationCap)
+                return false;
+            Graphics::GpuPropertyView back{};
+            if (!a.Mailbox.Borrow(
+                    [&back](const Graphics::GpuPropertyView& slot)
+                    {
+                        back = slot; // the view alone: the lease stays in the mailbox
+                        back.Lease.reset();
+                    }))
+                return false;
+            const auto token = a.Pages->SubmitCopy(
+                [&a, &back](RHI::ICommandContext& commands)
+                {
+                    RecordPublishCopy(a, commands, back);
+                    return back.Buffer;
+                });
+            a.Mailbox.Recorded(token.Value);
+            preview.Fence = token.Value;
+            return token.IsValid();
+        }
+
+        // The step run's Show (owner): a completed copy becomes the front; an incomplete one waits; one no longer in
+        // the mailbox (superseded by the terminal front or a restart) is never shown.
+        StepRunShow Show(ActiveOperation& a, const StepPreview& preview)
+        {
+            if (preview.Fence == 0u)
+                return StepRunShow::Never;
+            if (!Device->GetTransferQueue().IsComplete(RHI::ReadbackToken{preview.Fence}))
+                return StepRunShow::Later;
+            auto slot = a.Mailbox.Take(preview.Fence);
+            if (!slot)
+                return StepRunShow::Never;
+            slot.reset(); // its lease goes before the publication (the copy completed)
+            if (!Residency().Publish(EditorGpuPositionRunKey(a.PositionRun)))
+            {
+                a.PreviewFailed = true; // the next Advance ends the run (not from inside the run's own pump)
+                return StepRunShow::Never;
+            }
+            ++a.Result.GpuPreviews;
+            return StepRunShow::Shown;
+        }
+
+        // The Init, on the owner before any segment: pipelines, the working set, the seed rows and the initial values
+        // (uploads the first page waits for). False: the run failed (a budget refusal says so).
+        bool InitializeLop(ActiveOperation& a)
+        {
+            auto& r = a.Resources;
+            const auto refusals = a.Context.SpatialIndices->Stats().ScratchRefusals;
+            if (!EnsurePipelines() || (!r.IsValid() && !AllocateResources(*Buffers, a.Plan, r, a.Input->Buffer)))
+            {
+                if (a.Context.SpatialIndices->Stats().ScratchRefusals != refusals)
+                    a.BudgetDiagnostic = a.Context.SpatialIndices->MethodScratchDiagnostic(
+                        refusals, "Point-cloud consolidation Vulkan buffers are unavailable.");
+                return false;
+            }
+            if (a.Plan.TargetCount != a.Plan.SourceCount && !r.SeedRows.IsValid())
+            {
+                const auto bytes = a.Snapshot.GpuSeedRows.size() * sizeof(std::uint32_t);
+                if (!CreateBuffer(*Buffers, StorageBufferDesc(bytes, "LopGpu.SeedRows"), r.SeedRows, r.Leases))
+                    return false;
+                if (!Graphics::SubmitBufferUpload(*Device, r.SeedRows, a.Snapshot.GpuSeedRows.data(), bytes).Accepted())
+                    return false;
+                a.Result.CpuStageUploadBytes += bytes;
+            }
+            std::vector<std::uint32_t>{}.swap(a.Snapshot.GpuSeedRows);
+            a.Device = Device;
+            a.Buffers = Buffers;
+            a.Pipelines = Pipelines;
+            const auto address = [this](const RHI::BufferHandle buffer)
+            {
+                return buffer.IsValid() ? Device->GetBufferDeviceAddress(buffer) : std::uint64_t{};
+            };
+            a.StateAddress = address(r.State);
+            a.SourceCountsAddress = address(r.SourceCounts);
+            a.SourceOffsetsAddress = address(r.SourceOffsets);
+            a.ProjectedCountsAddress = address(r.ProjectedCounts);
+            a.ProjectedOffsetsAddress = address(r.ProjectedOffsets);
+            a.ScanScratchAddress = address(r.ScanScratch);
+            if (!a.StateAddress || !a.SourceCountsAddress || !a.SourceOffsetsAddress || !a.ProjectedCountsAddress ||
+                !a.ProjectedOffsetsAddress || (r.ScanScratch.IsValid() && !a.ScanScratchAddress))
+                return false;
+            UploadInputs(a);
+            a.Initialized = true;
+            return true;
+        }
+
+        // Frame maintenance: moves the resident run on, then tells its step run whether an owner page is in flight.
+        void AdvanceResident()
+        {
+            AdvanceLop();
+            if (Active)
+                Active->Driver.Recording(bool(Active->Page));
+        }
+
+        // Main thread, frame maintenance (and a discard): the Init, the live preview slot, ends decided while a worker
+        // step ran, and once the run ended or is accepted the terminal pages (an in-place run's front, the final
+        // reduction, a new output's readback) as owner pages.
         void AdvanceLop()
         {
             if (!Active || !Active->Input) return;
             auto& a = *Active;
+            Fold(a);
             if (a.Context.AttachmentActive && !a.Context.AttachmentActive()) a.Discarded = true;
+            const auto run = a.Steps->Observe(a.Run);
+            const bool busy = run && run->WorkerInFlight;
+            if (busy)
+            {
+                if (a.Discarded || a.Ending)
+                    a.Pages->Abort(); // the worker gives up; the end applies once it returned
+                else
+                    OfferPreview(a, *run);
+                a.Resting = false;
+                return;
+            }
+            if (a.Ending)
+            {
+                auto ending = std::move(*a.Ending);
+                a.Ending.reset();
+                FinishLop(ending.first, std::move(ending.second));
+                return;
+            }
             if (a.Page && a.Page->State != SpatialQueryState::Ready && a.Page->State != SpatialQueryState::Failed) return;
+            // The run ended on its own side: a failed step (its reason is the worker's), a discard or cancel (also of
+            // a pending Commit, whose run has no pump left to call Discard).
+            if (run && run->Phase == StepRunPhase::Failed && !a.WorkerDiagnostic.empty() && !a.Discarded)
+            {
+                FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, a.WorkerDiagnostic);
+                return;
+            }
+            if (run && IsTerminal(run->Phase) && run->Phase != StepRunPhase::Committed && !a.CommitRequested)
+                a.Discarded = true;
             if (a.Discarded)
             {
-                FinishLop(PointCloudConsolidationRunStatus::Cancelled, "GPU LOP discarded; previous positions retained.");
+                FinishLop(PointCloudConsolidationRunStatus::Cancelled,
+                    "GPU " + a.Label + " discarded; previous positions retained.");
                 return;
             }
-            if ((a.Snapshot.Request.AutoAccept || a.Accepting) && a.PositionRun &&
-                !EditorGpuPositionRunCurrent(a.Commands, a.PositionRun))
+            if (a.PreviewFailed)
+            {
+                FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed,
+                    "GPU " + a.Label + " preview publication refused.");
+                return;
+            }
+            if (!a.Initialized)
+            {
+                if (!InitializeLop(a))
+                    FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed,
+                        a.BudgetDiagnostic.empty() ? "Point-cloud consolidation Vulkan buffers are unavailable."
+                                                   : a.BudgetDiagnostic);
+                return;
+            }
+            if ((a.Snapshot.Request.Config.Execution.AutoAccept != StepRunAutoAccept::Never || a.CommitRequested ||
+                    a.Accepting) &&
+                a.PositionRun && !EditorGpuPositionRunCurrent(a.Commands, a.PositionRun))
             {
                 FinishLop(PointCloudConsolidationRunStatus::StaleSource,
-                    "GPU LOP inputs changed before automatic Accept; previous positions retained.");
+                    "GPU " + a.Label + " inputs changed before Accept; previous positions retained.");
                 return;
             }
-            if (a.Accepting || a.Ready) return;
+            if (a.Accepting && a.PositionRun)
+                return;
+            if (a.Ready && !a.Accepting)
+            {
+                if (a.CommitRequested)
+                    AcceptLop();
+                // A manual stale result stays inspectable with Accept disabled; a new output's Accept reads back.
+                if (!Active || !Active->Accepting || Active->PositionRun)
+                    return;
+            }
             if (a.Page)
             {
                 if (a.Page->State == SpatialQueryState::Failed)
                 {
-                    FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, a.Page->Diagnostic);
+                    FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed,
+                        a.BudgetDiagnostic.empty() ? a.Page->Diagnostic : a.BudgetDiagnostic);
                     return;
                 }
                 a.Result.CpuStageReadbackBytes += a.Page->Data.size();
                 if (a.PublishPending)
                 {
-                    // The page carrying the preview copy completed, so the back is filled.
+                    // The page carrying the terminal front completed, so the back is filled.
                     a.PublishPending = false;
                     if (!Residency().Publish(EditorGpuPositionRunKey(a.PositionRun)))
                     {
-                        FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, "LOP preview publication refused.");
+                        FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed,
+                            "GPU " + a.Label + " preview publication refused.");
                         return;
                     }
                     ++a.Result.GpuPreviews;
                     a.Back.reset();
                 }
-                const bool finalized = FinalizesIteration();
-                if (a.Phase == LopPhase::Upload || a.Phase == LopPhase::Grid || finalized)
-                {
-                    if (a.Page->Data.size() != sizeof(LopGpuDiagnosticsRecord))
-                    {
-                        FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, "LOP iteration diagnostics readback size mismatch.");
-                        return;
-                    }
-                    LopGpuDiagnosticsRecord diagnostic{};
-                    std::memcpy(&diagnostic, a.Page->Data.data(), sizeof(diagnostic));
-                    if (diagnostic.ErrorCode != 0u && diagnostic.ErrorCode != std::uint32_t(LopGpuAlgorithmError::NotConverged))
-                    {
-                        FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, "LOP GPU numerical or neighborhood failure; previous positions retained.");
-                        return;
-                    }
-                    a.MaximumCandidates = std::max(1u, diagnostic.MaximumCandidates);
-                    if (finalized)
-                    {
-                        a.Row = 0u;
-                        ++a.Iteration;
-                        a.TerminalPage = a.Stop || diagnostic.Active == 0u || a.Iteration == a.Snapshot.Params.MaxIterations;
-                        const bool publish = a.PositionRun && (a.TerminalPage ||
-                            a.Iteration % a.Snapshot.Request.Config.GpuPreviewInterval == 0u);
-                        a.Phase = publish ? LopPhase::Publish : a.TerminalPage ? LopPhase::Reduce : LopPhase::Grid;
-                    }
-                    else a.Phase = a.Phase == LopPhase::Upload ? LopPhase::Initialize : LopPhase::Project;
-                }
-                else if (a.Phase == LopPhase::Initialize || a.Phase == LopPhase::Project)
-                {
-                    a.Row += a.SubmittedRows;
-                    if (a.Row == a.Plan.TargetCount)
-                    {
-                        a.Row = 0u;
-                        a.Phase = LopPhase::Grid;
-                    }
-                }
-                else if (a.Phase == LopPhase::Reduce)
+                if (a.Phase == LopPhase::Reduce)
                 {
                     a.Row += std::min(a.Paging.ReduceRows, a.Plan.TargetCount - a.Row);
                     if (a.Row == a.Plan.TargetCount)
@@ -987,15 +1472,16 @@ namespace Extrinsic::Runtime
                         }
                         LopGpuDiagnosticsRecord diagnostic{};
                         std::memcpy(&diagnostic, a.Page->Data.data(), sizeof(diagnostic));
-                        if (diagnostic.ErrorCode != 0u && diagnostic.ErrorCode != std::uint32_t(LopGpuAlgorithmError::NotConverged))
+                        if (DiagnosticsFailed(diagnostic))
                         {
                             FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed, "LOP GPU numerical or neighborhood failure; previous positions retained.");
                             return;
                         }
                         const float maximum = std::bit_cast<float>(diagnostic.MaxDisplacementBits);
                         if (diagnostic.Iterations == 0u || diagnostic.Iterations > a.Iteration ||
-                            diagnostic.SourceGridBuilt != 1u || diagnostic.ProjectedGridBuilds != diagnostic.Iterations ||
-                            (!a.Stop && diagnostic.Active != 0u) || !std::isfinite(diagnostic.AverageDisplacement) ||
+                            diagnostic.SourceGridBuilt != 1u ||
+                            diagnostic.ProjectedGridBuilds != diagnostic.Iterations ||
+                            (!a.Partial && diagnostic.Active != 0u) || !std::isfinite(diagnostic.AverageDisplacement) ||
                             diagnostic.AverageDisplacement < 0.0f || !std::isfinite(maximum) || maximum < 0.0f)
                         {
                             FinishLop(PointCloudConsolidationRunStatus::GeometryProcessingFailed,
@@ -1003,19 +1489,18 @@ namespace Extrinsic::Runtime
                             return;
                         }
                         a.Result.Iterations = diagnostic.Iterations;
-                        a.Result.Converged = !a.Stop && diagnostic.Converged != 0u;
+                        a.Result.Converged = !a.Partial && diagnostic.Converged != 0u;
                         a.Result.AverageDisplacement = diagnostic.AverageDisplacement;
                         a.Result.MaxDisplacement = std::bit_cast<float>(diagnostic.MaxDisplacementBits);
-                        a.Result.GeometryStatus = a.Stop ? Consolidation::Status::NotConverged
+                        a.Result.GeometryStatus = a.Partial
+                            ? Consolidation::Status::NotConverged
                             : GeometryStatus(static_cast<LopGpuAlgorithmError>(diagnostic.ErrorCode));
-                        if (a.PositionRun)
-                        {
-                            a.Ready = true;
-                            a.Page.reset();
-                            if (a.Snapshot.Request.AutoAccept) AcceptLop();
+                        a.Ready = true;
+                        a.Page.reset();
+                        if (a.CommitRequested)
+                            AcceptLop(); // Accept (a user's or the batch's) asked for these
+                        if (!Active || !Active->Accepting || Active->PositionRun)
                             return;
-                        }
-                        a.Phase = LopPhase::Readback;
                     }
                 }
                 else if (a.Phase == LopPhase::Readback)
@@ -1045,89 +1530,99 @@ namespace Extrinsic::Runtime
                     result.Diagnostics.Converged = a.Result.Converged;
                     result.Diagnostics.AverageDisplacement = a.Result.AverageDisplacement;
                     result.Diagnostics.MaxDisplacement = a.Result.MaxDisplacement;
-                    Completed = PointCloudConsolidationGpuResult{.Status = PointCloudConsolidationGpuResultStatus::Completed,
-                        .Snapshot = std::move(a.Snapshot), .Consolidated = std::move(result), .Metrics = a.Result};
-                    RecycleResources(std::move(a.Resources), Spare);
+                    result.Diagnostics.UsedDensityWeighting = a.Plan.DensityWeighted;
+                    // The module publishes it (one undoable entry) and answers the pending Commit through Driver.
+                    // Every worker page completed; the residency slots it read are stamped before the views go.
+                    a.Pages->Seal();
+                    ClearMailbox(a);
+                    StampAndRelease(a, a.Back);
+                    a.Driver.Recording(false);
+                    Completed = PointCloudConsolidationGpuResult{.Snapshot = std::move(a.Snapshot),
+                        .Consolidated = std::move(result),
+                        .Metrics = a.Result,
+                        .Driver = a.Driver};
                     Active.reset();
                     return;
                 }
                 a.Page.reset();
             }
+            if (!a.TerminalPage)
+            {
+                // Accept (from a rest), or the run ended (convergence, the cap, Stop): the terminal front of the current
+                // positions. Otherwise the run rests or waits for its next segment, and live preview may take a slot.
+                if (!a.CommitRequested && !Ended(a))
+                {
+                    a.Resting = run && run->Phase != StepRunPhase::Running;
+                    if (run)
+                        OfferPreview(a, *run);
+                    return;
+                }
+                if (a.Iteration == 0u)
+                {
+                    FinishLop(PointCloudConsolidationRunStatus::Cancelled,
+                        "GPU " + a.Label + " stopped before its first iteration; previous positions retained.");
+                    return;
+                }
+                ClearMailbox(a); // a recorded, unpublished live preview is superseded by the terminal front
+                a.Resting = false;
+                a.TerminalPage = true;
+                a.Phase = a.PositionRun ? LopPhase::Publish : LopPhase::Reduce;
+            }
             if (a.Phase == LopPhase::Publish)
             {
                 if (!a.Back)
                     a.Back = Residency().AcquireBack(EditorGpuPositionRunKey(a.PositionRun), a.Input->Layout, 2u);
-                // A terminal front must be retained; preview ring pressure merely drops a preview.
-                if (a.TerminalPage && !a.Back) return;
-                a.PublishPending = a.Back.has_value();
-                a.Phase = a.TerminalPage ? LopPhase::Reduce : LopPhase::Grid;
+                // A terminal front must be retained: a busy ring defers it.
+                if (!a.Back)
+                    return;
+                a.PublishPending = true;
+                a.Phase = LopPhase::Reduce;
             }
-            if (a.Phase == LopPhase::Initialize || a.Phase == LopPhase::Project)
-                a.SubmittedRows = std::min(a.Plan.TargetCount - a.Row,
-                    std::max(1u, a.Paging.SubmissionPairs / a.MaximumCandidates));
-            const bool diagnostics = a.Phase == LopPhase::Upload || a.Phase == LopPhase::Grid ||
-                FinalizesIteration() ||
-                (a.Phase == LopPhase::Reduce && a.Plan.TargetCount - a.Row <= a.Paging.ReduceRows);
+            const bool diagnostics = a.Phase == LopPhase::Reduce && a.Plan.TargetCount - a.Row <= a.Paging.ReduceRows;
             const std::size_t bytes = diagnostics ? sizeof(LopGpuDiagnosticsRecord) :
                 a.Phase == LopPhase::Readback ? std::size_t(a.Plan.TargetCount) * sizeof(glm::vec3) : 0u;
             a.PageRecorded = false;
             a.Page = a.Context.SpatialIndices->QueueGpuCompute(bytes,
-                [this, alive = Alive](RHI::ICommandContext& commands, const SpatialGpuIndexView&) { return *alive ? RecordLopPage(commands) : RHI::BufferHandle{}; }, SpatialGpuLatency::Immediate);
+                [this, alive = Alive, op = Active](RHI::ICommandContext& commands, const SpatialGpuIndexView&)
+                {
+                    if (!*alive || op->Discarded)
+                        return RHI::BufferHandle{};
+                    // The owner's recorder, inside the cache's submission scope: the slots it uses are noted.
+                    const auto frame = Device->GetGlobalFrameNumber();
+                    Residency().NoteUse(op->Input->Buffer, frame);
+                    if (op->PublishPending && op->Back)
+                        Residency().NoteUse(op->Back->Buffer, frame);
+                    return RecordLopPage(*op, commands);
+                });
             ++a.Result.GpuSubmissions;
-
         }
 
-        void RecordFrameCommands(RHI::ICommandContext& commandContext)
+        // Live preview of an in-place run: a free slot in the mailbox for the worker's next copy (or a rest's), never
+        // waited for; a busy ring offers none and that preview is dropped. Preview off acquires nothing.
+        void OfferPreview(ActiveOperation& a, const StepRunObservation& run)
         {
-            if (!Active.has_value() || Completed.has_value() ||
-                Device == nullptr || Buffers == nullptr)
-            {
+            if (!a.PositionRun || !a.Initialized || a.TerminalPage || a.CommitRequested ||
+                a.Snapshot.Request.Config.Execution.PreviewEvery == 0u || IsTerminal(run.Phase) ||
+                run.Phase == StepRunPhase::Accepting || !a.Mailbox.Empty())
                 return;
-            }
-            if (Active->Input) { AdvanceLop(); return; }
-            if (!Active->ProducerSubmitted)
-            {
-                RecordProducerCommands(commandContext);
-                return;
-            }
-            if (!Active->ReadbackSubmitted)
-            {
-                const std::uint32_t framesInFlight =
-                    std::max(Device->GetFramesInFlight(), 1u);
-                const std::uint64_t requiredFrame =
-                    Active->ProducerCompletedFrame +
-                    static_cast<std::uint64_t>(framesInFlight - 1u);
-                if (Device->GetGlobalFrameNumber() < requiredFrame)
-                    return;
-                RecordReadbackCommands(commandContext);
-            }
+            auto back = std::exchange(a.Back, std::nullopt); // the position run's first back serves first
+            if (!back)
+                back = Residency().AcquireBack(EditorGpuPositionRunKey(a.PositionRun), a.Input->Layout, 2u);
+            if (back)
+                (void)a.Mailbox.Offer(std::move(*back));
+        }
+
+        // Both frame callbacks move the resident run on: a completed page is consumed and the next one queued.
+        void RecordFrameCommands(RHI::ICommandContext&)
+        {
+            if (Active && !Completed && Device != nullptr && Buffers != nullptr)
+                AdvanceResident();
         }
 
         void DrainCompletedTransfers()
         {
-            if (Active && Active->Input) { AdvanceLop(); return; }
-            if (!Active.has_value() || !Active->ReadbackSubmitted)
-                return;
-            RHI::NullCommandContext noop;
-            Transfer.DrainCompleted(noop);
-            if (Transfer.ReadbackBatchState(Active->Ticket) !=
-                Graphics::GpuTransferReadbackBatchState::Ready)
-            {
-                return;
-            }
-
-            Graphics::GpuTransferReadbackBatchResult batch{};
-            if (!Transfer.ConsumeReadbackBatch(
-                    Active->Ticket,
-                    Active->Ranges,
-                    batch) ||
-                !batch.IsValid())
-            {
-                CompleteFallback(
-                    "Point-cloud consolidation Vulkan readback failed exact multi-range transport validation.");
-                return;
-            }
-            CompleteReadback(batch);
+            if (Active)
+                AdvanceResident();
         }
 
         [[nodiscard]] std::optional<PointCloudConsolidationGpuResult>
@@ -1230,16 +1725,13 @@ namespace Extrinsic::Runtime
             Pipelines = {};
         }
 
-        [[nodiscard]] LopGpuPushConstants Push(
-            const std::uint32_t iteration,
-            const std::uint32_t passMode) const
+        [[nodiscard]] static LopGpuPushConstants Push(
+            const ActiveOperation& active, const std::uint32_t iteration, const std::uint32_t passMode)
         {
-            const ActiveOperation& active = *Active;
             const PointCloudConsolidationConfig& config =
                 active.Snapshot.Request.Config;
             return LopGpuPushConstants{
-                .StateBDA = Device->GetBufferDeviceAddress(
-                    active.Resources.State),
+                .StateBDA = active.StateAddress,
                 .SourceCount = active.Plan.SourceCount,
                 .TargetCount = active.Plan.TargetCount,
                 .CellCount = active.Plan.CellCount,
@@ -1255,15 +1747,12 @@ namespace Extrinsic::Runtime
                 .OriginY = active.Plan.Origin.y,
                 .OriginZ = active.Plan.Origin.z,
                 .SupportRadius = active.Plan.SupportRadius,
-                .RepulsionWeight = static_cast<float>(
-                    active.Snapshot.Params.RepulsionWeight),
-                .ConvergenceTolerance = static_cast<float>(
-                    active.Snapshot.Params.ConvergenceTolerance),
+                .RepulsionWeight = static_cast<float>(active.Snapshot.Params.RepulsionWeight),
+                .ConvergenceTolerance = static_cast<float>(active.Snapshot.Params.ConvergenceTolerance),
             };
         }
 
-        void Dispatch(
-            RHI::ICommandContext& commandContext,
+        static void Dispatch(RHI::ICommandContext& commandContext,
             const RHI::PipelineHandle pipeline,
             const LopGpuPushConstants& push,
             const std::uint32_t elementCount)
@@ -1279,12 +1768,12 @@ namespace Extrinsic::Runtime
                 1u);
         }
 
-        [[nodiscard]] bool RecordGrid(
+        // Commands only, with the device, buffers and pipelines captured at Init (a worker step records here).
+        [[nodiscard]] static bool RecordGrid(ActiveOperation& active,
             RHI::ICommandContext& commandContext,
             const bool source,
             const std::uint32_t iteration)
         {
-            ActiveOperation& active = *Active;
             LopGpuResources& resources = active.Resources;
             const RHI::BufferHandle counts = source
                 ? resources.SourceCounts
@@ -1329,41 +1818,38 @@ namespace Extrinsic::Runtime
                 RHI::MemoryAccess::ShaderRead |
                     RHI::MemoryAccess::ShaderWrite);
 
-            const LopGpuPushConstants push = Push(
-                iteration, source ? 0u : 1u);
-            Dispatch(
-                commandContext,
-                Pipelines.GridCount,
+            const LopGpuPushConstants push = Push(active, iteration, source ? 0u : 1u);
+            Dispatch(commandContext,
+                active.Pipelines.GridCount,
                 push,
-                source ? active.Plan.SourceCount
-                       : active.Plan.TargetCount);
+                source ? active.Plan.SourceCount : active.Plan.TargetCount);
             commandContext.BufferBarrier(
                 counts,
                 RHI::MemoryAccess::ShaderWrite,
                 RHI::MemoryAccess::ShaderRead);
 
             Graphics::GpuParallelPrimitiveRecordResult scan =
-                Graphics::RecordGpuPrefixScan(
-                    Graphics::GpuPrefixScanRecordDesc{
-                        .Device = Device,
-                        .CommandContext = &commandContext,
-                        .Buffers = Buffers,
-                        .Pipelines = Pipelines.Parallel,
-                        .Input = counts,
-                        .Output = offsets,
-                        .Scratch = resources.ScanScratch,
-                        .ElementCount = active.Plan.CellCount,
-                        .Mode = Graphics::PrefixScanMode::Exclusive,
-                    });
+                Graphics::RecordGpuPrefixScan(Graphics::GpuPrefixScanRecordDesc{
+                    .Device = active.Device,
+                    .CommandContext = &commandContext,
+                    .Buffers = active.Buffers,
+                    .Pipelines = active.Pipelines.Parallel,
+                    .Input = counts,
+                    .Output = offsets,
+                    .Scratch = resources.ScanScratch,
+                    .ElementCount = active.Plan.CellCount,
+                    .Mode = Graphics::PrefixScanMode::Exclusive,
+                    .InputAddress = source ? active.SourceCountsAddress : active.ProjectedCountsAddress,
+                    .OutputAddress = source ? active.SourceOffsetsAddress : active.ProjectedOffsetsAddress,
+                    .ScratchAddress = active.ScanScratchAddress,
+                });
             if (!scan.Succeeded() || !scan.Recorded)
                 return false;
 
-            Dispatch(
-                commandContext,
-                Pipelines.GridScatter,
+            Dispatch(commandContext,
+                active.Pipelines.GridScatter,
                 push,
-                source ? active.Plan.SourceCount
-                       : active.Plan.TargetCount);
+                source ? active.Plan.SourceCount : active.Plan.TargetCount);
             commandContext.BufferBarrier(
                 indices,
                 RHI::MemoryAccess::ShaderWrite,
@@ -1371,492 +1857,65 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        void UploadInputs()
+        // The working set's initial values (the positions are the resident input, copied by the Upload page): owner
+        // uploads the next compute page waits for.
+        void UploadInputs(ActiveOperation& active)
         {
-            ActiveOperation& active = *Active;
             LopGpuResources& resources = active.Resources;
-            std::vector<glm::vec4> source(active.Input ? 0u : active.Plan.SourceCount);
-            for (std::uint32_t index = 0u;
-                 index < source.size();
-                 ++index)
-            {
-                source[index] = glm::vec4{
-                    active.Snapshot.Positions[index], 1.0f};
-            }
-            std::vector<glm::vec4> projected(active.Input ? 0u : active.Plan.TargetCount);
-            for (std::uint32_t index = 0u;
-                 index < projected.size();
-                 ++index)
-            {
-                projected[index] = glm::vec4{
-                    active.Snapshot.GpuInitialPositions[index], 1.0f};
-            }
-            const std::vector<float> sourceWeights(
-                active.Plan.SourceCount, 1.0f);
-            const std::vector<float> projectedWeights(
-                active.Plan.TargetCount, 1.0f);
-            const std::vector<float> displacements(
-                active.Plan.TargetCount, 0.0f);
+            const std::vector<float> sourceWeights(active.Plan.SourceCount, 1.0f);
+            const std::vector<float> projectedWeights(active.Plan.TargetCount, 1.0f);
+            const std::vector<float> displacements(active.Plan.TargetCount, 0.0f);
             const LopGpuDiagnosticsRecord diagnostics{
                 .Active = 1u,
             };
-
-            if (active.Input)
-                active.Result.CpuStageUploadBytes += sizeof(LopGpuStateBufferRecord) + sizeof(diagnostics) +
-                    (sourceWeights.size() + projectedWeights.size() + displacements.size()) * sizeof(float);
+            active.Result.CpuStageUploadBytes += sizeof(LopGpuStateBufferRecord) + sizeof(diagnostics) +
+                (sourceWeights.size() + projectedWeights.size() + displacements.size()) * sizeof(float);
+            const auto address = [this](const RHI::BufferHandle buffer)
+            {
+                return buffer.IsValid() ? Device->GetBufferDeviceAddress(buffer) : 0u;
+            };
             const LopGpuStateBufferRecord state{
-                .SourcePositionsBDA = Device->GetBufferDeviceAddress(
-                    resources.SourcePositions),
-                .SourceWeightsBDA = Device->GetBufferDeviceAddress(
-                    resources.SourceWeights),
-                .ProjectedABDA = Device->GetBufferDeviceAddress(
-                    resources.ProjectedA),
-                .ProjectedBBDA = Device->GetBufferDeviceAddress(
-                    resources.ProjectedB),
-                .ProjectedWeightsBDA = Device->GetBufferDeviceAddress(
-                    resources.ProjectedWeights),
-                .DisplacementsBDA = Device->GetBufferDeviceAddress(
-                    resources.Displacements),
-                .SourceCountsBDA = Device->GetBufferDeviceAddress(
-                    resources.SourceCounts),
-                .SourceOffsetsBDA = Device->GetBufferDeviceAddress(
-                    resources.SourceOffsets),
-                .SourceCursorsBDA = Device->GetBufferDeviceAddress(
-                    resources.SourceCursors),
-                .SourceIndicesBDA = Device->GetBufferDeviceAddress(
-                    resources.SourceIndices),
-                .ProjectedCountsBDA = Device->GetBufferDeviceAddress(
-                    resources.ProjectedCounts),
-                .ProjectedOffsetsBDA = Device->GetBufferDeviceAddress(
-                    resources.ProjectedOffsets),
-                .ProjectedCursorsBDA = Device->GetBufferDeviceAddress(
-                    resources.ProjectedCursors),
-                .ProjectedIndicesBDA = Device->GetBufferDeviceAddress(
-                    resources.ProjectedIndices),
-                .DiagnosticsBDA = Device->GetBufferDeviceAddress(
-                    resources.Diagnostics),
-                .SeedRowsBDA = resources.SeedRows.IsValid() ? Device->GetBufferDeviceAddress(resources.SeedRows) : 0u,
+                .SourcePositionsBDA = address(resources.SourcePositions),
+                .SourceWeightsBDA = address(resources.SourceWeights),
+                .ProjectedABDA = address(resources.ProjectedA),
+                .ProjectedBBDA = address(resources.ProjectedB),
+                .ProjectedWeightsBDA = address(resources.ProjectedWeights),
+                .DisplacementsBDA = address(resources.Displacements),
+                .SourceCountsBDA = address(resources.SourceCounts),
+                .SourceOffsetsBDA = address(resources.SourceOffsets),
+                .SourceCursorsBDA = address(resources.SourceCursors),
+                .SourceIndicesBDA = address(resources.SourceIndices),
+                .ProjectedCountsBDA = address(resources.ProjectedCounts),
+                .ProjectedOffsetsBDA = address(resources.ProjectedOffsets),
+                .ProjectedCursorsBDA = address(resources.ProjectedCursors),
+                .ProjectedIndicesBDA = address(resources.ProjectedIndices),
+                .DiagnosticsBDA = address(resources.Diagnostics),
+                .SeedRowsBDA = address(resources.SeedRows),
             };
-
-            if (!active.Input)
+            const auto upload = [this](const RHI::BufferHandle buffer, const void* data, const std::uint64_t bytes)
             {
-            (void)Graphics::SubmitBufferUpload(
-                *Device,
-                resources.SourcePositions,
-                source.data(),
-                static_cast<std::uint64_t>(source.size()) *
-                    sizeof(glm::vec4),
-                0u);
-            (void)Graphics::SubmitBufferUpload(
-                *Device,
-                resources.ProjectedB,
-                projected.data(),
-                static_cast<std::uint64_t>(projected.size()) *
-                    sizeof(glm::vec4),
-                0u);
-            }
-            (void)Graphics::SubmitBufferUpload(
-                *Device,
-                resources.SourceWeights,
-                sourceWeights.data(),
-                static_cast<std::uint64_t>(sourceWeights.size()) *
-                    sizeof(float),
-                0u);
-            (void)Graphics::SubmitBufferUpload(
-                *Device,
-                resources.ProjectedWeights,
-                projectedWeights.data(),
-                static_cast<std::uint64_t>(projectedWeights.size()) *
-                    sizeof(float),
-                0u);
-            (void)Graphics::SubmitBufferUpload(
-                *Device,
-                resources.Displacements,
-                displacements.data(),
-                static_cast<std::uint64_t>(displacements.size()) *
-                    sizeof(float),
-                0u);
-            (void)Graphics::SubmitBufferUpload(
-                *Device,
-                resources.Diagnostics,
-                &diagnostics,
-                sizeof(diagnostics),
-                0u);
-            (void)Graphics::SubmitBufferUpload(
-                *Device,
-                resources.State,
-                &state,
-                sizeof(state),
-                0u);
-        }
-
-        void RecordProducerCommands(
-            RHI::ICommandContext& commandContext)
-        {
-            if (!EnsurePipelines() ||
-                !AllocateResources(
-                    *Buffers, Active->Plan, Spare, Active->Resources))
-            {
-                CompleteFallback(
-                    "Point-cloud consolidation Vulkan pipelines or bounded resources are unavailable.");
-                return;
-            }
-            UploadInputs();
-            const auto uploaded = RHI::MemoryAccess::TransferWrite;
-            const auto shaderReadWrite = RHI::MemoryAccess::ShaderRead |
-                RHI::MemoryAccess::ShaderWrite;
-            for (const RHI::BufferHandle handle : {
-                     Active->Resources.State,
-                     Active->Resources.SourcePositions,
-                     Active->Resources.SourceWeights,
-                     Active->Resources.ProjectedB,
-                     Active->Resources.ProjectedWeights,
-                     Active->Resources.Displacements,
-                     Active->Resources.Diagnostics})
-            {
-                commandContext.BufferBarrier(
-                    handle, uploaded, shaderReadWrite);
-            }
-
-            if (!RecordGrid(commandContext, true, 0u))
-            {
-                CompleteFallback(
-                    "Point-cloud consolidation Vulkan source-grid scan recording failed.");
-                return;
-            }
-            if (Active->Plan.DensityWeighted)
-            {
-                Dispatch(
-                    commandContext,
-                    Pipelines.Density,
-                    Push(0u, 0u),
-                    Active->Plan.SourceCount);
-                commandContext.BufferBarrier(
-                    Active->Resources.SourceWeights,
-                    RHI::MemoryAccess::ShaderWrite,
-                    RHI::MemoryAccess::ShaderRead);
-            }
-
-            Dispatch(
-                commandContext,
-                Pipelines.Initialize,
-                Push(0u, 0u),
-                Active->Plan.TargetCount);
-            commandContext.BufferBarrier(
-                Active->Resources.ProjectedA,
-                RHI::MemoryAccess::ShaderWrite,
-                RHI::MemoryAccess::ShaderRead);
-            commandContext.BufferBarrier(
-                Active->Resources.Diagnostics,
-                RHI::MemoryAccess::ShaderWrite,
-                shaderReadWrite);
-
-            for (std::uint32_t iteration = 0u;
-                 iteration < Active->Snapshot.Params.MaxIterations;
-                 ++iteration)
-            {
-                if (!RecordGrid(commandContext, false, iteration))
-                {
-                    CompleteFallback(
-                        "Point-cloud consolidation Vulkan projected-grid scan recording failed.");
-                    return;
-                }
-                if (Active->Plan.DensityWeighted)
-                {
-                    Dispatch(
-                        commandContext,
-                        Pipelines.Density,
-                        Push(iteration, 1u),
-                        Active->Plan.TargetCount);
-                    commandContext.BufferBarrier(
-                        Active->Resources.ProjectedWeights,
-                        RHI::MemoryAccess::ShaderWrite,
-                        RHI::MemoryAccess::ShaderRead);
-                    commandContext.BufferBarrier(
-                        Active->Resources.Diagnostics,
-                        RHI::MemoryAccess::ShaderWrite,
-                        shaderReadWrite);
-                }
-
-                Dispatch(
-                    commandContext,
-                    Pipelines.IterationReset,
-                    Push(iteration, 1u),
-                    1u);
-                commandContext.BufferBarrier(
-                    Active->Resources.Diagnostics,
-                    RHI::MemoryAccess::ShaderWrite,
-                    shaderReadWrite);
-                Dispatch(
-                    commandContext,
-                    Pipelines.Project,
-                    Push(iteration, 1u),
-                    Active->Plan.TargetCount);
-                const RHI::BufferHandle next = (iteration & 1u) == 0u
-                    ? Active->Resources.ProjectedB
-                    : Active->Resources.ProjectedA;
-                commandContext.BufferBarrier(
-                    next,
-                    RHI::MemoryAccess::ShaderWrite,
-                    RHI::MemoryAccess::ShaderRead);
-                commandContext.BufferBarrier(
-                    Active->Resources.Displacements,
-                    RHI::MemoryAccess::ShaderWrite,
-                    RHI::MemoryAccess::ShaderRead);
-                commandContext.BufferBarrier(
-                    Active->Resources.Diagnostics,
-                    RHI::MemoryAccess::ShaderWrite,
-                    shaderReadWrite);
-                Dispatch(
-                    commandContext,
-                    Pipelines.IterationFinalize,
-                    Push(iteration, 1u),
-                    1u);
-                commandContext.BufferBarrier(
-                    Active->Resources.Diagnostics,
-                    RHI::MemoryAccess::ShaderWrite,
-                    shaderReadWrite);
-            }
-
-            Dispatch(
-                commandContext,
-                Pipelines.FinalReduce,
-                Push(
-                    Active->Snapshot.Params.MaxIterations - 1u,
-                    1u),
-                1u);
-            commandContext.BufferBarrier(
-                Active->Resources.Diagnostics,
-                RHI::MemoryAccess::ShaderWrite,
-                RHI::MemoryAccess::ShaderRead);
-            Active->ProducerCompletedFrame =
-                Device->GetGlobalFrameNumber() + 1u;
-            Active->ProducerSubmitted = true;
-        }
-
-        void RecordReadbackCommands(
-            RHI::ICommandContext& commandContext)
-        {
-            const bool finalIsA =
-                (Active->Snapshot.Params.MaxIterations & 1u) == 0u;
-            const RHI::BufferHandle finalPositions = finalIsA
-                ? Active->Resources.ProjectedA
-                : Active->Resources.ProjectedB;
-            const char* finalName = finalIsA
-                ? "LopGpu.ProjectedA"
-                : "LopGpu.ProjectedB";
-            const std::uint64_t positionBytes =
-                static_cast<std::uint64_t>(Active->Plan.TargetCount) *
-                sizeof(glm::vec4);
-            // Retained buffers may exceed this run's plan; describe their real shape.
-            const auto actualDesc = [this](const RHI::BufferHandle handle, const std::uint64_t bytes, const char* name)
-            {
-                const RHI::BufferDesc* desc = Buffers->GetDesc(handle);
-                return desc != nullptr ? *desc : StorageBufferDesc(bytes, name);
+                (void)Graphics::SubmitBufferUpload(*Device, buffer, data, bytes, 0u);
             };
-            Active->Ranges = {
-                Graphics::GpuTransferReadbackRangeDesc{
-                    .Source = finalPositions,
-                    .SourceDesc = actualDesc(
-                        finalPositions, positionBytes, finalName),
-                    .SourceRange = RHI::BufferRange{
-                        .OffsetBytes = 0u,
-                        .SizeBytes = positionBytes,
-                    },
-                    .SourceAccess = RHI::MemoryAccess::ShaderWrite,
-                },
-                Graphics::GpuTransferReadbackRangeDesc{
-                    .Source = Active->Resources.Diagnostics,
-                    .SourceDesc = actualDesc(
-                        Active->Resources.Diagnostics,
-                        sizeof(LopGpuDiagnosticsRecord),
-                        "LopGpu.Diagnostics"),
-                    .SourceRange = RHI::BufferRange{
-                        .OffsetBytes = 0u,
-                        .SizeBytes = sizeof(LopGpuDiagnosticsRecord),
-                    },
-                    .SourceAccess = RHI::MemoryAccess::ShaderWrite,
-                },
-            };
-            Active->Ticket = Transfer.ScheduleReadbackBatch(
-                commandContext,
-                Graphics::GpuTransferReadbackBatchDesc{
-                    .Ranges = Active->Ranges});
-            if (!Active->Ticket.IsValid())
-            {
-                CompleteFallback(
-                    "Point-cloud consolidation Vulkan final multi-range readback could not be scheduled.");
-                return;
-            }
-            Active->ReadbackSubmitted = true;
-        }
-
-        void CompleteReadback(
-            const Graphics::GpuTransferReadbackBatchResult& batch)
-        {
-            const std::span<const std::byte> positionBytes = batch.Bytes(0u);
-            const std::span<const std::byte> diagnosticBytes = batch.Bytes(1u);
-            if (positionBytes.size_bytes() !=
-                    static_cast<std::size_t>(Active->Plan.TargetCount) *
-                        sizeof(glm::vec4) ||
-                diagnosticBytes.size_bytes() !=
-                    sizeof(LopGpuDiagnosticsRecord))
-            {
-                CompleteFallback(
-                    "Point-cloud consolidation Vulkan result byte sizes do not match the frozen dispatch plan.");
-                return;
-            }
-
-            LopGpuDiagnosticsRecord diagnostics{};
-            std::memcpy(
-                &diagnostics,
-                diagnosticBytes.data(),
-                sizeof(diagnostics));
-            if (diagnostics.ErrorCode > static_cast<std::uint32_t>(
-                    LopGpuAlgorithmError::NotConverged) ||
-                diagnostics.Iterations >
-                    Active->Snapshot.Params.MaxIterations ||
-                !std::isfinite(diagnostics.AverageDisplacement))
-            {
-                CompleteFallback(
-                    "Point-cloud consolidation Vulkan diagnostics are structurally invalid.");
-                return;
-            }
-
-            const auto error = static_cast<LopGpuAlgorithmError>(
-                diagnostics.ErrorCode);
-            const float maximumDisplacement =
-                std::bit_cast<float>(diagnostics.MaxDisplacementBits);
-            if ((error == LopGpuAlgorithmError::None ||
-                 error == LopGpuAlgorithmError::NotConverged) &&
-                (diagnostics.Active != 0u ||
-                 diagnostics.Iterations == 0u ||
-                 diagnostics.SourceGridBuilt != 1u ||
-                 diagnostics.ProjectedGridBuilds !=
-                     diagnostics.Iterations ||
-                 !(diagnostics.AverageDisplacement >= 0.0f) ||
-                 !std::isfinite(maximumDisplacement) ||
-                 !(maximumDisplacement >= 0.0f)))
-            {
-                CompleteFallback(
-                    "Point-cloud consolidation Vulkan completion diagnostics do not prove a complete source grid and projection sequence.");
-                return;
-            }
-            Consolidation::Result consolidated{};
-            consolidated.State = GeometryStatus(error);
-            consolidated.Diagnostics.Implementation =
-                kLopGpuImplementation;
-            consolidated.Diagnostics.Strategy = Consolidation::Kind(
-                Active->Snapshot.Params.Method);
-            consolidated.Diagnostics.InputPointCount =
-                Active->Plan.SourceCount;
-            consolidated.Diagnostics.OutputPointCount =
-                Active->Plan.TargetCount;
-            consolidated.Diagnostics.Iterations = diagnostics.Iterations;
-            consolidated.Diagnostics.Converged =
-                diagnostics.Converged != 0u;
-            consolidated.Diagnostics.UsedDensityWeighting =
-                Active->Plan.DensityWeighted;
-            consolidated.Diagnostics.AttractionContributionCount =
-                diagnostics.AttractionContributionCount;
-            consolidated.Diagnostics.RepulsionContributionCount =
-                diagnostics.RepulsionContributionCount;
-            consolidated.Diagnostics.DensityContributionCount =
-                diagnostics.DensityContributionCount;
-            consolidated.Diagnostics.EmptyNeighborhoodCount =
-                diagnostics.EmptyNeighborhoodCount;
-            consolidated.Diagnostics.AverageDisplacement =
-                diagnostics.AverageDisplacement;
-            consolidated.Diagnostics.MaxDisplacement =
-                maximumDisplacement;
-
-            if (error == LopGpuAlgorithmError::None ||
-                error == LopGpuAlgorithmError::NotConverged)
-            {
-                std::vector<glm::vec4> packed(Active->Plan.TargetCount);
-                std::memcpy(
-                    packed.data(),
-                    positionBytes.data(),
-                    positionBytes.size_bytes());
-                consolidated.Positions.resize(Active->Plan.TargetCount);
-                for (std::uint32_t index = 0u;
-                     index < Active->Plan.TargetCount;
-                     ++index)
-                {
-                    const glm::vec3 point{packed[index]};
-                    if (!Geometry::Validation::IsFinite(point))
-                    {
-                        CompleteFallback(
-                            "Point-cloud consolidation Vulkan positions contain a non-finite value.");
-                        return;
-                    }
-                    consolidated.Positions[index] = point;
-                }
-            }
-
-            PointCloudConsolidationSnapshot snapshot =
-                std::move(Active->Snapshot);
-            const std::string diagnostic = error == LopGpuAlgorithmError::None
-                ? std::string{}
-                : "Vulkan algorithm completed with geometry status " +
-                      std::string{Consolidation::DebugName(
-                          consolidated.State)} +
-                      ".";
-            Completed = PointCloudConsolidationGpuResult{
-                .Status =
-                    PointCloudConsolidationGpuResultStatus::Completed,
-                .Snapshot = std::move(snapshot),
-                .Consolidated = std::move(consolidated),
-                .Diagnostic = diagnostic,
-            };
-            // The readback completed after every producer pass.
-            RecycleResources(std::move(Active->Resources), Spare);
-            Active.reset();
-        }
-
-        void CompleteFallback(std::string diagnostic)
-        {
-            if (!Active.has_value())
-                return;
-            if (Active->Ticket.IsValid())
-                (void)Transfer.CancelReadbackBatch(Active->Ticket);
-            Completed = PointCloudConsolidationGpuResult{
-                .Status = PointCloudConsolidationGpuResultStatus::
-                    FallbackRequired,
-                .Snapshot = std::move(Active->Snapshot),
-                .Diagnostic = std::move(diagnostic),
-            };
-            // A recording failure can occur after earlier passes were already
-            // appended to the current frame command buffer. Retain their
-            // leases until module shutdown/device idle instead of releasing
-            // storage that the pending command buffer still references.
-            if (!Active->Resources.Leases.empty())
-            {
-                RetiredResources.push_back(
-                    std::move(Active->Resources));
-            }
-            Active.reset();
+            upload(resources.SourceWeights, sourceWeights.data(), sourceWeights.size() * sizeof(float));
+            upload(resources.ProjectedWeights, projectedWeights.data(), projectedWeights.size() * sizeof(float));
+            upload(resources.Displacements, displacements.data(), displacements.size() * sizeof(float));
+            upload(resources.Diagnostics, &diagnostics, sizeof(diagnostics));
+            upload(resources.State, &state, sizeof(state));
         }
 
         std::shared_ptr<bool> Alive{std::make_shared<bool>(true)};
+        StepRunsService* StepRuns{};
         RHI::IDevice* Device{nullptr};
-        RHI::BufferManager* Buffers{nullptr};
-        Graphics::GpuTransfer Transfer;
+        RHI::BufferManager* Buffers{nullptr}; // the SpatialIndexCache method scratch the last Start found
         LopGpuPipelineSet Pipelines{};
-        // Buffers of completed runs, kept at their capacity for the next run.
-        LopGpuResources Spare{};
-        std::optional<ActiveOperation> Active{};
+        std::shared_ptr<ActiveOperation> Active{};
         std::optional<PointCloudConsolidationGpuResult> Completed{};
         std::vector<LopGpuResources> RetiredResources{};
         std::vector<Graphics::GpuPropertyView> RetiredViews{};
     };
 
-    PointCloudConsolidationGpuState::PointCloudConsolidationGpuState(
-        RHI::IDevice& device,
-        RHI::BufferManager& buffers,
-        RHI::ITransferQueue& transferQueue)
-        : m_Impl(std::make_unique<Impl>(
-              device, buffers, transferQueue))
+    PointCloudConsolidationGpuState::PointCloudConsolidationGpuState(RHI::IDevice& device)
+        : m_Impl(std::make_unique<Impl>(device))
     {
     }
 
@@ -1905,8 +1964,18 @@ namespace Extrinsic::Runtime
 
     bool PointCloudConsolidationGpuState::HasInFlightWork() const noexcept
     {
-        return m_Impl != nullptr && (!m_Impl->RetiredResources.empty() || m_Impl->Completed.has_value() ||
-            (m_Impl->Active && (!m_Impl->Active->Ready || m_Impl->Active->Accepting)));
+        // A run waiting for its user (ready, or resting without a page) has nothing in flight.
+        if (m_Impl == nullptr)
+            return false;
+        const auto& a = m_Impl->Active;
+        return !m_Impl->RetiredResources.empty() || m_Impl->Completed.has_value() ||
+            (a && (a->Accepting || a->Page || (!a->Ready && !a->Resting)));
+    }
+
+    void PointCloudConsolidationGpuState::UseStepRuns(StepRunsService* steps) noexcept
+    {
+        if (m_Impl)
+            m_Impl->StepRuns = steps;
     }
     bool PointCloudConsolidationGpuState::HasPendingRun() const noexcept
     {

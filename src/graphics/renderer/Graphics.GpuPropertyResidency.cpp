@@ -54,6 +54,8 @@ namespace Extrinsic::Graphics
         std::vector<Slot> Retired{}; // released while leased or pending; freed once neither
         GpuPropertyResidencyStats Stats{};
         std::vector<std::byte> Staging{};
+        // Buffers used inside BeginSubmission/EndSubmission; nullopt outside one.
+        std::optional<std::vector<RHI::BufferHandle>> Submission{};
         Impl(RHI::IDevice& device, GpuPropertyResidencyConfig config) : Device(device), Config(std::move(config)) {}
 
         double Now() const
@@ -99,8 +101,14 @@ namespace Extrinsic::Graphics
             return layout;
         }
         bool Reusable(Slot& slot) { return !Leased(slot) && Complete(slot); }
+        void NoteSubmissionUse(const RHI::BufferHandle buffer)
+        {
+            if (Submission)
+                Submission->push_back(buffer);
+        }
         GpuPropertyView Use(Slot& slot)
         {
+            NoteSubmissionUse(slot.View.Buffer);
             slot.LastFrame = Device.GetGlobalFrameNumber();
             slot.LastUse = Now();
             auto view = slot.View;
@@ -333,6 +341,7 @@ namespace Extrinsic::Graphics
 
     void GpuPropertyResidency::NoteUse(const RHI::BufferHandle slot, const std::uint64_t frame)
     {
+        m_Impl->NoteSubmissionUse(slot);
         if (auto* found = m_Impl->FindSlot(slot))
         {
             found->LastFrame = std::max(found->LastFrame.value_or(0u), frame);
@@ -354,6 +363,25 @@ namespace Extrinsic::Graphics
         ++m_Impl->Stats.Readbacks;
         m_Impl->Stats.ReadbackBytes += bytes;
         if (token.IsValid()) found->Readbacks.push_back(token);
+    }
+
+    void GpuPropertyResidency::BeginSubmission()
+    {
+        m_Impl->Submission.emplace();
+    }
+
+    void GpuPropertyResidency::EndSubmission(const RHI::ReadbackToken token)
+    {
+        auto used = std::exchange(m_Impl->Submission, std::nullopt);
+        if (!used || !token.IsValid())
+            return;
+        std::ranges::sort(*used);
+        const auto [last, end] = std::ranges::unique(*used);
+        used->erase(last, end);
+        // Slots released while recording are gone; DestroyBuffer itself waits for the compute lane.
+        for (const auto buffer : *used)
+            if (auto* found = m_Impl->FindSlot(buffer))
+                found->Readbacks.push_back(token);
     }
 
     void GpuPropertyResidency::MarkObserved(const GpuPropertyKey& key)

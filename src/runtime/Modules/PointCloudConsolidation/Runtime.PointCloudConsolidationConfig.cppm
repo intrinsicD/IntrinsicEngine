@@ -10,6 +10,7 @@ module;
 export module Extrinsic.Runtime.PointCloudConsolidationConfig;
 
 export import Extrinsic.Runtime.PointSamplingConfig;
+export import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -24,6 +25,8 @@ export namespace Extrinsic::Runtime
             "intrinsic.runtime.sandbox.point-cloud-consolidation";
     inline constexpr std::uint32_t
         kPointCloudConsolidationConfigSectionSchemaVersion = 1u;
+    // The iteration cap of every consolidation strategy (max_iterations).
+    inline constexpr std::uint32_t kMaxPointCloudConsolidationIterations = 4096u;
 
     enum class PointCloudConsolidationStrategy : std::uint32_t
     {
@@ -66,7 +69,14 @@ export namespace Extrinsic::Runtime
         std::uint32_t MaxSupportNeighbors{4'096u};
         std::uint64_t MaxPredictedContributions{100'000'000u};
         double RepulsionWeight{0.45};
-        std::uint32_t MaxIterations{20u};
+        // ARCH-023: the shared execution options of every backend's step run (one step: one projection
+        // iteration); the cap is every strategy's iteration count (max_iterations). Live preview shows an in-place
+        // output of the same cardinality; other outputs show their result at Accept.
+        StepRunExecution Execution{.IterationCap = 20u,
+            .PreviewEvery = 5u,
+            .PreviewIntervalMs = 0u,
+            .AutoAccept = StepRunAutoAccept::Never,
+            .Start = StepRunStart::Run};
         double ConvergenceTolerance{1.0e-4};
         std::uint32_t TargetPointCount{0u};
         std::uint32_t Seed{42u};
@@ -77,7 +87,6 @@ export namespace Extrinsic::Runtime
         // RUNTIME-289); results report it apart from the consolidation backend.
         PointSamplingBackend InitialBackend{PointSamplingBackend::Cpu};
 
-        std::uint32_t GpuPreviewInterval{5u};
         std::uint32_t GpuQueryBatchSize{4096u};
         std::uint32_t GpuRadiusCapacity{256u};
 

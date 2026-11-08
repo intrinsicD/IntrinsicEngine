@@ -10,43 +10,30 @@ module;
 module Intrinsic.Plugin.CoherentPointDrift;
 
 import Extrinsic.Runtime.PluginContract;
-import Extrinsic.Runtime.StepRuns;
+import Extrinsic.Runtime.StepRunControls;
 import Extrinsic.Runtime.UiHostTypes;
 
 namespace Intrinsic::Plugins::CoherentPointDrift
 {
     namespace
     {
-        // The request being edited and the last refusal; the controls act on the run started last.
+        // The request being edited, the last start refusal and the control row's state; the controls act on the run
+        // started last.
         struct WindowState
         {
             Request Draft{};
             std::string Message{};
+            R::StepRunControlsState Row{};
         };
         WindowState* g_Window{nullptr};
 
+        // The host's shared step-run row (the actions run_control issues), then the objective's curve.
         void Controls(WindowState& state, R::StepRunsService& runs)
         {
+            (void)R::DrawStepRunControls(runs, LastRun(), {}, state.Row);
             const auto run = runs.Observe(LastRun());
-            if (!run) return;
-            ImGui::Text("Run %llu: %s, end %s, step %u", static_cast<unsigned long long>(run->Id),
-                        R::ToString(run->Phase).data(), R::ToString(run->End).data(), run->Steps);
-            if (!run->Diagnostic.empty()) ImGui::TextWrapped("%s", run->Diagnostic.c_str());
-            constexpr struct
-            {
-                const char* Label;
-                R::StepRunAction Action;
-            } kButtons[]{{"Run", R::StepRunAction::Run},   {"Pause", R::StepRunAction::Pause},
-                         {"Step", R::StepRunAction::Step}, {"Stop", R::StepRunAction::Stop},
-                         {"Accept", R::StepRunAction::Accept}, {"Discard", R::StepRunAction::Discard}};
-            for (const auto& button : kButtons)
-            {
-                if (&button != kButtons) ImGui::SameLine();
-                std::string refusal;
-                if (ImGui::Button(button.Label) && !runs.Control(run->Id, button.Action, 1u, refusal))
-                    state.Message = refusal;
-            }
-            if (!run->Metrics) return;
+            if (!run || !run->Metrics)
+                return;
             std::vector<float> objective;
             for (const auto& metric : run->Metrics->Records()) objective.push_back(float(metric.Values[1]));
             if (!objective.empty())
@@ -67,9 +54,7 @@ namespace Intrinsic::Plugins::CoherentPointDrift
             auto& draft = state.Draft;
             ImGui::InputScalar("Source", ImGuiDataType_U32, &draft.Source);
             ImGui::InputScalar("Target", ImGuiDataType_U32, &draft.Target);
-            ImGui::InputScalar("Max iterations", ImGuiDataType_U32, &draft.MaxIterations);
-            ImGui::Checkbox("Accept on convergence", &draft.AcceptOnConvergence);
-            ImGui::Checkbox("Live preview", &draft.Preview);
+            (void)R::DrawStepRunExecutionOptions({}, draft.Execution, kMaxIterations, true);
             if (ImGui::Button("Start"))
             {
                 std::string refusal;

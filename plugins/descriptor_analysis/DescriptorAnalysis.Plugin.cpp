@@ -18,5 +18,9 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
         return true;
     }
 
-    void Shutdown() noexcept { ShutdownWindow(); }
+    void Shutdown() noexcept
+    {
+        ShutdownWindow();
+        ShutdownRuns();
+    }
 }

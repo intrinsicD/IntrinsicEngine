@@ -88,7 +88,8 @@ runs a `Cancel` was accepted for (`RunCancelRequested`, `IsEditorRunCancelReques
 reaping, so a requested cancel is told apart from a stage cancelled because a dependency failed
 (both end in `JobState::Cancelled`). The memory is cleared on detach, and a cancel of an auxiliary
 job (`EditorJobIdentity::Auxiliary`, such as Coherent Point Drift's Vulkan E-step pump) is not a
-run cancel. **View > Jobs** (`view.jobs`, UI-060; `DrawJobsWindow` in `Sandbox.PanelSupport.*`, registered by the shell) lists
+run cancel. A step run retiring the jobs of its ended run (`EditorStepRunJobs`, through the surface's
+`Retire`) is not a cancel request either. **View > Jobs** (`view.jobs`, UI-060; `DrawJobsWindow` in `Sandbox.PanelSupport.*`, registered by the shell) lists
 `GetEditorJobs` rows newest first (job, entity, output, state, the shared `DrawOperationProgress` bar, elapsed,
 requested/resolved backend, diagnostic) and keeps the last 32 finished rows itself (`JobsHistory`), since the runtime
 reaps a job a frame after it ends; it drops them with the scene epoch. Each active row has a Cancel that calls
@@ -593,13 +594,13 @@ then compares captured source rows and coordinates; typed backend gates, failure
 statuses and method-specific diagnostics stay with the callers. Registration's
 transformed target-space acquisition stays separate.
 
-`RadiusRows.cpp` compiles the CPU capture and both pagers once outside either family and preserves
-complete radius support and its explicit lowest-ID limit. Both pagers and the framed
-outlier, bilateral and normal neighborhood stages share `AdvanceGpuRowPages` in
-`RadiusRows.hpp`: one batch cursor for pending/failed/ready states, batch recycling,
-query counts and first-to-last timing. Each caller passes its own per-batch decoder and
-query submission, so radius versus kNN queries, exclusions, capacity caps, source-ID
-decoding and result timing stay method-specific; the shared cursor adds no row checks. Property capture imports
+`RadiusRows.cpp` compiles the CPU capture once outside either family and preserves
+complete radius support and its explicit lowest-ID limit. GPU kNN and radius rows run in a
+worker query session (`SpatialIndexCache::PrepareQuerySession`, stepped by the run's
+worker; ARCH-023). The frame-paced `GpuRowPages`/`AdvanceGpuRowPages` cursor is deleted:
+point construction, its last caller, pages its kNN rows through an `Uploads` session, and
+the source rule `RuntimeReuseDriftGuard.GpuNeighbourQueriesUseWorkerQuerySessions` admits
+no frame-paced caller. Property capture imports
 only the leaf point-LBVH algorithm for coordinate validation, without the spatial
 cache service or paging records; `ProcessingCompilationLocality.PropertyCapture`
 guards that compiler boundary. Normal processing uses its dedicated
@@ -665,7 +666,12 @@ line for a GPU transaction's Accept refusal. `DrawGpuTransactionControls` is the
 Stop/Accept/Discard row of a two-phase GPU transaction: families adapt their snapshot to
 `GpuTransactionRowView` (phase, `CanAccept`, the runtime's refusal, counters), Stop is
 enabled only while the run works, Accept only when the runtime allows it, Discard while
-the transaction is live, and the buttons are `##Family`-suffixed. See also
+the transaction is live, and the buttons are `##Family`-suffixed. ARCH-023: a row with a
+step run (`GpuTransactionRowView::StepRuns`/`StepRun`, from `GetEditorStepRuns`) draws the
+runtime's shared `DrawStepRunControls` row instead, whose buttons issue `run_control`'s calls
+(smoothing, point sampling and keypoints use it for either backend). `DrawStepRunExecutionOptions`
+hides the cap row for a method whose cap is its own parameter and the live-preview rows for a path
+without one. See also
 [UI-037](../../tasks/active/UI-037-linear-domain-action-readiness-tooltips.md) and
 [UI-058](../../tasks/done/UI-058-all-reasons-readiness-tooltips.md), which own the
 readiness content. Method- and mesh-processing-panel actions disabled by

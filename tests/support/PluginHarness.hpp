@@ -75,13 +75,12 @@ namespace Intrinsic::Tests::Plugins
                                                  .Startup = std::move(Startup)});
                                              host->RegisterOperations(Registry); // as the agent server does
                                              engine.AddModule(std::move(host));
-                                             auto runs = std::make_unique<R::StepRunsModule>();
-                                             runs->Service().RegisterOperations(Registry);
-                                             engine.AddModule(std::move(runs));
                                              if (moreModules) moreModules(engine);
                                          })
         {
             Engine.Services().Find<R::PluginHostModule>()->UseEditorWorkspace(Shell);
+            // The editing harness composes the step runs; the agent server registers their tools as here.
+            Engine.Services().Find<R::StepRunsService>()->RegisterOperations(Registry);
             Context = {.ConfigControl = Engine.Services().Find<R::EngineConfigControl>(),
                        .Jobs = &Engine.Jobs(),
                        .History = &History()};

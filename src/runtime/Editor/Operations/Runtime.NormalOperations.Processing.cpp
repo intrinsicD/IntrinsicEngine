@@ -1,7 +1,10 @@
 module;
+#include <atomic>
 #include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <string_view>
+#include <atomic>
 #include <functional>
+#include <mutex>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -23,6 +26,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Private.WorkspaceLease;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
@@ -43,6 +47,8 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRunExecution;
+import Extrinsic.Runtime.StepRuns; // the worker-step hooks of Runtime.GpuTransactionLifecycle.hpp
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.VertexNormals;
 import Extrinsic.Graphics.PointNormals;
@@ -54,13 +60,20 @@ import Extrinsic.RHI.TransferQueue;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.OneShotCpuRun.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 #include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
+#include "Services/Runtime.WorkerGpuPages.hpp"
 
 namespace Extrinsic::Runtime
 {
+    template std::shared_ptr<Graphics::PointNormalsWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::PointNormalsWorkspace>();
+    template std::shared_ptr<Graphics::VertexNormalsWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::VertexNormalsWorkspace>();
+
     namespace
     {
         namespace GS = ECS::Components::GeometrySources;
@@ -585,8 +598,24 @@ namespace Extrinsic::Runtime
         std::uint32_t PointFirst{};
         bool StoreRecorded{};
         std::uint32_t Previews{};
+        EditorNormalEstimationResult Initial{}; // the result as queued: a restart's new generation begins here
         std::function<void(EditorNormalEstimationResult)> Sink{};
         std::optional<std::vector<glm::vec3>> TestFront{};
+        // ARCH-023: the step runs on the step run's worker. Its Init (owner) retains the index view (point normals)
+        // and captures what the pages record with (its own workspace references, the views without their leases);
+        // the worker writes only the last page's statistics and its readback bytes, read once the step ended.
+        std::shared_ptr<SpatialGpuIndexLease> IndexView{};
+        struct WorkerView
+        {
+            std::shared_ptr<Graphics::VertexNormalsWorkspace> Workspace{};
+            std::shared_ptr<Graphics::PointNormalsWorkspace> PointWorkspace{};
+            std::shared_ptr<SpatialGpuIndexLease> Index{};
+            Graphics::PointNormalsResidentIo PointIo{};
+            Graphics::VertexNormalsResidentIo MeshIo{};
+            std::vector<std::byte> Stats{};
+            std::uint64_t ReadbackBytes{};
+            std::size_t Batches{};
+        } Worker{};
     };
 
     namespace NormalTransactionDetail
@@ -760,14 +789,6 @@ namespace Extrinsic::Runtime
             if (!v) return {};
             return {.Buffer = v->Buffer, .Address = v->Address};
         }
-        // The frame whose commands touch the run's slots (their reuse waits for it).
-        void NoteUses(const Run& w)
-        {
-            if (!w->Core.Residency || !w->Core.Context.Device) return;
-            const auto frame = w->Core.Context.Device->GetGlobalFrameNumber();
-            for (const auto* view : {&w->Input, &w->Base, &w->Topology, &Ring(w).Back})
-                if (*view) w->Core.Residency->NoteUse((*view)->Buffer, frame);
-        }
         Graphics::VertexNormalsGpuParams Params(const NormalEstimationConfig& c)
         {
             using Weighting = Geometry::HalfedgeMesh::VertexNormals::AveragingMode;
@@ -833,150 +854,198 @@ namespace Extrinsic::Runtime
             }
             return TopologyState::Ready;
         }
-        std::shared_ptr<SpatialGpuResult> FailedResult(std::string why)
-        {
-            auto result = std::make_shared<SpatialGpuResult>();
-            result->State = SpatialQueryState::Failed;
-            result->Diagnostic = std::move(why);
-            return result;
-        }
-        bool Defer(const Run& w)
-        {
-            if (!GP::GpuTransactionDeferralsExhausted(w->Core)) return false;
-            w->Core.Gpu = FailedResult("The GPU property residency refused the run's input, topology or output slot; previous normals retained.");
-            return true;
-        }
         void PublishPreview(const Run& w)
         {
             const bool recorded = std::exchange(w->StoreRecorded, false);
             Ring(w).Back.reset();
             if (recorded && w->Core.Residency && w->Core.Residency->Publish(Ring(w).Key)) ++w->Previews;
         }
-        // Mesh passes share a submission; point normals submit one completion-gated page.
-        void Queue(const Run& w)
+        Graphics::PointNormalsGpuParams PointParams(const NormalEstimationConfig& c)
         {
+            return {.K = std::max(c.KNeighbors, c.MinimumNeighbors),
+                .MinimumNeighbors = c.MinimumNeighbors,
+                .BatchSize = c.GpuQueryBatchSize,
+                .RadiusSearch = c.UseRadiusSearch,
+                .Radius = c.Radius,
+                .Epsilon = c.DegenerateNormalLengthEpsilon,
+                .CollinearRatio = c.CollinearEigenvalueRatioEpsilon,
+                .Fallback = {c.FallbackNormal.x, c.FallbackNormal.y, c.FallbackNormal.z}};
+        }
+        Graphics::GpuPropertyView Stripped(Graphics::GpuPropertyView view)
+        {
+            view.Lease.reset(); // the owner keeps the lease
+            return view;
+        }
+        // The Init (main thread, once the run computes): the canonical inputs, the topology bundle and the output's
+        // write slot, the workspace prepared for this capture and (point normals) the retained index view; then the
+        // immutable recording view.
+        GP::GpuTransactionPrepare Prepare(const Run& w, std::string& why)
+        {
+            using P = GP::GpuTransactionPrepare;
             const auto& ctx = w->Core.Context;
-            auto& gpu = w->Core.Gpu;
+            switch (AcquireSlots(w, why))
+            {
+            case TopologyState::Failed: return P::Failed;
+            case TopologyState::Deferred:
+                if (!GP::GpuTransactionDeferralsExhausted(w->Core))
+                    return P::Pending;
+                why =
+                    "The GPU property residency refused the run's input, topology or output slot; previous normals retained.";
+                return P::Failed;
+            case TopologyState::Ready: break;
+            }
+            auto& worker = w->Worker;
+            const auto& back = Ring(w).Back;
             if (PointNormals(*w->Work))
             {
                 if (!w->PointWorkspace)
                     w->PointWorkspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::PointNormalsWorkspace>();
-                if (!w->PointWorkspace)
+                if (!w->IndexView)
+                    w->IndexView = ctx.SpatialIndices->PrepareGpuIndex(w->Work->GpuIndex, why);
+                if (!w->IndexView)
+                    return P::Failed;
+                const auto& index = w->IndexView->View();
+                const auto refusals = ctx.SpatialIndices->Stats().ScratchRefusals;
+                if (!w->PointWorkspace || !w->PointWorkspace->Prepare(PointParams(w->Work->Config), index.Count))
                 {
-                    gpu = FailedResult("PCA normal device workspace unavailable.");
-                    return;
+                    why = ctx.SpatialIndices->MethodScratchDiagnostic(
+                        refusals, "PCA normal device workspace unavailable.");
+                    return P::Failed;
                 }
-                w->StoreRecorded = true;
-                gpu = ctx.SpatialIndices->QueueGpuCompute(w->Work->GpuIndex, sizeof(Graphics::PointNormalsGpuStats),
-                    [w, workspace = w->PointWorkspace](RHI::ICommandContext& commands, const SpatialGpuIndexView& index) -> RHI::BufferHandle {
-                        if (!Current(w) || !w->Input || !Ring(w).Back) return {};
-                        NoteUses(w);
-                        const auto& c = w->Work->Config;
-                        return workspace->Record(commands,
-                            {.K = std::max(c.KNeighbors, c.MinimumNeighbors), .MinimumNeighbors = c.MinimumNeighbors, .BatchSize = c.GpuQueryBatchSize,
-                             .RadiusSearch = c.UseRadiusSearch, .Radius = c.Radius,
-                             .Epsilon = c.DegenerateNormalLengthEpsilon, .CollinearRatio = c.CollinearEigenvalueRatioEpsilon,
-                             .Fallback = {c.FallbackNormal.x, c.FallbackNormal.y, c.FallbackNormal.z}},
-                            {.Positions = *w->Input, .Output = *Ring(w).Back, .Base = w->Base.value_or(Graphics::GpuPropertyView{}),
-                             .Nodes = index.NodesBDA, .LiveSlots = index.OriginalSlotsBDA, .LiveCount = index.Count}, w->PointFirst);
-                    });
-                ++w->Work->Result.GpuQueryBatches;
-                return;
+                worker.PointWorkspace = w->PointWorkspace;
+                worker.Index = w->IndexView;
+                worker.PointIo = {.Positions = Stripped(*w->Input),
+                    .Output = Stripped(*back),
+                    .Base = w->Base ? Stripped(*w->Base) : Graphics::GpuPropertyView{},
+                    .Nodes = index.NodesBDA,
+                    .LiveSlots = index.OriginalSlotsBDA,
+                    .LiveCount = index.Count};
+                worker.Stats.assign(sizeof(Graphics::PointNormalsGpuStats), std::byte{0});
             }
-            w->Workspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::VertexNormalsWorkspace>();
-            if (!w->Workspace)
+            else
             {
-                gpu = FailedResult("Vertex normal device workspace unavailable.");
-                return;
+                if (!w->Workspace)
+                    w->Workspace = ctx.SpatialIndices->LeaseGpuWorkspace<Graphics::VertexNormalsWorkspace>();
+                const auto refusals = ctx.SpatialIndices->Stats().ScratchRefusals;
+                if (!w->Workspace || !w->Workspace->Prepare(w->Layout))
+                {
+                    why = ctx.SpatialIndices->MethodScratchDiagnostic(
+                        refusals, "Vertex normal device workspace unavailable.");
+                    return P::Failed;
+                }
+                worker.Workspace = w->Workspace;
+                worker.MeshIo = {.Positions = View(w->Input),
+                    .Topology = View(w->Topology),
+                    .Output = View(back),
+                    .Base = View(w->Base),
+                    .OutputBytes = back->Bytes,
+                    .Layout = w->Layout};
+                worker.Stats.assign(std::size_t(Graphics::VertexNormalsWorkspace::StatsReadbackBytes), std::byte{0});
             }
+            worker.ReadbackBytes = 0u;
+            worker.Batches = 0u;
             w->StoreRecorded = true;
-            gpu = ctx.SpatialIndices->QueueGpuCompute(std::size_t(Graphics::VertexNormalsWorkspace::StatsReadbackBytes),
-                [w, workspace = w->Workspace](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
-                    const auto& back = Ring(w).Back;
-                    if (w->Core.Abandoned || !back) return {};
-                    NoteUses(w);
-                    const Graphics::VertexNormalsResidentIo io{.Positions = View(w->Input), .Topology = View(w->Topology),
-                                                               .Output = View(back), .Base = View(w->Base),
-                                                               .OutputBytes = back->Bytes, .Layout = w->Layout};
-                    return workspace->Record(commands, Params(w->Work->Config), io);
-                });
+            return P::Ready;
         }
-        // Main-thread readiness poll of the compute job.
+        // One page of the worker step; empty on success, else why it failed (nothing for an abandoned page).
+        std::string RunPage(
+            EditorNormalTransaction& w, const std::function<RHI::BufferHandle(RHI::ICommandContext&)>& record)
+        {
+            switch (w.Core.Pages->Run(record, w.Worker.Stats))
+            {
+            case WorkerGpuPageStatus::Complete:
+                w.Worker.ReadbackBytes += w.Worker.Stats.size();
+                ++w.Worker.Batches;
+                return {};
+            case WorkerGpuPageStatus::Aborted:  return " ";
+            case WorkerGpuPageStatus::Refused:
+                return "Vulkan normals compute submission refused; previous normals retained.";
+            case WorkerGpuPageStatus::Failed:
+            case WorkerGpuPageStatus::TimedOut: break;
+            }
+            return "Vulkan normals page did not complete: the device was lost.";
+        }
+        // The step run's Step, on a worker: the mesh passes in one page, or every completion-gated PCA page.
+        StepOutcome Step(EditorNormalTransaction& w)
+        {
+            auto& worker = w.Worker;
+            const auto fail = [&w](std::string why)
+            {
+                if (why != " ")
+                    w.Core.WorkerFailure = std::move(why);
+                return StepOutcome::Failed;
+            };
+            if (!PointNormals(*w.Work))
+            {
+                const auto params = Params(w.Work->Config);
+                if (auto why = RunPage(w,
+                        [&](RHI::ICommandContext& commands)
+                        {
+                            return worker.Workspace->Record(commands, params, worker.MeshIo);
+                        });
+                    !why.empty())
+                    return fail(std::move(why));
+                return StepOutcome::Converged;
+            }
+            const auto& c = w.Work->Config;
+            const auto params = PointParams(c);
+            const auto rows =
+                Graphics::PointNormalsWorkspace::RowsPerSubmission(c.UseRadiusSearch, c.GpuQueryBatchSize);
+            for (std::uint32_t first = 0u; first < worker.PointIo.LiveCount; first += rows)
+            {
+                if (auto why = RunPage(w,
+                        [&](RHI::ICommandContext& commands)
+                        {
+                            for (const auto buffer : worker.Index->Barriers())
+                                commands.BufferBarrier(buffer,
+                                    RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferWrite,
+                                    RHI::MemoryAccess::ShaderRead);
+                            return worker.PointWorkspace->Record(commands, params, worker.PointIo, first);
+                        });
+                    !why.empty())
+                    return fail(std::move(why));
+                Graphics::PointNormalsGpuStats stats{};
+                std::memcpy(&stats, worker.Stats.data(), sizeof(stats));
+                if (stats.Overflow)
+                    return fail("Vulkan PCA radius neighborhoods exceed 1024 candidates; use a CPU backend.");
+            }
+            return StepOutcome::Converged;
+        }
+        // The owner's side: once the step completed, its store becomes the preview front.
         bool Poll(const Run& w)
         {
-            auto& gpu = w->Core.Gpu;
-            if (!gpu)
-            {
-                std::string why;
-                switch (AcquireSlots(w, why))
-                {
-                case TopologyState::Failed: gpu = FailedResult(std::move(why)); return true;
-                case TopologyState::Deferred: return Defer(w);
-                case TopologyState::Ready: break;
-                }
-                Queue(w);
+            if (!GP::GpuTransactionStepCompleted(w->Core))
                 return false;
-            }
-            if (gpu->State == SpatialQueryState::Ready && PointNormals(*w->Work) &&
-                w->PointFirst < w->Work->Result.LiveCount)
-            {
-                w->Work->Result.CpuStageReadbackBytes += gpu->Data.size();
-                const auto fail = [&](std::string why) { ReleaseWorkspaces(w); gpu = FailedResult(std::move(why)); };
-                Graphics::PointNormalsGpuStats stats{};
-                if (gpu->Data.size() != sizeof(stats)) fail("Invalid PCA normal diagnostics readback.");
-                else
-                {
-                    std::memcpy(&stats, gpu->Data.data(), sizeof(stats));
-                    if (stats.Overflow) fail("Vulkan PCA radius neighborhoods exceed 1024 candidates; use a CPU backend.");
-                    else
-                    {
-                        const auto& c = w->Work->Config;
-                        w->PointFirst += Graphics::PointNormalsWorkspace::RowsPerSubmission(c.UseRadiusSearch, c.GpuQueryBatchSize);
-                        if (w->PointFirst < w->Work->Result.LiveCount)
-                        {
-                            Queue(w);
-                            return false;
-                        }
-                    }
-                }
-            }
-            if (gpu->State == SpatialQueryState::Ready) PublishPreview(w);
-            return gpu->State == SpatialQueryState::Ready || gpu->State == SpatialQueryState::Failed;
+            PublishPreview(w);
+            return true;
         }
         // The compute job ended: the run either waits for Accept or failed.
+        // The input, base and topology views and the workspaces stay until Accept, Discard or the run's end
+        // (Release), so a restart records again without resolving, uploading or leasing anything.
         void CompleteRun(const Run& w)
         {
-            w->Input.reset();
-            w->Base.reset();
-            w->Topology.reset();
-            ReleaseWorkspaces(w);
             auto& r = w->Work->Result;
-            const auto& gpu = w->Core.Gpu;
-            if (!gpu || gpu->State != SpatialQueryState::Ready)
-            {
-                Finish(w, EditorGpuTransactionPhase::Failed, EditorCommandStatus::GeometryProcessingFailed,
-                       gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic
-                                                            : "Vulkan normals did not return a result; previous normals retained.");
-                return;
-            }
+            // The step's pulled statistics (its last page's): no step runs now.
+            const auto& data = w->Worker.Stats;
             if (w->Previews == 0u)
             {
                 Finish(w, EditorGpuTransactionPhase::Discarded, EditorCommandStatus::StaleEntity,
                        "Vulkan normals published no preview; previous normals retained.");
                 return;
             }
-            if (gpu->Data.size() == sizeof(std::uint32_t) * 3u)
+            if (!PointNormals(*w->Work) && data.size() == sizeof(std::uint32_t) * 3u)
             {
                 std::array<std::uint32_t, 3> stats{};
-                std::memcpy(stats.data(), gpu->Data.data(), sizeof(stats));
+                std::memcpy(stats.data(), data.data(), sizeof(stats));
                 r.ProcessedFaces = stats[0];
                 r.ValidCount = stats[1];
                 r.FallbackCount = stats[2];
             }
-            if (PointNormals(*w->Work) && gpu->Data.size() == sizeof(Graphics::PointNormalsGpuStats))
+            if (PointNormals(*w->Work) && data.size() == sizeof(Graphics::PointNormalsGpuStats))
             {
+                r.GpuQueryBatches = std::exchange(w->Worker.Batches, 0u);
                 Graphics::PointNormalsGpuStats stats{};
-                std::memcpy(&stats, gpu->Data.data(), sizeof(stats));
+                std::memcpy(&stats, data.data(), sizeof(stats));
                 r.ValidCount = stats.Valid;
                 r.FallbackCount = stats.Fallback;
                 r.PointDiagnostics.ValidNormalPointCount = stats.Valid;
@@ -991,7 +1060,7 @@ namespace Extrinsic::Runtime
                 r.PointDiagnostics.FallbackNormalWasRepaired = stats.FallbackRepaired != 0;
             }
             r.ActualBackend = std::string{BackendOf(*w->Work)};
-            if (!PointNormals(*w->Work)) r.CpuStageReadbackBytes += gpu->Data.size();
+            r.CpuStageReadbackBytes += std::exchange(w->Worker.ReadbackBytes, 0u);
             GP::ReadyGpuTransaction(w->Core);
             r.Status = EditorCommandStatus::Pending;
             r.Message = "The GPU normals wait for Accept or Discard.";
@@ -1083,27 +1152,87 @@ namespace Extrinsic::Runtime
             t.RingCount = 1;
             auto* raw = w.get();
             const auto self = [raw] { return raw->shared_from_this(); };
-            t.Hooks = {
-                .Current = [raw] { return CurrentNormalInput(raw->Core.Context, *raw->Work, true); },
-                .Poll = [self] { return Poll(self()); },
-                .CompleteRun = [self] { CompleteRun(self()); },
-                .CompleteAccept = [self] { CompleteAccept(self()); },
-                .Accepting = [raw] {
+            t.Hooks = {.Current =
+                           [raw]
+                {
+                    return CurrentNormalInput(raw->Core.Context, *raw->Work, true);
+                },
+                .Poll =
+                    [self]
+                {
+                    return Poll(self());
+                },
+                .CompleteRun =
+                    [self]
+                {
+                    CompleteRun(self());
+                },
+                .CompleteAccept =
+                    [self]
+                {
+                    CompleteAccept(self());
+                },
+                .Accepting =
+                    [raw]
+                {
                     raw->Work->Result.Status = EditorCommandStatus::Pending;
                     raw->Work->Result.Message = "Reading the GPU normals back.";
                 },
-                .Release = [self] {
+                // A restart records the passes again from the capture: the inputs, topology, workspaces and index view
+                // stay (the capture is current); the Init acquires a fresh write slot; no preview yet, counters as queued.
+                .Restart =
+                    [self](std::string&)
+                {
+                    const auto w = self();
+                    w->PointFirst = 0u;
+                    w->StoreRecorded = false;
+                    w->Previews = 0u;
+                    w->Worker.ReadbackBytes = 0u;
+                    w->Work->Result = w->Initial;
+                    if (w->Topology) // the held bundle: resident, nothing uploaded again
+                    {
+                        w->Work->Result.GpuTopologyBytes = w->Layout.Bytes();
+                        w->Work->Result.GpuTopologyReused = true;
+                    }
+                    return true;
+                },
+                .Prepare =
+                    [self](std::string& diagnostic)
+                {
+                    return Prepare(self(), diagnostic);
+                },
+                .Step =
+                    [raw](StepRunMetric&)
+                {
+                    return Step(*raw);
+                },
+                .Uses =
+                    [raw](std::vector<RHI::BufferHandle>& buffers)
+                {
+                    for (const auto* view : {&raw->Input, &raw->Base, &raw->Topology})
+                        if (*view)
+                            buffers.push_back((*view)->Buffer);
+                },
+                .Release =
+                    [self]
+                {
                     const auto w = self();
                     w->Input.reset();
                     w->Base.reset();
                     w->Topology.reset();
                     ReleaseWorkspaces(w);
+                    w->IndexView.reset();
+                    w->Worker = {}; // no step runs any more (the core waits for that)
                 },
-                .Deliver = [raw](const EditorCommandStatus status, std::string message) {
+                .Deliver =
+                    [raw](const EditorCommandStatus status, std::string message)
+                {
                     auto& r = raw->Work->Result;
                     r.Status = status;
                     r.Message = std::move(message);
-                    if (auto sink = std::move(raw->Sink)) sink(r);
+                    r.StepRun = raw->Core.StepRun;
+                    if (auto sink = std::move(raw->Sink))
+                        sink(r);
                 }};
             return w;
         }
@@ -1123,9 +1252,11 @@ namespace Extrinsic::Runtime
         }
         // Builds the run from the capture and queues its compute job. Null with `result` filled
         // (a rejection) when the request cannot run.
-        Run StartVulkan(const EditorProcessingContext& context, const std::shared_ptr<NormalWork>& work,
-                        EditorNormalEstimationResult& result, std::function<void(EditorNormalEstimationResult)> onComplete,
-                        const bool autoAccept)
+        Run StartVulkan(const EditorProcessingContext& context,
+            const std::shared_ptr<NormalWork>& work,
+            EditorNormalEstimationResult& result,
+            std::function<void(EditorNormalEstimationResult)> onComplete,
+            const StepRunExecution& execution)
         {
             const auto fail = [&](const EditorCommandStatus status, std::string message) {
                 result.Status = status;
@@ -1139,27 +1270,39 @@ namespace Extrinsic::Runtime
             if (PointNormals(*work))
             {
                 std::string why;
-                if (GP::AcquirePointIndex(*context.SpatialIndices, context.World, work->Entity, c.Positions,
-                        work->Slots, work->Points, work->GpuIndex, work->Index, work->Result.IndexReused, why)
-                    != GP::PointIndexState::Ready)
+                if (GP::AcquirePointIndex(*context.SpatialIndices,
+                        context.World,
+                        work->Entity,
+                        c.Positions,
+                        work->Slots,
+                        work->Points,
+                        work->GpuIndex,
+                        work->Index,
+                        work->Result.IndexReused,
+                        why,
+                        false) != GP::PointIndexState::Ready)
                     return fail(EditorCommandStatus::InvalidProcessingParameters, why);
             }
-            w->Core.AutoAccept = autoAccept;
+            w->Core.Execution = OneShotExecution(execution);
             w->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
             result = work->Result;
             result.Status = EditorCommandStatus::Pending;
             result.Message = "Vulkan normals queued.";
             work->Result = result;
+            w->Initial = result;
+            w->Core.Pages = std::make_shared<WorkerGpuPages>(*context.Device); // the passes run on the step's worker
             if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Vulkan normals").IsValid())
                 return fail(EditorCommandStatus::GeometryProcessingFailed, GP::MeshSupport::QueuedJobRejectedMessage(w->Core.JobLabel));
             return w;
         }
     } // namespace NormalTransactionDetail
 
-    EditorNormalTransactionHandle StartEditorNormalEstimationTransaction(
-        const EditorProcessingCommands& commands, const NormalEstimationConfig& config, EditorNormalEstimationResult& failure)
+    EditorNormalTransactionHandle StartEditorNormalEstimationTransaction(const EditorProcessingCommands& commands,
+        const NormalEstimationConfig& config,
+        EditorNormalEstimationResult& failure)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        const auto& execution = config.Execution;
         failure = {.Method = config.Method, .RequestedBackend = config.Backend, .Output = config.Output};
         failure.Status = EditorCommandStatus::InvalidProcessingParameters;
         if (config.Backend != NormalEstimationBackend::Vulkan && config.Backend != NormalEstimationBackend::VulkanLBVH)
@@ -1174,7 +1317,7 @@ namespace Extrinsic::Runtime
             failure.Message = diagnostic;
             return {};
         }
-        return NormalTransactionDetail::StartVulkan(context, work, failure, {}, false);
+        return NormalTransactionDetail::StartVulkan(context, work, failure, {}, execution);
     }
 
     EditorNormalTransactionSnapshot SnapshotEditorNormalEstimation(const EditorProcessingCommands&,
@@ -1184,8 +1327,9 @@ namespace Extrinsic::Runtime
         if (!run) return snapshot;
         snapshot.Phase = run->Core.Phase;
         snapshot.Previews = run->Previews;
-        snapshot.DeviceWorkQueued = run->Core.Gpu != nullptr;
+        snapshot.DeviceWorkQueued = run->Core.Gpu != nullptr || run->Core.Prepared; // a worker step's Init done
         snapshot.Result = run->Work->Result;
+        snapshot.Result.StepRun = run->Core.StepRun;
         if (run->Core.Phase == EditorGpuTransactionPhase::ReadyToAccept)
         {
             snapshot.Stale = !NormalTransactionDetail::Current(run);
@@ -1292,85 +1436,159 @@ namespace Extrinsic::Runtime
         const auto work = CaptureNormalWork(context, config, diagnostic, CapturePurpose::Readiness);
         return {bool(work), std::move(diagnostic)};
     }
-    EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(
-        const EditorProcessingCommands &commands, const NormalEstimationConfig &config,
+    namespace
+    {
+        // Apply's run (a batch) or a start's (`config.Execution`): Vulkan as its transaction (whose step run keeps it
+        // until it ends), the CPU backends as a one-shot worker step run of the session's service; without that
+        // service (or without a job lane) only a batch runs, as one queued job (or inline).
+        EditorNormalEstimationResult RunNormalEstimation(const EditorProcessingCommands& commands,
+            const NormalEstimationConfig& config,
+            std::function<void(EditorNormalEstimationResult)> onComplete,
+            const StepRunExecution& execution)
+        {
+            const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+            std::string diagnostic;
+            auto w = CaptureNormalWork(context,
+                config,
+                diagnostic,
+                config.Backend == NormalEstimationBackend::Vulkan ? CapturePurpose::ExecuteResident
+                                                                  : CapturePurpose::Execute);
+            const auto report = [&config, &w](EditorCommandStatus status, std::string message)
+            {
+                auto result = w
+                    ? w->Result
+                    : EditorNormalEstimationResult{
+                          .Method = config.Method, .RequestedBackend = config.Backend, .Output = config.Output};
+                result.Status = status;
+                result.Message = std::move(message);
+                return result;
+            };
+            if (!w)
+                return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
+            if (w->Config.Backend == NormalEstimationBackend::Vulkan ||
+                w->Config.Backend == NormalEstimationBackend::VulkanLBVH)
+            {
+                auto pending = w->Result;
+                const auto run =
+                    NormalTransactionDetail::StartVulkan(context, w, pending, std::move(onComplete), execution);
+                if (run)
+                    pending.StepRun = run->Core.StepRun;
+                return pending;
+            }
+            const bool batch = execution.Start == StepRunStart::Run && execution.AutoAccept != StepRunAutoAccept::Never;
+            if (!batch && (!context.StepRuns || !context.JobCommands.Available()))
+                return report(EditorCommandStatus::InvalidProcessingParameters,
+                    "Normal estimation needs the step-run service and a job lane for its run controls; none is "
+                    "composed.");
+            if (w->Config.Method == NormalEstimationMethod::PointSetPCA &&
+                w->Config.Backend != NormalEstimationBackend::CpuKDTree)
+            {
+                const auto indexState = GeometryProcessingDetail::AcquirePointIndex(*context.SpatialIndices,
+                    context.World,
+                    w->Entity,
+                    w->Config.Positions,
+                    w->Slots,
+                    w->Points,
+                    w->GpuIndex,
+                    w->Index,
+                    w->Result.IndexReused,
+                    diagnostic);
+                if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
+                    return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
+                if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
+                    return report(
+                        EditorCommandStatus::StaleEntity, "Normal index snapshot does not match the selected samples.");
+            }
+            if (!context.JobCommands.Available())
+            {
+                ComputeNormals(*w);
+                return PublishNormals(context, w);
+            }
+            const EditorJobIdentity identity{.EntityId = config.StableEntityId,
+                .Scope = ToEditorJobScope(w->Config.Output.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::Normal,
+                .OutputName = w->Config.Output.Name,
+                .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
+            namespace MS = GeometryProcessingDetail::MeshSupport;
+            if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Normal estimation"))
+                return report(EditorCommandStatus::Pending, std::move(busy->Message));
+            auto queued = w->Result;
+            queued.Message = "Normal estimation queued.";
+            const MS::QueuedJobDelivery<EditorNormalEstimationResult> delivery{
+                context, std::move(onComplete), std::move(queued), "Normal estimation"};
+            if (context.StepRuns)
+                return MS::StartOneShotCpuRun<NormalWork, EditorNormalEstimationResult>(
+                    context,
+                    {.Label = "Normal estimation",
+                        .Owner = "Runtime.NormalEstimation",
+                        .Identity = identity,
+                        .Execution = execution},
+                    w,
+                    [](NormalWork& work)
+                    {
+                        ComputeNormals(work);
+                    },
+                    [context](const NormalWork& work)
+                    {
+                        return CurrentNormalInput(context, work, true);
+                    },
+                    [context](const std::shared_ptr<NormalWork>& work)
+                    {
+                        return PublishNormals(context, work);
+                    },
+                    delivery);
+            JobDesc desc{.DebugName = "Normal estimation",
+                .Scope = context.World,
+                .Work = [w](const JobCancellation&) -> JobResultEnvelope
+                {
+                    ComputeNormals(*w);
+                    return JobResultEnvelope::Make(true);
+                },
+                .ValidateBeforeApply =
+                    [context, w]
+                {
+                    return MS::ValidateQueuedJob(w->Abandoned, CurrentNormalInput(context, *w, true));
+                },
+                .PublishCompletion =
+                    [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
+                {
+                    return delivery.Publish(PublishNormals(context, w));
+                },
+                .FinalizeUnpublishedOnMainThread =
+                    [w, delivery]
+                {
+                    w->Abandoned = true;
+                    delivery.FinalizeAfterWorker(w->Result);
+                }};
+            if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
+            {
+                w->Abandoned = true;
+                return delivery.Rejected();
+            }
+            return delivery.Pending();
+        }
+    }
+    EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(const EditorProcessingCommands& commands,
+        const NormalEstimationConfig& config,
         std::function<void(EditorNormalEstimationResult)> onComplete)
     {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string diagnostic;
-        auto w = CaptureNormalWork(context, config, diagnostic,
-                                   config.Backend == NormalEstimationBackend::Vulkan ? CapturePurpose::ExecuteResident
-                                                                                      : CapturePurpose::Execute);
-        const auto report = [&config, &w](EditorCommandStatus status, std::string message) {
-            auto result = w ? w->Result
-                            : EditorNormalEstimationResult{.Method = config.Method,
-                                                           .RequestedBackend = config.Backend,
-                                                           .Output = config.Output};
-            result.Status = status;
-            result.Message = std::move(message);
-            return result;
-        };
-        if (!w)
-            return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
-        if (w->Config.Backend == NormalEstimationBackend::Vulkan || w->Config.Backend == NormalEstimationBackend::VulkanLBVH)
-        {
-            // Batch and agent callers accept automatically when the device finishes.
-            auto pending = w->Result;
-            (void)NormalTransactionDetail::StartVulkan(context, w, pending, std::move(onComplete), true);
-            return pending;
-        }
-        if (w->Config.Method == NormalEstimationMethod::PointSetPCA &&
-            w->Config.Backend != NormalEstimationBackend::CpuKDTree)
-        {
-            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
-                *context.SpatialIndices, context.World, w->Entity, w->Config.Positions,
-                w->Slots, w->Points, w->GpuIndex, w->Index, w->Result.IndexReused, diagnostic);
-            if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
-                return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
-            if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
-                return report(EditorCommandStatus::StaleEntity,
-                              "Normal index snapshot does not match the selected samples.");
-        }
-        if (!context.JobCommands.Available())
-        {
-            ComputeNormals(*w);
-            return PublishNormals(context, w);
-        }
-        const EditorJobIdentity identity{.EntityId = config.StableEntityId,
-                                         .Scope = ToEditorJobScope(w->Config.Output.Domain),
-                                         .OutputSemantic = GeometryPresentationSlotSemantic::Normal,
-                                         .OutputName = w->Config.Output.Name,
-                                         .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
-        namespace MS = GeometryProcessingDetail::MeshSupport;
-        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Normal estimation"))
-            return report(EditorCommandStatus::Pending, std::move(busy->Message));
-        auto queued = w->Result;
-        queued.Message = "Normal estimation queued.";
-        const MS::QueuedJobDelivery<EditorNormalEstimationResult> delivery{
-            context, std::move(onComplete), std::move(queued), "Normal estimation"};
-        JobDesc desc{
-            .DebugName = "Normal estimation",
-            .Scope = context.World,
-            .Work = [w](const JobCancellation &) -> JobResultEnvelope {
-                ComputeNormals(*w);
-                return JobResultEnvelope::Make(true);
-            },
-            .ValidateBeforeApply = [context, w] {
-                return MS::ValidateQueuedJob(w->Abandoned, CurrentNormalInput(context, *w, true));
-            },
-            .PublishCompletion = [context, w, delivery](KernelEventBus &, const JobResultEnvelope &) {
-                return delivery.Publish(PublishNormals(context, w));
-            },
-            .FinalizeUnpublishedOnMainThread = [w, delivery] {
-                w->Abandoned = true;
-                delivery.FinalizeAfterWorker(w->Result);
-            }};
-        if (!context.JobCommands.Submit(std::move(desc), identity).IsValid())
-        {
-            w->Abandoned = true;
-            return delivery.Rejected();
-        }
-        return delivery.Pending();
+        // A batch: the device or the worker computes at once and the result is accepted at its end.
+        return RunNormalEstimation(commands, config, std::move(onComplete), kOneShotBatchExecution);
+    }
+    EditorNormalEstimationResult StartEditorNormalEstimationRun(const EditorProcessingCommands& commands,
+        const NormalEstimationConfig& config,
+        std::function<void(EditorNormalEstimationResult)> onComplete)
+    {
+        return RunNormalEstimation(commands, config, std::move(onComplete), config.Execution);
+    }
+    EditorNormalEstimationResult StartEditorConfiguredNormalEstimation(
+        const EditorProcessingCommands& commands, std::function<void(EditorNormalEstimationResult)> onComplete)
+    {
+        const auto config = GetEditorNormalEstimationConfig(commands);
+        if (!config)
+            return {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                .Message = "Normal estimation config is unavailable."};
+        return StartEditorNormalEstimationRun(commands, *config, std::move(onComplete));
     }
     EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(
         const EditorProcessingCommands &commands, std::function<void(EditorNormalEstimationResult)> onComplete)

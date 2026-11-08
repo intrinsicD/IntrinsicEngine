@@ -220,7 +220,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
 
     Runtime::ClusteringConfig clustering{};
     clustering.Parameters.ClusterCount = 13u;
-    clustering.Parameters.MaxIterations = 77u;
+    clustering.Parameters.Execution.IterationCap = 77u;
     clustering.Parameters.Seed = 0xf1234567u;
     clustering.Parameters.Initialization =
         Runtime::KMeansInitialization::Random;
@@ -289,7 +289,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         Runtime::GetClusteringConfig(boot.Config);
     ASSERT_TRUE(bootClustering.has_value());
     EXPECT_EQ(bootClustering->Parameters.ClusterCount, 13u);
-    EXPECT_EQ(bootClustering->Parameters.MaxIterations, 77u);
+    EXPECT_EQ(bootClustering->Parameters.Execution.IterationCap, 77u);
     EXPECT_EQ(bootClustering->Parameters.Seed, 0xf1234567u);
     EXPECT_EQ(
         bootClustering->Parameters.Initialization,
@@ -366,7 +366,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     auto liveClustering = Runtime::GetClusteringConfig(candidate);
     ASSERT_TRUE(liveClustering.has_value());
     liveClustering->Parameters.ClusterCount = 5u;
-    liveClustering->Parameters.MaxIterations = 19u;
+    liveClustering->Parameters.Execution.IterationCap = 19u;
     liveClustering->Parameters.Seed = 0xffffffffu;
     liveClustering->Parameters.Initialization =
         Runtime::KMeansInitialization::Hierarchical;
@@ -397,7 +397,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     ASSERT_TRUE(livePointCloudConsolidation.has_value());
     livePointCloudConsolidation->Strategy =
         Runtime::PointCloudConsolidationStrategy::Wlop;
-    livePointCloudConsolidation->MaxIterations = 31u;
+    livePointCloudConsolidation->Execution.IterationCap = 31u;
     livePointCloudConsolidation->Seed = 0xfedcba98u;
     Runtime::SetPointCloudConsolidationConfig(
         candidate,
@@ -471,7 +471,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_EQ(
         activePointCloudConsolidation->Strategy,
         Runtime::PointCloudConsolidationStrategy::Wlop);
-    EXPECT_EQ(activePointCloudConsolidation->MaxIterations, 31u);
+    EXPECT_EQ(activePointCloudConsolidation->Execution.IterationCap, 31u);
     EXPECT_EQ(activePointCloudConsolidation->Seed, 0xfedcba98u);
     const auto activePhysics =
         Runtime::GetPhysicsModuleConfig(engine.GetEngineConfig());
@@ -491,7 +491,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
               Runtime::GeometryElementDomain::MeshVertex);
     EXPECT_EQ(command.Properties.OutputLabels.Name, "v:configured_cluster");
     EXPECT_EQ(command.Parameters.ClusterCount, 5u);
-    EXPECT_EQ(command.Parameters.MaxIterations, 19u);
+    EXPECT_EQ(command.Parameters.Execution.IterationCap, 19u);
     EXPECT_EQ(command.Parameters.Seed, 0xffffffffu);
     EXPECT_EQ(command.Parameters.Initialization,
               Runtime::KMeansInitialization::Hierarchical);
@@ -1094,7 +1094,7 @@ TEST(SandboxConfigSections,
 
     Runtime::ClusteringConfig repaired{};
     repaired.Parameters.ClusterCount = 6u;
-    repaired.Parameters.MaxIterations = 44u;
+    repaired.Parameters.Execution.IterationCap = 44u;
     Runtime::SetClusteringConfig(config, repaired);
 
     ASSERT_EQ(config.AppSections.size(), 3u);
@@ -1122,7 +1122,7 @@ TEST(SandboxConfigSections,
     const auto decoded = Runtime::GetClusteringConfig(config);
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Parameters.ClusterCount, 6u);
-    EXPECT_EQ(decoded->Parameters.MaxIterations, 44u);
+    EXPECT_EQ(decoded->Parameters.Execution.IterationCap, 44u);
 }
 
 TEST(SandboxConfigSections, ConfigParsingPreservesStrictAndFallbackFailurePolicy)
@@ -1355,9 +1355,16 @@ TEST(SandboxConfigSections, PointConfigSectionsShareRegistrationSetAndGetContrac
         MakeNormalEstimationConfigSectionRegistration, SetNormalEstimationConfig, GetNormalEstimationConfig,
         ZeroGpuQueryBatch<NormalEstimationConfig>);
     ExpectPointConfigSectionContract<RegistrationConfig>(kRegistrationConfigSectionName,
-        kRegistrationConfigSectionSchemaId, SerializeRegistrationConfig, ValidateRegistrationConfigSection,
-        MakeRegistrationConfigSectionRegistration, SetRegistrationConfig, GetRegistrationConfig,
-        [](RegistrationConfig& config) { config.MaxIterations = 0u; });
+        kRegistrationConfigSectionSchemaId,
+        SerializeRegistrationConfig,
+        ValidateRegistrationConfigSection,
+        MakeRegistrationConfigSectionRegistration,
+        SetRegistrationConfig,
+        GetRegistrationConfig,
+        [](RegistrationConfig& config)
+        {
+            config.Execution.IterationCap = 0u;
+        });
 }
 
 TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
@@ -2101,7 +2108,7 @@ TEST(SandboxConfigSections, RegistrationPropertyValidationPreservesDiagnosticCat
            "source_positions requires domain, name and kind=vec3.");
     reject(R"({"target_positions":null,"target_normals":null})",
            "target_positions requires domain, name and kind=vec3.");
-    reject(R"({"max_iterations":0,"source_positions":null})", "max_iterations must be positive.");
+    reject(R"({"max_iterations":0,"source_positions":null})", "max_iterations: max_iterations must be 1 to 1e+05.");
 }
 
 TEST(SandboxConfigSections, Vec3PropertyValidationPreservesFamilyRules)

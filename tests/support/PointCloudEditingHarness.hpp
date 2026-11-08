@@ -16,6 +16,7 @@
 #include "PointDomainFixture.hpp"
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -67,6 +68,7 @@ namespace Intrinsic::Tests::PointCloudEditing
             Engine.EmplaceModule<R::SceneDocumentModule>();
             Engine.EmplaceModule<R::SpatialIndexCache>();
             Engine.EmplaceModule<R::PointCloudEditingModule>();
+            Engine.EmplaceModule<R::StepRunsModule>(); // as the Sandbox: GPU transactions are refused without it
             if (addModules) addModules(Engine);
             Engine.Initialize();
             Shell.Attach(Engine.Worlds(), Engine.Services());

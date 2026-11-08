@@ -95,6 +95,10 @@ namespace Extrinsic::Runtime
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         return context.JobCommands.SceneEpoch ? context.JobCommands.SceneEpoch() : 0u;
     }
+    StepRunsService* GetEditorStepRuns(const EditorProcessingCommands& commands) noexcept
+    {
+        return EditorProcessingCommandsAccess::Resolve(commands).StepRuns;
+    }
     std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands& commands)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);

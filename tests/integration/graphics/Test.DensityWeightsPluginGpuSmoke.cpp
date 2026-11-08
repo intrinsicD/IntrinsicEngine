@@ -34,6 +34,7 @@ import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.RHI.BufferManager;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.PointCloud.Kernels;
@@ -116,6 +117,16 @@ namespace
 
     // Phases 0 (cold) and 1 (warm): LOP theta, direct; 2-5: Gaussian and Wendland C2, direct and reciprocal; 6: LOP
     // theta reciprocal; 7: an automatic radius.
+    // A run that computes at once and accepts at its end (`accept`, a batch) or waits for Accept or Discard (the
+    // section's auto_accept and start rows).
+    DW::Config Running(DW::Config config, const bool accept)
+    {
+        config.Execution =
+            R::OneShotExecution({.AutoAccept = accept ? R::StepRunAutoAccept::End : R::StepRunAutoAccept::Never,
+                .Start = R::StepRunStart::Run});
+        return config;
+    }
+
     DW::Config Settings(const entt::entity entity, const D domain, const B backend, const unsigned phase)
     {
         DW::Config c{.StableEntityId = R::SelectionController::ToStableEntityId(entity),
@@ -176,7 +187,7 @@ TEST(DensityWeightsPluginGpuSmoke, EightDomainsEveryKernelAndModeAndAnAutomaticR
             for (unsigned d = 1; d <= 8; ++d)
             {
                 Fill(Props(scene, entities[d - 1], D(d)));
-                references.push_back(DW::Start(Settings(entities[d - 1], D(d), B::CpuKDTree, phase), false));
+                references.push_back(DW::Start(Running(Settings(entities[d - 1], D(d), B::CpuKDTree, phase), true)));
             }
             return false;
         }
@@ -193,7 +204,7 @@ TEST(DensityWeightsPluginGpuSmoke, EightDomainsEveryKernelAndModeAndAnAutomaticR
             }
             started = std::chrono::steady_clock::now();
             for (unsigned d = 1; d <= 8; ++d)
-                vulkan.push_back(DW::Start(Settings(entities[d - 1], D(d), B::VulkanLBVH, phase), true));
+                vulkan.push_back(DW::Start(Running(Settings(entities[d - 1], D(d), B::VulkanLBVH, phase), true)));
             return false;
         }
         if (!AllFinal(vulkan)) return false;
@@ -279,74 +290,87 @@ TEST(DensityWeightsPluginGpuSmoke, AcceptDiscardStaleCancelAndARadiusOverflow)
     auto& cache = *gpu.H->Engine.Services().Find<R::SpatialIndexCache>();
     std::uint64_t submittedBefore = 0;
     std::size_t undoBefore = 0;
-    ASSERT_TRUE(gpu.Run([&]
-    {
-        if (!discarded) discarded = DW::Start(config, false);
-        DW::Refresh(*discarded);
-        if (!discarded->Final)
+    ASSERT_TRUE(gpu.Run(
+        [&]
         {
-            const auto state = discarded->Analysis.Poll();
-            if (state.Phase != R::ScalarAnalysisPhase::ReadyToAccept) return false;
-            previewSeen = state.CanAccept && HasRing(*gpu.H, cloud, config.Weights) &&
-                std::as_const(props).Get<float>("weights")[0] == 77.f;
-            undoBefore = gpu.H->History().UndoCount();
-            (void)DW::Cancel(*discarded); // the window's Discard
-            return false;
-        }
-        if (!accepted) accepted = DW::Start(config, false);
-        DW::Refresh(*accepted);
-        if (!accepted->Final)
-        {
-            if (accepted->Analysis.Poll().Phase == R::ScalarAnalysisPhase::ReadyToAccept) DW::Accept(*accepted);
-            return false;
-        }
-        if (!stale)
-        {
-            Fill(props);
-            stale = DW::Start(config, true);
-            props.Get<glm::vec3>("samples")[0].x += .1f; // before any GPU recording
-        }
-        DW::Refresh(*stale);
-        if (!stale->Final) return false;
-        if (!cancelled)
-        {
-            staleKept = std::as_const(props).Get<float>("weights")[0] == 77.f;
-            props.Get<glm::vec3>("samples")[0].x -= .1f;
-            submittedBefore = cache.Stats().GpuComputeSubmissions;
-            cancelled = DW::Start(config, true);
-        }
-        if (!cancelRequested)
-        {
-            // Only after this run's compute reached the device and before its result is read.
-            DW::Refresh(*cancelled);
-            if (cancelled->Final) return true; // it ended before its cancel: reported below
-            if (cache.Stats().GpuComputeSubmissions != submittedBefore + 1u ||
-                cancelled->Analysis.Poll().Phase != R::ScalarAnalysisPhase::Running)
+            if (!discarded)
+                discarded = DW::Start(Running(config, false));
+            DW::Refresh(*discarded);
+            if (!discarded->Final)
+            {
+                const auto state = discarded->Analysis.Poll();
+                if (state.Phase != R::ScalarAnalysisPhase::ReadyToAccept)
+                    return false;
+                previewSeen = state.CanAccept && HasRing(*gpu.H, cloud, config.Weights) &&
+                    std::as_const(props).Get<float>("weights")[0] == 77.f;
+                undoBefore = gpu.H->History().UndoCount();
+                (void)DW::Cancel(*discarded); // the window's Discard
                 return false;
-            const auto jobs = gpu.H->Jobs();
-            const auto row = std::ranges::find_if(jobs, [&](const auto& job)
-            { return job.Identity.OutputName == "weights" && job.State == R::JobState::AwaitingApply; });
-            if (row == jobs.end()) return false;
-            const auto commands = R::PrepareEditorProcessingCommands(gpu.H->Shell);
-            cancelRequested = R::CancelEditorJobRun(commands, *row) == R::EditorJobCancelStatus::Requested;
-            return false;
-        }
-        DW::Refresh(*cancelled);
-        if (!cancelled->Final) return false;
-        if (!overflow)
-        {
-            cancelKept = std::as_const(props).Get<float>("weights")[0] == 77.f;
-            props.Resize(1030);
-            props.Get<glm::vec3>("samples").Vector().assign(1030, glm::vec3(0));
-            props.Get<bool>("v:deleted").Vector().assign(1030, false);
-            Fill(props);
-            auto c = config;
-            c.GpuRadiusCapacity = 1024;
-            overflow = DW::Start(c, true);
-        }
-        DW::Refresh(*overflow);
-        return overflow->Final.has_value();
-    })) << "the frames ran out";
+            }
+            if (!accepted)
+                accepted = DW::Start(Running(config, false));
+            DW::Refresh(*accepted);
+            if (!accepted->Final)
+            {
+                if (accepted->Analysis.Poll().Phase == R::ScalarAnalysisPhase::ReadyToAccept)
+                    DW::Accept(*accepted);
+                return false;
+            }
+            if (!stale)
+            {
+                Fill(props);
+                stale = DW::Start(Running(config, true));
+                props.Get<glm::vec3>("samples")[0].x += .1f; // before any GPU recording
+            }
+            DW::Refresh(*stale);
+            if (!stale->Final)
+                return false;
+            if (!cancelled)
+            {
+                staleKept = std::as_const(props).Get<float>("weights")[0] == 77.f;
+                props.Get<glm::vec3>("samples")[0].x -= .1f;
+                submittedBefore = cache.Stats().GpuComputeSubmissions;
+                cancelled = DW::Start(Running(config, true));
+            }
+            if (!cancelRequested)
+            {
+                // Only after this run's compute reached the device and before its result is read.
+                DW::Refresh(*cancelled);
+                if (cancelled->Final)
+                    return true; // it ended before its cancel: reported below
+                if (cache.Stats().GpuComputeSubmissions != submittedBefore + 1u ||
+                    cancelled->Analysis.Poll().Phase != R::ScalarAnalysisPhase::Running)
+                    return false;
+                const auto jobs = gpu.H->Jobs();
+                const auto row = std::ranges::find_if(jobs,
+                    [&](const auto& job)
+                    {
+                        return job.Identity.OutputName == "weights" && job.State == R::JobState::AwaitingApply;
+                    });
+                if (row == jobs.end())
+                    return false;
+                const auto commands = R::PrepareEditorProcessingCommands(gpu.H->Shell);
+                cancelRequested = R::CancelEditorJobRun(commands, *row) == R::EditorJobCancelStatus::Requested;
+                return false;
+            }
+            DW::Refresh(*cancelled);
+            if (!cancelled->Final)
+                return false;
+            if (!overflow)
+            {
+                cancelKept = std::as_const(props).Get<float>("weights")[0] == 77.f;
+                props.Resize(1030);
+                props.Get<glm::vec3>("samples").Vector().assign(1030, glm::vec3(0));
+                props.Get<bool>("v:deleted").Vector().assign(1030, false);
+                Fill(props);
+                auto c = config;
+                c.GpuRadiusCapacity = 1024;
+                overflow = DW::Start(Running(c, true));
+            }
+            DW::Refresh(*overflow);
+            return overflow->Final.has_value();
+        }))
+        << "the frames ran out";
     EXPECT_TRUE(previewSeen) << "the preview was resident and the output unchanged";
     ASSERT_TRUE(discarded->Final);
     EXPECT_EQ(discarded->Final->Status, "discarded") << discarded->Final->Message;
@@ -425,7 +449,8 @@ TEST(DensityWeightsPluginGpuSmoke, TinySupportsAndOneSampleMatchTheCpuReference)
             refusals.push_back(DW::Preview(far));
             return false;
         }
-        if (!run) run = DW::Start(config, true);
+        if (!run)
+            run = DW::Start(Running(config, true));
         DW::Refresh(*run);
         if (!run->Final) return false;
         EXPECT_EQ(run->Final->Status, "applied") << run->Final->Message;
@@ -471,7 +496,7 @@ TEST(DensityWeightsPluginGpuSmoke, ARejectedSubmissionFailsAndWritesNothing)
     {
         if (DW::Preview(config).starts_with("Checking")) return false; // the input validation settles first
         gpu.H->Engine.Jobs().CancelAndDrain();
-        run = DW::Start(config, true);
+        run = DW::Start(Running(config, true));
         gpu.H->Engine.Jobs().ResumeSubmissions();
         return true;
     })) << "the frames ran out";
@@ -501,7 +526,8 @@ TEST(DensityWeightsPluginGpuSmoke, AnUnloadReleasesAWaitingPreviewWithoutWriting
     {
         if (!ready)
         {
-            if (waiting.expired()) waiting = DW::Start(config, false);
+            if (waiting.expired())
+                waiting = DW::Start(Running(config, false));
             const auto run = waiting.lock();
             if (!run || run->Final) return true; // reported below
             ready = run->Analysis.Poll().Phase == R::ScalarAnalysisPhase::ReadyToAccept;
@@ -522,5 +548,145 @@ TEST(DensityWeightsPluginGpuSmoke, AnUnloadReleasesAWaitingPreviewWithoutWriting
     EXPECT_TRUE(waiting.expired()) << "the plugin's runs went with it";
     EXPECT_FALSE(HasRing(*gpu.H, cloud, config.Weights)) << "the preview was released";
     EXPECT_FALSE(props.Exists("weights"));
+    EXPECT_FALSE(gpu.H->History().CanUndo());
+}
+
+// ARCH-023: method scratch on the real Vulkan path. A warm run, started once the cold run's buffers retired, takes
+// its scratch from the cache (no device allocation) and publishes bitwise the cold run's weights; a plugin unload
+// leaves only the host's parked raw buffers (nothing active), and the reloaded plugin's run is served from them.
+TEST(DensityWeightsPluginGpuSmoke, ScratchCacheWarmAndReloadedRunsMatchTheColdRunBitwise)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    Gpu gpu;
+    auto& scene = gpu.H->Scene();
+    const auto cloud = MakeDomains(scene).back();
+    auto& props = Props(scene, cloud, D::PointCloudPoint);
+    const auto config = Settings(cloud, D::PointCloudPoint, B::VulkanLBVH, 0);
+    auto& cache = *gpu.H->Engine.Services().Find<R::SpatialIndexCache>();
+    const auto poll = [&](std::optional<R::AgentOperationOutcome>& call, R::AgentOperationOutcome& result)
+    {
+        if (!call->Continuation)
+        {
+            result = *call;
+            return true;
+        }
+        return call->Continuation(gpu.H->Context, result);
+    };
+    // Every buffer of the previous run is reusable: nothing leased or awaiting completion, something idle.
+    const auto retired = [&]
+    {
+        const auto stats = cache.Stats();
+        return stats.ScratchActiveBytes == 0u && stats.ScratchPendingBytes == 0u && stats.ScratchIdleBytes > 0u;
+    };
+    std::vector<std::vector<float>> weights;
+    std::vector<R::SpatialIndexCacheStats> before, after;
+    std::optional<R::SpatialIndexCacheStats> afterUnload;
+    std::shared_ptr<DW::Run> run;
+    std::optional<R::AgentOperationOutcome> unload, load;
+    R::AgentOperationOutcome unloaded{}, loaded{};
+    unsigned stage = 0; // runs: 0 cold, 1 warm, 4 after the reload; 2 unloads, 3 loads
+    ASSERT_TRUE(gpu.Run(
+        [&]
+        {
+            if (stage == 2)
+            {
+                if (!retired())
+                    return false;
+                if (!unload)
+                    unload = R::InvokeAgentOperation(gpu.H->Registry, "plugin_unload", gpu.H->Context, "{}", false);
+                if (!poll(unload, unloaded))
+                    return false;
+                unload->Continuation = {}; // answered: released, as the agent server does
+                afterUnload = cache.Stats();
+                stage = 3;
+                return false;
+            }
+            if (stage == 3)
+            {
+                if (!load)
+                    load = R::InvokeAgentOperation(
+                        gpu.H->Registry, "plugin_load", gpu.H->Context, R"({"path":"density_weights"})", false);
+                if (!poll(load, loaded))
+                    return false;
+                load->Continuation = {};
+                stage = 4;
+                return false;
+            }
+            if (!run)
+            {
+                if (stage > 0 && !retired())
+                    return false;
+                Fill(props);
+                before.push_back(cache.Stats());
+                run = DW::Start(Running(config, true));
+                return false;
+            }
+            DW::Refresh(*run);
+            if (!run->Final)
+                return false;
+            EXPECT_EQ(run->Final->Status, "applied") << run->Final->Message;
+            after.push_back(cache.Stats());
+            weights.push_back(std::as_const(props).Get<float>("weights").Vector());
+            run.reset();
+            if (stage == 4)
+                return true;
+            ++stage;
+            return false;
+        }))
+        << "the frames ran out in stage " << stage;
+    ASSERT_EQ(weights.size(), 3u);
+    ASSERT_EQ(after.size(), 3u);
+    EXPECT_GT(after[0].ScratchMisses, before[0].ScratchMisses) << "the cold run allocates its scratch";
+    for (const std::size_t warm : {std::size_t{1}, std::size_t{2}})
+    {
+        SCOPED_TRACE(warm);
+        EXPECT_EQ(weights[warm], weights[0]) << "bitwise the cold run's weights";
+        EXPECT_GE(after[warm].ScratchHits - before[warm].ScratchHits, 3u) << "neighbors, means and stats";
+        EXPECT_EQ(after[warm].ScratchMisses, before[warm].ScratchMisses) << "no device allocation";
+    }
+    EXPECT_FALSE(unloaded.IsError) << unloaded.Text;
+    EXPECT_FALSE(loaded.IsError) << loaded.Text;
+    ASSERT_TRUE(afterUnload);
+    EXPECT_EQ(afterUnload->ScratchActiveBytes, 0u) << "nothing of the unloaded plugin holds a lease";
+    EXPECT_GT(afterUnload->ScratchIdleBytes, 0u) << "the host's parked raw buffers survive the unload";
+}
+
+// ARCH-023: a run whose scratch the method budget refuses fails with the byte counts and the config key, allocates
+// nothing beyond the budget and publishes nothing (no CPU fallback).
+TEST(DensityWeightsPluginGpuSmoke, AMethodBudgetRefusalFailsAndWritesNothing)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    Gpu gpu;
+    auto& scene = gpu.H->Scene();
+    const auto cloud = MakeDomains(scene).back();
+    auto& props = Props(scene, cloud, D::PointCloudPoint);
+    Fill(props);
+    const auto config = Settings(cloud, D::PointCloudPoint, B::VulkanLBVH, 0);
+    auto& cache = *gpu.H->Engine.Services().Find<R::SpatialIndexCache>();
+    ASSERT_NE(cache.MethodScratch(), nullptr);
+    cache.MethodScratch()->SetScratchBudget(1024u); // below the 66-row neighbor scratch
+    std::shared_ptr<DW::Run> run;
+    ASSERT_TRUE(gpu.Run(
+        [&]
+        {
+            if (!run)
+                run = DW::Start(Running(config, true));
+            DW::Refresh(*run);
+            return run->Final.has_value();
+        }))
+        << "the frames ran out";
+    ASSERT_TRUE(run->Final);
+    EXPECT_EQ(run->Final->Status, "failed") << run->Final->Message;
+    EXPECT_NE(run->Final->Message.find("budget exceeded"), std::string::npos) << run->Final->Message;
+    EXPECT_NE(run->Final->Message.find("render.gpu_method_buffer_budget_megabytes"), std::string::npos)
+        << run->Final->Message;
+    EXPECT_NE(run->Final->ActualBackend, "cpu_kdtree") << "no CPU fallback";
+    EXPECT_GT(cache.Stats().ScratchRefusals, 0u);
+    EXPECT_LE(
+        cache.Stats().ScratchActiveBytes + cache.Stats().ScratchPendingBytes + cache.Stats().ScratchIdleBytes, 1024u);
+    EXPECT_EQ(std::as_const(props).Get<float>("weights")[0], 77.f);
+    EXPECT_FALSE(HasRing(*gpu.H, cloud, config.Weights));
     EXPECT_FALSE(gpu.H->History().CanUndo());
 }

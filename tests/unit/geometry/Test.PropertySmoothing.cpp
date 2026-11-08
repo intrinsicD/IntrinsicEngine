@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cmath>
 #include <limits>
 #include <span>
@@ -218,4 +219,59 @@ TEST(PropertySmoothing, ImplicitDirectMatchesConjugateGradientReference)
                     for (std::size_t c=0;c<channels;++c) EXPECT_EQ(direct.Values[row*channels+c],values[row*channels+c]);
                 for (std::size_t c=0;c<channels;++c) EXPECT_EQ(direct.Values[(count-1)*channels+c],values[(count-1)*channels+c]);
             }
+}
+// ARCH-023: a step is one explicit pass (or one implicit time step over every channel); the run after k steps of a
+// longer run equals FilterProperty with k iterations bitwise, so Run, Step(n) and the one-shot command agree.
+TEST(PropertySmoothing, AStepIsOnePassAndAPrefixOfStepsEqualsTheShorterFilter)
+{
+    const std::vector<double> two{0, 10};
+    const std::vector<S::PropertyEdge> pair{{0, 1, 1}};
+    S::PropertyFilterRun run;
+    std::string why;
+    ASSERT_TRUE(run.Begin(two, 1, pair, {.Iterations = 5, .Lambda = 0.25}, {}, {}, why)) << why;
+    EXPECT_EQ(run.Steps(), 0u) << "Begin iterates nothing";
+    EXPECT_EQ(std::vector<double>(run.Values().begin(), run.Values().end()), two);
+    ASSERT_TRUE(run.Step(why)) << why;
+    EXPECT_EQ(std::vector<double>(run.Values().begin(), run.Values().end()), (std::vector<double>{2.5, 7.5}));
+    ASSERT_TRUE(run.Step(why)) << why;
+    EXPECT_EQ(std::vector<double>(run.Values().begin(), run.Values().end()), (std::vector<double>{3.75, 6.25}));
+    EXPECT_EQ(run.Finish().OperatorApplications, 2u);
+
+    // Every stepped method: k steps of a 6-step run equal FilterProperty with k iterations.
+    const std::vector<double> values{0, 1, 4, 9, 16, 25, 1, 0, 2, 3, 5, 8};
+    const std::vector<S::PropertyEdge> chain{{0, 1, 1}, {1, 2, 2}, {2, 3, 1}, {3, 4, 0.5}, {4, 5, 1}};
+    const std::vector<std::size_t> fixed{5};
+    for (const S::PropertyFilterParams base :
+        {S::PropertyFilterParams{.Method = S::PropertyFilter::Averaging, .Lambda = 0.4},
+            S::PropertyFilterParams{.Method = S::PropertyFilter::Taubin, .Lambda = 0.3, .Mu = -0.31},
+            S::PropertyFilterParams{.Method = S::PropertyFilter::Bilateral, .Lambda = 0.5, .RangeSigma = 3},
+            S::PropertyFilterParams{.Method = S::PropertyFilter::SpectralHeat, .HeatTime = 0.4},
+            S::PropertyFilterParams{
+                .Method = S::PropertyFilter::Implicit, .TimeStep = 0.2, .Solver = S::PropertySolver::ConjugateGradient},
+            S::PropertyFilterParams{
+                .Method = S::PropertyFilter::Implicit, .TimeStep = 0.2, .Solver = S::PropertySolver::Direct}})
+    {
+        auto p = base;
+        p.Iterations = 6;
+        S::PropertyFilterRun stepped;
+        ASSERT_TRUE(stepped.Begin(values, 2, chain, p, fixed, {}, why)) << why;
+        for (std::uint32_t k = 1; k <= 3; ++k)
+        {
+            ASSERT_TRUE(stepped.Step(why)) << why;
+            auto shorter = p;
+            shorter.Iterations = k;
+            const auto expected = S::FilterProperty(values, 2, chain, shorter, fixed);
+            const auto got = stepped.Finish();
+            ASSERT_TRUE(expected.Success && got.Success) << expected.Diagnostic << got.Diagnostic;
+            EXPECT_EQ(got.Values, expected.Values) << "method " << int(p.Method) << ", step " << k;
+            EXPECT_EQ(got.OperatorApplications, expected.OperatorApplications);
+            EXPECT_EQ(got.Diagnostic, expected.Diagnostic);
+        }
+    }
+    S::PropertyFilterRun once;
+    ASSERT_TRUE(once.Begin(two, 1, pair, {.Iterations = 1}, {}, {}, why));
+    ASSERT_TRUE(once.Step(why));
+    EXPECT_FALSE(once.Step(why)) << "no step past the run's iterations";
+    EXPECT_FALSE(S::PropertyFilterRun{}.Begin(two, 1, pair, {.Method = S::PropertyFilter::VariationalFit}, {}, {}, why))
+        << "the variational fit is solved whole by HarmonicField::FitProperty";
 }

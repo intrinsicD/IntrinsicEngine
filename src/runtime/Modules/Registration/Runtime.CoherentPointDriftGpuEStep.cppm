@@ -1,19 +1,18 @@
-// Device E-step broker of one Coherent Point Drift run (METHOD-056). The solver runs on a
-// JobService coroutine, but GPU work is recorded on the device-owner thread: Queue
-// converts the request to float-float pairs in staging the run reuses and returns a
-// per-request event for suspension; Pump, called on the main thread every drain while a step job
-// runs, records it through SpatialIndexCache::QueueGpuCompute into a pooled
-// Graphics::CoherentPointDriftEStepWorkspace (SpatialIndexCache::LeaseGpuWorkspace) as an
-// immediate submit (GRAPHICS-150) and hands the readback back, usually in the frame that
-// submitted it. The E-step alone runs on the device: the M-step, the objective and rows flagged
-// for exact evaluation stay on the CPU, so every iteration uploads the moved source and reads
-// back the row and source statistics.
+// Device E-step of one Coherent Point Drift run (METHOD-056). ARCH-023: the run's Init (main thread) leases a pooled
+// Graphics::CoherentPointDriftEStepWorkspace (SpatialIndexCache::LeaseGpuWorkspace) and prepares its pipelines and
+// buffers for the run's largest sets; each EM iteration's E-step is then evaluated on the step's own worker: the
+// request is converted to float-float pairs in staging the run reuses, written into the prepared host-visible
+// buffers, recorded and submitted as one bounded page (GRAPHICS-150) whose statistics are pulled back and waited for
+// there (Runtime.WorkerGpuPages.hpp), with no frame or main-thread pump. The E-step alone runs on the device: the
+// M-step, the objective and rows flagged for exact evaluation stay on the CPU, so every iteration uploads the moved
+// source and reads back the row and source statistics (the existing hybrid transfer).
 //
-// Queue refuses or Complete returns false, and an uncancelled solver falls back to the CPU, when the broker is
-// closed, the computation is refused or fails (which closes the broker, so later iterations do
-// not wait for a device that cannot help), or Pump observes the request's timeout.
+// Evaluate returns false, and an uncancelled solver runs that E-step on the CPU, when the broker is closed, the page
+// is refused or fails (which closes the broker, so later iterations do not wait for a device that cannot help), or
+// the request's timeout elapsed.
 module;
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -21,11 +20,14 @@ module;
 export module Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 
 import Geometry.Registration.CoherentPointDrift.EStep;
-import Extrinsic.Core.Tasks.CounterEvent;
 
 extern "C++"
 {
     namespace Extrinsic::Runtime { class SpatialIndexCache; }
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+    }
 }
 
 export namespace Extrinsic::Runtime
@@ -33,40 +35,35 @@ export namespace Extrinsic::Runtime
     struct CoherentPointDriftGpuEStepStats
     {
         std::uint64_t Requests{0u}, Completed{0u}, Failed{0u};
-        double WaitSeconds{0.0}; // elapsed request time through owner-thread completion/cancellation
+        double WaitSeconds{0.0}; // elapsed request time through completion, failure or cancellation
     };
 
     class CoherentPointDriftGpuEStep
     {
     public:
-        // The cache (and its device) must outlive every Pump call and the last computation.
-        explicit CoherentPointDriftGpuEStep(SpatialIndexCache& cache,
-                                            std::chrono::milliseconds timeout = std::chrono::seconds{60});
+        // The cache (and `device`) must outlive the broker's workspace lease: release or destroy the broker before
+        // the cache shuts down.
+        CoherentPointDriftGpuEStep(SpatialIndexCache& cache,
+            RHI::IDevice& device,
+            std::chrono::milliseconds timeout = std::chrono::seconds{60});
         ~CoherentPointDriftGpuEStep();
         CoherentPointDriftGpuEStep(const CoherentPointDriftGpuEStep&) = delete;
         CoherentPointDriftGpuEStep& operator=(const CoherentPointDriftGpuEStep&) = delete;
 
-        // Worker thread. A non-null event belongs only to this request; Queue never waits.
-        [[nodiscard]] std::shared_ptr<Core::Tasks::CounterEvent> Queue(
-            const Geometry::CoherentPointDrift::EStep::ExternalRequest& request);
-        // Worker thread after the event signals. Copies into the still-owned solver spans;
-        // obsolete, cancelled and failed requests return false without writing them.
-        [[nodiscard]] bool Complete(const std::shared_ptr<Core::Tasks::CounterEvent>& event,
-            const Geometry::CoherentPointDrift::EStep::ExternalRequest& request);
-        // Device-owner (main) thread: queues a waiting request, delivers a finished one.
-        void Pump();
-        // Main thread, once no step job runs: returns the workspace lease to the cache's pool, so a
-        // run that outlives the device never frees into a destroyed one. The next request leases
-        // again; a matured pooled workspace keeps its pipelines and buffers, and uploads the target
-        // again only when it last held another target generation.
+        // Main thread, the run's Init: leases the workspace and prepares it for at most `targets` x `sources` points
+        // (every later request of the run fits), held across every step, pause and restart until the terminal
+        // release, Close or destruction. False, closed with the reason: no device workspace or a refused preparation.
+        [[nodiscard]] bool Prepare(std::size_t targets, std::size_t sources);
+        // Worker (the step's own thread), one request at a time: evaluates the E-step on the device and copies its
+        // statistics into the solver's spans. False without writing them: closed, refused, failed, timed out or a
+        // shape beyond Prepare's.
+        [[nodiscard]] bool Evaluate(const Geometry::CoherentPointDrift::EStep::ExternalRequest& request);
+        // Main thread, once the run is applied, discarded or otherwise done: no page is submitted any more and the
+        // workspace lease returns to the pool (a page still on the device is covered by the pool's compute fence).
         void ReleaseDeviceResources();
-        // Any thread: fails the waiting request and every later one.
+        // Any thread: fails every later request; a waiting one gives up.
         void Close(std::string diagnostic = {});
         [[nodiscard]] bool Closed() const;
-
-        // Set while a step job may still queue work; the pump job ends once it is cleared.
-        void SetWorkerActive(bool active);
-        [[nodiscard]] bool WorkerActive() const;
 
         // Why the last iteration did not run on the device (empty while none failed).
         [[nodiscard]] std::string Diagnostic() const;

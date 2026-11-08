@@ -38,7 +38,17 @@ namespace Extrinsic::Graphics
             std::uint32_t KNearestCount{};
             std::uint64_t ExcludedIndices{};
         };
-        static_assert(sizeof(BuildPush) == 64 && sizeof(QueryPush) == 72);
+        // point_brute_force_query.comp: QueryPush with target rows in place of the hierarchy.
+        struct BruteForcePush
+        {
+            std::uint64_t Targets{}, TargetIndices{}, Queries{}, Neighbors{}, Headers{};
+            std::uint32_t TargetCount{}, QueryCount{}, Stride{}, Capacity{};
+            float Radius{};
+            std::uint32_t KNearestCount{};
+            std::uint64_t ExcludedIndices{};
+            std::uint32_t TargetStride{}, Reserved{};
+        };
+        static_assert(sizeof(BuildPush) == 64 && sizeof(QueryPush) == 72 && sizeof(BruteForcePush) == 80);
         constexpr std::uint32_t kMortonBits = 30u; // lbvh_morton.comp: 10 bits per axis
         constexpr ParallelPrimitiveKind kSort[] = {ParallelPrimitiveKind::RadixSort};
     } // namespace
@@ -71,12 +81,27 @@ namespace Extrinsic::Graphics
             }
             return CreateParallelPrimitivePipelines(Device, Sort, kSort);
         }
+        // 4: the query transform, 5: brute force; created on first use (owner) or by PreparePipelines.
+        bool QueryPipeline(std::size_t i)
+        {
+            if (!Pipelines[i].IsValid())
+                Pipelines[i] = i == 4 ? CreateComputePipeline(Device,
+                                            "shaders/lbvh_transform_queries.comp.spv",
+                                            sizeof(TransformPush),
+                                            "LBVH query transform")
+                                      : CreateComputePipeline(Device,
+                                            "shaders/point_brute_force_query.comp.spv",
+                                            sizeof(BruteForcePush),
+                                            "Point brute-force query");
+            return Pipelines[i].IsValid();
+        }
         RHI::IDevice& Device;
         RHI::BufferHandle Storage{}, SortScratch{};
-        std::array<RHI::PipelineHandle, 5> Pipelines{};
+        std::uint64_t SortScratchAddress{}; // resolved with the storage, for a resolved build's sort
+        std::array<RHI::PipelineHandle, 6> Pipelines{}; // 4: query transform, 5: brute force
         ParallelPrimitivePipelineSet Sort{}; // radix sort of the (Morton code, index) keys
         std::uint32_t Capacity{}, Count{}, Padded{};
-        std::uint64_t Allocations{}, Builds{}, Keys{}, Nodes{}, Bounds{};
+        std::uint64_t Allocations{}, Builds{}, Keys{}, Nodes{}, Bounds{}, Bytes{};
         bool Built{};
     };
     PointLbvhWorkspace::PointLbvhWorkspace(RHI::IDevice& device)
@@ -107,6 +132,7 @@ namespace Extrinsic::Graphics
             ? s.Device.CreateBuffer(BuildParallelPrimitiveScratchBufferDesc(sortPlan, "PointLBVH.SortScratch"))
             : RHI::BufferHandle{};
         auto bda = buffer.IsValid() ? s.Device.GetBufferDeviceAddress(buffer) : 0u;
+        const auto scratchBda = scratch.IsValid() ? s.Device.GetBufferDeviceAddress(scratch) : 0u;
         if (!bda || (sortPlan.ScratchBytes && !scratch.IsValid()))
         {
             for (auto b : {buffer, scratch})
@@ -119,7 +145,9 @@ namespace Extrinsic::Graphics
                 s.Device.DestroyBuffer(b);
         s.Storage = buffer;
         s.SortScratch = scratch;
+        s.SortScratchAddress = scratchBda;
         s.Capacity = padded;
+        s.Bytes = bytes + sortPlan.ScratchBytes;
         ++s.Allocations;
         s.Built = false;
         s.Bounds = bda;
@@ -131,10 +159,12 @@ namespace Extrinsic::Graphics
                                          RHI::BufferHandle objectIndices)
     {
         auto& s = *m_Impl;
-        if (points.Count > s.Capacity || points.Stride < 12 || points.Stride % 4 ||
-            points.Offset % 4 || !s.Storage.IsValid() || !s.Device.IsOperational())
+        // Resolved (ARCH-023): the caller's address, no readiness query; Reserve created the pipelines.
+        const bool resolved = points.Address != 0u;
+        if (points.Count > s.Capacity || points.Stride < 12 || points.Stride % 4 || points.Offset % 4 ||
+            !s.Storage.IsValid() || (resolved ? objectIndices.IsValid() : !s.Device.IsOperational()))
             return false;
-        const auto source = s.Device.GetBufferDeviceAddress(points.Buffer);
+        const auto source = resolved ? points.Address : s.Device.GetBufferDeviceAddress(points.Buffer);
         if (points.Count && (!source || points.Offset > ~std::uint64_t{} - source))
             return false;
         BuildPush push{.Points = source + points.Offset,
@@ -170,10 +200,18 @@ namespace Extrinsic::Graphics
         dispatch(1, (push.Padded + 255) / 256);
         // Stable by Morton code over records in index order: the (code, index) order the build
         // expects; the invalid padding records past Count stay in place.
-        if (!RecordGpuRadixSort({.Device = &s.Device, .CommandContext = &cmd, .Pipelines = s.Sort,
-                                 .Elements = s.Storage, .ElementsOffsetBytes = s.Keys - s.Bounds,
-                                 .Scratch = s.SortScratch, .ElementCount = points.Count,
-                                 .KeyWords = 1u, .KeyBits = kMortonBits}).Succeeded())
+        if (!RecordGpuRadixSort({.Device = &s.Device,
+                                    .CommandContext = &cmd,
+                                    .Pipelines = s.Sort,
+                                    .Elements = s.Storage,
+                                    .ElementsOffsetBytes = s.Keys - s.Bounds,
+                                    .Scratch = s.SortScratch,
+                                    .ElementCount = points.Count,
+                                    .KeyWords = 1u,
+                                    .KeyBits = kMortonBits,
+                                    .ElementsAddress = resolved ? s.Bounds : 0u,
+                                    .ScratchAddress = resolved ? s.SortScratchAddress : 0u})
+                .Succeeded())
             return false;
         dispatch(2, (std::max(points.Count, 1u) + 255) / 256);
         s.Count = points.Count;
@@ -182,42 +220,82 @@ namespace Extrinsic::Graphics
         ++s.Builds;
         return true;
     }
+    bool PointLbvhWorkspace::PreparePipelines(const bool bruteForce, const bool transform)
+    {
+        return (!bruteForce || m_Impl->QueryPipeline(5)) && (!transform || m_Impl->QueryPipeline(4));
+    }
     bool PointLbvhWorkspace::RecordQuery(RHI::ICommandContext& cmd, const PointLbvhQuery& query)
     {
+        return RecordQueries(cmd, query, nullptr, {});
+    }
+    bool PointLbvhWorkspace::RecordBruteForceQuery(
+        RHI::ICommandContext& cmd, PointLbvhInput targets, RHI::BufferHandle targetIndices, const PointLbvhQuery& query)
+    {
+        return RecordQueries(cmd, query, &targets, targetIndices);
+    }
+    bool PointLbvhWorkspace::RecordQueries(RHI::ICommandContext& cmd,
+        const PointLbvhQuery& query,
+        const PointLbvhInput* targets,
+        RHI::BufferHandle targetIndices)
+    {
         auto& s = *m_Impl;
-        if (!s.Built || !s.Device.IsOperational() || query.Queries.Stride < 12 ||
-            query.Queries.Stride % 4 || query.Queries.Offset % 4 ||
-            query.Queries.Count > (1u << 20u) || query.Capacity > 1024 ||
-            !std::isfinite(query.Radius) || (query.Radius < 0 && query.Radius != -1) ||
-            query.Radius > 1e18f || (query.KNearestCount ? (query.KNearestCount > 64 ||
-                query.Capacity != query.KNearestCount || query.Radius != -1) :
-                (query.Radius == -1 && query.Capacity != 1)))
+        if (targets
+                ? (targets->Count > (1u << 20u) || targets->Stride < 12 || targets->Stride % 4 || targets->Offset % 4 ||
+                      !PointBruteForceRefusal(query.Queries.Count, targets->Count, query.Capacity).empty())
+                : !s.Built)
+            return false;
+        // Resolved (ARCH-023): every address is the caller's and no pipeline is created; no device call at all.
+        const bool resolved = query.Queries.Address != 0u;
+        const auto address = [&](RHI::BufferHandle buffer, std::uint64_t given) -> std::uint64_t
+        {
+            return resolved ? given : s.Device.GetBufferDeviceAddress(buffer);
+        };
+        if ((!resolved && !s.Device.IsOperational()) || query.Queries.Stride < 12 || query.Queries.Stride % 4 ||
+            query.Queries.Offset % 4 || query.Queries.Count > (1u << 20u) || query.Capacity > 1024 ||
+            !std::isfinite(query.Radius) || (query.Radius < 0 && query.Radius != -1) || query.Radius > 1e18f ||
+            (query.KNearestCount
+                    ? (query.KNearestCount > 64 || query.Capacity != query.KNearestCount || query.Radius != -1)
+                    : (query.Radius == -1 && query.Capacity != 1)))
             return false;
         if (!query.Queries.Count)
             return true;
-        const auto qb = s.Device.GetBufferDeviceAddress(query.Queries.Buffer),
-                   nb = s.Device.GetBufferDeviceAddress(query.Neighbors),
-                   hb = s.Device.GetBufferDeviceAddress(query.Headers);
+        const auto qb = resolved ? query.Queries.Address : s.Device.GetBufferDeviceAddress(query.Queries.Buffer),
+                   nb = address(query.Neighbors, query.Resolved.Neighbors),
+                   hb = address(query.Headers, query.Resolved.Headers);
         if (!qb || !nb || !hb || query.Queries.Offset > ~std::uint64_t{} - qb ||
             query.HeaderOffset % 8u || query.HeaderOffset > ~std::uint64_t{} - hb)
             return false;
-        const auto excluded = query.ExcludedIndices.IsValid() ?
-            s.Device.GetBufferDeviceAddress(query.ExcludedIndices) : 0;
+        const auto excluded =
+            query.ExcludedIndices.IsValid() ? address(query.ExcludedIndices, query.Resolved.ExcludedIndices) : 0;
         if (query.ExcludedIndices.IsValid() && !excluded) return false;
+        std::uint64_t targetAddress = 0, indexAddress = 0;
+        if (targets)
+        {
+            targetAddress =
+                targets->Count ? (resolved ? targets->Address : s.Device.GetBufferDeviceAddress(targets->Buffer)) : 0;
+            indexAddress = targetIndices.IsValid() ? address(targetIndices, query.Resolved.TargetIndices) : 0;
+            if ((targets->Count && (!targetAddress || targets->Offset > ~std::uint64_t{} - targetAddress)) ||
+                (targetIndices.IsValid() && !indexAddress))
+                return false;
+            if (resolved ? !s.Pipelines[5].IsValid() : !s.QueryPipeline(5))
+                return false;
+            if (targetAddress)
+                targetAddress += targets->Offset;
+        }
         auto queryAddress = qb + query.Queries.Offset;
         auto queryStride = query.Queries.Stride;
         auto queryBuffer = query.Queries.Buffer;
         if (query.Transform.IsValid() != query.TransformedQueries.IsValid()) return false;
         if (query.Transform.IsValid())
         {
-            if (!s.Device.SupportsShaderFloat64() || query.TransformedQueries == query.Queries.Buffer) return false;
-            const auto matrix = s.Device.GetBufferDeviceAddress(query.Transform);
-            const auto output = s.Device.GetBufferDeviceAddress(query.TransformedQueries);
+            // A resolved transform's float64 support was checked when its pipeline was prepared.
+            if ((!resolved && !s.Device.SupportsShaderFloat64()) || query.TransformedQueries == query.Queries.Buffer)
+                return false;
+            const auto matrix = address(query.Transform, query.Resolved.Transform);
+            const auto output = address(query.TransformedQueries, query.Resolved.TransformedQueries);
             if (!matrix || !output) return false;
-            if (!s.Pipelines[4].IsValid())
-                s.Pipelines[4] = CreateComputePipeline(s.Device, "shaders/lbvh_transform_queries.comp.spv",
-                                                      sizeof(TransformPush), "LBVH query transform");
-            if (!s.Pipelines[4].IsValid()) return false;
+            if (resolved ? !s.Pipelines[4].IsValid() : !s.QueryPipeline(4))
+                return false;
             for (auto input : {query.Queries.Buffer, query.Transform})
                 cmd.BufferBarrier(input, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
                                   RHI::MemoryAccess::ShaderRead);
@@ -231,18 +309,15 @@ namespace Extrinsic::Graphics
             queryStride = 12;
             queryBuffer = query.TransformedQueries;
         }
-        const QueryPush push{.Nodes = s.Nodes,
-                             .Bounds = s.Bounds,
-                             .Queries = queryAddress,
-                             .Neighbors = nb,
-                             .Headers = hb + query.HeaderOffset,
-                             .PointCount = s.Count,
-                             .QueryCount = query.Queries.Count,
-                             .Stride = queryStride,
-                             .Capacity = query.Capacity,
-                             .Radius = query.Radius,
-                             .KNearestCount = query.KNearestCount,
-                             .ExcludedIndices = excluded};
+        if (targets)
+        {
+            for (auto input : {targets->Count ? targets->Buffer : RHI::BufferHandle{}, targetIndices})
+                if (input.IsValid())
+                    cmd.BufferBarrier(input,
+                        RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
+                        RHI::MemoryAccess::ShaderRead);
+        }
+        const auto headers = hb + query.HeaderOffset;
         cmd.BufferBarrier(queryBuffer,
                           RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
                           RHI::MemoryAccess::ShaderRead);
@@ -250,9 +325,44 @@ namespace Extrinsic::Graphics
             cmd.BufferBarrier(query.ExcludedIndices,
                               RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
                               RHI::MemoryAccess::ShaderRead);
-        cmd.BindPipeline(s.Pipelines[3]);
-        cmd.PushConstants(&push, sizeof(push), 0);
-        cmd.Dispatch((push.QueryCount + 255) / 256, 1, 1);
+        if (targets)
+        {
+            // The hierarchy fields stay unread: the owner may Reserve or build this workspace's hierarchy while a
+            // worker records brute-force pages against it.
+            const BruteForcePush brute{.Targets = targetAddress,
+                .TargetIndices = indexAddress,
+                .Queries = queryAddress,
+                .Neighbors = nb,
+                .Headers = headers,
+                .TargetCount = targets->Count,
+                .QueryCount = query.Queries.Count,
+                .Stride = queryStride,
+                .Capacity = query.Capacity,
+                .Radius = query.Radius,
+                .KNearestCount = query.KNearestCount,
+                .ExcludedIndices = excluded,
+                .TargetStride = targets->Stride};
+            cmd.BindPipeline(s.Pipelines[5]);
+            cmd.PushConstants(&brute, sizeof(brute), 0);
+        }
+        else
+        {
+            const QueryPush push{.Nodes = s.Nodes,
+                .Bounds = s.Bounds,
+                .Queries = queryAddress,
+                .Neighbors = nb,
+                .Headers = headers,
+                .PointCount = s.Count,
+                .QueryCount = query.Queries.Count,
+                .Stride = queryStride,
+                .Capacity = query.Capacity,
+                .Radius = query.Radius,
+                .KNearestCount = query.KNearestCount,
+                .ExcludedIndices = excluded};
+            cmd.BindPipeline(s.Pipelines[3]);
+            cmd.PushConstants(&push, sizeof(push), 0);
+        }
+        cmd.Dispatch((query.Queries.Count + 255) / 256, 1, 1);
         for (auto buffer : {query.Neighbors, query.Headers})
             cmd.BufferBarrier(buffer, RHI::MemoryAccess::ShaderWrite,
                               RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::TransferRead);
@@ -270,5 +380,9 @@ namespace Extrinsic::Graphics
     std::uint64_t PointLbvhWorkspace::BuildCount() const noexcept
     {
         return m_Impl->Builds;
+    }
+    std::uint64_t PointLbvhWorkspace::DeviceBytes() const noexcept
+    {
+        return m_Impl->Bytes;
     }
 } // namespace Extrinsic::Graphics

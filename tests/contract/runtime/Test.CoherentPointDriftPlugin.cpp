@@ -90,8 +90,12 @@ namespace
 
         std::uint64_t Start(const Json& extra = Json::object())
         {
-            Json args{{"source", Id(Source)}, {"target", Id(Target)}, {"positions", "samples"}, {"max_iterations", 200},
-                      {"tolerance", 1e-8}, {"preview", false}};
+            Json args{{"source", Id(Source)},
+                {"target", Id(Target)},
+                {"positions", "samples"},
+                {"max_iterations", 200},
+                {"tolerance", 1e-8},
+                {"preview_every", 0}};
             args.update(extra);
             const auto out = Call("coherent_point_drift_start", args);
             EXPECT_FALSE(out.IsError) << out.Text;
@@ -267,7 +271,7 @@ TEST(CoherentPointDriftPlugin, TransformedCloudsRegisterInWorldSpaceAndWriteBack
 TEST(CoherentPointDriftPlugin, APreviewWithoutADeviceIsNotCountedAsShown)
 {
     Harness harness;
-    const auto run = harness.Start({{"preview", true}});
+    const auto run = harness.Start({{"preview_every", 1}});
     ASSERT_FALSE(harness.Control(run, "step", 3).contains("error"));
     ASSERT_TRUE(harness.Stopped(run));
     for (int frame = 0; frame < 10; ++frame) harness.Frame();
@@ -340,8 +344,11 @@ TEST(CoherentPointDriftPlugin, APausedRunHoldsItsOutputUntilItEnds)
     ASSERT_TRUE(harness.Stopped(first));
     EXPECT_EQ(harness.Observe(first)["phase"], "paused");
     for (int frame = 0; frame < 10; ++frame) harness.Frame();
-    const auto refused = harness.Call("coherent_point_drift_start", {{"source", Id(harness.Source)}, {"target", Id(harness.Target)},
-                                                               {"positions", "samples"}, {"preview", false}});
+    const auto refused = harness.Call("coherent_point_drift_start",
+        {{"source", Id(harness.Source)},
+            {"target", Id(harness.Target)},
+            {"positions", "samples"},
+            {"preview_every", 0}});
     EXPECT_TRUE(refused.IsError);
     EXPECT_NE(refused.Text.find("already running"), std::string::npos) << refused.Text;
     const auto rows = harness.Jobs();
@@ -366,8 +373,70 @@ TEST(CoherentPointDriftPlugin, AnUnloadEndsAPausedRunOnce)
     ASSERT_FALSE(unload.IsError) << unload.Text;
     const auto ended = harness.Observe(run);
     EXPECT_EQ(ended["phase"], "discarded") << ended.dump();
+    // ARCH-023 M4: nothing of the unloaded plugin stays in the step runs (its callables went with the run).
+    EXPECT_EQ(ended["can_restart"], false) << ended.dump();
+    EXPECT_EQ(harness.Control(run, "restart")["error"], "refused");
     EXPECT_EQ(harness.Samples(harness.Source), before);
     EXPECT_FALSE(harness.History().CanUndo());
+}
+
+// ARCH-023: the shared execution options and restart over MCP. A ready run (the default) computes nothing until a
+// step; restart (the plugin's initializer: the solver from its captured clouds) begins generation 1 from step 0, ready
+// again since it was paused, and its steps repeat the solver's own first steps bit for bit; start=run computes at
+// once to its end. Predictions as asserted. Mutation: an initializer that keeps the solver's state gives other metrics.
+TEST(CoherentPointDriftPlugin, RestartAndTheStartModeFollowTheSharedExecutionOptions)
+{
+    const auto reference = Solve();
+    ASSERT_GT(reference.Trace.size(), 3u);
+    Harness harness;
+    const auto run = harness.Start();
+    ASSERT_NE(run, 0u);
+    for (int frame = 0; frame < 5; ++frame)
+        harness.Frame();
+    auto observed = harness.Observe(run);
+    EXPECT_EQ(observed["phase"], "ready");
+    EXPECT_EQ(observed["steps"], 0);
+    EXPECT_EQ(observed["can_restart"], true);
+    EXPECT_EQ(observed["execution"]["start"], "ready");
+    EXPECT_EQ(observed["execution"]["max_iterations"], 200);
+    ASSERT_FALSE(harness.Control(run, "step", 3).contains("error"));
+    ASSERT_TRUE(harness.Stopped(run));
+    ASSERT_FALSE(harness.Control(run, "restart").contains("error"));
+    ASSERT_TRUE(harness.Until(run,
+        [](const Json& o)
+        {
+            return o["generation"] == 1;
+        }));
+    observed = harness.Observe(run);
+    EXPECT_EQ(observed["steps"], 0) << "a new generation from step 0";
+    EXPECT_EQ(observed["phase"], "ready") << "it was paused, and the run starts ready";
+    ASSERT_FALSE(harness.Control(run, "step", 3).contains("error"));
+    ASSERT_TRUE(harness.Stopped(run));
+    observed = harness.Observe(run, true);
+    ASSERT_EQ(observed["metrics"].size(), 3u) << "this generation's metrics only";
+    for (std::size_t i = 0; i < 3u; ++i)
+        EXPECT_EQ(observed["metrics"][i]["values"]["sigma2"].get<double>(), reference.Trace[i].Sigma2) << i;
+    ASSERT_FALSE(harness.Control(run, "discard").contains("error"));
+    ASSERT_TRUE(harness.Until(run,
+        [](const Json& o)
+        {
+            return o["phase"] == "discarded";
+        }));
+    for (int frame = 0; frame < 5; ++frame)
+        harness.Frame();
+
+    const auto running = harness.Start({{"start", "run"}});
+    ASSERT_NE(running, 0u);
+    ASSERT_TRUE(harness.Until(running,
+        [](const Json& o)
+        {
+            return o["end"] != "none" && !o["computing"].get<bool>();
+        }))
+        << "computed without a control";
+    EXPECT_EQ(harness.Observe(running)["end"], "converged");
+    const auto refused = harness.Call("coherent_point_drift_start",
+        {{"source", Id(harness.Source)}, {"target", Id(harness.Target)}, {"positions", "samples"}, {"start", "later"}});
+    EXPECT_TRUE(refused.IsError) << "the shared rows refuse an unknown start";
 }
 
 TEST(CoherentPointDriftPlugin, TheWindowsButtonsControlTheRunStartedLast)

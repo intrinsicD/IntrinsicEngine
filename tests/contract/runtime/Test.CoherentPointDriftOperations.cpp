@@ -1,6 +1,7 @@
 // RUNTIME-273: the Coherent Point Drift editor operation. Config validation, every variant
-// on point-cloud and graph-node domains with its publication path and undo/redo, step
-// mode (synchronous and on the job service), cancellation, and stale-input rejection.
+// on point-cloud and graph-node domains with its publication path and undo/redo, and the
+// step-run lifecycle (ARCH-023): ready start, step n, run, pause, stop, restart, accept,
+// discard, stale captures, shutdown and the Vulkan E-step's resident target.
 #include <cmath>
 #include <utility>
 #include <span>
@@ -22,6 +23,9 @@
 #include <chrono>
 #include <limits>
 #include <thread>
+#include <functional>
+#include <memory>
+#include <mutex>
 import Extrinsic.Core.Tasks.CounterEvent;
 import Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 import Extrinsic.Runtime.SpatialIndexCache;
@@ -36,6 +40,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.CoherentPointDriftEStep;
 import Geometry.Registration.CoherentPointDrift;
 import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.SelectionController;
@@ -97,6 +102,101 @@ namespace
     };
 
     std::uint32_t Id(entt::entity entity) { return R::SelectionController::ToStableEntityId(entity); }
+
+    // The CPD section's execution options with another iteration cap (ready, wait for Accept).
+    R::StepRunExecution Cap(const std::uint32_t iterations)
+    {
+        auto execution = R::kDefaultCoherentPointDriftExecution;
+        execution.IterationCap = iterations;
+        return execution;
+    }
+
+    // Drains the job service until `done` holds (a paused run's holder never ends, so DrainUntilTerminal cannot).
+    template <class Done>
+    bool DrainUntil(Extrinsic::Tests::EditorJobHarness& jobs,
+        Done done,
+        const std::chrono::milliseconds timeout = std::chrono::seconds{10})
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            (void)jobs.Jobs().DrainCompletions(jobs.Events());
+            if (done())
+                return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        }
+        return false;
+    }
+
+    bool Control(Extrinsic::Tests::EditorJobHarness& jobs,
+        const std::uint64_t run,
+        const R::StepRunAction action,
+        const std::uint32_t count = 1u)
+    {
+        std::string refusal;
+        const bool accepted = jobs.StepRuns().Control(run, action, count, refusal);
+        EXPECT_TRUE(accepted) << refusal;
+        return accepted;
+    }
+
+    // A rigid case that converges in a few dozen EM iterations: the source is the target moved by (0.3, 0.1, 0).
+    struct ShiftedPair
+    {
+        Scene S;
+        Extrinsic::Tests::EditorJobHarness Jobs;
+        entt::entity Source{}, Target{};
+        std::vector<glm::vec3> Points{};
+        // `related` false: the target is an unrelated cloud, so sigma^2 never reaches its floor (no early end).
+        explicit ShiftedPair(const std::size_t count = 100u, const unsigned seed = 11u, const bool related = true)
+            : Points(Cloud(count, seed))
+        {
+            std::vector<glm::vec3> moved = related ? std::vector<glm::vec3>{} : Cloud(count, seed + 1000u);
+            if (related)
+                for (const auto& p : Points)
+                    moved.push_back(p + glm::vec3(0.3f, 0.1f, 0.0f));
+            Source = Make(S.Registry, D::PointCloudPoint, Points);
+            Target = Make(S.Registry, D::PointCloudPoint, moved);
+            Jobs.Attach(S.Context);
+        }
+        [[nodiscard]] R::CoherentPointDriftConfig Config() const
+        {
+            return {.SourceStableEntityId = Id(Source), .TargetStableEntityId = Id(Target)};
+        }
+        [[nodiscard]] R::EditorCoherentPointDriftRunHandle Start(const R::CoherentPointDriftConfig& config)
+        {
+            R::EditorCoherentPointDriftResult failure;
+            auto run = R::StartEditorCoherentPointDrift(S.Commands(), config, failure);
+            EXPECT_TRUE(run) << failure.Message;
+            return run;
+        }
+        [[nodiscard]] std::optional<R::StepRunObservation> Observe(const R::EditorCoherentPointDriftRunHandle& run)
+        {
+            return Jobs.StepRuns().Observe(R::SnapshotEditorCoherentPointDrift(run).StepRun);
+        }
+        // Until the run rests (paused or ended) with nothing in flight.
+        bool Rest(const R::EditorCoherentPointDriftRunHandle& run)
+        {
+            return DrainUntil(Jobs,
+                [&]
+                {
+                    const auto o = Observe(run);
+                    return o && (o->Phase == R::StepRunPhase::Paused || R::IsTerminal(o->Phase)) && !o->SegmentInFlight;
+                });
+        }
+        bool Terminal(const R::EditorCoherentPointDriftRunHandle& run)
+        {
+            return DrainUntil(Jobs,
+                [&]
+                {
+                    const auto o = Observe(run);
+                    return o && R::IsTerminal(o->Phase);
+                });
+        }
+        [[nodiscard]] glm::vec3 SourcePosition()
+        {
+            return S.Registry.Raw().get<T::Component>(Source).Position;
+        }
+    };
 }
 
 TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
@@ -248,74 +348,218 @@ TEST(CoherentPointDriftOperations, AffineWritesPositionsAndNonrigidWritesADispla
     EXPECT_TRUE(invalidConfig({.Subsample = 2}));
 }
 
-TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAppliesTheCurrentEstimate)
+// ARCH-023: a ready run computes nothing until a control asks; Step n takes exactly n EM iterations and pauses; the
+// preview moves while nothing is published; Run continues to the end; Accept publishes the estimate once (one undo
+// entry) and an ended run takes no more steps.
+TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAcceptsTheCurrentEstimate)
 {
-    Scene s;
-    const auto points = Cloud(100, 11);
-    std::vector<glm::vec3> moved;
-    for (const auto& p : points) moved.push_back(p + glm::vec3(0.3f, 0.1f, 0.0f));
-    const auto source = Make(s.Registry, D::PointCloudPoint, points);
-    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
-    R::EditorCoherentPointDriftResult failure;
-    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), {.SourceStableEntityId = Id(source),
-        .TargetStableEntityId = Id(target)}, failure);
-    ASSERT_TRUE(run) << failure.Message;
-    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Ready);
+    ShiftedPair pair;
+    const auto run = pair.Start(pair.Config());
+    ASSERT_TRUE(run);
+    const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+    ASSERT_NE(id, 0u);
+    // Init stays ready: drains compute nothing.
+    for (int i = 0; i < 20; ++i)
+        (void)pair.Jobs.Jobs().DrainCompletions(pair.Jobs.Events());
+    EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Ready);
+    EXPECT_EQ(pair.Observe(run)->Steps, 0u);
+    EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(run).Trace.empty());
     EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Target->size(), 100u);
-    EXPECT_EQ(R::ApplyEditorCoherentPointDrift(s.Commands(), run).Status, R::EditorCommandStatus::InvalidProcessingParameters)
-        << "nothing to apply before a step";
+    std::string refusal;
+    EXPECT_FALSE(pair.Jobs.StepRuns().Control(id, R::StepRunAction::Accept, 1u, refusal))
+        << "nothing to accept before a step";
 
-    EXPECT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 2), R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Step, 2u));
+    ASSERT_TRUE(pair.Rest(run));
     auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
-    EXPECT_EQ(snapshot.Phase, R::EditorCoherentPointDriftPhase::Paused);
+    EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Paused);
+    EXPECT_EQ(pair.Observe(run)->Steps, 2u) << "Step 2 is two EM iterations";
     EXPECT_EQ(snapshot.Trace.size(), 2u);
     EXPECT_EQ(snapshot.Result.Iterations, 2u);
     EXPECT_LT(snapshot.Trace[1].Sigma2, snapshot.Trace[0].Sigma2);
-    EXPECT_NE((*snapshot.SourcePreview)[0], points[0]) << "the preview moves before anything is published";
-    EXPECT_EQ(s.Registry.Raw().get<T::Component>(source).Position, glm::vec3(0.0f));
+    EXPECT_NE((*snapshot.SourcePreview)[0], pair.Points[0]) << "the preview moves before anything is published";
+    EXPECT_EQ(pair.SourcePosition(), glm::vec3(0.0f));
+    // A paused run stays at its boundary.
+    for (int i = 0; i < 20; ++i)
+        (void)pair.Jobs.Jobs().DrainCompletions(pair.Jobs.Events());
+    EXPECT_EQ(pair.Observe(run)->Steps, 2u);
 
-    EXPECT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 0), R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Run));
+    ASSERT_TRUE(pair.Rest(run));
     snapshot = R::SnapshotEditorCoherentPointDrift(run);
-    EXPECT_EQ(snapshot.Phase, R::EditorCoherentPointDriftPhase::Finished);
+    EXPECT_NE(pair.Observe(run)->End, R::StepRunEnd::None);
     EXPECT_NE(snapshot.Result.Termination, "none");
-    EXPECT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 1), R::EditorCommandStatus::InvalidProcessingParameters)
-        << "a finished run takes no more steps";
-    const auto applied = R::ApplyEditorCoherentPointDrift(s.Commands(), run);
-    ASSERT_TRUE(applied.Succeeded()) << applied.Message;
-    EXPECT_NEAR(s.Registry.Raw().get<T::Component>(source).Position.x, 0.3f, 1e-3f);
-    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Applied);
+    EXPECT_FALSE(pair.Jobs.StepRuns().Control(id, R::StepRunAction::Step, 1u, refusal))
+        << "an ended run takes no more steps";
+    ASSERT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Accept));
+    ASSERT_TRUE(pair.Terminal(run));
+    EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Committed);
+    EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(run).Result.Succeeded());
+    EXPECT_NEAR(pair.SourcePosition().x, 0.3f, 1e-3f);
+    ASSERT_TRUE(pair.S.History.Undo().Succeeded());
+    EXPECT_EQ(pair.SourcePosition(), glm::vec3(0.0f));
+    EXPECT_FALSE(pair.S.History.CanUndo()) << "Accept is one undo entry";
 }
 
-TEST(CoherentPointDriftOperations, StaleInputsAndCancelledRunsPublishNothing)
+// Run equals the same steps taken one at a time (CPU E-step, deterministic): the same trace and published transform.
+TEST(CoherentPointDriftOperations, ARunEqualsItsStepsOneAtATime)
 {
-    Scene s;
-    const auto points = Cloud(80, 13);
-    std::vector<glm::vec3> moved;
-    for (const auto& p : points) moved.push_back(p + glm::vec3(0.2f, 0.0f, 0.0f));
-    const auto source = Make(s.Registry, D::PointCloudPoint, points);
-    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
-    const R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target)};
-    R::EditorCoherentPointDriftResult failure;
+    const auto accepted = [](const bool stepwise)
+    {
+        ShiftedPair pair;
+        auto config = pair.Config();
+        config.EStep = R::CoherentPointDriftEStep::Reference;
+        config.Execution.IterationCap = 12u;
+        const auto run = pair.Start(config);
+        const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+        if (stepwise)
+            while (pair.Observe(run)->End == R::StepRunEnd::None)
+            {
+                EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Step, 1u));
+                EXPECT_TRUE(pair.Rest(run));
+            }
+        else
+        {
+            EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Run));
+            EXPECT_TRUE(pair.Rest(run));
+        }
+        std::vector<double> sigma2;
+        for (const auto& row : R::SnapshotEditorCoherentPointDrift(run).Trace)
+            sigma2.push_back(row.Sigma2);
+        EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Accept));
+        EXPECT_TRUE(pair.Terminal(run));
+        return std::pair{sigma2, pair.SourcePosition()};
+    };
+    const auto [stepwiseTrace, stepwisePosition] = accepted(true);
+    const auto [runTrace, runPosition] = accepted(false);
+    ASSERT_FALSE(runTrace.empty());
+    EXPECT_EQ(stepwiseTrace, runTrace);
+    EXPECT_EQ(stepwisePosition, runPosition);
+}
 
-    auto run = R::StartEditorCoherentPointDrift(s.Commands(), config, failure);
-    ASSERT_TRUE(run);
-    EXPECT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 0), R::EditorCommandStatus::Pending);
-    s.Registry.Raw().get<T::Component>(target).Position = {0.0f, 5.0f, 0.0f};
-    EXPECT_EQ(R::ApplyEditorCoherentPointDrift(s.Commands(), run).Status, R::EditorCommandStatus::StaleEntity);
-    s.Registry.Raw().get<T::Component>(target).Position = {};
+// Stop ends a run with its partial estimate, which Accept publishes; Restart begins a new generation from step 0 whose
+// steps match a fresh run's, so nothing of the older computation is published.
+TEST(CoherentPointDriftOperations, StopKeepsAPartialResultAndRestartBeginsANewGeneration)
+{
+    const auto twoSteps = [](const bool restart)
+    {
+        ShiftedPair pair;
+        auto config = pair.Config();
+        config.EStep = R::CoherentPointDriftEStep::Reference;
+        const auto run = pair.Start(config);
+        const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+        if (restart)
+        {
+            EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Step, 3u));
+            EXPECT_TRUE(pair.Rest(run));
+            EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Restart));
+            EXPECT_TRUE(DrainUntil(pair.Jobs,
+                [&]
+                {
+                    return pair.Observe(run)->Generation == 1u;
+                }));
+            EXPECT_EQ(pair.Observe(run)->Steps, 0u);
+            EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Ready) << "the start mode of the run (ready)";
+            EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(run).Trace.empty());
+        }
+        EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Step, 2u));
+        EXPECT_TRUE(pair.Rest(run));
+        EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Stop));
+        EXPECT_TRUE(pair.Rest(run));
+        EXPECT_EQ(pair.Observe(run)->End, R::StepRunEnd::Stopped);
+        const auto stopped = R::SnapshotEditorCoherentPointDrift(run).Result;
+        EXPECT_EQ(stopped.Iterations, 2u);
+        EXPECT_EQ(pair.SourcePosition(), glm::vec3(0.0f)) << "Stop never accepts";
+        EXPECT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Accept));
+        EXPECT_TRUE(pair.Terminal(run));
+        EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.Iterations, 2u);
+        EXPECT_TRUE(pair.S.History.CanUndo());
+        return pair.SourcePosition();
+    };
+    const auto fresh = twoSteps(false);
+    EXPECT_NE(fresh, glm::vec3(0.0f));
+    EXPECT_GT(fresh.x, 0.0f);
+    EXPECT_LT(fresh.x, 0.3f) << "two iterations are a partial alignment";
+    EXPECT_EQ(twoSteps(true), fresh);
+}
 
-    run = R::StartEditorCoherentPointDrift(s.Commands(), config, failure);
-    ASSERT_TRUE(run);
-    EXPECT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 0), R::EditorCommandStatus::Pending);
-    s.Registry.Raw().get<GS::Vertices>(source).Properties.GetOrAdd<glm::vec3>("v:position").Vector()[0] += glm::vec3(1.0f);
-    EXPECT_EQ(R::ApplyEditorCoherentPointDrift(s.Commands(), run).Status, R::EditorCommandStatus::StaleEntity);
-
-    run = R::StartEditorCoherentPointDrift(s.Commands(), config, failure);
-    ASSERT_TRUE(run);
-    R::CancelEditorCoherentPointDrift(run);
-    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Cancelled);
-    EXPECT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 1), R::EditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_FALSE(s.History.CanUndo()) << "nothing was published";
+// Changed captures end a run (paused or computing) without publication; Discard ends it at once; a shutdown with a
+// paused run and with a computing one drains both, each delivering one terminal result and publishing nothing.
+TEST(CoherentPointDriftOperations, StaleDiscardedAndShutdownRunsPublishNothing)
+{
+    {
+        ShiftedPair pair;
+        auto config = pair.Config();
+        config.Execution.Start = R::StepRunStart::Run;
+        const auto run = pair.Start(config);
+        ASSERT_TRUE(pair.Rest(run));
+        pair.S.Registry.Raw().get<T::Component>(pair.Target).Position = {0.0f, 5.0f, 0.0f};
+        ASSERT_TRUE(pair.Terminal(run));
+        EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Discarded);
+        ASSERT_TRUE(pair.Jobs.DrainUntilTerminal()); // the result arrives at the settled end
+        EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.Status, R::EditorCommandStatus::StaleEntity);
+        EXPECT_FALSE(pair.S.History.CanUndo());
+    }
+    {
+        ShiftedPair pair;
+        const auto run = pair.Start(pair.Config());
+        pair.S.Registry.Raw().get<GS::Vertices>(pair.Source).Properties.GetOrAdd<glm::vec3>("v:position").Vector()[0] +=
+            glm::vec3(1.0f);
+        ASSERT_TRUE(pair.Terminal(run));
+        EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Discarded);
+        EXPECT_NE(pair.Observe(run)->Diagnostic.find("stale"), std::string::npos) << pair.Observe(run)->Diagnostic;
+        EXPECT_FALSE(pair.S.History.CanUndo());
+    }
+    {
+        ShiftedPair pair;
+        const auto run = pair.Start(pair.Config());
+        ASSERT_TRUE(Control(pair.Jobs, R::SnapshotEditorCoherentPointDrift(run).StepRun, R::StepRunAction::Discard));
+        EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Discarded) << "Discard answers at once";
+        std::string refusal;
+        EXPECT_FALSE(pair.Jobs.StepRuns().Control(
+            R::SnapshotEditorCoherentPointDrift(run).StepRun, R::StepRunAction::Step, 1u, refusal));
+        ASSERT_TRUE(pair.Jobs.DrainUntilTerminal());
+        EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.Status, R::EditorCommandStatus::StaleEntity);
+        EXPECT_FALSE(pair.S.History.CanUndo()) << "nothing was published";
+    }
+    for (const bool computing : {false, true})
+    {
+        SCOPED_TRACE(computing ? "computing" : "paused");
+        ShiftedPair pair(400u, 23u, false);
+        unsigned delivered = 0u;
+        auto config = pair.Config();
+        config.Execution.IterationCap = 10000u;
+        config.Tolerance = 0.0;
+        // The one-shot command (run at once, accept at its end) with a sink, paused or left computing.
+        (void)R::ApplyEditorCoherentPointDriftCommand(pair.S.Commands(),
+            config,
+            [&](const R::EditorCoherentPointDriftResult& result)
+            {
+                ++delivered;
+                EXPECT_FALSE(result.Succeeded());
+            });
+        const auto id = pair.Jobs.StepRuns().Runs().back();
+        ASSERT_TRUE(DrainUntil(pair.Jobs,
+            [&]
+            {
+                return pair.Jobs.StepRuns().Observe(id)->Steps >= 2u;
+            }));
+        if (!computing)
+        {
+            ASSERT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Pause));
+            ASSERT_TRUE(DrainUntil(pair.Jobs,
+                [&]
+                {
+                    return pair.Jobs.StepRuns().Observe(id)->Phase == R::StepRunPhase::Paused;
+                }));
+        }
+        pair.Jobs.Jobs().CancelAndDrain();
+        (void)pair.Jobs.Jobs().DrainCompletions(pair.Jobs.Events());
+        EXPECT_TRUE(R::IsTerminal(pair.Jobs.StepRuns().Observe(id)->Phase));
+        EXPECT_EQ(delivered, 1u) << "one terminal result";
+        EXPECT_FALSE(pair.S.History.CanUndo());
+        EXPECT_EQ(pair.SourcePosition(), glm::vec3(0.0f));
+    }
 }
 
 TEST(CoherentPointDriftOperations, ReadinessExplainsWhyARunCannotStart)
@@ -352,8 +596,11 @@ TEST(CoherentPointDriftOperations, LargeDeformingRunsUseTheAutomaticLowRank)
     for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f * p.y, 0.0f, 0.02f));
     const auto source = Make(s.Registry, D::PointCloudPoint, points);
     const auto target = Make(s.Registry, D::PointCloudPoint, moved);
-    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                       .Method = M::Nonrigid, .MaxIterations = 2u, .Output = O::DisplacementProperty};
+    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target),
+        .Method = M::Nonrigid,
+        .Execution = Cap(2u),
+        .Output = O::DisplacementProperty};
     const auto automatic = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
     ASSERT_TRUE(automatic.Succeeded()) << automatic.Message;
     EXPECT_GT(automatic.KernelRank, 0u);
@@ -361,8 +608,11 @@ TEST(CoherentPointDriftOperations, LargeDeformingRunsUseTheAutomaticLowRank)
 
     // Below the threshold the default stays exact.
     const auto small = Make(s.Registry, D::PointCloudPoint, Cloud(200, 43));
-    config = {.SourceStableEntityId = Id(small), .TargetStableEntityId = Id(target), .Method = M::Nonrigid,
-              .MaxIterations = 2u, .Output = O::DisplacementProperty};
+    config = {.SourceStableEntityId = Id(small),
+        .TargetStableEntityId = Id(target),
+        .Method = M::Nonrigid,
+        .Execution = Cap(2u),
+        .Output = O::DisplacementProperty};
     const auto smallRun = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
     ASSERT_TRUE(smallRun.Succeeded()) << smallRun.Message;
     EXPECT_EQ(smallRun.KernelRank, 0u);
@@ -379,8 +629,12 @@ TEST(CoherentPointDriftOperations, LargeDeformingRunsKeepTheFullKernelWhenExactI
     const auto source = Make(s.Registry, D::PointCloudPoint, points);
     const auto target = Make(s.Registry, D::PointCloudPoint, moved);
     const auto exact = R::ApplyEditorCoherentPointDriftCommand(s.Commands(),
-        {.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target), .Method = M::Nonrigid,
-         .MaxIterations = 1u, .Output = O::DisplacementProperty, .AutoLowRank = false});
+        {.SourceStableEntityId = Id(source),
+            .TargetStableEntityId = Id(target),
+            .Method = M::Nonrigid,
+            .Execution = Cap(1u),
+            .Output = O::DisplacementProperty,
+            .AutoLowRank = false});
     ASSERT_TRUE(exact.Succeeded()) << exact.Message;
     EXPECT_EQ(exact.KernelRank, 0u) << "the full kernel was asked for";
 }
@@ -483,16 +737,14 @@ TEST(CoherentPointDriftOperations, NystromEStepReportsItsBackendAndSampledError)
 // with box landmarks reports a different sampled error than with point landmarks.
 TEST(CoherentPointDriftOperations, NystromLocalSigmaReachesTheSolverTrace)
 {
-    Scene s;
-    const auto points = Cloud(150, 11);
-    const auto source = Make(s.Registry, D::PointCloudPoint, points);
-    const auto target = Make(s.Registry, D::PointCloudPoint, points);
-    R::EditorCoherentPointDriftResult failure;
-    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), {.SourceStableEntityId = Id(source),
-        .TargetStableEntityId = Id(target), .EStep = R::CoherentPointDriftEStep::Nystrom,
-        .NystromLocalSigma = 10.0}, failure);
-    ASSERT_TRUE(run) << failure.Message;
-    (void)R::StepEditorCoherentPointDrift(s.Commands(), run, 1);
+    ShiftedPair pair(150u, 11u);
+    const auto run = pair.Start({.SourceStableEntityId = Id(pair.Source),
+        .TargetStableEntityId = Id(pair.Target),
+        .EStep = R::CoherentPointDriftEStep::Nystrom,
+        .NystromLocalSigma = 10.0});
+    ASSERT_TRUE(run);
+    ASSERT_TRUE(Control(pair.Jobs, R::SnapshotEditorCoherentPointDrift(run).StepRun, R::StepRunAction::Step, 1u));
+    ASSERT_TRUE(pair.Rest(run));
     const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
     ASSERT_EQ(snapshot.Trace.size(), 1u);
     EXPECT_EQ(snapshot.Trace[0].EStep, "truncated");
@@ -540,9 +792,12 @@ TEST(CoherentPointDriftOperations, NystromLandmarkVariantRoundTripsAndReachesThe
     {
         // Here every variant reaches its largest sampled error within the first 10 iterations
         // (measured), so 10 iterations keep the values below at half the runtime.
-        R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                           .OutlierWeight = 0.0, .MaxIterations = 10u,
-                                           .EStep = R::CoherentPointDriftEStep::Nystrom, .NystromLandmarks = 64};
+        R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source),
+            .TargetStableEntityId = Id(target),
+            .OutlierWeight = 0.0,
+            .Execution = Cap(10u),
+            .EStep = R::CoherentPointDriftEStep::Nystrom,
+            .NystromLandmarks = 64};
         config.Output = O::DisplacementProperty;
         // Box landmarks miss the default 1e-3 (box Halton even 0.05) in every iteration here (measured).
         config.NystromErrorLimit = 0.5;
@@ -634,16 +889,26 @@ TEST(CoherentPointDriftOperations, SamplingMethodsAreSelectableForSubsamplesAndL
     for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f, -0.02f, 0.03f));
     const auto source = Make(s.Registry, D::PointCloudPoint, points);
     const auto target = Make(s.Registry, D::PointCloudPoint, moved);
-    R::CoherentPointDriftConfig bayesian{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                         .Method = M::Bayesian, .OutlierWeight = 0.1, .MaxIterations = 5u,
-                                         .Output = O::DisplacementProperty, .DisplacementName = "bcpd", .Subsample = 300};
+    R::CoherentPointDriftConfig bayesian{.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target),
+        .Method = M::Bayesian,
+        .OutlierWeight = 0.1,
+        .Execution = Cap(5u),
+        .Output = O::DisplacementProperty,
+        .DisplacementName = "bcpd",
+        .Subsample = 300};
     bayesian.SubsampleSampling.Method = R::PointSamplingMethod::Random;
     bayesian.SubsampleSampling.Seed = 4u;
     const auto subsampled = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), bayesian);
     ASSERT_TRUE(subsampled.Succeeded()) << subsampled.Message;
-    R::CoherentPointDriftConfig lowRank{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                        .Method = M::Nonrigid, .OutlierWeight = 0.0, .MaxIterations = 5u,
-                                        .Output = O::DisplacementProperty, .DisplacementName = "warp", .LowRank = 30};
+    R::CoherentPointDriftConfig lowRank{.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target),
+        .Method = M::Nonrigid,
+        .OutlierWeight = 0.0,
+        .Execution = Cap(5u),
+        .Output = O::DisplacementProperty,
+        .DisplacementName = "warp",
+        .LowRank = 30};
     lowRank.LandmarkSampling.Method = R::PointSamplingMethod::Random;
     const auto result = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), lowRank);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
@@ -666,9 +931,14 @@ TEST(CoherentPointDriftOperations, VulkanSubsamplesWithoutADeviceRunOnTheCpuAndS
     for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f, -0.02f, 0.03f));
     const auto source = Make(s.Registry, D::PointCloudPoint, points);
     const auto target = Make(s.Registry, D::PointCloudPoint, moved);
-    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-                                       .Method = M::Bayesian, .OutlierWeight = 0.1, .MaxIterations = 5,
-                                       .Output = O::DisplacementProperty, .DisplacementName = "bcpd", .Subsample = 100};
+    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target),
+        .Method = M::Bayesian,
+        .OutlierWeight = 0.1,
+        .Execution = Cap(5u),
+        .Output = O::DisplacementProperty,
+        .DisplacementName = "bcpd",
+        .Subsample = 100};
     config.SubsampleBackend = R::PointSamplingBackend::Vulkan;
     const auto immediate = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
     ASSERT_TRUE(immediate.Succeeded()) << immediate.Message;
@@ -701,60 +971,33 @@ TEST(CoherentPointDriftOperations, VulkanSubsamplesWithoutADeviceRunOnTheCpuAndS
         << queued.SubsampleBackendDiagnostic;
 }
 
-namespace
+TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedWithoutAWorkspace)
 {
-    bool EvaluateBrokerBlocking(R::CoherentPointDriftGpuEStep& broker,
-        const Geometry::CoherentPointDrift::EStep::ExternalRequest& request)
-    {
-        auto ready = broker.Queue(request);
-        if (!ready) return false;
-        ready->WaitForProgress(1u);
-        return broker.Complete(ready, request);
-    }
-}
-
-TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
-{
-    // Refusal and an elapsed deadline both close the broker. The owner observes the deadline
-    // during Pump; Queue never blocks and there is no timer thread.
-    R::SpatialIndexCache cache; // no device: no workspace lease, so the computation is refused
+    // ARCH-023: the run's Init prepares the workspace; without a device lease it closes the broker at once and every
+    // later E-step answers false (the solver runs it on the CPU) without waiting.
+    R::SpatialIndexCache cache; // no device: no workspace lease
+    Extrinsic::Tests::MockDevice device;
     const std::vector<double> x{0.0, 1.0}, zero(2, 0.0), weights(2, 0.0);
     std::vector<double> logDen(2), pt1(2), p1(2), px(2), py(2), pz(2);
     const Geometry::CoherentPointDrift::EStep::ExternalRequest request{
         .Target = {x, zero, zero}, .Moved = {x, zero, zero}, .TargetGeneration = 1u, .Sigma2 = 1.0,
         .LogOutlier = -std::numeric_limits<double>::infinity(), .LogWeights = weights,
         .LogDenominator = logDen, .Pt1 = pt1, .P1 = p1, .PXx = px, .PXy = py, .PXz = pz};
-    {
-        R::CoherentPointDriftGpuEStep broker(cache);
-        std::atomic<bool> done{false};
-        bool evaluated = true;
-        std::thread worker([&] { evaluated = EvaluateBrokerBlocking(broker, request); done = true; });
-        while (!done) { broker.Pump(); std::this_thread::yield(); }
-        worker.join();
-        EXPECT_FALSE(evaluated);
-        EXPECT_TRUE(broker.Closed());
-        EXPECT_FALSE(broker.Diagnostic().empty());
-        EXPECT_EQ(broker.Stats().Failed, 1u);
-        EXPECT_FALSE(EvaluateBrokerBlocking(broker, request)) << "a closed broker answers at once";
-    }
-    {
-        R::CoherentPointDriftGpuEStep broker(cache, std::chrono::milliseconds{20});
-        auto ready = broker.Queue(request);
-        ASSERT_TRUE(ready);
-        std::this_thread::sleep_for(std::chrono::milliseconds{25});
-        EXPECT_FALSE(broker.Closed()) << "only the owner pump observes the deadline";
-        broker.Pump();
-        EXPECT_EQ(ready->PendingCount(), 0u);
-        EXPECT_FALSE(broker.Complete(ready, request));
-        EXPECT_TRUE(broker.Closed());
-        EXPECT_NE(broker.Diagnostic().find("in time"), std::string::npos) << broker.Diagnostic();
-    }
+    R::CoherentPointDriftGpuEStep broker(cache, device);
+    EXPECT_FALSE(broker.Prepare(2u, 2u));
+    EXPECT_TRUE(broker.Closed());
+    EXPECT_FALSE(broker.Diagnostic().empty());
+    EXPECT_EQ(broker.Stats().Failed, 1u);
+    EXPECT_FALSE(broker.Evaluate(request)) << "a closed broker answers at once";
+    EXPECT_EQ(broker.Stats().Requests, 0u);
 }
 
 namespace
 {
-    // A broker on a cache bound to a mock framed device whose immediate submits record the real
-    // workspace and hold the readback until the test delivers it (as the GPU would, later).
+    // ARCH-023: a broker on a cache bound to a mock device whose submissions record the real workspace. A page's
+    // pulled readback completes at once, or, while Hold is set, stays pending until Release; the worker waits through
+    // WaitCompute and takes its bytes through TakeCompletedReadback (every double is its index, or Answer's), with no
+    // frame, drain or main-thread pump. Fields the worker's hooks touch are guarded by Gpu.
     class CpdBrokerWorkspaceReuse : public ::testing::Test
     {
     protected:
@@ -766,8 +1009,12 @@ namespace
         R::KernelEventBus Events;
         R::ServiceRegistry Services;
         R::SpatialIndexCache Cache;
-        std::optional<Extrinsic::RHI::ReadbackSink> Held{};
-        std::uint64_t HeldBytes{0u}, Tokens{0u};
+        std::mutex Gpu;
+        bool Hold{false}; // the next page stays pending until Release
+        std::uint64_t HeldToken{0u}; // the page held now (0: none)
+        std::uint64_t Tokens{0u}, Taken{0u}, Released{0u};
+        bool AllPulled{true}; // every E-step page asked for a pulled readback
+        std::function<std::vector<double>(std::size_t)> Answer{};
         bool Stopped{false};
 
         // One request's storage: n targets on the x axis, m sources, a target generation.
@@ -792,12 +1039,54 @@ namespace
 
         void SetUp() override
         {
+            namespace RHI = Extrinsic::RHI;
             Device.ShaderFloat64 = true;
-            Device.ComputeReadback = [this](auto record, std::uint64_t bytes, Extrinsic::RHI::ReadbackSink sink) {
-                if (!record(Device.CommandContext).IsValid()) return Extrinsic::RHI::ReadbackToken{};
-                Held = std::move(sink);
-                HeldBytes = bytes;
-                return Extrinsic::RHI::ReadbackToken{++Tokens};
+            Device.ComputeReadback = [this](auto record, std::uint64_t, RHI::ReadbackSink sink)
+            {
+                if (!record(Device.CommandContext).IsValid())
+                    return RHI::ReadbackToken{};
+                std::scoped_lock lock{Gpu};
+                AllPulled = AllPulled && sink.Pulled;
+                const RHI::ReadbackToken token{++Tokens};
+                if (std::exchange(Hold, false))
+                    HeldToken = token.Value;
+                return token;
+            };
+            Device.TransferQueue.ComputeWait = [this](RHI::ReadbackToken token, std::uint64_t)
+            {
+                {
+                    std::scoped_lock lock{Gpu};
+                    if (token.Value != HeldToken)
+                        return RHI::ComputeWaitStatus::Complete;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+                return RHI::ComputeWaitStatus::Pending;
+            };
+            // An invalid token names no submission and is complete (as the default mock answers): the workspace pool's
+            // retirement stamp carries the compute fence (ARCH-023), which is 0 here, and must retire with its frames.
+            Device.TransferQueue.ReadbackComplete = [this](RHI::ReadbackToken token)
+            {
+                std::scoped_lock lock{Gpu};
+                return !token.IsValid() || token.Value != HeldToken;
+            };
+            Device.TransferQueue.TakeReadback = [this](RHI::ReadbackToken, std::span<std::byte> destination)
+            {
+                std::vector<double> values(destination.size() / sizeof(double));
+                if (Answer)
+                    values = Answer(values.size());
+                else
+                    for (std::size_t k = 0; k < values.size(); ++k)
+                        values[k] = double(k);
+                std::memcpy(
+                    destination.data(), values.data(), std::min(destination.size(), values.size() * sizeof(double)));
+                std::scoped_lock lock{Gpu};
+                ++Taken;
+                return true;
+            };
+            Device.TransferQueue.ReleaseReadbackHook = [this](RHI::ReadbackToken)
+            {
+                std::scoped_lock lock{Gpu};
+                ++Released;
             };
             Services.BeginRegistration();
             ASSERT_TRUE(Services.Provide<Extrinsic::RHI::IDevice>(Device, "test").has_value());
@@ -810,15 +1099,41 @@ namespace
             R::RuntimeModuleShutdownContext shutdown{Commands, Events, Jobs.Jobs(), Worlds, Services};
             Cache.OnShutdown(shutdown);
         }
-        // The GPU finishes: every double of the readback is its index.
-        void Deliver()
+        void HoldNext()
         {
-            std::vector<double> values(HeldBytes / sizeof(double));
-            for (std::size_t k = 0; k < values.size(); ++k) values[k] = double(k);
-            Held->Deliver(std::as_bytes(std::span<const double>(values)));
-            Held.reset();
+            std::scoped_lock lock{Gpu};
+            Hold = true;
         }
-        // Drains completed computations and retires every frame that may have used their buffers.
+        // The held page completes (the device finished it).
+        void Release()
+        {
+            std::scoped_lock lock{Gpu};
+            HeldToken = 0u;
+            Hold = false;
+        }
+        [[nodiscard]] bool Waiting()
+        {
+            std::scoped_lock lock{Gpu};
+            return HeldToken != 0u;
+        }
+        [[nodiscard]] std::uint64_t Count(const std::uint64_t& counter)
+        {
+            std::scoped_lock lock{Gpu};
+            return counter;
+        }
+        // Waits (bounded) for a page to be held, draining the job lane so a step run's pump can start its segment.
+        [[nodiscard]] bool AwaitHeld(const bool drain)
+        {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+            while (!Waiting() && std::chrono::steady_clock::now() < deadline)
+            {
+                if (drain)
+                    (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            }
+            return Waiting();
+        }
+        // Retires every frame that may have used released buffers.
         void RetireFrames()
         {
             for (int i = 0; i < 2; ++i)
@@ -829,24 +1144,23 @@ namespace
                 Cache.Prune();
             }
         }
-        // A worker evaluates while this (main) thread pumps and completes the device work.
-        bool Evaluate(R::CoherentPointDriftGpuEStep& broker, Case& c)
+        // ARCH-023: a worker's E-step writes its rows into the prepared staging (IDevice::WriteMappedBuffer) and copies
+        // them on the compute lane; an owner WriteBuffer would be a regression.
+        [[nodiscard]] std::size_t WritesOf(std::size_t bytes)
         {
-            std::atomic<bool> done{false};
-            bool evaluated = false;
-            std::thread worker([&] { evaluated = EvaluateBrokerBlocking(broker, c.Request()); done = true; });
-            while (!done)
-            {
-                broker.Pump();
-                if (Held) Deliver();
-                std::this_thread::yield();
-            }
-            worker.join();
-            return evaluated;
-        }
-        [[nodiscard]] std::size_t WritesOf(std::size_t bytes) const
-        {
-            return std::size_t(std::ranges::count_if(Device.BufferWrites, [&](const auto& w) { return w.Data.size() == bytes; }));
+            std::scoped_lock lock{Device.MappedWriteMutex};
+            EXPECT_EQ(std::ranges::count_if(Device.BufferWrites,
+                          [&](const auto& w)
+                          {
+                              return w.Data.size() == bytes;
+                          }),
+                0)
+                << "no owner WriteBuffer of E-step rows";
+            return std::size_t(std::ranges::count_if(Device.MappedWrites,
+                [&](const auto& w)
+                {
+                    return w.Data.size() == bytes;
+                }));
         }
     };
 
@@ -857,8 +1171,30 @@ namespace
     };
 }
 
-TEST_F(CpdSingleWorkerWait, PendingGpuEStepReleasesTheWorkerForOrdinaryJobs)
+TEST_F(CpdBrokerWorkspaceReuse, TimedOutEStepClosesTheBrokerOnItsWorker)
 {
+    // The deadline is observed by the waiting worker itself (no owner pump, no timer thread): the page is given up,
+    // the broker closes and the solver runs that E-step on the CPU.
+    Case c(2, 2, 11);
+    R::CoherentPointDriftGpuEStep broker(Cache, Device, std::chrono::milliseconds{20});
+    ASSERT_TRUE(broker.Prepare(2u, 2u)) << broker.Diagnostic();
+    HoldNext();
+    const auto started = std::chrono::steady_clock::now();
+    EXPECT_FALSE(broker.Evaluate(c.Request()));
+    EXPECT_GE(std::chrono::steady_clock::now() - started, std::chrono::milliseconds{20});
+    EXPECT_TRUE(broker.Closed());
+    EXPECT_NE(broker.Diagnostic().find("in time"), std::string::npos) << broker.Diagnostic();
+    EXPECT_EQ(Count(Released), 1u) << "the late page is given up, never taken";
+    EXPECT_EQ(Count(Taken), 0u);
+    EXPECT_TRUE(AllPulled) << "the E-step's statistics are pulled by its worker";
+    Release();
+}
+
+TEST_F(CpdSingleWorkerWait, PendingGpuEStepCompletesOnItsWorkerWithoutDrains)
+{
+    // ARCH-023 replaces the parked coroutine and its main-thread pump: the step's worker waits for its own page
+    // (one worker per active run, as a CPU step run), so the iteration completes with no drain, frame or pump once
+    // the device finished.
     Scene scene;
     const auto points = Cloud(64, 31);
     auto shifted = points;
@@ -869,52 +1205,130 @@ TEST_F(CpdSingleWorkerWait, PendingGpuEStepReleasesTheWorkerForOrdinaryJobs)
     scene.Context.SpatialIndices = &Cache;
     scene.Context.Device = &Device;
     R::EditorCoherentPointDriftResult failure;
-    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(), {
-        .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-        .MaxIterations = 1u, .InitialSigma2 = 10.0,
-        .EStep = R::CoherentPointDriftEStep::Vulkan, .Threads = 1u}, failure);
+    HoldNext();
+    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(),
+        {.SourceStableEntityId = Id(source),
+            .TargetStableEntityId = Id(target),
+            .Execution = Cap(1u),
+            .InitialSigma2 = 10.0,
+            .EStep = R::CoherentPointDriftEStep::Vulkan,
+            .Threads = 1u},
+        failure);
     ASSERT_TRUE(run) << failure.Message;
-    ASSERT_EQ(R::StepEditorCoherentPointDrift(scene.Commands(), run, 1u), R::EditorCommandStatus::Pending);
-    const auto cleanup = [&] {
-        R::CancelEditorCoherentPointDrift(run);
+    const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+    ASSERT_TRUE(Control(Jobs, id, R::StepRunAction::Step, 1u));
+    const auto cleanup = [&]
+    {
+        Release();
+        std::string refusal;
+        (void)Jobs.StepRuns().Control(id, R::StepRunAction::Discard, 1u, refusal);
         (void)Jobs.Jobs().CancelAll();
-        // Closing the auxiliary pump also unblocks the pre-coroutine baseline.
         (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-        if (Held) Deliver();
         (void)Jobs.Jobs().ShutdownGpuQueueParticipants([&] { Device.WaitIdle(); });
         Jobs.Jobs().CancelAndDrain();
     };
-    const auto requestDeadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
-    while (!Held && std::chrono::steady_clock::now() < requestDeadline)
-    {
-        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-        std::this_thread::sleep_for(std::chrono::milliseconds{1});
-    }
-    if (!Held)
+    if (!AwaitHeld(true))
     {
         cleanup();
-        FAIL() << "The actual CPD operation never reached its held GPU readback.";
+        FAIL() << "The actual CPD operation never reached its held device E-step.";
     }
-    std::atomic<bool> ordinaryRan{false};
-    const auto token = Jobs.Jobs().Submit(R::JobDesc{
-        .DebugName = "CPD.worker-availability-control",
-        .Work = [&](const R::JobCancellation&) {
-            ordinaryRan.store(true, std::memory_order_release);
-            return R::JobResultEnvelope::Make(true);
-        },
-        .PublishCompletion = [](R::KernelEventBus&, const R::JobResultEnvelope&) { return true; },
-    });
-    EXPECT_TRUE(token.IsValid());
-    const auto ordinaryDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{500};
-    while (!ordinaryRan.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < ordinaryDeadline)
+    Release(); // no drain, frame or pump from here on
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+    while (Jobs.StepRuns().Observe(id)->Steps < 1u && std::chrono::steady_clock::now() < deadline)
         std::this_thread::sleep_for(std::chrono::milliseconds{1});
-    EXPECT_TRUE(ordinaryRan.load(std::memory_order_acquire))
-        << "A pending E-step must suspend its coroutine, freeing the sole worker.";
-    EXPECT_TRUE(Held.has_value()) << "The control must finish before the GPU result is delivered.";
+    EXPECT_EQ(Jobs.StepRuns().Observe(id)->Steps, 1u) << "the iteration completed on its worker";
+    EXPECT_EQ(Count(Taken), 1u);
+    EXPECT_TRUE(AllPulled);
     cleanup();
 }
 
-TEST_F(CpdSingleWorkerWait, EditorCancelWakesPendingEStepWithoutFallbackOrIteration)
+// ARCH-023: a running Vulkan E-step run advances on its worker alone: once its segment started, three EM iterations
+// (three device pages, each pulled and taken by the worker) complete with no drain, frame or pump on this thread.
+// Prediction: Steps 3, Taken 3, three trace rows, every page pulled. Mutation: restoring a main-thread pump (or an
+// ordinary sink) leaves Steps at 0 until a drain runs.
+TEST_F(CpdSingleWorkerWait, ARunningVulkanRunAdvancesThreeIterationsWithNoDrainOrFrame)
+{
+    constexpr std::size_t kSources = 48u, kTargets = 64u;
+    const auto sourcePoints = Cloud(kSources, 41);
+    auto targetPoints = Cloud(kTargets, 43);
+    for (std::size_t i = 0; i < kSources; ++i)
+        targetPoints[i] = sourcePoints[i] + glm::vec3(0.1f, -0.05f, 0.02f);
+    Scene scene;
+    const auto source = Make(scene.Registry, D::PointCloudPoint, sourcePoints);
+    const auto target = Make(scene.Registry, D::PointCloudPoint, targetPoints);
+    Jobs.Attach(scene.Context);
+    scene.Context.SpatialIndices = &Cache;
+    scene.Context.Device = &Device;
+    // A consistent soft E-step: source i gives weight 1-w to target i and w to target i+1 (cyclic over the first
+    // kSources targets, so each of them still receives Pt1 = 1), w growing every call. The exact one-to-one answer
+    // this replaces drove sigma^2 to its floor after the first M-step (SigmaFloor ended the run at one iteration); a
+    // fixed soft answer repeats one objective and converges at the third E-step. This one keeps sigma^2 positive and
+    // changes the objective every iteration, so only the cap ends the run (the solver's rules are unchanged).
+    Answer = [&, call = 0u](const std::size_t doubles) mutable
+    {
+        std::vector<double> values(doubles, 0.0);
+        if (values.size() >= 2u * kTargets + 4u * kSources)
+        {
+            const double w = 0.1 * double(++call);
+            for (std::size_t i = 0; i < kSources; ++i)
+            {
+                const auto& own = targetPoints[i];
+                const auto& following = targetPoints[(i + 1u) % kSources];
+                values[kTargets + i] = 1.0;
+                values[2u * kTargets + i] = 1.0;
+                values[2u * kTargets + kSources + i] = (1.0 - w) * own.x + w * following.x;
+                values[2u * kTargets + 2u * kSources + i] = (1.0 - w) * own.y + w * following.y;
+                values[2u * kTargets + 3u * kSources + i] = (1.0 - w) * own.z + w * following.z;
+            }
+        }
+        return values;
+    };
+    R::EditorCoherentPointDriftResult failure;
+    HoldNext();
+    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(),
+        {.SourceStableEntityId = Id(source),
+            .TargetStableEntityId = Id(target),
+            .Execution = Cap(3u),
+            .Tolerance = 1.0e-12, // no early convergence: the cap ends the run
+            .InitialSigma2 = 10.0,
+            .NormalizeInputs = false,
+            .EStep = R::CoherentPointDriftEStep::Vulkan,
+            .Threads = 1u},
+        failure);
+    ASSERT_TRUE(run) << failure.Message;
+    const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+    ASSERT_TRUE(Control(Jobs, id, R::StepRunAction::Run));
+    const auto cleanup = [&]
+    {
+        Release();
+        (void)Jobs.Jobs().CancelAll();
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        (void)Jobs.Jobs().ShutdownGpuQueueParticipants(
+            [&]
+            {
+                Device.WaitIdle();
+            });
+        Jobs.Jobs().CancelAndDrain();
+    };
+    if (!AwaitHeld(true))
+    {
+        cleanup();
+        FAIL() << "the run's segment never submitted its first device E-step";
+    }
+    Release(); // from here on this thread neither drains nor renders
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+    while (Jobs.StepRuns().Observe(id)->Steps < 3u && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    EXPECT_EQ(Jobs.StepRuns().Observe(id)->Steps, 3u);
+    EXPECT_EQ(Count(Taken), 3u) << "three device pages, each taken once by the worker";
+    EXPECT_TRUE(AllPulled);
+    (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Trace.size(), 3u);
+    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Result.EStepFallbacks, 0u);
+    cleanup();
+}
+
+TEST_F(CpdSingleWorkerWait, EditorDiscardWakesPendingEStepWithoutFallbackOrIteration)
 {
     Scene scene;
     const auto points = Cloud(64, 31);
@@ -926,253 +1340,536 @@ TEST_F(CpdSingleWorkerWait, EditorCancelWakesPendingEStepWithoutFallbackOrIterat
     scene.Context.SpatialIndices = &Cache;
     scene.Context.Device = &Device;
     R::EditorCoherentPointDriftResult failure;
-    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(), {
-        .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
-        .MaxIterations = 1u, .InitialSigma2 = 10.0,
-        .EStep = R::CoherentPointDriftEStep::Vulkan, .Threads = 1u}, failure);
+    HoldNext();
+    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(),
+        {.SourceStableEntityId = Id(source),
+            .TargetStableEntityId = Id(target),
+            .Execution = Cap(1u),
+            .InitialSigma2 = 10.0,
+            .EStep = R::CoherentPointDriftEStep::Vulkan,
+            .Threads = 1u},
+        failure);
     ASSERT_TRUE(run) << failure.Message;
-    ASSERT_EQ(R::StepEditorCoherentPointDrift(scene.Commands(), run, 1u), R::EditorCommandStatus::Pending);
-    const auto cleanup = [&] {
+    const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+    ASSERT_TRUE(Control(Jobs, id, R::StepRunAction::Step, 1u));
+    const auto cleanup = [&]
+    {
+        Release();
         (void)Jobs.Jobs().CancelAll();
         (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-        if (Held) Deliver();
         (void)Jobs.Jobs().ShutdownGpuQueueParticipants([&] { Device.WaitIdle(); });
         Jobs.Jobs().CancelAndDrain();
     };
-    const auto requestDeadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
-    while (!Held && std::chrono::steady_clock::now() < requestDeadline)
+    if (!AwaitHeld(true))
     {
-        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
-        std::this_thread::sleep_for(std::chrono::milliseconds{1});
-    }
-    if (!Held)
-    {
-        ADD_FAILURE() << "The real CPD step did not queue its device request.";
+        ADD_FAILURE() << "The real CPD step did not submit its device E-step.";
         cleanup();
         return;
     }
-    R::JobToken step;
-    for (const auto& job : Jobs.Jobs().SnapshotAll())
-        if (job.DebugName == "Sandbox.CoherentPointDrift") step = job.Token;
-    EXPECT_TRUE(step.IsValid());
-    R::CancelEditorCoherentPointDrift(run);
+    ASSERT_TRUE(Control(Jobs, id, R::StepRunAction::Discard));
     const auto cancelDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{500};
-    while (!Jobs.Jobs().IsComplete(step) && std::chrono::steady_clock::now() < cancelDeadline)
+    while (Jobs.StepRuns().Observe(id)->SegmentInFlight && std::chrono::steady_clock::now() < cancelDeadline)
     {
         (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
         std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
-    EXPECT_TRUE(Jobs.Jobs().IsComplete(step)) << "Editor cancel must wake the parked step by itself.";
-    EXPECT_TRUE(Held.has_value()) << "The GPU must still be pending until all assertions finish.";
+    EXPECT_FALSE(Jobs.StepRuns().Observe(id)->SegmentInFlight) << "Discard must wake the waiting step by itself.";
+    EXPECT_TRUE(Waiting()) << "The GPU must still be pending until all assertions finish.";
+    EXPECT_EQ(Count(Released), 1u) << "the abandoned page is given up";
+    EXPECT_EQ(Count(Taken), 0u);
     const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
-    EXPECT_EQ(snapshot.Phase, R::EditorCoherentPointDriftPhase::Cancelled);
+    EXPECT_EQ(Jobs.StepRuns().Observe(id)->Phase, R::StepRunPhase::Discarded);
     EXPECT_EQ(snapshot.Result.EStepFallbacks, 0u);
     EXPECT_TRUE(snapshot.Trace.empty());
     cleanup();
 }
 
+// ARCH-023 Q7: a run whose device subsample ordering is pending at its start is owner-driven (its pump job submits
+// the iterations). Cancelled from the Jobs window while an iteration runs, its holder, pump and iteration end
+// together, and the pump's finalizer can run first (here the pump row is cancelled and drained first). The run
+// answers once, at its settled end after the held iteration returned: a same-source run started from that answer is
+// admitted. Prediction, the pump finalizer abandoning the run: one delivery in the pump's drain while the iteration
+// is held, the run no longer in flight, the start inside it refused as busy. Fixed: none while held, then exactly
+// one cancelled result, and the new run is ready with its own step run.
+TEST_F(CpdBrokerWorkspaceReuse, ACancelledOwnerDrivenRunAnswersOnceItsHeldIterationReturned)
+{
+    Scene scene;
+    const auto source = Make(scene.Registry, D::PointCloudPoint, Cloud(64, 31));
+    const auto target = Make(scene.Registry, D::PointCloudPoint, Cloud(64, 37));
+    Jobs.Attach(scene.Context);
+    scene.Context.SpatialIndices = &Cache;
+    scene.Context.Device = &Device;
+    // The iteration's device E-step waits on its worker until released; closing the broker does not end this wait.
+    const auto held = std::make_shared<std::atomic<bool>>(true);
+    const auto entered = std::make_shared<std::atomic<bool>>(false);
+    Device.TransferQueue.ComputeWait = [held, entered, base = Device.TransferQueue.ComputeWait](
+                                           const Extrinsic::RHI::ReadbackToken token, const std::uint64_t timeout)
+    {
+        *entered = true;
+        while (*held)
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        return base(token, timeout);
+    };
+    unsigned delivered = 0u;
+    std::optional<R::EditorCoherentPointDriftResult> ended;
+    R::EditorCoherentPointDriftRunHandle next;
+    R::EditorCoherentPointDriftResult refused;
+    // The mock refuses uploads, so the pending source ordering falls back to the CPU when it is submitted: the run
+    // stays owner-driven and its first iteration depends on nothing.
+    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target),
+        .Method = M::Bayesian,
+        .Execution = Cap(10000u),
+        .InitialSigma2 = 10.0,
+        .Output = O::DisplacementProperty,
+        .DisplacementName = "bcpd",
+        .EStep = R::CoherentPointDriftEStep::Vulkan,
+        .Threads = 1u,
+        .Subsample = 32u};
+    config.SubsampleBackend = R::PointSamplingBackend::Vulkan;
+    const auto pending = R::ApplyEditorCoherentPointDriftCommand(scene.Commands(),
+        config,
+        [&](R::EditorCoherentPointDriftResult result)
+        {
+            ++delivered;
+            ended = std::move(result);
+            next = R::StartEditorCoherentPointDrift(
+                scene.Commands(), {.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target)}, refused);
+        });
+    const auto rows = [&]
+    {
+        return scene.Context.JobCommands.SnapshotAll();
+    };
+    R::JobToken pump{}, holder{};
+    for (const auto& row : rows())
+        if (row.Identity.OutputName == "coherent_point_drift.pump")
+        {
+            pump = row.Token;
+            holder = row.Identity.Run;
+        }
+    // The old run's active jobs: its holder and every job that joined it.
+    const auto active = [&]
+    {
+        return std::ranges::count_if(rows(),
+            [&](const R::EditorJobRecord& row)
+            {
+                return (row.Token == holder || row.Identity.Run == holder) && R::IsActiveEditorJobState(row.State);
+            });
+    };
+    const auto cleanup = [&]
+    {
+        *held = false;
+        (void)Jobs.Jobs().CancelAll();
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        (void)Jobs.Jobs().ShutdownGpuQueueParticipants(
+            [&]
+            {
+                Device.WaitIdle();
+            });
+        Jobs.Jobs().CancelAndDrain();
+    };
+    if (pending.Status != R::EditorCommandStatus::Pending || !pump.IsValid() || !holder.IsValid())
+    {
+        cleanup();
+        FAIL() << "the pending device ordering makes the run owner-driven, its pump joining the holder: "
+               << pending.Message;
+    }
+    EXPECT_NE(pending.SubsampleBackendDiagnostic.find("Resident sampling input acquisition refused"), std::string::npos)
+        << pending.SubsampleBackendDiagnostic;
+    const auto id = pending.StepRun;
+    if (!DrainUntil(
+            Jobs,
+            [&]
+            {
+                return entered->load();
+            },
+            std::chrono::seconds{5}))
+    {
+        cleanup();
+        FAIL() << "the pump's iteration never reached its held device E-step";
+    }
+
+    // The Jobs window: the pump row first (its finalizer runs in this drain), then the run (holder and iteration).
+    EXPECT_EQ(R::CancelEditorRuns(scene.Context.JobCommands, std::span<const R::JobToken>{&pump, 1u}).Requested, 1u);
+    (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+    EXPECT_EQ(delivered, 0u) << "no answer from the pump's finalizer while the iteration runs";
+    EXPECT_EQ(R::CancelEditorRuns(scene.Context.JobCommands, std::span<const R::JobToken>{&holder, 1u}).Requested, 2u)
+        << "the holder and the held iteration";
+    for (int drain = 0; drain < 20; ++drain)
+    {
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    EXPECT_EQ(delivered, 0u) << "no answer while the iteration is held";
+    const auto whileHeld = Jobs.StepRuns().Observe(id);
+    EXPECT_TRUE(whileHeld && whileHeld->Phase == R::StepRunPhase::Discarded && whileHeld->SegmentInFlight)
+        << "discarded, its held iteration still in flight";
+    EXPECT_EQ(active(), 1) << "only the held iteration: the holder and the pump are finalized";
+
+    *held = false;
+    EXPECT_TRUE(DrainUntil(Jobs,
+        [&]
+        {
+            return delivered > 0u;
+        }));
+    for (int drain = 0; drain < 5; ++drain)
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+    EXPECT_EQ(delivered, 1u);
+    EXPECT_EQ(active(), 0) << "no stranded holder, pump or later iteration";
+    const auto settled = Jobs.StepRuns().Observe(id);
+    EXPECT_TRUE(settled && !settled->SegmentInFlight && settled->Steps == 0u);
+    if (ended)
+    {
+        EXPECT_EQ(ended->Status, R::EditorCommandStatus::StaleEntity);
+        EXPECT_NE(ended->Message.find("cancelled"), std::string::npos) << ended->Message;
+        EXPECT_EQ(ended->StepRun, id);
+    }
+    EXPECT_TRUE(next) << "admitted, not refused as busy: " << refused.Message;
+    if (next)
+    {
+        const auto nextId = R::SnapshotEditorCoherentPointDrift(next).StepRun;
+        EXPECT_NE(nextId, 0u);
+        EXPECT_NE(nextId, id);
+        const auto ready = Jobs.StepRuns().Observe(nextId);
+        EXPECT_TRUE(ready && ready->Phase == R::StepRunPhase::Ready);
+    }
+    cleanup();
+    EXPECT_EQ(delivered, 1u) << "one terminal result for the cancelled run";
+}
+
 TEST_F(CpdBrokerWorkspaceReuse, StepsAndRunsReuseThePooledWorkspaceAndUploadEachTargetOnce)
 {
-    // n = 3 targets (96 bytes as float-float), m = 2 sources (64 bytes).
+    // n = 3 targets (96 bytes as float-float), m = 2 sources (64 bytes); the Init prepares 3 x 4.
     constexpr std::size_t kTargetBytes = 3u * 32u, kSourceBytes = 2u * 32u;
     Case first(3, 2, 101);
-    R::CoherentPointDriftGpuEStep run(Cache);
-    ASSERT_TRUE(Evaluate(run, first)) << run.Diagnostic();
+    R::CoherentPointDriftGpuEStep run(Cache, Device);
+    ASSERT_TRUE(run.Prepare(3u, 4u)) << run.Diagnostic();
+    EXPECT_EQ(Device.CreatePipelineCount, 2) << "the Init creates both pipelines";
+    const int buffers = Device.CreateBufferCount;
+    ASSERT_TRUE(run.Evaluate(first.Request())) << run.Diagnostic();
     // The readback lands in the solver's spans in the LogDenominator, Pt1, P1, PX order.
     EXPECT_EQ(first.LogDen, (std::vector<double>{0, 1, 2}));
     EXPECT_EQ(first.Pt1, (std::vector<double>{3, 4, 5}));
     EXPECT_EQ(first.P1, (std::vector<double>{6, 7}));
     EXPECT_EQ(first.PZ, (std::vector<double>{12, 13}));
-    ASSERT_TRUE(Evaluate(run, first));
+    ASSERT_TRUE(run.Evaluate(first.Request()));
     EXPECT_EQ(Device.CreatePipelineCount, 2);
-    const int buffers = Device.CreateBufferCount;
-    EXPECT_EQ(WritesOf(kTargetBytes), 1u) << "the fixed target is uploaded once per step";
+    EXPECT_EQ(Device.CreateBufferCount, buffers) << "a worker's E-step creates nothing";
+    EXPECT_EQ(WritesOf(kTargetBytes), 1u) << "the fixed target is uploaded once per run";
     EXPECT_EQ(WritesOf(kSourceBytes), 2u) << "the moved source every iteration";
 
-    // The step's pump ends: the lease returns to the pool and the next step is served by it,
-    // keeping pipelines, buffers and the uploaded target of this generation.
-    run.ReleaseDeviceResources();
+    // Frames retire meanwhile: the run keeps its lease, so the next step reuses its pipelines, buffers and the
+    // uploaded target of this generation.
     RetireFrames();
-    ASSERT_TRUE(Evaluate(run, first));
-    EXPECT_EQ(Cache.Stats().WorkspaceReuses, 1u);
-    EXPECT_EQ(Device.CreatePipelineCount, 2);
+    ASSERT_TRUE(run.Evaluate(first.Request()));
+    EXPECT_EQ(Cache.Stats().WorkspaceLeases, 1u) << "one lease for the whole run";
+    EXPECT_GT(Cache.Stats().ScratchActiveBytes, 0u) << "the run's buffers stay pinned between steps";
     EXPECT_EQ(Device.CreateBufferCount, buffers);
     EXPECT_EQ(WritesOf(kTargetBytes), 1u);
 
-    // Growth replaces only undersized buffers (source, results); shrinking keeps them.
+    // Every shape up to the prepared one fits without growth; a larger one closes the broker (the CPU goes on).
     Case wider(3, 4, 101);
-    ASSERT_TRUE(Evaluate(run, wider));
-    EXPECT_EQ(Device.CreateBufferCount, buffers + 2);
-    ASSERT_TRUE(Evaluate(run, first));
-    EXPECT_EQ(Device.CreateBufferCount, buffers + 2);
+    ASSERT_TRUE(run.Evaluate(wider.Request()));
+    EXPECT_EQ(Device.CreateBufferCount, buffers);
+    ASSERT_TRUE(run.Evaluate(first.Request()));
     EXPECT_EQ(first.P1, (std::vector<double>{6, 7})) << "the readback is the current shape's prefix";
-    EXPECT_EQ(WritesOf(kTargetBytes), 1u);
+    Case beyond(3, 5, 101);
+    EXPECT_FALSE(run.Evaluate(beyond.Request()));
+    EXPECT_TRUE(run.Closed());
+    EXPECT_NE(run.Diagnostic().find("prepared"), std::string::npos) << run.Diagnostic();
+    EXPECT_EQ(Device.CreateBufferCount, buffers);
     run.ReleaseDeviceResources();
     RetireFrames();
 
-    // Another run (a new target generation of the same size) on the same pooled workspace
-    // uploads its own target; generation 0 is never taken as current.
+    // Another run (a new target generation of the same size) on the same pooled workspace uploads its own target;
+    // generation 0 is never taken as current.
     Case other(3, 2, 202, 10.0);
-    R::CoherentPointDriftGpuEStep next(Cache);
-    ASSERT_TRUE(Evaluate(next, other)) << next.Diagnostic();
-    EXPECT_EQ(Cache.Stats().WorkspaceReuses, 2u);
+    R::CoherentPointDriftGpuEStep next(Cache, Device);
+    ASSERT_TRUE(next.Prepare(3u, 2u)) << next.Diagnostic();
+    ASSERT_TRUE(next.Evaluate(other.Request())) << next.Diagnostic();
+    EXPECT_EQ(Cache.Stats().WorkspaceReuses, 1u) << "the terminal release returned the run's workspace";
     EXPECT_EQ(Device.CreatePipelineCount, 2);
     ASSERT_EQ(WritesOf(kTargetBytes), 2u) << "a pooled workspace never keeps another run's target";
-    const auto& upload = *std::ranges::find_if(Device.BufferWrites | std::views::reverse,
-                                               [&](const auto& w) { return w.Data.size() == kTargetBytes; });
+    const auto& upload = *std::ranges::find_if(Device.MappedWrites | std::views::reverse,
+        [&](const auto& w)
+        {
+            return w.Data.size() == kTargetBytes;
+        });
     float x0{};
     std::memcpy(&x0, upload.Data.data(), sizeof(float));
     EXPECT_EQ(x0, 10.0f);
     Case unversioned(3, 2, 0);
-    ASSERT_TRUE(Evaluate(next, unversioned));
-    ASSERT_TRUE(Evaluate(next, unversioned));
+    ASSERT_TRUE(next.Evaluate(unversioned.Request()));
+    ASSERT_TRUE(next.Evaluate(unversioned.Request()));
     EXPECT_EQ(WritesOf(kTargetBytes), 4u);
     EXPECT_EQ(next.Stats().Completed, 3u);
     EXPECT_EQ(next.Stats().Failed, 0u);
+    EXPECT_TRUE(AllPulled);
 }
 
-TEST_F(CpdBrokerWorkspaceReuse, CancelledAndRefusedComputationsKeepTheirLeaseUntilDoneAndFailClosed)
+// ARCH-023: a Vulkan E-step run holds its broker, and with it the workspace lease, from its Init to its end: across
+// steps and a pause the fixed target is uploaded once while the moved source is uploaded every device iteration, and
+// no step leases a workspace again. The mock answers each device E-step with exact one-to-one correspondences
+// (source i to target i, world units), so every iteration completes on the device path.
+TEST_F(CpdBrokerWorkspaceReuse, AStepRunKeepsItsTargetResidentAcrossStepsAndPauses)
+{
+    constexpr std::size_t kSources = 48u, kTargets = 64u;
+    std::mt19937 random(5u);
+    std::normal_distribution<float> noise(0.0f, 0.5f);
+    const auto sourcePoints = Cloud(kSources, 31);
+    auto targetPoints = Cloud(kTargets, 37);
+    for (std::size_t i = 0; i < kSources; ++i)
+        targetPoints[i] =
+            sourcePoints[i] + glm::vec3(0.2f, -0.1f, 0.05f) + glm::vec3(noise(random), noise(random), noise(random));
+    Scene scene;
+    const auto source = Make(scene.Registry, D::PointCloudPoint, sourcePoints);
+    const auto target = Make(scene.Registry, D::PointCloudPoint, targetPoints);
+    Jobs.Attach(scene.Context);
+    scene.Context.SpatialIndices = &Cache;
+    scene.Context.Device = &Device;
+    // Readback rows: LogDenominator and Pt1 per target, then P1, PX, PY, PZ per source.
+    Answer = [&](const std::size_t doubles)
+    {
+        std::vector<double> values(doubles, 0.0);
+        if (values.size() >= 2u * kTargets + 4u * kSources)
+            for (std::size_t i = 0; i < kSources; ++i)
+            {
+                values[kTargets + i] = 1.0;
+                values[2u * kTargets + i] = 1.0;
+                values[2u * kTargets + kSources + i] = targetPoints[i].x;
+                values[2u * kTargets + 2u * kSources + i] = targetPoints[i].y;
+                values[2u * kTargets + 3u * kSources + i] = targetPoints[i].z;
+            }
+        return values;
+    };
+    R::EditorCoherentPointDriftResult failure;
+    const auto run = R::StartEditorCoherentPointDrift(scene.Commands(),
+        {.SourceStableEntityId = Id(source),
+            .TargetStableEntityId = Id(target),
+            .Execution = Cap(5u),
+            .InitialSigma2 = 10.0,
+            .NormalizeInputs = false,
+            .EStep = R::CoherentPointDriftEStep::Vulkan,
+            .Threads = 1u},
+        failure);
+    ASSERT_TRUE(run) << failure.Message;
+    const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+    const auto cleanup = [&]
+    {
+        (void)Jobs.Jobs().CancelAll();
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        (void)Jobs.Jobs().ShutdownGpuQueueParticipants(
+            [&]
+            {
+                Device.WaitIdle();
+            });
+        Jobs.Jobs().CancelAndDrain();
+    };
+    const auto step = [&]
+    {
+        EXPECT_TRUE(Control(Jobs, id, R::StepRunAction::Step, 1u));
+        return DrainUntil(Jobs,
+            [&]
+            {
+                const auto observed = Jobs.StepRuns().Observe(id);
+                return observed && observed->Phase == R::StepRunPhase::Paused && !observed->SegmentInFlight;
+            });
+    };
+    const std::size_t targetBytes = kTargets * 32u, sourceBytes = kSources * 32u;
+    if (!step())
+    {
+        cleanup();
+        FAIL() << "the first step did not rest";
+    }
+    EXPECT_EQ(WritesOf(targetBytes), 1u);
+    EXPECT_EQ(WritesOf(sourceBytes), 1u);
+    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Trace.size(), 1u);
+    // A pause: frames pass and the cache prunes; the run keeps its lease.
+    for (int frame = 0; frame < 5; ++frame)
+    {
+        (void)Jobs.Jobs().DrainCompletions(Jobs.Events());
+        RetireFrames();
+    }
+    EXPECT_EQ(Jobs.StepRuns().Observe(id)->Steps, 1u);
+    if (!step())
+    {
+        cleanup();
+        FAIL() << "the second step did not rest";
+    }
+    EXPECT_EQ(WritesOf(targetBytes), 1u) << "the target stays uploaded across steps and the pause";
+    EXPECT_EQ(WritesOf(sourceBytes), 2u) << "the moved source is uploaded every device iteration";
+    EXPECT_EQ(Cache.Stats().WorkspaceReuses, 0u) << "no step leased a workspace again";
+    EXPECT_EQ(Jobs.StepRuns().Observe(id)->Steps, 2u);
+    EXPECT_EQ(Count(Taken), 2u) << "each device iteration pulled its statistics once";
+    EXPECT_TRUE(Control(Jobs, id, R::StepRunAction::Discard));
+    cleanup();
+    EXPECT_EQ(Jobs.StepRuns().Observe(id)->Phase, R::StepRunPhase::Discarded);
+}
+
+TEST_F(CpdBrokerWorkspaceReuse, CancelledAndRefusedComputationsKeepTheirWorkspaceUntilDoneAndFailClosed)
 {
     Case c(3, 2, 303);
     {
-        // Cancelled while in flight: the worker returns at once (the CPU runs the iteration),
-        // the late result is dropped, and the workspace only returns once the work completed.
-        R::CoherentPointDriftGpuEStep run(Cache);
-        std::atomic<bool> done{false};
+        // Cancelled while in flight: the worker returns at once (the CPU runs the iteration), the late page is given
+        // up, and the workspace returns to the pool only once that page completed (the compute fence).
+        R::CoherentPointDriftGpuEStep run(Cache, Device);
+        ASSERT_TRUE(run.Prepare(3u, 2u));
+        HoldNext();
         bool evaluated = true;
-        std::thread worker([&] { evaluated = EvaluateBrokerBlocking(run, c.Request()); done = true; });
-        while (!Held) { run.Pump(); std::this_thread::yield(); }
+        std::thread worker(
+            [&]
+            {
+                evaluated = run.Evaluate(c.Request());
+            });
+        ASSERT_TRUE(AwaitHeld(false));
+        Device.TransferQueue.ComputeFenceToken = {Count(Tokens)};
         run.Close("cancelled");
         worker.join();
         EXPECT_FALSE(evaluated);
-        auto late = std::move(*Held);
-        const auto lateBytes = HeldBytes;
-        Held.reset();
+        EXPECT_EQ(Count(Released), 1u);
         run.ReleaseDeviceResources();
         RetireFrames();
-        R::CoherentPointDriftGpuEStep during(Cache);
+        R::CoherentPointDriftGpuEStep during(Cache, Device);
         Case probe(3, 2, 304);
-        ASSERT_TRUE(Evaluate(during, probe));
-        EXPECT_EQ(Cache.Stats().WorkspaceReuses, 0u) << "the in-flight lease is not served to another run";
+        ASSERT_TRUE(during.Prepare(3u, 2u));
+        ASSERT_TRUE(during.Evaluate(probe.Request()));
+        EXPECT_EQ(Cache.Stats().WorkspaceReuses, 0u) << "the in-flight workspace is not served to another run";
         during.ReleaseDeviceResources();
-        Held = std::move(late);
-        HeldBytes = lateBytes;
-        Deliver();
-        run.Pump();
-        EXPECT_EQ(run.Stats().Completed, 1u);
+        Release(); // the late page completed
         EXPECT_TRUE(run.Closed());
         EXPECT_EQ(run.Diagnostic(), "cancelled");
-        EXPECT_FALSE(EvaluateBrokerBlocking(run, c.Request()));
+        EXPECT_FALSE(run.Evaluate(c.Request()));
         RetireFrames();
-        R::CoherentPointDriftGpuEStep after(Cache);
-        ASSERT_TRUE(Evaluate(after, c));
+        R::CoherentPointDriftGpuEStep after(Cache, Device);
+        ASSERT_TRUE(after.Prepare(3u, 2u));
+        ASSERT_TRUE(after.Evaluate(c.Request()));
         EXPECT_EQ(Cache.Stats().WorkspaceReuses, 1u);
         after.ReleaseDeviceResources();
     }
-    // Refused on the device (no shader float64): fail closed, later iterations do not wait.
+    // Refused on the device (no shader float64): the Init fails closed, later iterations do not wait.
     Device.ShaderFloat64 = false;
-    R::CoherentPointDriftGpuEStep refused(Cache);
-    EXPECT_FALSE(Evaluate(refused, c));
+    R::CoherentPointDriftGpuEStep refused(Cache, Device);
+    EXPECT_FALSE(refused.Prepare(3u, 2u));
     EXPECT_TRUE(refused.Closed());
     EXPECT_FALSE(refused.Diagnostic().empty());
     EXPECT_EQ(refused.Stats().Failed, 1u);
-    EXPECT_FALSE(EvaluateBrokerBlocking(refused, c.Request()));
+    EXPECT_FALSE(refused.Evaluate(c.Request()));
 }
 
-TEST_F(CpdBrokerWorkspaceReuse, RequestEventsKeepTheirIdentityAndSettledLatency)
+TEST_F(CpdBrokerWorkspaceReuse, SerialRequestsSettleTheirLatencyAndAClosedBrokerRefusesLaterOnes)
 {
     Case c(3, 2, 401);
-    R::CoherentPointDriftGpuEStep broker(Cache);
-    const auto first = broker.Queue(c.Request());
-    ASSERT_TRUE(first);
-    broker.Pump();
-    ASSERT_TRUE(Held);
-    Deliver();
-    broker.Pump();
-    ASSERT_TRUE(first->IsReady());
-    ASSERT_TRUE(broker.Complete(first, c.Request()));
-
-    const auto second = broker.Queue(c.Request());
-    ASSERT_TRUE(second);
-    EXPECT_NE(first, second);
-    EXPECT_FALSE(second->IsReady());
-    broker.Pump();
-    ASSERT_TRUE(Held);
-    Deliver();
-    broker.Pump();
-    ASSERT_TRUE(second->IsReady());
-    EXPECT_FALSE(broker.Complete(first, c.Request()));
+    R::CoherentPointDriftGpuEStep broker(Cache, Device);
+    ASSERT_TRUE(broker.Prepare(3u, 2u));
+    ASSERT_TRUE(broker.Evaluate(c.Request()));
+    ASSERT_TRUE(broker.Evaluate(c.Request()));
     const double settledRequestSeconds = broker.Stats().WaitSeconds;
     EXPECT_GT(settledRequestSeconds, 0.0);
     broker.Close("cancelled");
     broker.Close("cancelled again");
     EXPECT_EQ(broker.Stats().WaitSeconds, settledRequestSeconds);
-    EXPECT_EQ(first->PendingCount(), 0u);
-    EXPECT_EQ(second->PendingCount(), 0u);
-    EXPECT_FALSE(broker.Complete(second, c.Request()));
-    EXPECT_FALSE(broker.Queue(c.Request()));
+    EXPECT_FALSE(broker.Evaluate(c.Request()));
     EXPECT_EQ(broker.Stats().Requests, 2u);
     EXPECT_EQ(broker.Stats().Completed, 2u);
+    EXPECT_EQ(broker.Diagnostic(), "cancelled again");
     broker.ReleaseDeviceResources();
 }
 
-TEST(CoherentPointDriftOperations, CancelAnswersAtOnceAndTraceRowsCarryElapsedTime)
+TEST(CoherentPointDriftOperations, DiscardAnswersAtOnceAndTraceRowsCarryElapsedTime)
 {
-    // UI-067: Cancel while a step job is queued turns the phase to Cancelled immediately; the
-    // job, when it runs, publishes nothing that overrides it. Trace rows carry elapsed times.
-    Scene s;
-    const auto points = Cloud(200, 13);
-    std::vector<glm::vec3> moved;
-    for (const auto& p : points) moved.push_back(p + glm::vec3(0.2f, 0.0f, 0.1f));
-    const auto source = Make(s.Registry, D::PointCloudPoint, points);
-    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
-    const R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target)};
-
-    R::EditorCoherentPointDriftResult failure;
-    const auto timed = R::StartEditorCoherentPointDrift(s.Commands(), config, failure);
-    ASSERT_TRUE(timed) << failure.Message;
-    ASSERT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), timed, 3), R::EditorCommandStatus::Pending);
-    const auto trace = R::SnapshotEditorCoherentPointDrift(timed).Trace;
-    ASSERT_EQ(trace.size(), 3u);
-    for (std::size_t k = 0; k < trace.size(); ++k)
+    // UI-067: Discard while an iteration is queued ends the run at once; the iteration, when it completes, publishes
+    // nothing that overrides it. Trace rows carry elapsed times.
     {
-        EXPECT_GE(trace[k].IterationSeconds, 0.0);
-        if (k > 0) EXPECT_GE(trace[k].Seconds, trace[k - 1].Seconds);
+        ShiftedPair pair(200u, 13u);
+        const auto timed = pair.Start(pair.Config());
+        ASSERT_TRUE(Control(pair.Jobs, R::SnapshotEditorCoherentPointDrift(timed).StepRun, R::StepRunAction::Step, 3u));
+        ASSERT_TRUE(pair.Rest(timed));
+        const auto trace = R::SnapshotEditorCoherentPointDrift(timed).Trace;
+        ASSERT_EQ(trace.size(), 3u);
+        for (std::size_t k = 0; k < trace.size(); ++k)
+        {
+            EXPECT_GE(trace[k].IterationSeconds, 0.0);
+            if (k > 0)
+                EXPECT_GE(trace[k].Seconds, trace[k - 1].Seconds);
+        }
+        EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(timed).Stage.empty()) << "no stage once paused";
     }
-    EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(timed).Stage.empty()) << "no stage once paused";
+    ShiftedPair pair(200u, 13u);
+    const auto run = pair.Start(pair.Config());
+    const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
+    ASSERT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Step, 1u));
+    EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Running);
+    ASSERT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Discard));
+    EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Discarded) << "the panel sees the discard before the job ends";
+    ASSERT_TRUE(pair.Jobs.DrainUntilTerminal());
+    EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Discarded);
+    EXPECT_FALSE(R::SnapshotEditorCoherentPointDrift(run).Result.Succeeded());
+    EXPECT_FALSE(pair.S.History.CanUndo());
+}
 
-    Extrinsic::Tests::EditorJobHarness jobs;
-    jobs.Attach(s.Context);
-    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), config, failure);
-    ASSERT_TRUE(run) << failure.Message;
-    ASSERT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 1), R::EditorCommandStatus::Pending);
-    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Running);
-    R::CancelEditorCoherentPointDrift(run);
-    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Cancelled)
-        << "the panel sees the cancel before the job ends";
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    const auto after = R::SnapshotEditorCoherentPointDrift(run);
-    EXPECT_EQ(after.Phase, R::EditorCoherentPointDriftPhase::Cancelled);
-    EXPECT_FALSE(R::ApplyEditorCoherentPointDrift(s.Commands(), run).Succeeded());
+// ARCH-023: a run that ends without a commit answers at its settled end (StepRunCallbacks::Finished), once its holder
+// released the source, with its final observation: a same-source run started from inside that answer is admitted.
+// Prediction, answered from Discard (the holder still active): one delivery before Control returns, and the start
+// inside it is refused as busy (no handle, a Pending refusal). Fixed: none before the drain, then exactly one,
+// and the new run has its own step run, ready.
+TEST(CoherentPointDriftOperations, ADiscardedRunAnswersOnceTheSourceIsFree)
+{
+    ShiftedPair pair(100u, 11u, false);
+    auto config = pair.Config();
+    config.Execution.IterationCap = 10000u;
+    config.Tolerance = 0.0;
+    unsigned delivered = 0u;
+    std::optional<R::EditorCoherentPointDriftResult> ended;
+    R::EditorCoherentPointDriftRunHandle next;
+    R::EditorCoherentPointDriftResult refused;
+    // The one-shot command (the form with a result callback) computes at once; it is discarded before any drain.
+    const auto pending = R::ApplyEditorCoherentPointDriftCommand(pair.S.Commands(),
+        config,
+        [&](R::EditorCoherentPointDriftResult result)
+        {
+            ++delivered;
+            ended = std::move(result);
+            next = R::StartEditorCoherentPointDrift(pair.S.Commands(), pair.Config(), refused);
+        });
+    ASSERT_EQ(pending.Status, R::EditorCommandStatus::Pending) << pending.Message;
+    ASSERT_NE(pending.StepRun, 0u);
+    ASSERT_TRUE(Control(pair.Jobs, pending.StepRun, R::StepRunAction::Discard));
+    EXPECT_EQ(delivered, 0u) << "no answer while the holder still holds the source";
+    ASSERT_TRUE(DrainUntil(pair.Jobs,
+        [&]
+        {
+            return delivered > 0u;
+        }));
+    ASSERT_TRUE(ended);
+    EXPECT_EQ(ended->Status, R::EditorCommandStatus::StaleEntity);
+    EXPECT_NE(ended->Message.find("cancelled"), std::string::npos) << ended->Message;
+    EXPECT_EQ(ended->StepRun, pending.StepRun);
+    ASSERT_TRUE(next) << "admitted, not refused as busy: " << refused.Message;
+    const auto id = R::SnapshotEditorCoherentPointDrift(next).StepRun;
+    EXPECT_NE(id, 0u);
+    EXPECT_NE(id, pending.StepRun);
+    EXPECT_EQ(pair.Jobs.StepRuns().Observe(id)->Phase, R::StepRunPhase::Ready);
+    ASSERT_TRUE(Control(pair.Jobs, id, R::StepRunAction::Discard));
+    ASSERT_TRUE(pair.Jobs.DrainUntilTerminal());
+    EXPECT_EQ(delivered, 1u) << "one terminal result for the discarded run";
+    EXPECT_FALSE(pair.S.History.CanUndo());
 }
 
 TEST(CoherentPointDriftOperations, BayesianSubsamplesReachTheSnapshotForThePreview)
 {
     // UI-067: the chosen source and target samples are published once, as indices into the
     // preview and target, so the panel can draw them.
-    Scene s;
-    const auto points = Cloud(300, 17);
-    std::vector<glm::vec3> moved;
-    for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f, 0.0f, 0.0f));
-    const auto source = Make(s.Registry, D::PointCloudPoint, points);
-    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
-    R::EditorCoherentPointDriftResult failure;
-    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), {.SourceStableEntityId = Id(source),
-        .TargetStableEntityId = Id(target), .Method = M::Bayesian, .Output = O::DisplacementProperty,
-        .Subsample = 60, .SubsampleTarget = 80}, failure);
-    ASSERT_TRUE(run) << failure.Message;
+    ShiftedPair pair(300u, 17u);
+    const auto run = pair.Start({.SourceStableEntityId = Id(pair.Source),
+        .TargetStableEntityId = Id(pair.Target),
+        .Method = M::Bayesian,
+        .Output = O::DisplacementProperty,
+        .Subsample = 60,
+        .SubsampleTarget = 80});
+    ASSERT_TRUE(run);
     EXPECT_FALSE(R::SnapshotEditorCoherentPointDrift(run).SourceSamples) << "nothing chosen before a step";
-    ASSERT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 1), R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Control(pair.Jobs, R::SnapshotEditorCoherentPointDrift(run).StepRun, R::StepRunAction::Step, 1u));
+    ASSERT_TRUE(pair.Rest(run));
     const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
     ASSERT_TRUE(snapshot.SourceSamples && snapshot.TargetSamples);
     EXPECT_EQ(snapshot.SourceSamples->size(), 60u);

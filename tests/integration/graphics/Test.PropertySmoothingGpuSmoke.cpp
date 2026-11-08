@@ -17,6 +17,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
@@ -83,6 +84,13 @@ namespace
             Context.CommandHistory = &History;
             Context.JobCommands.Submit = [this](Runtime::JobDesc desc, Runtime::EditorJobIdentity) {
                 return Kernel().Jobs().Submit(std::move(desc));
+            };
+            // ARCH-023: a GPU transaction is a step run of the composed service, its holder cancelled like the run's jobs.
+            Context.StepRuns = Kernel().Services().Find<Runtime::StepRunsService>();
+            Context.JobCommands.Cancel = [this](const Runtime::JobToken token)
+            {
+                return Kernel().Jobs().Cancel(token) ? Runtime::EditorJobCancelStatus::Requested
+                                                     : Runtime::EditorJobCancelStatus::NotActive;
             };
             std::mt19937 random(81);
             std::uniform_real_distribution<float> coordinate(-1, 1);
@@ -245,6 +253,23 @@ namespace
                 stalled.Filter.SolverTolerance = 1e-14;
                 Cases.push_back({"implicit_nonconvergence", stalled, 4, false, 0.0, true});
             }
+            if (StepOnly)
+            {
+                auto averaging = make(Domain::GraphNode,
+                    "signal",
+                    K::Double,
+                    S::PropertyFilter::Averaging,
+                    S::PropertyLaplacian::RandomWalk);
+                averaging.Filter.Iterations = 7;
+                auto implicit = averaging;
+                implicit.Filter.Method = S::PropertyFilter::Implicit;
+                implicit.Filter.Solver = S::PropertySolver::ConjugateGradient;
+                implicit.Filter.TimeStep = 2.0;
+                implicit.Filter.SolverTolerance = 1e-10;
+                implicit.Output.Name = "gpu_implicit_out";
+                Cases = {
+                    {"stepped_explicit", averaging, 4, false, 1e-12}, {"stepped_implicit", implicit, 4, false, 1e-9}};
+            }
             if (StaleOnly)
             {
                 auto c = make(Domain::GraphNode, "signal", K::Double, S::PropertyFilter::Taubin, S::PropertyLaplacian::RandomWalk);
@@ -290,6 +315,8 @@ namespace
             }
             if (!Kernel().GetDevice().IsOperational()) return;
             ++Frames;
+            if (StepOnly)
+                return StepFrame();
             if (Waiting) return;
             if (std::getenv("GEOM081_TRACE")) std::printf("case %zu frames %zu t=%.0f ms\n", Next, Frames,
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - Started).count());
@@ -367,8 +394,9 @@ namespace
                 EXPECT_FALSE(Props(current.Entity, c.Output.Domain).Exists(c.Output.Name)) << "a failed solve must not publish";
                 auto reference = c;
                 reference.Backend = Runtime::PropertySmoothingBackend::Cpu;
-                EXPECT_FALSE(Runtime::ApplyEditorPropertySmoothingCommand(Runtime::BindEditorProcessingCommands(Context),
-                    Runtime::SelectionController::ToStableEntityId(Entities[current.Entity]), reference).Succeeded());
+                EXPECT_FALSE(Runtime::ApplyEditorPropertySmoothingCommand(
+                    CpuCommands(), Runtime::SelectionController::ToStableEntityId(Entities[current.Entity]), reference)
+                        .Succeeded());
                 ++Compared;
                 return;
             }
@@ -386,7 +414,7 @@ namespace
             else reference.Output.Name = "cpu_out";
             const auto id = Runtime::SelectionController::ToStableEntityId(Entities[current.Entity]);
             const auto cpuStart = std::chrono::steady_clock::now();
-            const auto cpu = Runtime::ApplyEditorPropertySmoothingCommand(Runtime::BindEditorProcessingCommands(Context), id, reference);
+            const auto cpu = Runtime::ApplyEditorPropertySmoothingCommand(CpuCommands(), id, reference);
             CpuMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cpuStart).count();
             ASSERT_TRUE(cpu.Succeeded()) << current.Name << ": " << cpu.Message;
             const auto cpuValues = Read(current.Entity, reference.Output);
@@ -406,10 +434,142 @@ namespace
             ++Compared;
         }
 
-        void Shutdown() override { Context = {}; }
+        // The CPU reference inline: a context without the step-run service publishes at once (no run controls).
+        Runtime::EditorProcessingCommands CpuCommands()
+        {
+            CpuContext = Context;
+            CpuContext.StepRuns = nullptr;
+            return Runtime::BindEditorProcessingCommands(CpuContext);
+        }
 
-        Runtime::EditorProcessingContext Context{};
+        // ARCH-023: an interactive run steps exactly on the device. Ready computes nothing; Step(1), then Step(2)
+        // leave three steps of a seven-step cap; with live preview off nothing is stored before Accept, whose one
+        // store is the third step: the CPU reference with three iterations. Explicit and implicit (CG) alike.
+        void StepFrame()
+        {
+            const auto runs = Context.StepRuns;
+            const auto observed = [&]
+            {
+                return runs->Observe(StepRun);
+            };
+            const auto settled = [&]
+            {
+                const auto run = observed();
+                return run && run->Phase == Runtime::StepRunPhase::Paused && !run->SegmentInFlight;
+            };
+            const auto control = [&](const Runtime::StepRunAction action, const std::uint32_t count)
+            {
+                std::string refusal;
+                EXPECT_TRUE(runs->Control(StepRun, action, count, refusal)) << refusal;
+            };
+            if (Next == Cases.size())
+            {
+                Done = true;
+                Kernel().RequestExit();
+                return;
+            }
+            auto& current = Cases[Next];
+            const auto id = Runtime::SelectionController::ToStableEntityId(Entities[current.Entity]);
+            const auto commands = Runtime::BindEditorProcessingCommands(Context);
+            switch (StepStage)
+            {
+            case 0:
+            {
+                auto c = current.Config;
+                c.Execution = {.PreviewEvery = 0u,
+                    .PreviewIntervalMs = 0u,
+                    .AutoAccept = Runtime::StepRunAutoAccept::Never,
+                    .Start = Runtime::StepRunStart::Ready};
+                Runtime::EditorPropertySmoothingResult started;
+                StepTransaction = Runtime::StartEditorPropertySmoothing(commands,
+                    id,
+                    c,
+                    started,
+                    [this](Runtime::EditorPropertySmoothingResult result)
+                    {
+                        Result = std::move(result);
+                    });
+                ASSERT_TRUE(StepTransaction) << current.Name << ": " << started.Message;
+                StepRun = started.StepRun;
+                ASSERT_NE(StepRun, 0u);
+                StepFrames = 0;
+                StepStage = 1;
+                return;
+            }
+            case 1:
+                if (++StepFrames < 10)
+                    return;
+                EXPECT_EQ(observed()->Phase, Runtime::StepRunPhase::Ready) << current.Name;
+                EXPECT_EQ(observed()->Steps, 0u) << current.Name;
+                EXPECT_FALSE(Runtime::SnapshotEditorPropertySmoothing(commands, StepTransaction).DeviceWorkQueued)
+                    << current.Name << ": a ready run queues no device work";
+                control(Runtime::StepRunAction::Step, 1u);
+                StepStage = 2;
+                return;
+            case 2:
+                if (!settled())
+                    return;
+                EXPECT_EQ(observed()->Steps, 1u) << current.Name << ": Step(1) is one pass or time step";
+                control(Runtime::StepRunAction::Step, 2u);
+                StepStage = 3;
+                return;
+            case 3:
+                if (!settled())
+                    return;
+                EXPECT_EQ(observed()->Steps, 3u) << current.Name;
+                EXPECT_EQ(observed()->End, Runtime::StepRunEnd::None) << current.Name << ": the cap is seven";
+                EXPECT_EQ(Runtime::SnapshotEditorPropertySmoothing(commands, StepTransaction).Previews, 0u)
+                    << current.Name << ": live preview off stores nothing while stepping";
+                control(Runtime::StepRunAction::Accept, 1u);
+                StepStage = 4;
+                return;
+            case 4:
+            {
+                if (!Result)
+                    return;
+                ASSERT_EQ(Result->Status, Runtime::EditorCommandStatus::Applied)
+                    << current.Name << ": " << Result->Message;
+                EXPECT_EQ(Result->Steps, 3u);
+                EXPECT_EQ(Result->StepRun, StepRun);
+                EXPECT_EQ(Runtime::SnapshotEditorPropertySmoothing(commands, StepTransaction).Previews, 1u)
+                    << current.Name << ": Accept's one store";
+                const auto gpuValues = Read(current.Entity, current.Config.Output);
+                auto reference = current.Config;
+                reference.Backend = Runtime::PropertySmoothingBackend::Cpu;
+                reference.Filter.Iterations = 3u;
+                reference.Output.Name = "cpu_out";
+                ASSERT_TRUE(Runtime::ApplyEditorPropertySmoothingCommand(CpuCommands(), id, reference).Succeeded());
+                const auto cpuValues = Read(current.Entity, reference.Output);
+                ASSERT_EQ(cpuValues.size(), gpuValues.size());
+                for (std::size_t j = 0; j < cpuValues.size(); ++j)
+                    EXPECT_NEAR(gpuValues[j], cpuValues[j], current.Bound) << current.Name << ": row value " << j;
+                ASSERT_TRUE(History.Undo().Succeeded()) << "remove the CPU reference command first";
+                ASSERT_TRUE(History.Undo().Succeeded()) << "the stepped run's Accept is one undo entry";
+                EXPECT_FALSE(Props(current.Entity, current.Config.Output.Domain).Exists(current.Config.Output.Name));
+                RemoveOutput(current.Entity, reference.Output);
+                Result.reset();
+                StepTransaction.reset();
+                ++Compared;
+                ++Next;
+                StepStage = 0;
+                return;
+            }
+            default: return;
+            }
+        }
+
+        void Shutdown() override
+        {
+            StepTransaction.reset();
+            CpuContext = {};
+            Context = {};
+        }
+
+        Runtime::EditorProcessingContext Context{}, CpuContext{};
         Runtime::EditorCommandHistory History{};
+        Runtime::EditorPropertySmoothingTransactionHandle StepTransaction{};
+        std::uint64_t StepRun{};
+        int StepStage{}, StepFrames{};
         std::vector<entt::entity> Entities;
         std::vector<Case> Cases;
         std::vector<glm::vec3> OriginalPositions;
@@ -419,7 +579,7 @@ namespace
         std::size_t Next{}, Compared{}, Frames{};
         std::uint64_t WorkspaceLeases{}, WorkspaceReuses{};
         double MaxLinearError{}, MaxBilateralError{}, GpuMs{}, CpuMs{};
-        bool Waiting{}, Done{}, TimedOut{}, StaleOnly{}, ImplicitOnly{};
+        bool Waiting{}, Done{}, TimedOut{}, StaleOnly{}, ImplicitOnly{}, StepOnly{};
     };
 
     bool Prepare(Extrinsic::Core::Config::EngineConfig& config)
@@ -442,6 +602,7 @@ TEST(GEOM081VulkanPropertySmoothing, ExplicitFiltersMatchTheCpuReferenceOnEveryD
     auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>();
     engine.Initialize();
     Shutdown shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
@@ -483,6 +644,7 @@ TEST(GEOM081VulkanPropertySmoothing, StaleInputRejectsPublication)
     run->StaleOnly = true;
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>();
     engine.Initialize();
     Shutdown shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
@@ -501,6 +663,7 @@ TEST(GEOM089VulkanImplicitSmoothing, ConjugateGradientStepsMatchTheCpuReference)
     run->ImplicitOnly = true;
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>();
     engine.Initialize();
     Shutdown shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
@@ -514,4 +677,28 @@ TEST(GEOM089VulkanImplicitSmoothing, ConjugateGradientStepsMatchTheCpuReference)
     EXPECT_GT(run->WorkspaceReuses, 0u);
     std::printf("GEOM-089 implicit parity: %zu cases, max relative error %.3g; GPU %.1f ms, CPU %.1f ms\n",
                 run->Compared, run->MaxLinearError, run->GpuMs, run->CpuMs);
+}
+
+// ARCH-023: Step(n) on the device is exactly n passes (implicit: n time steps over every channel), Ready computes
+// nothing, live preview off stores nothing before Accept, and Accept publishes the last complete step (undoable once).
+TEST(GEOM081VulkanPropertySmoothing, SteppedRunsAdvanceExactlyAndAcceptTheLastCompleteStep)
+{
+    Extrinsic::Core::Config::EngineConfig config;
+    if (!Prepare(config))
+        GTEST_SKIP() << "GLFW unavailable";
+    auto app = std::make_unique<SmoothingApp>();
+    auto* run = app.get();
+    run->StepOnly = true;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>();
+    engine.Initialize();
+    Shutdown shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64())
+        GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut);
+    ASSERT_TRUE(run->Done);
+    EXPECT_EQ(run->Compared, run->Cases.size());
 }

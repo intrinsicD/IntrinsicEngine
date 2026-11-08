@@ -11,6 +11,7 @@ module;
 module Extrinsic.Graphics.SparseConjugateGradient;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -48,9 +49,10 @@ namespace Extrinsic::Graphics
             "SparseCG.Values", "SparseCG.RightHandSides", "SparseCG.RhsDiagonal", "SparseCG.RhsConstant", "SparseCG.Work",
             "SparseCG.Partials", "SparseCG.Result"};
         RHI::IDevice& Device;
+        RHI::BufferManager& Scratch;
         RHI::PipelineHandle Pipeline{};
-        std::array<RHI::BufferHandle, SlotCount> Buffers{};
-        std::array<std::uint64_t, SlotCount> Capacity{};
+        std::array<RHI::BufferManager::BufferLease, SlotCount> Buffers{};
+        std::array<std::uint64_t, SlotCount> Addresses{}; // each lease's, resolved when ensured
         // Owned copy of the problem.
         std::uint32_t Rows{}, Solves{}, ChainStride{}, MaxIterations{}, Groups{};
         double Tolerance{};
@@ -61,33 +63,38 @@ namespace Extrinsic::Graphics
         std::uint32_t Solve{}, Iteration{}, ChunkCount{};
         bool Started{}, Uploaded{}, Failed{}, SeedsOnDevice{};
 
-        explicit Impl(RHI::IDevice& device) : Device(device) {}
+        Impl(RHI::IDevice& device, RHI::BufferManager& scratch) : Device(device), Scratch(scratch) {}
         ~Impl()
         {
-            for (auto buffer : Buffers)
-                if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             if (Pipeline.IsValid()) Device.DestroyPipeline(Pipeline);
+        }
+        RHI::BufferHandle Buffer(const Slot slot) const
+        {
+            return Buffers[slot].GetHandle();
         }
         bool Ensure(const Slot slot, const std::uint64_t bytes)
         {
-            const auto size = std::max<std::uint64_t>(bytes, 8);
-            if (Buffers[slot].IsValid() && Capacity[slot] >= size) return true;
-            if (Buffers[slot].IsValid()) Device.DestroyBuffer(Buffers[slot]);
-            Buffers[slot] = Device.CreateBuffer({.SizeBytes = size,
-                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                .HostVisible = true, .DebugName = kNames[slot]});
-            Capacity[slot] = Buffers[slot].IsValid() ? size : 0u;
-            if (!Buffers[slot].IsValid()) Failed = true;
-            return Buffers[slot].IsValid();
+            const bool ensured = Scratch.EnsureScratch(Buffers[slot],
+                {.SizeBytes = std::max<std::uint64_t>(bytes, 8),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
+                    .HostVisible = true,
+                    .DebugName = kNames[slot]});
+            Failed = Failed || !ensured;
+            // ARCH-023: resolved here (the upload, device-owner thread), so a worker's chunks make no device call.
+            Addresses[slot] = ensured ? Device.GetBufferDeviceAddress(Buffer(slot)) : 0u;
+            return ensured;
         }
         bool Write(const Slot slot, const void* data, const std::size_t bytes, const std::uint64_t capacity)
         {
             if (!Ensure(slot, capacity)) return false;
-            if (data && bytes) Device.WriteBuffer(Buffers[slot], data, bytes, 0u);
+            if (data && bytes)
+                Device.WriteBuffer(Buffer(slot), data, bytes, 0u);
             return true;
         }
-        std::uint64_t Address(RHI::BufferHandle b) const { return Device.GetBufferDeviceAddress(b); }
-        std::uint64_t Address(const Slot slot) const { return Address(Buffers[slot]); }
+        std::uint64_t Address(const Slot slot) const
+        {
+            return Addresses[slot];
+        }
         std::size_t ReportBytes() const { return std::size_t(Solves) * sizeof(SparseCgReport); }
 
         bool Upload()
@@ -113,8 +120,9 @@ namespace Extrinsic::Graphics
             // Reports start zeroed every run; each solve's solution starts at its initial guess
             // (host guesses, a device seed, or the chained previous solution).
             const std::vector<std::byte> reports(ReportBytes(), std::byte{0});
-            Device.WriteBuffer(Buffers[ResultSlot], reports.data(), reports.size(), 0u);
-            if (!Guesses.empty()) Device.WriteBuffer(Buffers[ResultSlot], Guesses.data(), bytes(Guesses), ReportBytes());
+            Device.WriteBuffer(Buffer(ResultSlot), reports.data(), reports.size(), 0u);
+            if (!Guesses.empty())
+                Device.WriteBuffer(Buffer(ResultSlot), Guesses.data(), bytes(Guesses), ReportBytes());
             Base = {.Offsets = Address(OffsetSlot), .Columns = Address(ColumnSlot), .Values = Address(ValueSlot),
                     .Work = Address(WorkSlot), .Partials = Address(PartialSlot), .Rows = Rows, .Groups = Groups,
                     .Tolerance = Tolerance};
@@ -122,9 +130,21 @@ namespace Extrinsic::Graphics
         }
     };
 
-    SparseConjugateGradientWorkspace::SparseConjugateGradientWorkspace(RHI::IDevice& device)
-        : m_Impl(std::make_unique<Impl>(device)) {}
+    SparseConjugateGradientWorkspace::SparseConjugateGradientWorkspace(
+        RHI::IDevice& device, RHI::BufferManager& scratch)
+        : m_Impl(std::make_unique<Impl>(device, scratch))
+    {
+    }
     SparseConjugateGradientWorkspace::~SparseConjugateGradientWorkspace() = default;
+    void SparseConjugateGradientWorkspace::ReleaseScratch()
+    {
+        auto& s = *m_Impl;
+        s.Buffers = {};
+        s.Addresses = {};
+        s.Base = {};
+        s.Rows = s.Solves = 0;
+        s.Started = s.Uploaded = false;
+    }
 
     std::uint64_t SparseConjugateGradientWorkspace::ReadbackBytes(std::uint32_t rows, std::uint32_t solves)
     {
@@ -140,9 +160,10 @@ namespace Extrinsic::Graphics
     {
         auto& s = *m_Impl;
         if (s.Failed || !s.Uploaded || !Finished()) return {};
-        commands.BufferBarrier(s.Buffers[Impl::ResultSlot], RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
-                               RHI::MemoryAccess::TransferRead);
-        return s.Buffers[Impl::ResultSlot];
+        commands.BufferBarrier(s.Buffer(Impl::ResultSlot),
+            RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+            RHI::MemoryAccess::TransferRead);
+        return s.Buffer(Impl::ResultSlot);
     }
 
     bool SparseConjugateGradientWorkspace::Begin(const SparseCgProblem& p)
@@ -191,23 +212,30 @@ namespace Extrinsic::Graphics
     bool SparseConjugateGradientWorkspace::RecordUpload(RHI::ICommandContext& commands)
     {
         auto& s = *m_Impl;
-        if (s.Failed || s.Rows == 0 || !s.Device.IsOperational()) return false;
-        if (s.Uploaded) return true;
+        if (s.Failed || s.Rows == 0)
+            return false;
+        if (s.Uploaded)
+            return true; // no device call once uploaded (a method worker's chunks)
+        if (!s.Device.IsOperational())
+            return false;
         if (!s.Upload()) return false;
         s.Uploaded = true;
         // A reused buffer's previous reads (an earlier run's readback included) precede this run.
-        for (auto buffer : s.Buffers)
+        for (const auto& buffer : s.Buffers)
             if (buffer.IsValid())
-                commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::TransferRead |
-                                               RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
-                                       RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+                commands.BufferBarrier(buffer.GetHandle(),
+                    RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::TransferRead | RHI::MemoryAccess::ShaderRead |
+                        RHI::MemoryAccess::ShaderWrite,
+                    RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
         return true;
     }
 
-    RHI::BufferHandle SparseConjugateGradientWorkspace::RecordNext(RHI::ICommandContext& commands)
+    RHI::BufferHandle SparseConjugateGradientWorkspace::RecordNext(
+        RHI::ICommandContext& commands, const std::uint32_t solveLimit)
     {
         auto& s = *m_Impl;
-        if (s.Failed || s.Rows == 0 || Finished() || !s.Device.IsOperational()) return {};
+        if (s.Failed || s.Rows == 0 || Finished() || (!s.Uploaded && !s.Device.IsOperational()))
+            return {};
         std::uint32_t budget = ChunkDispatches;
         const std::uint64_t n = s.Rows;
         if (!RecordUpload(commands)) return {};
@@ -218,13 +246,15 @@ namespace Extrinsic::Graphics
             commands.PushConstants(&push, sizeof(push), 0);
             commands.Dispatch(single ? 1u : s.Groups, 1, 1);
             for (const auto slot : {Impl::RhsSlot, Impl::WorkSlot, Impl::PartialSlot, Impl::ResultSlot})
-                commands.BufferBarrier(s.Buffers[slot], RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
-                                       RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+                commands.BufferBarrier(s.Buffer(slot),
+                    RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+                    RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
             --budget;
         };
         const auto result = s.Address(Impl::ResultSlot);
         if (s.ChunkCount == 0) dispatch(Diagonal);
-        while (s.Solve < s.Solves && budget > kIterationDispatches + 5)
+        const std::uint32_t last = std::min(s.Solves, solveLimit);
+        while (s.Solve < last && budget > kIterationDispatches + 5)
         {
             push.State = result + s.Solve * sizeof(SparseCgReport);
             push.X = result + s.ReportBytes() + std::uint64_t(s.Solve) * n * sizeof(double);
@@ -261,9 +291,10 @@ namespace Extrinsic::Graphics
             s.Started = false;
         }
         ++s.ChunkCount;
-        commands.BufferBarrier(s.Buffers[Impl::ResultSlot], RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
-                               RHI::MemoryAccess::TransferRead);
-        return s.Buffers[Impl::ResultSlot];
+        commands.BufferBarrier(s.Buffer(Impl::ResultSlot),
+            RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+            RHI::MemoryAccess::TransferRead);
+        return s.Buffer(Impl::ResultSlot);
     }
 
     void SparseConjugateGradientWorkspace::Observe(std::span<const std::byte> readback)
@@ -281,7 +312,10 @@ namespace Extrinsic::Graphics
     }
 
     bool SparseConjugateGradientWorkspace::Finished() const noexcept { return m_Impl->Solve >= m_Impl->Solves; }
-    RHI::BufferHandle SparseConjugateGradientWorkspace::ResultBuffer() const noexcept { return m_Impl->Uploaded ? m_Impl->Buffers[Impl::ResultSlot] : RHI::BufferHandle{}; }
+    RHI::BufferHandle SparseConjugateGradientWorkspace::ResultBuffer() const noexcept
+    {
+        return m_Impl->Uploaded ? m_Impl->Buffer(Impl::ResultSlot) : RHI::BufferHandle{};
+    }
     std::uint64_t SparseConjugateGradientWorkspace::SolutionsAddress() const
     {
         return m_Impl->Uploaded ? m_Impl->Address(Impl::ResultSlot) + m_Impl->ReportBytes() : 0u;

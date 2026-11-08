@@ -17,6 +17,7 @@ import Geometry.Properties.Types;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Config/internal/Runtime.PointSamplingConfigJson.hpp"
+#include "Config/internal/Runtime.StepRunExecutionJson.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -46,44 +47,167 @@ namespace Extrinsic::Runtime
         constexpr std::array kBaseFields{
             ConfigFieldSpec{.Name = "source", .Type = FT::UInt, .Description = "Stable id of the moving entity."},
             ConfigFieldSpec{.Name = "target", .Type = FT::UInt, .Description = "Stable id of the fixed entity."},
-            ConfigFieldSpec{.Name = "source_positions", .Type = FT::PropertyRef, .Description = "Moving points: any vec3 position property on a point domain (Unknown picks the primary one).", .RefKinds = kVec3},
-            ConfigFieldSpec{.Name = "target_positions", .Type = FT::PropertyRef, .Description = "Fixed points: any vec3 position property on a point domain.", .RefKinds = kVec3},
-            ConfigFieldSpec{.Name = "method", .Type = FT::Enum, .Description = "Transformation model fitted by EM.", .EnumNames = kMethodNames},
-            ConfigFieldSpec{.Name = "outlier_weight", .Type = FT::Float, .Description = "Weight w of the uniform outlier component: 0 when every target point has a counterpart, 0.05-0.3 for clutter or partial overlap.", .Min = 0, .Max = 1, .ExclusiveMax = true},
-            ConfigFieldSpec{.Name = "max_iterations", .Type = FT::UInt, .Description = "EM iteration cap.", .Min = 1, .Max = 10000},
-            ConfigFieldSpec{.Name = "tolerance", .Type = FT::Float, .Description = "Stop when the objective changes by at most this fraction; 0 runs to the cap.", .Min = 0, .Max = 1},
-            ConfigFieldSpec{.Name = "initial_sigma2", .Type = FT::Float, .Description = "Starting sigma^2 (normalized units); 0 derives it from the data.", .Min = 0},
-            ConfigFieldSpec{.Name = "sigma2_floor", .Type = FT::Float, .Description = "Lower bound for sigma^2 (normalized units); reaching it ends the run.", .Min = 0, .Max = 1, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "normalize", .Type = FT::Bool, .Description = "Center both sets and scale them by one shared factor so beta, lambda and sigma^2 are unitless."},
-            ConfigFieldSpec{.Name = "estimate_scale", .Type = FT::Bool, .Description = "Rigid: also fit a uniform scale."},
-            ConfigFieldSpec{.Name = "allow_reflection", .Type = FT::Bool, .Description = "Rigid: allow a mirrored solution."},
-            ConfigFieldSpec{.Name = "beta", .Type = FT::Float, .Description = "Nonrigid: Gaussian kernel width; larger values move points more jointly.", .Min = 0, .Max = 100, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "lambda", .Type = FT::Float, .Description = "Nonrigid: coherence weight; larger values give smoother motion.", .Min = 0, .Max = 1e6, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "output", .Type = FT::Enum, .Description = "Where the result is written; the source transform is available for rigid registration only.", .EnumNames = kOutputNames},
-            ConfigFieldSpec{.Name = "displacement_name", .Type = FT::String, .Description = "Name of the vec3 displacement property written on the source domain.", .NonEmpty = true},
-            ConfigFieldSpec{.Name = "e_step", .Type = FT::Enum, .Description = "How responsibilities are evaluated each iteration; every option reports its backend and error bound.", .EnumNames = kEStepNames},
-            ConfigFieldSpec{.Name = "e_step_tolerance", .Type = FT::Float, .Description = "Truncated, fast Gauss and Auto: bound on each point's relative responsibility error.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
-            ConfigFieldSpec{.Name = "threads", .Type = FT::UInt, .Description = "Worker threads for the parallel E-step; 0 uses all cores.", .Min = 0, .Max = 256},
-            ConfigFieldSpec{.Name = "nystrom_landmarks", .Type = FT::UInt, .Description = "Nystroem: landmark points; more landmarks keep the approximation accurate for narrower kernels.", .Min = 2, .Max = 4096},
-            ConfigFieldSpec{.Name = "nystrom_landmark_source", .Type = FT::Enum, .Description = "Nystroem: where the landmarks come from.", .EnumNames = kNystromSourceNames},
-            ConfigFieldSpec{.Name = "nystrom_landmark_schedule", .Type = FT::Enum, .Description = "Nystroem: when the landmarks are drawn; fixed point landmarks follow their points, fixed box landmarks keep their coordinates.", .EnumNames = kNystromScheduleNames},
-            ConfigFieldSpec{.Name = "nystrom_box_pattern", .Type = FT::Enum, .Description = "Nystroem, bounding-box landmarks: random or structured sampling (seed: landmark_seed).", .EnumNames = kNystromBoxPatternNames},
-            ConfigFieldSpec{.Name = "nystrom_local_sigma", .Type = FT::Float, .Description = "Nystroem: switch to bounded neighbor sums below this sigma in solver units; 0 disables.", .Min = 0},
-            ConfigFieldSpec{.Name = "nystrom_error_limit", .Type = FT::Float, .Description = "Nystroem: largest sampled relative responsibility error accepted; iterations above it run exactly. An estimate from exact sample rows, not a bound.", .Min = 0, .Max = 1, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points; see auto_low_rank); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
-            ConfigFieldSpec{.Name = "auto_low_rank", .Type = FT::Bool, .Description = "Nonrigid and Bayesian with low_rank 0: above 1024 registered source points use 100 kernel eigenpairs, since the full kernel costs O(m^3) per iteration; off keeps the exact full kernel."},
-            ConfigFieldSpec{.Name = "gamma", .Type = FT::Float, .Description = "Bayesian: factor on the data-derived initial sigma^2.", .Min = 0, .Max = 100, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "kappa", .Type = FT::Float, .Description = "Bayesian: Dirichlet concentration of the mixing weights; small values adapt them to uneven density, 0 keeps them equal.", .Min = 0, .Max = 1e6},
-            ConfigFieldSpec{.Name = "subsample", .Type = FT::UInt, .Description = "Bayesian: register this many source samples (subsample_method) and interpolate the deformation to every point (0 = all points, else at least 4).", .Min = 0, .Max = 1000000},
-            ConfigFieldSpec{.Name = "subsample_backend", .Type = FT::Enum, .Description = "Bayesian: where the subsamples are ordered: CPU, or Vulkan for exact farthest point; results report the backend per set and why the CPU ran.", .EnumNames = kPointSamplingBackendNames},
-            ConfigFieldSpec{.Name = "subsample_target", .Type = FT::UInt, .Description = "Bayesian: register against this many target samples (0 = all points, else at least 4); with omega = 0 unmatched samples bias the fit.", .Min = 0, .Max = 1000000},
+            ConfigFieldSpec{.Name = "source_positions",
+                .Type = FT::PropertyRef,
+                .Description =
+                    "Moving points: any vec3 position property on a point domain (Unknown picks the primary one).",
+                .RefKinds = kVec3},
+            ConfigFieldSpec{.Name = "target_positions",
+                .Type = FT::PropertyRef,
+                .Description = "Fixed points: any vec3 position property on a point domain.",
+                .RefKinds = kVec3},
+            ConfigFieldSpec{.Name = "method",
+                .Type = FT::Enum,
+                .Description = "Transformation model fitted by EM.",
+                .EnumNames = kMethodNames},
+            ConfigFieldSpec{.Name = "outlier_weight",
+                .Type = FT::Float,
+                .Description =
+                    "Weight w of the uniform outlier component: 0 when every target point has a counterpart, 0.05-0.3 for clutter or partial overlap.",
+                .Min = 0,
+                .Max = 1,
+                .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "tolerance",
+                .Type = FT::Float,
+                .Description = "Stop when the objective changes by at most this fraction; 0 runs to the cap.",
+                .Min = 0,
+                .Max = 1},
+            ConfigFieldSpec{.Name = "initial_sigma2",
+                .Type = FT::Float,
+                .Description = "Starting sigma^2 (normalized units); 0 derives it from the data.",
+                .Min = 0},
+            ConfigFieldSpec{.Name = "sigma2_floor",
+                .Type = FT::Float,
+                .Description = "Lower bound for sigma^2 (normalized units); reaching it ends the run.",
+                .Min = 0,
+                .Max = 1,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "normalize",
+                .Type = FT::Bool,
+                .Description =
+                    "Center both sets and scale them by one shared factor so beta, lambda and sigma^2 are unitless."},
+            ConfigFieldSpec{
+                .Name = "estimate_scale", .Type = FT::Bool, .Description = "Rigid: also fit a uniform scale."},
+            ConfigFieldSpec{
+                .Name = "allow_reflection", .Type = FT::Bool, .Description = "Rigid: allow a mirrored solution."},
+            ConfigFieldSpec{.Name = "beta",
+                .Type = FT::Float,
+                .Description = "Nonrigid: Gaussian kernel width; larger values move points more jointly.",
+                .Min = 0,
+                .Max = 100,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "lambda",
+                .Type = FT::Float,
+                .Description = "Nonrigid: coherence weight; larger values give smoother motion.",
+                .Min = 0,
+                .Max = 1e6,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "output",
+                .Type = FT::Enum,
+                .Description =
+                    "Where the result is written; the source transform is available for rigid registration only.",
+                .EnumNames = kOutputNames},
+            ConfigFieldSpec{.Name = "displacement_name",
+                .Type = FT::String,
+                .Description = "Name of the vec3 displacement property written on the source domain.",
+                .NonEmpty = true},
+            ConfigFieldSpec{.Name = "e_step",
+                .Type = FT::Enum,
+                .Description =
+                    "How responsibilities are evaluated each iteration; every option reports its backend and error bound.",
+                .EnumNames = kEStepNames},
+            ConfigFieldSpec{.Name = "e_step_tolerance",
+                .Type = FT::Float,
+                .Description = "Truncated, fast Gauss and Auto: bound on each point's relative responsibility error.",
+                .Min = 0,
+                .Max = 1,
+                .ExclusiveMin = true,
+                .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "threads",
+                .Type = FT::UInt,
+                .Description = "Worker threads for the parallel E-step; 0 uses all cores.",
+                .Min = 0,
+                .Max = 256},
+            ConfigFieldSpec{.Name = "nystrom_landmarks",
+                .Type = FT::UInt,
+                .Description =
+                    "Nystroem: landmark points; more landmarks keep the approximation accurate for narrower kernels.",
+                .Min = 2,
+                .Max = 4096},
+            ConfigFieldSpec{.Name = "nystrom_landmark_source",
+                .Type = FT::Enum,
+                .Description = "Nystroem: where the landmarks come from.",
+                .EnumNames = kNystromSourceNames},
+            ConfigFieldSpec{.Name = "nystrom_landmark_schedule",
+                .Type = FT::Enum,
+                .Description =
+                    "Nystroem: when the landmarks are drawn; fixed point landmarks follow their points, fixed box landmarks keep their coordinates.",
+                .EnumNames = kNystromScheduleNames},
+            ConfigFieldSpec{.Name = "nystrom_box_pattern",
+                .Type = FT::Enum,
+                .Description = "Nystroem, bounding-box landmarks: random or structured sampling (seed: landmark_seed).",
+                .EnumNames = kNystromBoxPatternNames},
+            ConfigFieldSpec{.Name = "nystrom_local_sigma",
+                .Type = FT::Float,
+                .Description =
+                    "Nystroem: switch to bounded neighbor sums below this sigma in solver units; 0 disables.",
+                .Min = 0},
+            ConfigFieldSpec{.Name = "nystrom_error_limit",
+                .Type = FT::Float,
+                .Description =
+                    "Nystroem: largest sampled relative responsibility error accepted; iterations above it run exactly. An estimate from exact sample rows, not a bound.",
+                .Min = 0,
+                .Max = 1,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "low_rank",
+                .Type = FT::UInt,
+                .Description =
+                    "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points; see auto_low_rank); k > 0 uses k kernel eigenpairs and allows large sources.",
+                .Min = 0,
+                .Max = 2000},
+            ConfigFieldSpec{.Name = "auto_low_rank",
+                .Type = FT::Bool,
+                .Description =
+                    "Nonrigid and Bayesian with low_rank 0: above 1024 registered source points use 100 kernel eigenpairs, since the full kernel costs O(m^3) per iteration; off keeps the exact full kernel."},
+            ConfigFieldSpec{.Name = "gamma",
+                .Type = FT::Float,
+                .Description = "Bayesian: factor on the data-derived initial sigma^2.",
+                .Min = 0,
+                .Max = 100,
+                .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "kappa",
+                .Type = FT::Float,
+                .Description =
+                    "Bayesian: Dirichlet concentration of the mixing weights; small values adapt them to uneven density, 0 keeps them equal.",
+                .Min = 0,
+                .Max = 1e6},
+            ConfigFieldSpec{.Name = "subsample",
+                .Type = FT::UInt,
+                .Description =
+                    "Bayesian: register this many source samples (subsample_method) and interpolate the deformation to every point (0 = all points, else at least 4).",
+                .Min = 0,
+                .Max = 1000000},
+            ConfigFieldSpec{.Name = "subsample_backend",
+                .Type = FT::Enum,
+                .Description =
+                    "Bayesian: where the subsamples are ordered: CPU, or Vulkan for exact farthest point; results report the backend per set and why the CPU ran.",
+                .EnumNames = kPointSamplingBackendNames},
+            ConfigFieldSpec{.Name = "subsample_target",
+                .Type = FT::UInt,
+                .Description =
+                    "Bayesian: register against this many target samples (0 = all points, else at least 4); with omega = 0 unmatched samples bias the fit.",
+                .Min = 0,
+                .Max = 1000000},
         };
 
-        // Base fields plus the shared sampling blocks "subsample_" and "landmark_".
+        // Base fields, the shared step-run execution rows (one step is one EM iteration) and the shared sampling
+        // blocks "subsample_" and "landmark_".
         std::span<const ConfigFieldSpec> Fields()
         {
             static const std::vector<ConfigFieldSpec> fields = [] {
                 std::vector<ConfigFieldSpec> all(kBaseFields.begin(), kBaseFields.end());
+                constexpr auto execution = StepRunExecutionFields(kMaxCoherentPointDriftIterations);
+                all.insert(all.end(), execution.begin(), execution.end());
                 for (const std::string_view prefix : {"subsample_", "landmark_"})
                 {
                     const auto block = PointSamplingFieldSpecs(prefix);
@@ -96,28 +220,44 @@ namespace Extrinsic::Runtime
 
         Json Encode(const CoherentPointDriftConfig& c)
         {
-            return Json{{"source", c.SourceStableEntityId}, {"target", c.TargetStableEntityId},
-                        {"source_positions", ConfigDetail::EncodePointPropertyRef(c.SourcePositions)},
-                        {"target_positions", ConfigDetail::EncodePointPropertyRef(c.TargetPositions)},
-                        {"method", unsigned(c.Method)}, {"outlier_weight", c.OutlierWeight},
-                        {"max_iterations", c.MaxIterations}, {"tolerance", c.Tolerance},
-                        {"initial_sigma2", c.InitialSigma2}, {"sigma2_floor", c.Sigma2Floor},
-                        {"normalize", c.NormalizeInputs}, {"estimate_scale", c.EstimateScale},
-                        {"allow_reflection", c.AllowReflection}, {"beta", c.Beta}, {"lambda", c.Lambda},
-                        {"output", unsigned(c.Output)}, {"displacement_name", c.DisplacementName},
-                        {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
-                        {"threads", c.Threads}, {"nystrom_landmarks", c.NystromLandmarks},
-                        {"nystrom_error_limit", c.NystromErrorLimit}, {"nystrom_local_sigma", c.NystromLocalSigma},
-                        {"nystrom_landmark_source", unsigned(c.NystromSource)},
-                        {"nystrom_landmark_schedule", unsigned(c.NystromSchedule)},
-                        {"nystrom_box_pattern", unsigned(c.NystromBoxPattern)}, {"low_rank", c.LowRank}, {"auto_low_rank", c.AutoLowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
-                        {"subsample", c.Subsample}, {"subsample_target", c.SubsampleTarget},
-                        {"subsample_backend", unsigned(c.SubsampleBackend)}};
+            return Json{{"source", c.SourceStableEntityId},
+                {"target", c.TargetStableEntityId},
+                {"source_positions", ConfigDetail::EncodePointPropertyRef(c.SourcePositions)},
+                {"target_positions", ConfigDetail::EncodePointPropertyRef(c.TargetPositions)},
+                {"method", unsigned(c.Method)},
+                {"outlier_weight", c.OutlierWeight},
+                {"tolerance", c.Tolerance},
+                {"initial_sigma2", c.InitialSigma2},
+                {"sigma2_floor", c.Sigma2Floor},
+                {"normalize", c.NormalizeInputs},
+                {"estimate_scale", c.EstimateScale},
+                {"allow_reflection", c.AllowReflection},
+                {"beta", c.Beta},
+                {"lambda", c.Lambda},
+                {"output", unsigned(c.Output)},
+                {"displacement_name", c.DisplacementName},
+                {"e_step", unsigned(c.EStep)},
+                {"e_step_tolerance", c.EStepTolerance},
+                {"threads", c.Threads},
+                {"nystrom_landmarks", c.NystromLandmarks},
+                {"nystrom_error_limit", c.NystromErrorLimit},
+                {"nystrom_local_sigma", c.NystromLocalSigma},
+                {"nystrom_landmark_source", unsigned(c.NystromSource)},
+                {"nystrom_landmark_schedule", unsigned(c.NystromSchedule)},
+                {"nystrom_box_pattern", unsigned(c.NystromBoxPattern)},
+                {"low_rank", c.LowRank},
+                {"auto_low_rank", c.AutoLowRank},
+                {"gamma", c.Gamma},
+                {"kappa", c.Kappa},
+                {"subsample", c.Subsample},
+                {"subsample_target", c.SubsampleTarget},
+                {"subsample_backend", unsigned(c.SubsampleBackend)}};
         }
 
         Json EncodeAll(const CoherentPointDriftConfig& c)
         {
             Json doc = Encode(c);
+            ConfigDetail::EncodeStepRunExecutionJson(doc, c.Execution);
             ConfigDetail::EncodePointSampling(doc, "subsample_", c.SubsampleSampling);
             ConfigDetail::EncodePointSampling(doc, "landmark_", c.LandmarkSampling);
             return doc;
@@ -132,7 +272,7 @@ namespace Extrinsic::Runtime
             ConfigDetail::DecodePointPropertyRef(doc.at("target_positions"), c.TargetPositions);
             c.Method = CoherentPointDriftMethod(doc.at("method").get<unsigned>());
             c.OutlierWeight = doc.at("outlier_weight").get<double>();
-            c.MaxIterations = doc.at("max_iterations").get<std::uint32_t>();
+            c.Execution = ConfigDetail::DecodeStepRunExecutionJson(doc);
             c.Tolerance = doc.at("tolerance").get<double>();
             c.InitialSigma2 = doc.at("initial_sigma2").get<double>();
             c.Sigma2Floor = doc.at("sigma2_floor").get<double>();

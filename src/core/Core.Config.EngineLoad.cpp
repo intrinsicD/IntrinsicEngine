@@ -457,20 +457,21 @@ namespace Extrinsic::Core::Config
                 return;
             }
 
-            AddUnknownFieldDiagnostics(
-                result,
+            AddUnknownFieldDiagnostics(result,
                 *object,
                 "render",
                 {"backend",
-                 "enable_promoted_vulkan_device",
-                 "enable_validation",
-                 "enable_vsync",
-                 "enable_gpu_profiling",
-                 "frames_in_flight",
-                 "default_recipe_config_path",
-                 "gpu_property_idle_evict_seconds",
-                 "gpu_property_budget_megabytes",
-                 "synchronous_extraction"});
+                    "enable_promoted_vulkan_device",
+                    "enable_validation",
+                    "enable_vsync",
+                    "enable_gpu_profiling",
+                    "frames_in_flight",
+                    "default_recipe_config_path",
+                    "gpu_property_idle_evict_seconds",
+                    "gpu_property_budget_megabytes",
+                    "gpu_method_buffer_budget_megabytes",
+                    "synchronous_extraction",
+                    "method_compute_graphics_queue"});
 
             RenderConfig& config = result.Preview.Config.Render;
             if (ReadEnum(
@@ -559,6 +560,20 @@ namespace Extrinsic::Core::Config
                 megabytes.has_value())
             {
                 config.GpuPropertyBudgetMegabytes = static_cast<std::uint32_t>(*megabytes);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> megabytes =
+                    ReadInteger(result, *object, "gpu_method_buffer_budget_megabytes", "render", 1, 1048576);
+                megabytes.has_value())
+            {
+                config.GpuMethodBufferBudgetMegabytes = static_cast<std::uint32_t>(*megabytes);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<bool> graphics =
+                    ReadBool(result, *object, "method_compute_graphics_queue", "render");
+                graphics.has_value())
+            {
+                config.MethodComputeOnGraphicsQueue = *graphics;
                 ++result.Preview.ParsedFieldCount;
             }
         }
@@ -1400,17 +1415,17 @@ namespace Extrinsic::Core::Config
         });
         root["render"] = json::object({
             {"backend", std::string{ToConfigString(config.Render.Backend)}},
-            {"enable_promoted_vulkan_device",
-             config.Render.EnablePromotedVulkanDevice},
+            {"enable_promoted_vulkan_device", config.Render.EnablePromotedVulkanDevice},
             {"enable_validation", config.Render.EnableValidation},
             {"enable_vsync", config.Render.EnableVSync},
             {"enable_gpu_profiling", config.Render.EnableGpuProfiling},
             {"frames_in_flight", config.Render.FramesInFlight},
-            {"default_recipe_config_path",
-             config.Render.DefaultRecipeConfigPath},
+            {"default_recipe_config_path", config.Render.DefaultRecipeConfigPath},
             {"synchronous_extraction", config.Render.SynchronousExtraction},
             {"gpu_property_idle_evict_seconds", config.Render.GpuPropertyIdleEvictSeconds},
             {"gpu_property_budget_megabytes", config.Render.GpuPropertyBudgetMegabytes},
+            {"gpu_method_buffer_budget_megabytes", config.Render.GpuMethodBufferBudgetMegabytes},
+            {"method_compute_graphics_queue", config.Render.MethodComputeOnGraphicsQueue},
         });
         root["simulation"] = json::object({
             {"worker_thread_count", config.Simulation.WorkerThreadCount},

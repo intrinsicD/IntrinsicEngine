@@ -16,21 +16,21 @@ import Extrinsic.Runtime.PluginSections;
 import Extrinsic.Runtime.PointCloudEditing;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.StepRunControls;
 import Extrinsic.Runtime.UiHostTypes;
 
 namespace Intrinsic::Plugins::BilateralFilter
 {
     namespace
     {
-        // The window's state: the edited settings (from the section until applied), the runs still going (one per
-        // output; the host refuses a second run on the same output), the last run started and messages.
+        // The window's state: the edited settings (from the section until applied), messages and the host's run row
+        // (it controls the run started last, here or over MCP; the Jobs window lists every run).
         struct WindowState
         {
             std::optional<Config> Draft{};
             std::string LastApplied{}; // the section the draft was taken from (serialized)
-            std::vector<std::shared_ptr<Run>> Running{};
-            std::shared_ptr<Run> Last{};
             std::string Message{};
+            R::StepRunControlsState Row{};
         };
         WindowState* g_Window{nullptr};
 
@@ -87,10 +87,16 @@ namespace Intrinsic::Plugins::BilateralFilter
                 ImGui::EndCombo();
             }
             ImGui::InputScalar("k neighbors", ImGuiDataType_U32, &draft.KNeighbors);
-            ImGui::InputScalar("Iterations", ImGuiDataType_U32, &draft.Iterations);
+            // One step is one filter pass; live preview only for an in-place output (no inert control).
+            (void)R::DrawStepRunExecutionOptions("Bilateral",
+                draft.Execution,
+                kMaxIterations,
+                true,
+                draft.Output.Name == draft.Positions.Name,
+                kMinIterations);
             ImGui::InputFloat("Spatial sigma (0: auto)", &draft.SpatialSigma);
             ImGui::InputFloat("Normal sigma", &draft.NormalSigma);
-            if (draft.Backend == FilterBackend::VulkanLBVH)
+            if (IsVulkan(draft.Backend))
                 ImGui::InputScalar("GPU query batch", ImGuiDataType_U32, &draft.GpuQueryBatchSize);
             if (ImGui::Button("Apply settings"))
             {
@@ -103,26 +109,18 @@ namespace Intrinsic::Plugins::BilateralFilter
             if (ImGui::Button("Revert")) state.Draft = active;
             if (!state.Message.empty()) ImGui::TextWrapped("%s", state.Message.c_str());
             ImGui::Separator();
-            // Run uses the applied settings, as the MCP tool does.
+            // Start uses the applied settings, as bilateral_filter_start does.
             const std::string reason = active ? Preview(*active) : "The section is invalid.";
-            std::erase_if(state.Running, [](const auto& run) { return run->Final.has_value(); });
             ImGui::BeginDisabled(!reason.empty());
-            if (ImGui::Button("Run"))
-            {
-                state.Last = Start(*active);
-                if (!state.Last->Final) state.Running.push_back(state.Last);
-            }
+            if (ImGui::Button("Start"))
+                (void)Start(*active);
             ImGui::EndDisabled();
             if (!reason.empty()) ImGui::TextWrapped("Not ready: %s", reason.c_str());
-            for (std::size_t i = 0; i < state.Running.size(); ++i)
-            {
-                ImGui::PushID(int(i));
-                ImGui::Text("Running into '%s'", state.Running[i]->Pending.Output.Name.c_str());
-                ImGui::SameLine();
-                if (ImGui::Button("Cancel")) (void)R::CancelPluginRun(*state.Running[i]);
-                ImGui::PopID();
-            }
-            if (state.Last && state.Last->Final) ShowResult(*state.Last->Final);
+            const auto last = LastRun();
+            if (auto* runs = R::PluginService<R::StepRunsService>(); runs != nullptr && last && last->Pending.StepRun)
+                (void)R::DrawStepRunControls(*runs, last->Pending.StepRun, "Bilateral", state.Row);
+            if (last && last->Final)
+                ShowResult(*last->Final);
             ImGui::End();
         }
     }

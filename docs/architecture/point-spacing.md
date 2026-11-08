@@ -82,15 +82,25 @@ version 1:
   "radii": {"domain":"unknown", "name":"radii", "kind":"float"},
   "k_neighbors": 6,
   "scale_factor": 1,
-  "gpu_query_batch_size": 4096
+  "gpu_query_batch_size": 4096,
+  "auto_accept": "never",
+  "start": "ready"
 }
 ```
+
+`auto_accept` and `start` are the shared one-shot rows (ARCH-023): every backend runs as a one-shot step run, the
+whole estimate its one step, with the host's run controls. `start: ready` computes nothing before run or step 1;
+`auto_accept: never` waits for Accept. Their defaults are every one-shot's (`kOneShotStepRunExecution`): the window's
+start is ready and computes on Run or Step, as the GPU run does (before ARCH-023's one default it computed at once).
+The window starts the applied section with them.
 
 Unknown domain resolves to the entity's primary point domain. Input/output
 references must be distinct and on the same domain. Existing output types and
 cardinality must match; topology/deletion names are protected.
 The window's Apply and `config_apply` set the section; the window's **Estimate radii** and the MCP tool
-`point_spacing` run it (the tool waits for the end, is cancellable, and a `vulkan_lbvh` run accepts at once), and
+`point_spacing` run it (without `start` and `auto_accept` the tool runs at once, accepts at the end and waits for it,
+and is cancellable; each one it names replaces the section's, and a run that then does not run at once and accept by
+itself answers at once with its run id `run` on every backend), and
 `point_spacing_preview` answers the readiness the window shows (the operation runtime's capture checks and GPU
 admission, with its texts, through `PointCloudEditingService::ScalarAnalysisReadiness`). Results have a status
 (applied, invalid, busy, failed, stale, discarded, cancelled) and include requested/actual backend,

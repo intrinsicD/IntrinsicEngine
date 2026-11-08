@@ -15,21 +15,21 @@ import Extrinsic.Runtime.PluginContract;
 import Extrinsic.Runtime.PluginSections;
 import Extrinsic.Runtime.PointCloudEditing;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StepRunControls;
 import Extrinsic.Runtime.UiHostTypes;
 
 namespace Intrinsic::Plugins::DescriptorAnalysis
 {
     namespace
     {
-        // The window's state: the edited settings (from the section until applied), the runs still going (one per
-        // first output; the host refuses a second run on the same output), the last run started, the output prefix,
-        // the displayed bin and whether the viewport follows it (after a successful Show), and messages.
+        // The window's state: the edited settings (from the section until applied), the host's run row (it controls
+        // the run started last, here or over MCP; the Jobs window lists every run), the output prefix, the displayed
+        // bin and whether the viewport follows it (after a successful Show), and messages.
         struct WindowState
         {
             std::optional<Config> Draft{};
             std::string LastApplied{}; // the section the draft was taken from (serialized)
-            std::vector<std::shared_ptr<Run>> Running{};
-            std::shared_ptr<Run> Last{};
+            R::StepRunControlsState Row{};
             std::array<char, 256> Prefix{"fpfh"};
             int DisplayBin{0};
             bool FollowDisplayBin{false};
@@ -130,10 +130,14 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
             {
                 ImGui::InputScalar("GPU query batch size", ImGuiDataType_U32, &draft.GpuQueryBatchSize);
                 ImGui::InputScalar("Radius result capacity", ImGuiDataType_U32, &draft.GpuRadiusCapacity);
-                ImGui::TextWrapped("Uncapped radius support must fit the selected capacity (up to 1024). A neighbor cap "
-                                   "within that capacity can use the exact lowest-ID prefix even in denser "
-                                   "neighborhoods. Scale, SPFH and FPFH run on CPU.");
+                ImGui::TextWrapped(
+                    "Uncapped radius support must fit the selected capacity (up to 1024). A neighbor cap "
+                    "within that capacity can use the exact lowest-ID prefix even in denser "
+                    "neighborhoods. A hybrid: the radius rows run on the GPU and are read back; scale, "
+                    "SPFH and FPFH run on CPU.");
             }
+            // One step, no live preview: Accept and start alone (no inert control).
+            (void)R::DrawStepRunExecutionOptions("Descriptor", draft.Execution, 1u, true, false);
             if (ImGui::Button("Apply settings"))
             {
                 std::string error;
@@ -145,25 +149,16 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
             if (ImGui::Button("Revert")) state.Draft = active;
             if (!state.Message.empty()) ImGui::TextWrapped("%s", state.Message.c_str());
             ImGui::Separator();
-            // Run uses the applied settings, as the MCP tool does.
+            // Start uses the applied settings, as descriptor_analysis_start does.
             const std::string reason = active ? Preview(*active) : "The section is invalid.";
-            std::erase_if(state.Running, [](const auto& run) { return run->Final.has_value(); });
             ImGui::BeginDisabled(!reason.empty());
-            if (ImGui::Button("Run"))
-            {
-                state.Last = Start(*active);
-                if (!state.Last->Final) state.Running.push_back(state.Last);
-            }
+            if (ImGui::Button("Start"))
+                (void)Start(*active);
             ImGui::EndDisabled();
             if (!reason.empty()) ImGui::TextWrapped("Not ready: %s", reason.c_str());
-            for (std::size_t i = 0; i < state.Running.size(); ++i)
-            {
-                ImGui::PushID(int(i));
-                ImGui::Text("Running into '%s' and 32 more", state.Running[i]->Pending.Outputs.front().Name.c_str());
-                ImGui::SameLine();
-                if (ImGui::Button("Cancel")) (void)R::CancelPluginRun(*state.Running[i]);
-                ImGui::PopID();
-            }
+            const auto last = LastRun();
+            if (auto* runs = R::PluginService<R::StepRunsService>(); runs != nullptr && last && last->Pending.StepRun)
+                (void)R::DrawStepRunControls(*runs, last->Pending.StepRun, "Descriptor", state.Row);
             ImGui::TextWrapped("Writes 33 named float histogram properties in one undoable operation. Each nonempty "
                                "eleven-bin block sums to 100.");
             // The viewport follows the slider only after a Show succeeded.
@@ -173,7 +168,8 @@ namespace Intrinsic::Plugins::DescriptorAnalysis
             if (ImGui::Button("Show histogram bin") || (binChanged && state.FollowDisplayBin))
                 state.FollowDisplayBin = ShowBin(state, draft);
             if (!state.ShowMessage.empty()) ImGui::TextWrapped("%s", state.ShowMessage.c_str());
-            if (state.Last && state.Last->Final) ShowResult(*state.Last->Final);
+            if (last && last->Final)
+                ShowResult(*last->Final);
             ImGui::End();
         }
     }

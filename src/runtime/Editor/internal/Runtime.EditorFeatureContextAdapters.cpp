@@ -1077,44 +1077,35 @@ MakeEditorSceneEditingContext(const EditorFeatureBindings &bindings) {
 
 EditorProcessingContext
 MakeEditorProcessingContext(const EditorFeatureBindings& bindings) {
-  return EditorProcessingContext{
-      .Scene = bindings.Scene,
-      .World = bindings.World,
-      .CommandHistory = bindings.CommandHistory,
-      .SpatialIndices = bindings.SpatialIndices,
-      .Device = bindings.Device,
-      .JobCommands = bindings.JobCommands,
-      .EngineConfigControlState = bindings.EngineConfigControlState,
-      .PreviewEngineConfigDocument = bindings.PreviewEngineConfigDocument,
-      .ApplyEngineConfigHotSubset = bindings.ApplyEngineConfigHotSubset,
-      .AttachmentActive = bindings.AttachmentActive,
-      .InvalidateWorkspaceSnapshotCache = bindings.InvalidateWorkspaceSnapshotCache,
-      .EngineConfigCommandsAvailable = bindings.EngineConfigCommandsAvailable,
-      .Selection = bindings.Selection,
-      .MeshDenoiseKernelAvailable = bindings.MeshDenoiseKernelAvailable,
-      .MeshCurvatureKernelAvailable = bindings.MeshCurvatureKernelAvailable,
-      .MeshCurvatureDirectionsAvailable =
-          bindings.MeshCurvatureDirectionsAvailable,
-      .CurvatureSegmentationKernelAvailable =
-          bindings.CurvatureSegmentationKernelAvailable,
-      .MeshRemeshUniformKernelAvailable =
-          bindings.MeshRemeshUniformKernelAvailable,
-      .MeshRemeshAdaptiveKernelAvailable =
-          bindings.MeshRemeshAdaptiveKernelAvailable,
-      .MeshRemeshProjectToSurfaceAvailable =
-          bindings.MeshRemeshProjectToSurfaceAvailable,
-      .MeshRemeshErrorBoundedSizingAvailable =
-          bindings.MeshRemeshErrorBoundedSizingAvailable,
-      .MeshSubdivideLoopKernelAvailable =
-          bindings.MeshSubdivideLoopKernelAvailable,
-      .MeshSubdivideCatmullClarkKernelAvailable =
-          bindings.MeshSubdivideCatmullClarkKernelAvailable,
-      .MeshSubdivideSqrt3KernelAvailable =
-          bindings.MeshSubdivideSqrt3KernelAvailable,
-      .MeshSubdivideLoopFeatureEdgesAvailable =
-          bindings.MeshSubdivideLoopFeatureEdgesAvailable,
-      .MeshSimplifyKernelAvailable = bindings.MeshSimplifyKernelAvailable,
-  };
+    return EditorProcessingContext{
+        .Scene = bindings.Scene,
+        .World = bindings.World,
+        .CommandHistory = bindings.CommandHistory,
+        .SpatialIndices = bindings.SpatialIndices,
+        .StepRuns = bindings.StepRuns,
+        .Device = bindings.Device,
+        .JobCommands = bindings.JobCommands,
+        .EngineConfigControlState = bindings.EngineConfigControlState,
+        .PreviewEngineConfigDocument = bindings.PreviewEngineConfigDocument,
+        .ApplyEngineConfigHotSubset = bindings.ApplyEngineConfigHotSubset,
+        .AttachmentActive = bindings.AttachmentActive,
+        .InvalidateWorkspaceSnapshotCache = bindings.InvalidateWorkspaceSnapshotCache,
+        .EngineConfigCommandsAvailable = bindings.EngineConfigCommandsAvailable,
+        .Selection = bindings.Selection,
+        .MeshDenoiseKernelAvailable = bindings.MeshDenoiseKernelAvailable,
+        .MeshCurvatureKernelAvailable = bindings.MeshCurvatureKernelAvailable,
+        .MeshCurvatureDirectionsAvailable = bindings.MeshCurvatureDirectionsAvailable,
+        .CurvatureSegmentationKernelAvailable = bindings.CurvatureSegmentationKernelAvailable,
+        .MeshRemeshUniformKernelAvailable = bindings.MeshRemeshUniformKernelAvailable,
+        .MeshRemeshAdaptiveKernelAvailable = bindings.MeshRemeshAdaptiveKernelAvailable,
+        .MeshRemeshProjectToSurfaceAvailable = bindings.MeshRemeshProjectToSurfaceAvailable,
+        .MeshRemeshErrorBoundedSizingAvailable = bindings.MeshRemeshErrorBoundedSizingAvailable,
+        .MeshSubdivideLoopKernelAvailable = bindings.MeshSubdivideLoopKernelAvailable,
+        .MeshSubdivideCatmullClarkKernelAvailable = bindings.MeshSubdivideCatmullClarkKernelAvailable,
+        .MeshSubdivideSqrt3KernelAvailable = bindings.MeshSubdivideSqrt3KernelAvailable,
+        .MeshSubdivideLoopFeatureEdgesAvailable = bindings.MeshSubdivideLoopFeatureEdgesAvailable,
+        .MeshSimplifyKernelAvailable = bindings.MeshSimplifyKernelAvailable,
+    };
 }
 
 EditorVisualizationEditingContext

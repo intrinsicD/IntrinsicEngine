@@ -62,9 +62,10 @@ namespace
     KD::Config Settings(const entt::entity entity, const D domain)
     {
         return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
-                .Positions = {.Domain = domain, .Name = "samples", .ValueKind = K::Vec3},
-                .Density = {.Domain = domain, .Name = "density", .ValueKind = K::Float},
-                .KNeighbors = 2};
+            .Positions = {.Domain = domain, .Name = "samples", .ValueKind = K::Vec3},
+            .Density = {.Domain = domain, .Name = "density", .ValueKind = K::Float},
+            .KNeighbors = 2,
+            .Execution = R::kOneShotBatchExecution}; // a batch: computes at once, accepts at its end
     }
 
     const char* DeletedName(const D d)
@@ -198,7 +199,7 @@ TEST(KernelDensityPlugin, EveryDomainPublishesNamedDensityKeepsDeletedRowsAndThe
                 EXPECT_EQ(harness.Settled(config), "");
                 const auto catalog = editing->InputCatalog(config.StableEntityId, 2u);
                 EXPECT_TRUE(std::ranges::any_of(catalog.Entries, [&](const auto& e) { return e.Ref == config.Positions; }));
-                const auto reference = harness.Wait(*KD::Start(config, false));
+                const auto reference = harness.Wait(*KD::Start(config));
                 ASSERT_EQ(reference.Status, "applied") << reference.Message;
                 EXPECT_EQ(reference.ActualBackend, "cpu_octree");
                 const auto values = std::as_const(props).Get<float>("density").Vector();
@@ -212,13 +213,13 @@ TEST(KernelDensityPlugin, EveryDomainPublishesNamedDensityKeepsDeletedRowsAndThe
                 ASSERT_TRUE(harness.History().Redo().Succeeded());
                 EXPECT_EQ(std::as_const(props).Get<float>("keep")[0], 99);
                 config.Backend = KD::DensityBackend::CpuLBVH;
-                const auto indexed = harness.Wait(*KD::Start(config, false));
+                const auto indexed = harness.Wait(*KD::Start(config));
                 ASSERT_EQ(indexed.Status, "applied") << indexed.Message;
                 EXPECT_EQ(indexed.ActualBackend, "cpu_lbvh");
                 const auto actual = std::as_const(props).Get<float>("density");
                 for (std::size_t i = 0; i < size; ++i) EXPECT_NEAR(actual[i], values[i], 1e-5 * std::max(1.f, values[i]));
                 EXPECT_FLOAT_EQ(indexed.UsedBandwidth, reference.UsedBandwidth);
-                EXPECT_TRUE(harness.Wait(*KD::Start(config, false)).IndexReused);
+                EXPECT_TRUE(harness.Wait(*KD::Start(config)).IndexReused);
                 props.Get<float>("density")[0] = 123; // a foreign edit of the output: undo is refused
                 EXPECT_FALSE(harness.History().Undo().Succeeded());
                 std::string diagnostic; // Show records its own undo entry (the visualization recipe)
@@ -264,7 +265,7 @@ TEST(KernelDensityPlugin, AnInvalidDeletionMaskRefusesPreviewAndRun)
             const char* expected =
                 fault < 3 ? "Deletion mask must be a count-matched bool property." : "Invalid deletion domain/cardinality.";
             EXPECT_EQ(harness.Settled(config), expected);
-            const auto run = KD::Start(config, false);
+            const auto run = KD::Start(config);
             ASSERT_TRUE(run->Final);
             EXPECT_EQ(run->Final->Status, "invalid");
             EXPECT_EQ(run->Final->Message, expected);
@@ -285,7 +286,7 @@ TEST(KernelDensityPlugin, AChangedInputOrOutputOrACancelEndsTheRunWithoutAWrite)
         auto& scene = harness.Scene();
         const auto entity = Make(scene, D::MeshVertex);
         auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-        const auto run = KD::Start(Settings(entity, D::MeshVertex), false);
+        const auto run = KD::Start(Settings(entity, D::MeshVertex));
         ASSERT_FALSE(run->Final) << run->Final->Message;
         switch (change)
         {
@@ -323,16 +324,16 @@ TEST(KernelDensityPlugin, InvalidOutputsTheGpuWithoutADeviceAndNumericalFailures
     unrelated.Density.Name = "h:next";
     EXPECT_EQ(harness.Settled(unrelated), "");
     config.Backend = KD::DensityBackend::VulkanLBVH;
-    EXPECT_EQ(harness.Wait(*KD::Start(config, true)).Status, "invalid");
+    EXPECT_EQ(harness.Wait(*KD::Start(config)).Status, "invalid");
     // A coincident peer keeps a nonzero kernel: h^-3 genuinely overflows the float output.
     props.Get<glm::vec3>("samples")[1] = std::as_const(props).Get<glm::vec3>("samples")[0];
     config.Backend = KD::DensityBackend::CpuOctree;
     config.Bandwidth = 1e-30f;
-    EXPECT_EQ(harness.Wait(*KD::Start(config, false)).Status, "failed");
+    EXPECT_EQ(harness.Wait(*KD::Start(config)).Status, "failed");
     EXPECT_EQ(std::as_const(props).Get<float>("density")[0], 77);
     config.Bandwidth = 1;
     config.KNeighbors = std::numeric_limits<std::uint32_t>::max();
-    EXPECT_EQ(harness.Wait(*KD::Start(config, false)).Status, "applied");
+    EXPECT_EQ(harness.Wait(*KD::Start(config)).Status, "applied");
 }
 
 // Without a device here, the Vulkan backend answers the GPU admission of the operation runtime through both entry
@@ -373,7 +374,7 @@ TEST(KernelDensityPlugin, TheVulkanBackendAnswersTheGpuAdmissionThroughBothTools
         auto cpu = wide;
         cpu.Backend = backend;
         cpu.KNeighbors = 64;
-        EXPECT_EQ(harness.Wait(*KD::Start(cpu, false)).Status, "applied") << KD::ToString(backend);
+        EXPECT_EQ(harness.Wait(*KD::Start(cpu)).Status, "applied") << KD::ToString(backend);
     }
 }
 
@@ -386,13 +387,13 @@ TEST(KernelDensityPlugin, UndoRedoAndAPositionEditRebuildTheIndex)
     config.Backend = KD::DensityBackend::CpuLBVH;
     config.KNeighbors = std::numeric_limits<std::uint32_t>::max();
     auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
-    ASSERT_EQ(harness.Wait(*KD::Start(config, false)).Status, "applied");
+    ASSERT_EQ(harness.Wait(*KD::Start(config)).Status, "applied");
     ASSERT_TRUE(harness.History().Undo().Succeeded());
     EXPECT_FALSE(props.Exists("density"));
     ASSERT_TRUE(harness.History().Redo().Succeeded());
     EXPECT_TRUE(props.Exists("density"));
     props.Get<glm::vec3>("samples")[0].x += .1f;
-    const auto rerun = harness.Wait(*KD::Start(config, false));
+    const auto rerun = harness.Wait(*KD::Start(config));
     ASSERT_EQ(rerun.Status, "applied") << rerun.Message;
     EXPECT_FALSE(rerun.IndexReused);
 }
@@ -407,7 +408,7 @@ TEST(KernelDensityPlugin, AReplacedStorageMakesUndoStale)
         const auto entity = Make(scene, D::PointCloudPoint);
         const auto config = Settings(entity, D::PointCloudPoint);
         auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
-        ASSERT_EQ(harness.Wait(*KD::Start(config, false)).Status, "applied");
+        ASSERT_EQ(harness.Wait(*KD::Start(config)).Status, "applied");
         const auto computed = std::as_const(props).Get<float>("density").Vector();
         if (replaceOutput)
         {
@@ -443,7 +444,7 @@ TEST(KernelDensityPlugin, ScalarStoragePublishesWithCheckedConversionAndExactUnd
         auto config = Settings(entity, D::PointCloudPoint);
         config.KNeighbors = 1;
         config.Density.ValueKind = kind;
-        const auto result = harness.Wait(*KD::Start(config, false));
+        const auto result = harness.Wait(*KD::Start(config));
         ASSERT_EQ(result.Status, "applied") << result.Message;
         EXPECT_EQ(R::DetectGeometryPropertyValueKind(props, "density"), kind);
         EXPECT_EQ(harness.History().Undo().Status, R::EditorCommandHistoryStatus::Undone);
@@ -456,7 +457,7 @@ TEST(KernelDensityPlugin, ScalarStoragePublishesWithCheckedConversionAndExactUnd
         const auto entity = Make(scene, D::PointCloudPoint);
         auto config = Settings(entity, D::PointCloudPoint);
         config.Density.ValueKind = K::Int32; // densities of 0.01-spaced samples are not integers
-        const auto result = harness.Wait(*KD::Start(config, false));
+        const auto result = harness.Wait(*KD::Start(config));
         EXPECT_EQ(result.Status, "invalid");
         EXPECT_EQ(result.Message, "Output values are not exactly representable in the selected scalar storage.");
         EXPECT_FALSE(PointDomainProperties(scene, entity, D::PointCloudPoint).Exists("density"));
@@ -471,7 +472,7 @@ TEST(KernelDensityPlugin, ScalarStoragePublishesWithCheckedConversionAndExactUnd
         props.Get<double>("density")[4] = std::numeric_limits<double>::quiet_NaN();
         auto config = Settings(entity, D::PointCloudPoint);
         config.Density.ValueKind = K::Double;
-        ASSERT_EQ(harness.Wait(*KD::Start(config, false)).Status, "applied");
+        ASSERT_EQ(harness.Wait(*KD::Start(config)).Status, "applied");
         EXPECT_TRUE(std::isnan(std::as_const(props).Get<double>("density")[4])) << "the deleted row keeps its NaN";
         props.Get<float>("keep")[0] = 99;
         ASSERT_TRUE(harness.History().Undo().Succeeded());
@@ -493,19 +494,19 @@ TEST(KernelDensityPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessio
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
     const auto config = Settings(entity, D::MeshVertex);
-    const auto older = KD::Start(config, false);
+    const auto older = KD::Start(config);
     ASSERT_FALSE(older->Final);
     auto elsewhere = config;
     elsewhere.StableEntityId = 0xFFFFFFF0u;
-    const auto newer = KD::Start(elsewhere, false); // refused at once: a newer result while the older run goes on
+    const auto newer = KD::Start(elsewhere); // refused at once: a newer result while the older run goes on
     ASSERT_TRUE(newer->Final);
     EXPECT_EQ(harness.Wait(*older).Status, "applied");
     EXPECT_EQ(KD::Latest(), newer) << "the older run's completion never replaces a newer result";
-    const auto first = KD::Start(config, false);
+    const auto first = KD::Start(config);
     ASSERT_FALSE(first->Final);
     EXPECT_EQ(KD::Latest(), first) << "a started run is the latest at once";
     ASSERT_EQ(KD::Active().size(), 1u);
-    const auto busy = KD::Start(config, false);
+    const auto busy = KD::Start(config);
     ASSERT_TRUE(busy->Final);
     EXPECT_EQ(busy->Final->Status, "busy") << busy->Final->Message;
     EXPECT_EQ(KD::Latest(), first) << "a busy refusal answers for the other run";
@@ -514,7 +515,7 @@ TEST(KernelDensityPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessio
     EXPECT_TRUE(KD::Active().empty());
     auto missing = config;
     missing.StableEntityId = 0xFFFFFFF0u;
-    const auto refused = KD::Start(missing, false);
+    const auto refused = KD::Start(missing);
     ASSERT_TRUE(refused->Final);
     EXPECT_EQ(refused->Final->Status, "invalid");
     EXPECT_EQ(refused->Final->Message, "Density target entity is stale or missing.") << "the removed operation's text";
@@ -526,7 +527,7 @@ TEST(KernelDensityPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessio
 
     auto other = config;
     other.Density.Name = "density_of_the_old_session";
-    const auto outlived = KD::Start(other, false);
+    const auto outlived = KD::Start(other);
     ASSERT_FALSE(outlived->Final);
     EXPECT_EQ(KD::Latest(), outlived);
     const auto undo = harness.History().UndoCount();
@@ -538,7 +539,7 @@ TEST(KernelDensityPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessio
     EXPECT_EQ(KD::Latest(), nullptr) << "an old session's delivery does not come back";
     EXPECT_FALSE(props.Exists("density_of_the_old_session"));
     EXPECT_EQ(harness.History().UndoCount(), undo);
-    const auto fresh = KD::Start(config, false);
+    const auto fresh = KD::Start(config);
     EXPECT_EQ(harness.Wait(*fresh).Status, "applied");
     EXPECT_EQ(KD::Latest(), fresh);
 }
@@ -551,7 +552,7 @@ TEST(KernelDensityPlugin, ARunOfAReleasedWorkspaceWritesNothing)
     auto& scene = harness.Scene();
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-    const auto run = KD::Start(Settings(entity, D::MeshVertex), false);
+    const auto run = KD::Start(Settings(entity, D::MeshVertex));
     ASSERT_FALSE(run->Final);
     harness.Editing().ReleaseEditorWorkspace(harness.Shell);
     EXPECT_EQ(harness.Wait(*run).Status, "cancelled") << run->Final->Message;
@@ -572,7 +573,7 @@ TEST(KernelDensityPlugin, AnOutOfRangeCoordinateIsRefusedWithTheMethodsLbvhText)
     config.Backend = KD::DensityBackend::CpuLBVH;
     const std::string limits = "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.";
     EXPECT_EQ(harness.Settled(config), limits);
-    const auto run = KD::Start(config, false);
+    const auto run = KD::Start(config);
     ASSERT_TRUE(run->Final);
     EXPECT_EQ(run->Final->Status, "invalid");
     EXPECT_EQ(run->Final->Message, limits);
@@ -609,7 +610,7 @@ TEST(KernelDensityPlugin, TheJobsWindowCancelsARun)
     auto& scene = harness.Scene();
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-    const auto run = KD::Start(Settings(entity, D::MeshVertex), false);
+    const auto run = KD::Start(Settings(entity, D::MeshVertex));
     ASSERT_FALSE(run->Final);
     const auto jobs = harness.Jobs();
     const auto row = std::ranges::find_if(jobs, [](const auto& job) { return job.Name == "Density estimation"; });
@@ -701,7 +702,7 @@ TEST(KernelDensityPlugin, CpuOutputsAreBitwiseTheGeometryFunctions)
             config.Backend = backend;
             config.Bandwidth = bandwidth;
             config.KNeighbors = k;
-            ASSERT_EQ(harness.Wait(*KD::Start(config, false)).Status, "applied");
+            ASSERT_EQ(harness.Wait(*KD::Start(config)).Status, "applied");
             const auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
             const auto samples = std::as_const(props).Get<glm::vec3>("samples").Vector();
             const auto deleted = std::as_const(props).Get<bool>("v:deleted").Vector();

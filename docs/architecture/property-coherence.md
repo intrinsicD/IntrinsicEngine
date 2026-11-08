@@ -41,11 +41,15 @@ ECS-blind; runtime binds entities through `Runtime.GpuPropertyBinding`):
   revision, so the next run uploads nothing. `Discard` releases the ring. An
   exhausted ring (every slot front, leased or pending) drops the preview; it
   never blocks and never overwrites.
-- **Completion.** Every slot records its last frame of use (`NoteUse`) and its
-  transfer/readback tokens (`AddCompletion`); it is rewritten or freed only when
-  the frames in flight have passed, every token is complete and no lease is
-  held. `DestroyBuffer` is frame-deferred, so freeing was already safe; the
-  records exist for in-place ring rewrites and eviction.
+- **Completion.** Every slot records its last frame of use (`NoteUse`), its
+  transfer/readback tokens (`AddCompletion`) and, for compute-lane submissions,
+  the returned token of each submission that used it while recording
+  (`BeginSubmission`/`EndSubmission`, stamped by `SpatialIndexCache`; a safety
+  completion that changes no readback counter). It is rewritten or freed only
+  when the frames in flight have passed, every token is complete and no lease is
+  held, so frame retirement alone never releases compute-lane data.
+  `DestroyBuffer` itself waits for frames and the compute fence; the records
+  exist for in-place ring rewrites, canonical replacement and eviction.
 - **Cache.** Canonical slots are an LRU cache (`Tick`): a slot unused for
   `render.gpu_property_idle_evict_seconds` is evicted, and above
   `render.gpu_property_budget_megabytes` the least recently used slots go
@@ -207,8 +211,8 @@ agent commands accept at once) does, in order:
 
 1. one readback of the front in float3 (`GpuFrontReadback`, the readback of the
    shared GPU transaction lifecycle, RUNTIME-311: positions are its accept-only
-   transaction; immediate where the device can, otherwise with the frame; the
-   front stays leased until the bytes landed);
+   transaction; submitted at once on the compute lane, failing when the device
+   refuses it; the front stays leased until the bytes landed);
 2. the undoable publication of **every row** (deleted rows included, so the
    CPU rows are byte-identical to the front) as one history entry guarded by
    the other inputs' watches and the positions' own revision; non-finite rows
@@ -463,18 +467,39 @@ and then stays GPU-local through its iterations. GPU inputs deliberately using
 host-visible storage, such as property-texture baking, keep the cheaper
 persistently mapped `WriteBuffer` path instead of staging an extra copy.
 
-The promoted transfer service currently submits on the graphics queue. Queue
-order protects an in-place target range from earlier-frame readers and orders
-the copy before the later render submission, so destination double-buffering is
-not required merely to avoid a CPU stall. A future dedicated transfer/compute
-queue requires explicit producer completion tokens, queue-family ownership,
-and either destination renaming or a proven non-overlap schedule before this
-assumption may change.
+The promoted transfer service submits uploads and downloads on the graphics
+queue. Queue order protects an in-place target range from earlier-frame readers
+and orders the copy before the later render submission, so destination
+double-buffering is not required merely to avoid a CPU stall.
+
+Method compute (`IDevice::SubmitComputeReadback`, ARCH-023) runs on a separate
+lane of the same service: its own pool and timeline on the async compute queue
+when one exists (`render.method_compute_graphics_queue` forces graphics; the
+transfer diagnostics report the actual lane). It replaces queue order with GPU
+waits: an owner's (and every run's first) compute submission waits on the
+graphics lane's last submitted transfer ticket (every upload, download and
+one-shot upload issued before it; `ComputeInputOrder::AfterIssuedTransfers`).
+No frame is waited for directly, but that ticket is a graphics-queue signal and
+covers every earlier graphics batch, frames and swapchain waits included, so a
+default-order submission after a renderer or preview upload can wait for the
+preceding frame. A worker page after the run's first submission reads only
+prepared inputs and follows it in compute-lane order alone (`LaneOrderOnly`), so
+later preview or renderer uploads do not hold it. Where the method lane shares a
+queue with frames (graphics lane, or the framegraph's compute queue), queue
+order behind earlier frame work applies to both orders. Graphics submissions
+acquire only compute values `CollectCompleted` observed complete, never pending
+method work. Buffers are
+`CONCURRENT` across the families; readback slots are lane-private. Owners must
+not overwrite an input a compute submission reads until its token completed.
+`SpatialIndexCache` submits every query batch and method computation this way,
+at once and never inside a frame (see [spatial indices](spatial-indices.md#submission-and-completion-arch-023)),
+and stamps the residency slots each submission used with its token.
 
 GPU-to-CPU method completion uses the shared mapped readback ring. In-flight
 method resources and staging/readback slots retire by completion token; they
-are not destroyed by a guessed frame delay. No intermediate method iteration
-crosses to the CPU.
+are not destroyed by a guessed frame delay: device deferred deletion and pooled
+workspaces also wait for the transfer queue's `ComputeFence()`, which frame
+retirement does not cover. No intermediate method iteration crosses to the CPU.
 
 ## Ownership and failure rules
 
@@ -498,6 +523,11 @@ The contract is exercised by geometry property revision tests, mesh/graph/
 point-cloud no-dirty-tag extraction tests, visualization dirty-stamp tests,
 `GpuWorld` transfer-staging tests, and the validation-enabled Vulkan LOP
 publication-to-render-residency regression listed in the contract catalog.
+The method-compute lane is exercised by `VulkanTransferLifetimeGpuSmoke`
+(upload -> compute -> readback and compute -> frame known answers under
+synchronization validation with submission diagnostics, compute-gated deferred
+destruction, forced-graphics fallback), `VulkanFailClosedContract` lane-token and
+lane-resolution cases, and the `SpatialWorkspaceLeases` compute-fence case.
 
 ### Resident density, spacing and density weights
 
@@ -562,9 +592,9 @@ readback bytes (zero for FPS); metadata is not a property-value upload.
 
 Rounds remain bounded by the workspace's point-pair budget. Intermediate chunks
 use zero-byte `QueueGpuCompute` submissions; Vulkan uses the existing transfer
-queue timeline and callback with no staging allocation or copy. The framed
-fallback waits past frame-fence reuse before reporting completion. A submission
-refused after its recorder ran fails instead of replaying an advanced cursor.
+queue timeline and callback with no staging allocation or copy; completion is
+that callback, not a frame count. A refused submission fails instead of replaying
+an advanced cursor.
 
 GPU preview: no; commit via the existing atomic rank/selection publication on
 completion (or the existing generated-point-cloud publication). Input, weight,
@@ -575,10 +605,12 @@ See the [sampling backend contract](../methods/point-sampling.md) for verificati
 
 ### Resident LOP consolidation
 
-LOP resolves canonical float3 inputs and pages initialization/projection through
-immediate `SpatialIndexCache` submissions, with 64-byte grid-bound and per-iteration
-diagnostics. The existing consolidation GPU
-participant owns its method cursor; no second transfer queue or scheduler is added.
+LOP and isotropic WLOP resolve canonical float3 inputs and page initialization,
+density weights (WLOP) and projection through immediate `SpatialIndexCache`
+submissions, with 64-byte grid-bound and per-iteration diagnostics. The existing
+consolidation GPU participant owns its method cursor; no second transfer queue or
+scheduler is added. Every run is a step run whose Init (upload, source grid,
+density, initialization) precedes Ready.
 For same-cardinality in-place positions, `BeginEditorGpuPositionRun` owns the ring.
 Only configured preview boundaries and the terminal iteration copy into its back
 slot; completion publishes the front. Intermediate slot
@@ -586,11 +618,14 @@ pressure drops previews, while terminal publication waits for a slot.
 
 Stop retains the completed iteration. Accept uses `AcceptEditorGpuPositionRun`;
 Discard and attachment loss use `DiscardEditorGpuPositionRun`. CPU edits make
-Accept stale, with a visible reason. Batch/agent requests auto-accept. Canonical
-revision binding lets the next run reuse the accepted input without another upload.
-Cardinality changes and separate named outputs retain terminal publication rather
-than borrowing the same-cardinality positions transaction. Their inputs are also
-resident and their producer is paged. See the [LOP backend contract](../methods/locally-optimal-projection.md)
+Accept stale, with a visible reason. Batch/agent requests accept at their end.
+Canonical revision binding lets the next run reuse the accepted input without
+another upload. Cardinality changes and separate named outputs do not borrow the
+same-cardinality positions transaction: they preview nothing, and Accept reads
+their positions back once for the module's guarded property or replacement
+publication. CPU and hybrid consolidation runs of an in-place output show live
+previews as a CPU-uploaded ring front (`UploadGpuPropertyFront`) released on
+Accept or Discard. See the [LOP backend contract](../methods/locally-optimal-projection.md)
 for IO accounting, numerical scope and the Vulkan proof surface.
 
 ### Resident k-means labels
@@ -631,7 +666,7 @@ both fronts and calls the existing checked two-field history publisher exactly o
 Matching typed fronts bind to the new CPU revisions; converted fronts are discarded. The transaction ignores re-entrant
 Discard while the atomic publication is running. Stale input/deletion/output
 refuses Accept; Discard, Stop before completion, and panel detach retain CPU state.
-Batch and `run_keypoint_analysis` auto-accept, including terminal stale completion
+Batch and waiting `run_keypoint_analysis` auto-accept, including terminal stale completion
 when auto-accept is refused. There is no additional transaction service.
 
 GPU preview: yes (score); commit via PointScalarTransaction.

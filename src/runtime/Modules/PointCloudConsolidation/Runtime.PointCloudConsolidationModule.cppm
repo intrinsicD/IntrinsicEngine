@@ -29,6 +29,7 @@ extern "C++"
     {
         class WorldRegistry;
         class SpatialIndexCache;
+        class StepRunsService;
     }
 }
 
@@ -36,6 +37,8 @@ export namespace Extrinsic::Runtime
 {
     class PointCloudConsolidationGpuState;
     struct PointCloudConsolidationReadinessState;
+    struct PointCloudConsolidationRunTable;
+    struct PointCloudConsolidationRunContext;
 
     [[nodiscard]] PointCloudConsolidationAvailability
     ResolvePointCloudConsolidationAvailability(
@@ -62,8 +65,13 @@ export namespace Extrinsic::Runtime
         }
 
     private:
+        [[nodiscard]] PointCloudConsolidationRunContext RunContext() noexcept;
+
         PointCloudConsolidationService m_Service{};
         std::unique_ptr<PointCloudConsolidationReadinessState> m_Readiness{};
+        // The CPU and hybrid runs in progress (every backend runs as a step run of m_StepRuns).
+        std::unique_ptr<PointCloudConsolidationRunTable> m_Runs{};
+        StepRunsService* m_StepRuns{};
         KernelEventSubscription m_JobCompletedSubscription{};
         KernelEventBus* m_Events{};
         JobService* m_Jobs{};

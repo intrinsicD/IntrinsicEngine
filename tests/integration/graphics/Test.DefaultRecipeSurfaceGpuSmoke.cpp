@@ -1163,23 +1163,21 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ShadowFramesInFlightRunWithoutSynchronization
             ++shadowFrames;
     }
 
-    // The last frame's shadow draw count, read after every submitted frame.
+    // The last frame's shadow draw count, read after every submitted frame. A frame wrote it, so the graphics-lane
+    // DownloadBuffer reads it (queue order after the frames, backend-owned write-to-transfer-read barrier); the
+    // method lane's SubmitComputeReadback waits for no frame and may run on another queue (ARCH-023).
     const Extrinsic::RHI::BufferHandle count =
         renderer.GetCullingSystem().GetBucket(Extrinsic::RHI::GpuDrawBucketKind::ShadowOpaque).CountBuffer;
     std::optional<std::uint32_t> shadowDraws{};
-    const auto token = device.SubmitComputeReadback(
-        [count](Extrinsic::RHI::ICommandContext& commands) {
-            commands.BufferBarrier(count,
-                Extrinsic::RHI::MemoryAccess::IndirectRead | Extrinsic::RHI::MemoryAccess::ShaderRead |
-                    Extrinsic::RHI::MemoryAccess::ShaderWrite,
-                Extrinsic::RHI::MemoryAccess::TransferRead);
-            return count;
-        },
+    const auto token = device.GetTransferQueue().DownloadBuffer(count,
         sizeof(std::uint32_t),
-        Extrinsic::RHI::ReadbackSink::Invoke([&](std::span<const std::byte> data) {
-            if (data.size() == sizeof(std::uint32_t))
-                shadowDraws = std::bit_cast<std::uint32_t>(std::array{data[0], data[1], data[2], data[3]});
-        }));
+        0u,
+        Extrinsic::RHI::ReadbackSink::Invoke(
+            [&](std::span<const std::byte> data)
+            {
+                if (data.size() == sizeof(std::uint32_t))
+                    shadowDraws = std::bit_cast<std::uint32_t>(std::array{data[0], data[1], data[2], data[3]});
+            }));
     ASSERT_TRUE(token.IsValid());
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     while (!shadowDraws && std::chrono::steady_clock::now() < deadline)

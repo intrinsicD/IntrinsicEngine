@@ -56,7 +56,7 @@ void main()
     LopUIntArray(indicesBDA).Values[destination] = index;
     // Counts are complete before scatter. One invocation per occupied query cell
     // measures the actual stencil, including both loops of the project shader.
-    if (pc.Strategy == LOP_GPU_STRATEGY_LOP && local == 0u)
+    if (local == 0u)
     {
         uint candidates = 0u;
         for (int z = -1; z <= 1; ++z)

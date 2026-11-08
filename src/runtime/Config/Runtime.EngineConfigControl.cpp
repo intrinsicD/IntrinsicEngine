@@ -132,6 +132,12 @@ namespace Extrinsic::Runtime
                                           candidate.Render.GpuPropertyBudgetMegabytes,
                                       "render.gpu_property_budget_megabytes");
             RecordBootOnlyDifference(fields,
+                current.Render.GpuMethodBufferBudgetMegabytes != candidate.Render.GpuMethodBufferBudgetMegabytes,
+                "render.gpu_method_buffer_budget_megabytes");
+            RecordBootOnlyDifference(fields,
+                current.Render.MethodComputeOnGraphicsQueue != candidate.Render.MethodComputeOnGraphicsQueue,
+                "render.method_compute_graphics_queue");
+            RecordBootOnlyDifference(fields,
                                       current.Simulation.WorkerThreadCount !=
                                           candidate.Simulation.WorkerThreadCount,
                                       "simulation.worker_thread_count");

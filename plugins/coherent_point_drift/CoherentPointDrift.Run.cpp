@@ -27,14 +27,16 @@ namespace Intrinsic::Plugins::CoherentPointDrift
     {
         namespace CPD = Geometry::CoherentPointDrift;
 
-        // A run's own data: the two captures, the solver over world points, and the source's world-to-local map. Step
-        // and Preview use the solver (never at once, never beside Commit); Show, Valid and Discard use only the
-        // captures and the service.
+        // A run's own data: the two captures, the solver over world points (with what initialized it, for a
+        // restart), and the source's world-to-local map. Step and Preview use the solver (never at once, never beside
+        // Commit or Restart); Show, Valid and Discard use only the captures and the service.
         struct State
         {
             R::PointCloudEditingService* Editing{};
             std::shared_ptr<R::PointEdit> Source{}, Target{};
             CPD::Solver Solver{};
+            std::vector<glm::vec3> TargetWorld{}, SourceWorld{};
+            CPD::Params Params{};
             glm::dmat4 SourceFromWorld{1.0}; // the full affine inverse of the source's model matrix
         };
 
@@ -97,10 +99,17 @@ namespace Intrinsic::Plugins::CoherentPointDrift
             refusal = "The source's Transform cannot be inverted (a zero or non-finite scale).";
             return 0u;
         }
-        CPD::Params params{.MaxIterations = request.MaxIterations, .Tolerance = request.Tolerance};
+        if (!R::StepRunExecutionRefusal(request.Execution, kMaxIterations).empty())
+        {
+            refusal =
+                "Coherent point drift: " + std::string{R::StepRunExecutionRefusal(request.Execution, kMaxIterations)};
+            return 0u;
+        }
+        state->Params = {.MaxIterations = request.Execution.IterationCap, .Tolerance = request.Tolerance};
         const auto target = editing->View(*state->Target);
-        if (const auto status = state->Solver.Initialize(Mapped(target.Model, target.Points), Mapped(source.Model, source.Points),
-                                                         params);
+        state->TargetWorld = Mapped(target.Model, target.Points);
+        state->SourceWorld = Mapped(source.Model, source.Points);
+        if (const auto status = state->Solver.Initialize(state->TargetWorld, state->SourceWorld, state->Params);
             status != CPD::Status::Success)
         {
             refusal = "Coherent point drift: " + std::string{CPD::ToString(status)};
@@ -108,16 +117,19 @@ namespace Intrinsic::Plugins::CoherentPointDrift
         }
 
         R::StepRunCallbacks callbacks{
-            .Step = [state, hold = std::chrono::milliseconds{request.HoldStepMs}](R::StepRunMetric& metric)
+            .Step =
+                [state, hold = std::chrono::milliseconds{request.HoldStepMs}](R::StepRunMetric& metric)
             {
                 std::this_thread::sleep_for(hold);
                 CPD::IterationTrace trace{};
                 bool iterated = false;
                 const bool more = state->Solver.Step([&](const CPD::IterationTrace& t) { trace = t, iterated = true; });
                 metric.Values = {trace.Sigma2, trace.Objective, trace.MatchedWeight, trace.NegativeLogLikelihood};
-                if (more) return R::StepOutcome::Continue;
+                if (more)
+                    return R::StepOutcome::Continue;
                 const auto result = state->Solver.Current(); // once, at the end
-                if (!result.Succeeded()) return R::StepOutcome::Failed;
+                if (!result.Succeeded())
+                    return R::StepOutcome::Failed;
                 // The solver detects convergence in the next call's E-step, which ends without an iteration: its
                 // metric is that E-step's (rigid: the objective is the negative log-likelihood).
                 if (!iterated)
@@ -126,13 +138,17 @@ namespace Intrinsic::Plugins::CoherentPointDrift
                 // The solver's cap is the run's: the run ends it at the same step.
                 return result.Stop == CPD::Termination::IterationCap ? R::StepOutcome::Continue : R::StepOutcome::Converged;
             },
-            .Preview = [state](std::vector<float>& values)
+            .Preview =
+                [state](R::StepPreview& preview)
             {
+                auto& values = preview.Values;
                 values.clear();
                 for (const auto& p : Mapped(state->SourceFromWorld, state->Solver.Current().TransformedSource))
                     values.insert(values.end(), {p.x, p.y, p.z});
+                return true;
             },
-            .Show = [state](const R::StepPreview& preview)
+            .Show =
+                [state](const R::StepPreview& preview)
             {
                 std::vector<glm::vec3> points(preview.Values.size() / 3u);
                 for (std::size_t i = 0; i < points.size(); ++i)
@@ -146,26 +162,47 @@ namespace Intrinsic::Plugins::CoherentPointDrift
                 }
                 return R::StepRunShow::Never;
             },
-            .Valid = [state] { return state->Editing->Current(*state->Source) && state->Editing->Current(*state->Target); },
-            .Commit = [state](std::string& diagnostic)
+            .Valid =
+                [state]
+            {
+                return state->Editing->Current(*state->Source) && state->Editing->Current(*state->Target);
+            },
+            .Commit =
+                [state](std::string& diagnostic)
             {
                 const auto status = state->Editing->Publish(
                     *state->Source, Mapped(state->SourceFromWorld, state->Solver.Current().TransformedSource),
                     "Coherent point drift (steps)");
-                if (status == R::PointPublishStatus::Applied) return R::StepRunCommit::Committed;
+                if (status == R::PointPublishStatus::Applied)
+                    return R::StepRunCommit::Committed;
                 diagnostic = status == R::PointPublishStatus::Stale ? "stale: the captured inputs changed"
                                                                     : "the positions were refused";
                 return R::StepRunCommit::Refused;
             },
-            .Discard = [state] { state->Editing->DiscardPreview(*state->Source); },
+            .Discard =
+                [state]
+            {
+                state->Editing->DiscardPreview(*state->Source);
+            },
+            // run_control restart (no step runs then): the solver starts again from the captured clouds; it accepted
+            // them at the start, so the same initialization succeeds again.
+            .Restart =
+                [state](std::string& diagnostic)
+            {
+                if (const auto status = state->Solver.Initialize(state->TargetWorld, state->SourceWorld, state->Params);
+                    status != CPD::Status::Success)
+                {
+                    diagnostic = "Coherent point drift: " + std::string{CPD::ToString(status)};
+                    return false;
+                }
+                return true;
+            },
         };
-        if (!request.Preview) callbacks.Preview = {};
         R::StepRunOptions options{.Label = "Coherent point drift (steps)",
-                                  .Owner = "coherent_point_drift",
-                                  .Output = {.StableEntityId = request.Source, .Property = source.Output},
-                                  .IterationCap = request.MaxIterations,
-                                  .AcceptOnConvergence = request.AcceptOnConvergence,
-                                  .MetricNames = {"sigma2", "objective", "matched", "nll"}};
+            .Owner = "coherent_point_drift",
+            .Output = {.StableEntityId = request.Source, .Property = source.Output},
+            .Execution = request.Execution,
+            .MetricNames = {"sigma2", "objective", "matched", "nll"}};
         const auto run = runs->Start(std::move(options), std::move(callbacks), R::PluginStepRunJobs(), refusal);
         if (run != 0u) g_LastRun = run;
         return run;

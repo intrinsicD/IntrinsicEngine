@@ -43,6 +43,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.StepRunControls;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
@@ -126,12 +127,12 @@ namespace Extrinsic::Sandbox::Editor
 
         return SandboxPointCloudConsolidationPanelApplyRequest{
             .Config = config,
-            .Execute = Runtime::PointCloudConsolidationRequest{
-                .StableEntityId = stableEntityId,
-                .Properties = properties,
-                .Config = config,
-                .AutoAccept = false,
-            },
+            .Execute =
+                Runtime::PointCloudConsolidationRequest{
+                    .StableEntityId = stableEntityId,
+                    .Properties = properties,
+                    .Config = config,
+                },
         };
     }
 
@@ -482,6 +483,8 @@ namespace Extrinsic::Sandbox::Editor
             std::optional<Runtime::KMeansRunCompleted> LastResult{};
             Runtime::CommandCorrelationId LastServiceResult{};
             Runtime::CommandCorrelationId ActiveGpuCorrelation{};
+            Runtime::CommandCorrelationId ActiveCpuCorrelation{}; // the latest request, for its CPU step run (B8)
+            Runtime::StepRunControlsState CpuControls{};
             std::optional<Runtime::RuntimeEngineConfigApplyResult>
                 LastConfigApply{};
             Runtime::KMeansPropertyRefs Properties{};
@@ -490,9 +493,8 @@ namespace Extrinsic::Sandbox::Editor
             OperationRunSlot Run{};
             std::int32_t Backend{0};
             std::uint32_t ClusterCount{8u};
-            std::int32_t MaxIterations{32};
             std::uint32_t Seed{42u};
-            std::uint32_t GpuPreviewInterval{5u};
+            Runtime::StepRunExecution Execution{Runtime::KMeansParameters{}.Execution};
             bool UseHierarchicalInitialization{true};
             bool Initialized{false};
             bool Dirty{false};
@@ -1018,10 +1020,9 @@ namespace Extrinsic::Sandbox::Editor
                 0.0,
                 0.0,
                 "%.6g");
-            changed |= ImGui::InputScalar(
-                "Max iterations##PointCloudConsolidation",
-                ImGuiDataType_U32,
-                &config.MaxIterations);
+            // The shared execution options; every consolidation backend runs as a step run.
+            changed |= Runtime::DrawStepRunExecutionOptions(
+                "PointCloudConsolidation", config.Execution, Runtime::kMaxPointCloudConsolidationIterations, true);
             changed |= ImGui::InputDouble(
                 "Convergence tolerance##PointCloudConsolidation",
                 &config.ConvergenceTolerance,
@@ -1055,13 +1056,7 @@ namespace Extrinsic::Sandbox::Editor
             using Strategy = Runtime::PointCloudConsolidationStrategy;
             switch (config.Strategy)
             {
-            case Strategy::Lop:
-                changed |= ImGui::InputScalar("Preview every k iterations##PointCloudConsolidation",
-                    ImGuiDataType_U32, &config.GpuPreviewInterval);
-                config.GpuPreviewInterval = std::max(1u, config.GpuPreviewInterval);
-                ImGui::TextDisabled(
-                    "LOP uses unit density weights and the shared parameters.");
-                break;
+            case Strategy::Lop: ImGui::TextDisabled("LOP uses unit density weights and the shared parameters."); break;
             case Strategy::Wlop:
                 changed |= ImGui::Checkbox(
                     "Anisotropic weighting##PointCloudConsolidation",
@@ -1624,14 +1619,17 @@ namespace Extrinsic::Sandbox::Editor
                 if (gpu.Running || gpu.ReadyToAccept || gpu.Accepting)
                 {
                     availability.Available = false;
-                    availability.Message = "Accept or Discard the pending GPU run before starting another.";
+                    availability.Message = "Accept or Discard the pending run before starting another.";
                     // While Accept is refused the message is the row's reason; otherwise it is the state line.
                     if (gpu.CanAccept) ImGui::TextWrapped("%s", gpu.Message.c_str());
                     ImGui::Text("Iterations: %u, submissions: %u, previews: %u", gpu.Iterations, gpu.Submissions, gpu.Previews);
                     const GpuTransactionRowView row{.Phase = GpuTransactionPhaseOf(gpu.ReadyToAccept, gpu.Accepting),
-                        .CanAccept = gpu.CanAccept, .AcceptRefusal = gpu.CanAccept ? std::string_view{} : std::string_view{gpu.Message},
+                        .CanAccept = gpu.CanAccept,
+                        .AcceptRefusal = gpu.CanAccept ? std::string_view{} : std::string_view{gpu.Message},
                         .HasStop = true,
-                        .Io = GpuTransactionIo{.UploadBytes = gpu.InputUploadBytes, .CacheHits = gpu.InputCacheHits}};
+                        .Io = GpuTransactionIo{.UploadBytes = gpu.InputUploadBytes, .CacheHits = gpu.InputCacheHits},
+                        .StepRuns = Runtime::GetEditorStepRuns(service.Commands),
+                        .StepRun = gpu.StepRun};
                     switch (DrawGpuTransactionControls(row, "PointCloudConsolidation"))
                     {
                     case GpuTransactionRowAction::Stop:
@@ -1762,6 +1760,8 @@ namespace Extrinsic::Sandbox::Editor
                 KMeans.Run.Watch(result.StableEntityId, Runtime::EditorRunCorrelation{result.Correlation.Value});
             if(result.Correlation.IsValid() && result.RequestedBackend==Runtime::ClusteringBackend::VulkanCompute)
                 KMeans.ActiveGpuCorrelation=result.Correlation;
+            if (result.Correlation.IsValid())
+                KMeans.ActiveCpuCorrelation = result.Correlation; // a Vulkan request's CPU fallback is a CPU run
         }
 
         void DrawKMeansControls(
@@ -1784,10 +1784,8 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     KMeans.Backend = IndexOfOption(kKMeansBackends, active->Backend);
                     KMeans.ClusterCount = active->Parameters.ClusterCount;
-                    KMeans.MaxIterations = static_cast<std::int32_t>(
-                        active->Parameters.MaxIterations);
                     KMeans.Seed = active->Parameters.Seed;
-                    KMeans.GpuPreviewInterval = active->Parameters.GpuPreviewInterval;
+                    KMeans.Execution = active->Parameters.Execution;
                     KMeans.UseHierarchicalInitialization =
                         active->Parameters.Initialization ==
                         Runtime::KMeansInitialization::Hierarchical;
@@ -1861,40 +1859,33 @@ namespace Extrinsic::Sandbox::Editor
 
             bool configChanged = ImGui::InputScalar(
                 "Clusters##KMeans", ImGuiDataType_U32, &KMeans.ClusterCount);
-            configChanged |= ImGui::DragInt(
-                "Max iterations##KMeans",
-                &KMeans.MaxIterations,
-                1.0f,
-                1,
-                4096);
+            // The shared execution options; both backends are step runs, the CPU reference without live preview.
+            configChanged |= Runtime::DrawStepRunExecutionOptions("KMeans",
+                KMeans.Execution,
+                Runtime::kMaxKMeansIterations,
+                true,
+                OptionFromIndex(kKMeansBackends, KMeans.Backend) == Runtime::ClusteringBackend::VulkanCompute);
             configChanged |= ImGui::InputScalar(
                 "Seed##KMeans",
                 ImGuiDataType_U32,
                 &KMeans.Seed);
             KMeans.ClusterCount = std::clamp(KMeans.ClusterCount, 1u, 1024u);
-            KMeans.MaxIterations =
-                std::clamp(KMeans.MaxIterations, 1, 4096);
-            configChanged |= ImGui::Checkbox(
-                "Hierarchical initialization##KMeans",
-                &KMeans.UseHierarchicalInitialization);
-            configChanged |= ImGui::InputScalar("GPU preview interval##KMeans", ImGuiDataType_U32, &KMeans.GpuPreviewInterval);
-            KMeans.GpuPreviewInterval = std::clamp(KMeans.GpuPreviewInterval, 1u, 1000000u);
+            configChanged |=
+                ImGui::Checkbox("Hierarchical initialization##KMeans", &KMeans.UseHierarchicalInitialization);
             KMeans.Dirty |= configChanged;
 
             const Runtime::ClusteringBackend backend =
                 OptionFromIndex(kKMeansBackends, KMeans.Backend);
             const Runtime::ClusteringConfig clusteringConfig{
-                .Parameters = Runtime::KMeansParameters{
-                    .ClusterCount = static_cast<std::uint32_t>(
-                        KMeans.ClusterCount),
-                    .MaxIterations = static_cast<std::uint32_t>(
-                        KMeans.MaxIterations),
-                    .Seed = KMeans.Seed,
-                    .GpuPreviewInterval = KMeans.GpuPreviewInterval,
-                    .Initialization = KMeans.UseHierarchicalInitialization
-                        ? Runtime::KMeansInitialization::Hierarchical
-                        : Runtime::KMeansInitialization::Random,
-                },
+                .Parameters =
+                    Runtime::KMeansParameters{
+                        .ClusterCount = static_cast<std::uint32_t>(KMeans.ClusterCount),
+                        .Seed = KMeans.Seed,
+                        .Initialization = KMeans.UseHierarchicalInitialization
+                            ? Runtime::KMeansInitialization::Hierarchical
+                            : Runtime::KMeansInitialization::Random,
+                        .Execution = KMeans.Execution,
+                    },
                 .Backend = backend,
                 .Properties = KMeans.Properties,
             };
@@ -1922,9 +1913,9 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             const bool clusteringAvailable = service.ClusteringAvailable;
-            Runtime::RunKMeans request = Runtime::MakeConfiguredKMeansRequest(
-                model.SelectedStableId, KMeans.Properties, clusteringConfig);
-            request.AutoAccept = false;
+            // The section's execution options decide start and automatic Accept (default: run, wait for Accept).
+            Runtime::RunKMeans request =
+                Runtime::MakeConfiguredKMeansRequest(model.SelectedStableId, KMeans.Properties, clusteringConfig);
             bool pendingGpuRun = false;
             if (service.Clustering && KMeans.ActiveGpuCorrelation.IsValid())
             {
@@ -1938,10 +1929,15 @@ namespace Extrinsic::Sandbox::Editor
                     if (run.CanAccept) ImGui::TextWrapped("%s", run.Message.c_str());
                     ImGui::Text("Iterations: %u  submissions: %u  previews: %u", run.Iterations, run.Submissions, run.Previews);
                     const GpuTransactionRowView row{.Phase = GpuTransactionPhaseOf(run.ReadyToAccept, run.Accepting),
-                        .CanAccept = run.CanAccept, .AcceptRefusal = run.CanAccept ? std::string_view{} : std::string_view{run.Message},
+                        .CanAccept = run.CanAccept,
+                        .AcceptRefusal = run.CanAccept ? std::string_view{} : std::string_view{run.Message},
                         .HasStop = true,
-                        .Io = GpuTransactionIo{.UploadBytes = run.InputUploadBytes, .CacheHits = run.InputCacheHits,
-                            .CpuStageUploadBytes = run.CpuStageUploadBytes, .CpuReadbackBytes = run.CpuStageReadbackBytes}};
+                        .Io = GpuTransactionIo{.UploadBytes = run.InputUploadBytes,
+                            .CacheHits = run.InputCacheHits,
+                            .CpuStageUploadBytes = run.CpuStageUploadBytes,
+                            .CpuReadbackBytes = run.CpuStageReadbackBytes},
+                        .StepRuns = Runtime::GetEditorStepRuns(service.Commands),
+                        .StepRun = run.StepRun};
                     switch (DrawGpuTransactionControls(row, "KMeans"))
                     {
                     case GpuTransactionRowAction::Stop: (void)service.Clustering->GpuRun(id, Runtime::KMeansGpuAction::Stop); break;
@@ -1952,6 +1948,20 @@ namespace Extrinsic::Sandbox::Editor
                         break;
                     default: break;
                     }
+                }
+            }
+            // The latest request's CPU run (also a Vulkan request's fallback): the host's step-run row while it is live.
+            if (auto* runs = Runtime::GetEditorStepRuns(service.Commands);
+                runs != nullptr && service.Clustering && !pendingGpuRun && KMeans.ActiveCpuCorrelation.IsValid())
+            {
+                const auto id = service.Clustering->StepRun(KMeans.ActiveCpuCorrelation);
+                const auto observed = id != 0u ? runs->Observe(id) : std::nullopt;
+                if (observed && !Runtime::IsTerminal(observed->Phase))
+                {
+                    KMeans.Run.AwaitingAccept(observed->Phase == Runtime::StepRunPhase::Paused);
+                    if (Runtime::DrawStepRunControls(*runs, id, "KMeansCpu", KMeans.CpuControls) ==
+                        Runtime::StepRunAction::Discard)
+                        KMeans.Run.Forget(); // a discarded result never reads as a finished run
                 }
             }
             auto readiness = Runtime::ResolveEditorProcessingActionReadiness(

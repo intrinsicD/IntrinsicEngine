@@ -373,9 +373,11 @@ RULES: list[Rule] = [
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/geometry-operations",
          files=(OPERATIONS + "Runtime.PointSetOperations.Processing.cpp",),
          count=(("JobDesc desc{", 1), (".Scope = context.World", 1))),
+    # ARCH-023 B8: the CPU run is a step run of editor jobs (the session stamps the active world); the
+    # seeding job is the module's one direct submission.
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/clustering",
          files=("src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",),
-         count=(("MakeCpuJobDesc<KMeansJobResult>(", 1), ("const WorldHandle world = snapshot.World", 1))),
+         count=(("MakeCpuJobDesc", 0), ("JobDesc job{}", 1), ("job.Scope = world;", 1))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/clustering-snapshot",
          files=("src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",), compact=True,
          require=("returnKMeansSnapshot{.Command=command,.World=world",)),
@@ -388,7 +390,11 @@ RULES: list[Rule] = [
              "Runtime.MeshFieldOperations.Curvature.cpp", "Runtime.MeshFieldOperations.Geodesics.cpp",
              "Runtime.MeshTopologyOperations.Topology.cpp")),
          forbid=("return DerivedJobDesc{",),
-         count=(("return JobDesc{", 4), (".Scope = context.World", 4))),
+         # ARCH-023: ICP's CPU and GPU steps use the world's shared step-run jobs; no correspondence pump remains.
+         count=(("return JobDesc{", 3), ("JobDesc pump{", 0), (".Scope = context.World", 3))),
+    rule("ProductionAsyncSubmissionsCarryOwningWorldScope/registration-step-run",
+         files=(OPERATIONS + "Runtime.RegistrationOperations.Processing.cpp",),
+         require=("EditorStepRunJobs(context.JobCommands",)),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/normal-operations",
          files=(OPERATIONS + "Runtime.NormalOperations.Processing.cpp",),
          count=(("JobDesc desc{", 1), ("JobDesc ", 1), (".Scope = context.World", 1))),

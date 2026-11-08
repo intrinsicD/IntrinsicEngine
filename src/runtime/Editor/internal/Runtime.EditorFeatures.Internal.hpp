@@ -19,6 +19,7 @@ namespace Extrinsic::Runtime
     // owns the complete definitions.
     struct EditorSelectedModelCache;
     struct EditorWorkspaceSnapshotContext;
+    class StepRunsService;
 }
 namespace Extrinsic::Runtime::EditorFeatureDetail
 {
@@ -38,6 +39,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         RHI::IDevice* Device{nullptr};
         TextureBakeService* TextureBake{nullptr};
         SpatialIndexCache* SpatialIndices{};
+        StepRunsService* StepRuns{};
         EditorAssetImportCommandSurface AssetImportCommands{};
         EditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         EditorSceneFileCommandSurface SceneFileCommands{};

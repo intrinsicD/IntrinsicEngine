@@ -1,4 +1,6 @@
-// Resident PCA normal parity, publication, IO reuse and discard on the real Vulkan path.
+// Resident PCA normal parity, publication, IO reuse and discard on the real Vulkan path; and (ARCH-023) the common
+// one-shot lifecycle of a ready start, whose restart pages the PCA again from row 0.
+#include "OneShotLifecycleScript.hpp"
 #include "RuntimeTestModule.hpp"
 #include <algorithm>
 #include <chrono>
@@ -14,6 +16,7 @@
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
@@ -51,6 +54,9 @@ namespace
         unsigned Step{}, Mode{}, Starts{};
         std::size_t TinyPlaneBegin{};
         bool Done{};
+        // ARCH-023: a ready start driven by the common script, then the same parity checks.
+        bool Scripted{};
+        Intrinsic::Tests::OneShotLifecycleScript Script{};
         R::SpatialIndexCacheStats Final{};
         auto Commands() { return R::BindEditorProcessingCommands(Context); }
         Geometry::PropertySet& Props() { return Context.Scene->Raw().get<GS::Vertices>(Entity).Properties; }
@@ -65,6 +71,13 @@ namespace
             Context.SpatialIndices = Kernel().Services().Find<R::SpatialIndexCache>();
             Context.CommandHistory = &History;
             Context.JobCommands.Submit = [this](R::JobDesc d, R::EditorJobIdentity) { return Kernel().Jobs().Submit(std::move(d)); };
+            // ARCH-023: a GPU transaction is a step run of the composed service, its holder cancelled like the run's jobs.
+            Context.StepRuns = Kernel().Services().Find<R::StepRunsService>();
+            Context.JobCommands.Cancel = [this](const R::JobToken token)
+            {
+                return Kernel().Jobs().Cancel(token) ? R::EditorJobCancelStatus::Requested
+                                                     : R::EditorJobCancelStatus::NotActive;
+            };
             Entity = Context.Scene->Create();
             Context.Scene->Raw().emplace<GS::Vertices>(Entity);
             std::mt19937 random(299);
@@ -96,7 +109,11 @@ namespace
         bool Start()
         {
             R::EditorNormalEstimationResult failure;
-            Run = R::StartEditorNormalEstimationTransaction(Commands(), Config, failure);
+            // The scripted run starts ready (the section's start row); the direct path waits for ReadyToAccept
+            // without Run or Step, so it starts the computation at once (the one-shot default is ready).
+            auto config = Config;
+            config.Execution.Start = Scripted ? R::StepRunStart::Ready : R::StepRunStart::Run;
+            Run = R::StartEditorNormalEstimationTransaction(Commands(), config, failure);
             if (!Run) Fail(failure.Message);
             else ++Starts;
             return bool(Run);
@@ -163,6 +180,34 @@ namespace
                 Reference = std::as_const(Props()).Get<glm::vec3>("reference").Vector();
                 Before = Rows();
                 if (Start()) ++Step;
+                const auto nothingQueued = [this]
+                {
+                    const auto s = R::SnapshotEditorNormalEstimation(Commands(), Run);
+                    EXPECT_EQ(s.Phase, Phase::Running);
+                    EXPECT_FALSE(s.DeviceWorkQueued) << "nothing recorded while ready";
+                    EXPECT_EQ(s.Previews, 0u);
+                    EXPECT_EQ(s.Result.GpuQueryBatches, 0u);
+                    EXPECT_EQ(Rows(), Before);
+                };
+                Script.OnReadyHeld = nothingQueued;
+                Script.OnRestartedReady = nothingQueued;
+            }
+            else if (Scripted)
+            {
+                const auto s = R::SnapshotEditorNormalEstimation(Commands(), Run);
+                if (s.Phase == Phase::Failed || s.Phase == Phase::Discarded)
+                    return Fail(s.Result.Message);
+                if (!Script.Advance(*Context.StepRuns, s.Result.StepRun))
+                    return;
+                const auto final = R::SnapshotEditorNormalEstimation(Commands(), Run);
+                if (final.Phase != Phase::Applied)
+                    return Fail("the scripted run did not apply: " + final.Result.Message);
+                EXPECT_EQ(final.Result.ValidCount, CpuResult.ValidCount);
+                EXPECT_EQ(final.Result.FallbackCount, CpuResult.FallbackCount);
+                Parity();
+                EXPECT_EQ(History.UndoCount(), 1u) << "one Accept, one undo entry";
+                Done = true;
+                Kernel().RequestExit();
             }
             else if (Step == 1)
             {
@@ -212,7 +257,9 @@ TEST(RUNTIME299PointNormalsResidency, PcaParityAcceptZeroUploadAndDiscard)
     config.Render.EnableValidation = true; config.Render.EnableVSync = false; config.ReferenceScene.Enabled = false;
     auto app = std::make_unique<PointNormalsApp>(); auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
-    engine.EmplaceModule<R::SpatialIndexCache>(); engine.Initialize();
+    engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
+    engine.Initialize();
     struct Shutdown { R::Engine& Engine; ~Shutdown() { Engine.Shutdown(); } } shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
     engine.Run(); EXPECT_TRUE(engine.GetDevice().IsOperational()); EXPECT_TRUE(run->Done);
@@ -220,4 +267,36 @@ TEST(RUNTIME299PointNormalsResidency, PcaParityAcceptZeroUploadAndDiscard)
     // retired workspace (the radius mode growing the k-NN scratch) and still matches the CPU.
     EXPECT_EQ(run->Final.WorkspaceLeases, run->Starts);
     EXPECT_GT(run->Final.WorkspaceReuses, 0u);
+}
+TEST(RUNTIME299PointNormalsResidency, AReadyStartFollowsTheCommonOneShotLifecycle)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    auto config = R::CreateReferenceEngineConfig();
+    config.Window.Width = 64;
+    config.Window.Height = 64;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    auto app = std::make_unique<PointNormalsApp>();
+    auto* run = app.get();
+    run->Scripted = true;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
+    engine.Initialize();
+    struct Shutdown
+    {
+        R::Engine& Engine;
+        ~Shutdown()
+        {
+            Engine.Shutdown();
+        }
+    } shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64())
+        GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    EXPECT_TRUE(engine.GetDevice().IsOperational());
+    EXPECT_TRUE(run->Done);
+    EXPECT_EQ(run->Script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
 }

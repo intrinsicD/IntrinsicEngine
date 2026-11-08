@@ -8,7 +8,15 @@ module;
 export module Extrinsic.Graphics.SparseConjugateGradient;
 import Extrinsic.RHI.Handles;
 
-extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+        class ICommandContext;
+        class BufferManager;
+    }
+}
 
 export namespace Extrinsic::Graphics
 {
@@ -56,7 +64,8 @@ export namespace Extrinsic::Graphics
     class SparseConjugateGradientWorkspace
     {
     public:
-        explicit SparseConjugateGradientWorkspace(RHI::IDevice& device);
+        // Device buffers are cached scratch leases of `scratch`, which must outlive the workspace.
+        SparseConjugateGradientWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch);
         ~SparseConjugateGradientWorkspace();
         // Dispatches recorded per chunk at most; one CG iteration costs nine.
         static constexpr std::uint32_t ChunkDispatches = 2048;
@@ -77,7 +86,10 @@ export namespace Extrinsic::Graphics
         // buffer holding every report and solution, ready for transfer reads; invalid on failure.
         // Read back ReportReadbackBytes per chunk.
         // Record one chunk per framed submission and Observe its readback before the next.
-        [[nodiscard]] RHI::BufferHandle RecordNext(RHI::ICommandContext& commands);
+        // ARCH-023: the chunk records no solve at or past `solveLimit` (a caller's logical step boundary, e.g. the
+        // chained solves of one time step); it may then record no work at all and still returns the buffer.
+        [[nodiscard]] RHI::BufferHandle RecordNext(
+            RHI::ICommandContext& commands, std::uint32_t solveLimit = 0xffffffffu);
         // Consumes a chunk's readback (at least the reports): a finished solve skips its remaining
         // iterations.
         void Observe(std::span<const std::byte> readback);
@@ -95,6 +107,9 @@ export namespace Extrinsic::Graphics
         // Solves the recorded commands complete (each solve k < CompletedSolves() has its
         // Finalize recorded, or the device reported it done).
         [[nodiscard]] std::uint32_t CompletedSolves() const noexcept;
+        // Returns every buffer to its cache and ends the run (Begin starts the next); the pipeline stays.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

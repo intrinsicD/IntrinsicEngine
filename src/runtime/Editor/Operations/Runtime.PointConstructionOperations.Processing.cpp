@@ -1,4 +1,5 @@
 module;
+#include <atomic>
 #include <string_view>
 #include <functional>
 #include <algorithm>
@@ -50,6 +51,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -62,6 +64,7 @@ import Geometry.HalfedgeMesh.IO;
 #include "Editor/internal/Runtime.EditorGeneratedEntity.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.OneShotCpuRun.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 namespace Extrinsic::Runtime
 {
@@ -78,7 +81,8 @@ namespace Extrinsic::Runtime
             PointConstructionConfig Config{};
             entt::entity Entity{entt::null};
             glm::mat4 SourceMatrix{1};
-            std::vector<glm::vec3> Queries{};
+            // Derived state of one generation (the step's), cleared before and freed after it; the output stays
+            // until Accept moves it into the new entity.
             std::vector<std::uint32_t> Offsets{0}, Indices{};
             std::vector<float> Field{};
             std::optional<SR::PreparedReconstruction> Prepared{};
@@ -86,20 +90,25 @@ namespace Extrinsic::Runtime
             std::optional<Geometry::Graph::Graph> Graph{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            Detail::GpuRowPages Pages{};
+            // ARCH-023, Vulkan LBVH as a step run: the kNN session prepared at the start (one fixed page of query
+            // rows the worker uploads per page, no frame) and the run's discard, which every page boundary and a
+            // waiting page observe.
+            std::shared_ptr<SpatialQuerySession> Session{};
+            std::atomic<bool> Abort{false};
+            // Neighbours per query, with the query itself: min(N, Hoppe and k = 1 ? 1 : k + 1), set at capture.
             std::uint32_t Width{};
-            bool PreparedOk{}, QueriesComplete{}, Abandoned{};
-            Clock::time_point GpuStarted{};
-            std::optional<EditorPointConstructionResult> MainFailure{};
+            bool Abandoned{};
             EditorPointConstructionResult Result{};
         };
         bool Attached(const EditorProcessingContext& c)
         {
             return c.Scene && (!c.AttachmentActive || c.AttachmentActive());
         }
+        // The world first (the run's job has no scope of its own, and this runs on every drain while it waits).
         bool Current(const EditorProcessingContext& c, const ConstructionWork& w)
         {
-            if (!Attached(c) || !Detail::GeometryPropertiesCurrent(c, w.Entity, w.Inputs))
+            if (!Detail::EditorProcessingContextWorldCurrent(c) || !Attached(c) ||
+                !Detail::GeometryPropertiesCurrent(c, w.Entity, w.Inputs))
                 return false;
             const auto matrix = ECS::Systems::TransformHierarchy::TryComposeWorldMatrix(c.Scene->Raw(), w.Entity);
             return matrix && *matrix == w.SourceMatrix;
@@ -187,12 +196,19 @@ namespace Extrinsic::Runtime
                 count * std::min<std::size_t>(count, c.KNeighbors + 1) > (1u << 24))
                 return fail("Graph neighborhood storage exceeds 16777216 candidate entries; reduce "
                             "k or the sample count.");
+            // One width for the CPU rows and the GPU session (at most 64: k <= 63).
+            w->Width = std::uint32_t(std::min<std::size_t>(
+                count, c.Method == PointConstructionMethod::Hoppe && c.KNeighbors == 1 ? 1 : c.KNeighbors + 1));
             if (c.Backend != PointConstructionBackend::CpuReference && !context.SpatialIndices)
                 return fail("The shared spatial cache is unavailable.");
             if (c.Backend == PointConstructionBackend::VulkanLBVH &&
                 (!context.JobCommands.Available() ||
                  !context.SpatialIndices->GpuQueriesAvailable()))
-                return fail("Vulkan construction requires framed GPU queries and editor jobs.");
+                return fail("Vulkan construction requires GPU queries and editor jobs.");
+            // ARCH-023: Vulkan neighbourhoods are a worker step run's pages; without the session's step runs there
+            // is no frame-paced substitute.
+            if (c.Backend == PointConstructionBackend::VulkanLBVH && !context.StepRuns)
+                return fail("Vulkan construction requires the session's step runs.");
             return w;
         }
         SR::ReconstructionParams ReconstructionParams(const PointConstructionConfig& c)
@@ -208,7 +224,7 @@ namespace Extrinsic::Runtime
             p.KernelSigmaScale = c.KernelSigmaScale;
             return p;
         }
-        void Prepare(ConstructionWork& w)
+        bool Prepare(ConstructionWork& w)
         {
             const auto start = Clock::now();
             auto& r = w.Result;
@@ -221,23 +237,20 @@ namespace Extrinsic::Runtime
                     r.Message =
                         "Reconstruction preparation failed: check normal estimation, nondegenerate "
                         "extent and grid budget. Every live sample must survive preparation.";
-                    return;
+                    return false;
                 }
                 r.QueryCount = w.Prepared->Dimensions.VertexCount();
                 w.Field.reserve(r.QueryCount);
-                w.Width = std::min<std::size_t>(
-                    w.Points.size(), w.Config.KNeighbors == 1 ? 1 : w.Config.KNeighbors + 1);
             }
             else
             {
                 r.QueryCount = w.Points.size();
-                w.Width = std::min<std::size_t>(w.Points.size(), w.Config.KNeighbors + 1);
                 w.Indices.reserve(r.QueryCount * w.Width);
                 w.Offsets.reserve(r.QueryCount + 1);
             }
-            w.PreparedOk = true;
             r.CpuComputeMilliseconds +=
                 std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+            return true;
         }
         std::vector<glm::vec3> Queries(const ConstructionWork& w, std::size_t first,
                                        std::size_t count)
@@ -275,21 +288,31 @@ namespace Extrinsic::Runtime
                 std::chrono::duration<double, std::milli>(Clock::now() - start).count();
             return true;
         }
-        void QueryCpu(ConstructionWork& w, const JobCancellation* cancellation = nullptr)
+        // A page boundary: the run's discard (Abort) or the queued job's cancellation stops the step there; the
+        // result belongs to a run that already ended.
+        bool Stopped(ConstructionWork& w, const JobCancellation* cancellation)
         {
-            if (!w.PreparedOk)
-                return;
+            if (!w.Abort.load(std::memory_order_acquire) && !(cancellation && cancellation->IsCancelled()))
+                return false;
+            w.Result.Status = EditorCommandStatus::StaleEntity;
+            w.Result.Message = "Construction cancelled.";
+            return true;
+        }
+        bool QueryCpu(ConstructionWork& w, const JobCancellation* cancellation)
+        {
+            if (w.Index && !w.Index->Cpu)
+            {
+                w.Result.Message = "CPU construction rows require a CPU hierarchy."; // a GPU-only capture
+                return false;
+            }
             const auto start = Clock::now();
             const auto priorCpu = w.Result.CpuComputeMilliseconds;
             w.Result.ActualBackend = ToString(w.Config.Backend);
             for (std::size_t first = 0; first < w.Result.QueryCount;
                  first += w.Config.GpuQueryBatchSize)
             {
-                if (cancellation && cancellation->IsCancelled())
-                {
-                    w.Result.Message = "Construction cancelled.";
-                    return;
-                }
+                if (Stopped(w, cancellation))
+                    return false;
                 const auto queries = Queries(
                     w, first,
                     std::min<std::size_t>(w.Config.GpuQueryBatchSize, w.Result.QueryCount - first));
@@ -303,120 +326,128 @@ namespace Extrinsic::Runtime
                     if (row.size() != w.Width)
                     {
                         w.Result.Message = "CPU construction received incomplete neighbors.";
-                        return;
+                        return false;
                     }
                     for (const auto& n : row)
                         indices.push_back(n.Index);
                     offsets.push_back(indices.size());
                 }
                 if (!ConsumeRows(w, queries, offsets, indices))
-                    return;
+                    return false;
             }
-            w.QueriesComplete = true;
-            w.Result.ActualBackend = ToString(w.Config.Backend);
             w.Result.CpuComputeMilliseconds =
                 priorCpu + std::chrono::duration<double, std::milli>(Clock::now() - start).count();
-        }
-        bool AdvanceGpu(const EditorProcessingContext& context, ConstructionWork& w)
-        {
-            const auto fail = [&](std::string message)
-            {
-                auto r = w.Result;
-                r.Status = EditorCommandStatus::GeometryProcessingFailed;
-                r.Message = std::move(message);
-                w.MainFailure = std::move(r);
-                w.Pages.Batch.reset();
-                return true;
-            };
-            if (w.Abandoned || !Current(context, w))
-                return fail("Construction source changed or the job was cancelled.");
-            if (w.Result.QueryCount == 0u)
-            {
-                w.QueriesComplete = true;
-                return true;
-            }
-            // Batch counts and GPU time cover consumed batches, timed from each submission.
-            std::string diagnostic;
-            const auto state = Detail::AdvanceGpuRowPages(
-                w.Pages, w.Result.QueryCount, w.Config.GpuQueryBatchSize, diagnostic,
-                [&](const SpatialNearestBatch& batch, std::string& why)
-                {
-                    w.Result.ActualBackend = "vulkan_lbvh";
-                    if (batch.Capacity != w.Width || batch.Counts.size() != w.Queries.size() ||
-                        batch.Neighbors.size() != w.Queries.size() * w.Width)
-                    {
-                        why = "Vulkan construction returned an invalid neighborhood layout.";
-                        return false;
-                    }
-                    std::vector<std::uint32_t> offsets{0}, indices;
-                    indices.reserve(w.Queries.size() * w.Width);
-                    for (std::size_t i = 0; i < w.Queries.size(); ++i)
-                    {
-                        if (batch.Counts[i] != w.Width)
-                        {
-                            why = "Vulkan construction returned an incomplete neighborhood.";
-                            return false;
-                        }
-                        const auto first = indices.size();
-                        for (unsigned j = 0; j < w.Width; ++j)
-                        {
-                            const auto slot = batch.Neighbors[i * w.Width + j].Index;
-                            const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), slot);
-                            if (found == w.Slots.end() || *found != slot)
-                            {
-                                why = "Vulkan construction returned an unknown source slot.";
-                                return false;
-                            }
-                            indices.push_back(std::uint32_t(found - w.Slots.begin()));
-                        }
-                        // CPU reduction uses a stable float distance/source-ID order;
-                        // recompute it after GPU readback instead of relying on GPU arithmetic order.
-                        std::sort(indices.begin() + first, indices.end(),
-                                  [&](auto a, auto b)
-                                  {
-                                      const auto da = w.Queries[i] - w.Points[a],
-                                                 db = w.Queries[i] - w.Points[b];
-                                      const auto aa = glm::dot(da, da), bb = glm::dot(db, db);
-                                      return aa < bb || (aa == bb && a < b);
-                                  });
-                        offsets.push_back(indices.size());
-                    }
-                    if (!ConsumeRows(w, w.Queries, offsets, indices))
-                    {
-                        why = w.Result.Message;
-                        return false;
-                    }
-                    ++w.Result.GpuQueryBatches;
-                    w.Result.GpuNeighborhoodMilliseconds +=
-                        std::chrono::duration<double, std::milli>(Clock::now() - w.GpuStarted).count();
-                    return true;
-                },
-                [&](std::size_t first, std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
-                {
-                    w.Queries = Queries(w, first, count);
-                    if (!std::all_of(w.Queries.begin(), w.Queries.end(), GpuPoint))
-                    {
-                        auto refused = std::make_shared<SpatialNearestBatch>();
-                        refused->State = SpatialQueryState::Failed;
-                        refused->Diagnostic = "Vulkan grid queries require normal-or-zero components within 1e18.";
-                        return refused;
-                    }
-                    w.GpuStarted = Clock::now();
-                    return context.SpatialIndices->QueueGpuKNearest(w.GpuIndex, w.Queries, w.Width, {},
-                                                                     std::move(reuse));
-                });
-            if (state == Detail::RowsState::Failed)
-                return fail(std::move(diagnostic));
-            if (state == Detail::RowsState::Pending)
-                return false;
-            w.QueriesComplete = true;
-            w.Pages.Spare.reset(); // no later pass reuses the completed batch
             return true;
+        }
+        // The existing row decoder on one completed page of `queries` (the page's active prefix only): the layout
+        // and full width of every row, each source slot mapped to its compact index (an unknown slot refuses the
+        // page), each row re-sorted by the CPU's stable float distance/source-ID order.
+        bool DecodeGpuRows(const ConstructionWork& w,
+            std::span<const glm::vec3> queries,
+            const SpatialNearestBatch& batch,
+            std::vector<std::uint32_t>& offsets,
+            std::vector<std::uint32_t>& indices,
+            std::string& why)
+        {
+            if (batch.Capacity != w.Width || batch.Counts.size() != queries.size() ||
+                batch.Neighbors.size() != queries.size() * w.Width)
+            {
+                why = "Vulkan construction returned an invalid neighborhood layout.";
+                return false;
+            }
+            offsets.assign(1u, 0u);
+            indices.clear();
+            indices.reserve(queries.size() * w.Width);
+            for (std::size_t i = 0; i < queries.size(); ++i)
+            {
+                if (batch.Counts[i] != w.Width)
+                {
+                    why = "Vulkan construction returned an incomplete neighborhood.";
+                    return false;
+                }
+                const auto first = indices.size();
+                for (unsigned j = 0; j < w.Width; ++j)
+                {
+                    const auto slot = batch.Neighbors[i * w.Width + j].Index;
+                    const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), slot);
+                    if (found == w.Slots.end() || *found != slot)
+                    {
+                        why = "Vulkan construction returned an unknown source slot.";
+                        return false;
+                    }
+                    indices.push_back(std::uint32_t(found - w.Slots.begin()));
+                }
+                // CPU reduction uses a stable float distance/source-ID order;
+                // recompute it after GPU readback instead of relying on GPU arithmetic order.
+                std::sort(indices.begin() + first,
+                    indices.end(),
+                    [&](auto a, auto b)
+                    {
+                        const auto da = queries[i] - w.Points[a], db = queries[i] - w.Points[b];
+                        const auto aa = glm::dot(da, da), bb = glm::dot(db, db);
+                        return aa < bb || (aa == bb && a < b);
+                    });
+                offsets.push_back(indices.size());
+            }
+            return true;
+        }
+        // ARCH-023, Vulkan LBVH: every page through the prepared session on the worker, without frames. A page's
+        // queries are refused before any upload unless normal-or-zero within 1e18, written into the prefix of the
+        // session's fixed page (the tail keeps earlier valid rows: padding the page never queries), queried as rows
+        // [0, count) and decoded from that prefix. Batches count consumed pages of this step; the traffic is the
+        // session's delta over the step. False with the result's reason.
+        bool QueryGpu(ConstructionWork& w)
+        {
+            auto& r = w.Result;
+            auto& session = *w.Session;
+            const auto uploads = session.UploadBytes(), readbacks = session.ReadbackBytes();
+            const auto settle = [&](const bool ok)
+            {
+                r.CpuStageUploadBytes = session.UploadBytes() - uploads;
+                r.CpuStageReadbackBytes = session.ReadbackBytes() - readbacks;
+                return ok;
+            };
+            std::vector<glm::vec3> page(session.Rows()); // zero rows are valid padding
+            std::vector<std::uint32_t> offsets, indices;
+            SpatialNearestBatch batch;
+            for (std::size_t first = 0; first < r.QueryCount; first += session.PageQueries())
+            {
+                if (Stopped(w, nullptr))
+                    return settle(false);
+                const auto count = std::min<std::size_t>(session.PageQueries(), r.QueryCount - first);
+                const auto queries = Queries(w, first, count);
+                if (!std::all_of(queries.begin(), queries.end(), GpuPoint))
+                {
+                    r.Message = "Vulkan grid queries require normal-or-zero components within 1e18.";
+                    return settle(false);
+                }
+                const auto started = Clock::now();
+                std::copy(queries.begin(), queries.end(), page.begin());
+                if (!session.UploadQueries(page, r.Message))
+                    return settle(false);
+                const auto status = session.Query(0u, std::uint32_t(count), 0.f, nullptr, w.Abort, batch);
+                if (status == SpatialPageStatus::Abandoned) // the run's discard won while the page waited
+                {
+                    (void)Stopped(w, nullptr);
+                    return settle(false);
+                }
+                if (status == SpatialPageStatus::Failed)
+                {
+                    r.Message = batch.Diagnostic;
+                    return settle(false);
+                }
+                r.ActualBackend = "vulkan_lbvh";
+                if (!DecodeGpuRows(w, queries, batch, offsets, indices, r.Message) ||
+                    !ConsumeRows(w, queries, offsets, indices))
+                    return settle(false);
+                ++r.GpuQueryBatches;
+                r.GpuNeighborhoodMilliseconds +=
+                    std::chrono::duration<double, std::milli>(Clock::now() - started).count();
+            }
+            return settle(true);
         }
         void BuildOutput(ConstructionWork& w)
         {
-            if (!w.QueriesComplete)
-                return;
             const auto start = Clock::now();
             auto& r = w.Result;
             bool atlasUnavailable = false;
@@ -530,6 +561,180 @@ namespace Extrinsic::Runtime
                 r.Message = published.Message;
             return r;
         }
+        // The run's one step (on a worker, or inline without a job lane), from the capture: preparation, every
+        // query page (CPU rows, or the session's on the device), the output (replacing an earlier generation's), and
+        // the preparation's intermediates freed whatever the outcome, so a restart starts from empty rows and a run
+        // waiting for Accept keeps only the output. The run's discard and a queued job's `cancellation` stop it at
+        // a page boundary.
+        void Compute(ConstructionWork& w, const JobCancellation* cancellation = nullptr)
+        {
+            if (Prepare(w) && (w.Session ? QueryGpu(w) : QueryCpu(w, cancellation)))
+                BuildOutput(w);
+            w.Field = std::vector<float>{};
+            w.Indices = std::vector<std::uint32_t>{};
+            w.Offsets = std::vector<std::uint32_t>{0u};
+            w.Prepared.reset();
+        }
+        // ARCH-023: every backend as a one-shot worker step run (the shared helper, OneShotCpuRun.hpp) with the
+        // caller's execution: a batch runs at once and accepts at its end, an interactive start honours the
+        // section's start and auto_accept. Accept (Publish) creates the entity once, as one undo entry; a discard,
+        // cancel or stale capture creates nothing and a restart computes again from the capture. Vulkan LBVH pages
+        // its kNN rows on the device inside that step (the session prepared before the start); a discard aborts a
+        // waiting page at once.
+        EditorPointConstructionResult StartConstructionRun(const EditorProcessingContext& context,
+            const std::shared_ptr<ConstructionWork>& w,
+            const EditorJobIdentity& identity,
+            const GeometryProcessingDetail::MeshSupport::QueuedJobDelivery<EditorPointConstructionResult>& delivery,
+            const StepRunExecution& execution)
+        {
+            namespace MS = GeometryProcessingDetail::MeshSupport;
+            return MS::StartOneShotCpuRun<ConstructionWork, EditorPointConstructionResult>(
+                context,
+                {.Label = "Point construction",
+                    .Owner = "Runtime.PointConstruction",
+                    .Identity = identity,
+                    .Execution = execution,
+                    .Abort =
+                        [w]
+                    {
+                        w->Abort.store(true, std::memory_order_release); // a page boundary or waiting page gives up
+                    },
+                    .MetricNames = {"vertices", "edges", "faces", ""},
+                    .Metric =
+                        [w](StepRunMetric& metric)
+                    {
+                        metric.Values[0] = double(w->Result.OutputVertexCount);
+                        metric.Values[1] = double(w->Result.OutputEdgeCount);
+                        metric.Values[2] = double(w->Result.OutputFaceCount);
+                    }},
+                w,
+                [](ConstructionWork& work)
+                {
+                    Compute(work);
+                },
+                [context](const ConstructionWork& work)
+                {
+                    return Current(context, work);
+                },
+                [context](const std::shared_ptr<ConstructionWork>& work)
+                {
+                    return Publish(context, work);
+                },
+                delivery);
+        }
+        // Apply's run (a batch) or a start's (`execution`, the section's): a one-shot worker step run of the
+        // session's service; without that service (or without a job lane) only a CPU batch runs, as one queued job
+        // (or inline). Vulkan without step runs is refused at capture.
+        EditorPointConstructionResult RunPointConstruction(const EditorProcessingCommands& commands,
+            const PointConstructionConfig& config,
+            std::function<void(EditorPointConstructionResult)> onComplete,
+            const StepRunExecution& execution)
+        {
+            const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+            std::string diagnostic;
+            auto w = Capture(context, config, diagnostic);
+            const auto report = [&](EditorCommandStatus status, std::string message)
+            {
+                auto r = w ? w->Result
+                           : EditorPointConstructionResult{.Method = config.Method, .RequestedBackend = config.Backend};
+                r.Status = status;
+                r.Message = std::move(message);
+                return r;
+            };
+            if (!w)
+                return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
+            if (w->Config.Backend != PointConstructionBackend::CpuReference)
+            {
+                const auto indexState = GeometryProcessingDetail::AcquirePointIndex(*context.SpatialIndices,
+                    context.World,
+                    w->Entity,
+                    w->Config.Positions,
+                    w->Slots,
+                    w->Points,
+                    w->GpuIndex,
+                    w->Index,
+                    w->Result.IndexReused,
+                    diagnostic,
+                    w->Config.Backend == PointConstructionBackend::CpuLBVH); // Vulkan rows build no CPU hierarchy
+                if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
+                    return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
+                if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
+                    return report(
+                        EditorCommandStatus::StaleEntity, "Construction index does not match selected samples.");
+            }
+            const bool batch = execution.Start == StepRunStart::Run && execution.AutoAccept != StepRunAutoAccept::Never;
+            if (!batch && (!context.StepRuns || !context.JobCommands.Available()))
+                return report(EditorCommandStatus::InvalidProcessingParameters,
+                    "Point construction needs the step-run service and a job lane for its run controls; none is "
+                    "composed.");
+            if (!context.JobCommands.Available())
+            {
+                Compute(*w);
+                return Publish(context, w);
+            }
+            EditorJobIdentity identity{.EntityId = config.StableEntityId,
+                .Scope = ToEditorJobScope(w->Config.Positions.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
+                .OutputName = std::string("construct:") + ToString(config.Method),
+                .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
+            namespace MS = GeometryProcessingDetail::MeshSupport;
+            if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Point construction"))
+                return report(
+                    EditorCommandStatus::Pending, std::move(busy->Message)); // the active run keeps its callback
+            if (w->Config.Backend == PointConstructionBackend::VulkanLBVH)
+            {
+                // The kNN session, once, on the main thread: resident index, buffers, pipelines and one page of
+                // zero query rows (a graph's page holds at most its N samples) the worker replaces page by page.
+                const std::vector<glm::vec3> rows(w->Config.Method == PointConstructionMethod::Hoppe
+                        ? w->Config.GpuQueryBatchSize
+                        : std::min<std::size_t>(w->Config.GpuQueryBatchSize, w->Points.size()));
+                w->Session = context.SpatialIndices->PrepareQuerySession(w->GpuIndex,
+                    {.Capacity = w->Width, .PageQueries = std::uint32_t(rows.size()), .Queries = rows, .Uploads = true},
+                    diagnostic);
+                if (!w->Session)
+                    return report(EditorCommandStatus::GeometryProcessingFailed,
+                        "Vulkan construction neighbourhoods could not be prepared: " + diagnostic);
+            }
+            // Once submitted, Result belongs to the running job. A submission failure reports from the delivery's
+            // immutable snapshot.
+            const MS::QueuedJobDelivery<EditorPointConstructionResult> delivery{context,
+                std::move(onComplete),
+                report(EditorCommandStatus::Pending, "Point construction queued."),
+                "Point construction"};
+            if (context.StepRuns)
+                return StartConstructionRun(context, w, identity, delivery, execution);
+            const auto validate = [context, w]
+            {
+                return MS::ValidateQueuedJob(w->Abandoned, Current(context, *w));
+            };
+            JobDesc desc{.DebugName = "Point construction",
+                .Scope = context.World,
+                .Work =
+                    [w](const JobCancellation& cancellation)
+                {
+                    Compute(*w, &cancellation);
+                    return JobResultEnvelope::Make(true);
+                },
+                .ValidateBeforeApply = validate,
+                .PublishCompletion =
+                    [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
+                {
+                    return delivery.Publish(Publish(context, w));
+                },
+                .FinalizeUnpublishedOnMainThread =
+                    [w, delivery]
+                {
+                    w->Abandoned = true;
+                    delivery.Finalize();
+                }};
+            const auto token = context.JobCommands.Submit(std::move(desc), identity);
+            if (!token.IsValid())
+            {
+                w->Abandoned = true;
+                return delivery.Rejected();
+            }
+            return delivery.Pending();
+        }
     } // namespace
     EditorPointConstructionReadiness
     PreviewEditorPointConstructionCommand(const EditorProcessingCommands& commands,
@@ -548,122 +753,13 @@ namespace Extrinsic::Runtime
                                         const PointConstructionConfig& config,
                                         std::function<void(EditorPointConstructionResult)> onComplete)
     {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        std::string diagnostic;
-        auto w = Capture(context, config, diagnostic);
-        const auto report = [&](EditorCommandStatus status, std::string message)
-        {
-            auto r = w ? w->Result
-                       : EditorPointConstructionResult{.Method = config.Method,
-                                                       .RequestedBackend = config.Backend};
-            r.Status = status;
-            r.Message = std::move(message);
-            return r;
-        };
-        if (!w)
-            return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
-        if (w->Config.Backend != PointConstructionBackend::CpuReference)
-        {
-            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
-                *context.SpatialIndices, context.World, w->Entity, w->Config.Positions,
-                w->Slots, w->Points, w->GpuIndex, w->Index, w->Result.IndexReused, diagnostic);
-            if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
-                return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
-            if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
-                return report(EditorCommandStatus::StaleEntity,
-                              "Construction index does not match selected samples.");
-        }
-        if (!context.JobCommands.Available())
-        {
-            Prepare(*w);
-            QueryCpu(*w);
-            BuildOutput(*w);
-            return Publish(context, w);
-        }
-        EditorJobIdentity identity{
-            .EntityId = config.StableEntityId,
-            .Scope = ToEditorJobScope(w->Config.Positions.Domain),
-            .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
-            .OutputName = std::string("construct:") + ToString(config.Method),
-            .RequestedDomain = EditorJobDomainOfBackend(ToString(config.Backend))};
-        namespace MS = GeometryProcessingDetail::MeshSupport;
-        if (auto busy = MS::ActiveOutputJobRefusal(context, identity, "Point construction"))
-            return report(EditorCommandStatus::Pending, std::move(busy->Message));
-        const MS::QueuedJobDelivery<EditorPointConstructionResult> delivery{
-            context, std::move(onComplete), report(EditorCommandStatus::Pending, "Point construction queued."),
-            "Point construction"};
-        const auto validate = [context, w] { return MS::ValidateQueuedJob(w->Abandoned, Current(context, *w)); };
-        JobDesc final{.DebugName = "Point construction",
-                      .Scope = context.World,
-                      .Work =
-                          [w](const JobCancellation& cancellation)
-                      {
-                          if (w->Config.Backend != PointConstructionBackend::VulkanLBVH)
-                          {
-                              Prepare(*w);
-                              QueryCpu(*w, &cancellation);
-                          }
-                          BuildOutput(*w);
-                          return JobResultEnvelope::Make(true);
-                      },
-                      .ValidateBeforeApply = validate,
-                      .PublishCompletion =
-                          [context, w, delivery](KernelEventBus&, const JobResultEnvelope&)
-                      { return delivery.Publish(Publish(context, w)); },
-                      .FinalizeUnpublishedOnMainThread =
-                          [w, delivery]
-                      {
-                          w->Abandoned = true;
-                          delivery.Finalize(w->MainFailure);
-                      }};
-        if (w->Config.Backend == PointConstructionBackend::VulkanLBVH)
-        {
-            JobDesc prepare{.DebugName = "Prepare point construction",
-                            .Scope = context.World,
-                            .Work =
-                                [w](const JobCancellation&)
-                            {
-                                Prepare(*w);
-                                return JobResultEnvelope::Make(true);
-                            },
-                            .ValidateBeforeApply = validate,
-                            .PublishCompletion =
-                                [w](KernelEventBus&, const JobResultEnvelope&)
-                            {
-                                if (!w->PreparedOk)
-                                    w->MainFailure = w->Result;
-                                return w->PreparedOk;
-                            },
-                            .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
-            const auto prepared = context.JobCommands.Submit(std::move(prepare), identity);
-            identity.Run = prepared; // later stages join the run
-            if (!prepared.IsValid())
-                return delivery.Rejected("preparation");
-            JobDesc gpu{.DebugName = "Construction neighbors (Vulkan)",
-                        .Scope = context.World,
-                        .Work = [](const JobCancellation&)
-                        { return JobResultEnvelope::Make(true); },
-                        .IsReadyToApply = [context, w] { return AdvanceGpu(context, *w); },
-                        .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&)
-                        { return w->QueriesComplete; },
-                        .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
-            gpu.DependsOn.push_back({prepared, "Prepare query locations before Vulkan dispatch"});
-            const auto support = context.JobCommands.Submit(std::move(gpu), identity);
-            if (!support.IsValid())
-            {
-                w->Abandoned = true;
-                return delivery.Rejected("Vulkan neighbors");
-            }
-            final.DependsOn.push_back(
-                {support, "Complete Vulkan neighborhoods before geometry extraction"});
-        }
-        const auto token = context.JobCommands.Submit(std::move(final), identity);
-        if (!token.IsValid())
-        {
-            w->Abandoned = true;
-            return delivery.Rejected();
-        }
-        return delivery.Pending();
+        return RunPointConstruction(commands, config, std::move(onComplete), kOneShotBatchExecution);
+    }
+    EditorPointConstructionResult StartEditorPointConstructionRun(const EditorProcessingCommands& commands,
+        const PointConstructionConfig& config,
+        std::function<void(EditorPointConstructionResult)> onComplete)
+    {
+        return RunPointConstruction(commands, config, std::move(onComplete), config.Execution);
     }
     EditorPointConstructionResult
     ApplyEditorConfiguredPointConstruction(const EditorProcessingCommands& commands,
@@ -674,6 +770,15 @@ namespace Extrinsic::Runtime
             return {.Status = EditorCommandStatus::InvalidProcessingParameters,
                     .Message = "Point construction config is unavailable."};
         return ApplyEditorPointConstructionCommand(commands, *config, std::move(onComplete));
+    }
+    EditorPointConstructionResult StartEditorConfiguredPointConstruction(
+        const EditorProcessingCommands& commands, std::function<void(EditorPointConstructionResult)> onComplete)
+    {
+        const auto config = GetEditorPointConstructionConfig(commands);
+        if (!config)
+            return {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                .Message = "Point construction config is unavailable."};
+        return StartEditorPointConstructionRun(commands, *config, std::move(onComplete));
     }
 
     RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(

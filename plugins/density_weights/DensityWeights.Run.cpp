@@ -11,6 +11,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -132,34 +133,37 @@ namespace Intrinsic::Plugins::DensityWeights
             r.Diagnostics.UsedSuppliedNeighborhoods = true;
         }
 
-        // A CPU run's state; the worker touches it only inside Work, the main thread everywhere else.
+        // A CPU run's state; the worker touches it (Current, Invalid, through Compute) only inside the step, the
+        // main thread everywhere else.
         struct Work
         {
             Config Cfg{};
             R::PointCloudEditingService* Service{nullptr};
             std::shared_ptr<R::PointEdit> Edit{};
             std::vector<glm::vec3> Points{};
-            std::vector<float> Weights{};
-            Result Current{};
-            bool Failed{false}, Invalid{false};
+            Result Initial{}, Current{}; // Initial: as captured (a restart's step starts from it)
+            bool Invalid{false}; // the step failed on its settings (an automatic radius), not its data
             std::shared_ptr<Run> Shared{};
         };
 
-        // Worker: an automatic radius, the radius candidates (the KD-tree's own, or complete rows of the cached LBVH,
-        // self excluded, as the removed engine operation queried them) and the weights.
-        void Compute(Work& w)
+        // Worker, the one step: an automatic radius, the radius candidates (the KD-tree's own, or complete rows of
+        // the cached LBVH, self excluded, as the removed engine operation queried them) and the weights into
+        // `weights`; false with the reason in Current.
+        bool Compute(Work& w, std::vector<float>& weights)
         {
             const auto started = std::chrono::steady_clock::now();
+            w.Current = w.Initial;
+            w.Invalid = false;
             auto& r = w.Current;
             const auto fail = [&](std::string message)
             {
-                w.Failed = true;
                 r.Message = std::move(message);
+                return false;
             };
             if (!(r.SupportRadius > 0) && !Resolve(w.Cfg, w.Points, r, r.Message))
             {
-                w.Failed = w.Invalid = true;
-                return;
+                w.Invalid = true;
+                return false;
             }
             Kernels::DensityWeightResult result;
             if (w.Cfg.Backend == DensityWeightBackend::CpuKDTree)
@@ -191,67 +195,27 @@ namespace Intrinsic::Plugins::DensityWeights
             r.MinWeight = *minimum;
             r.MaxWeight = *maximum;
             r.Diagnostics = result.Diagnostics;
-            w.Weights = std::move(result.Weights);
+            weights = std::move(result.Weights);
             r.CpuComputeMilliseconds =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+            return true;
         }
 
-        // Main thread: the run's completion.
-        bool Complete(Work& w, const bool applied)
+        // Main thread, the run's one settled end (ScalarCpuRun::Finish; the host frees `w` when the run retires); a
+        // failed automatic radius is invalid settings.
+        void Finish(Work& w, std::string_view status, std::string message, const bool ownResult)
         {
-            auto& run = *w.Shared;
-            if (run.Final) return false;
-            auto& r = w.Current;
-            if (applied && !w.Failed && !w.Service->SessionCurrent(run.Session))
+            auto r = ownResult ? w.Current : w.Shared->Pending;
+            if (status == "failed" && ownResult && w.Invalid)
+                status = "invalid";
+            if (status == "applied")
             {
-                // The service no longer works in the run's editor session (a release or a switch of its workspace,
-                // or a detach): nothing of it may land in another one.
-                r.Status = "cancelled";
-                r.Message = "The editor session of the density weight run ended; nothing was written.";
+                r.WrittenCount = r.LiveCount;
+                message = "Density weights computed with " + r.ActualBackend +
+                    " radius candidates and CPU double-precision kernel reduction; support radius " +
+                    std::format("{:.4g}.", r.SupportRadius);
             }
-            else if (!applied || w.Failed || !w.Service->Current(*w.Edit))
-            {
-                // The job gate's check before publication, as the removed engine operation's: a cancel, or an input or
-                // the output changed while the run went.
-                r.Status = w.Invalid ? "invalid" : w.Failed ? "failed" : !w.Service->Current(*w.Edit) ? "stale"
-                                                                                                    : "cancelled";
-                if (!w.Failed)
-                    r.Message = "Density weights was cancelled or its source became stale; nothing was applied.";
-            }
-            else
-            {
-                const std::vector<std::vector<float>> columns{std::move(w.Weights)};
-                const auto status = w.Service->PublishScalars(*w.Edit, columns, "Compute compact density weights");
-                switch (status)
-                {
-                case R::PointPublishStatus::Applied:
-                    r.Status = "applied";
-                    r.WrittenCount = r.LiveCount;
-                    r.Message = "Density weights computed with " + r.ActualBackend +
-                        " radius candidates and CPU double-precision kernel reduction; support radius " +
-                        std::format("{:.4g}.", r.SupportRadius);
-                    break;
-                case R::PointPublishStatus::Stale:
-                    r.Status = "stale";
-                    r.Message = "Density-weight input or output changed before publication.";
-                    break;
-                case R::PointPublishStatus::Unrepresentable:
-                    r.Status = "invalid";
-                    r.Message = "Output values are not exactly representable in the selected scalar storage.";
-                    break;
-                case R::PointPublishStatus::Rejected:
-                    r.Status = "failed";
-                    r.Message = "Density publication rejected by history checks.";
-                    break;
-                }
-            }
-            if (run.Handle.IsValid()) R::ReportPluginJobOutcome(run.Handle, R::PluginJobDomain::Cpu, r.Message);
-            g_Runs.Finish(run, r);
-            // The job's callables keep `w` until the host reaps them: release the copies and the index lease now.
-            w.Edit.reset();
-            w.Points = std::vector<glm::vec3>{};
-            w.Weights = std::vector<float>{};
-            return r.Status == "applied";
+            R::FinishScalarCpuPluginRun(g_Runs, *w.Shared, std::move(r), status, std::move(message));
         }
 
         // The capture both paths start from, with the method's own checks and texts after the service's.
@@ -274,7 +238,7 @@ namespace Intrinsic::Plugins::DensityWeights
             return edit;
         }
 
-        // A CPU run: the capture, a given radius checked at once, one plugin job.
+        // A CPU run: the capture, a given radius checked at once, then the host's one-shot step run.
         void StartCpu(const std::shared_ptr<Run>& run, const Config& config, R::PointCloudEditingService& service)
         {
             auto fail = [&](std::string status, std::string message)
@@ -291,8 +255,9 @@ namespace Intrinsic::Plugins::DensityWeights
             if (w->Edit == nullptr) return fail("invalid", diagnostic);
             if (config.Backend == DensityWeightBackend::CpuLBVH && (!view.ValidLbvh || view.LiveCount > (1u << 24)))
                 return fail("invalid", kLbvhLimits);
-            w->Current = run->Pending;
-            if (config.SupportRadius > 0 && !Resolve(config, view.Points, w->Current, diagnostic))
+            auto& r = w->Initial;
+            r = run->Pending;
+            if (config.SupportRadius > 0 && !Resolve(config, view.Points, r, diagnostic))
                 return fail("invalid", diagnostic);
             if (config.Backend == DensityWeightBackend::CpuLBVH)
             {
@@ -300,28 +265,50 @@ namespace Intrinsic::Plugins::DensityWeights
                 view = service.View(*w->Edit);
             }
             w->Points.assign(view.Points.begin(), view.Points.end());
-            w->Current.ActualBackend = ToString(config.Backend);
-            w->Current.Weights = view.ScalarOutputs.front();
-            w->Current.SlotCount = view.SlotCount;
-            w->Current.LiveCount = view.LiveCount;
-            w->Current.IndexReused = view.IndexReused;
-            run->Pending = w->Current;
+            r.ActualBackend = ToString(config.Backend);
+            r.Weights = view.ScalarOutputs.front();
+            r.SlotCount = view.SlotCount;
+            r.LiveCount = view.LiveCount;
+            r.IndexReused = view.IndexReused;
+            w->Current = r;
+            run->Pending = r;
             std::string refusal;
-            if (!R::SubmitPluginRunStage(*run, {.Label = "Density weights",
-                                                .Output = R::PluginJobOutput{.StableEntityId = config.StableEntityId,
-                                                                             .Property = w->Current.Weights},
-                                                .Domain = R::PluginJobDomain::Cpu,
-                                                .Work = [w](const std::function<bool()>&) { Compute(*w); },
-                                                .Completion = [w](const bool applied) { return Complete(*w, applied); }},
-                                         refusal))
-                fail("busy", refusal.empty() ? "The density weight run was not queued." : refusal);
+            const auto holder = std::make_shared<R::PluginJobHandle>();
+            const auto id = service.StartScalarCpuRun(
+                {.Edit = w->Edit,
+                    .Session = run->Session,
+                    .Output = {.StableEntityId = config.StableEntityId, .Property = r.Weights},
+                    .Label = "Density weights",
+                    .History = "Compute compact density weights",
+                    .Noun = "Density-weight",
+                    .Method = "density weight",
+                    .Execution = config.Execution,
+                    .Compute =
+                        [w](std::vector<float>& weights)
+                    {
+                        return Compute(*w, weights);
+                    },
+                    .Finish =
+                        [w](const std::string_view status, std::string message, const bool ownResult)
+                    {
+                        Finish(*w, status, std::move(message), ownResult);
+                    }},
+                R::PluginStepRunJobs(holder),
+                refusal);
+            if (id == 0u)
+                return fail("busy", refusal.empty() ? "The density weight run was not queued." : refusal);
+            run->Handle = *holder;
+            run->Pending.StepRun = id;
         }
 
         // A Vulkan run: the radius-independent limits refuse before an automatic radius is derived on this thread.
         // shortcut: the frame-thread analysis is bounded by Vulkan's 2^20-point admission; move it into a worker, as
         // K-Means seeds, if large clouds stall the frame.
-        R::ScalarAnalysis StartGpu(Run& run, const Config& config, R::PointCloudEditingService& service,
-                                   const bool autoAccept, R::ScalarAnalysisRefusal& refusal)
+        R::ScalarAnalysis StartGpu(Run& run,
+            const Config& config,
+            R::PointCloudEditingService& service,
+            const R::StepRunExecution& execution,
+            R::ScalarAnalysisRefusal& refusal)
         {
             auto& r = run.Pending;
             if (!(config.SupportRadius > 0))
@@ -334,7 +321,7 @@ namespace Intrinsic::Plugins::DensityWeights
             }
             else if (std::vector<glm::vec3> none; !Resolve(config, none, r, refusal.Message))
                 return {};
-            return service.StartScalarAnalysis(Request(config, r), autoAccept, refusal);
+            return service.StartScalarAnalysis(Request(config, r), execution, refusal);
         }
     }
 
@@ -355,7 +342,7 @@ namespace Intrinsic::Plugins::DensityWeights
         return service->ScalarAnalysisReadiness(Request(config, radii), BackendOf(config.Backend));
     }
 
-    std::shared_ptr<Run> Start(const Config& config, const bool autoAccept)
+    std::shared_ptr<Run> Start(const Config& config)
     {
         auto run = std::make_shared<Run>();
         run->Pending = {.Status = "pending", .Message = "Density weights queued.", .RequestedBackend = config.Backend,
@@ -378,7 +365,7 @@ namespace Intrinsic::Plugins::DensityWeights
             return g_Runs.Keep(run, run->Final && run->Final->Status == "busy");
         }
         R::ScalarAnalysisRefusal refusal;
-        run->Analysis = StartGpu(*run, config, *service, autoAccept, refusal);
+        run->Analysis = StartGpu(*run, config, *service, config.Execution, refusal);
         if (!run->Analysis)
             return fail(refusal.Busy ? "busy" : refusal.Failed ? "failed" : "invalid", std::move(refusal.Message), refusal.Busy);
         g_Runs.Keep(run);

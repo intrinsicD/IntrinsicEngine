@@ -1,7 +1,9 @@
 // ARCH-022: the FPFH descriptor analysis plugin's contract, in an engine composed as the Sandbox composes it
 // (in-process startup plugin, so it runs in static builds too): its section (including a payload saved by the
 // built-in feature it replaced), every point domain on both CPU backends with one undo entry, its stale and
-// cancelled runs, its preflight refusals, typed and atomic multi-column publication, its MCP tool and its window.
+// cancelled runs, its preflight refusals, typed and atomic multi-column publication, its MCP tools and its window.
+// ARCH-023: a run is a one-step step run; the batch settings below run at once and accept at their end, the lifecycle
+// case drives a ready run through run_control.
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -59,10 +61,35 @@ namespace
     DA::Config Settings(const entt::entity entity, const D domain)
     {
         return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
-                .Positions = {.Domain = domain, .Name = "samples", .ValueKind = Geometry::PropertyValueKind::Vec3},
-                .Normals = {.Domain = domain, .Name = "directions", .ValueKind = Geometry::PropertyValueKind::Vec3},
-                .Outputs = DA::MakeOutputs(domain, "descriptor"),
-                .FeatureRadius = 10};
+            .Positions = {.Domain = domain, .Name = "samples", .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .Normals = {.Domain = domain, .Name = "directions", .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .Outputs = DA::MakeOutputs(domain, "descriptor"),
+            .FeatureRadius = 10,
+            .Execution = {.IterationCap = 1u,
+                .PreviewEvery = 0u,
+                .PreviewIntervalMs = 0u,
+                .AutoAccept = R::StepRunAutoAccept::End,
+                .Start = R::StepRunStart::Run}};
+    }
+
+    Json Observe(Harness& harness, const std::uint64_t run)
+    {
+        return Json::parse(harness.Call("run_observe", {{"run", run}}).Text);
+    }
+    bool Control(Harness& harness, const std::uint64_t run, const std::string& action)
+    {
+        return !harness.Call("run_control", {{"run", run}, {"action", action}}).IsError;
+    }
+    // Frames until `done(observation)` holds (or a bound).
+    template <class Done> Json Until(Harness& harness, const std::uint64_t run, Done done)
+    {
+        Json observed = Observe(harness, run);
+        for (int frame = 0; frame < 2000 && !done(observed); ++frame)
+        {
+            harness.Frame();
+            observed = Observe(harness, run);
+        }
+        return observed;
     }
 
     bool Usable(const std::string& payload) { return R::ValidateDerivedSection<DA::kSection>(payload, {}, "test").Usable(); }
@@ -87,11 +114,22 @@ TEST(DescriptorAnalysisPlugin, TheSectionKeepsItsNameAndRefusesInvalidSettings)
     ASSERT_TRUE(read);
     EXPECT_EQ(read->Outputs, config.Outputs);
     EXPECT_EQ(R::SerializeDerivedSection<DA::kSection>(*read), payload);
-    for (const auto* bad : {R"({"backend":"vulkan"})", R"({"max_neighbors":-1})", R"({"outputs":[]})",
-                            R"({"gpu_query_batch_size":0})", R"({"gpu_radius_capacity":0})",
-                            R"({"gpu_radius_capacity":1025})", R"({"feature_radius":1e100})",
-                            R"({"feature_radius":1e-100})", R"({"unknown":1})"})
-        EXPECT_FALSE(Usable(bad)) << bad;
+    for (const auto* bad : {R"({"backend":"vulkan"})",
+             R"({"max_neighbors":-1})",
+             R"({"outputs":[]})",
+             R"({"gpu_query_batch_size":0})",
+             R"({"gpu_radius_capacity":0})",
+             R"({"gpu_radius_capacity":1025})",
+             R"({"feature_radius":1e100})",
+             R"({"feature_radius":1e-100})",
+             R"({"unknown":1})",
+             R"({"start":"later"})",
+             R"({"auto_accept":"sometimes"})",
+             R"({"max_iterations":1})",
+             R"({"preview_every":0})"})
+        EXPECT_FALSE(Usable(bad)) << bad; // a one-step run binds no cap or preview rows (no inert option)
+    EXPECT_TRUE(Usable(R"({"start":"ready","auto_accept":"converged"})"));
+    EXPECT_EQ(read->Execution, config.Execution) << "auto_accept and start round-trip";
     auto invalid = config;
     invalid.Outputs[32] = invalid.Outputs[0];
     EXPECT_FALSE(Usable(R::SerializeDerivedSection<DA::kSection>(invalid))) << "duplicate output names";
@@ -116,10 +154,10 @@ TEST(DescriptorAnalysisPlugin, TheSectionKeepsItsNameAndRefusesInvalidSettings)
     EXPECT_FALSE(Usable(long_.dump())) << "34 outputs";
 }
 
-TEST(DescriptorAnalysisPlugin, APayloadTheBuiltInFeatureSavedLoadsAtBootUnchanged)
+TEST(DescriptorAnalysisPlugin, APayloadTheBuiltInFeatureSavedLoadsAtBootWithDefaultExecution)
 {
     // config_get of the built-in section at 60de92325: names with spaces and slashes, float and double columns,
-    // non-default limits.
+    // non-default limits. ARCH-023 added auto_accept and start: the payload loads with their defaults.
     std::ifstream file{std::filesystem::path{INTRINSIC_SOURCE_DIR} / "tests/data/descriptor_analysis_saved_section.json"};
     ASSERT_TRUE(file) << "the saved section fixture";
     std::stringstream text;
@@ -133,7 +171,10 @@ TEST(DescriptorAnalysisPlugin, APayloadTheBuiltInFeatureSavedLoadsAtBootUnchange
     Harness harness{std::move(boot)};
     const auto active = R::ActivePluginSection<DA::kSection>();
     ASSERT_TRUE(active) << "the saved payload is usable";
-    EXPECT_EQ(Json::parse(R::SerializeDerivedSection<DA::kSection>(*active)), saved);
+    auto expected = saved;
+    expected["auto_accept"] = "never";
+    expected["start"] = "ready";
+    EXPECT_EQ(Json::parse(R::SerializeDerivedSection<DA::kSection>(*active)), expected);
     EXPECT_EQ(active->StableEntityId, 12u);
     EXPECT_EQ(active->Backend, DA::DescriptorBackend::CpuLBVH);
     EXPECT_EQ(active->MaxNeighbors, 17u);
@@ -376,11 +417,107 @@ TEST(DescriptorAnalysisPlugin, TheToolAnswersWhenTheRunEndsAndTheRunIsAJobsWindo
     EXPECT_EQ(result["outputs"].size(), DA::kBins);
     EXPECT_EQ(result["outputs"][0], config.Outputs[0].Name);
     EXPECT_EQ(result["written_count"], PointDomainProperties(scene, entity, D::MeshVertex).Size());
+    EXPECT_GT(result["run"].get<std::uint64_t>(), 0u);
     const auto jobs = harness.Jobs();
-    ASSERT_EQ(jobs.size(), 1u);
-    EXPECT_EQ(jobs.front().Identity.EntityId, config.StableEntityId);
-    EXPECT_EQ(jobs.front().Identity.OutputName, config.Outputs[0].Name);
-    EXPECT_EQ(jobs.front().State, R::JobState::Published);
+    // The step run's holder carries the output: its row (its step is a job of the same run).
+    EXPECT_TRUE(std::ranges::any_of(jobs,
+        [&](const auto& job)
+        {
+            return job.Identity.EntityId == config.StableEntityId &&
+                job.Identity.OutputName == config.Outputs[0].Name && job.State == R::JobState::Published;
+        }));
+}
+
+// ARCH-023: one logical step. Ready computes nothing; step 1 computes the 33 columns and ends converged; a restart
+// after convergence begins a new generation and computes them again; nothing is written before Accept, which writes
+// all 33 with one undo entry, equal to the batch run's; a discarded run writes nothing.
+TEST(DescriptorAnalysisPlugin, AOneStepRunIsReadyStepsRestartsAndAcceptsLikeTheBatchRun)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    auto config = Settings(entity, D::MeshVertex);
+    ASSERT_EQ(harness.Wait(*DA::Start(config)).Status, "applied");
+    std::vector<std::vector<float>> batch;
+    for (const auto& output : config.Outputs)
+        batch.push_back(Column(props, output.Name));
+    ASSERT_TRUE(harness.History().Undo().Succeeded());
+    ASSERT_FALSE(props.Exists(config.Outputs[0].Name));
+
+    config.Execution.AutoAccept = R::StepRunAutoAccept::Never;
+    ASSERT_TRUE(harness.Apply(config));
+    const auto started = harness.Call("descriptor_analysis_start", {{"start", "ready"}});
+    ASSERT_FALSE(started.IsError) << started.Text;
+    const auto run = Json::parse(started.Text)["run"].get<std::uint64_t>();
+    for (int frame = 0; frame < 20; ++frame)
+        harness.Frame();
+    auto observed = Observe(harness, run);
+    EXPECT_EQ(observed["phase"], "ready") << observed.dump();
+    EXPECT_EQ(observed["steps"], 0u);
+    EXPECT_EQ(observed["execution"]["max_iterations"], 1u) << "one logical step";
+    EXPECT_EQ(observed["execution"]["preview_every"], 0u) << "no live preview";
+    EXPECT_TRUE(harness.Call("descriptor_analysis_start", {{"preview_every", 1}}).IsError)
+        << "the start tool offers no preview argument";
+
+    ASSERT_TRUE(Control(harness, run, "step"));
+    observed = Until(harness,
+        run,
+        [](const Json& o)
+        {
+            return o["end"] == "converged" && !o["computing"];
+        });
+    EXPECT_EQ(observed["steps"], 1u);
+    EXPECT_FALSE(props.Exists(config.Outputs[0].Name)) << "nothing before Accept";
+    ASSERT_TRUE(Control(harness, run, "restart")) << "a restart after convergence, before Accept";
+    observed = Until(harness,
+        run,
+        [](const Json& o)
+        {
+            return o["generation"] == 1u;
+        });
+    EXPECT_EQ(observed["steps"], 0u);
+    ASSERT_TRUE(Control(harness, run, "run"));
+    observed = Until(harness,
+        run,
+        [](const Json& o)
+        {
+            return o["end"] == "converged" && !o["computing"];
+        });
+    EXPECT_EQ(observed["steps"], 1u);
+    ASSERT_TRUE(Control(harness, run, "accept"));
+    observed = Until(harness,
+        run,
+        [](const Json& o)
+        {
+            return o["phase"] == "committed";
+        });
+    EXPECT_EQ(observed["phase"], "committed");
+    for (std::size_t b = 0; b < DA::kBins; ++b)
+        EXPECT_EQ(Column(props, config.Outputs[b].Name), batch[b]) << b;
+    EXPECT_EQ(harness.History().UndoCount(), 1u) << "33 columns, one undo entry";
+    ASSERT_TRUE(DA::LastRun() && DA::LastRun()->Final);
+    EXPECT_EQ(DA::LastRun()->Final->StepRun, run);
+
+    ASSERT_TRUE(harness.History().Undo().Succeeded());
+    const auto second = Json::parse(harness.Call("descriptor_analysis_start").Text)["run"].get<std::uint64_t>();
+    (void)Until(harness,
+        second,
+        [](const Json& o)
+        {
+            return o["end"] == "converged" && !o["computing"];
+        });
+    ASSERT_TRUE(Control(harness, second, "discard"));
+    (void)Until(harness,
+        second,
+        [](const Json& o)
+        {
+            return o["phase"] == "discarded";
+        });
+    (void)harness.Wait(*DA::LastRun()); // Discard is observable before its holder retires.
+    ASSERT_TRUE(DA::LastRun()->Final);
+    EXPECT_EQ(DA::LastRun()->Final->Status, "discarded");
+    EXPECT_FALSE(props.Exists(config.Outputs[0].Name)) << "a discarded run writes nothing";
 }
 
 TEST(DescriptorAnalysisPlugin, TheWindowRunsTheAppliedSettingsAndTheBinFollowsOnlyAfterAShow)
@@ -428,7 +565,8 @@ TEST(DescriptorAnalysisPlugin, TheWindowRunsTheAppliedSettingsAndTheBinFollowsOn
         if (auto* window = ImGui::FindWindowByName("FPFH Descriptor Analysis###view.descriptor_analysis"))
         {
             ImGui::FocusWindow(window);
-            if (frame == 2) ImGui::ActivateItemByID(window->GetID("Run"));
+            if (frame == 2)
+                ImGui::ActivateItemByID(window->GetID("Start"));
             editBin(frame, 30, "7", window); // before any Show: the viewport does not follow
             if (frame == 45) ImGui::ActivateItemByID(window->GetID("Show histogram bin"));
             editBin(frame, 55, "19", window); // after a successful Show it does
@@ -440,7 +578,7 @@ TEST(DescriptorAnalysisPlugin, TheWindowRunsTheAppliedSettingsAndTheBinFollowsOn
         if (frame == 52) afterShow = shownBin();
     }
     ImGui::DestroyContext(context);
-    EXPECT_TRUE(props.Exists(config.Outputs[0].Name)) << "the Run button started a run that published";
+    EXPECT_TRUE(props.Exists(config.Outputs[0].Name)) << "the Start button started a run that published at its end";
     EXPECT_EQ(harness.History().UndoCount(), 3u) << "the run, then the two displays (each display is undoable)";
     EXPECT_EQ(beforeShow, "") << "editing the bin before a Show shows nothing";
     EXPECT_EQ(afterShow, config.Outputs[7].Name) << "Show displays the selected bin";

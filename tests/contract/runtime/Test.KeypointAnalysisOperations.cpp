@@ -1,6 +1,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <functional>
+#include <map>
+#include <mutex>
+#include <set>
+#include <span>
 #include <thread>
 #include "MockRHI.hpp"
 #include "Modules/KeypointAnalysis/Runtime.KeypointPaging.TestSupport.hpp"
@@ -25,6 +30,7 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Graphics.PointKeypoints;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -331,6 +337,13 @@ namespace
         R::EditorKeypointAnalysisResult Initial;
         std::vector<R::EditorKeypointAnalysisResult> Results;
         std::vector<std::function<void()>> Completions;
+        // ARCH-023: the resident run's pages are submitted and waited for on its step run's worker, whose pulled
+        // header a Tick completes (as the frame-paced sink did); Gpu guards what the worker's submissions touch.
+        std::recursive_mutex Gpu;
+        std::uint64_t Tokens{100u};
+        std::set<std::uint64_t> Done{};
+        std::map<std::uint64_t, std::vector<std::byte>> Pulled{};
+        bool Stopping{};
         entt::entity Entity{};
         bool Hold{}, HoldCopy{}, FreezeFrame{}, Attached{true}, ResumeSeen{}, ForceResume{true};
         unsigned Submissions{}, Copies{};
@@ -340,6 +353,22 @@ namespace
         auto Commands(){return R::BindEditorProcessingCommands(Context);}
         auto& Rows(){return PointDomainProperties(*Context.Scene,Entity,D::PointCloudPoint);}
         auto Phase(){return R::SnapshotEditorPointScalar(Commands(),Run).Phase;}
+        // ARCH-023: the transaction's one step completed and its step run rests at the end (Accept may follow).
+        bool Computed()
+        {
+            const auto run = Jobs.StepRuns().Observe(R::SnapshotEditorPointScalar(Commands(), Run).StepRun);
+            return run && run->Phase == R::StepRunPhase::Paused && run->End != R::StepRunEnd::None &&
+                !run->SegmentInFlight;
+        }
+        // The shared controls' Accept (run_control's); Pending once issued.
+        R::EditorCommandStatus Accept()
+        {
+            std::string refusal;
+            return Jobs.StepRuns().Control(
+                       R::SnapshotEditorPointScalar(Commands(), Run).StepRun, R::StepRunAction::Accept, 1u, refusal)
+                ? R::EditorCommandStatus::Pending
+                : R::EditorCommandStatus::InvalidProcessingParameters;
+        }
         void SetUp() override
         {
             Context.World=Worlds.CreateWorld("keypoint resident");Context.Scene=Worlds.Get(Context.World);
@@ -354,15 +383,51 @@ namespace
             R::EngineSetup setup{Bus,Events,Jobs.Jobs(),Worlds,Services,[](R::FramePhase,R::RuntimeFrameHook){}};
             ASSERT_TRUE(Cache.OnRegister(setup));
             R::KeypointPagingForTesting={.Rows=3,.Visits=8,.Pairs=24};
-            Device.ComputeReadback=[this](auto record,auto bytes,auto sink){
-                auto buffer=record(Device.CommandContext);EXPECT_TRUE(buffer.IsValid());
-                Queue(buffer,bytes,std::move(sink));return Extrinsic::RHI::ReadbackToken{2};
+            Device.ComputeReadback = [this](auto record, auto bytes, auto sink)
+            {
+                std::scoped_lock lock{Gpu};
+                auto buffer=record(Device.CommandContext);
+                EXPECT_TRUE(buffer.IsValid());
+                const Extrinsic::RHI::ReadbackToken token{++Tokens};
+                Queue(buffer, bytes, std::move(sink), token.Value);
+                return token;
             };
-            Device.TransferQueue.BufferDownload=[this](auto buffer,auto bytes,auto,auto sink){
-                Queue(buffer,bytes,std::move(sink));return Extrinsic::RHI::ReadbackToken{3};
+            Device.TransferQueue.ComputeWait = [this](Extrinsic::RHI::ReadbackToken token, std::uint64_t)
+            {
+                {
+                    std::scoped_lock lock{Gpu};
+                    if (Stopping || Done.contains(token.Value))
+                        return Extrinsic::RHI::ComputeWaitStatus::Complete;
+                }
+                std::this_thread::sleep_for(std::chrono::microseconds(100));
+                return Extrinsic::RHI::ComputeWaitStatus::Pending;
+            };
+            Device.TransferQueue.ReadbackComplete = [this](Extrinsic::RHI::ReadbackToken token)
+            {
+                std::scoped_lock lock{Gpu};
+                return !token.IsValid() || token.Value <= 100u || Done.contains(token.Value);
+            };
+            Device.TransferQueue.TakeReadback = [this](Extrinsic::RHI::ReadbackToken token, std::span<std::byte> out)
+            {
+                std::scoped_lock lock{Gpu};
+                const auto found = Pulled.find(token.Value);
+                if (found == Pulled.end() || found->second.size() != out.size())
+                    return Stopping;
+                std::memcpy(out.data(), found->second.data(), out.size());
+                Pulled.erase(found);
+                return true;
+            };
+            Device.TransferQueue.BufferDownload = [this](auto buffer, auto bytes, auto, auto sink)
+            {
+                std::scoped_lock lock{Gpu};
+                Queue(buffer,bytes,std::move(sink));
+                return Extrinsic::RHI::ReadbackToken{3};
             };
         }
-        void Queue(Extrinsic::RHI::BufferHandle buffer,std::uint64_t bytes,Extrinsic::RHI::ReadbackSink sink)
+        void Queue(Extrinsic::RHI::BufferHandle buffer,
+            std::uint64_t bytes,
+            Extrinsic::RHI::ReadbackSink sink,
+            std::uint64_t token = 0u)
         {
             std::vector<std::byte> data(bytes);
             if(bytes==sizeof(Extrinsic::Graphics::PointKeypointHeader)) {
@@ -397,13 +462,42 @@ namespace
                 const auto& contents=Device.BufferContents[buffer.Index];
                 if(contents.size()>=bytes)std::memcpy(data.data(),contents.data(),bytes);
             }
-            Completions.push_back([sink=std::move(sink),data=std::move(data)]()mutable{sink.Deliver(data);});
+            if (sink.Pulled)
+                Completions.push_back(
+                    [this, token, data = std::move(data)]() mutable
+                    {
+                        std::scoped_lock lock{Gpu};
+                        Pulled[token] = std::move(data);
+                        Done.insert(token);
+                    });
+            else
+                Completions.push_back(
+                    [this, token, sink = std::move(sink), data = std::move(data)]() mutable
+                    {
+                        sink.Deliver(data);
+                        std::scoped_lock lock{Gpu};
+                        Done.insert(token);
+                    });
         }
         void Tick()
         {
-            if(!Hold){auto pending=std::exchange(Completions,{});for(auto& complete:pending)complete();}
+            if (!Hold)
+            {
+                std::vector<std::function<void()>> pending;
+                {
+                    std::scoped_lock lock{Gpu};
+                    pending = std::exchange(Completions, {});
+                }
+                for (auto& complete : pending)
+                    complete();
+            }
             (void)Jobs.Jobs().DrainCompletions(Events);
-            Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);if(!FreezeFrame)++Device.GlobalFrameNumber;
+            {
+                std::scoped_lock lock{Gpu};
+                Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+            }
+            if (!FreezeFrame)
+                ++Device.GlobalFrameNumber;
             (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
         }
         template<class P>bool Until(P predicate)
@@ -412,11 +506,29 @@ namespace
             while(!predicate()&&std::chrono::steady_clock::now()<end){Tick();std::this_thread::yield();}
             return predicate();
         }
-        void Start(bool automatic=false){Run=R::StartEditorKeypointAnalysisTransaction(Commands(),C,Initial,[this](auto r){Results.push_back(r);},automatic);}
+        // An interactive start computes at once here (start=run); a batch also accepts at its end.
+        void Start(bool automatic = false)
+        {
+            auto c = C;
+            c.Execution.Start = R::StepRunStart::Run;
+            Run = R::StartEditorKeypointAnalysisTransaction(
+                Commands(),
+                c,
+                Initial,
+                [this](auto r)
+                {
+                    Results.push_back(r);
+                },
+                automatic);
+        }
         void TearDown() override
         {
             R::DiscardEditorPointScalar(Commands(),Run);Hold=false;
             for(int i=0;i<5;++i)Tick();
+            {
+                std::scoped_lock lock{Gpu};
+                Stopping = true;
+            } // a waiting worker returns
             Jobs.Jobs().CancelAndDrain();(void)Jobs.Jobs().ShutdownGpuQueueParticipants([this]{Device.WaitIdle();});
             R::RuntimeModuleShutdownContext shutdown{Bus,Events,Jobs.Jobs(),Worlds,Services};Cache.OnShutdown(shutdown);
             Run.reset();R::KeypointPagingForTesting=Saved;
@@ -430,11 +542,24 @@ TEST_F(KeypointResident, ResidentPagingPreviewAcceptAtomicHistoryAndRepeatZeroUp
     auto* residency=Cache.PropertyResidency();
     const auto score=R::MakeGpuPropertyKey(Context.World,Entity,C.Score),mask=R::MakeGpuPropertyKey(Context.World,Entity,C.Mask);
     EXPECT_TRUE(residency->HasRing(score));EXPECT_TRUE(residency->HasRing(mask));EXPECT_FALSE(residency->Front(score));
-    ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     EXPECT_TRUE(ResumeSeen);EXPECT_GT(Submissions,20u);EXPECT_EQ(Copies,1u);
     EXPECT_TRUE(residency->Front(score));EXPECT_TRUE(residency->Front(mask));EXPECT_FALSE(Rows().Exists(C.Score.Name));
-    EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),Run).Status,R::EditorCommandStatus::Pending);
-    ASSERT_TRUE(Until([&]{return !Results.empty();}));EXPECT_EQ(Results.size(),1u);EXPECT_TRUE(Results[0].Succeeded());EXPECT_EQ(Results[0].MaximumNeighbors,19u);
+    EXPECT_NE(Initial.StepRun, 0u) << "the result names the step run";
+    EXPECT_EQ(Accept(), R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return !Results.empty();
+        }));
+    EXPECT_EQ(Results.size(), 1u);
+    EXPECT_TRUE(Results[0].Succeeded());
+    EXPECT_EQ(Results[0].StepRun, Initial.StepRun);
+    EXPECT_EQ(Results[0].MaximumNeighbors, 19u);
     EXPECT_EQ(History.UndoCount(),1u);EXPECT_EQ(std::as_const(Rows()).Get<float>(C.Score.Name)[0],3);
     EXPECT_EQ(std::as_const(Rows()).Get<std::uint32_t>(C.Mask.Name)[1],1u);
     EXPECT_GT(Results[0].CpuStageReadbackBytes,20u*8);EXPECT_EQ(Results[0].ImplementationId,"vulkan.keypoints.resident.paged.v1");
@@ -445,7 +570,11 @@ TEST_F(KeypointResident, ResidentPagingPreviewAcceptAtomicHistoryAndRepeatZeroUp
     const auto pipelines = Device.CreatePipelineCount;
     Start();ASSERT_TRUE(Run);EXPECT_EQ(Initial.GpuInputUploadBytes,0u);EXPECT_GT(Initial.GpuInputCacheHits,0u);
     EXPECT_EQ(Cache.Stats().WorkspaceReuses, reuses + 1);
-    ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     EXPECT_EQ(Device.CreatePipelineCount, pipelines);
 }
 TEST_F(KeypointResident, SharedPreviewRefusesAnUnacceptedGpuResult)
@@ -457,7 +586,11 @@ TEST_F(KeypointResident, SharedPreviewRefusesAnUnacceptedGpuResult)
     ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(Commands(), C).Enabled);
     Start();
     ASSERT_TRUE(Run) << Initial.Message;
-    ASSERT_TRUE(Until([&] { return Phase() == R::EditorGpuTransactionPhase::ReadyToAccept; }));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     const auto blocked = R::PreviewEditorKeypointAnalysisCommand(Commands(), C);
     EXPECT_FALSE(blocked.Enabled);
     EXPECT_NE(blocked.DisabledReason.find("Accept or Discard"), std::string::npos);
@@ -473,19 +606,50 @@ TEST_F(KeypointResident, SharedPreviewRefusesAnUnacceptedGpuResult)
 TEST_F(KeypointResident, CompletionGatesPreviewAndDiscardKeepsResourcesUntilIdle)
 {
     Hold=true;Start();ASSERT_TRUE(Run);
-    ASSERT_TRUE(Until([&]{return !Completions.empty();}));const auto submissions=Submissions;
-    for(int i=0;i<5;++i)Tick();EXPECT_EQ(Submissions,submissions);
+    // ARCH-023: the owner Init's index preparation queues its own (header-less) completion before the worker's first
+    // page, so the first traversal page is what this waits for, not the first completion.
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            std::scoped_lock lock{Gpu};
+            return Submissions > 0u;
+        }));
+    const auto submissions = [&]
+    {
+        std::scoped_lock lock{Gpu};
+        return Submissions;
+    }();
+    EXPECT_EQ(submissions, 1u) << "one page in flight, held";
+    for (int i = 0; i < 5; ++i)
+        Tick();
+    EXPECT_EQ(
+        [&]
+        {
+            std::scoped_lock lock{Gpu};
+            return Submissions;
+        }(),
+        submissions);
     R::DiscardEditorPointScalar(Commands(),Run);EXPECT_EQ(Results.size(),1u);
     EXPECT_FALSE(Rows().Exists(C.Score.Name));
     unsigned idle=0;(void)Jobs.Jobs().ShutdownGpuQueueParticipants([&]{++idle;Device.WaitIdle();});EXPECT_EQ(idle,1u);
 }
 TEST_F(KeypointResident, StaleAcceptRefusalAndDetachDiscard)
 {
-    Start();ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
+    // ARCH-023: the run waits on its step run, so a stale input discards it (nothing publishes).
     Rows().Get<glm::vec3>("samples")[0].x+=1;
-    const auto snapshot=R::SnapshotEditorPointScalar(Commands(),Run);EXPECT_FALSE(snapshot.CanAccept);EXPECT_FALSE(snapshot.AcceptRefusalReason.empty());
-    EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),Run).Status,R::EditorCommandStatus::StaleEntity);
-    R::DiscardEditorPointScalar(Commands(),Run);EXPECT_FALSE(Rows().Exists(C.Mask.Name));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Phase() == R::EditorGpuTransactionPhase::Discarded;
+        }));
+    EXPECT_EQ(Results.back().Status, R::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(Rows().Exists(C.Mask.Name));
     Start();ASSERT_TRUE(Run);Attached=false;
     ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::Discarded;}));EXPECT_FALSE(Rows().Exists(C.Mask.Name));
 }
@@ -499,8 +663,13 @@ TEST_F(KeypointResident, AutomaticAcceptAndInitialSubmissionRejectExactlyOnce)
 TEST_F(KeypointResident, ReentrantDiscardDuringAcceptStillPublishesPairExactlyOnce)
 {
     Context.InvalidateWorkspaceSnapshotCache=[this]{R::DiscardEditorPointScalar(Commands(),Run);};
-    Start();ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
-    (void)R::AcceptEditorPointScalar(Commands(),Run);
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
+    (void)Accept();
     ASSERT_TRUE(Until([&]{return !Results.empty();}));
     EXPECT_EQ(Results.size(),1u);EXPECT_TRUE(Results.back().Succeeded());EXPECT_EQ(History.UndoCount(),1u);
     EXPECT_TRUE(Rows().Exists(C.Score.Name));EXPECT_TRUE(Rows().Exists(C.Mask.Name));
@@ -525,16 +694,28 @@ TEST_F(KeypointResident, RingCopyMustCompleteBeforeObservedFrontPublication)
     EXPECT_FALSE(Cache.PropertyResidency()->Front(key));
     EXPECT_EQ(Phase(),R::EditorGpuTransactionPhase::Running);
     HoldCopy=false;Hold=false;
-    ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     EXPECT_TRUE(Cache.PropertyResidency()->Front(key));
 }
 TEST_F(KeypointResident, EitherOutputRevisionRefusesPairAccept)
 {
-    Start();ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     (void)Rows().GetOrAdd<std::uint32_t>(C.Mask.Name,9);
-    EXPECT_FALSE(R::SnapshotEditorPointScalar(Commands(),Run).CanAccept);
-    EXPECT_EQ(R::AcceptEditorPointScalar(Commands(),Run).Status,R::EditorCommandStatus::StaleEntity);
-    R::DiscardEditorPointScalar(Commands(),Run);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Phase() == R::EditorGpuTransactionPhase::Discarded;
+        }));
+    EXPECT_EQ(Results.back().Status, R::EditorCommandStatus::StaleEntity);
     EXPECT_FALSE(Rows().Exists(C.Score.Name));EXPECT_EQ(std::as_const(Rows()).Get<std::uint32_t>(C.Mask.Name)[0],9u);
 }
 
@@ -545,7 +726,11 @@ TEST_F(KeypointResident, SubmissionCountUsesPairBudgetAndLinearStagesUseOneDispa
     for(unsigned i=0;i<count;++i)Rows().Get<glm::vec3>("samples")[i]={float(i),float(i%3),float(i%5)};
     R::KeypointPagingForTesting={};ForceResume=false;
     Start();ASSERT_TRUE(Run)<<Initial.Message;
-    ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     // Three traversal stages, each completing in one visit budget per row,
     // plus spacing partials, final scale reduction and ring copy.
     EXPECT_EQ(Submissions,3u*((count*1024ull+(1u<<24)-1)/(1u<<24))+3u);
@@ -591,7 +776,12 @@ TEST_F(KeypointResident, DuplicateGpuRequestIsPendingAndDoesNotStealCompletion)
     EXPECT_EQ(duplicate.Status,R::EditorCommandStatus::Pending);
     EXPECT_EQ(duplicate.Message.rfind("Keypoint analysis already has an active ",0),0u)<<duplicate.Message;
     EXPECT_EQ(duplicates,0u);
-    Hold=false;ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    Hold = false;
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     R::DiscardEditorPointScalar(Commands(),Run);EXPECT_EQ(Results.size(),1u);
 }
 
@@ -601,14 +791,18 @@ TEST_F(KeypointResident, ImmediateCompletionsAdvanceWithoutAnotherFrame)
     // Warm the cached index and complete the first traversal chunk.
     ASSERT_TRUE(Until([&]{return ResumeSeen;}));
     FreezeFrame=true;const auto frame=Device.GlobalFrameNumber;
-    ASSERT_TRUE(Until([&]{return Phase()==R::EditorGpuTransactionPhase::ReadyToAccept;}));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
     EXPECT_EQ(Device.GlobalFrameNumber,frame);EXPECT_EQ(Copies,1u);
 }
 TEST_F(KeypointResident, RecordPageRejectsInvalidParametersAndBudgets)
 {
     auto input=R::ResolveGpuPropertyInput(*Cache.PropertyResidency(),*Context.Scene,Context.World,Entity,C.Positions);
     ASSERT_TRUE(input);
-    Extrinsic::Graphics::PointKeypointWorkspace workspace(Device);
+    Extrinsic::Graphics::PointKeypointWorkspace workspace(Device, *Cache.MethodScratch());
     Extrinsic::Graphics::PointKeypointParams params;
     Extrinsic::Graphics::PointKeypointPage page{.Rows=20};
     const auto record=[&] {return workspace.RecordPage(Device.CommandContext,1,*input,1,20,params,page,{},{}).IsValid();};
@@ -653,4 +847,60 @@ TEST(KeypointAnalysis, PairedPublicationUndoIsRefusedWhenEitherOutputChanged)
         if(changeMask)EXPECT_EQ(std::as_const(props).Get<float>(config.Score.Name).Vector(),score);
         else EXPECT_EQ(std::as_const(props).Get<std::uint32_t>(config.Mask.Name).Vector(),mask);
     }
+}
+
+// ARCH-023: the paged traversal is one logical step of the transaction's step run: a ready start submits nothing,
+// Step(1) runs every page, Restart renews the rings and runs again from the captured input, Accept publishes once.
+TEST_F(KeypointResident, OneShotIsOneStepWithReadyStartAndRestart)
+{
+    Run = R::StartEditorKeypointAnalysisTransaction(
+        Commands(),
+        C,
+        Initial,
+        [this](auto r)
+        {
+            Results.push_back(r);
+        },
+        false);
+    ASSERT_TRUE(Run) << Initial.Message;
+    ASSERT_NE(Initial.StepRun, 0u);
+    auto& runs = Jobs.StepRuns();
+    for (int i = 0; i < 10; ++i)
+        Tick();
+    EXPECT_EQ(Submissions, 0u) << "ready: nothing is submitted";
+    EXPECT_EQ(runs.Observe(Initial.StepRun)->Phase, R::StepRunPhase::Ready);
+    std::string why;
+    ASSERT_TRUE(runs.Control(Initial.StepRun, R::StepRunAction::Step, 1u, why)) << why;
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
+    EXPECT_EQ(runs.Observe(Initial.StepRun)->Steps, 1u) << "every page is within the one step";
+    EXPECT_EQ(Copies, 1u);
+    const auto first = Submissions;
+    ASSERT_TRUE(runs.Control(Initial.StepRun, R::StepRunAction::Restart, 1u, why)) << why;
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return runs.Observe(Initial.StepRun)->Generation == 1u;
+        }));
+    EXPECT_EQ(runs.Observe(Initial.StepRun)->Steps, 0u);
+    ASSERT_TRUE(runs.Control(Initial.StepRun, R::StepRunAction::Step, 1u, why)) << why;
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Computed();
+        }));
+    EXPECT_GT(Submissions, first) << "the restart ran the pages again";
+    EXPECT_EQ(Copies, 2u);
+    EXPECT_EQ(Accept(), R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return !Results.empty();
+        }));
+    ASSERT_EQ(Results.size(), 1u);
+    EXPECT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_EQ(History.UndoCount(), 1u);
 }

@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -66,6 +67,61 @@ namespace Extrinsic::Runtime
     namespace ECSC = ECS::Components;
     using D = GeometryElementDomain;
 
+    namespace
+    {
+        // One completed kNN page appended as compact rows: original source IDs mapped through `slots`, or (a private
+        // target over the moved points, empty `slots`) identity rows below `rows`.
+        bool AppendGpuKnnPage(const SpatialNearestBatch& batch,
+            std::uint32_t width,
+            std::span<const std::uint32_t> slots,
+            std::size_t rows,
+            std::vector<std::uint32_t>& out,
+            std::string& why)
+        {
+            for (std::size_t row = 0; row < batch.Counts.size(); ++row)
+            {
+                if (batch.Counts[row] != width)
+                {
+                    why = "Incomplete GPU kNN neighbourhood.";
+                    return false;
+                }
+                for (std::size_t j = 0; j < width; ++j)
+                {
+                    const auto id = batch.Neighbors[row * batch.Capacity + j].Index;
+                    if (slots.empty())
+                    {
+                        if (id >= rows)
+                        {
+                            why = "Invalid private GPU neighbour row.";
+                            return false;
+                        }
+                        out.push_back(id);
+                        continue;
+                    }
+                    // The cached index names source rows: map them to compact indices.
+                    const auto found = std::lower_bound(slots.begin(), slots.end(), id);
+                    if (found == slots.end() || *found != id)
+                    {
+                        why = "Invalid GPU source row.";
+                        return false;
+                    }
+                    out.push_back(std::uint32_t(found - slots.begin()));
+                }
+            }
+            return true;
+        }
+    }
+
+    struct PointGpuRows
+    {
+        std::shared_ptr<SpatialQuerySession> First{}, Moving{}; // the cached index; the moved points (kNN, Moving)
+        std::vector<std::uint32_t> Slots{}; // the capture's source rows
+        std::uint32_t Width{}, LowestIdLimit{};
+        bool Moved{}; // a pass completed: later kNN passes query the moved points (worker)
+        std::atomic<bool> Abort{};
+        std::atomic<std::uint64_t> Microseconds{}, Builds{};
+    };
+
     struct PointEdit
     {
         EditorProcessingContext Context{}; // a copy, as today's operations keep in their callbacks
@@ -76,15 +132,9 @@ namespace Extrinsic::Runtime
         std::vector<glm::vec3> BeforeOutput{}, AfterOutput{};
         std::vector<Detail::PointPropertyWatch> ScalarWatches{};
         std::vector<GeometryScalarPropertySnapshot> ScalarBefore{};
-        Detail::PointRadiusRows RadiusPages{};
         std::shared_ptr<const SpatialIndexSnapshot> Index{};
         SpatialIndexHandle GpuIndex{};
         bool IndexReused{false};
-        // GPU rows: the cached index first, then a private index over the moved points.
-        SpatialIndexWorkspace Moving{};
-        Detail::GpuRowPages Pages{};
-        bool Moved{false};
-        PointGpuRowStats Stats{};
         std::uint64_t PreviewRing{0u}; // the generation of the positions' ring PreviewPositions made; 0: none
         std::optional<ECSC::Transform::Component> Transform{}; // with CaptureTransform (empty: none)
         glm::dmat4 Model{1.0};
@@ -234,9 +284,17 @@ namespace Extrinsic::Runtime
             diagnostic = "The spatial index cache is unavailable.";
             return false;
         }
-        const auto state = Detail::AcquirePointIndex(*context.SpatialIndices, context.World, edit.Entity,
-                                                     edit.Request.Positions, edit.Capture.Slots, edit.Capture.Points,
-                                                     edit.GpuIndex, edit.Index, edit.IndexReused, diagnostic);
+        const auto state = Detail::AcquirePointIndex(*context.SpatialIndices,
+            context.World,
+            edit.Entity,
+            edit.Request.Positions,
+            edit.Capture.Slots,
+            edit.Capture.Points,
+            edit.GpuIndex,
+            edit.Index,
+            edit.IndexReused,
+            diagnostic,
+            edit.Request.CpuIndex);
         if (state == Detail::PointIndexState::Mismatched)
             diagnostic = "The index snapshot does not match the selected samples.";
         return state == Detail::PointIndexState::Ready;
@@ -260,7 +318,7 @@ namespace Extrinsic::Runtime
 
     const Geometry::PointLBVH::Index* PointCloudEditingService::CpuIndex(const PointEdit& edit) const
     {
-        return edit.Index ? &edit.Index->Index : nullptr;
+        return edit.Index && edit.Index->Cpu ? &edit.Index->Index : nullptr;
     }
 
     bool PointCloudEditingService::GpuQueriesAvailable()
@@ -271,92 +329,148 @@ namespace Extrinsic::Runtime
             context.SpatialIndices->GpuQueriesAvailable();
     }
 
-    PointRowsState PointCloudEditingService::AdvanceGpuKnnRows(PointEdit& edit, const std::span<const glm::vec3> points,
-                                                               const std::uint32_t width, const std::uint32_t batchSize,
-                                                               std::vector<std::uint32_t>& rows, std::string& diagnostic)
+    std::shared_ptr<PointGpuRows> PointCloudEditingService::PrepareGpuRows(
+        PointEdit& edit, const PointGpuRowsRequest& request, std::string& diagnostic)
     {
         auto* cache = edit.Context.SpatialIndices;
-        const auto fail = [&](std::string why)
+        if (cache == nullptr || !edit.GpuIndex.Value)
         {
-            diagnostic = std::move(why);
-            edit.Pages.Batch.reset();
-            return PointRowsState::Failed;
-        };
-        if (cache == nullptr) return fail("The spatial index cache is unavailable.");
-        if (!Impl::InputsCurrent(edit)) return fail("The inputs changed.");
-        if (edit.Pages.Finished) return PointRowsState::Ready;
-        if (!edit.GpuIndex.Value)
-        {
-            if (!edit.Moving.Ready() || !cache->UpdateWorkspace(edit.Moving, points))
-            {
-                edit.Moving = cache->CreateWorkspace(points);
-                if (!edit.Moving.Ready()) return fail(edit.Moving.Diagnostic);
-                ++edit.Stats.WorkspaceBuilds;
-            }
-            edit.GpuIndex = edit.Moving.Handle;
+            diagnostic = "GPU rows need the spatial index cache and a capture made with AcquireIndex.";
+            return {};
         }
-        const auto& slots = edit.Capture.Slots;
-        const auto state = Detail::AdvanceGpuRowPages(
-            edit.Pages, points.size(), batchSize, diagnostic,
-            [&](const SpatialNearestBatch& batch, std::string& why)
+        if (!Impl::InputsCurrent(edit))
+        {
+            diagnostic = "The inputs changed.";
+            return {};
+        }
+        const auto& points = edit.Capture.Points;
+        const bool radius = request.Width == 0u;
+        if (points.size() < 2u || (radius && request.Capacity == 0u) || request.BatchSize == 0u)
+        {
+            diagnostic = "Invalid GPU row request.";
+            return {};
+        }
+        if (radius && request.Strategy != Graphics::PointQueryStrategy::Lbvh)
+        {
+            diagnostic = "GPU radius rows use the LBVH strategy; brute force serves kNN rows only.";
+            return {};
+        }
+        auto rows = std::make_shared<PointGpuRows>();
+        rows->Slots = edit.Capture.Slots;
+        rows->Width = request.Width;
+        rows->LowestIdLimit = request.LowestIdLimit;
+        // Radius rows exclude each query's own source row; PointRadiusCapacity bounds their candidates.
+        const SpatialQuerySessionDesc first{.Strategy = request.Strategy,
+            .Radius = radius,
+            .Capacity = radius ? Detail::PointRadiusCapacity(request.Capacity, points.size(), request.LowestIdLimit)
+                               : request.Width,
+            .PageQueries = request.BatchSize,
+            .Queries = points,
+            .Excluded = radius ? std::span<const std::uint32_t>(edit.Capture.Slots) : std::span<const std::uint32_t>{}};
+        rows->First = cache->PrepareQuerySession(edit.GpuIndex, first, diagnostic);
+        if (!rows->First)
+            return {};
+        if (!radius && request.Moving)
+        {
+            auto moving = first;
+            moving.Moving = true;
+            rows->Moving = cache->PrepareQuerySession({}, moving, diagnostic);
+            if (!rows->Moving)
+                return {};
+        }
+        return rows;
+    }
+
+    PointRowsState ComputeGpuKnnRows(PointGpuRows& rows,
+        const std::span<const glm::vec3> points,
+        std::vector<std::uint32_t>& out,
+        std::string& diagnostic)
+    {
+        const auto started = std::chrono::steady_clock::now();
+        const bool moved = rows.Moved && rows.Moving;
+        auto& session = moved ? *rows.Moving : *rows.First;
+        if (rows.Width == 0u || points.size() != session.Rows())
+        {
+            diagnostic = "GPU kNN rows need a kNN request and one point per captured point.";
+            return PointRowsState::Failed;
+        }
+        if (moved)
+        {
+            if (!session.UploadQueries(points, diagnostic))
+                return PointRowsState::Failed;
+            if (rows.Builds.load(std::memory_order_relaxed) == 0u)
+                rows.Builds.store(1u, std::memory_order_relaxed); // the private target, prepared once
+        }
+        out.clear();
+        out.reserve(points.size() * rows.Width);
+        const auto slots = moved ? std::span<const std::uint32_t>{} : std::span<const std::uint32_t>(rows.Slots);
+        SpatialNearestBatch batch;
+        for (std::uint32_t first = 0; first < session.Rows();)
+        {
+            const auto count = std::min(session.PageQueries(), session.Rows() - first);
+            switch (session.Query(first, count, -1.f, nullptr, rows.Abort, batch))
             {
-                for (std::size_t row = 0; row < batch.Counts.size(); ++row)
-                {
-                    if (batch.Counts[row] != width)
-                    {
-                        why = "Incomplete GPU kNN neighbourhood.";
-                        return false;
-                    }
-                    for (std::size_t j = 0; j < width; ++j)
-                    {
-                        const auto id = batch.Neighbors[row * batch.Capacity + j].Index;
-                        if (edit.Moved)
-                        {
-                            if (id >= points.size())
-                            {
-                                why = "Invalid private GPU neighbour row.";
-                                return false;
-                            }
-                            rows.push_back(id);
-                            continue;
-                        }
-                        // The cached index names source rows: map them to compact indices.
-                        const auto found = std::lower_bound(slots.begin(), slots.end(), id);
-                        if (found == slots.end() || *found != id)
-                        {
-                            why = "Invalid GPU source row.";
-                            return false;
-                        }
-                        rows.push_back(std::uint32_t(found - slots.begin()));
-                    }
-                }
-                return true;
-            },
-            [&](const std::size_t first, const std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
-            { return cache->QueueGpuKNearest(edit.GpuIndex, points.subspan(first, count), width, {}, std::move(reuse)); });
-        edit.Stats.QueryBatches = edit.Pages.QueryBatches;
-        if (state == Detail::RowsState::Failed) return fail(std::move(diagnostic));
-        if (state == Detail::RowsState::Pending) return PointRowsState::Pending;
-        edit.Stats.Milliseconds += edit.Pages.Milliseconds;
+            case SpatialPageStatus::Abandoned: return PointRowsState::Pending;
+            case SpatialPageStatus::Failed:    diagnostic = batch.Diagnostic; return PointRowsState::Failed;
+            case SpatialPageStatus::Ready:     break;
+            }
+            if (!AppendGpuKnnPage(batch, rows.Width, slots, points.size(), out, diagnostic))
+                return PointRowsState::Failed;
+            first += count;
+        }
+        rows.Moved = true;
+        rows.Microseconds.fetch_add(std::uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
+                                        std::chrono::steady_clock::now() - started)
+                                            .count()),
+            std::memory_order_relaxed);
         return PointRowsState::Ready;
     }
 
-    void PointCloudEditingService::RestartGpuKnnRows(PointEdit& edit)
+    PointRowsState ComputeGpuRadiusRows(
+        PointGpuRows& rows, const float radius, PointNeighbourRows& out, std::string& diagnostic)
     {
-        // The next pass queries a private index over the moved points; the batch count stays cumulative.
-        edit.GpuIndex = {};
-        edit.Index.reset();
-        edit.Pages.Restart();
-        edit.Moved = true;
+        if (rows.Width != 0u)
+        {
+            diagnostic = "GPU radius rows need a radius request.";
+            return PointRowsState::Failed;
+        }
+        Detail::PointRadiusRows packed{};
+        const auto state = Detail::ComputePointRadiusRows(
+            *rows.First, rows.Slots, radius, rows.LowestIdLimit, rows.Abort, packed, diagnostic);
+        out.MaximumNeighbors = packed.MaximumNeighbors;
+        rows.Microseconds.fetch_add(std::uint64_t(packed.Milliseconds * 1000.0), std::memory_order_relaxed);
+        if (state != Detail::RowsState::Ready)
+            return state == Detail::RowsState::Pending ? PointRowsState::Pending : PointRowsState::Failed;
+        out.Offsets = std::move(packed.Offsets);
+        out.Indices = std::move(packed.Indices);
+        return PointRowsState::Ready;
     }
 
-    PointGpuRowStats PointCloudEditingService::GpuRowStats(const PointEdit& edit) const { return edit.Stats; }
+    void AbortGpuRows(PointGpuRows& rows) noexcept
+    {
+        rows.Abort.store(true, std::memory_order_release);
+    }
+
+    PointGpuRowStats GpuRowStats(const PointGpuRows& rows) noexcept
+    {
+        PointGpuRowStats stats{.WorkspaceBuilds = std::size_t(rows.Builds.load(std::memory_order_relaxed)),
+            .Milliseconds = double(rows.Microseconds.load(std::memory_order_relaxed)) / 1000.0};
+        for (const auto* session : {rows.First.get(), rows.Moving.get()})
+            if (session)
+            {
+                stats.QueryBatches += std::size_t(session->Pages());
+                stats.ReadbackBytes += session->ReadbackBytes();
+                (session == rows.Moving.get() ? stats.WorkspaceUploadBytes : stats.QueryUploadBytes) +=
+                    session->UploadBytes();
+            }
+        return stats;
+    }
 
     bool PointCloudEditingService::CpuRadiusRows(const PointEdit& edit, const float radius,
                                                  const std::uint32_t lowestIdLimit, PointNeighbourRows& rows,
                                                  std::string& diagnostic) const
     {
-        if (!edit.Index)
+        if (!edit.Index || !edit.Index->Cpu)
         {
             diagnostic = "The CPU index is unavailable.";
             return false;
@@ -383,37 +497,6 @@ namespace Extrinsic::Runtime
         rows = {.Offsets = std::move(packed.Offsets), .Indices = std::move(packed.Indices),
                 .MaximumNeighbors = packed.MaximumNeighbors};
         return true;
-    }
-
-    PointRowsState PointCloudEditingService::AdvanceGpuRadiusRows(PointEdit& edit, const float radius,
-                                                                  const std::uint32_t batchSize,
-                                                                  const std::uint32_t capacity,
-                                                                  const std::uint32_t lowestIdLimit,
-                                                                  PointNeighbourRows& rows, std::string& diagnostic)
-    {
-        auto& pages = edit.RadiusPages;
-        if (edit.Context.SpatialIndices == nullptr)
-        {
-            diagnostic = "The spatial index cache is unavailable.";
-            return PointRowsState::Failed;
-        }
-        if (!Impl::InputsCurrent(edit))
-        {
-            diagnostic = "The inputs changed.";
-            pages.Batch.reset();
-            return PointRowsState::Failed;
-        }
-        const auto state = Detail::AdvancePointRadiusRows(*edit.Context.SpatialIndices, edit.GpuIndex,
-                                                          edit.Capture.Points, edit.Capture.Slots, radius, batchSize,
-                                                          capacity, lowestIdLimit, pages, diagnostic);
-        edit.Stats.QueryBatches = pages.QueryBatches;
-        edit.Stats.Milliseconds = pages.Milliseconds;
-        rows.MaximumNeighbors = pages.MaximumNeighbors;
-        if (state == Detail::RowsState::Failed) return PointRowsState::Failed;
-        if (state == Detail::RowsState::Pending) return PointRowsState::Pending;
-        rows.Offsets = std::move(pages.Offsets);
-        rows.Indices = std::move(pages.Indices);
-        return PointRowsState::Ready;
     }
 
     PointPreviewStatus PointCloudEditingService::PreviewPositions(PointEdit& edit, const std::span<const glm::vec3> live,
@@ -575,6 +658,7 @@ namespace Extrinsic::Runtime
         const void* Workspace{nullptr};           // the workspace the service used then
         std::size_t SlotCount{0u};                // of the captured domain
         GeometryPropertyRef Output{};             // with its resolved domain
+        StepRunsService* StepRuns{nullptr}; // the context's, whose run controls the transaction
         bool Released{false};                     // the service stopped using that workspace
     };
 
@@ -637,11 +721,14 @@ namespace Extrinsic::Runtime
             return ScalarAnalysisPhase::Failed;
         }
 
-        ScalarAnalysis StartScalarRun(const EditorProcessingContext& context, const ScalarAnalysisRequest& request,
-                                      const void* workspace, std::vector<std::weak_ptr<ScalarAnalysis::Run>>& runs,
-                                      const bool autoAccept,
-                                      Graphics::GpuPropertyResidency* testResidency, std::vector<float> testValues,
-                                      ScalarAnalysisRefusal& refusal)
+        ScalarAnalysis StartScalarRun(const EditorProcessingContext& context,
+            const ScalarAnalysisRequest& request,
+            const void* workspace,
+            std::vector<std::weak_ptr<ScalarAnalysis::Run>>& runs,
+            const StepRunExecution& execution,
+            Graphics::GpuPropertyResidency* testResidency,
+            std::vector<float> testValues,
+            ScalarAnalysisRefusal& refusal)
         {
             refusal = {};
             auto capture = std::make_shared<Detail::PointScalarCapture>();
@@ -662,17 +749,30 @@ namespace Extrinsic::Runtime
                 capture->AfterValues = std::move(testValues);
             }
             EditorPointScalarTransactionSnapshot state;
-            auto transaction = Detail::StartPointScalarGpu(context, capture, entity, request.StableEntityId, positions,
-                                                           request.Params, request.History, request.Noun + " estimation",
-                                                           state, {}, autoAccept, testResidency);
+            auto transaction = Detail::StartPointScalarGpu(context,
+                capture,
+                entity,
+                request.StableEntityId,
+                positions,
+                request.Params,
+                request.History,
+                request.Noun + " estimation",
+                state,
+                {},
+                execution,
+                testResidency);
             if (!transaction)
             {
                 refusal = {.Message = std::move(state.Message), .Busy = state.OutputBusy,
                            .Failed = state.Status == EditorCommandStatus::GeometryProcessingFailed};
                 return {};
             }
-            auto run = std::make_shared<ScalarAnalysis::Run>(std::move(transaction), context.AttachmentActive, workspace,
-                                                             capture->SlotCount, capture->Output);
+            auto run = std::make_shared<ScalarAnalysis::Run>(std::move(transaction),
+                context.AttachmentActive,
+                workspace,
+                capture->SlotCount,
+                capture->Output,
+                context.StepRuns);
             std::erase_if(runs, [](const auto& weak) { return weak.expired(); });
             runs.push_back(run);
             return ScalarAnalysis{std::move(run)};
@@ -706,20 +806,128 @@ namespace Extrinsic::Runtime
         if (detached) Discard();
         const auto s = SnapshotEditorPointScalar({}, m_Run->Transaction);
         return {.Phase = PhaseOf(s.Phase),
-                .Message = s.Message,
-                .AcceptRefusal = s.AcceptRefusalReason,
-                .CanAccept = s.CanAccept && !detached,
-                .Stale = s.Status == EditorCommandStatus::StaleEntity,
-                .Detached = detached,
-                .IndexReused = s.IndexReused,
-                .SlotCount = m_Run->SlotCount,
-                .LiveCount = s.LiveCount,
-                .Output = m_Run->Output,
-                .GpuInputUploadBytes = s.GpuInputUploadBytes,
-                .GpuInputCacheHits = s.GpuInputCacheHits,
-                .CpuStageReadbackBytes = s.CpuStageReadbackBytes,
-                .GpuQueryBatches = s.GpuQueryBatches,
-                .Statistics = s.Statistics};
+            .Message = s.Message,
+            .AcceptRefusal = s.AcceptRefusalReason,
+            .CanAccept = s.CanAccept && !detached,
+            .Stale = s.Status == EditorCommandStatus::StaleEntity,
+            .Detached = detached,
+            .IndexReused = s.IndexReused,
+            .SlotCount = m_Run->SlotCount,
+            .LiveCount = s.LiveCount,
+            .Output = m_Run->Output,
+            .GpuInputUploadBytes = s.GpuInputUploadBytes,
+            .GpuInputCacheHits = s.GpuInputCacheHits,
+            .CpuStageReadbackBytes = s.CpuStageReadbackBytes,
+            .GpuQueryBatches = s.GpuQueryBatches,
+            .Statistics = s.Statistics,
+            .StepRun = s.StepRun};
+    }
+
+    StepRunsService* ScalarAnalysis::StepRuns() const noexcept
+    {
+        return m_Run ? m_Run->StepRuns : nullptr;
+    }
+
+    void DrawScalarAnalysisControls(ScalarAnalysis& analysis,
+        const std::uint64_t stepRun,
+        const std::string_view idSuffix,
+        StepRunControlsState& row)
+    {
+        if (!analysis)
+        {
+            if (auto* runs = PluginService<StepRunsService>(); runs != nullptr && stepRun != 0u)
+                (void)DrawStepRunControls(*runs, stepRun, idSuffix, row);
+            return;
+        }
+        const auto state = analysis.Poll(); // a detached run is discarded here, before any control
+        if (auto* runs = analysis.StepRuns(); runs != nullptr && state.StepRun != 0u)
+            (void)DrawStepRunControls(*runs, state.StepRun, idSuffix, row);
+        if (state.Phase == ScalarAnalysisPhase::ReadyToAccept && !state.CanAccept && !state.AcceptRefusal.empty())
+            ImGui::TextWrapped("%s", state.AcceptRefusal.c_str());
+    }
+
+    std::uint64_t PointCloudEditingService::StartScalarCpuRun(ScalarCpuRun spec, StepRunJobs jobs, std::string& refusal)
+    {
+        auto* runs = spec.Edit ? spec.Edit->Context.StepRuns : nullptr;
+        if (runs == nullptr || !spec.Edit || !spec.Compute || !spec.Finish)
+        {
+            refusal = runs == nullptr ? "The step-run service is unavailable." : "A scalar CPU run is incomplete.";
+            return 0u;
+        }
+        // Values: the column of the generation's one step (a worker writes it, Publish reads it once no step runs).
+        struct State
+        {
+            ScalarCpuRun Spec{};
+            std::vector<float> Values{};
+        };
+        const auto s = std::make_shared<State>(State{.Spec = std::move(spec)});
+        StepRunOptions options{.Label = s->Spec.Label,
+            .Owner = "point_cloud_editing",
+            .Output = s->Spec.Output,
+            .Execution = s->Spec.Execution,
+            .MetricNames = {"live_count", "", "", ""}};
+        OneShotWorkerCallbacks callbacks{.Compute =
+                                             [s]
+            {
+                s->Values.clear();
+                return s->Spec.Compute(s->Values);
+            },
+            // The capture's live samples, read here on the main thread (one value per live point is computed).
+            .Metric =
+                [live = double(s->Spec.Edit->Capture.LiveCount)](StepRunMetric& metric)
+            {
+                metric.Values[0] = live;
+            },
+            // The session first: a capture of a workspace no longer used is not read.
+            .Valid =
+                [this, s]
+            {
+                return SessionCurrent(s->Spec.Session) && Current(*s->Spec.Edit);
+            },
+            .Publish =
+                [this, s](std::string& diagnostic)
+            {
+                const std::vector<std::vector<float>> columns{std::move(s->Values)};
+                const auto& noun = s->Spec.Noun;
+                switch (PublishScalars(*s->Spec.Edit, columns, s->Spec.History))
+                {
+                case PointPublishStatus::Applied: s->Spec.Finish("applied", {}, true); return true;
+                case PointPublishStatus::Stale:
+                    diagnostic = noun + " input or output changed before publication.";
+                    break;
+                case PointPublishStatus::Unrepresentable:
+                    diagnostic = "Output values are not exactly representable in the selected scalar storage.";
+                    s->Spec.Finish("invalid", diagnostic, true);
+                    return false;
+                case PointPublishStatus::Rejected:
+                    diagnostic = noun + " publication rejected by history checks.";
+                    s->Spec.Finish("failed", diagnostic, true);
+                    return false;
+                }
+                s->Spec.Finish("stale", diagnostic, true);
+                return false;
+            },
+            .Ended =
+                [this, s](const StepRunObservation& run)
+            {
+                const auto why = UncommittedStatus(run);
+                if (why == "failed") // a failed step words its own reason; a refused next step is the host's
+                    s->Spec.Finish("failed", run.StepFailed ? std::string{} : run.Diagnostic, run.StepFailed);
+                else if (!SessionCurrent(s->Spec.Session))
+                    s->Spec.Finish("cancelled",
+                        "The editor session of the " + s->Spec.Method + " run ended; nothing was written.",
+                        false);
+                else
+                    s->Spec.Finish(Current(*s->Spec.Edit) ? why : "stale",
+                        s->Spec.Label + " was cancelled or its source became stale; nothing was applied.",
+                        false);
+            },
+            .Restart =
+                [s]
+            {
+                s->Values = std::vector<float>{};
+            }};
+        return StartOneShotWorkerRun(*runs, std::move(options), std::move(callbacks), std::move(jobs), refusal);
     }
 
     ScalarAnalysisState ScalarAnalysis::Accept()
@@ -743,12 +951,18 @@ namespace Extrinsic::Runtime
                                      entity, positions);
     }
 
-    ScalarAnalysis PointCloudEditingService::StartScalarAnalysis(const ScalarAnalysisRequest& request,
-                                                                 const bool autoAccept, ScalarAnalysisRefusal& refusal)
+    ScalarAnalysis PointCloudEditingService::StartScalarAnalysis(
+        const ScalarAnalysisRequest& request, const StepRunExecution& execution, ScalarAnalysisRefusal& refusal)
     {
         const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
-        return StartScalarRun(EditorProcessingCommandsAccess::Resolve(commands), request, m_Impl->Workspace.Current(),
-                              m_Impl->ScalarRuns, autoAccept, nullptr, {}, refusal);
+        return StartScalarRun(EditorProcessingCommandsAccess::Resolve(commands),
+            request,
+            m_Impl->Workspace.Current(),
+            m_Impl->ScalarRuns,
+            execution,
+            nullptr,
+            {},
+            refusal);
     }
 
     ScalarAnalysis PointCloudEditingService::StartScalarAnalysisForTest(const ScalarAnalysisRequest& request,
@@ -757,8 +971,14 @@ namespace Extrinsic::Runtime
                                                                         ScalarAnalysisRefusal& refusal)
     {
         const EditorProcessingCommands commands = m_Impl->Workspace.Commands();
-        return StartScalarRun(EditorProcessingCommandsAccess::Resolve(commands), request, m_Impl->Workspace.Current(),
-                              m_Impl->ScalarRuns, false, &residency, std::move(values), refusal);
+        return StartScalarRun(EditorProcessingCommandsAccess::Resolve(commands),
+            request,
+            m_Impl->Workspace.Current(),
+            m_Impl->ScalarRuns,
+            kOneShotStepRunExecution,
+            &residency,
+            std::move(values),
+            refusal);
     }
 
     PointSession PointCloudEditingService::CurrentSession()

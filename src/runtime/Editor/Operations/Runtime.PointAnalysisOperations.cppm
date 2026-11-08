@@ -31,6 +31,9 @@ export namespace Extrinsic::Runtime
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
+        // ARCH-023: the run's step run (run_control, run_observe; one step, its bounded pages within); 0 for an
+        // inline or job-chained run and a refusal.
+        std::uint64_t StepRun{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
     enum class EditorPointAnalysisResultSlot : std::uint8_t { KeypointAnalysis };
@@ -65,7 +68,16 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorKeypointAnalysisResult)> onComplete = {}, bool automatic = false);
     [[nodiscard]] ActionReadiness PreviewEditorKeypointAnalysisCommand(const EditorProcessingCommands&, const KeypointAnalysisConfig&);
     [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(const EditorProcessingCommands&, const KeypointAnalysisConfig&, std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
+    // ARCH-023: an interactive start of the CPU and Vulkan LBVH backends (Vulkan compute: its transaction) with the
+    // section's execution (`config.Execution`: start and auto_accept), a one-shot step run that run_control and the
+    // panel's row drive; it needs the session's step runs and a job lane. Apply is the batch (runs at once, accepts at
+    // its end).
+    [[nodiscard]] EditorKeypointAnalysisResult StartEditorKeypointAnalysisRun(const EditorProcessingCommands&,
+        const KeypointAnalysisConfig&,
+        std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(const EditorProcessingCommands&, const KeypointAnalysisConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorProcessingCommands&, std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
+    [[nodiscard]] EditorKeypointAnalysisResult StartEditorConfiguredKeypointAnalysis(
+        const EditorProcessingCommands&, std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
 }

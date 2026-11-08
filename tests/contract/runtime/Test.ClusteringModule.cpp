@@ -6,7 +6,9 @@
 #include <cstdint>
 #include <limits>
 #include <map>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <tuple>
 #include <optional>
@@ -124,13 +126,17 @@ namespace
     {
         return Runtime::RunKMeans{
             .StableEntityId = stableEntityId,
-            .Properties = Runtime::MakeKMeansPropertyRefs(
-                Runtime::GeometryElementDomain::PointCloudPoint),
-            .Parameters = Runtime::KMeansParameters{
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-            },
+            .Properties = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint),
+            .Parameters =
+                Runtime::KMeansParameters{
+                    .ClusterCount = 2u,
+                    .Seed = 13u,
+                    .Execution = {.IterationCap = 8u,
+                        .PreviewEvery = 5u,
+                        .PreviewIntervalMs = 0u,
+                        .AutoAccept = Runtime::StepRunAutoAccept::End,
+                        .Start = Runtime::StepRunStart::Run},
+                },
             .Backend = backend,
         };
     }
@@ -757,6 +763,8 @@ TEST(ClusteringModule, EngineRunCommitsLabelsAndPublishesChangeEvent)
     KMeansSuccessApp* appPtr = app.get();
 
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -809,6 +817,8 @@ TEST(ClusteringModule, DocumentHistoryOwnsQueuedOutputUndoRedo)
     Intrinsic::Tests::RuntimeTestKernel engine(
         NullWindowHeadlessConfig(),
         std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -904,6 +914,8 @@ TEST(ClusteringModule, ClosingTheSceneDocumentReleasesTheKeptCapture)
     auto app = std::make_unique<KMeansSuccessApp>();
     KMeansSuccessApp* appPtr = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(1u), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -928,6 +940,8 @@ TEST(ClusteringModule, NullDeviceVulkanRequestFallsBackHonestly)
 
     Intrinsic::Tests::RuntimeTestKernel engine(
         NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -951,6 +965,8 @@ TEST(ClusteringModule, WorldSwitchBeforeCompletionDropsCommit)
     KMeansWorldSwitchApp* appPtr = app.get();
 
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(1u), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -975,6 +991,8 @@ TEST(ClusteringModule, ValidationFailuresPublishCanonicalTypedCompletions)
 
     Intrinsic::Tests::RuntimeTestKernel engine(
         NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -1028,6 +1046,8 @@ TEST(ClusteringModule, CpuResultsAreDeterministicAndHonorCustomPropertyRefs)
 
     Intrinsic::Tests::RuntimeTestKernel engine(
         NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -1069,6 +1089,8 @@ TEST(ClusteringModule, SourceMutationBeforeCompletionDropsWriteback)
 
     Intrinsic::Tests::RuntimeTestKernel engine(
         NullWindowHeadlessConfig(1u), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -1094,6 +1116,7 @@ TEST(ClusteringModule, CancelledCpuWorkPublishesCanonicalCompletion)
     Intrinsic::Tests::RuntimeTestKernel engine(
         NullWindowHeadlessConfig(1u), std::move(app));
     engine.EmplaceModule<Runtime::AsyncWorkModule>(); // the editor session reaches JobService through it
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -1142,6 +1165,8 @@ TEST(ClusteringModule, RunKMeansWithoutModuleFailsClosedAtCommandDrain)
 TEST(ClusteringModule, EditorReadinessUsesLiveConfigLaneAndCanonicalAdmission)
 {
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(1u));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     auto* service = engine.Services().Find<Runtime::ClusteringService>();
@@ -1389,6 +1414,8 @@ TEST(ClusteringModule, EveryPointDomainPreservesDeletedSlotsAndExactScalarUndo)
         auto app = std::make_unique<KMeansElementDomainApp>(domain);
         auto* state = app.get();
         Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
+        engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+        engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
         engine.EmplaceModule<Runtime::ClusteringModule>();
         engine.EmplaceModule<Runtime::SceneDocumentModule>();
         engine.Initialize();
@@ -1420,6 +1447,8 @@ TEST(ClusteringModule, UnrepresentableScalarLabelRejectsAllOutputPublication)
     auto app = std::make_unique<KMeansElementDomainApp>(Runtime::GeometryElementDomain::MeshFace, true);
     auto* state = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -1482,11 +1511,56 @@ namespace
         Runtime::CommandCorrelationId Correlation;
         Runtime::KernelEventSubscription Subscription;
         std::vector<Runtime::KMeansRunCompleted> Results;
-        std::vector<std::function<void()>> Completions;
-        std::optional<Extrinsic::RHI::ReadbackSink> Held;
-        std::vector<std::byte> HeldData;
-        bool Hold{}, Attached{true}, Converged{}, Moved{};
+        // ARCH-023: a mock GPU the run's worker and the main thread share (Gpu guards it). A submitted page is
+        // complete at once unless held; an ordinary sink is delivered by the next Tick (CollectCompleted's analogue),
+        // a pulled one only by the worker's take. A held page stays pending until ReleaseHeld.
+        struct MockPage
+        {
+            std::vector<std::byte> Data{};
+            Extrinsic::RHI::ReadbackSink Sink{};
+            bool Done{}, Released{};
+        };
+        std::mutex Gpu;
+        std::map<std::uint64_t, MockPage> Pages;
+        std::uint64_t NextToken{100u};
+        std::optional<std::uint64_t> HeldToken;
+        std::vector<std::function<void()>> Completions; // guarded by Gpu
+        std::atomic<bool> Hold{};
+        // Holds the submission whose bytes and phase sequence it accepts (a preview copy, say); on the submitter's
+        // thread, under Gpu.
+        std::function<bool(std::uint64_t bytes, const std::vector<std::uint32_t>& phases, std::size_t firstPush)>
+            HoldWhen{};
+        std::atomic<std::uint32_t> PreviewCopySubmissions{}; // completion-only pages that scatter labels (phase 4)
+        // Per submission (under Gpu): the transfer-queue uploads issued so far and the submission's input order.
+        std::vector<std::pair<std::size_t, Extrinsic::RHI::ComputeInputOrder>> OrderLog{};
+        bool Attached{true}, Converged{}, Moved{};
         std::uint32_t MaximumDispatches{};
+        bool HeldPending()
+        {
+            std::scoped_lock lock{Gpu};
+            return HeldToken.has_value();
+        }
+        void Later(std::function<void()> work)
+        {
+            std::scoped_lock lock{Gpu};
+            Completions.push_back(std::move(work));
+        }
+        void SetHoldWhen(decltype(HoldWhen) when)
+        {
+            std::scoped_lock lock{Gpu};
+            HoldWhen = std::move(when);
+        }
+        // Completes the held page (with `data` instead of its own bytes when given).
+        void ReleaseHeld(std::optional<std::vector<std::byte>> data = {})
+        {
+            std::scoped_lock lock{Gpu};
+            if (!HeldToken)
+                return;
+            auto& page = Pages[*std::exchange(HeldToken, std::nullopt)];
+            if (data)
+                page.Data = std::move(*data);
+            page.Done = true;
+        }
         Runtime::KMeansPagingLimits SavedLimits{Runtime::KMeansPagingForTesting};
         auto& Scene(){return *Worlds.Get(World);}
         auto& Properties(){return Scene().Raw().get<GS::Vertices>(Entity).Properties;}
@@ -1509,23 +1583,37 @@ namespace
             Subscription=Service->SubscribeRunCompleted([this](const auto& r){Results.push_back(r);});
             Request.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entity);
             Request.Properties=Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint);
-            Request.Parameters.ClusterCount=3;Request.Parameters.MaxIterations=4;Request.Parameters.GpuPreviewInterval=2;
-            Request.Backend=Runtime::ClusteringBackend::VulkanCompute;Request.AutoAccept=false;
+            Request.Parameters.ClusterCount = 3;
+            Request.Parameters.Execution.IterationCap = 4;
+            Request.Parameters.Execution.PreviewEvery = 2;
+            Request.Backend = Runtime::ClusteringBackend::VulkanCompute;
+            Request.Parameters.Execution.AutoAccept = Runtime::StepRunAutoAccept::Never;
             Request.AttachmentActive=[this]{return Attached;};
-            Device.ComputeReadback=[this](auto record,auto bytes,auto sink){
+            Device.ComputeReadback = [this](auto record, auto bytes, auto sink)
+            {
+                std::scoped_lock lock{Gpu}; // the run's worker records here, the owner's terminal pages too
+                {
+                    std::scoped_lock orders{Device.ComputeInputOrderMutex};
+                    OrderLog.emplace_back(Device.TransferQueue.BufferUploads.size(), Device.ComputeInputOrders.back());
+                }
                 const auto before=Device.CommandContext.DispatchCalls;
                 const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
                 EXPECT_TRUE(record(Device.CommandContext).IsValid());
                 std::uint64_t pairs=0;
                 std::uint32_t serialDepth=0;
-                for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
+                for (std::size_t i = firstPush; i < Device.CommandContext.PushConstantPayloads.size(); ++i)
+                {
                     const auto& payload=Device.CommandContext.PushConstantPayloads[i];
                     EXPECT_EQ(payload.size(),128u);
-                    if(payload.size()!=128u)continue;
+                    if (payload.size() != 128u)
+                        continue;
                     std::uint32_t points{},clusters{},phase{},first{},rows{},innerFirst{},columns{};
-                    std::memcpy(&points,payload.data()+96,4);std::memcpy(&clusters,payload.data()+100,4);
-                    std::memcpy(&phase,payload.data()+104,4);std::memcpy(&first,payload.data()+108,4);
-                    std::memcpy(&rows,payload.data()+112,4);std::memcpy(&innerFirst,payload.data()+116,4);
+                    std::memcpy(&points, payload.data() + 96, 4);
+                    std::memcpy(&clusters, payload.data() + 100, 4);
+                    std::memcpy(&phase, payload.data() + 104, 4);
+                    std::memcpy(&first, payload.data() + 108, 4);
+                    std::memcpy(&rows, payload.data() + 112, 4);
+                    std::memcpy(&innerFirst, payload.data() + 116, 4);
                     std::memcpy(&columns,payload.data()+120,4);
                     // ARCH-022 Q79 step 7b: a Reduce (3) or Update (2) dispatch holds a batch of pages (their count in
                     // InnerCount or Clusters) and its combine (6, 7) adds their partials; PagePairs caps each page,
@@ -1535,9 +1623,12 @@ namespace
                     const std::uint64_t dispatchPairs=phase==3?std::min<std::uint64_t>(std::uint64_t(pages)*rows,points-first)
                         :phase==2?rows*std::min<std::uint64_t>(std::uint64_t(pages)*columns,points-innerFirst)
                         :phase==6||phase==7?0u:pagePairs;
-                    if(phase!=6&&phase!=7)EXPECT_LE(pagePairs,Runtime::KMeansPagingForTesting.PagePairs);
-                    if(phase==2||phase==7)EXPECT_LE(rows,64u)<<"an Update tile holds at most 64 centroids";
-                    EXPECT_LE(pages,64u);pairs+=dispatchPairs;
+                    if (phase != 6 && phase != 7)
+                        EXPECT_LE(pagePairs, Runtime::KMeansPagingForTesting.PagePairs);
+                    if (phase == 2 || phase == 7)
+                        EXPECT_LE(rows, 64u) << "an Update tile holds at most 64 centroids";
+                    EXPECT_LE(pages, 64u);
+                    pairs += dispatchPairs;
                     serialDepth+=phase==1?columns+1:phase==2?(columns+63)/64+7:phase==3?(rows+63)/64+7
                         :phase==6||phase==7?pages+7:1;
                 }
@@ -1545,33 +1636,131 @@ namespace
                 EXPECT_LE(serialDepth,Runtime::KMeansSubmissionSerialDepth);
                 MaximumDispatches=std::max(MaximumDispatches,std::uint32_t(Device.CommandContext.DispatchCalls-before));
                 std::vector<std::byte> data(bytes);
-                if(bytes==32){
+                if (bytes == 32)
+                {
                     std::array<std::uint32_t,6> diagnostics{};
-                    diagnostics[2]=std::bit_cast<std::uint32_t>(1.0f);diagnostics[4]=(Converged?0u:1u)|(Moved?2u:0u);
+                    diagnostics[2] = std::bit_cast<std::uint32_t>(1.0f);
+                    diagnostics[4] = (Converged ? 0u : 1u) | (Moved ? 2u : 0u);
                     std::memcpy(data.data(),diagnostics.data(),24);
                 }
-                if(Hold){Held=std::move(sink);HeldData=std::move(data);return Extrinsic::RHI::ReadbackToken{2};}
-                Completions.push_back([sink=std::move(sink),data=std::move(data)]()mutable{sink.Deliver(data);});
-                return Extrinsic::RHI::ReadbackToken{2};
+                std::vector<std::uint32_t> phases;
+                for (std::size_t i = firstPush; i < Device.CommandContext.PushConstantPayloads.size(); ++i)
+                {
+                    const auto& push = Device.CommandContext.PushConstantPayloads[i];
+                    if (push.size() != 128u)
+                        continue;
+                    std::uint32_t phase{};
+                    std::memcpy(&phase, push.data() + 104, 4);
+                    if (phases.empty() || phases.back() != phase)
+                        phases.push_back(phase);
+                }
+                if (bytes == 0 && !phases.empty() && phases.front() == 4u)
+                    ++PreviewCopySubmissions;
+                const Extrinsic::RHI::ReadbackToken token{NextToken++};
+                const bool held = !HeldToken && (Hold.load() || (HoldWhen && HoldWhen(bytes, phases, firstPush)));
+                if (held)
+                    HeldToken = token.Value;
+                Pages[token.Value] = MockPage{.Data = std::move(data), .Sink = std::move(sink), .Done = !held};
+                return token;
             };
-            Device.TransferQueue.BufferDownload=[this](auto,auto bytes,auto,auto sink){
-                Completions.push_back([sink=std::move(sink),bytes]()mutable{std::vector<std::byte> data(bytes);sink.Deliver(data);});
+            Device.TransferQueue.ComputeWait = [this](auto token, auto timeout)
+            {
+                {
+                    std::scoped_lock lock{Gpu};
+                    const auto page = Pages.find(token.Value);
+                    if (page == Pages.end() || page->second.Done)
+                        return Extrinsic::RHI::ComputeWaitStatus::Complete;
+                }
+                std::this_thread::sleep_for(std::chrono::nanoseconds(std::min<std::uint64_t>(timeout, 1'000'000u)));
+                return Extrinsic::RHI::ComputeWaitStatus::Pending;
+            };
+            Device.TransferQueue.TakeReadback = [this](auto token, std::span<std::byte> destination)
+            {
+                std::scoped_lock lock{Gpu};
+                const auto page = Pages.find(token.Value);
+                if (page == Pages.end() || !page->second.Done || !page->second.Sink.Pulled || page->second.Released ||
+                    page->second.Data.size() != destination.size())
+                    return false;
+                std::ranges::copy(page->second.Data, destination.begin());
+                Pages.erase(page);
+                return true;
+            };
+            Device.TransferQueue.ReleaseReadbackHook = [this](auto token)
+            {
+                std::scoped_lock lock{Gpu};
+                if (const auto page = Pages.find(token.Value); page != Pages.end() && page->second.Sink.Pulled)
+                    page->second.Released = true;
+            };
+            // A compute token completes once the device finished it and it is not a pulled page awaiting its take.
+            Device.TransferQueue.ReadbackComplete = [this](auto token)
+            {
+                std::scoped_lock lock{Gpu};
+                const auto page = Pages.find(token.Value);
+                return token.Value < 100u || page == Pages.end() ||
+                    (page->second.Done && (!page->second.Sink.Pulled || page->second.Released));
+            };
+            Device.TransferQueue.BufferDownload = [this](auto, auto bytes, auto, auto sink)
+            {
+                Later(
+                    [sink = std::move(sink), bytes]() mutable
+                    {
+                        std::vector<std::byte> data(bytes);
+                        sink.Deliver(data);
+                    });
                 return Extrinsic::RHI::ReadbackToken{3};
             };
         }
-        void Tick()
+        void Tick(const bool advanceGpu = true)
         {
             if(Shell)(void)Runtime::PrepareEditorWorkspaceSnapshotFrame(*Shell);
-            auto completions=std::exchange(Completions,{});for(auto& complete:completions)complete();
+            std::vector<std::function<void()>> completions;
+            {
+                // CollectCompleted's analogue: completed ordinary pages deliver, released pulled ones go; a pulled
+                // page waits for its worker's take.
+                std::scoped_lock lock{Gpu};
+                completions = std::exchange(Completions, {});
+                for (auto it = Pages.begin(); it != Pages.end();)
+                {
+                    auto& page = it->second;
+                    if (!page.Done || (page.Sink.Pulled && !page.Released))
+                    {
+                        ++it;
+                        continue;
+                    }
+                    if (!page.Sink.Pulled)
+                        completions.push_back(
+                            [sink = std::move(page.Sink), data = std::move(page.Data)]() mutable
+                            {
+                                sink.Deliver(data);
+                            });
+                    it = Pages.erase(it);
+                }
+            }
+            for (auto& complete : completions)
+                complete();
             Commands.Drain(Scene(),{.Events=&Events,.Jobs=&Jobs.Jobs(),.Worlds=&Worlds});
             (void)Jobs.Jobs().DrainCompletions(Events);(void)Events.Pump();
-            Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);++Device.GlobalFrameNumber;
-            (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+            if (advanceGpu)
+                Jobs.Jobs().RecordGpuQueueFrameCommands(Device.CommandContext);
+            ++Device.GlobalFrameNumber;
+            if (advanceGpu)
+                (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+            Cache.Prune(); // the Maintenance hook: returned method scratch is stamped and matures
         }
-        template<class P>bool Until(P predicate)
+        // ARCH-023: every method scratch buffer is back in the cache and reusable.
+        bool ScratchRetired()
+        {
+            const auto s = Cache.Stats();
+            return s.ScratchActiveBytes == 0u && s.ScratchPendingBytes == 0u;
+        }
+        template <class P> bool Until(P predicate, const bool advanceGpu = true)
         {
             const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(5);
-            while(!predicate()&&std::chrono::steady_clock::now()<end){Tick();std::this_thread::yield();}
+            while (!predicate() && std::chrono::steady_clock::now() < end)
+            {
+                Tick(advanceGpu);
+                std::this_thread::yield();
+            }
             return predicate();
         }
         // The run's step run (known once the command drained), remembered so it stays observable after the run.
@@ -1618,7 +1807,9 @@ namespace
     protected:
         void TearDown()override
         {
-            if(Held){Held->Deliver(HeldData);Held.reset();}
+            Hold = false;
+            SetHoldWhen({});
+            ReleaseHeld();
             if(Service){(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);Service->Unsubscribe(Subscription);}
             for(int i=0;i<5;++i)Tick();
             if(Shell){Service->ReleaseEditorWorkspace(*Shell);Shell->Detach();}
@@ -1631,13 +1822,25 @@ namespace
 }
 TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUploadsZero)
 {
-    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
     EXPECT_EQ(Observation().InputUploadBytes,12u*12u);
     const auto submissions=Observation().Submissions;for(int i=0;i<5;++i)Tick();
     EXPECT_EQ(Observation().Submissions,submissions);
-    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Hold = false;
+    ReleaseHeld();
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
-    EXPECT_EQ(Observation().Iterations,4u);EXPECT_EQ(Observation().Previews,2u);
+    EXPECT_EQ(Observation().Iterations, 4u);
+    // The owner may offer another slot before iteration 4; loose preview timing cannot change compute work.
+    const auto liveCopies = PreviewCopySubmissions.load();
+    EXPECT_GE(liveCopies, 1u);
+    EXPECT_LE(liveCopies, 2u);
+    EXPECT_EQ(Observation().Previews, liveCopies + 1u);
     Runtime::EditorProcessingContext previewContext{.Scene = &Scene(), .World = World, .SpatialIndices = &Cache};
     const auto previewCommands = Runtime::BindEditorProcessingCommands(previewContext);
     const auto blocked = Runtime::PreviewEditorKMeansRun(previewCommands, Service, Request);
@@ -1650,9 +1853,9 @@ TEST_F(ClusteringModuleResident, ResidentInputWaitsForCompletionAndRepeatRunUplo
     otherOutput.Properties.OutputScalarLabels.reset();
     EXPECT_FALSE(Service->GpuReadinessDiagnostic(Request, previewContext).empty());
     EXPECT_EQ(Runtime::PreviewEditorKMeansRun(previewCommands, Service, otherOutput).DisabledReason, blocked.DisabledReason);
-    // One submission per iteration (the interval preview shares iteration 3's)
-    // plus the terminal preview, which also reads the centroids back.
-    EXPECT_EQ(Observation().Submissions,5u);
+    // One submission per iteration, the interval preview's own (ARCH-023: never fused into an iteration's), and
+    // the terminal preview, which also reads the centroids back.
+    EXPECT_EQ(Observation().Submissions, 5u + liveCopies);
     EXPECT_EQ(Observation().CpuStageUploadBytes,3u*12u);
     EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
@@ -1686,12 +1889,17 @@ TEST_F(ClusteringModuleResident, RetainedWorkspaceReusesCapacityAndUnbindsSlots)
         Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
         (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
         ASSERT_TRUE(Until([&]{return Results.size()==results;}));
+        ASSERT_TRUE(Until(
+            [&]
+            {
+                return ScratchRetired();
+            })); // the parked workspace's buffers retired
     };
     run(1);
     EXPECT_GT(Results[0].GpuWorkspaceBuffersCreated,0u);EXPECT_EQ(Results[0].GpuWorkspacePipelinesCreated,3u);
     Properties().GetOrAdd<bool>("v:deleted",false)[4]=true;
     run(2);
-    // Eleven live rows fit the retained buffers; only the live-slot map is new.
+    // Eleven live rows fit the retired buffers' size classes; only the live-slot map is new.
     EXPECT_EQ(Results[1].GpuWorkspaceBuffersCreated,1u);EXPECT_EQ(Results[1].GpuWorkspacePipelinesCreated,0u);
     Properties().GetOrAdd<bool>("v:deleted",false)[4]=false;
     const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
@@ -1726,8 +1934,16 @@ TEST_F(ClusteringModuleResident, StopAcceptIsExactlyOnceAndUndoable)
 {
     Request.Properties.OutputScalarLabels=Runtime::GeometryPropertyRef{
         .Domain=Runtime::GeometryElementDomain::PointCloudPoint,.Name="scalar_labels",.ValueKind=Geometry::PropertyValueKind::Double};
-    Start();ASSERT_TRUE(Until([&]{return Observation().Submissions>0;}));
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        })); // the first iteration's page is in flight
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Stop);
+    Hold = false;
+    ReleaseHeld();
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));EXPECT_EQ(Observation().Iterations,1u);
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
@@ -1740,51 +1956,107 @@ TEST_F(ClusteringModuleResident, StopAcceptIsExactlyOnceAndUndoable)
 }
 TEST_F(ClusteringModuleResident, BatchAutoAccept)
 {
-    Request.AutoAccept=true;Start();ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    Request.Parameters.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1;
+        }));
     EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;EXPECT_GT(Results[0].CpuStageReadbackBytes,0u);
     EXPECT_EQ(Results[0].ImplementationId,"vulkan_resident_paged_lloyd");
 }
+// ARCH-023: a live preview is its own completion-only submission (scatter 4 and presentation 5 alone, never fused into
+// an iteration's), copied into the slot the owner offered, and published only once it completed; a held copy stalls
+// no iteration. Preview off acquires and copies nothing. Mutation: publishing at submission shows the front early;
+// fusing it into the next iteration changes the phase sequence; waiting for the copy holds the next step.
 TEST_F(ClusteringModuleResident, PreviewCopiesOnlyAtCadenceAndPublishesAfterCompletion)
 {
     const auto key=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
-    auto* residency=Cache.PropertyResidency();ASSERT_NE(residency,nullptr);
-    const auto submit=Device.ComputeReadback;
-    bool heldOnce=false;
+    auto* residency = Cache.PropertyResidency();
+    ASSERT_NE(residency, nullptr);
     std::uint64_t copiedBack{};
     std::vector<std::uint32_t> phases{};
-    Device.ComputeReadback=[&](auto record,auto bytes,auto sink){
-        // The interval preview is recorded in the submission after iteration 2.
-        const bool boundary=!heldOnce&&Observation().Iterations==2;
-        Hold=boundary;heldOnce|=boundary;
-        const auto token=submit([&](auto& cmd){
-            const auto count=Device.CommandContext.CopyBufferRecords.size();
-            const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
-            const auto result=record(cmd);
-            if(boundary){
-                EXPECT_EQ(Device.CommandContext.CopyBufferRecords.size(),count);
-                for(std::size_t i=firstPush;i<Device.CommandContext.PushConstantPayloads.size();++i){
-                    const auto& push=Device.CommandContext.PushConstantPayloads[i];
-                    std::uint32_t phase{};std::memcpy(&phase,push.data()+104,4);
-                    if(phases.empty()||phases.back()!=phase)phases.push_back(phase);
-                    // Phase 4 scatters every live label; all-live previews need no copy.
-                    if(phase==4)std::memcpy(&copiedBack,push.data()+80,8);
-                }
-                EXPECT_FALSE(residency->Front(key));
-            }
-            return result;
-        },bytes,std::move(sink));
-        Hold=false;return token;
+    HoldWhen = [&](std::uint64_t bytes, const std::vector<std::uint32_t>& recorded, std::size_t firstPush)
+    {
+        if (bytes != 0u || recorded.empty() || recorded.front() != 4u || !phases.empty())
+            return false;
+        phases = recorded;
+        for (std::size_t i = firstPush; i < Device.CommandContext.PushConstantPayloads.size(); ++i)
+        {
+            const auto& push = Device.CommandContext.PushConstantPayloads[i];
+            std::uint32_t phase{};
+            std::memcpy(&phase, push.data() + 104, 4);
+            if (phase == 4)
+                std::memcpy(&copiedBack, push.data() + 80, 8); // phase 4 scatters every live label
+        }
+        return true; // the first live preview copy stays in flight
     };
-    Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));ASSERT_NE(copiedBack,0u);
-    // Preview scatter and presentation share the submission with iteration 3:
-    // Assign(1), Reduce(3) and its combine (6), Update(2) and its combine (7), stopping at its diagnostics boundary.
-    EXPECT_EQ(phases,(std::vector<std::uint32_t>{4u,5u,1u,3u,6u,2u,7u}));
-    EXPECT_EQ(Observation().Previews,0u);for(int i=0;i<5;++i)Tick();EXPECT_FALSE(residency->Front(key));
-    Held->Deliver(HeldData);Held.reset();
+    Request.Parameters.Execution.Start = Runtime::StepRunStart::Ready;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRunId() != 0u;
+        }));
+    for (int i = 0; i < 3; ++i)
+        Tick(); // the owner offers its slot
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Step, 2u));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
+    ASSERT_NE(copiedBack, 0u);
+    EXPECT_EQ(phases, (std::vector<std::uint32_t>{4u, 5u})) << "the copy alone, after iteration 2";
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRun().PreviewCopies == 1u;
+        })); // the submission hook precedes its receipt
+    for (int i = 0; i < 5; ++i)
+        Tick();
+    EXPECT_EQ(Observation().Previews, 0u);
+    EXPECT_FALSE(residency->Front(key)) << "not shown before it completed";
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRun().Phase == Runtime::StepRunPhase::Paused;
+        }));
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Step, 1u));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRun().Steps == 3u && StepRun().Phase == Runtime::StepRunPhase::Paused;
+        }))
+        << "the held copy stalls no iteration";
+    ReleaseHeld();
     ASSERT_TRUE(Until([&]{return Observation().Previews==1;}));
     ASSERT_TRUE(residency->Front(key));EXPECT_EQ(residency->Front(key)->Address,copiedBack);
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Run));
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     EXPECT_EQ(Device.CommandContext.CopyBufferRecords.size(),0u);
+    (void)Service->GpuRun(Correlation, Runtime::KMeansGpuAction::Discard);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1;
+        }));
+
+    // Preview off: no slot acquired, no copy submitted, only the terminal labels.
+    SetHoldWhen({});
+    const auto copies = PreviewCopySubmissions.load();
+    Request.Parameters.Execution.PreviewEvery = 0;
+    Request.Parameters.Execution.Start = Runtime::StepRunStart::Run;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().ReadyToAccept;
+        }));
+    EXPECT_EQ(PreviewCopySubmissions.load(), copies);
+    EXPECT_EQ(StepRun().PreviewCopies, 0u);
+    EXPECT_EQ(Observation().Previews, 1u);
 }
 TEST_F(ClusteringModuleResident, ReentrantDiscardDuringAcceptKeepsOneAppliedCompletion)
 {
@@ -1803,10 +2075,15 @@ TEST_F(ClusteringModuleResident, DiscardPendingAcceptDeliversOnce)
 {
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     Hold=true;(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
-    ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Discard);
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));
-    Hold=false;std::vector<std::byte> bytes(12*4);Held->Deliver(bytes);Held.reset();
+    Hold = false;
+    ReleaseHeld(std::vector<std::byte>(12 * 4));
     for(int i=0;i<10;++i)Tick();EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"discarded before its publication";
@@ -1819,6 +2096,8 @@ TEST(ClusteringModule, AgentRunAutoAcceptsAndReportsBackendAndIo)
     Runtime::SetClusteringConfig(config,clustering);
     Intrinsic::Tests::RuntimeTestKernel engine{std::move(config)};
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     CoreConfig::EngineConfigSectionRegistry sections;
@@ -1838,6 +2117,7 @@ TEST(ClusteringModule, AgentRunAutoAcceptsAndReportsBackendAndIo)
     Runtime::AgentOperationOutcome completed;bool done=false;
     const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
     while(!done&&std::chrono::steady_clock::now()<deadline){
+        (void)Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment);
         engine.Commands().Drain(*scene,{&engine.Events(),&engine.Jobs(),&engine.Worlds()});
         (void)engine.Jobs().DrainCompletions(engine.Events());(void)engine.Events().Pump();
         done=outcome.Continuation(context,completed);std::this_thread::yield();
@@ -1854,6 +2134,8 @@ TEST(ClusteringModule, AgentCompletionListenerIsReleasedOnDetachAndCancellation)
     auto config=NullWindowHeadlessConfig();
     Intrinsic::Tests::RuntimeTestKernel engine{std::move(config)};
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::AsyncWorkModule>(); // ARCH-023 B8: a CPU run's editor jobs reach JobService
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // a CPU or GPU K-Means run is a step run
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     CoreConfig::EngineConfigSectionRegistry sections;
@@ -1905,7 +2187,13 @@ TEST_F(ClusteringModuleResident, DeletedSlotsUseDeclaredMapAndPreservePriorLabel
 {
     Properties().GetOrAdd<bool>("v:deleted",false)[1]=true;
     (void)Properties().GetOrAdd<std::uint32_t>("p:kmeans_label",9u);
-    Request.AutoAccept=true;Start();ASSERT_TRUE(Until([&]{return Results.size()==1;}));
+    Request.Parameters.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1;
+        }));
     ASSERT_TRUE(Results[0].Succeeded())<<Results[0].Message;
     EXPECT_EQ(Results[0].LabelCount,11u);
     EXPECT_EQ(Results[0].CpuStageUploadBytes,3u*12u+11u*4u);
@@ -1930,7 +2218,7 @@ TEST_F(ClusteringModuleResident, FailedRecordedPageRequiresIdleAtShutdown)
 TEST_F(ClusteringModuleResident, AutoAcceptRefusalCompletesStaleAndAllowsNextRun)
 {
     bool arm=false;unsigned checks=0;
-    Request.AutoAccept=true;
+    Request.Parameters.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
     Request.AttachmentActive=[&]{
         if(arm&&++checks==3)Properties().Get<glm::vec3>("v:position")[0].x=9;
         return true;
@@ -1938,7 +2226,12 @@ TEST_F(ClusteringModuleResident, AutoAcceptRefusalCompletesStaleAndAllowsNextRun
     const auto submit=Device.ComputeReadback;
     Device.ComputeReadback=[&](auto record,auto bytes,auto sink){
         const auto token=submit(std::move(record),bytes,std::move(sink));
-        if(bytes==3*12)Completions.push_back([&]{arm=true;});
+        if (bytes == 3 * 12)
+            Later(
+                [&]
+                {
+                    arm = true;
+                }); // the owner's terminal page
         return token;
     };
     Start();ASSERT_TRUE(Until([&]{return Results.size()==1;}));
@@ -2029,8 +2322,13 @@ TEST_F(ClusteringModuleResident, ARequestWaitingForItsSeedsIsCancelledByANewerOn
     Correlation=Service->RunKMeans(newer);RunId=0;
     ASSERT_TRUE(Until([&]{return Results.size()==1u;}));
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled)<<Results[0].Message;
-    EXPECT_TRUE(Until([&]{return Observation().ReadyToAccept;}))<<"the newer request runs";
-    release->store(true);
+    release->store(true); // the newer resident run now computes on the same worker pool
+    EXPECT_TRUE(Until(
+        [&]
+        {
+            return Observation().ReadyToAccept;
+        }))
+        << "the newer request runs";
     for(int i=0;i<10;++i)Tick();
     EXPECT_EQ(Module.Stats().GpuRequestsAccepted,1u)<<"the cancelled one never starts";
 }
@@ -2109,17 +2407,46 @@ TEST_F(ClusteringModuleResident, AdmissionReservesTypedAndPresentationAgainstSca
 }
 TEST_F(ClusteringModuleResident, TerminalPreviewRetriesAreBounded)
 {
-    Request.Parameters.GpuPreviewInterval=1;
+    Request.Parameters.Execution.PreviewEvery = 1;
+    Request.Parameters.Execution.Start = Runtime::StepRunStart::Ready;
     Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRunId() != 0u;
+        }));
     std::vector<Extrinsic::Graphics::GpuPropertyView> leases;
     std::uint64_t publication=0;
-    ASSERT_TRUE(Until([&]{
+    const auto lease = [&]
+    {
         const auto key=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
-        if(auto front=Cache.PropertyResidency()->Front(key);front&&front->Publication!=publication){
-            publication=front->Publication;leases.push_back(*front);
+        if (auto front = Cache.PropertyResidency()->Front(key); front && front->Publication != publication)
+        {
+            publication = front->Publication;
+            leases.push_back(*front);
         }
-        return Results.size()==1;
-    }));
+    };
+    // One step at a time: each step's preview publishes into a fresh slot, which this test then leases.
+    for (std::size_t i = 1; i <= 3; ++i)
+    {
+        for (int t = 0; t < 3; ++t)
+            Tick(); // the owner offers its slot
+        ASSERT_TRUE(Control(Runtime::StepRunAction::Step, 1u));
+        ASSERT_TRUE(Until(
+            [&]
+            {
+                lease();
+                return leases.size() == i;
+            }))
+            << i;
+    }
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Run));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            lease();
+            return Results.size() == 1;
+        }));
     EXPECT_EQ(leases.size(),3u);
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::GeometryProcessingFailed);
     EXPECT_NE(Results[0].Message.find("600 retries"),std::string::npos);
@@ -2128,7 +2455,8 @@ TEST_F(ClusteringModuleResident, TerminalPreviewRetriesAreBounded)
 TEST_F(ClusteringModuleResident, MillionRowsRespectPairAndSerialBudgets)
 {
     SetPositions(Scene().Raw().get<GS::Vertices>(Entity),std::vector<glm::vec3>(1u<<20,glm::vec3(1,2,3)));
-    Request.Parameters.ClusterCount=8;Request.Parameters.MaxIterations=1;
+    Request.Parameters.ClusterCount = 8;
+    Request.Parameters.Execution.IterationCap = 1;
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     // Fixture checks every recorded submission's pair and lane-depth totals.
     // Fused phases still split at the serial-depth budget and host boundary.
@@ -2163,19 +2491,40 @@ TEST_F(ClusteringModuleResident, AGpuRunIsAStepRunCountingItsIterations)
 }
 TEST_F(ClusteringModuleResident, ARunRestsAtItsBoundaryAndAcceptPreparesTheCurrentCentroidsLabels)
 {
-    Moved=true;Request.Parameters.MaxIterations=10;Request.Parameters.GpuPreviewInterval=100;
-    Start();ASSERT_TRUE(Until([&]{return Observation().Submissions>0u;}));
+    Moved = true;
+    Request.Parameters.Execution.IterationCap = 10;
+    Request.Parameters.Execution.PreviewEvery = 100;
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
     ASSERT_TRUE(Control(Runtime::StepRunAction::Pause)); // the first page is in flight: it counts, then the run rests
+    Hold = false;
+    ReleaseHeld();
     ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused;}));
     EXPECT_EQ(Observation().Iterations,1u);EXPECT_EQ(StepRun().Steps,1u);
     EXPECT_TRUE(Observation().ReadyToAccept)<<Observation().Message;EXPECT_TRUE(Observation().CanAccept);
-    EXPECT_EQ(Observation().Previews,1u)<<"its boundary's preview, recorded alone";
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().Previews == 1u;
+        }))
+        << "its boundary's preview, recorded alone";
     const auto submissions=Observation().Submissions;
     for(int i=0;i<10;++i)Tick();
     EXPECT_EQ(Observation().Submissions,submissions)<<"nothing is recorded while it rests";
     EXPECT_EQ(Observation().Iterations,1u);
     ASSERT_TRUE(Control(Runtime::StepRunAction::Step,1));
     ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused&&Observation().Iterations==2u;}));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().Previews == 2u;
+        }))
+        << "the new rest's preview";
     for(int i=0;i<5;++i)Tick();
     EXPECT_EQ(Observation().Iterations,2u)<<"one step, one iteration";
     const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
@@ -2190,12 +2539,25 @@ TEST_F(ClusteringModuleResident, ARunRestsAtItsBoundaryAndAcceptPreparesTheCurre
 }
 TEST_F(ClusteringModuleResident, ACappedBatchPublishesAndACappedInteractiveRunWaits)
 {
-    Request.AutoAccept=true;Request.Parameters.MaxIterations=2;Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    Request.Parameters.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+    Request.Parameters.Execution.IterationCap = 2;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRunId() != 0u;
+        }));
     ASSERT_TRUE(Until([&]{return Results.size()==1;}));EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
     ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Committed;}));
     EXPECT_EQ(StepRun().End,Runtime::StepRunEnd::IterationCap);
     ASSERT_EQ(History.UndoCount(),1u);ASSERT_TRUE(History.Undo().Succeeded());
-    Request.AutoAccept=false;Start();ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}));
+    Request.Parameters.Execution.AutoAccept = Runtime::StepRunAutoAccept::Never;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRunId() != 0u;
+        }));
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     for(int i=0;i<10;++i)Tick();
     EXPECT_EQ(Results.size(),1u);EXPECT_EQ(StepRun().End,Runtime::StepRunEnd::IterationCap);
@@ -2204,10 +2566,18 @@ TEST_F(ClusteringModuleResident, ACappedBatchPublishesAndACappedInteractiveRunWa
 }
 TEST_F(ClusteringModuleResident, AStoppedBatchNeverAcceptsALateConvergence)
 {
-    Request.AutoAccept=true;Converged=true;Hold=true;Start();
-    ASSERT_TRUE(Until([&]{return Held.has_value();})); // the first page, reporting convergence, is held
+    Request.Parameters.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+    Converged = true;
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        })); // the first page, reporting convergence, is held
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Stop);
-    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Hold = false;
+    ReleaseHeld();
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     for(int i=0;i<10;++i)Tick();
     EXPECT_TRUE(Results.empty())<<"a stopped run waits for Accept or Discard";
@@ -2216,7 +2586,13 @@ TEST_F(ClusteringModuleResident, AStoppedBatchNeverAcceptsALateConvergence)
 }
 TEST_F(ClusteringModuleResident, APausedRunWithAHeldPageRefusesAcceptAndDiscardsOnceItIsConsumed)
 {
-    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
     ASSERT_TRUE(Control(Runtime::StepRunAction::Pause));
     EXPECT_FALSE(Control(Runtime::StepRunAction::Accept))<<"not while its page is in flight";
     (void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
@@ -2227,7 +2603,8 @@ TEST_F(ClusteringModuleResident, APausedRunWithAHeldPageRefusesAcceptAndDiscards
     ASSERT_TRUE(Until([&]{return Results.size()==1;}))<<"the discarded run completes while its page is held";
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     EXPECT_TRUE(StepRun().SegmentInFlight)<<"its page is still recorded";
-    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Hold = false;
+    ReleaseHeld();
     ASSERT_TRUE(Until([&]{return !StepRun().SegmentInFlight;}))<<"and it retires once the page completed";
     EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
 }
@@ -2235,7 +2612,13 @@ TEST_F(ClusteringModuleResident, TheRunIsAJobsRowWhileRunningRestingAndAccepting
 {
     LendShell();
     Request.Properties.OutputLabels.Name="p:cluster_id"; // a custom output names the row
-    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
     const auto find=[&](auto predicate){auto rows=Rows();const auto row=std::ranges::find_if(rows,predicate);
         return row==rows.end()?std::optional<Runtime::EditorJobRecord>{}:std::optional{*row};};
     const auto holder=find([](const auto& row){return row.Identity.OutputName=="p:cluster_id";});
@@ -2244,14 +2627,19 @@ TEST_F(ClusteringModuleResident, TheRunIsAJobsRowWhileRunningRestingAndAccepting
     EXPECT_EQ(holder->Identity.RequestedDomain,Runtime::EditorJobDomain::GpuCompute);
     EXPECT_TRUE(Runtime::IsActiveEditorJobState(holder->State));
     ASSERT_TRUE(Control(Runtime::StepRunAction::Pause));
-    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Hold = false;
+    ReleaseHeld();
     ASSERT_TRUE(Until([&]{return StepRun().Phase==Runtime::StepRunPhase::Paused;}));
     const auto resting=find([&](const auto& row){return row.Token==holder->Token;});
     ASSERT_TRUE(resting);EXPECT_TRUE(Runtime::IsActiveEditorJobState(resting->State))<<"a resting run stays a row";
     ASSERT_TRUE(Control(Runtime::StepRunAction::Run));
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept&&!Observation().Running&&Observation().Iterations==4u;}));
     Hold=true;(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
-    ASSERT_TRUE(Until([&]{return Held.has_value();})); // its label readback
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        })); // its label readback
     const auto stage=find([&](const auto& row){return row.Identity.Run==holder->Token;});
     ASSERT_TRUE(stage)<<"the Accept stage joins the run";
     EXPECT_EQ(stage->Identity.OutputName,"p:cluster_id");
@@ -2261,7 +2649,8 @@ TEST_F(ClusteringModuleResident, TheRunIsAJobsRowWhileRunningRestingAndAccepting
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded);
-    Hold=false;Held->Deliver(std::vector<std::byte>(12*4));Held.reset();
+    Hold = false;
+    ReleaseHeld(std::vector<std::byte>(12 * 4));
     for(int i=0;i<5;++i)Tick();
     EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:cluster_id"));
     // Cancelling the holder's row ends a running run.
@@ -2281,9 +2670,17 @@ TEST_F(ClusteringModuleResident, ACancelOfTheAcceptStageAloneDiscardsTheRun)
     LendShell();
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     Hold=true;(void)Service->GpuRun(Correlation,Runtime::KMeansGpuAction::Accept);
-    ASSERT_TRUE(Until([&]{return Held.has_value();})); // its label readback
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        })); // its label readback
     const auto rows=Rows();
-    const auto stage=std::ranges::find_if(rows,[](const auto& row){return row.Identity.Run.IsValid();});
+    const auto stage = std::ranges::find_if(rows,
+        [](const auto& row)
+        {
+            return row.Identity.Run.IsValid() && Runtime::IsActiveEditorJobState(row.State);
+        });
     ASSERT_NE(stage,rows.end());
     // The agent's jobs_cancel {token}: this job only, not its run.
     EXPECT_EQ(Runtime::CancelEditorJob(Runtime::PrepareEditorProcessingCommands(*Shell),stage->Token),
@@ -2292,7 +2689,8 @@ TEST_F(ClusteringModuleResident, ACancelOfTheAcceptStageAloneDiscardsTheRun)
     EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
     ASSERT_TRUE(Until([&]{return Runtime::IsTerminal(StepRun().Phase);}));
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"a cancel before the publication discards the run";
-    Hold=false;Held->Deliver(std::vector<std::byte>(12*4));Held.reset();
+    Hold = false;
+    ReleaseHeld(std::vector<std::byte>(12 * 4));
     for(int i=0;i<5;++i)Tick();
     EXPECT_EQ(Results.size(),1u);EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
 }
@@ -2309,16 +2707,24 @@ TEST_F(ClusteringModuleResident, ADiscardedRunLeavesNoActiveRow)
 }
 TEST_F(ClusteringModuleResident, AReplacingRequestDiscardsTheRunAndStartsOnceItsPageCompleted)
 {
-    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();})); // A's first page is held
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        })); // A's first page is held
     const auto first=Correlation;const auto firstRun=StepRunId();
     auto replacing=Request;replacing.ReplaceRunning=true;
-    replacing.Parameters.ClusterCount=5;replacing.Parameters.MaxIterations=2; // a new capacity and its own cap
+    replacing.Parameters.ClusterCount = 5;
+    replacing.Parameters.Execution.IterationCap = 2; // a new capacity and its own cap
     const auto second=Service->RunKMeans(replacing);
     ASSERT_TRUE(Until([&]{return Results.size()==1;})); // the replaced run's completion, its page still held
     EXPECT_EQ(StepRun().Phase,Runtime::StepRunPhase::Discarded)<<"the running run is discarded";
     EXPECT_EQ(Service->GpuRun(second).StepRun,0u)<<"the replacement waits until the held page completed";
     EXPECT_EQ(Results[0].Correlation,first);EXPECT_EQ(Results[0].Status,Runtime::KMeansRunStatus::Cancelled);
-    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Hold = false;
+    ReleaseHeld();
     Correlation=second;RunId=0;
     ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept&&StepRunId()!=0u&&StepRun().End!=Runtime::StepRunEnd::None;}));
     EXPECT_NE(StepRunId(),firstRun)<<"a new step run";
@@ -2334,10 +2740,16 @@ TEST_F(ClusteringModuleResident, ASupersededRequestCompletesCancelledAndOnlyTheN
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     const auto a=Correlation;
     Hold=true;(void)Service->GpuRun(a,Runtime::KMeansGpuAction::Accept);
-    ASSERT_TRUE(Until([&]{return Held.has_value();})); // A's label readback is held
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        })); // A's label readback is held
     auto replacing=Request;replacing.ReplaceRunning=true;
-    replacing.Parameters.MaxIterations=3;const auto b=Service->RunKMeans(replacing);
-    replacing.Parameters.MaxIterations=2;const auto c=Service->RunKMeans(replacing);
+    replacing.Parameters.Execution.IterationCap = 3;
+    const auto b = Service->RunKMeans(replacing);
+    replacing.Parameters.Execution.IterationCap = 2;
+    const auto c = Service->RunKMeans(replacing);
     const auto of=[&](const Runtime::CommandCorrelationId id){
         return std::ranges::count_if(Results,[&](const auto& result){return result.Correlation==id;});};
     ASSERT_TRUE(Until([&]{return of(b)==1;}));
@@ -2345,7 +2757,8 @@ TEST_F(ClusteringModuleResident, ASupersededRequestCompletesCancelledAndOnlyTheN
         Runtime::KMeansRunStatus::Cancelled)<<"superseded before it started";
     for(int i=0;i<5;++i)Tick();
     EXPECT_EQ(Service->GpuRun(c).StepRun,0u)<<"C waits for A's acceptance";EXPECT_EQ(of(a),0);
-    Hold=false;Held->Deliver(std::vector<std::byte>(12*4));Held.reset();
+    Hold = false;
+    ReleaseHeld(std::vector<std::byte>(12 * 4));
     ASSERT_TRUE(Until([&]{return of(a)==1;}));
     EXPECT_TRUE(std::ranges::find_if(Results,[&](const auto& r){return r.Correlation==a;})->Succeeded())
         <<"A's acceptance settled";
@@ -2371,35 +2784,55 @@ TEST_F(ClusteringModuleResident, AReplacedRunsPreviewGoesAtOnce)
 {
     const auto key=Runtime::MakeGpuPropertyKey(World,Entity,Request.Properties.OutputLabels);
     auto* residency=Cache.PropertyResidency();ASSERT_NE(residency,nullptr);
-    Request.Parameters.GpuPreviewInterval=1;Request.Parameters.MaxIterations=10;
-    const auto submit=Device.ComputeReadback;
-    bool heldOnce=false;
-    Device.ComputeReadback=[&](auto record,auto bytes,auto sink){
-        Hold=!heldOnce&&Observation().Previews>=1; // the page after the first shown preview is held
-        heldOnce|=Hold;
-        const auto token=submit(std::move(record),bytes,std::move(sink));
-        Hold=false;return token;
+    Request.Parameters.Execution.PreviewEvery = 1;
+    Request.Parameters.Execution.IterationCap = 10;
+    // The first iteration page after a preview copy is held (on the submitting worker, under the mock's lock).
+    HoldWhen = [&](std::uint64_t bytes, const std::vector<std::uint32_t>&, std::size_t)
+    {
+        return bytes != 0u && PreviewCopySubmissions.load() >= 1u;
     };
-    Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
-    ASSERT_TRUE(residency->Front(key))<<"a preview is shown";
+    Request.Parameters.Execution.Start = Runtime::StepRunStart::Ready;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRunId() != 0u;
+        }));
+    for (int i = 0; i < 3; ++i)
+        Tick(); // the owner offers its slot
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Run));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending() && residency->Front(key);
+        }))
+        << "a preview is shown";
+    SetHoldWhen({});
     auto replacing=Request;replacing.ReplaceRunning=true;
     const auto second=Service->RunKMeans(replacing);
     EXPECT_TRUE(Until([&]{return !residency->Front(key);}))<<"the replaced run's preview goes, its page still in flight";
     EXPECT_EQ(Service->GpuRun(second).StepRun,0u);
-    Held->Deliver(HeldData);Held.reset();
+    ReleaseHeld();
     Correlation=second;RunId=0;
     ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}))<<"the replacement starts once the page completed";
 }
 TEST_F(ClusteringModuleResident, AHeldRequestStartsOnlyInTheWorldItWasAdmittedIn)
 {
-    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
     auto replacing=Request;replacing.ReplaceRunning=true;
     const auto second=Service->RunKMeans(replacing);
     for(int i=0;i<3;++i)Tick(); // admitted and held
     const auto other=Worlds.CreateWorld("other");
     ASSERT_TRUE(Worlds.RequestSetActiveWorld(other));(void)Worlds.ApplyMaintenance(Events,Jobs.Jobs());
     ASSERT_EQ(Worlds.ActiveWorld(),other);
-    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Hold = false;
+    ReleaseHeld();
     const auto find=[&]{return std::ranges::find_if(Results,[&](const auto& r){return r.Correlation==second;});};
     ASSERT_TRUE(Until([&]{return find()!=Results.end();}));
     EXPECT_EQ(find()->Status,Runtime::KMeansRunStatus::StaleWorld);
@@ -2409,7 +2842,13 @@ TEST_F(ClusteringModuleResident, AHeldRequestStartsOnlyInTheWorldItWasAdmittedIn
 }
 TEST_F(ClusteringModuleResident, AnInadmissibleReplacementDiscardsNeitherTheRunNorAHeldRequest)
 {
-    Hold=true;Start();ASSERT_TRUE(Until([&]{return Held.has_value();}));
+    Hold = true;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return HeldPending();
+        }));
     auto replacing=Request;replacing.ReplaceRunning=true;
     auto invalid=replacing;invalid.Parameters.ClusterCount=0;
     const auto of=[&](const Runtime::CommandCorrelationId id){
@@ -2423,7 +2862,8 @@ TEST_F(ClusteringModuleResident, AnInadmissibleReplacementDiscardsNeitherTheRunN
     const auto worse=Service->RunKMeans(invalid);
     ASSERT_TRUE(Until([&]{return of(worse)==1;}));
     EXPECT_EQ(of(held),0)<<"the held request is not superseded by an inadmissible one";
-    Hold=false;Held->Deliver(HeldData);Held.reset();
+    Hold = false;
+    ReleaseHeld();
     Correlation=held;RunId=0;
     ASSERT_TRUE(Until([&]{return StepRunId()!=0u;}))<<"the held request starts";
 }
@@ -2526,9 +2966,12 @@ TEST_F(ClusteringModuleResident, CpuRunsOnAReusedCaptureEqualTheReferenceAndSeeA
         points.push_back(glm::vec3(i/4==1?10.f:0.f,i/4==2?10.f:0.f,0.f)+0.25f*float(i%4)*glm::vec3(1,1,1));
     Properties().Get<glm::vec3>(std::string{PN::kPosition}).Vector()=points;
     Request.Backend=Runtime::ClusteringBackend::CpuReference;
+    Request.Parameters.Execution.AutoAccept =
+        Runtime::StepRunAutoAccept::End; // a batch: accepted at its end (ARCH-023)
     const auto reference=[&]{
         GK::KMeansParams params{};params.ClusterCount=Request.Parameters.ClusterCount;
-        params.MaxIterations=Request.Parameters.MaxIterations;params.Seed=Request.Parameters.Seed;
+        params.MaxIterations = Request.Parameters.Execution.IterationCap;
+        params.Seed = Request.Parameters.Seed;
         params.Init=Request.Parameters.Initialization==Runtime::KMeansInitialization::Hierarchical
             ?GK::Initialization::Hierarchical:GK::Initialization::Random;
         auto result=GK::Cluster(std::span<const glm::vec3>{points},params);
@@ -2572,7 +3015,8 @@ TEST_F(ClusteringModuleResident, UpdateTilesHoldAtMost64CentroidsAndCoverEveryCe
     std::vector<glm::vec3> points;
     for(int i=0;i<128;++i)points.push_back(glm::vec3(float(i),0,0));
     SetPositions(Scene().Raw().get<GS::Vertices>(Entity),points);
-    Request.Parameters.ClusterCount=128;Request.Parameters.MaxIterations=1;
+    Request.Parameters.ClusterCount = 128;
+    Request.Parameters.Execution.IterationCap = 1;
     const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     std::map<std::uint32_t,std::vector<std::uint32_t>> covered; // point chunk -> centroids, from Update pass A
@@ -2611,7 +3055,8 @@ TEST_F(ClusteringModuleResident, OnePageSubmissionsAndAThousandClustersRecordWit
     std::vector<glm::vec3> points;
     for(int i=0;i<2048;++i)points.push_back(glm::vec3(float(i%1024),float(i/1024),0));
     SetPositions(Scene().Raw().get<GS::Vertices>(Entity),points);
-    Request.Parameters.ClusterCount=1024;Request.Parameters.MaxIterations=1;
+    Request.Parameters.ClusterCount = 1024;
+    Request.Parameters.Execution.IterationCap = 1;
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}))<<Observation().Message;
 }
 // ARCH-022 Q79 step 7b: a batch's pass A runs one workgroup per page (Update: per tile centroid and page) and its
@@ -2622,7 +3067,8 @@ TEST_F(ClusteringModuleResident, BatchedDispatchesRunOneWorkgroupPerPage)
     std::vector<glm::vec3> points;
     for(int i=0;i<128;++i)points.push_back(glm::vec3(float(i%4)*10.0f,float(i),0));
     SetPositions(Scene().Raw().get<GS::Vertices>(Entity),points);
-    Request.Parameters.ClusterCount=4;Request.Parameters.MaxIterations=1;
+    Request.Parameters.ClusterCount = 4;
+    Request.Parameters.Execution.IterationCap = 1;
     const auto firstPush=Device.CommandContext.PushConstantPayloads.size();
     const auto firstDispatch=Device.CommandContext.DispatchRecords.size();
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
@@ -2645,4 +3091,370 @@ TEST_F(ClusteringModuleResident, BatchedDispatchesRunOneWorkgroupPerPage)
     }
     EXPECT_GT(largestReduce,1u)<<"a Reduce batch of several pages";
     EXPECT_GT(largestUpdate,1u)<<"an Update batch of several point chunks";
+}
+
+// ARCH-023 L1 at the second owner: an interval preview is counted once its copy is submitted. With the label ring's
+// free slots held elsewhere after the first preview, the previews at iterations 4 and 6 are dropped (the residency
+// counts them) and the step run's copy count stays 1; the terminal labels wait for a slot and the run ends as before.
+// Predictions: PreviewCopies 1 (counting a copy that found no free slot gives 3), Previews 2 (one interval copy and the
+// terminal labels), at least 2 dropped previews. Mutation: counting a Preview that made no copy.
+TEST_F(ClusteringModuleResident, ABusyLabelRingDropsLivePreviewsWithoutCountingThem)
+{
+    Request.Parameters.Execution.IterationCap = 8;
+    Request.Parameters.Execution.PreviewEvery = 2;
+    auto* residency = Cache.PropertyResidency();
+    ASSERT_NE(residency, nullptr);
+    auto typed = Request.Properties.OutputLabels;
+    typed.ValueKind = Geometry::PropertyValueKind::UInt32;
+    const auto key = Runtime::MakeGpuPropertyKey(World, Entity, typed);
+    Request.Parameters.Execution.Start = Runtime::StepRunStart::Ready;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRunId() != 0u;
+        }));
+    for (int i = 0; i < 3; ++i)
+        Tick(); // the owner offers its slot
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Step, 2u));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().Previews == 1u;
+        },
+        false)) // publish the completed copy before the owner reserves its next mailbox slot
+        << "the copy after iteration 2 published";
+    ASSERT_LT(Observation().Iterations, 4u);
+    const auto dropped = residency->Stats().DroppedPreviews;
+    const auto front = residency->Front(key);
+    ASSERT_TRUE(front);
+    // Every free slot of the ring (depth 3: the front and two more), held elsewhere.
+    std::vector<decltype(residency->AcquireBack(key, front->Layout, 3u))> held;
+    for (int i = 0; i < 2; ++i)
+        if (auto slot = residency->AcquireBack(key, front->Layout, 3u))
+            held.push_back(std::move(slot));
+    ASSERT_EQ(held.size(), 2u);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRun().Phase == Runtime::StepRunPhase::Paused;
+        }));
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Run));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().Iterations == 8u;
+        }));
+    for (int i = 0; i < 5; ++i)
+        Tick();
+    EXPECT_FALSE(Observation().ReadyToAccept) << "the terminal labels wait for a slot";
+    EXPECT_EQ(Observation().Previews, 1u);
+    EXPECT_EQ(StepRun().PreviewCopies, 1u) << "the dropped previews are not counted";
+    EXPECT_GE(residency->Stats().DroppedPreviews - dropped, 2u) << "4 and 6 were dropped";
+    held.clear();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().ReadyToAccept;
+        }));
+    EXPECT_EQ(Observation().Previews, 2u) << "the interval copy and the terminal labels";
+    EXPECT_EQ(StepRun().PreviewCopies, 1u) << "the terminal labels are the result, not a live preview";
+}
+
+namespace
+{
+    // ARCH-023 B8: the CPU reference as a step run, on the hand-worked cloud of PointCloud_KMeans.LloydSteps* (three
+    // Lloyd iterations to convergence; a stop after one keeps labels [0,0,1,1] for the moved centroids).
+    class ClusteringModuleCpuStepRun : public ClusteringModuleResident
+    {
+    protected:
+        void UseHandWorkedCloud()
+        {
+            SetPositions(Scene().Raw().get<GS::Vertices>(Entity),
+                std::vector<glm::vec3>{{0, 0, 0}, {1, 0, 0}, {4, 0, 0}, {6, 0, 0}});
+            Request.Backend = Runtime::ClusteringBackend::CpuReference;
+            Request.Parameters.ClusterCount = 2;
+            Request.Parameters.Initialization = Runtime::KMeansInitialization::Hierarchical;
+            Request.Parameters.Execution = {.IterationCap = 8u,
+                .PreviewEvery = 0u,
+                .PreviewIntervalMs = 0u,
+                .AutoAccept = Runtime::StepRunAutoAccept::Never,
+                .Start = Runtime::StepRunStart::Ready};
+        }
+        std::uint64_t CpuRun()
+        {
+            return Service->StepRun(Correlation);
+        }
+        Runtime::StepRunObservation Cpu()
+        {
+            const auto run = Steps.Observe(CpuRun());
+            EXPECT_TRUE(run);
+            return run ? *run : Runtime::StepRunObservation{};
+        }
+        bool CpuControl(const Runtime::StepRunAction action, const std::uint32_t count = 1u)
+        {
+            std::string refusal;
+            const bool done = Steps.Control(CpuRun(), action, count, refusal);
+            EXPECT_TRUE(done) << refusal;
+            return done;
+        }
+        bool Rests(const std::uint32_t steps)
+        {
+            const auto run = Cpu();
+            return run.Phase == Runtime::StepRunPhase::Paused && !run.SegmentInFlight && run.Steps == steps;
+        }
+        std::vector<std::uint32_t> Labels()
+        {
+            const auto property = Properties().Get<std::uint32_t>("p:kmeans_label");
+            return property ? property.Vector() : std::vector<std::uint32_t>{};
+        }
+    };
+}
+
+TEST_F(ClusteringModuleCpuStepRun, ReadyDoesNoWorkStepStopAcceptsThePartialResultWithOneUndoEntry)
+{
+    UseHandWorkedCloud();
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return CpuRun() != 0u;
+        }))
+        << "the CPU request started a step run";
+    for (int i = 0; i < 10; ++i)
+        Tick();
+    auto run = Cpu();
+    EXPECT_EQ(run.Phase, Runtime::StepRunPhase::Ready);
+    EXPECT_EQ(run.Steps, 0u) << "a ready run computes nothing";
+    EXPECT_TRUE(run.CanRestart);
+    EXPECT_EQ(run.Owner, "Runtime.ClusteringModule");
+    EXPECT_TRUE(Results.empty());
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Step, 1u));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Rests(1u);
+        }));
+    run = Cpu();
+    ASSERT_EQ(run.Metrics->Records().size(), 1u);
+    EXPECT_EQ(run.Metrics->Records()[0].Values[0], 12.1875) << "step 1's inertia (hand-worked)";
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Stop));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Cpu().End == Runtime::StepRunEnd::Stopped;
+        }));
+    for (int i = 0; i < 5; ++i)
+        Tick();
+    EXPECT_TRUE(Results.empty()) << "a stopped run waits for Accept";
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Accept));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1u;
+        }));
+    EXPECT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_EQ(Results[0].ActualBackend, Runtime::ClusteringBackend::CpuReference);
+    EXPECT_EQ(Results[0].Iterations, 1u);
+    EXPECT_FALSE(Results[0].Converged);
+    EXPECT_EQ(Results[0].StepRun, CpuRun()) << "the result names its run";
+    EXPECT_EQ(Labels(), (std::vector<std::uint32_t>{0u, 0u, 1u, 1u})) << "the labels of the moved centroids";
+    EXPECT_EQ(Cpu().Phase, Runtime::StepRunPhase::Committed);
+    EXPECT_EQ(History.UndoCount(), 1u);
+    std::string refusal;
+    EXPECT_FALSE(Steps.Control(CpuRun(), Runtime::StepRunAction::Accept, 1u, refusal)) << "one Accept";
+}
+
+TEST_F(ClusteringModuleCpuStepRun, StepsOfOneEqualTheRunAndARestartAfterConvergenceComputesAgain)
+{
+    UseHandWorkedCloud();
+    Request.Parameters.Execution.Start = Runtime::StepRunStart::Run;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return CpuRun() != 0u && Cpu().End == Runtime::StepRunEnd::Converged && Rests(3u);
+        }));
+    EXPECT_EQ(Cpu().Steps, 3u) << "the CPU counts one step per Lloyd iteration, as the reference converges";
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Restart)) << "after convergence, before Accept";
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Cpu().Generation == 1u && Cpu().End == Runtime::StepRunEnd::Converged && Rests(3u);
+        }))
+        << "a running run restarts running and converges again";
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Accept));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1u;
+        }));
+    ASSERT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_EQ(Results[0].Iterations, 3u);
+    EXPECT_TRUE(Results[0].Converged);
+    EXPECT_EQ(Results[0].Inertia, 2.5f);
+    const auto whole = Labels();
+    EXPECT_EQ(whole, (std::vector<std::uint32_t>{0u, 0u, 1u, 1u}));
+    ASSERT_TRUE(History.Undo().Succeeded());
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+
+    // The same run in steps of one, from ready.
+    Request.Parameters.Execution.Start = Runtime::StepRunStart::Ready;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return CpuRun() != 0u;
+        }));
+    for (std::uint32_t step = 1; step <= 3; ++step)
+    {
+        ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Step, 1u));
+        ASSERT_TRUE(Until(
+            [&]
+            {
+                return Rests(step);
+            }))
+            << step;
+    }
+    EXPECT_EQ(Cpu().End, Runtime::StepRunEnd::Converged);
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Accept));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 2u;
+        }));
+    ASSERT_TRUE(Results[1].Succeeded()) << Results[1].Message;
+    EXPECT_EQ(Results[1].Iterations, Results[0].Iterations);
+    EXPECT_EQ(Results[1].Centroids, Results[0].Centroids);
+    EXPECT_EQ(std::bit_cast<std::uint32_t>(Results[1].Inertia), std::bit_cast<std::uint32_t>(Results[0].Inertia));
+    EXPECT_EQ(Labels(), whole);
+}
+
+TEST_F(ClusteringModuleCpuStepRun, AStaleSourceRefusesAcceptAndADiscardPublishesNothing)
+{
+    UseHandWorkedCloud();
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return CpuRun() != 0u;
+        }));
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Step, 1u));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Rests(1u);
+        }));
+    Properties().Get<glm::vec3>(std::string{PN::kPosition})[0].x = 0.5f; // the source changes before Accept
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1u;
+        }));
+    EXPECT_EQ(Results[0].Status, Runtime::KMeansRunStatus::StaleSource) << Results[0].Message;
+    EXPECT_EQ(Cpu().Phase, Runtime::StepRunPhase::Discarded);
+    std::string refusal;
+    EXPECT_FALSE(Steps.Control(CpuRun(), Runtime::StepRunAction::Accept, 1u, refusal)) << "a stale run accepts nothing";
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+    EXPECT_FALSE(History.CanUndo());
+
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return CpuRun() != 0u;
+        }));
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Step, 2u));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Rests(2u);
+        }));
+    ASSERT_TRUE(CpuControl(Runtime::StepRunAction::Discard));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 2u;
+        }));
+    EXPECT_EQ(Results[1].Status, Runtime::KMeansRunStatus::Cancelled) << Results[1].Message;
+    EXPECT_EQ(Results[1].StepRun, CpuRun());
+    EXPECT_FALSE(Properties().Exists("p:kmeans_label"));
+    EXPECT_FALSE(History.CanUndo());
+}
+
+// ARCH-023: a GPU run whose final labels are prepared (it ended at its cap) restarts before Accept on its own
+// workspace and transaction: a new generation computes again and its Accept publishes once.
+TEST_F(ClusteringModuleResident, AGpuRunRestartsAfterItsFinalLabelsBeforeAccept)
+{
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().ReadyToAccept && StepRun().End == Runtime::StepRunEnd::IterationCap;
+        }));
+    const auto submissions = Observation().Submissions;
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Restart)) << "final labels prepared, not yet accepted";
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRun().Generation == 1u;
+        }))
+        << StepRun().Diagnostic;
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().ReadyToAccept && StepRun().Steps == 4u;
+        }));
+    EXPECT_GT(Observation().Submissions, submissions) << "the new generation recorded its own pages";
+    EXPECT_TRUE(Results.empty());
+    EXPECT_FALSE(History.CanUndo());
+    (void)Service->GpuRun(Correlation, Runtime::KMeansGpuAction::Accept);
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Results.size() == 1u;
+        }));
+    EXPECT_TRUE(Results[0].Succeeded()) << Results[0].Message;
+    EXPECT_EQ(Results[0].Iterations, 4u);
+    EXPECT_EQ(History.UndoCount(), 1u);
+}
+
+// ARCH-023 query-review B2: K-Means pages follow the compute lane alone once a page of the run waited for its inputs'
+// transfers. The run's first submission, and the first after the restart's reseed upload (any submission that follows
+// a transfer-queue upload), use AfterIssuedTransfers; the iterations between use LaneOrderOnly. Predictions, before
+// any run: first entry AfterIssuedTransfers; at least one upload-following submission (the reseed's; the Start uploads
+// precede the first entry), all AfterIssuedTransfers;
+// LaneOrderOnly pages present. Mutations: InputOrdered never set (no LaneOrderOnly page); not reset by the reseed
+// (the page after the reseed upload is LaneOrderOnly).
+TEST_F(ClusteringModuleResident, KMeansPagesWaitForIssuedTransfersOnlyAfterStartAndAReseed)
+{
+    using O = Extrinsic::RHI::ComputeInputOrder;
+    Start();
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return Observation().ReadyToAccept && StepRun().End == Runtime::StepRunEnd::IterationCap;
+        }));
+    ASSERT_TRUE(Control(Runtime::StepRunAction::Restart));
+    ASSERT_TRUE(Until(
+        [&]
+        {
+            return StepRun().Generation == 1u && Observation().ReadyToAccept && StepRun().Steps == 4u;
+        }));
+    std::scoped_lock lock{Gpu};
+    ASSERT_FALSE(OrderLog.empty());
+    EXPECT_EQ(OrderLog.front().second, O::AfterIssuedTransfers) << "the run's first page follows the Start uploads";
+    std::size_t afterUploads = 0u, laneOrder = 0u;
+    for (std::size_t i = 0; i < OrderLog.size(); ++i)
+    {
+        laneOrder += OrderLog[i].second == O::LaneOrderOnly;
+        if (i > 0u && OrderLog[i].first != OrderLog[i - 1u].first)
+        {
+            ++afterUploads;
+            EXPECT_EQ(OrderLog[i].second, O::AfterIssuedTransfers) << "submission " << i << " follows an upload";
+        }
+    }
+    EXPECT_GE(afterUploads, 1u) << "the restart's reseed upload";
+    EXPECT_GT(laneOrder, 0u) << "iterations after the first page follow the lane alone";
 }

@@ -102,7 +102,8 @@ advance, and with `--agent-socket` every module's queued commands and job comple
 minimized. GPU work only progresses on presented frames, so tools that may dispatch it fail fast
 on a minimized frame with the error code `viewport_not_presentable`: `view_screenshot`,
 `view_capture`, `run_operation`, `run_mesh_operation`, `run_registration`, `run_point_sampling`,
-`run_keypoint_analysis`, `run_kmeans` and `run_point_cloud_consolidation`
+`run_keypoint_analysis`, `run_kmeans`, `start_kmeans`, `run_point_cloud_consolidation` and
+`start_point_cloud_consolidation`
 (`AgentOperationSpec::NeedsPresentedFrame`; any new tool that may dispatch GPU work sets it).
 `jobs_wait` sets it too, so no wait outlives a minimize (the job it watches may be GPU work). A call of those
 tools that is already waiting when the window minimizes is answered with the same code instead of
@@ -189,7 +190,8 @@ stack ends the requested batch successfully; it does not mask a failed command.
   surface accepted for one of the run's jobs, which it remembers per run past the jobs' reaping
   (`RunCancelRequested`; minimized frames drain and reap before the call's next poll). A stage
   cancelled because an earlier stage failed, or an older run's cancelled job on the same output,
-  leaves the run's own failure as its answer. One or two
+  leaves the run's own failure as its answer. A step run retiring the jobs of its ended run (a stale
+  source, a discard) is not a cancel request either. One or two
   progress notifications already queued may still arrive after the cancel (allowed by the
   specification).
 - Tool results are the existing JSON text content plus, when the negotiated version is
@@ -230,12 +232,21 @@ stack ends the requested batch successfully; it does not mask a failed command.
   `preview_point_cloud_consolidation`, `preview_operation`, `preview_mesh_operation` and
   `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
   `config_apply`, `save_scene`, `load_scene`, `set_visibility`, `bind_attribute`, `set_camera`, `undo`, `redo`, `jobs_cancel`,
-  `run_operation`,
+  `run_operation` (`wait: false` starts `property_smoothing`, `normal_estimation`, `outlier_analysis` or `point_construction` as a step
+  run with the section's `start` and `auto_accept` and answers its `run` at once),
   `run_mesh_operation`, `run_registration` (ICP
   or Coherent Point Drift from their config sections; the reply waits for the job),
-  `run_point_sampling` (the `sandbox.point_sampling` section), `run_keypoint_analysis`,
-  `run_kmeans` and `run_point_cloud_consolidation`. `view_capture` writes a PNG inside the
-  allowed roots.
+  `run_point_sampling` (the `sandbox.point_sampling` section) and `run_keypoint_analysis` (both run and accept at their
+  end; `wait: false` starts the panel's step run with the section's `start` and `auto_accept` and answers its `run`
+  at once),
+  `run_kmeans` (runs and accepts at its end), `start_kmeans` (a CPU or Vulkan K-Means step run with the section's
+  execution options or the ones it names, answered with its run id for `run_control`),
+  `run_point_cloud_consolidation` (runs and accepts at its end) and `start_point_cloud_consolidation` (its step run
+  with the section's execution options or the ones it names, answered with its run id). The scalar plugin tools
+  (`point_spacing`, `kernel_density`, `density_weights`) wait without execution arguments; each of `start` and
+  `auto_accept` they name replaces the section's, and a run that then does not run at once and accept by itself
+  answers at once with its run id `run` on every backend. Every result and start answer names its step run by the
+  one key `run` (as `run_control` and `run_observe` do). `view_capture` writes a PNG inside the allowed roots.
 - Jobs (RUNTIME-279). `jobs_list` lists every job the job service retains with its token
   (`"<index>:<generation>"`), state, progress and elapsed time; a job the editor submitted through
   `EditorJobCommandSurface::Submit` also names its `editor` output (entity, output property), the

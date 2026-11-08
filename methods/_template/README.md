@@ -10,6 +10,11 @@ Use this template as the starting point for a new method package.
 4. Implement CPU reference backend first.
 5. Add correctness tests before any optimization work.
 6. Add benchmarks and report outputs.
+7. Bind production execution using the [runtime execution contract](../../docs/methods/method-template.md#runtime-execution-contract)
+   and its working CPU, resident GPU or scalar-plugin reference. Reuse the run
+   driver and resource/publication owners rather than copying their machinery.
+   [`src/TemplateMethod.cpp`](src/TemplateMethod.cpp) is the executable adapter to start
+   from (its test: `tests/contract/runtime/Test.MethodTemplate.cpp`).
 
 ## Required package contents
 

@@ -1,9 +1,10 @@
 // ARCH-022: compact density weights as a plugin. For each live point it writes 1 + the sum of a radial kernel over
 // the other points within the support radius (given, or derived from the positions), or its reciprocal, into a
 // scalar output with one undo entry; on CPU KD-tree or CPU LBVH radius candidates (any scalar storage, checked
-// conversion), or on the GPU (Vulkan LBVH, float storage) with a preview that waits for Accept or Discard. The
-// plugin owns its config section, its MCP tools and its window; the point-cloud editing service does the capture,
-// the GPU run and the publication.
+// conversion), or on the GPU (Vulkan LBVH, float storage) with a preview that waits for Accept or Discard. ARCH-023:
+// every backend runs as a one-shot step run (the whole estimate is its one step) with the host's run controls and the
+// section's auto_accept and start. The plugin owns its config section, its MCP tools and its window; the point-cloud
+// editing service does the capture, the runs and the publication.
 module;
 
 #include <array>
@@ -48,6 +49,9 @@ export namespace Intrinsic::Plugins::DensityWeights
         Kernels::KernelType Kernel{Kernels::KernelType::ThetaLop};
         Kernels::DensityWeightMode Mode{Kernels::DensityWeightMode::Direct};
         std::uint32_t GpuQueryBatchSize{4096}, GpuRadiusCapacity{256};
+        // The one-shot options (rows auto_accept and start; one step, no live preview), by default every one-shot's
+        // interactive start: ready (nothing computed before run or step), waiting for Accept.
+        R::StepRunExecution Execution{R::kOneShotStepRunExecution};
     };
 
     inline constexpr Geometry::PropertyValueKind kFloatKind[]{Geometry::PropertyValueKind::Float};
@@ -58,53 +62,56 @@ export namespace Intrinsic::Plugins::DensityWeights
     inline constexpr std::string_view kModeTokens[]{"direct", "reciprocal"};
     inline constexpr std::string_view kCapacityRefusal =
         "GPU query batch must be 1..16384 and complete radius capacity 1..1024.";
+    inline constexpr auto kExecutionRows = R::BindStepRunExecution<&Config::Execution>(1u);
     inline constexpr std::array kRows{
-        R::Bind<&Config::StableEntityId>({.Name = "entity", .Type = R::ConfigFieldType::UInt, .Description = "Entity."}),
+        R::Bind<&Config::StableEntityId>(
+            {.Name = "entity", .Type = R::ConfigFieldType::UInt, .Description = "Entity."}),
         R::Bind<&Config::GpuQueryBatchSize>({.Name = "gpu_query_batch_size",
-                                             .Type = R::ConfigFieldType::UInt,
-                                             .Description = "Gpu query batch size.",
-                                             .Min = 1,
-                                             .Max = 16384,
-                                             .Refusal = kCapacityRefusal}),
+            .Type = R::ConfigFieldType::UInt,
+            .Description = "Gpu query batch size.",
+            .Min = 1,
+            .Max = 16384,
+            .Refusal = kCapacityRefusal}),
         R::Bind<&Config::GpuRadiusCapacity>({.Name = "gpu_radius_capacity",
-                                             .Type = R::ConfigFieldType::UInt,
-                                             .Description = "Gpu radius capacity.",
-                                             .Min = 1,
-                                             .Max = 1024,
-                                             .Refusal = kCapacityRefusal}),
+            .Type = R::ConfigFieldType::UInt,
+            .Description = "Gpu radius capacity.",
+            .Min = 1,
+            .Max = 1024,
+            .Refusal = kCapacityRefusal}),
         R::Bind<&Config::Backend>({.Name = "backend",
-                                   .Type = R::ConfigFieldType::StringEnum,
-                                   .Description = "Backend.",
-                                   .EnumNames = kBackendNames,
-                                   .EnumValues = kBackendTokens,
-                                   .Refusal = "Unknown density weight backend."}),
+            .Type = R::ConfigFieldType::StringEnum,
+            .Description = "Backend.",
+            .EnumNames = kBackendNames,
+            .EnumValues = kBackendTokens,
+            .Refusal = "Unknown density weight backend."}),
         R::Bind<&Config::Kernel>({.Name = "kernel",
-                                  .Type = R::ConfigFieldType::StringEnum,
-                                  .Description = "Kernel.",
-                                  .EnumValues = kKernelTokens,
-                                  .Refusal = "Unknown radial kernel."}),
+            .Type = R::ConfigFieldType::StringEnum,
+            .Description = "Kernel.",
+            .EnumValues = kKernelTokens,
+            .Refusal = "Unknown radial kernel."}),
         R::Bind<&Config::Mode>({.Name = "mode",
-                                .Type = R::ConfigFieldType::StringEnum,
-                                .Description = "Mode.",
-                                .EnumValues = kModeTokens,
-                                .Refusal = "Unknown density weight mode."}),
-        R::Bind<&Config::SupportRadius>(
-            {.Name = "support_radius",
-             .Type = R::ConfigFieldType::Float,
-             .Description = "Support radius; 0 derives it from the selected positions (support-radius policy), "
-                            "positive values are source units.",
-             .Min = 0,
-             .Max = double(std::numeric_limits<float>::max())}),
+            .Type = R::ConfigFieldType::StringEnum,
+            .Description = "Mode.",
+            .EnumValues = kModeTokens,
+            .Refusal = "Unknown density weight mode."}),
+        R::Bind<&Config::SupportRadius>({.Name = "support_radius",
+            .Type = R::ConfigFieldType::Float,
+            .Description = "Support radius; 0 derives it from the selected positions (support-radius policy), "
+                           "positive values are source units.",
+            .Min = 0,
+            .Max = double(std::numeric_limits<float>::max())}),
         R::Bind<&Config::Positions>({.Name = "positions",
-                                     .Type = R::ConfigFieldType::PropertyRef,
-                                     .Description = "Position and weight bindings must have distinct names on the "
-                                                    "same element domain.",
-                                     .RefKinds = kVec3Kind}),
+            .Type = R::ConfigFieldType::PropertyRef,
+            .Description = "Position and weight bindings must have distinct names on the "
+                           "same element domain.",
+            .RefKinds = kVec3Kind}),
         R::Bind<&Config::Weights>({.Name = "weights",
-                                   .Type = R::ConfigFieldType::PropertyRef,
-                                   .Description = "Weights.",
-                                   .RefKinds = kFloatKind,
-                                   .AnyScalar = true}),
+            .Type = R::ConfigFieldType::PropertyRef,
+            .Description = "Weights.",
+            .RefKinds = kFloatKind,
+            .AnyScalar = true}),
+        kExecutionRows[3], // auto_accept
+        kExecutionRows[4], // start
     };
     inline constexpr auto kFields = R::SpecsOf(kRows);
     inline constexpr R::DerivedConfigSection<Config> kSection{
@@ -139,21 +146,26 @@ export namespace Intrinsic::Plugins::DensityWeights
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double CpuComputeMilliseconds{};
+        std::uint64_t StepRun{}; // the run's step run (run_control, run_observe); 0: it never started
     };
 
-    // A run, shared by the window and a waiting MCP call. A Vulkan run is the service's GPU run (`Analysis`); its
-    // state reaches `Final` through Refresh. `Session` is the editor session it belongs to.
+    // A run, shared by the window and a waiting MCP call. A Vulkan run is the service's GPU run (`Analysis`), whose
+    // state reaches `Final` through Refresh; a CPU run is the service's ScalarCpuRun (`Pending.StepRun`, `Handle` its
+    // holder job), which sets `Final` itself. `Session` is the editor session it belongs to; `Row` the window's
+    // run-control row state.
     struct Run : R::PluginRun<Result>
     {
         R::ScalarAnalysis Analysis{};
         R::PointSession Session{};
+        R::StepRunControlsState Row{};
     };
 
     // Readiness: empty when a run can start, else why not (copies no values).
     [[nodiscard]] std::string Preview(const Config& config);
-    // Starts a run (main thread). An immediate failure sets `Final` at once. A Vulkan run waits for Accept or Discard
-    // unless `autoAccept`.
-    [[nodiscard]] std::shared_ptr<Run> Start(const Config& config, bool autoAccept);
+    // Starts a one-shot step run with `config.Execution` (main thread): ready (nothing computed before run or step),
+    // or computing at once; then it waits for Accept or Discard unless auto_accept. An immediate failure sets `Final`
+    // at once.
+    [[nodiscard]] std::shared_ptr<Run> Start(const Config& config);
     // Main thread: folds a Vulkan run's state into `Pending`, and into `Final` once it ended.
     void Refresh(Run& run);
     void Accept(Run& run);

@@ -21,6 +21,7 @@
 
 #include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
@@ -1061,23 +1062,32 @@ TEST(SandboxEditorUi, QueuedPointSetJobsDiscardStaleInputAndReportOneTerminalRes
         const ECS::EntityHandle source = MakePointCloudEntity(s.registry, "Stale ICP Source", sourcePoints);
         const ECS::EntityHandle targetEntity = MakePointCloudEntity(s.registry, "Stale ICP Target", target);
         const ECSC::Transform::Component before = s.registry.Raw().get<ECSC::Transform::Component>(source);
-        expectStale(s, "Sandbox.RegistrationICP",
-            [&](auto sink) {
+        expectStale(
+            s,
+            "ICP registration",
+            [&](auto sink)
+            {
                 return Runtime::ApplyEditorRegistrationCommand(s.context,
                     Runtime::EditorRegistrationCommand{
                         .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
                         .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
                         .Variant = Runtime::EditorICPVariant::PointToPoint,
-                        .MaxIterations = 60u, .InlierRatio = 1.0, .TrajectoryStep = 1000u},
+                        .Execution = {.IterationCap = 60u,
+                            .AutoAccept = Runtime::StepRunAutoAccept::End,
+                            .Start = Runtime::StepRunStart::Run},
+                        .InlierRatio = 1.0,
+                        .TrajectoryStep = 1000u},
                     sink);
             },
-            [&] {
+            [&]
+            {
                 std::vector<glm::vec3> stale = sourcePoints;
                 for (glm::vec3& point : stale)
                     point += glm::vec3{10.0f, 0.0f, 0.0f};
                 SetPositions(s.registry.Raw().get<GS::Vertices>(source), stale);
             },
-            [&](const auto& result) {
+            [&](const auto& result)
+            {
                 EXPECT_EQ(result.Variant, Runtime::EditorICPVariant::PointToPoint);
                 expectSourcePoseUnchanged(s, source, before);
             });
@@ -1093,21 +1103,32 @@ TEST(SandboxEditorUi, QueuedPointSetJobsDiscardStaleInputAndReportOneTerminalRes
         const ECS::EntityHandle targetEntity = MakePointCloudEntity(s.registry, "StaleNormalTarget", target);
         SetPointCloudNormals(s.registry, targetEntity, UniformNormals(target.size(), glm::vec3{0.0f, 0.0f, 1.0f}));
         const ECSC::Transform::Component before = s.registry.Raw().get<ECSC::Transform::Component>(source);
-        expectStale(s, "Sandbox.RegistrationICP",
-            [&](auto sink) {
+        expectStale(
+            s,
+            "ICP registration",
+            [&](auto sink)
+            {
                 return Runtime::ApplyEditorRegistrationCommand(s.context,
                     Runtime::EditorRegistrationCommand{
                         .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
                         .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
                         .Variant = Runtime::EditorICPVariant::PointToPlane,
-                        .MaxIterations = 40u, .MaxCorrespondenceDistance = 10.0,
-                        .InlierRatio = 1.0, .TrajectoryStep = 1000u},
+                        .Execution = {.IterationCap = 40u,
+                            .AutoAccept = Runtime::StepRunAutoAccept::End,
+                            .Start = Runtime::StepRunStart::Run},
+                        .MaxCorrespondenceDistance = 10.0,
+                        .InlierRatio = 1.0,
+                        .TrajectoryStep = 1000u},
                     sink);
             },
             // Edit the normals the job snapshotted, before it applies.
-            [&] { SetPointCloudNormals(s.registry, targetEntity,
-                      UniformNormals(target.size(), glm::vec3{1.0f, 0.0f, 0.0f})); },
-            [&](const auto& result) {
+            [&]
+            {
+                SetPointCloudNormals(
+                    s.registry, targetEntity, UniformNormals(target.size(), glm::vec3{1.0f, 0.0f, 0.0f}));
+            },
+            [&](const auto& result)
+            {
                 EXPECT_EQ(result.Variant, Runtime::EditorICPVariant::PointToPlane);
                 expectSourcePoseUnchanged(s, source, before);
             });
@@ -1422,21 +1443,22 @@ TEST(SandboxEditorUi, ProgressivePoissonAndRegistrationCancelledJobsReportOneTer
         const ECSC::Transform::Component before =
             registry.Raw().get<ECSC::Transform::Component>(source);
 
-        const Runtime::EditorRegistrationResult queued =
-            Runtime::ApplyEditorRegistrationCommand(
-                context,
-                Runtime::EditorRegistrationCommand{
-                    .SourceStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(source),
-                    .TargetStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(targetEntity),
-                    .Variant = Runtime::EditorICPVariant::PointToPoint,
-                    .MaxIterations = 60u,
-                    .InlierRatio = 1.0,
-                    .TrajectoryStep = 1000u,
-                },
-                [&deliveries, &completed](Runtime::EditorRegistrationResult r)
-                { ++deliveries; completed = std::move(r); });
+        const Runtime::EditorRegistrationResult queued = Runtime::ApplyEditorRegistrationCommand(context,
+            Runtime::EditorRegistrationCommand{
+                .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+                .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+                .Variant = Runtime::EditorICPVariant::PointToPoint,
+                .Execution = {.IterationCap = 60u,
+                    .AutoAccept = Runtime::StepRunAutoAccept::End,
+                    .Start = Runtime::StepRunStart::Run},
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            },
+            [&deliveries, &completed](Runtime::EditorRegistrationResult r)
+            {
+                ++deliveries;
+                completed = std::move(r);
+            });
         ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
 
         const Runtime::EditorJobQueueSnapshot pending = jobs.Snapshot();
@@ -1447,12 +1469,9 @@ TEST(SandboxEditorUi, ProgressivePoissonAndRegistrationCancelledJobsReportOneTer
         EXPECT_EQ(deliveries, 1u);
         ASSERT_TRUE(completed.has_value());
         EXPECT_FALSE(completed->Succeeded());
-        EXPECT_EQ(completed->Status,
-                  Runtime::EditorCommandStatus::GeometryProcessingFailed);
-        EXPECT_EQ(completed->Error, Core::ErrorCode::Unknown);
-        EXPECT_EQ(completed->Message,
-                  "Sandbox.RegistrationICP did not apply: "
-                  "it terminated without publishing a result.");
+        EXPECT_EQ(completed->Status, Runtime::EditorCommandStatus::StaleEntity);
+        EXPECT_EQ(completed->Error, Core::ErrorCode::InvalidState);
+        EXPECT_EQ(completed->Message, "ICP was cancelled; nothing was applied.");
         EXPECT_FALSE(history.CanUndo());
         const ECSC::Transform::Component& after =
             registry.Raw().get<ECSC::Transform::Component>(source);
@@ -1512,22 +1531,21 @@ TEST(SandboxEditorUi, DetachedQueuedPointSetAndRegistrationJobsDoNotReadFreedSce
                 MakePointCloudEntity(*registry, "DetachedICPSource", sourcePoints);
             const ECS::EntityHandle targetEntity =
                 MakePointCloudEntity(*registry, "DetachedICPTarget", target);
-            const Runtime::EditorRegistrationResult queued =
-                Runtime::ApplyEditorRegistrationCommand(
-                    context,
-                    Runtime::EditorRegistrationCommand{
-                        .SourceStableEntityId =
-                            Runtime::SelectionController::ToStableEntityId(source),
-                        .TargetStableEntityId =
-                            Runtime::SelectionController::ToStableEntityId(
-                                targetEntity),
-                        .Variant = Runtime::EditorICPVariant::PointToPoint,
-                        .MaxIterations = 60u,
-                        .InlierRatio = 1.0,
-                        .TrajectoryStep = 1000u,
-                    },
-                    [&deliveries](Runtime::EditorRegistrationResult)
-                    { ++deliveries; });
+            const Runtime::EditorRegistrationResult queued = Runtime::ApplyEditorRegistrationCommand(context,
+                Runtime::EditorRegistrationCommand{
+                    .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+                    .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+                    .Variant = Runtime::EditorICPVariant::PointToPoint,
+                    .Execution = {.IterationCap = 60u,
+                        .AutoAccept = Runtime::StepRunAutoAccept::End,
+                        .Start = Runtime::StepRunStart::Run},
+                    .InlierRatio = 1.0,
+                    .TrajectoryStep = 1000u,
+                },
+                [&deliveries](Runtime::EditorRegistrationResult)
+                {
+                    ++deliveries;
+                });
             ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending)
                 << queued.Message;
         }
@@ -1538,7 +1556,8 @@ TEST(SandboxEditorUi, DetachedQueuedPointSetAndRegistrationJobsDoNotReadFreedSce
         ASSERT_TRUE(jobs.DrainUntilTerminal());
         const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
         ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+        EXPECT_EQ(
+            done.Entries[0].State, family == 1 ? Runtime::JobState::Cancelled : Runtime::JobState::StaleDiscarded);
         // The finalizer still runs, but its guarded sink refuses to call into a
         // detached editor.
         EXPECT_EQ(deliveries, 0u);
@@ -1822,7 +1841,7 @@ TEST(SandboxEditorUi,
     const auto decoded = Runtime::GetClusteringConfig(canonical);
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Parameters.ClusterCount, 11u);
-    EXPECT_EQ(decoded->Parameters.MaxIterations, 91u);
+    EXPECT_EQ(decoded->Parameters.Execution.IterationCap, 91u);
     EXPECT_EQ(decoded->Parameters.Seed, 0xffffffffu);
     EXPECT_EQ(decoded->Parameters.Initialization,
               Runtime::KMeansInitialization::Random);
@@ -2346,7 +2365,9 @@ TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRe
         .SourceStableEntityId = sourceId,
         .TargetStableEntityId = targetId,
         .Variant = Runtime::EditorICPVariant::PointToPoint,
-        .MaxIterations = 60u,
+        .Execution = {.IterationCap = 60u,
+            .AutoAccept = Runtime::StepRunAutoAccept::End,
+            .Start = Runtime::StepRunStart::Run},
         .InlierRatio = 1.0,
         .TrajectoryStep = 1000u,
     };
@@ -2422,20 +2443,30 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
         .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
         .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
         .Variant = Runtime::EditorICPVariant::PointToPoint,
-        .MaxIterations = 60u,
+        .Execution = {.IterationCap = 60u,
+            .AutoAccept = Runtime::StepRunAutoAccept::End,
+            .Start = Runtime::StepRunStart::Run},
         .InlierRatio = 1.0,
         .TrajectoryStep = 1000u,
     };
 
-    Tests::ExpectQueuedJobTerminates(s.jobs, "Sandbox.RegistrationICP", Runtime::JobState::Published,
-        [&](auto sink) { return Runtime::ApplyEditorRegistrationCommand(s.context, command, sink); },
-        [&](const auto& pending) {
+    Tests::ExpectQueuedJobTerminates(
+        s.jobs,
+        "ICP registration",
+        Runtime::JobState::Published,
+        [&](auto sink)
+        {
+            return Runtime::ApplyEditorRegistrationCommand(s.context, command, sink);
+        },
+        [&](const auto& pending)
+        {
             EXPECT_EQ(pending.SourcePointCount, sourcePoints.size());
             EXPECT_EQ(pending.TargetPointCount, target.size());
             expectPose(before.Position, 1.0e-6f);
             EXPECT_FALSE(s.registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
         },
-        [&](const auto& result) {
+        [&](const auto& result)
+        {
             EXPECT_TRUE(result.HasResult);
             EXPECT_GT(result.IterationsPerformed, 0u);
             EXPECT_EQ(result.AppliedStep, result.TrajectoryLength);
@@ -2527,21 +2558,18 @@ TEST(SandboxEditorUi, RegistrationPointToPlaneUsesTargetNormals)
             MakePointCloudEntity(registry, "SphereTarget", target);
         if (!normals.empty())
             SetPointCloudNormals(registry, targetEntity, normals);
-        const Runtime::EditorRegistrationResult result =
-            Runtime::ApplyEditorRegistrationCommand(
-                context,
-                Runtime::EditorRegistrationCommand{
-                    .SourceStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(source),
-                    .TargetStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(
-                            targetEntity),
-                    .Variant = variant,
-                    .MaxIterations = 40u,
-                    .MaxCorrespondenceDistance = 10.0,
-                    .InlierRatio = 1.0,
-                    .TrajectoryStep = 1000u,
-                });
+        const Runtime::EditorRegistrationResult result = Runtime::ApplyEditorRegistrationCommand(context,
+            Runtime::EditorRegistrationCommand{
+                .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+                .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+                .Variant = variant,
+                .Execution = {.IterationCap = 40u,
+                    .AutoAccept = Runtime::StepRunAutoAccept::End,
+                    .Start = Runtime::StepRunStart::Run},
+                .MaxCorrespondenceDistance = 10.0,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
         return std::tuple{
             result,
             history.CanUndo(),
@@ -2655,21 +2683,19 @@ TEST(SandboxEditorUi, QueuedRegistrationPointToPlaneUsesTargetNormals)
             MakePointCloudEntity(registry, "QueuedSphereTarget", target);
         SetPointCloudNormals(registry, targetEntity, normals);
 
-        const Runtime::EditorRegistrationResult queued =
-            Runtime::ApplyEditorRegistrationCommand(
-                context,
-                Runtime::EditorRegistrationCommand{
-                    .SourceStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(source),
-                    .TargetStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(
-                            targetEntity),
-                    .Variant = variant,
-                    .MaxIterations = 40u,
-                    .MaxCorrespondenceDistance = 10.0,
-                    .InlierRatio = 1.0,
-                    .TrajectoryStep = 1000u,
-                }, onComplete);
+        const Runtime::EditorRegistrationResult queued = Runtime::ApplyEditorRegistrationCommand(context,
+            Runtime::EditorRegistrationCommand{
+                .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+                .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+                .Variant = variant,
+                .Execution = {.IterationCap = 40u,
+                    .AutoAccept = Runtime::StepRunAutoAccept::End,
+                    .Start = Runtime::StepRunStart::Run},
+                .MaxCorrespondenceDistance = 10.0,
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            },
+            onComplete);
         EXPECT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
         EXPECT_TRUE(jobs.DrainUntilTerminal());
         return completed;
@@ -2710,20 +2736,18 @@ TEST(SandboxEditorUi, QueuedRegistrationPointToPlaneUsesTargetNormals)
     const ECS::EntityHandle syncTarget =
         MakePointCloudEntity(syncRegistry, "SyncSphereTarget", target);
     SetPointCloudNormals(syncRegistry, syncTarget, normals);
-    const Runtime::EditorRegistrationResult synchronous =
-        Runtime::ApplyEditorRegistrationCommand(
-            syncContext,
-            Runtime::EditorRegistrationCommand{
-                .SourceStableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(syncSource),
-                .TargetStableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(syncTarget),
-                .Variant = Runtime::EditorICPVariant::PointToPlane,
-                .MaxIterations = 40u,
-                .MaxCorrespondenceDistance = 10.0,
-                .InlierRatio = 1.0,
-                .TrajectoryStep = 1000u,
-            });
+    const Runtime::EditorRegistrationResult synchronous = Runtime::ApplyEditorRegistrationCommand(syncContext,
+        Runtime::EditorRegistrationCommand{
+            .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(syncSource),
+            .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(syncTarget),
+            .Variant = Runtime::EditorICPVariant::PointToPlane,
+            .Execution = {.IterationCap = 40u,
+                .AutoAccept = Runtime::StepRunAutoAccept::End,
+                .Start = Runtime::StepRunStart::Run},
+            .MaxCorrespondenceDistance = 10.0,
+            .InlierRatio = 1.0,
+            .TrajectoryStep = 1000u,
+        });
     ASSERT_TRUE(synchronous.Succeeded()) << synchronous.Message;
     EXPECT_EQ(pointToPlane->IterationsPerformed,
               synchronous.IterationsPerformed);
@@ -2762,20 +2786,17 @@ TEST(SandboxEditorUi, RegistrationPointToPlaneRejectsInvalidTargetNormals)
         const ECSC::Transform::Component before =
             registry.Raw().get<ECSC::Transform::Component>(source);
 
-        const Runtime::EditorRegistrationResult result =
-            Runtime::ApplyEditorRegistrationCommand(
-                context,
-                Runtime::EditorRegistrationCommand{
-                    .SourceStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(source),
-                    .TargetStableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(
-                            targetEntity),
-                    .Variant = Runtime::EditorICPVariant::PointToPlane,
-                    .MaxIterations = 40u,
-                    .InlierRatio = 1.0,
-                    .TrajectoryStep = 1000u,
-                });
+        const Runtime::EditorRegistrationResult result = Runtime::ApplyEditorRegistrationCommand(context,
+            Runtime::EditorRegistrationCommand{
+                .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+                .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+                .Variant = Runtime::EditorICPVariant::PointToPlane,
+                .Execution = {.IterationCap = 40u,
+                    .AutoAccept = Runtime::StepRunAutoAccept::End,
+                    .Start = Runtime::StepRunStart::Run},
+                .InlierRatio = 1.0,
+                .TrajectoryStep = 1000u,
+            });
 
         EXPECT_EQ(result.Status,
                   Runtime::EditorCommandStatus::InvalidProcessingParameters)
@@ -2874,20 +2895,18 @@ TEST(SandboxEditorUi, RegistrationPointToPlaneTransformsNormalsByInverseTranspos
         registry.Raw().get<ECSC::Transform::Component>(targetEntity);
     targetTransform.Scale = glm::vec3{1.0f, 4.0f, 1.0f};
 
-    const Runtime::EditorRegistrationResult result =
-        Runtime::ApplyEditorRegistrationCommand(
-            context,
-            Runtime::EditorRegistrationCommand{
-                .SourceStableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(source),
-                .TargetStableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(targetEntity),
-                .Variant = Runtime::EditorICPVariant::PointToPlane,
-                .MaxIterations = 40u,
-                .MaxCorrespondenceDistance = 100.0,
-                .InlierRatio = 1.0,
-                .TrajectoryStep = 1000u,
-            });
+    const Runtime::EditorRegistrationResult result = Runtime::ApplyEditorRegistrationCommand(context,
+        Runtime::EditorRegistrationCommand{
+            .SourceStableEntityId = Runtime::SelectionController::ToStableEntityId(source),
+            .TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(targetEntity),
+            .Variant = Runtime::EditorICPVariant::PointToPlane,
+            .Execution = {.IterationCap = 40u,
+                .AutoAccept = Runtime::StepRunAutoAccept::End,
+                .Start = Runtime::StepRunStart::Run},
+            .MaxCorrespondenceDistance = 100.0,
+            .InlierRatio = 1.0,
+            .TrajectoryStep = 1000u,
+        });
 
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.EffectiveVariant,
@@ -2930,15 +2949,15 @@ TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParame
             .Status,
         Runtime::EditorCommandStatus::InvalidProcessingParameters);
 
-    EXPECT_EQ(
-        Runtime::ApplyEditorRegistrationCommand(
-            context,
-            Runtime::EditorRegistrationCommand{
-                .SourceStableEntityId = sourceId,
-                .TargetStableEntityId = targetId,
-                .MaxIterations = 0u,
-            })
-            .Status,
+    EXPECT_EQ(Runtime::ApplyEditorRegistrationCommand(context,
+                  Runtime::EditorRegistrationCommand{
+                      .SourceStableEntityId = sourceId,
+                      .TargetStableEntityId = targetId,
+                      .Execution = {.IterationCap = 0u,
+                          .AutoAccept = Runtime::StepRunAutoAccept::End,
+                          .Start = Runtime::StepRunStart::Run},
+                  })
+                  .Status,
         Runtime::EditorCommandStatus::InvalidProcessingParameters);
 
     EXPECT_EQ(
@@ -2984,17 +3003,17 @@ TEST(SandboxEditorUi, RegistrationCommandAlignsAcrossEntityTransforms)
     const std::uint32_t targetId =
         Runtime::SelectionController::ToStableEntityId(target);
 
-    const Runtime::EditorRegistrationResult result =
-        Runtime::ApplyEditorRegistrationCommand(
-            context,
-            Runtime::EditorRegistrationCommand{
-                .SourceStableEntityId = sourceId,
-                .TargetStableEntityId = targetId,
-                .Variant = Runtime::EditorICPVariant::PointToPoint,
-                .MaxIterations = 60u,
-                .InlierRatio = 1.0,
-                .TrajectoryStep = 1000u,
-            });
+    const Runtime::EditorRegistrationResult result = Runtime::ApplyEditorRegistrationCommand(context,
+        Runtime::EditorRegistrationCommand{
+            .SourceStableEntityId = sourceId,
+            .TargetStableEntityId = targetId,
+            .Variant = Runtime::EditorICPVariant::PointToPoint,
+            .Execution = {.IterationCap = 60u,
+                .AutoAccept = Runtime::StepRunAutoAccept::End,
+                .Start = Runtime::StepRunStart::Run},
+            .InlierRatio = 1.0,
+            .TrajectoryStep = 1000u,
+        });
 
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_LT(result.FinalRMSE, 1.0e-3);
@@ -3252,18 +3271,84 @@ TEST(SandboxEditorUi, ProgressivePoissonRejectsUnrepresentableOutputsWithoutPart
 TEST(SandboxEditorUi, KMeansPreviewIntervalRoundTripsAndRejectsInvalidIntervals)
 {
     Runtime::ClusteringConfig value;
-    value.Parameters.GpuPreviewInterval=7;
+    value.Parameters.Execution.PreviewEvery = 7;
     value.Parameters.ClusterCount=1024;
     Core::Config::EngineConfig engine;
     Runtime::SetClusteringConfig(engine,value);
     const auto restored=Runtime::GetClusteringConfig(engine);
-    ASSERT_TRUE(restored);EXPECT_EQ(restored->Parameters.GpuPreviewInterval,7u);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->Parameters.Execution.PreviewEvery, 7u);
     EXPECT_EQ(restored->Parameters.ClusterCount,1024u);
     EXPECT_TRUE(Runtime::ValidateClusteringConfigSection(Runtime::SerializeClusteringConfig(value),{},"test").Usable());
-    for(auto interval:{0u,1000001u}){
-        value.Parameters.GpuPreviewInterval=interval;
+    // ARCH-023: 0 turns live preview off (a valid value that round-trips); beyond the shared maximum is invalid.
+    value.Parameters.Execution.PreviewEvery = 0;
+    Runtime::SetClusteringConfig(engine, value);
+    ASSERT_TRUE(Runtime::GetClusteringConfig(engine));
+    EXPECT_EQ(Runtime::GetClusteringConfig(engine)->Parameters.Execution.PreviewEvery, 0u);
+    EXPECT_EQ(Runtime::ValidateClusteringConfigSection(Runtime::SerializeClusteringConfig(value), {}, "test").State,
+        Core::Config::EngineConfigState::Valid);
+    for (auto interval : {1000001u, 0xffffffffu})
+    {
+        value.Parameters.Execution.PreviewEvery = interval;
         const auto invalid=Runtime::ValidateClusteringConfigSection(Runtime::SerializeClusteringConfig(value),{},"test");
         EXPECT_EQ(invalid.State,Core::Config::EngineConfigState::FallbackApplied);
+    }
+}
+
+// ARCH-023: the shared execution options in sandbox.clustering. The defaults are today's (32 iterations, live preview
+// every 5, no time limit, wait for Accept, start running) and serialize under the shared names; a document is
+// validated first (an out-of-range value or unknown token keeps the reference value with a diagnostic) and the
+// canonical payload round-trips exactly. Predictions as asserted. Mutation: reading auto_accept with the wrong
+// parser (or dropping a row from kClusteringFields) leaves the reference value for a valid document.
+TEST(SandboxEditorUi, KMeansExecutionOptionsValidateThenApplyAndRoundTripWithTheirDefaults)
+{
+    const Runtime::ClusteringConfig defaults{};
+    EXPECT_EQ(defaults.Parameters.Execution,
+        (Runtime::StepRunExecution{.IterationCap = 32u,
+            .PreviewEvery = 5u,
+            .PreviewIntervalMs = 0u,
+            .AutoAccept = Runtime::StepRunAutoAccept::Never,
+            .Start = Runtime::StepRunStart::Run}));
+    const auto canonical = nlohmann::json::parse(Runtime::SerializeClusteringConfig(defaults));
+    EXPECT_EQ(canonical.at("max_iterations"), 32);
+    EXPECT_EQ(canonical.at("preview_every"), 5);
+    EXPECT_EQ(canonical.at("preview_interval_ms"), 0);
+    EXPECT_EQ(canonical.at("auto_accept"), "never");
+    EXPECT_EQ(canonical.at("start"), "run");
+    EXPECT_FALSE(canonical.contains("gpu_preview_interval")) << "no alias of the former name";
+
+    const auto reference = Runtime::SerializeClusteringConfig(defaults);
+    const auto valid = Runtime::ValidateClusteringConfigSection(
+        R"({"max_iterations":7,"preview_every":0,"preview_interval_ms":16,"auto_accept":"end","start":"ready"})",
+        reference,
+        "test");
+    ASSERT_EQ(valid.State, Core::Config::EngineConfigState::Valid);
+    Core::Config::EngineConfig engine;
+    Runtime::SetClusteringConfig(engine, defaults);
+    Core::Config::UpsertEngineConfigSection(engine.AppSections,
+        Core::Config::EngineConfigSection{.Name = std::string{Runtime::kClusteringConfigSectionName},
+            .SchemaId = std::string{Runtime::kClusteringConfigSectionSchemaId},
+            .SchemaVersion = Runtime::kClusteringConfigSectionSchemaVersion,
+            .PayloadJson = valid.CanonicalPayloadJson});
+    const auto applied = Runtime::GetClusteringConfig(engine);
+    ASSERT_TRUE(applied);
+    EXPECT_EQ(applied->Parameters.Execution,
+        (Runtime::StepRunExecution{.IterationCap = 7u,
+            .PreviewEvery = 0u,
+            .PreviewIntervalMs = 16u,
+            .AutoAccept = Runtime::StepRunAutoAccept::End,
+            .Start = Runtime::StepRunStart::Ready}));
+    EXPECT_EQ(Runtime::SerializeClusteringConfig(*applied), valid.CanonicalPayloadJson) << "round-trips exactly";
+
+    for (const char* bad : {R"({"max_iterations":4097})",
+             R"({"preview_interval_ms":60001})",
+             R"({"auto_accept":"sometimes"})",
+             R"({"start":"later"})"})
+    {
+        const auto invalid = Runtime::ValidateClusteringConfigSection(bad, reference, "test");
+        EXPECT_EQ(invalid.State, Core::Config::EngineConfigState::FallbackApplied) << bad;
+        EXPECT_FALSE(invalid.Diagnostics.empty()) << bad;
+        EXPECT_EQ(nlohmann::json::parse(invalid.CanonicalPayloadJson), canonical) << bad << ": the reference is kept";
     }
 }
 

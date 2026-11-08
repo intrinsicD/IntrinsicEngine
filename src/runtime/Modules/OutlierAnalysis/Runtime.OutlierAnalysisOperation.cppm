@@ -14,6 +14,7 @@ export import Extrinsic.Runtime.OutlierAnalysisConfig;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Graphics.GpuPropertyResidency;
 export namespace Extrinsic::Runtime
 {
@@ -28,6 +29,8 @@ export namespace Extrinsic::Runtime
         std::size_t SlotCount{}, LiveCount{}, RejectedCount{}, WrittenCount{};
         float MeanDistance{}, StdDevDistance{}, DistanceThreshold{};
         std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
+        std::uint64_t
+            StepRun{}; // the run's step run (run_control, run_observe); 0: none (refused, immediate, no service)
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
@@ -52,6 +55,9 @@ export namespace Extrinsic::Runtime
         std::string AcceptDisabledReason{};
         EditorOutlierAnalysisResult Result{};
     };
+    // A one-shot step run (Result.StepRun) with `config.Execution`: its start (ready: nothing recorded until
+    // run_control run or step) and automatic Accept (any but never: once the step ended, unless stopped); it restarts
+    // from the same capture, reusing its resident inputs and workspace, until Accept or Discard.
     // Null with `failure` filled when refused; an active job on the same output answers Pending
     // with the shared "already has an active" message, as for the other GPU transactions.
     [[nodiscard]] EditorOutlierTransactionHandle StartEditorOutlierAnalysisTransaction(
@@ -84,5 +90,14 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&, const OutlierAnalysisConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(
+        const EditorProcessingCommands&, std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
+    // ARCH-023: Apply's run with `config.Execution` instead of the batch (Apply always computes at once and accepts at
+    // its end): on every backend a one-shot step run of the session's service (the CPU's a worker run, Vulkan's its
+    // transaction), driven by run_control or a panel's row; its answer names it (StepRun, Pending while it runs) and
+    // `onComplete` gets its terminal result, stored as Apply's. The removal mode is immediate, as Apply's.
+    [[nodiscard]] EditorOutlierAnalysisResult StartEditorOutlierAnalysisRun(const EditorProcessingCommands&,
+        const OutlierAnalysisConfig&,
+        std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
+    [[nodiscard]] EditorOutlierAnalysisResult StartEditorConfiguredOutlierAnalysis(
         const EditorProcessingCommands&, std::function<void(EditorOutlierAnalysisResult)> onComplete = {});
 }

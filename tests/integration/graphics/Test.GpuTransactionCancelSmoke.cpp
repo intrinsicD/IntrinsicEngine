@@ -12,11 +12,13 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
@@ -65,9 +67,7 @@ namespace
     class CancelApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        // Accept is issued from Maintenance, after this frame's transfers were collected: its
-        // readback lands at the earliest at the next collection, after the next completion
-        // drain parked the Accept job, so the next UiBuild frame sees it in AwaitingApply.
+        // Drain the handover to Accept here, then withhold readback delivery until its job is parked.
         [[nodiscard]] Extrinsic::Core::Result OnRegister(Runtime::EngineSetup& setup) override
         {
             if (auto registered = RuntimeTestModule::OnRegister(setup); !registered) return registered;
@@ -79,17 +79,41 @@ namespace
         {
             if (Step != 4 || !Run || !Commands.IsBound()) return;
             const auto snapshot = Runtime::SnapshotEditorPropertySmoothing(Commands, Run);
-            if (snapshot.Phase == Phase::Running) return;
-            if (snapshot.Phase != Phase::ReadyToAccept) return Fail("explicit run ended: " + snapshot.Result.Message);
+            if (snapshot.Phase != Phase::Running)
+                return Fail("explicit run ended: " + snapshot.Result.Message);
+            auto* runs = Runtime::GetEditorStepRuns(Commands);
+            const auto run = runs ? runs->Observe(snapshot.Result.StepRun) : std::nullopt;
+            if (!run || run->Phase != Runtime::StepRunPhase::Paused || run->End == Runtime::StepRunEnd::None ||
+                run->SegmentInFlight || snapshot.Previews == 0u)
+                return;
             Delivered.clear();
-            const auto accepted = Runtime::AcceptEditorPropertySmoothing(Commands, Run,
-                [this](Runtime::EditorPropertySmoothingResult r) { Delivered.push_back(std::move(r)); });
-            if (accepted.Status != Runtime::EditorCommandStatus::Pending) return Fail("Accept refused: " + accepted.Message);
-            const auto job = Job("Vulkan property smoothing accept");
-            if (!job) return Fail("the Accept job is not an editor job");
-            AcceptToken = job->Token;
-            EXPECT_EQ(job->Identity.Run, RunToken) << "the Accept stage joins the run";
-            ++Step;
+            std::string refusal;
+            if (!runs->Control(snapshot.Result.StepRun, Runtime::StepRunAction::Accept, 1u, refusal))
+                return Fail("Accept refused: " + refusal);
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+            while (std::chrono::steady_clock::now() < deadline)
+            {
+                // The final store may need collection. Once Accept is submitted its ordinary readback sink
+                // stays undelivered, so the real readiness gate parks deterministically even on a fast GPU.
+                if (!AcceptToken.IsValid())
+                    Kernel().GetDevice().GetTransferQueue().CollectCompleted();
+                (void)Kernel().Jobs().DrainCompletions(Kernel().Events());
+                if (!AcceptToken.IsValid())
+                    if (const auto job = Job("Vulkan property smoothing accept"))
+                    {
+                        AcceptToken = job->Token;
+                        EXPECT_EQ(job->Identity.Run, RunToken) << "the Accept stage joins the run";
+                    }
+                if (AcceptToken.IsValid() && Kernel().Jobs().GetState(AcceptToken) == Runtime::JobState::AwaitingApply)
+                {
+                    if (!CancelThroughAgent(AcceptToken))
+                        return Fail("jobs_cancel refused the parked Accept");
+                    Step = 6;
+                    return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            }
+            Fail("the Accept never parked in AwaitingApply");
         }
 
         void Resolve() override
@@ -130,6 +154,12 @@ namespace
             Explicit = Config;
             Explicit.Filter.Method = S::PropertyFilter::Averaging;
             Explicit.Filter.Iterations = 3;
+            // ARCH-023: both compute at once, every step previewed (the paused front is the last step).
+            for (auto* config : {&Implicit, &Explicit})
+            {
+                config->Execution.Start = Runtime::StepRunStart::Run;
+                config->Execution.PreviewIntervalMs = 0u;
+            }
             Runtime::RegisterEditorAgentOperations(Registry);
             Attachment.Attach(Kernel().Worlds(), Kernel().Services());
         }
@@ -197,7 +227,14 @@ namespace
                 Before = Output();
                 BeforeRevision = Props().FindPropertyRevision("smooth");
                 Runtime::EditorPropertySmoothingResult failure;
-                Run = Runtime::StartEditorPropertySmoothing(Commands, Id, Implicit, failure);
+                Run = Runtime::StartEditorPropertySmoothing(Commands,
+                    Id,
+                    Implicit,
+                    failure,
+                    [this](Runtime::EditorPropertySmoothingResult r)
+                    {
+                        Delivered.push_back(std::move(r));
+                    });
                 if (!Run) return Fail("implicit start refused: " + failure.Message);
                 const auto job = Job("Vulkan property smoothing");
                 if (!job) return Fail("the Run job is not an editor job");
@@ -241,7 +278,14 @@ namespace
                 Before = Output();
                 BeforeRevision = Props().FindPropertyRevision("smooth");
                 Runtime::EditorPropertySmoothingResult failure;
-                Run = Runtime::StartEditorPropertySmoothing(Commands, Id, Explicit, failure);
+                Run = Runtime::StartEditorPropertySmoothing(Commands,
+                    Id,
+                    Explicit,
+                    failure,
+                    [this](Runtime::EditorPropertySmoothingResult r)
+                    {
+                        Delivered.push_back(std::move(r));
+                    });
                 if (!Run) return Fail("explicit start refused: " + failure.Message);
                 const auto job = Job("Vulkan property smoothing");
                 if (!job) return Fail("the second Run job is not an editor job");
@@ -250,26 +294,6 @@ namespace
                 return;
             }
             case 4: return; // Accept: MaintenanceFrame
-            case 5: // Cancel the Accept while its readback keeps it parked in AwaitingApply.
-            {
-                const auto state = Kernel().Jobs().GetState(AcceptToken);
-                if (state == Runtime::JobState::AwaitingApply)
-                {
-                    if (!CancelThroughAgent(AcceptToken)) return Fail("jobs_cancel refused the parked Accept");
-                    ++Step;
-                    return;
-                }
-                if (!Runtime::IsActiveEditorJobState(state))
-                {
-                    // The readback landed before a frame saw the job parked: try again from the
-                    // published output.
-                    if (++AcceptAttempts >= 8) return Fail("the Accept never parked in AwaitingApply");
-                    Run.reset();
-                    Settle = 0;
-                    Step = 3;
-                }
-                return;
-            }
             case 6:
             {
                 if (snapshot.Phase == Phase::Accepting) return;
@@ -287,7 +311,6 @@ namespace
                 if (++Settle < 8) return;
                 EXPECT_EQ(Delivered.size(), 1u);
                 ExpectPreviousOutputKept("after the cancelled Accept settled");
-                ::testing::Test::RecordProperty("accept_retries_before_parked", std::to_string(AcceptAttempts));
                 Done = true;
                 Kernel().RequestExit();
                 return;
@@ -315,7 +338,7 @@ namespace
         entt::entity Entity{};
         std::uint32_t Id{};
         std::chrono::steady_clock::time_point Started{};
-        std::size_t OperationalFrames{}, Settle{}, AcceptAttempts{};
+        std::size_t OperationalFrames{}, Settle{};
         int Step{};
         bool Done{}, TimedOut{};
     };
@@ -335,6 +358,7 @@ TEST(RUNTIME311GpuTransactionCancel, AwaitingApplyCancelThroughTheEditorJobSurfa
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // ARCH-023: GPU transactions are refused without it
     engine.Initialize();
     Shutdown shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";

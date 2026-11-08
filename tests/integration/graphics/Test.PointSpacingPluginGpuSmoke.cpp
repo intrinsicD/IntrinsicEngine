@@ -118,6 +118,16 @@ namespace
         return entities;
     }
 
+    // A run that computes at once and accepts at its end (`accept`, a batch) or waits for Accept or Discard (the
+    // section's auto_accept and start rows).
+    PS::Config Running(PS::Config config, const bool accept)
+    {
+        config.Execution =
+            R::OneShotExecution({.AutoAccept = accept ? R::StepRunAutoAccept::End : R::StepRunAutoAccept::Never,
+                .Start = R::StepRunStart::Run});
+        return config;
+    }
+
     PS::Config Settings(const entt::entity entity, const D domain, const PS::SpacingBackend backend, const unsigned phase)
     {
         return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
@@ -184,7 +194,8 @@ TEST(PointSpacingPluginGpuSmoke, EightDomainsAgreeWithTheCpuOctreeColdWarmAndSca
             for (unsigned d = 1; d <= 8; ++d)
             {
                 Fill(Props(scene, entities[d - 1], D(d)));
-                references.push_back(PS::Start(Settings(entities[d - 1], D(d), PS::SpacingBackend::CpuOctree, phase), false));
+                references.push_back(
+                    PS::Start(Running(Settings(entities[d - 1], D(d), PS::SpacingBackend::CpuOctree, phase), true)));
             }
             return false;
         }
@@ -201,7 +212,8 @@ TEST(PointSpacingPluginGpuSmoke, EightDomainsAgreeWithTheCpuOctreeColdWarmAndSca
             }
             started = std::chrono::steady_clock::now();
             for (unsigned d = 1; d <= 8; ++d)
-                vulkan.push_back(PS::Start(Settings(entities[d - 1], D(d), PS::SpacingBackend::VulkanLBVH, phase), true));
+                vulkan.push_back(
+                    PS::Start(Running(Settings(entities[d - 1], D(d), PS::SpacingBackend::VulkanLBVH, phase), true)));
             return false;
         }
         if (!AllFinal(vulkan)) return false;
@@ -308,80 +320,93 @@ TEST(PointSpacingPluginGpuSmoke, AcceptDiscardStaleCancelAndACoincidentCluster)
     auto& cache = *gpu.H->Engine.Services().Find<R::SpatialIndexCache>();
     std::uint64_t submittedBefore = 0;
     std::size_t undoBefore = 0;
-    ASSERT_TRUE(gpu.Run([&]
-    {
-        if (!discarded) discarded = PS::Start(config, false);
-        PS::Refresh(*discarded);
-        if (!discarded->Final)
+    ASSERT_TRUE(gpu.Run(
+        [&]
         {
-            const auto state = discarded->Analysis.Poll();
-            if (state.Phase != R::ScalarAnalysisPhase::ReadyToAccept) return false;
-            previewSeen = state.CanAccept && HasRing(*gpu.H, cloud, config.Radii) &&
-                std::as_const(props).Get<float>("radii")[0] == 77.f;
-            undoBefore = gpu.H->History().UndoCount();
-            (void)PS::Cancel(*discarded); // the window's Discard
-            return false;
-        }
-        if (!accepted)
-        {
-            auto unknown = config; // the domains resolve to the entity's primary point domain
-            unknown.Positions.Domain = unknown.Radii.Domain = D::Unknown;
-            accepted = PS::Start(unknown, false);
-        }
-        PS::Refresh(*accepted);
-        if (!accepted->Final)
-        {
-            if (accepted->Analysis.Poll().Phase == R::ScalarAnalysisPhase::ReadyToAccept) PS::Accept(*accepted);
-            return false;
-        }
-        if (!stale)
-        {
-            Fill(props);
-            stale = PS::Start(config, true);
-            props.Get<glm::vec3>("samples")[0].x += .1f; // before any GPU recording
-        }
-        PS::Refresh(*stale);
-        if (!stale->Final) return false;
-        if (!cancelled)
-        {
-            staleKept = std::as_const(props).Get<float>("radii")[0] == 77.f;
-            props.Get<glm::vec3>("samples")[0].x -= .1f;
-            submittedBefore = cache.Stats().GpuComputeSubmissions;
-            cancelled = PS::Start(config, true);
-        }
-        if (!cancelRequested)
-        {
-            // Only after this run's compute reached the device (submitted at once or recorded into a frame; one run is
-            // in flight) and before its result is read.
-            PS::Refresh(*cancelled);
-            if (cancelled->Final) return true; // it ended before its cancel: reported below
-            if (cache.Stats().GpuComputeSubmissions != submittedBefore + 1u ||
-                cancelled->Analysis.Poll().Phase != R::ScalarAnalysisPhase::Running)
+            if (!discarded)
+                discarded = PS::Start(Running(config, false));
+            PS::Refresh(*discarded);
+            if (!discarded->Final)
+            {
+                const auto state = discarded->Analysis.Poll();
+                if (state.Phase != R::ScalarAnalysisPhase::ReadyToAccept)
+                    return false;
+                previewSeen = state.CanAccept && HasRing(*gpu.H, cloud, config.Radii) &&
+                    std::as_const(props).Get<float>("radii")[0] == 77.f;
+                undoBefore = gpu.H->History().UndoCount();
+                (void)PS::Cancel(*discarded); // the window's Discard
                 return false;
-            const auto jobs = gpu.H->Jobs();
-            const auto row = std::ranges::find_if(jobs, [&](const auto& job)
-            { return job.Identity.OutputName == "radii" && job.State == R::JobState::AwaitingApply; });
-            if (row == jobs.end()) return false;
-            const auto commands = R::PrepareEditorProcessingCommands(gpu.H->Shell);
-            cancelRequested = R::CancelEditorJobRun(commands, *row) == R::EditorJobCancelStatus::Requested;
-            return false;
-        }
-        PS::Refresh(*cancelled);
-        if (!cancelled->Final) return false;
-        if (!coincident) cancelKept = std::as_const(props).Get<float>("radii")[0] == 77.f;
-        if (!coincident)
-        {
-            props.Resize(1030);
-            props.Get<glm::vec3>("samples").Vector().assign(1030, glm::vec3(0));
-            props.Get<glm::vec3>("samples")[1029] = {10, 0, 0};
-            props.Get<bool>("v:deleted").Vector().assign(1030, false);
-            auto c = config;
-            c.GpuQueryBatchSize = 4096;
-            coincident = PS::Start(c, true);
-        }
-        PS::Refresh(*coincident);
-        return coincident->Final.has_value();
-    })) << "the frames ran out";
+            }
+            if (!accepted)
+            {
+                auto unknown = config; // the domains resolve to the entity's primary point domain
+                unknown.Positions.Domain = unknown.Radii.Domain = D::Unknown;
+                accepted = PS::Start(Running(unknown, false));
+            }
+            PS::Refresh(*accepted);
+            if (!accepted->Final)
+            {
+                if (accepted->Analysis.Poll().Phase == R::ScalarAnalysisPhase::ReadyToAccept)
+                    PS::Accept(*accepted);
+                return false;
+            }
+            if (!stale)
+            {
+                Fill(props);
+                stale = PS::Start(Running(config, true));
+                props.Get<glm::vec3>("samples")[0].x += .1f; // before any GPU recording
+            }
+            PS::Refresh(*stale);
+            if (!stale->Final)
+                return false;
+            if (!cancelled)
+            {
+                staleKept = std::as_const(props).Get<float>("radii")[0] == 77.f;
+                props.Get<glm::vec3>("samples")[0].x -= .1f;
+                submittedBefore = cache.Stats().GpuComputeSubmissions;
+                cancelled = PS::Start(Running(config, true));
+            }
+            if (!cancelRequested)
+            {
+                // Only after this run's compute reached the device (submitted at once or recorded into a frame; one run is
+                // in flight) and before its result is read.
+                PS::Refresh(*cancelled);
+                if (cancelled->Final)
+                    return true; // it ended before its cancel: reported below
+                if (cache.Stats().GpuComputeSubmissions != submittedBefore + 1u ||
+                    cancelled->Analysis.Poll().Phase != R::ScalarAnalysisPhase::Running)
+                    return false;
+                const auto jobs = gpu.H->Jobs();
+                const auto row = std::ranges::find_if(jobs,
+                    [&](const auto& job)
+                    {
+                        return job.Identity.OutputName == "radii" && job.State == R::JobState::AwaitingApply;
+                    });
+                if (row == jobs.end())
+                    return false;
+                const auto commands = R::PrepareEditorProcessingCommands(gpu.H->Shell);
+                cancelRequested = R::CancelEditorJobRun(commands, *row) == R::EditorJobCancelStatus::Requested;
+                return false;
+            }
+            PS::Refresh(*cancelled);
+            if (!cancelled->Final)
+                return false;
+            if (!coincident)
+                cancelKept = std::as_const(props).Get<float>("radii")[0] == 77.f;
+            if (!coincident)
+            {
+                props.Resize(1030);
+                props.Get<glm::vec3>("samples").Vector().assign(1030, glm::vec3(0));
+                props.Get<glm::vec3>("samples")[1029] = {10, 0, 0};
+                props.Get<bool>("v:deleted").Vector().assign(1030, false);
+                auto c = config;
+                c.GpuQueryBatchSize = 4096;
+                coincident = PS::Start(Running(c, true));
+            }
+            PS::Refresh(*coincident);
+            return coincident->Final.has_value();
+        }))
+        << "the frames ran out";
     EXPECT_TRUE(previewSeen) << "the preview was resident and the output unchanged";
     ASSERT_TRUE(discarded->Final);
     EXPECT_EQ(discarded->Final->Status, "discarded") << discarded->Final->Message;
@@ -427,7 +452,7 @@ TEST(PointSpacingPluginGpuSmoke, TinySeparationsAndScalesMatchTheCpuReference)
             auto c = Settings(entity, D::PointCloudPoint, PS::SpacingBackend::VulkanLBVH, 0);
             c.Radii.Name = "radii_" + std::to_string(runs.size());
             c.ScaleFactor = scales[runs.size()];
-            runs.push_back(PS::Start(c, true));
+            runs.push_back(PS::Start(Running(c, true)));
         }
         return AllFinal(runs) && runs.size() == scales.size();
     })) << "the frames ran out";
@@ -465,7 +490,8 @@ TEST(PointSpacingPluginGpuSmoke, AnUnloadReleasesAWaitingPreviewWithoutWriting)
     {
         if (!ready)
         {
-            if (waiting.expired()) waiting = PS::Start(config, false);
+            if (waiting.expired())
+                waiting = PS::Start(Running(config, false));
             const auto run = waiting.lock();
             if (!run || run->Final) return true; // reported below
             ready = run->Analysis.Poll().Phase == R::ScalarAnalysisPhase::ReadyToAccept;

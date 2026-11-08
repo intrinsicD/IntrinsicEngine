@@ -11,6 +11,7 @@
 #include "MockRHI.hpp"
 import Extrinsic.Graphics.PropertyFilter;
 import Extrinsic.Graphics.SparseConjugateGradient;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Handles;
 namespace G = Extrinsic::Graphics;
 using Extrinsic::Tests::MockCommandContext;
@@ -67,7 +68,8 @@ TEST(PropertyFilterWorkspace, ResidentMovesRespectDispatchLimitsAcrossGroupBound
         MockDevice device;
         device.ShaderFloat64 = true;
         MockCommandContext commands;
-        G::PropertyFilterWorkspace workspace(device);
+        Extrinsic::RHI::BufferManager scratch{device};
+        G::PropertyFilterWorkspace workspace(device, scratch);
         const auto makeView = [&] {
             const auto handle = device.CreateBuffer({.SizeBytes = std::uint64_t(rows) * 8u,
                 .Usage = Extrinsic::RHI::BufferUsage::Storage});
@@ -102,7 +104,8 @@ TEST(PropertyFilterWorkspace, ResidentFilterRespectDispatchLimitsAcrossGroupBoun
     MockDevice device;
     device.ShaderFloat64 = true;
     MockCommandContext commands;
-    G::PropertyFilterWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PropertyFilterWorkspace workspace(device, scratch);
     const auto makeView = [&] {
         const auto handle = device.CreateBuffer({.SizeBytes = std::uint64_t(rows) * 8u,
             .Usage = Extrinsic::RHI::BufferUsage::Storage});
@@ -128,7 +131,8 @@ TEST(PropertyFilterWorkspace, BilateralWithoutEdgesKeepsZeroSizedDispatch)
     MockDevice device;
     device.ShaderFloat64 = true;
     MockCommandContext commands;
-    G::PropertyFilterWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PropertyFilterWorkspace workspace(device, scratch);
     const std::vector<double> values{7.25}, degree{0.0};
     const std::vector<std::uint32_t> fixed{1u};
     ASSERT_TRUE(workspace.Record(commands,
@@ -145,7 +149,8 @@ TEST(PropertyFilterWorkspace, WarmRunsKeepPipelineAndBuffersAndRewriteEveryInput
     MockDevice device;
     device.ShaderFloat64 = true;
     MockCommandContext commands;
-    G::PropertyFilterWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PropertyFilterWorkspace workspace(device, scratch);
     const PathGraph graph;
     const G::PropertyFilterGpuParams averaging{.Iterations = 2, .Step = 0.5};
     const G::PropertyFilterGpuParams bilateral{.Method = G::PropertyFilterGpuMethod::Bilateral, .Iterations = 2, .Step = 0.5};
@@ -198,7 +203,8 @@ TEST(PropertyFilterWorkspace, WarmRunsKeepPipelineAndBuffersAndRewriteEveryInput
     wide.Values.assign(16, 1.0);
     EXPECT_TRUE(workspace.Record(commands, wide.Input(4), averaging).IsValid());
     EXPECT_EQ(newBuffers(), 15);
-    EXPECT_EQ(device.DestroyBufferCount, 4);
+    EXPECT_EQ(device.DestroyBufferCount, 0) << "the replaced value buffers return to the scratch cache";
+    EXPECT_EQ(scratch.GetScratchStats().PendingBytes, 4u * Extrinsic::RHI::BufferManager::ScratchClassBytes(4u * 8u));
     EXPECT_EQ(device.CreatePipelineCount, 1);
 
     // A failed growth refuses before recording; the next run allocates it.
@@ -219,7 +225,8 @@ TEST(PropertyFilterWorkspace, EachRunBindsOnlyItsOwnRowMapAndRestoreMask)
     MockDevice device;
     device.ShaderFloat64 = true;
     MockCommandContext commands;
-    G::PropertyFilterWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PropertyFilterWorkspace workspace(device, scratch);
     PathGraph graph;
     graph.Values.clear(); // gathered from the resident input
     const G::PropertyFilterGpuParams averaging{.Iterations = 1, .Step = 0.5};
@@ -287,7 +294,8 @@ TEST(SparseConjugateGradientWorkspace, WarmRunsKeepBuffersAndZeroTheirReports)
     MockDevice device;
     device.ShaderFloat64 = true;
     MockCommandContext commands;
-    G::SparseConjugateGradientWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::SparseConjugateGradientWorkspace workspace(device, scratch);
     const int created = device.CreateBufferCount;
     const Tridiagonal a;
     const std::vector<double> rhs{1, 2, 3}, guess{0.5, 0.5, 0.5};
@@ -333,7 +341,13 @@ TEST(SparseConjugateGradientWorkspace, WarmRunsKeepBuffersAndZeroTheirReports)
     since = device.BufferWrites.size();
     ASSERT_TRUE(workspace.RecordUpload(commands));
     EXPECT_EQ(device.CreateBufferCount - created, 13);
-    EXPECT_EQ(device.DestroyBufferCount, 4);
+    EXPECT_EQ(device.DestroyBufferCount, 0) << "the replaced buffers return to the scratch cache";
+    // Right-hand sides (one solve), both 8-byte coefficient minima and the one-solve result.
+    EXPECT_EQ(scratch.GetScratchStats().PendingBytes,
+        Extrinsic::RHI::BufferManager::ScratchClassBytes(3u * 8u) +
+            2u * Extrinsic::RHI::BufferManager::ScratchClassBytes(8u) +
+            Extrinsic::RHI::BufferManager::ScratchClassBytes(
+                G::SparseConjugateGradientWorkspace::ReadbackBytes(3u, 1u)));
     EXPECT_EQ(device.BufferWrites.size() - since, 6u); // offsets, columns, values, diagonal, constant, reports
     EXPECT_TRUE(Wrote(device, since, std::vector<std::byte>(4 * sizeof(G::SparseCgReport), std::byte{0})));
     EXPECT_NE(workspace.SolutionsAddress(), 0u);
@@ -346,7 +360,8 @@ TEST(SparseConjugateGradientWorkspace, RefusedProblemOrGrowthLeavesNoEarlierRunR
     MockDevice device;
     device.ShaderFloat64 = true;
     MockCommandContext commands;
-    G::SparseConjugateGradientWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::SparseConjugateGradientWorkspace workspace(device, scratch);
     const Tridiagonal a;
     const std::vector<double> rhs{1, 2, 3}, guess{0, 0, 0};
     ASSERT_TRUE(workspace.Begin({.Matrix = a.Matrix(), .RightHandSides = rhs, .InitialGuesses = guess, .MaxIterations = 2000}));
@@ -374,4 +389,78 @@ TEST(SparseConjugateGradientWorkspace, RefusedProblemOrGrowthLeavesNoEarlierRunR
     ASSERT_TRUE(workspace.Begin(batch));
     EXPECT_TRUE(workspace.RecordNext(commands).IsValid());
     EXPECT_EQ(device.CreatePipelineCount, 1);
+}
+
+// ARCH-023: a run a range of iterations at a time records exactly the dispatches of the whole run, Begin records no
+// iteration and needs no write slot, no iteration past the run's is recorded, and the current values store into the
+// resident output on request.
+TEST(PropertyFilterWorkspace, IterationRangesRecordTheWholeRunsDispatchesAndNoMore)
+{
+    MockDevice device;
+    device.ShaderFloat64 = true;
+    Extrinsic::RHI::BufferManager scratch{device};
+    const PathGraph graph;
+    const G::PropertyFilterGpuParams taubin{
+        .Method = G::PropertyFilterGpuMethod::Taubin, .Iterations = 3, .Step = 0.5, .TaubinStep = -0.53};
+    MockCommandContext whole;
+    G::PropertyFilterWorkspace reference(device, scratch);
+    ASSERT_TRUE(reference.Record(whole, graph.Input(), taubin).IsValid());
+    G::PropertyFilterWorkspace workspace(device, scratch);
+    MockCommandContext begin, first, second;
+    ASSERT_TRUE(workspace.Begin(begin, graph.Input(), taubin));
+    EXPECT_EQ(begin.DispatchCalls, 0) << "Begin records no iteration";
+    EXPECT_EQ(workspace.RecordedIterations(), 0u);
+    ASSERT_TRUE(workspace.RecordIterations(first, 2u).IsValid());
+    ASSERT_TRUE(workspace.RecordIterations(second, 1u).IsValid());
+    EXPECT_EQ(first.DispatchCalls + second.DispatchCalls, whole.DispatchCalls) << "two submissions, the same passes";
+    EXPECT_EQ(first.DispatchCalls, 4) << "a Taubin pass is two applies";
+    EXPECT_EQ(workspace.RecordedIterations(), 3u);
+    MockCommandContext past;
+    EXPECT_FALSE(workspace.RecordIterations(past, 1u).IsValid()) << "no iteration past the run's";
+    EXPECT_TRUE(workspace.RecordIterations(past, 0u).IsValid()) << "none: the current values, ready for a read";
+    EXPECT_EQ(past.DispatchCalls, 0);
+    // Resident: Begin without a write slot (a stepped run stores only when it holds one), then a store.
+    const std::vector<std::uint32_t> slots{0, 1, 2, 3}, restore{0, 0, 0, 0};
+    G::PropertyFilterResidentIo io{.Input = View(device, true), .Slots = slots, .RestoreMask = restore};
+    MockCommandContext resident;
+    ASSERT_TRUE(workspace.Begin(resident,
+        {.Channels = 1, .Edges = graph.Edges, .Weights = graph.Weights, .Degree = graph.Degree, .Fixed = graph.Fixed},
+        taubin,
+        &io));
+    ASSERT_TRUE(workspace.RecordIterations(resident, 1u).IsValid());
+    EXPECT_FALSE(workspace.RecordStoreCurrent(resident, io)) << "no write slot, no store";
+    io.Output = View(device, true);
+    io.OutputBytes = 32u;
+    ASSERT_TRUE(workspace.RecordStoreCurrent(resident, io));
+    EXPECT_EQ(PushField<std::uint32_t>(resident, kMode), kStore);
+}
+
+// ARCH-023: a chunk records no solve at or past its limit (a time step's boundary), so Step(1) of chained solves stops
+// at its channels; a later chunk with a larger limit continues, and the remaining chunk finishes the run.
+TEST(SparseConjugateGradientWorkspace, ASolveLimitBoundsAChunkAtATimeStep)
+{
+    MockDevice device;
+    device.ShaderFloat64 = true;
+    MockCommandContext commands;
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::SparseConjugateGradientWorkspace workspace(device, scratch);
+    const Tridiagonal a;
+    const std::vector<double> diagonal(6, 1.0), constant(6, 0.0);
+    ASSERT_TRUE(workspace.Begin({.Matrix = a.Matrix(),
+        .Solves = 6,
+        .RhsDiagonal = diagonal,
+        .RhsConstant = constant,
+        .ChainStride = 2,
+        .SeedsOnDevice = true,
+        .MaxIterations = 3}));
+    ASSERT_TRUE(workspace.RecordUpload(commands));
+    ASSERT_TRUE(workspace.RecordNext(commands, 2u).IsValid());
+    EXPECT_EQ(workspace.CompletedSolves(), 2u) << "one time step of two channels";
+    EXPECT_FALSE(workspace.Finished());
+    ASSERT_TRUE(workspace.RecordNext(commands, 2u).IsValid()) << "at its limit a chunk records nothing new";
+    EXPECT_EQ(workspace.CompletedSolves(), 2u);
+    ASSERT_TRUE(workspace.RecordNext(commands, 4u).IsValid());
+    EXPECT_EQ(workspace.CompletedSolves(), 4u);
+    ASSERT_TRUE(workspace.RecordNext(commands).IsValid());
+    EXPECT_TRUE(workspace.Finished());
 }

@@ -1310,6 +1310,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PointScalarTransaction.cpp
         Test.OutlierTransaction.cpp
         Test.GpuTransactionLifecycleContract.cpp
+        Test.MethodTemplate.cpp
         Test.NormalTransaction.cpp
         Test.GpuPositionsAccept.cpp
         Test.RegistrationDomains.cpp
@@ -1393,8 +1394,11 @@ if(TARGET ExtrinsicRuntime)
         SOURCES
             ${_runtime_contract_test_sources}
             support/SandboxEditorJobHarness.cpp
+            # ARCH-023: the executable future-method template, built and tested here (Test.MethodTemplate.cpp).
+            ${CMAKE_SOURCE_DIR}/methods/_template/src/TemplateMethod.cpp
         DEPS ExtrinsicRuntime IntrinsicProgressivePoissonReference imgui_core_lib nlohmann_json::nlohmann_json
     )
+    target_include_directories(RuntimeContractTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/methods/_template/include)
     # Test.QueuedEditorJobContract.cpp scans the editor operation sources (RUNTIME-313 drift guard).
     target_compile_definitions(RuntimeContractTestObjs PRIVATE INTRINSIC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     # ARCH-022: the plugin tests link the plugins' objects (in-process plugins).
@@ -1875,6 +1879,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.ComputeCapabilitiesGpuSmoke.cpp
                 integration/graphics/Test.CoherentPointDriftGpuEStepSmoke.cpp
                 integration/graphics/Test.PointSamplingGpuSmoke.cpp
+                integration/graphics/Test.WorkerProducersNoFrameGpuSmoke.cpp
                 integration/graphics/Test.LowLatencyComputeSmoke.cpp
                 integration/graphics/Test.GpuPropertyResidencySmoke.cpp
                 integration/graphics/Test.PropertySmoothingTransactionGpuSmoke.cpp
@@ -1892,12 +1897,15 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.KernelDensityPluginGpuSmoke.cpp
                 integration/graphics/Test.DensityWeightsPluginGpuSmoke.cpp
                 integration/graphics/Test.PointSpacingPluginGpuSmoke.cpp
+                # ARCH-023: the method template's one-shot on its resident GPU producer (Test.PointCloudEditingScalarAnalysisGpuSmoke.cpp).
+                ${CMAKE_SOURCE_DIR}/methods/_template/src/TemplateMethod.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
              IntrinsicBilateralFilterPluginObjects IntrinsicDescriptorAnalysisPluginObjects
              IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects IntrinsicDensityWeightsPluginObjects
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
-    target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners)
+    target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners
+        ${CMAKE_SOURCE_DIR}/methods/_template/include)
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
         OBJECTS PointLBVHGpuTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicBilateralFilterPluginObjects
@@ -2885,8 +2893,9 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch|3"
     "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState|3"
     "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.StepsAndRunsReuseThePooledWorkspaceAndUploadEachTargetOnce|3"
-    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.CancelledAndRefusedComputationsKeepTheirLeaseUntilDoneAndFailClosed|3"
-    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.RequestEventsKeepTheirIdentityAndSettledLatency|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.CancelledAndRefusedComputationsKeepTheirWorkspaceUntilDoneAndFailClosed|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.SerialRequestsSettleTheirLatencyAndAClosedBrokerRefusesLaterOnes|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.AStepRunKeepsItsTargetResidentAcrossStepsAndPauses|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.ReadyJobsHonorPriorityAndEqualPrioritySubmissionOrder|2"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce|3"
@@ -3055,7 +3064,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.KeypointVulkanComputePublishesAcrossDomains PointLBVHGpuSmoke.KeypointVulkanComputeRejectsStaleCancellationAndIgnoresHybridCapacity PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(DescriptorAnalysisPluginGpuSmoke.EightDomainsAgreeWithTheCpuKdTreeColdWarmAndAutomatic DescriptorAnalysisPluginGpuSmoke.StaleInputsACancelBetweenStagesAndRadiusOverflowWriteNothing DescriptorAnalysisPluginGpuSmoke.ALowestIdCapServesADenseRadius DescriptorAnalysisPluginGpuSmoke.AnUnloadDuringAChainEndsTheRunOnceAndAReloadRunsAgain PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(CoherentPointDriftPluginGpuSmoke.APausedRunShowsItsPreviewAndOnlyAcceptWritesIt PROPERTIES TIMEOUT 120)\n"
-        "  set_tests_properties(KernelDensityPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled KernelDensityPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster KernelDensityPluginGpuSmoke.TinyBandwidthsMatchTheCpuReference PointSpacingPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled PointSpacingPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster PointSpacingPluginGpuSmoke.TinySeparationsAndScalesMatchTheCpuReference PointSpacingPluginGpuSmoke.AnUnloadReleasesAWaitingPreviewWithoutWriting PointCloudEditingScalarAnalysisGpuSmoke.AcceptPublishesTheCpuReferenceAndAnAutoAcceptRunNeedsNoCaller PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(KernelDensityPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled KernelDensityPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster KernelDensityPluginGpuSmoke.TinyBandwidthsMatchTheCpuReference PointSpacingPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled PointSpacingPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster PointSpacingPluginGpuSmoke.TinySeparationsAndScalesMatchTheCpuReference PointSpacingPluginGpuSmoke.AnUnloadReleasesAWaitingPreviewWithoutWriting PointCloudEditingScalarAnalysisGpuSmoke.AcceptPublishesTheCpuReferenceAndAnAutoAcceptRunNeedsNoCaller PointCloudEditingScalarAnalysisGpuSmoke.ARunControlAcceptAfterADetachPublishesNothing PointCloudEditingScalarAnalysisGpuSmoke.TheTemplatesOneShotRunsTheResidentProducerAndItsCpuCounterpart PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(DensityWeightsPluginGpuSmoke.EightDomainsEveryKernelAndModeAndAnAutomaticRadiusAgreeWithTheCpuKdTree DensityWeightsPluginGpuSmoke.AcceptDiscardStaleCancelAndARadiusOverflow DensityWeightsPluginGpuSmoke.TinySupportsAndOneSampleMatchTheCpuReference PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
         "if(DEFINED IntrinsicRuntimePointCloudConsolidationGpuParityTests_TESTS)\n"
@@ -3106,6 +3115,8 @@ if(Python3_Interpreter_FOUND)
     intrinsic_add_source_rules_test(RuntimeFrameLoopContract graphics integration runtime)
     intrinsic_add_source_rules_test(RuntimeEnginePrivateGlue contract runtime)
     intrinsic_add_source_rules_test(RuntimeEngineLayering contract runtime)
+    intrinsic_add_source_rules_test(RuntimeReuseDriftGuard contract runtime)
+    intrinsic_add_source_rules_test(SandboxEditorPresentation integration runtime)
 else()
     message(WARNING "Python3 not found: source-structure rule CTests are not registered (ci-docs still runs them).")
 endif()

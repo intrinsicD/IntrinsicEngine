@@ -28,11 +28,13 @@ import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.PointSamplingConfig;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.ConfigFieldSpec;
+import Extrinsic.Runtime.StepRunExecution;
 import Geometry.Properties.Types;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.PointSamplingConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
+#include "Config/internal/Runtime.StepRunExecutionJson.hpp"
 
 namespace Extrinsic::Runtime::ConfigDetail
 {
@@ -677,14 +679,30 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "angle_sum_tolerance", .Type = FT::Float, .Min = std::numeric_limits<double>::min(), .Max = 1.0e30},
             ConfigFieldSpec{.Name = "degeneracy_tolerance", .Type = FT::Float, .Min = std::numeric_limits<double>::min(), .Max = 1.0e30},
         };
+        // ARCH-023: the shared execution rows (max_iterations, preview_every, preview_interval_ms, auto_accept,
+        // start) with each method's own iteration limit; ReadStepRunExecution and EncodeStepRunExecutionJson are their
+        // one codec.
+        constexpr auto kKMeansExecutionFields = StepRunExecutionFields(kMaxKMeansIterations);
+        constexpr auto kConsolidationExecutionFields = StepRunExecutionFields(kMaxPointCloudConsolidationIterations);
         const std::array kClusteringFields{
             ConfigFieldSpec{.Name = "cluster_count", .Type = FT::UInt, .Min = 1, .Max = 1024},
-            ConfigFieldSpec{.Name = "gpu_preview_interval", .Type = FT::UInt, .Min = 1, .Max = 1000000},
-            ConfigFieldSpec{.Name = "max_iterations", .Type = FT::UInt, .Min = 1, .Max = 4096},
-            ConfigFieldSpec{.Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
-            ConfigFieldSpec{.Name = "initialization", .Type = FT::StringEnum, .EnumValues = kKMeansInitializationTokens},
+            kKMeansExecutionFields[0],
+            kKMeansExecutionFields[1],
+            kKMeansExecutionFields[2],
+            kKMeansExecutionFields[3],
+            kKMeansExecutionFields[4],
+            ConfigFieldSpec{
+                .Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
+            ConfigFieldSpec{
+                .Name = "initialization", .Type = FT::StringEnum, .EnumValues = kKMeansInitializationTokens},
             ConfigFieldSpec{.Name = "backend", .Type = FT::StringEnum, .EnumValues = kClusteringBackendTokens},
-            ConfigFieldSpec{.Name = "properties", .Type = FT::Object, .Description = "Bindings share one element domain and have distinct nonempty NUL-free names. Outputs must not replace topology or position storage; unknown nested keys are silently ignored.", .Nullable = true, .Fields = kClusteringPropertyFields.data(), .FieldCount = kClusteringPropertyFields.size()},
+            ConfigFieldSpec{.Name = "properties",
+                .Type = FT::Object,
+                .Description =
+                    "Bindings share one element domain and have distinct nonempty NUL-free names. Outputs must not replace topology or position storage; unknown nested keys are silently ignored.",
+                .Nullable = true,
+                .Fields = kClusteringPropertyFields.data(),
+                .FieldCount = kClusteringPropertyFields.size()},
         };
         const std::array kCurvatureSegmentationFields{
             ConfigFieldSpec{.Name = "features", .Type = FT::Array, .Description = "At most three total scalar components; feature-curve methods require computed curvature.", .Item = &kSegmentationFeature, .MaxItems = 3},
@@ -718,25 +736,51 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "patch_complexity_cost", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
         };
         const std::array kPointCloudConsolidationFields{
-            ConfigFieldSpec{.Name = "backend", .Type = FT::StringEnum, .EnumNames = kConsolidationBackendLabels, .EnumValues = kPointCloudConsolidationBackendTokens},
+            ConfigFieldSpec{.Name = "backend",
+                .Type = FT::StringEnum,
+                .EnumNames = kConsolidationBackendLabels,
+                .EnumValues = kPointCloudConsolidationBackendTokens},
             ConfigFieldSpec{.Name = "initial_backend", .Type = FT::StringEnum, .EnumValues = kInitialBackendTokens},
-            ConfigFieldSpec{.Name = "strategy", .Type = FT::StringEnum, .EnumValues = kPointCloudConsolidationStrategyTokens},
-            ConfigFieldSpec{.Name = "support_radius_mode", .Type = FT::StringEnum, .EnumValues = kPointCloudConsolidationSupportRadiusModeTokens},
+            ConfigFieldSpec{
+                .Name = "strategy", .Type = FT::StringEnum, .EnumValues = kPointCloudConsolidationStrategyTokens},
+            ConfigFieldSpec{.Name = "support_radius_mode",
+                .Type = FT::StringEnum,
+                .EnumValues = kPointCloudConsolidationSupportRadiusModeTokens},
             ConfigFieldSpec{.Name = "support_radius", .Type = FT::Float, .Min = 1.0e-12, .Max = 1.0e12},
             ConfigFieldSpec{.Name = "max_support_neighbors", .Type = FT::UInt, .Min = 1, .Max = 1'000'000},
-            ConfigFieldSpec{.Name = "max_predicted_contributions", .Type = FT::UInt, .Min = 1, .Max = 1'000'000'000'000LL},
+            ConfigFieldSpec{
+                .Name = "max_predicted_contributions", .Type = FT::UInt, .Min = 1, .Max = 1'000'000'000'000LL},
             ConfigFieldSpec{.Name = "repulsion_weight", .Type = FT::Float, .Min = 0.0, .Max = 0.499999999999},
-            ConfigFieldSpec{.Name = "max_iterations", .Type = FT::UInt, .Min = 1, .Max = 4096},
+            kConsolidationExecutionFields[0],
+            kConsolidationExecutionFields[1],
+            kConsolidationExecutionFields[2],
+            kConsolidationExecutionFields[3],
+            kConsolidationExecutionFields[4],
             ConfigFieldSpec{.Name = "convergence_tolerance", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
-            ConfigFieldSpec{.Name = "target_point_count", .Type = FT::UInt, .Description = "Zero or an explicit count of at least two is accepted. One retains the reference value with a warning.", .Min = 0, .Max = 1'000'000},
-            ConfigFieldSpec{.Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
-            ConfigFieldSpec{.Name = "gpu_preview_interval", .Type = FT::UInt, .Min = 1, .Max = 1000000},
+            ConfigFieldSpec{.Name = "target_point_count",
+                .Type = FT::UInt,
+                .Description =
+                    "Zero or an explicit count of at least two is accepted. One retains the reference value with a warning.",
+                .Min = 0,
+                .Max = 1'000'000},
+            ConfigFieldSpec{
+                .Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
             ConfigFieldSpec{.Name = "gpu_query_batch_size", .Type = FT::UInt, .Min = 1, .Max = 16384},
             ConfigFieldSpec{.Name = "gpu_radius_capacity", .Type = FT::UInt, .Min = 1, .Max = 1024},
             ConfigFieldSpec{.Name = "wlop_anisotropic", .Type = FT::Bool},
-            ConfigFieldSpec{.Name = "normal_source", .Type = FT::StringEnum, .EnumValues = kPointCloudConsolidationNormalSourceTokens},
-            ConfigFieldSpec{.Name = "normal_angle_radians", .Type = FT::Float, .Min = 1.0e-6, .Max = std::numbers::pi_v<double> - 1.0e-6},
-            ConfigFieldSpec{.Name = "normal_refinement_rounds", .Type = FT::UInt, .Description = "For EAR or anisotropic WLOP, values above max_iterations fall back to the reference rounds clamped to [1, max_iterations].", .Min = 1, .Max = 4096},
+            ConfigFieldSpec{.Name = "normal_source",
+                .Type = FT::StringEnum,
+                .EnumValues = kPointCloudConsolidationNormalSourceTokens},
+            ConfigFieldSpec{.Name = "normal_angle_radians",
+                .Type = FT::Float,
+                .Min = 1.0e-6,
+                .Max = std::numbers::pi_v<double> - 1.0e-6},
+            ConfigFieldSpec{.Name = "normal_refinement_rounds",
+                .Type = FT::UInt,
+                .Description =
+                    "For EAR or anisotropic WLOP, values above max_iterations fall back to the reference rounds clamped to [1, max_iterations].",
+                .Min = 1,
+                .Max = 4096},
             ConfigFieldSpec{.Name = "clop_mixture_component_count", .Type = FT::UInt, .Min = 1, .Max = 1'000'000},
             ConfigFieldSpec{.Name = "clop_mixture_max_iterations", .Type = FT::UInt, .Min = 1, .Max = 4096},
             ConfigFieldSpec{.Name = "clop_mixture_relative_tolerance", .Type = FT::Float, .Min = 0.0, .Max = 1.0},
@@ -1641,6 +1685,30 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // ARCH-023: the shared execution options of a section whose `fields` hold the StepRunExecutionFields rows;
+        // each value keeps the reference default when absent or outside its row, with the usual warning.
+        void ReadStepRunExecution(ValidationContext& context,
+            const json& object,
+            const std::span<const ConfigFieldSpec> fields,
+            StepRunExecution& options)
+        {
+            const auto integer = [&](const std::string_view key, std::uint32_t& value)
+            {
+                if (const auto read = ReadInteger(context, object, key, fields))
+                {
+                    value = static_cast<std::uint32_t>(*read);
+                    CountParsed(context);
+                }
+            };
+            integer("max_iterations", options.IterationCap);
+            integer("preview_every", options.PreviewEvery);
+            integer("preview_interval_ms", options.PreviewIntervalMs);
+            if (ReadEnum(context, object, "auto_accept", ParseStepRunAutoAccept, options.AutoAccept))
+                CountParsed(context);
+            if (ReadEnum(context, object, "start", ParseStepRunStart, options.Start))
+                CountParsed(context);
+        }
+
         // These values are persisted by the shared codec; changing them requires a schema change.
         static_assert(static_cast<unsigned>(Geometry::PropertyValueKind::Bool) == 1u &&
                       static_cast<unsigned>(Geometry::PropertyValueKind::Int32) == 2u &&
@@ -1706,17 +1774,7 @@ namespace Extrinsic::Runtime
                     static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", kClusteringFields))
-            {
-                config.Parameters.GpuPreviewInterval = static_cast<std::uint32_t>(*value);
-                CountParsed(context);
-            }
-            if (const auto value = ReadInteger(context, *object, "max_iterations", kClusteringFields))
-            {
-                config.Parameters.MaxIterations =
-                    static_cast<std::uint32_t>(*value);
-                CountParsed(context);
-            }
+            ReadStepRunExecution(context, *object, kClusteringFields, config.Parameters.Execution);
             if (const auto value = ReadInteger(context, *object, "seed", kClusteringFields))
             {
                 config.Parameters.Seed =
@@ -2043,11 +2101,7 @@ namespace Extrinsic::Runtime
                 config.RepulsionWeight = *value;
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(context, *object, "max_iterations", kPointCloudConsolidationFields))
-            {
-                config.MaxIterations = static_cast<std::uint32_t>(*value);
-                CountParsed(context);
-            }
+            ReadStepRunExecution(context, *object, kPointCloudConsolidationFields, config.Execution);
             if (const auto value = ReadNumber(context, *object, "convergence_tolerance", kPointCloudConsolidationFields))
             {
                 config.ConvergenceTolerance = *value;
@@ -2075,8 +2129,6 @@ namespace Extrinsic::Runtime
                 config.Seed = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
-            if (const auto value = ReadInteger(context, *object, "gpu_preview_interval", kPointCloudConsolidationFields))
-            { config.GpuPreviewInterval = static_cast<std::uint32_t>(*value); CountParsed(context); }
             if (const auto value = ReadInteger(context, *object, "gpu_query_batch_size", kPointCloudConsolidationFields))
             { config.GpuQueryBatchSize = static_cast<std::uint32_t>(*value); CountParsed(context); }
             if (const auto value = ReadInteger(context, *object, "gpu_radius_capacity", kPointCloudConsolidationFields))
@@ -2136,17 +2188,16 @@ namespace Extrinsic::Runtime
             }
 
             if ((config.Strategy == PointCloudConsolidationStrategy::Ear ||
-                 (config.Strategy == PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic)) &&
-                config.NormalRefinementRounds > config.MaxIterations)
+                    (config.Strategy == PointCloudConsolidationStrategy::Wlop && config.WlopAnisotropic)) &&
+                config.NormalRefinementRounds > config.Execution.IterationCap)
             {
                 AddWarning(
                     context,
                     Core::Config::EngineConfigDiagnosticCode::InvalidValue,
                     FieldSubject(context.Path, "normal_refinement_rounds"),
                     "Normal refinement rounds exceed max_iterations; reference-compatible value retained.");
-                config.NormalRefinementRounds = std::min(
-                    config.MaxIterations,
-                    std::max(1u, reference.NormalRefinementRounds));
+                config.NormalRefinementRounds =
+                    std::min(config.Execution.IterationCap, std::max(1u, reference.NormalRefinementRounds));
             }
             return config;
         }
@@ -2784,16 +2835,15 @@ namespace Extrinsic::Runtime
                           {"colors", EncodePropertyRef(config.Properties->OutputColors)},
                           {"scalar_labels", config.Properties->OutputScalarLabels
                               ? EncodePropertyRef(*config.Properties->OutputScalarLabels) : json(nullptr)}};
-        return ConfigDetail::SerializeConfigJson(json::object({
+        json doc = json::object({
             {"properties", properties},
             {"cluster_count", config.Parameters.ClusterCount},
-            {"gpu_preview_interval", config.Parameters.GpuPreviewInterval},
-            {"max_iterations", config.Parameters.MaxIterations},
             {"seed", config.Parameters.Seed},
-            {"initialization",
-             std::string{ToConfigString(config.Parameters.Initialization)}},
+            {"initialization", std::string{ToConfigString(config.Parameters.Initialization)}},
             {"backend", std::string{ToConfigString(config.Backend)}},
-        }));
+        });
+        ConfigDetail::EncodeStepRunExecutionJson(doc, config.Parameters.Execution);
+        return ConfigDetail::SerializeConfigJson(doc);
     }
 
     std::string SerializeCurvatureSegmentationConfig(
@@ -2990,20 +3040,16 @@ namespace Extrinsic::Runtime
         const PointCloudConsolidationConfig& config)
     {
         json doc = json::object({
-            {"gpu_preview_interval", config.GpuPreviewInterval},
             {"gpu_query_batch_size", config.GpuQueryBatchSize},
             {"gpu_radius_capacity", config.GpuRadiusCapacity},
             {"backend", std::string{ToConfigString(config.Backend)}},
             {"initial_backend", config.InitialBackend == PointSamplingBackend::Vulkan ? "vulkan" : "cpu"},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
-            {"support_radius_mode",
-             std::string{ToConfigString(config.SupportRadiusMode)}},
+            {"support_radius_mode", std::string{ToConfigString(config.SupportRadiusMode)}},
             {"support_radius", config.SupportRadius},
             {"max_support_neighbors", config.MaxSupportNeighbors},
-            {"max_predicted_contributions",
-             config.MaxPredictedContributions},
+            {"max_predicted_contributions", config.MaxPredictedContributions},
             {"repulsion_weight", config.RepulsionWeight},
-            {"max_iterations", config.MaxIterations},
             {"convergence_tolerance", config.ConvergenceTolerance},
             {"target_point_count", config.TargetPointCount},
             {"seed", config.Seed},
@@ -3017,6 +3063,7 @@ namespace Extrinsic::Runtime
             {"clop_covariance_floor", config.ClopCovarianceFloor},
             {"ear_edge_sensitivity", config.EarEdgeSensitivity},
         });
+        ConfigDetail::EncodeStepRunExecutionJson(doc, config.Execution);
         ConfigDetail::EncodePointSampling(doc, "initial_", config.InitialSampling);
         return ConfigDetail::SerializeConfigJson(doc);
     }

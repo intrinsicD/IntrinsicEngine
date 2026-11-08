@@ -6,7 +6,15 @@ module;
 export module Extrinsic.Graphics.PointNormals;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.RHI.Handles;
-extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+        class ICommandContext;
+        class BufferManager;
+    }
+}
 export namespace Extrinsic::Graphics
 {
     struct PointNormalsGpuParams
@@ -30,7 +38,8 @@ export namespace Extrinsic::Graphics
     class PointNormalsWorkspace
     {
     public:
-        explicit PointNormalsWorkspace(RHI::IDevice&);
+        // Scratch buffers are cached leases of `scratch`, which must outlive the workspace.
+        PointNormalsWorkspace(RHI::IDevice&, RHI::BufferManager& scratch);
         ~PointNormalsWorkspace();
         // Radius traversal and quadratic diagnostics have bounded work per submission.
         [[nodiscard]] static std::uint32_t RowsPerSubmission(bool radiusSearch, std::uint32_t batchSize);
@@ -39,6 +48,13 @@ export namespace Extrinsic::Graphics
         // Page 0 starts a run: a completed workspace is reused, growing only undersized scratch.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext&, const PointNormalsGpuParams&,
                                                const PointNormalsResidentIo&, std::uint32_t first = 0);
+        // ARCH-023, device-owner thread (a run's Init): checks the device, creates the pipeline and sizes the page
+        // scratch for `liveCount` rows of `p`, resolving their addresses, so every page of that run then makes no
+        // device call (a method worker records them).
+        [[nodiscard]] bool Prepare(const PointNormalsGpuParams& p, std::uint32_t liveCount);
+        // Returns every scratch buffer to its cache and ends the run, keeping the pipeline.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

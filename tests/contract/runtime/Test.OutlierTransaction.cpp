@@ -385,9 +385,16 @@ TEST(OutlierTransaction, ProductionStartRetainsItsTerminalResult)
     {
         return store.Copy().Last<R::OutlierOperation>();
     };
+    h.Config.Execution.AutoAccept = R::StepRunAutoAccept::Converged;
+    h.Config.Execution.Start = R::StepRunStart::Ready;
     R::EditorOutlierAnalysisResult result;
     const auto run = R::StartEditorOutlierAnalysisTransaction(h.Commands(), h.Config, result);
     ASSERT_TRUE(run) << result.Message;
+    const auto observation =
+        h.Jobs.StepRuns().Observe(R::SnapshotEditorOutlierAnalysis(h.Commands(), run).Result.StepRun);
+    ASSERT_TRUE(observation);
+    EXPECT_EQ(observation->Execution.AutoAccept, R::StepRunAutoAccept::Converged);
+    EXPECT_EQ(observation->Execution.Start, R::StepRunStart::Ready);
     ASSERT_TRUE(stored());
     EXPECT_EQ(stored()->Status, R::EditorCommandStatus::Pending);
     EXPECT_EQ(stored()->Message, "Device outlier analysis queued.");
