@@ -20,8 +20,10 @@
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Platform.Window;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -202,6 +204,20 @@ namespace
             Device->Shutdown();
             EXPECT_EQ(Deletes() - before, 1u);
         }
+
+        void AdvanceFrameCycle()
+        {
+            for (std::uint32_t i = 0; i <= Device->GetFramesInFlight(); ++i)
+            {
+                RHI::FrameHandle frame;
+                ASSERT_TRUE(Device->BeginFrame(frame));
+                ASSERT_TRUE(RecordFrame(frame));
+                ASSERT_TRUE(SubmitPresent(frame));
+            }
+        }
+
+        void ExpectRetirementQueryFailure(
+            bool deviceLost, Vulkan::VulkanRetirementQuery query = Vulkan::VulkanRetirementQuery::FrameFence);
 
         std::unique_ptr<Extrinsic::Platform::IWindow> Window;
         std::unique_ptr<RHI::IDevice> Device;
@@ -1300,4 +1316,400 @@ TEST_F(VulkanTransferLifetimeGpuSmoke, ALaneOrderPageDoesNotWaitForAGraphicsUplo
     EXPECT_EQ(controlRead, later);
     for (const auto buffer : {input, unrelated, output, control})
         Device->DestroyBuffer(buffer);
+}
+
+// ARCH-024 actual frame retirement: the frame fences answer without BeginFrame, WaitIdle or a frame-counter advance.
+// Each test names the mechanism it fails without.
+namespace
+{
+    namespace Graphics = Extrinsic::Graphics;
+
+    // A bounded owner-thread poll (no wait, no frame): the device's answer once its fences signal.
+    bool Retires(RHI::IDevice& device, const std::uint64_t frame)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+        while (!device.IsFrameRetired(frame) && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        return device.IsFrameRetired(frame);
+    }
+
+    bool EndFrameSubmitted(RHI::IDevice& device, const RHI::FrameHandle& frame)
+    {
+        device.EndFrame(frame);
+        return Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot().EndStatus ==
+            Vulkan::VulkanFrameEndStatus::Submitted;
+    }
+}
+
+// Frame states. Predictions, before any run: before any frame the current number retires (no frame carries it, none
+// records); it does not while its frame records and retires once that frame's fences signal; with graphics held, a
+// frame submitted behind the gate is unretired while the next, unsubmitted number retires, until a graphics-lane upload
+// behind the gate is pending too; after the release both retire, and every number does once three more frames reused
+// each slot. Frames held behind the gate are presented after its release (a present may wait for them). Mutations:
+// ignoring the recording frame retires the open number; ignoring the main fence retires the held frame; an unsubmitted
+// number that waits for submitted frames stays unretired behind the held frame; ignoring the graphics lane retires it
+// behind the held upload.
+TEST_F(VulkanTransferLifetimeGpuSmoke, FrameRetirementDistinguishesRecordingSubmittedAndUnsubmittedFrames)
+{
+    if (!Initialize())
+        GTEST_SKIP() << SkipReason;
+    const std::uint64_t first = Device->GetGlobalFrameNumber();
+    EXPECT_TRUE(Retires(*Device, first)) << "no frame carries this number and none records";
+    RHI::FrameHandle frame;
+    ASSERT_TRUE(Device->BeginFrame(frame));
+    EXPECT_FALSE(Device->IsFrameRetired(first)) << "its frame is recording";
+    ASSERT_TRUE(RecordFrame(frame));
+    ASSERT_TRUE(SubmitPresent(frame));
+    ASSERT_EQ(Device->GetGlobalFrameNumber(), first + 1u);
+    EXPECT_TRUE(Retires(*Device, first)) << "its fences signal without another frame";
+    ASSERT_TRUE(Retires(*Device, first + 1u)) << "nothing is pending on the graphics lane before the gate";
+
+    const auto buffer = MakeBuffer();
+    ASSERT_TRUE(buffer.IsValid());
+    RHI::FrameHandle gated;
+    bool submitted = false, heldRetired = true, nextRetired = false, nextBehindUpload = true;
+    ASSERT_TRUE(Vulkan::WithVulkanQueueGate(Device.get(),
+        Vulkan::VulkanGatedQueue::Graphics,
+        [&]
+        {
+            if (!Device->BeginFrame(gated) || !RecordFrame(gated) || !(submitted = EndFrameSubmitted(*Device, gated)))
+                return;
+            heldRetired = Device->IsFrameRetired(first + 1u);
+            nextRetired = Device->IsFrameRetired(first + 2u);
+            const std::uint32_t value = 5u;
+            if (Device->GetTransferQueue().UploadBuffer(buffer, &value, sizeof(value), 0u).IsValid())
+                nextBehindUpload = Device->IsFrameRetired(first + 2u);
+        }));
+    ASSERT_TRUE(submitted);
+    Device->Present(gated);
+    EXPECT_FALSE(heldRetired) << "the frame submitted behind the gate has not finished";
+    EXPECT_TRUE(nextRetired) << "an unsubmitted number does not wait for the held frame";
+    EXPECT_FALSE(nextBehindUpload) << "but it waits for the graphics-lane upload behind the gate";
+    EXPECT_TRUE(Retires(*Device, first + 1u));
+    EXPECT_TRUE(Retires(*Device, first + 2u));
+    for (unsigned i = 0; i < 3u; ++i)
+    {
+        RHI::FrameHandle next;
+        ASSERT_TRUE(Device->BeginFrame(next));
+        ASSERT_TRUE(RecordFrame(next));
+        ASSERT_TRUE(SubmitPresent(next));
+    }
+    const std::uint64_t last = Device->GetGlobalFrameNumber();
+    ASSERT_TRUE(Retires(*Device, last - 1u)) << "reused slots";
+    for (std::uint64_t number = first; number <= last; ++number)
+        EXPECT_TRUE(Device->IsFrameRetired(number)) << number;
+    Device->DestroyBuffer(buffer);
+}
+
+// A frame retires only once every queue it submitted to finished. Per arm, a frame with a graphics batch and an
+// async-compute (then a transfer) batch is submitted while that frame queue is held. Predictions, before any run: for
+// the 0.3 s watched the frame stays unretired and device maintenance does not release a buffer the held batch writes
+// (destroyed after the frame), although the graphics batch finished; after the release the frame retires and
+// maintenance releases the buffer once. A device without that separate frame queue skips the arm. Mutation: leaving
+// the async-compute (transfer) fence out of the check retires the frame and frees the buffer within the watch.
+TEST_F(VulkanTransferLifetimeGpuSmoke, AFrameRetiresOnlyOnceItsAsyncComputeAndTransferBatchesFinished)
+{
+    if (!Initialize())
+        GTEST_SKIP() << SkipReason;
+    struct Arm
+    {
+        Vulkan::VulkanGatedQueue Gate;
+        RHI::QueueAffinity Queue;
+    };
+    unsigned arms = 0u;
+    for (const Arm arm : {Arm{Vulkan::VulkanGatedQueue::FrameCompute, RHI::QueueAffinity::AsyncCompute},
+             Arm{Vulkan::VulkanGatedQueue::FrameTransfer, RHI::QueueAffinity::Transfer}})
+    {
+        SCOPED_TRACE(static_cast<int>(arm.Queue));
+        RHI::FrameHandle frame;
+        std::uint64_t number = 0u, before = 0u, deletesWhileHeld = 1u;
+        bool submitted = false, retiredWhileHeld = true;
+        const bool gated = Vulkan::WithVulkanQueueGate(Device.get(),
+            arm.Gate,
+            [&]
+            {
+                const auto buffer = MakeBuffer(); // only where the arm runs: no stray delete reaches another arm
+                const std::array<RHI::QueueSubmitBatchDesc, 2> batches{
+                    RHI::QueueSubmitBatchDesc{.Queue = RHI::QueueAffinity::Graphics},
+                    RHI::QueueSubmitBatchDesc{.Queue = arm.Queue},
+                };
+                const RHI::FrameQueueSubmitPlanDesc plan{
+                    .Batches = std::span<const RHI::QueueSubmitBatchDesc>{batches}};
+                if (!buffer.IsValid() || !Device->BeginFrame(frame) || !Device->BeginFrameQueueSubmitPlan(frame, plan))
+                    return;
+                auto& graphics = Device->GetQueueSubmitContext(RHI::QueueAffinity::Graphics, frame.FrameIndex, 0u);
+                graphics.Begin();
+                graphics.TextureBarrier(
+                    Device->GetBackbufferHandle(frame), RHI::TextureLayout::Undefined, RHI::TextureLayout::Present);
+                graphics.End();
+                auto& side = Device->GetQueueSubmitContext(arm.Queue, frame.FrameIndex, 1u);
+                side.Begin();
+                side.FillBuffer(buffer, 0u, 4u, 7u);
+                side.End();
+                number = Device->GetGlobalFrameNumber();
+                if (!(submitted = EndFrameSubmitted(*Device, frame)))
+                    return;
+                before = Deletes();
+                Device->DestroyBuffer(buffer);
+                const auto watch = std::chrono::steady_clock::now() + std::chrono::milliseconds{300};
+                do
+                {
+                    retiredWhileHeld = Device->IsFrameRetired(number);
+                    Device->CollectCompletedResources();
+                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
+                } while (!retiredWhileHeld && std::chrono::steady_clock::now() < watch);
+                deletesWhileHeld = Deletes() - before;
+            });
+        if (!gated)
+            continue; // no separate frame queue of this kind
+        ++arms;
+        ASSERT_TRUE(submitted);
+        Device->Present(frame);
+        EXPECT_FALSE(retiredWhileHeld) << "its held batch has not finished";
+        EXPECT_EQ(deletesWhileHeld, 0u) << "maintenance released nothing the held batch writes";
+        EXPECT_TRUE(Retires(*Device, number));
+        Device->CollectCompletedResources();
+        EXPECT_EQ(Deletes() - before, 1u) << "released once the frame retired";
+    }
+    if (arms == 0u)
+        GTEST_SKIP() << "No separate frame async-compute or transfer queue on this device.";
+}
+
+// No frame ever submitted (minimized from the start): device maintenance releases a destroyed buffer and its handle
+// slot without a frame, WaitIdle or counter advance, but not while a graphics-lane upload into it is pending.
+// Predictions, before any run: maintenance behind the held upload releases nothing; maintenance after it finished
+// releases the buffer exactly once (Shutdown adds nothing), a later allocation reuses its handle slot with a new
+// generation, and the frame counter keeps its first value. Mutations: no maintenance flush leaves the delete for
+// Shutdown; skipping the graphics-lane condition frees the buffer under its held upload.
+TEST_F(VulkanTransferLifetimeGpuSmoke, NoFrameDestroyRetiresThroughDeviceMaintenance)
+{
+    if (!Initialize())
+        GTEST_SKIP() << SkipReason;
+    const std::uint64_t frameNumber = Device->GetGlobalFrameNumber();
+    const auto buffer = MakeBuffer();
+    ASSERT_TRUE(buffer.IsValid());
+    ASSERT_TRUE(Retires(*Device, frameNumber));
+    const auto before = Deletes();
+    bool uploaded = false;
+    std::uint64_t whileUploading = 1u;
+    ASSERT_TRUE(Vulkan::WithVulkanQueueGate(Device.get(),
+        Vulkan::VulkanGatedQueue::Graphics,
+        [&]
+        {
+            const std::uint32_t value = 3u;
+            uploaded = Device->GetTransferQueue().UploadBuffer(buffer, &value, sizeof(value), 0u).IsValid();
+            Device->DestroyBuffer(buffer);
+            Device->CollectCompletedResources();
+            whileUploading = Deletes() - before;
+        }));
+    ASSERT_TRUE(uploaded);
+    EXPECT_EQ(whileUploading, 0u) << "the held upload still writes the buffer";
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+    while (Deletes() == before && std::chrono::steady_clock::now() < deadline)
+    {
+        Device->CollectCompletedResources();
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    EXPECT_EQ(Deletes() - before, 1u) << "released by maintenance alone";
+    EXPECT_EQ(Device->GetGlobalFrameNumber(), frameNumber);
+    bool reused = false;
+    for (std::uint32_t i = 0; i < std::max(buffer.Index + 8u, 256u) && !reused; ++i)
+    {
+        const auto probe = MakeBuffer(); // released by Shutdown, which counts no deferred delete
+        reused = probe.Index == buffer.Index && probe.Generation != buffer.Generation;
+    }
+    EXPECT_TRUE(reused) << "the handle slot returned to the free list";
+    Device->Shutdown();
+    EXPECT_EQ(Deletes() - before, 1u) << "executed once";
+}
+
+// The held frame: a frame that writes buffer A and shows a residency front is held on the graphics queue. Predictions,
+// before any run: the frame is unretired and device maintenance releases nothing (A, destroyed after the frame,
+// stays); once the front moved on, the shown slot is not handed out again (its depth-2 ring drops the preview);
+// meanwhile compute-only work retires without that frame: a ring acquired between frames serves a third preview from
+// two buffers, and a scratch buffer whose method page completed is reused. After the release the frame retires,
+// maintenance releases A once and the shown slot is reused. Mutations: an unsubmitted stamp that waits for submitted
+// frames keeps the compute-only ring and scratch pending; ignoring the frame fences releases A and hands out the shown
+// slot under the held frame.
+TEST_F(VulkanTransferLifetimeGpuSmoke, AHeldFrameKeepsItsResourcesWhileCompletedComputeOnlyWorkRetires)
+{
+    if (!Initialize())
+        GTEST_SKIP() << SkipReason;
+    auto& queue = Device->GetTransferQueue();
+    if (queue.GetDiagnostics().ComputeLane.Resolved != RHI::QueueAffinity::AsyncCompute)
+        GTEST_SKIP() << "A separate method queue is required: on the graphics lane compute shares the held queue.";
+    const Graphics::GpuPropertyLayout layout{.Scalar = Graphics::GpuScalarType::Float32, .Count = 4u};
+    const Graphics::GpuPropertyKey shownKey{.Owner = 1u, .Name = "held.shown"};
+    const Graphics::GpuPropertyKey computeKey{.Owner = 2u, .Name = "held.compute"};
+    const RHI::BufferDesc scratchDesc{.SizeBytes = 64u,
+        .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+        .DebugName = "HeldFrame.Scratch"};
+    Graphics::GpuPropertyResidency residency{*Device};
+    RHI::BufferManager scratch{*Device};
+    const auto framed = MakeBuffer();
+    ASSERT_TRUE(framed.IsValid());
+    ASSERT_TRUE(Retires(*Device, Device->GetGlobalFrameNumber())) << "nothing is pending before the gate";
+    const auto before = Deletes();
+    RHI::FrameHandle frame;
+    RHI::BufferHandle shown{};
+    std::uint64_t held = 0u, deletesWhileHeld = 1u;
+    bool submitted = false, heldRetired = true, shownServedWhileHeld = true;
+    bool computeRingServed = false, scratchReused = false;
+    ASSERT_TRUE(Vulkan::WithVulkanQueueGate(Device.get(),
+        Vulkan::VulkanGatedQueue::Graphics,
+        [&]
+        {
+            if (!Device->BeginFrame(frame))
+                return;
+            held = Device->GetGlobalFrameNumber();
+            // The recording frame shows a front (acquired and observed now) and writes A.
+            if (const auto front = residency.AcquireBack(shownKey, layout, 2u); front && residency.Publish(shownKey))
+                shown = front->Buffer;
+            residency.MarkObserved(shownKey);
+            if (!shown.IsValid() || !RecordFrame(frame, framed) || !(submitted = EndFrameSubmitted(*Device, frame)))
+                return;
+            Device->DestroyBuffer(framed);
+            // Between frames the front moves on; the held frame still reads the shown slot.
+            if (!residency.AcquireBack(shownKey, layout, 2u) || !residency.Publish(shownKey))
+                return;
+            shownServedWhileHeld = residency.AcquireBack(shownKey, layout, 2u).has_value();
+            // Compute-only: a ring acquired between frames...
+            computeRingServed = true;
+            for (int round = 0; round < 3 && computeRingServed; ++round)
+                computeRingServed =
+                    residency.AcquireBack(computeKey, layout, 2u).has_value() && residency.Publish(computeKey);
+            // ...and scratch a completed method page used.
+            auto created = scratch.CreateScratch(scratchDesc);
+            if (!created)
+                return;
+            auto lease = std::move(*created);
+            const auto page = Device->SubmitComputeReadback(
+                [buffer = lease.GetHandle()](RHI::ICommandContext& commands)
+                {
+                    commands.FillBuffer(buffer, 0u, 64u, 9u);
+                    return buffer;
+                },
+                0u,
+                IgnoreBytes());
+            if (!page.IsValid() || queue.WaitCompute(page, kDoneWaitNanoseconds) != RHI::ComputeWaitStatus::Complete)
+                return;
+            queue.CollectCompleted(); // the owner's collection makes the page's completion visible
+            const auto used = lease.GetHandle();
+            lease = {};
+            scratch.CollectScratch(RHI::StampRetirement(*Device));
+            const auto again = scratch.CreateScratch(scratchDesc);
+            scratchReused = again.has_value() && again->GetHandle() == used;
+            heldRetired = Device->IsFrameRetired(held);
+            Device->CollectCompletedResources();
+            deletesWhileHeld = Deletes() - before;
+        }));
+    ASSERT_TRUE(submitted);
+    Device->Present(frame);
+    EXPECT_FALSE(heldRetired) << "the held frame has not finished";
+    EXPECT_EQ(deletesWhileHeld, 0u) << "maintenance released nothing the held frame wrote";
+    EXPECT_FALSE(shownServedWhileHeld) << "the held frame still reads the shown slot";
+    EXPECT_TRUE(computeRingServed) << "compute-only ring slots retire without the held frame";
+    EXPECT_TRUE(scratchReused) << "completed compute-only scratch retires without the held frame";
+    EXPECT_TRUE(Retires(*Device, held));
+    Device->CollectCompletedResources();
+    EXPECT_EQ(Deletes() - before, 1u) << "A released once the frame retired";
+    const auto reused = residency.AcquireBack(shownKey, layout, 2u);
+    ASSERT_TRUE(reused);
+    EXPECT_EQ(reused->Buffer, shown);
+}
+
+// The frame portion of a delete retires while its method page is held. Once that page completes, a failed fence
+// query must still retain the ready delete. Removing the error return frees it; checking frame distance before loss
+// also retires oldFrame after the device-loss injection.
+void VulkanTransferLifetimeGpuSmoke::ExpectRetirementQueryFailure(
+    const bool deviceLost, const Vulkan::VulkanRetirementQuery query)
+{
+    if (!Initialize())
+        GTEST_SKIP() << SkipReason;
+    auto& queue = Device->GetTransferQueue();
+    if (queue.GetDiagnostics().ComputeLane.Resolved != RHI::QueueAffinity::AsyncCompute)
+        GTEST_SKIP() << "A separate method queue is required to hold compute after frame retirement.";
+    const auto oldFrame = Device->GetGlobalFrameNumber();
+    ASSERT_NO_FATAL_FAILURE(AdvanceFrameCycle());
+    ASSERT_TRUE(Retires(*Device, Device->GetGlobalFrameNumber() - 1u));
+    Device->CollectCompletedResources();
+    ASSERT_TRUE(Device->IsFrameRetired(oldFrame));
+    const auto buffer = MakeStorageBuffer(4u, "RetirementQueryFailure.Buffer");
+    ASSERT_TRUE(buffer.IsValid());
+    if (query == Vulkan::VulkanRetirementQuery::GraphicsTimeline)
+    {
+        const std::uint32_t initial = 0u;
+        const auto upload = queue.UploadBuffer(buffer, &initial, sizeof(initial), 0u);
+        ASSERT_TRUE(upload.IsValid());
+        ASSERT_TRUE(Drain(queue, upload)); // A nonzero issued graphics ticket forces the real timeline query.
+    }
+    const auto before = Deletes();
+    RHI::ReadbackToken page;
+    ASSERT_TRUE(Vulkan::WithVulkanQueueGate(Device.get(),
+        Vulkan::VulkanGatedQueue::MethodCompute,
+        [&]
+        {
+            page = Device->SubmitComputeReadback(
+                [&](RHI::ICommandContext& commands)
+                {
+                    commands.FillBuffer(buffer, 0u, 4u, 1u);
+                    return buffer;
+                },
+                0u,
+                IgnoreBytes());
+            ASSERT_TRUE(page.IsValid());
+            Device->DestroyBuffer(buffer);
+            Device->CollectCompletedResources();
+            EXPECT_EQ(Deletes(), before) << "only the method page keeps the delete pending";
+        }));
+    ASSERT_TRUE(Drain(queue, page));
+    ASSERT_TRUE(Vulkan::FailNextVulkanRetirementQuery(Device.get(), query, deviceLost));
+    Device->CollectCompletedResources();
+    EXPECT_EQ(Deletes(), before) << "a query error proves no reclamation";
+    EXPECT_EQ(Device->IsDeviceLost(), deviceLost);
+    if (deviceLost)
+        EXPECT_FALSE(Device->IsFrameRetired(oldFrame)) << "frame age cannot override device loss";
+    else
+    {
+        Device->CollectCompletedResources();
+        EXPECT_EQ(Deletes() - before, 1u) << "a later successful poll reclaims the ready delete";
+    }
+    Device->Shutdown();
+    EXPECT_EQ(Deletes() - before, 1u) << "shutdown releases a retained delete once";
+}
+
+TEST_F(VulkanTransferLifetimeGpuSmoke, FrameFenceQueryErrorRetainsAReadyComputeGatedDelete)
+{
+    ExpectRetirementQueryFailure(false);
+}
+
+TEST_F(VulkanTransferLifetimeGpuSmoke, FrameFenceDeviceLossRetainsReadyDeletesAndOldFrameStamps)
+{
+    ExpectRetirementQueryFailure(true);
+}
+
+TEST_F(VulkanTransferLifetimeGpuSmoke, GraphicsTimelineQueryErrorRetainsAReadyComputeGatedDelete)
+{
+    ExpectRetirementQueryFailure(false, Vulkan::VulkanRetirementQuery::GraphicsTimeline);
+}
+
+TEST_F(VulkanTransferLifetimeGpuSmoke, GraphicsTimelineDeviceLossRetainsReadyDeletesAndOldFrameStamps)
+{
+    ExpectRetirementQueryFailure(true, Vulkan::VulkanRetirementQuery::GraphicsTimeline);
+}
+
+TEST_F(VulkanTransferLifetimeGpuSmoke, FrameRetirementQueryLatchesDeviceLossBeforeMaintenance)
+{
+    if (!Initialize())
+        GTEST_SKIP() << SkipReason;
+    const auto oldFrame = Device->GetGlobalFrameNumber();
+    ASSERT_NO_FATAL_FAILURE(AdvanceFrameCycle());
+    const auto latest = Device->GetGlobalFrameNumber() - 1u;
+    ASSERT_TRUE(Retires(*Device, latest));
+    ASSERT_TRUE(Device->IsFrameRetired(oldFrame));
+    ASSERT_TRUE(Vulkan::FailNextVulkanRetirementQuery(Device.get(), Vulkan::VulkanRetirementQuery::FrameFence, true));
+    EXPECT_FALSE(Device->IsFrameRetired(latest));
+    EXPECT_TRUE(Device->IsDeviceLost());
+    EXPECT_FALSE(Device->IsFrameRetired(oldFrame));
+    EXPECT_FALSE(Device->IsFrameRetired(Device->GetGlobalFrameNumber()));
 }

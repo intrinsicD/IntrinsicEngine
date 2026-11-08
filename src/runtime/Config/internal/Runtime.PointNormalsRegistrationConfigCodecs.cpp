@@ -105,7 +105,7 @@ namespace Extrinsic::Runtime
             "CPU LBVH (cached)",
             "Vulkan LBVH (CPU solve)",
             "Vulkan brute force (CPU solve)"};
-        // The shared execution rows (max_iterations, preview_every, preview_interval_ms, auto_accept, start).
+        // The shared execution rows (max_iterations, preview_every, preview_interval_ms, auto_accept, start, preview_buffers).
         constexpr auto kRegistrationExecutionFields = StepRunExecutionFields(kMaxRegistrationIterations);
         constexpr std::array kRegistrationFields{
             ConfigFieldSpec{.Name = "source_entity", .Type = ConfigFieldType::UInt, .Description = "Source entity."},
@@ -115,6 +115,7 @@ namespace Extrinsic::Runtime
             kRegistrationExecutionFields[2],
             kRegistrationExecutionFields[3],
             kRegistrationExecutionFields[4],
+            kRegistrationExecutionFields[5],
             ConfigFieldSpec{
                 .Name = "trajectory_step", .Type = ConfigFieldType::UInt, .Description = "Trajectory step."},
             ConfigFieldSpec{.Name = "variant",

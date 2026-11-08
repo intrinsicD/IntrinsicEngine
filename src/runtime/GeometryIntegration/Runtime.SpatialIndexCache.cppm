@@ -56,13 +56,13 @@ export namespace Extrinsic::Runtime
         // Builds counts CPU hierarchies built (a GPU-only workspace builds none); GpuBuilds counts device
         // hierarchy builds in accepted submissions only.
         std::uint64_t Builds{}, Hits{}, Evictions{}, GpuBuilds{};
-        // GRAPHICS-153: device buffer sets created for query batches (a reused batch that fits
-        // allocates nothing), and private workspaces updated in place instead of rebuilt.
-        std::uint64_t GpuBatchAllocations{}, WorkspaceUpdates{};
+        // GRAPHICS-153: private workspaces updated in place instead of rebuilt.
+        std::uint64_t WorkspaceUpdates{};
         // Device workspaces handed out by LeaseGpuWorkspace, and those served by a retained one.
         std::uint64_t WorkspaceLeases{}, WorkspaceReuses{};
-        // Upload bytes: query-input writes only, excluding target-index builds and result readback.
-        // Submissions: query batches and computations (QueueGpuCompute) the device accepted.
+        // Query sessions' host traffic (rows, exclusions, poses, uploads; not target-index builds or result readback),
+        // their poses and their accepted pages; GpuComputeSubmissions counts accepted owner submissions
+        // (QueueGpuCompute, a session's or index lease's preparation).
         std::uint64_t GpuQueryUploadBytes{}, GpuQueryTransformUploads{}, GpuQuerySubmissions{};
         std::uint64_t GpuComputeSubmissions{};
         // ARCH-023 method scratch (MethodScratch, budget render.gpu_method_buffer_budget_megabytes), in physical
@@ -101,6 +101,7 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool Ready() const noexcept { return Handle.Value && bool(Snapshot); }
     };
     enum class SpatialQueryState : std::uint8_t { Queued, Submitted, Ready, Failed };
+    // One query session page's result (SpatialQuerySession::Query).
     struct SpatialNearestBatch
     {
         SpatialQueryState State{SpatialQueryState::Queued};
@@ -113,7 +114,7 @@ export namespace Extrinsic::Runtime
     };
     // ARCH-023: neighbourhood queries a method's worker step records, submits and waits for itself, with no frame,
     // render thread or owner callback: the cache's kernels (LBVH traversal or exhaustive scan), packed result,
-    // validation and original row IDs, as QueueGpuNearest/KNearest/Radius/NearestTransformed give them.
+    // validation and original row IDs; the cache's only GPU query interface.
     // SpatialIndexCache::PrepareQuerySession (device-owner thread, a run's Init) makes a fixed target resident with its
     // row map and (Lbvh) hierarchy through one accepted owner submission (always made; it waits for every transfer
     // issued before it), and allocates every buffer and pipeline the pages use. Pages then call
@@ -127,6 +128,8 @@ export namespace Extrinsic::Runtime
     // TransferQueueDiagnostics::ReadbackRingHighWaterBytes).
     struct SpatialQuerySessionDesc
     {
+        // One result contract: Lbvh traverses the target's device hierarchy (built by the preparation when missing);
+        // BruteForce scans its resident samples and builds none (GpuBuilds unchanged).
         Graphics::PointQueryStrategy Strategy{Graphics::PointQueryStrategy::Lbvh};
         // Radius rows (a page gives its radius) retaining Capacity hits each (1..1024); else nearest/kNN, k = Capacity
         // (1..64).
@@ -170,7 +173,7 @@ export namespace Extrinsic::Runtime
         // Worker: queries rows [first, first + count) (count <= PageQueries) with `radius` (radius sessions:
         // inclusive, finite, 0..1e18) or `transform` (a Transformed session), submits, then waits in bounded slices
         // until the page completed, `abort` holds, or the device failed. Ready: `out` holds the page (Neighbors,
-        // Counts, Capacity) exactly as the cache's batch of those queries would. Failed: out.Diagnostic says why.
+        // Counts, Capacity) in original row IDs. Failed: out.Diagnostic says why.
         // Abandoned: `abort` won; the page's bytes are released once the device finished it.
         [[nodiscard]] SpatialPageStatus Query(std::uint32_t first,
             std::uint32_t count,
@@ -273,53 +276,23 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool UpdateWorkspace(SpatialIndexWorkspace& workspace, std::span<const glm::vec3> positions);
         // Immutable CPU lease survives eviction; indices here are compact, Slots maps to original rows.
         [[nodiscard]] std::shared_ptr<const SpatialIndexSnapshot> Snapshot(SpatialIndexHandle handle) const;
-        // Device-owner thread only. Every query batch and computation is submitted at once through
-        // IDevice::SubmitComputeReadback (the compute lane; graphics where forced or single-queue)
-        // and is Ready once its own readback arrived, with no frame delay: Submitted when accepted,
-        // Failed when refused (never replayed). Missing gathers and hierarchy builds are recorded
-        // into the same submission; the index counts them only once a submission is accepted.
-        // Reuse a completed batch to retain its buffer allocation.
-        // Results use original property row IDs, matching Nearest. Every batch query takes an
-        // explicit strategy with one result contract: Lbvh (default) builds the GPU hierarchy
-        // lazily; BruteForce scans the resident samples and builds none (GpuBuilds unchanged).
-        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuNearest(SpatialIndexHandle handle,
-            std::span<const glm::vec3> queries,
-            std::shared_ptr<SpatialNearestBatch> reuse = {},
-            Graphics::PointQueryStrategy strategy = Graphics::PointQueryStrategy::Lbvh);
-        // Exact kNN, 1..64; optional exclusions have one original property row ID per query.
-        // Reuse requires the same query count and k. No CPU fallback on an unavailable device.
-        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuKNearest(SpatialIndexHandle handle,
-            std::span<const glm::vec3> queries,
-            std::uint32_t k,
-            std::span<const std::uint32_t> excludedSlots = {},
-            std::shared_ptr<SpatialNearestBatch> reuse = {},
-            Graphics::PointQueryStrategy strategy = Graphics::PointQueryStrategy::Lbvh);
-        // Inclusive radius; counts remain complete when retained hits exceed capacity (1..1024).
-        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuRadius(SpatialIndexHandle handle,
-            std::span<const glm::vec3> queries,
-            float radius,
-            std::uint32_t capacity,
-            std::span<const std::uint32_t> excludedSlots = {},
-            std::shared_ptr<SpatialNearestBatch> reuse = {},
-            Graphics::PointQueryStrategy strategy = Graphics::PointQueryStrategy::Lbvh);
+        // An operational device and the cache's queue participant; each request still validates its own inputs.
         [[nodiscard]] bool GpuQueriesAvailable() const noexcept;
-        // ARCH-023, device-owner thread, a run's Init: a worker query session over `target` (a current index; with
-        // desc.Moving none, the handle ignored) under the same admission as the batches above. Null with the reason
-        // in `diagnostic`. While it lives, a private workspace it targets refuses UpdateWorkspace.
+        // ARCH-023, device-owner thread, a run's Init: a worker query session over `target` (a current index of
+        // 1..2^20 rows; with desc.Moving none, the handle ignored), brute force within Graphics::PointBruteForceRefusal
+        // for one page. Null with the reason in `diagnostic`; never a CPU fallback. While it lives, a private
+        // workspace it targets refuses UpdateWorkspace.
         [[nodiscard]] std::shared_ptr<SpatialQuerySession> PrepareQuerySession(
             SpatialIndexHandle target, const SpatialQuerySessionDesc& desc, std::string& diagnostic);
-        // Fixed source points stay uploaded while exact values match the completed batch.
-        // Each iteration updates only a double-precision pose; requires shader float64.
-        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuNearestTransformed(SpatialIndexHandle handle,
-            std::span<const glm::vec3> source,
-            const glm::dmat4& transform,
-            std::shared_ptr<SpatialNearestBatch> reuse = {},
-            Graphics::PointQueryStrategy strategy = Graphics::PointQueryStrategy::Lbvh);
-        // Record against the retained, current index on the device-owner thread; the recorder runs
-        // inside this call. It owns its buffers (including a TransferSrc result of readbackBytes)
-        // through captured leases, retained until the readback arrived. Residency slots it uses
-        // must be NoteUse'd (or acquired) while recording: they are then guarded by the returned
-        // compute token as well as their frame. Zero bytes requests completion only.
+        // Device-owner thread only. Records against the retained, current index; the recorder runs inside this call.
+        // The computation is submitted at once through IDevice::SubmitComputeReadback (the compute lane; graphics
+        // where forced or single-queue) and is Ready once its own readback arrived, with no frame delay: Submitted
+        // when accepted, Failed when refused (never replayed). A missing gather or hierarchy build is recorded into
+        // the same submission before the recorder; the index counts it only once that submission is accepted. The
+        // recorder owns its buffers (including a TransferSrc result of readbackBytes) through captured leases,
+        // retained until the readback arrived. Residency slots it uses must be NoteUse'd (or acquired) while
+        // recording: they are then guarded by the returned compute token as well as their frame. Zero bytes
+        // requests completion only.
         [[nodiscard]] std::shared_ptr<SpatialGpuResult> QueueGpuCompute(SpatialIndexHandle handle,
             std::size_t readbackBytes,
             std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> record);
@@ -396,14 +369,6 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::shared_ptr<void> LeaseErasedGpuWorkspace(const void* kind,
             std::shared_ptr<void> (*make)(RHI::IDevice&, RHI::BufferManager&),
             void (*releaseScratch)(void*));
-        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuBatch(SpatialIndexHandle handle,
-            std::span<const glm::vec3> queries,
-            std::uint32_t capacity,
-            float radius,
-            std::span<const std::uint32_t> excludedSlots,
-            std::shared_ptr<SpatialNearestBatch> reuse,
-            Graphics::PointQueryStrategy strategy,
-            const glm::dmat4* transform = nullptr);
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
     };

@@ -295,7 +295,7 @@ namespace
                 if (BoundsScenario) EXPECT_EQ(NonBackground(CpuPixels), 0u) << "the cloud outside the frustum is drawn";
                 else EXPECT_GT(NonBackground(CpuPixels), 0u) << "the cloud is not drawn";
                 std::string why;
-                Run = Runtime::BeginEditorGpuPositionRun(Commands(), Id, PositionRef, *Residency(), why);
+                Run = Runtime::BeginEditorGpuPositionRun(Commands(), Id, PositionRef, *Residency(), why, 2u);
                 if (!Run) { (void)Fail("BeginEditorGpuPositionRun: " + why); return; }
                 EXPECT_EQ(Runtime::EditorGpuPositionRunRowCount(Run), Original.size());
                 if (!PublishShifted()) return;

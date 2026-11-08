@@ -9,18 +9,20 @@ as gaps, with their current owner.
 
 ## How to read the matrix
 
-- **Queue.** Worker pages and `SpatialIndexCache` query batches go through `IDevice::SubmitComputeReadback`. That is the compute lane, or
+- **Queue.** Worker pages and `SpatialIndexCache` query-session pages go through `IDevice::SubmitComputeReadback`. That is the compute lane, or
   the graphics queue on hardware without a separate one. The transfer queue diagnostics
   report the lane as `ComputeLane`.
 - **Transfers.** "Accept readback" means the only device-to-CPU copy of the result is the
   front readback when it is accepted.
 - **Run controls.** "Panel" means the panel's `DrawGpuTransactionControls` or
   `DrawStepRunControls` row. MCP `run_control` and `run_observe` act on every step run by
-  its id.
+  its id. A `run_*` tool’s `wait: false` start uses the section’s execution options;
+  arguments override them for that run only. Waiting calls refuse execution arguments
+  ([agent control lane](../architecture/agent-control-lane.md)).
 - **Frame dependency.** Worker steps submit and wait for bounded compute pages without rendering
-  frames. Owner-side GPU Init and Accept callbacks, and preview-fence visibility, still need
-  the frame's transfer collection (`CollectCompleted`), not just the main-thread job drain;
-  when the window is minimized, GPU Accept waits until frames resume. Initial farthest-point
+  frames. Owner-side GPU Init, preview visibility and Accept require transfer collection
+  (`CollectCompleted`) and participant draining. The engine performs both on minimized
+  iterations, including without Idle hooks, and on refused `BeginFrame` exits. Initial farthest-point
   orders (CPD subsamples, consolidation's initial samples) are worker pages too; the owner's
   drain still starts the work, uploads the first producer input and publishes, and consolidation's
   order reaches its solve job through one drain. The first page orders initial uploads;
@@ -93,35 +95,61 @@ record that pipeline. Moving the bake would need a compute port, which does not 
 ### Verification limits
 
 The CPU construction loop's cancellation at a page boundary has no independently held-page
-test. The GPU/hybrid path has that test; its exercised removal is the run's abort signal,
+test: `QueryCpu` has no query/page observer, and later run/publication checks mask removal of
+its inner `Stopped` check. A timing race on large input would not isolate that protection.
+The GPU/hybrid path has a held-page test; its exercised removal is the run's abort signal,
 not the loop's boundary check alone. The template's worker-thread test observes its Init;
-it does not independently detect moving only row construction back to the owner thread.
-GPU semaphore-wait and completion-visibility removal probes have not been run. Existing
-known-answer tests exercise these paths, but do not replace those specific probes.
+its private `BuildRows` calls concrete query functions without an observer, so the test does
+not independently detect moving only row construction back to the owner thread.
+Removing the native compute wait while retaining its diagnostic counter makes the held-upload
+test complete too early and read the old value. Removing completion publication makes the
+callback, upload and frame visibility-wait checks fail. Both tests pass after restoration on
+the separate NVIDIA compute queue. This does not independently prove every native semaphore path.
 
-The session-upload wait and `Abandon` clearing `Valid`, `Commit` and `Prepared` have no
-individual removal probe either; clearing `Restart` was independently exercised.
+The session-upload wait and `Abandon` clearing `Valid`, `Commit` and `Prepared` each
+have a removal probe: their focused tests fail when the individual protection is removed
+and pass after restoration. Clearing `Restart` was independently exercised as well.
 
 The initial farthest-point orders stamp their resident input slots with the compute fence before
-they are released. That stamp has no removal probe: an idle pooled farthest-point workspace still
-holds its last input view, which keeps the slot leased and masks the probe. A CPD ordering page
+they are released. That stamp has no independent removal probe: both the sampling run's input
+and the pooled farthest-point workspace hold input views; releasing scratch does not release
+those views. Their leases prevent slot reuse and mask removal of the fence stamp. A CPD ordering page
 in flight at engine shutdown relies on device completion (step segments have no cancel wake-up).
 A next ordering page submitted after the pre-drain idle wait is waited for by the job drain;
 consolidation's ordering job is woken by the cancel itself. CPD initial ordering has no separate
 Jobs-window row or stage text; its time is included in the first step.
-Consolidation's ordering has no real-Vulkan no-frame check of its own; the CPD smoke covers the
-shared worker transport.
+The minimized consolidation smoke exercises Vulkan farthest-point initialization before resident
+steps, preview and Accept at both live-ring capacities, with a frozen renderer frame counter.
 
 ### Remaining implementation differences
 
-K-Means keeps its own stateful page recorder and submit/wait loop: a mid-run reseed orders a
-new upload before recording more pages. Its shared run controls are covered by the same lifecycle
-checks. New resident methods use `WorkerGpuPages` through the shared transaction core.
+K-Means keeps its numerical page recorder and uses `WorkerGpuPages` for submission, waiting,
+readback, abort and sealing. A mid-run reseed marks the next page to wait for its upload without
+clearing a concurrent abort. Other resident methods use the same transport through the shared
+transaction core.
 Initial farthest-point orders use `PointSamplingGpuRun`'s own worker pages. A runtime CPD run
 with a Vulkan subsample backend holds its ordering workspace and resident input from its start to
 its settled end (an interactive run included), as its Vulkan E-step workspace is held; an editor
-detach ends it as stale ("inputs changed"), like every worker CPD run. Some start tools accept execution
-arguments directly, while nonwaiting `run_*` tools read the same validated section settings.
-[RUNTIME-355](../../tasks/backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md)
-owns these internal simplifications, the obsolete test-only queue APIs and owner-step branches,
-and the unprobed removal cases above. They do not change the shared run-control protocol.
+detach ends it as stale ("inputs changed"), like every worker CPD run.
+[RUNTIME-355](../../tasks/active/RUNTIME-355-method-execution-retirement-and-consistency.md)
+tracks verification of these simplifications and the remaining removal cases above. The
+obsolete owner-thread query APIs and owner-step branches have been removed; the shared
+run-control protocol remains the same.
+
+## Method plugin completion owners
+
+All six method plugins have a shared startup/lifecycle scenario. These scoped follow-ups
+track the remaining implementation or plugin-boundary evidence; shared lifecycle adoption
+alone does not mean every plugin has a GPU solver or every check below has run.
+
+| Plugin | Remaining work | Owner |
+| --- | --- | --- |
+| Point spacing | Complete GPU plugin-tool lifecycle and minimized execution coverage | [RUNTIME-356](../../tasks/backlog/runtime/RUNTIME-356-point-spacing-execution-completeness.md) |
+| Kernel density | GPU adapter/minimized coverage; CPU detach/unload and configuration cases | [RUNTIME-357](../../tasks/backlog/runtime/RUNTIME-357-kernel-density-execution-completeness.md) |
+| Density weights | Worker-side automatic radius initialization and adapter/configuration coverage | [RUNTIME-358](../../tasks/backlog/runtime/RUNTIME-358-density-weights-execution-completeness.md) |
+| Descriptor analysis | Atomic reservation of all output properties | [RUNTIME-359](../../tasks/backlog/runtime/RUNTIME-359-descriptor-analysis-execution-completeness.md) |
+| Bilateral filter | CPU pause/resume equivalence and shared metric curves, also integrated into CPD | [RUNTIME-360](../../tasks/backlog/runtime/RUNTIME-360-bilateral-filter-execution-completeness.md) |
+| Coherent point drift | Persistent configuration, worker initialization, lifecycle equivalence and removal of the public test hook | [RUNTIME-361](../../tasks/backlog/runtime/RUNTIME-361-coherent-point-drift-execution-completeness.md) |
+
+The fixture plugin tests the host and is not a numerical method. Remaining runtime methods
+migrate under ARCH-022; these follow-ups do not create duplicate algorithm-port owners.

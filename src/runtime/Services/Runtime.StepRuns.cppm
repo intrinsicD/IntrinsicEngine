@@ -237,6 +237,7 @@ export namespace Extrinsic::Runtime
         // copy is made while computing or resting; a paused or ended run otherwise shows its state whatever its step
         // count), automatic Accept and the start mode (Start: ready, or running at once).
         StepRunExecution Execution{};
+        bool DevicePreview{false}; // this live-preview route uses a device ring (not a terminal-only result ring)
         std::array<std::string, 4> MetricNames{};
         StepRunClock Clock{}; // monotonic; steady_clock by default (tests inject one)
     };
@@ -274,6 +275,9 @@ export namespace Extrinsic::Runtime
         // Failed because a step itself answered Failed (its reason is the owner's), not a refused step or Commit.
         bool StepFailed{false};
         StepRunExecution Execution{};
+        // Configured live device-ring capacity; 0 when preview is off or this route has no device ring.
+        // Not an allocation count: slots are lazy, and terminal result rings are separate.
+        std::uint32_t DevicePreviewBuffers{};
         std::optional<std::uint32_t> ShownStep{}; // the step of the copy shown last (this generation)
         std::shared_ptr<const Core::AppendLog<StepRunMetric>>
             Metrics{}; // this generation's bounded records; Steps counts every logical step

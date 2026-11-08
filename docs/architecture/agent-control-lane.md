@@ -94,22 +94,18 @@ the client). The module registers one drain for the `UiBuild` frame phase and on
 `FramePhase::Idle`, which the engine runs only on minimized frames (they skip every other
 phase). The drain attaches its own editor workspace attachment on first use and handles at
 most `MaxCallsPerFrame` (default 4) messages per frame on the main thread, so calls are served
-while the window is minimized too. An Idle frame does only the command drain, event pump,
-Idle hooks, job completions, pump and reap: no simulation, extraction or rendering.
-Idle frames also leave out the pre-render transform flush (world matrices and bounds stay as of
-the last presented frame until the window is restored), world maintenance and the frame-index
-advance, and with `--agent-socket` every module's queued commands and job completions apply while
-minimized. GPU work only progresses on presented frames, so tools that may dispatch it fail fast
-on a minimized frame with the error code `viewport_not_presentable`: `view_screenshot`,
-`view_capture`, `run_operation`, `run_mesh_operation`, `run_registration`, `run_point_sampling`,
-`run_keypoint_analysis`, `run_kmeans`, `start_kmeans`, `run_point_cloud_consolidation` and
-`start_point_cloud_consolidation`
-(`AgentOperationSpec::NeedsPresentedFrame`; any new tool that may dispatch GPU work sets it).
-`jobs_wait` sets it too, so no wait outlives a minimize (the job it watches may be GPU work). A call of those
-tools that is already waiting when the window minimizes is answered with the same code instead of
-occupying a slot; its editor job or capture is not cancelled and can still finish after the
-window is restored (a capture may then still write its file, so check the path or pass
-`overwrite: true` when retrying). CPU-only tools, queries and the `preview_*` tools keep
+while the window is minimized too. Minimized frames drain commands and events, run optional
+Idle hooks, collect completed GPU transfers, drain GPU participants, reclaim completed device
+resources, apply job completions, pump events again and reap jobs. This also runs without any
+registered Idle hook. Simulation, extraction, rendering, world maintenance and frame-index
+advancement remain suspended. The pre-render transform flush waits for a normal frame.
+Compute methods and `jobs_wait` continue through this owner-thread completion path. A refused
+`BeginFrame` also collects GPU completions and reclaims completed resources without waiting.
+Only operations that require rendered content, such as `view_screenshot` and `view_capture`,
+set `AgentOperationSpec::NeedsPresentedFrame` and fail with `viewport_not_presentable` while
+minimized. A pending call with that flag receives the same error without cancelling its underlying
+capture; it may still write its file after restoration. Check the path or use `overwrite: true`
+when retrying. CPU operations, queries and `preview_*` tools keep
 working. A connection may have at most 16 deferred calls; state-changing `tools/call` requests and
 read-only tools that need a presented frame (`view_screenshot`) beyond that get `-32000 too many
 pending calls` before the tool runs, and other read-only tools are served unless they would defer
@@ -233,16 +229,21 @@ stack ends the requested batch successfully; it does not mask a failed command.
   `view_screenshot`. State-changing: `select_entity`, `import_file`, `show_property`,
   `config_apply`, `save_scene`, `load_scene`, `set_visibility`, `bind_attribute`, `set_camera`, `undo`, `redo`, `jobs_cancel`,
   `run_operation` (`wait: false` starts `property_smoothing`, `normal_estimation`, `outlier_analysis` or `point_construction` as a step
-  run with the section's `start` and `auto_accept` and answers its `run` at once),
-  `run_mesh_operation`, `run_registration` (ICP
-  or Coherent Point Drift from their config sections; the reply waits for the job),
+  run and answers its `run` at once),
+  `run_mesh_operation` (always waits), `run_registration` (ICP
+  or Coherent Point Drift from their config sections; the reply waits for the job unless `wait: false`),
   `run_point_sampling` (the `sandbox.point_sampling` section) and `run_keypoint_analysis` (both run and accept at their
-  end; `wait: false` starts the panel's step run with the section's `start` and `auto_accept` and answers its `run`
-  at once),
+  end; `wait: false` starts the panel's step run and answers its `run` at once),
   `run_kmeans` (runs and accepts at its end), `start_kmeans` (a CPU or Vulkan K-Means step run with the section's
   execution options or the ones it names, answered with its run id for `run_control`),
   `run_point_cloud_consolidation` (runs and accepts at its end) and `start_point_cloud_consolidation` (its step run
-  with the section's execution options or the ones it names, answered with its run id). The scalar plugin tools
+  with the section's execution options or the ones it names, answered with its run id). A `run_*` tool's
+  `wait: false` start takes the same execution arguments (RUNTIME-355): each shared row its section binds that the
+  call names replaces the section's for that run only (the section is unchanged). ICP and CPD take `max_iterations`
+  (each method's own limit), `preview_every`, `preview_interval_ms`, `auto_accept` and `start`; `property_smoothing`
+  the preview rows, `auto_accept` and `start` (its cap is its `iterations`); the one-step rows and point sampling
+  (its cap is its count) `auto_accept` and `start`. A waiting call refuses every execution argument and a one-step
+  row a preview row (`invalid_params`) instead of ignoring it. The scalar plugin tools
   (`point_spacing`, `kernel_density`, `density_weights`) wait without execution arguments; each of `start` and
   `auto_accept` they name replaces the section's, and a run that then does not run at once and accept by itself
   answers at once with its run id `run` on every backend. Every result and start answer names its step run by the
@@ -264,8 +265,7 @@ stack ends the requested batch successfully; it does not mask a failed command.
   once or returns a continuation the server polls each frame, and ends when the job completed
   (terminal and its result delivered: `finished: true`), at the deadline (`timed_out: true`), or
   with an error when the job is unknown or was reaped (`unknown_job`), the scene was replaced
-  (`scene_replaced`, from the session scene epoch), the workspace detached or the window
-  minimized (`viewport_not_presentable`). A job the wait has seen that ends and is reaped before the
+  (`scene_replaced`, from the session scene epoch), or the workspace detached. Minimizing does not end the wait. A job the wait has seen that ends and is reaped before the
   next poll (one with no result to deliver completes and is reaped in the same frame) answers
   `finished: true, reaped: true` with its last seen row, whose `state` is `ended` when that row was
   still running (the terminal state was not observed), or `scene_replaced` when the scene changed
@@ -360,8 +360,8 @@ stack ends the requested batch successfully; it does not mask a failed command.
   config and shared source, strategy, pin and boundary checks; its preview answers `enabled: false`
   with a reason while validation is pending or a prerequisite fails. A
   `Pending` command answers when its job delivered (`result_unavailable` when none can). The
-  tool flag `NeedsPresentedFrame` is per tool, so `run_operation` (as `run_mesh_operation`) is
-  refused while minimized even for CPU-only rows. Behavior of the mesh aliases after the move
+  compute tools `run_operation` and `run_mesh_operation` remain available while minimized.
+  Behavior of the mesh aliases after the move
   into the table: a missing config section answers `enabled: false` with a reason (it was a call
   error), and a Vulkan property smoothing waits for its job (it was reported as an error while
   pending). Agent runs do not feed the panels' "last result" displays; the reply is the result.

@@ -170,8 +170,16 @@ uint64_t VulkanTransferQueue::QueryCompletedValue() const
     return QueryLaneCompletedValue(TransferLane::Graphics);
 }
 
-uint64_t VulkanTransferQueue::QueryLaneCompletedValue(const TransferLane laneId) const
+uint64_t VulkanTransferQueue::QueryLaneCompletedValue(const TransferLane laneId, VkResult* status) const
 {
+    if (status)
+        *status = VK_ERROR_INITIALIZATION_FAILED;
+    if (Lost())
+    {
+        if (status)
+            *status = VK_ERROR_DEVICE_LOST;
+        return 0;
+    }
     if (!IsValid())
     {
         Core::Log::Warn("[VulkanTransferQueue] QueryCompletedValue on invalid transfer service; returning zero");
@@ -180,9 +188,14 @@ uint64_t VulkanTransferQueue::QueryLaneCompletedValue(const TransferLane laneId)
     const Lane& lane = LaneFor(laneId);
     if (lane.Timeline == VK_NULL_HANDLE)
         return 0;
-
     uint64_t val = 0;
-    const VkResult result = vkGetSemaphoreCounterValue(m_Device, lane.Timeline, &val);
+    VkResult result = laneId == TransferLane::Graphics ? m_NextGraphicsQueryResult.exchange(VK_SUCCESS) : VK_SUCCESS;
+    if (result == VK_SUCCESS)
+        result = vkGetSemaphoreCounterValue(m_Device, lane.Timeline, &val);
+    if (result == VK_ERROR_DEVICE_LOST)
+        MarkLost();
+    if (status)
+        *status = result;
     if (result != VK_SUCCESS)
     {
         Core::Log::Warn("[VulkanTransferQueue] vkGetSemaphoreCounterValue failed; returning zero");
@@ -324,7 +337,7 @@ bool VulkanTransferQueue::ComputeLive() const noexcept
     return !m_Lost.load(std::memory_order_acquire) && IsValid();
 }
 
-void VulkanTransferQueue::MarkLost() noexcept
+void VulkanTransferQueue::MarkLost() const noexcept
 {
     m_Lost.store(true, std::memory_order_release);
 }

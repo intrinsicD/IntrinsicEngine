@@ -20,7 +20,6 @@ module;
 #include <utility>
 #include <vector>
 module Extrinsic.Runtime.SpatialIndexCache;
-import Extrinsic.Runtime.Private.WorkspaceLease;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Graphics.PointLBVH;
@@ -73,7 +72,7 @@ namespace Extrinsic::Runtime
         {
             return CompactSlot(std::span<const std::uint32_t>(snapshot.Slots), slot);
         }
-        // The packed result of one batch or session page (neighbors, then a {count, status} header per query) into
+        // The packed result of one session page (neighbors, then a {count, status} header per query) into
         // `state` (Neighbors and Counts sized), validated against the target's ordered original row IDs: nearest
         // and kNN rows hold min(capacity, available) hits, radius rows at most the available (all hits counted),
         // status 0 everywhere. `excluded`: empty or one original row ID per query.
@@ -550,32 +549,6 @@ namespace Extrinsic::Runtime
         std::vector<std::shared_ptr<Entry>> Entries{};
         JobService* Jobs{};
         GpuQueueParticipantHandle Participant{};
-        struct Batch
-        {
-            Batch(RHI::IDevice&, RHI::BufferManager&) {}
-            std::shared_ptr<SpatialNearestBatch> State{std::make_shared<SpatialNearestBatch>()};
-            std::shared_ptr<Entry> Target{};
-            std::vector<glm::vec3> Queries{};
-            std::vector<std::uint32_t> Headers{}, Excluded{};
-            std::uint32_t Capacity{1};
-            float Radius{-1.f};
-            // PackedResult holds neighbors followed by one header per query.
-            RHI::BufferManager::BufferLease Input{}, Exclusions{}, TransformBuffer{}, TransformedQueries{},
-                PackedResult{};
-            std::optional<glm::dmat4> Transform{};
-            Graphics::PointQueryStrategy Strategy{};
-            std::size_t TransformedRows{};
-            bool InputDirty{true};
-            std::size_t QueryRows{}, PackedBytes{};
-            void ReleaseScratch()
-            {
-                for (auto* lease : {&Input, &Exclusions, &TransformBuffer, &TransformedQueries, &PackedResult})
-                    *lease = {};
-                QueryRows = PackedBytes = TransformedRows = 0u;
-                InputDirty = true;
-            }
-        };
-        std::vector<std::shared_ptr<Batch>> Batches{};
         struct Computation
         {
             std::shared_ptr<SpatialGpuResult> Result{std::make_shared<SpatialGpuResult>()};
@@ -726,23 +699,6 @@ namespace Extrinsic::Runtime
                     work->Result->State = SpatialQueryState::Ready;
                 });
         }
-        // Copies a batch's packed neighbors and headers and validates them against its target.
-        static RHI::ReadbackSink BatchSink(const std::shared_ptr<Batch>& batch)
-        {
-            return RHI::ReadbackSink::Invoke(
-                [batch](std::span<const std::byte> data)
-                {
-                    if (batch->State->State == SpatialQueryState::Failed)
-                        return;
-                    (void)DecodePacked(data,
-                        batch->Target->Snapshot->Slots,
-                        batch->Excluded,
-                        batch->Capacity,
-                        batch->Radius,
-                        batch->Headers,
-                        *batch->State);
-                });
-        }
         void Commit(const Producer& producer)
         {
             if (!producer.Target)
@@ -753,7 +709,7 @@ namespace Extrinsic::Runtime
             producer.Target->Built = true;
             ++Stats.GpuBuilds;
         }
-        // The one submission path of every computation and query batch: IDevice::SubmitComputeReadback,
+        // The one owner submission path (computations, session/index preparations): IDevice::SubmitComputeReadback,
         // at once, on the compute lane (graphics where forced or single-queue; the transfer queue's
         // ComputeLane diagnostic reports which). Nothing records into a graphics frame. On acceptance
         // the target's producer state is committed and every residency slot the recorder used carries
@@ -830,52 +786,12 @@ namespace Extrinsic::Runtime
             ++Stats.GpuComputeSubmissions;
             Computations.push_back(work);
         }
-        void SubmitBatch(const std::shared_ptr<Batch>& batch)
-        {
-            const auto refusals = ScratchRefusals();
-            std::string_view why = "The GPU compute lane refused the spatial query before recording.";
-            Entry* e = nullptr;
-            const auto token = Submit(
-                [&]
-                {
-                    e = PrepareBatch(batch);
-                    if (!e)
-                        why = "GPU spatial query could not record against a current index.";
-                    return e != nullptr;
-                },
-                [&](RHI::ICommandContext& commands, Producer& producer) -> RHI::BufferHandle
-                {
-                    if (!RecordBatch(*e, batch, commands, producer))
-                    {
-                        why = "GPU spatial query could not record against a current index.";
-                        return {};
-                    }
-                    why = "GPU spatial submission refused after recording.";
-                    return batch->PackedResult.GetHandle();
-                },
-                batch->State->Neighbors.size() * 8u + batch->Headers.size() * 4u,
-                BatchSink(batch));
-            if (!token.IsValid())
-            {
-                batch->State->State = SpatialQueryState::Failed;
-                batch->State->Diagnostic = ScratchDiagnostic(refusals, why);
-                return;
-            }
-            if (batch->State->State == SpatialQueryState::Queued)
-                batch->State->State = SpatialQueryState::Submitted;
-            ++Stats.GpuQuerySubmissions;
-        }
         void ShutdownBatches()
         {
             // Called after the participant's device-idle fence. Deliver pending sinks
             // before releasing their device-owned source buffers.
-            if (Device && (!Batches.empty() || !Computations.empty())) Device->GetTransferQueue().CollectCompleted();
-            for (auto& batch : Batches)
-            {
-                batch->State->State = SpatialQueryState::Failed;
-                batch->State->Diagnostic = "Spatial query service stopped.";
-            }
-            Batches.clear();
+            if (Device && !Computations.empty())
+                Device->GetTransferQueue().CollectCompleted();
             for (auto& work : Computations)
             {
                 work->Result->State = SpatialQueryState::Failed;
@@ -962,12 +878,6 @@ namespace Extrinsic::Runtime
                     }
                     return Device->GetTransferQueue().IsComplete(i.Fence);
                 });
-            std::erase_if(Batches, [](const auto& b) {
-                const bool finished = b->State.use_count() == 1 && b->State->State != SpatialQueryState::Queued &&
-                    b->State->State != SpatialQueryState::Submitted && b.use_count() == 1;
-                if (finished) b->Target.reset(); // the pooled scratch does not retain a scene index
-                return finished;
-            });
         }
         std::uint64_t Next{1};
         SpatialIndexCacheStats Stats{};
@@ -1119,54 +1029,6 @@ namespace Extrinsic::Runtime
             producer.Built = true;
             return true;
         }
-        // Host side of a batch: its inputs written (mapped), the target made resident, and the pipelines its
-        // strategy and pose need. Null when the target cannot be.
-        Entry* PrepareBatch(const std::shared_ptr<Batch>& batch)
-        {
-            if (batch->InputDirty)
-            {
-                Device->WriteBuffer(batch->Input.GetHandle(), batch->Queries.data(), batch->Queries.size() * 12);
-                Stats.GpuQueryUploadBytes += batch->Queries.size()*12;
-                batch->InputDirty = false;
-            }
-            if (batch->Transform)
-            {
-                Device->WriteBuffer(batch->TransformBuffer.GetHandle(), &*batch->Transform, sizeof(glm::dmat4));
-                Stats.GpuQueryUploadBytes += sizeof(glm::dmat4);
-                ++Stats.GpuQueryTransformUploads;
-            }
-            else
-            {
-                Device->WriteBuffer(batch->Exclusions.GetHandle(), batch->Excluded.data(), batch->Excluded.size() * 4);
-                Stats.GpuQueryUploadBytes += batch->Excluded.size()*4;
-            }
-            const bool brute = batch->Strategy == Graphics::PointQueryStrategy::BruteForce;
-            auto* e = PrepareHost({batch->Target->Id}, !brute);
-            return e && e->Gpu->PreparePipelines(brute, batch->Transform.has_value()) ? e : nullptr;
-        }
-        bool RecordBatch(
-            Entry& e, const std::shared_ptr<Batch>& batch, RHI::ICommandContext& commands, Producer& producer)
-        {
-            const Graphics::PointLbvhQuery query{
-                .Queries = {.Buffer = batch->Input.GetHandle(), .Count = std::uint32_t(batch->Queries.size())},
-                .Neighbors = batch->PackedResult.GetHandle(),
-                .Headers = batch->PackedResult.GetHandle(),
-                .Capacity = batch->Capacity,
-                .Radius = batch->Radius,
-                .KNearestCount = batch->Radius < 0 ? batch->Capacity : 0u,
-                .ExcludedIndices = batch->Transform ? RHI::BufferHandle{} : batch->Exclusions.GetHandle(),
-                .Transform = batch->Transform ? batch->TransformBuffer.GetHandle() : RHI::BufferHandle{},
-                .TransformedQueries = batch->Transform ? batch->TransformedQueries.GetHandle() : RHI::BufferHandle{},
-                .HeaderOffset = batch->State->Neighbors.size() * 8u};
-            if (batch->Strategy == Graphics::PointQueryStrategy::BruteForce)
-            {
-                // Original resident samples and row mapping only; no hierarchy is reserved or built.
-                RecordGather(e, commands, producer);
-                return e.Gpu->RecordBruteForceQuery(
-                    commands, {.Buffer = e.Points, .Count = std::uint32_t(e.Snapshot->Slots.size())}, e.Mapping, query);
-            }
-            return RecordBuild(e, commands, producer) && e.Gpu->RecordQuery(commands, query);
-        }
         // ARCH-023 N5: device shutdown with sessions a run still holds. The device is idle (after the
         // participant's fence); each session's device objects (its target entry, private hierarchy, scratch
         // leases) go now, on this thread, and its later pages fail, so the run's last copy releases nothing.
@@ -1216,7 +1078,7 @@ namespace Extrinsic::Runtime
                     .HasInFlightWork =
                         [this]()
                     {
-                        return !m_Impl->Batches.empty() || !m_Impl->Computations.empty() || !m_Impl->Sessions.empty() ||
+                        return !m_Impl->Computations.empty() || !m_Impl->Sessions.empty() ||
                             !m_Impl->IndexLeases.empty() || m_Impl->HoldsWorkspaces();
                     },
                     .ShutdownAfterDeviceIdle =
@@ -1372,12 +1234,7 @@ namespace Extrinsic::Runtime
         const auto busy = [](SpatialQueryState state) {
             return state == SpatialQueryState::Queued || state == SpatialQueryState::Submitted;
         };
-        if (std::ranges::any_of(s.Batches,
-                [&](const auto& b)
-                {
-                    return b->Target == e && busy(b->State->State);
-                }) ||
-            std::ranges::any_of(s.Computations,
+        if (std::ranges::any_of(s.Computations,
                 [&](const auto& c)
                 {
                     return c->Target == e && busy(c->Result->State);
@@ -1408,47 +1265,6 @@ namespace Extrinsic::Runtime
     {
         const auto* entry = m_Impl->Find(handle);
         return entry ? entry->Snapshot : nullptr;
-    }
-    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuNearest(SpatialIndexHandle handle,
-        std::span<const glm::vec3> queries,
-        std::shared_ptr<SpatialNearestBatch> reuse,
-        const Graphics::PointQueryStrategy strategy)
-    {
-        return QueueGpuKNearest(handle, queries, 1, {}, std::move(reuse), strategy);
-    }
-    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuNearestTransformed(SpatialIndexHandle handle,
-        std::span<const glm::vec3> source,
-        const glm::dmat4& transform,
-        std::shared_ptr<SpatialNearestBatch> reuse,
-        const Graphics::PointQueryStrategy strategy)
-    {
-        return QueueGpuBatch(handle, source, 1, -1.f, {}, std::move(reuse), strategy, &transform);
-    }
-    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuKNearest(SpatialIndexHandle handle,
-        std::span<const glm::vec3> queries,
-        std::uint32_t k,
-        std::span<const std::uint32_t> excludedSlots,
-        std::shared_ptr<SpatialNearestBatch> reuse,
-        const Graphics::PointQueryStrategy strategy)
-    {
-        return QueueGpuBatch(handle, queries, k, -1.f, excludedSlots, std::move(reuse), strategy);
-    }
-    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuRadius(SpatialIndexHandle handle,
-        std::span<const glm::vec3> queries,
-        float radius,
-        std::uint32_t capacity,
-        std::span<const std::uint32_t> excludedSlots,
-        std::shared_ptr<SpatialNearestBatch> reuse,
-        const Graphics::PointQueryStrategy strategy)
-    {
-        if (!std::isfinite(radius) || radius < 0 || radius > Geometry::PointLBVH::CoordinateLimit)
-        {
-            auto result = std::make_shared<SpatialNearestBatch>();
-            result->State = SpatialQueryState::Failed;
-            result->Diagnostic = "GPU radius must be finite and in [0, 1e18].";
-            return result;
-        }
-        return QueueGpuBatch(handle, queries, capacity, radius, excludedSlots, std::move(reuse), strategy);
     }
     bool SpatialIndexCache::GpuQueriesAvailable() const noexcept
     {
@@ -1613,146 +1429,6 @@ namespace Extrinsic::Runtime
         auto session = std::make_shared<SpatialQuerySession>(std::move(i));
         s.Sessions.push_back(session);
         return session;
-    }
-    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuBatch(SpatialIndexHandle handle,
-        std::span<const glm::vec3> queries,
-        std::uint32_t k,
-        float radius,
-        std::span<const std::uint32_t> excludedSlots,
-        std::shared_ptr<SpatialNearestBatch> reuse,
-        const Graphics::PointQueryStrategy strategy,
-        const glm::dmat4* transform)
-    {
-        auto& s = *m_Impl;
-        auto fail = [](std::string diagnostic) {
-            auto result = std::make_shared<SpatialNearestBatch>();
-            result->State = SpatialQueryState::Failed;
-            result->Diagnostic = std::move(diagnostic);
-            return result;
-        };
-        const auto* entry = s.Find(handle);
-        if (!entry || !s.Device || !s.Device->IsOperational() || !s.Participant.IsValid() ||
-            entry->Snapshot->Slots.empty() || entry->Snapshot->Slots.size() > (1u << 20) || queries.empty() ||
-            queries.size() > (1u << 20) || k == 0 || k > (radius < 0 ? 64u : 1024u) ||
-            (!excludedSlots.empty() && excludedSlots.size() != queries.size()) ||
-            !std::ranges::all_of(queries, Geometry::PointLBVH::ValidPoint) ||
-            (strategy != Graphics::PointQueryStrategy::Lbvh && strategy != Graphics::PointQueryStrategy::BruteForce))
-            return fail(
-                "Vulkan queries require an operational device, a current target (1..2^20 rows), finite queries (1..2^20), k in 1..64 or radius capacity in 1..1024, and zero or query-count exclusions.");
-        if (strategy == Graphics::PointQueryStrategy::BruteForce)
-            if (const auto refusal = Graphics::PointBruteForceRefusal(
-                    std::uint32_t(queries.size()), std::uint32_t(entry->Snapshot->Slots.size()), k);
-                !refusal.empty())
-                return fail(std::string(refusal));
-        if (transform)
-        {
-            if (!s.Device->SupportsShaderFloat64()) return fail("Transformed queries require shader float64.");
-            for (unsigned column = 0; column < 4; ++column)
-                for (unsigned row = 0; row < 4; ++row)
-                    if (!std::isfinite((*transform)[column][row])) return fail("Query transform must be finite.");
-        }
-        std::shared_ptr<Impl::Batch> batch;
-        if (reuse)
-        {
-            auto found = std::ranges::find_if(s.Batches, [&](const auto& b) { return b->State == reuse; });
-            if (found == s.Batches.end() || reuse->State != SpatialQueryState::Ready)
-                return fail("Only a completed batch can be reused.");
-            batch = *found;
-            // Keep pooled ICP scratch bounded to nearest-query storage. A radius/kNN request
-            // starts its own non-pooled batch rather than growing this lease to k*N neighbors.
-            if (!transform && batch->Transform) batch.reset();
-        }
-        if (!batch)
-        {
-            batch = transform ? LeaseGpuWorkspace<Impl::Batch>() : std::make_shared<Impl::Batch>(*s.Device, *s.Scratch);
-            if (!batch) return fail("GPU query workspace unavailable.");
-            s.Batches.push_back(batch);
-        }
-        const auto refusals = s.ScratchRefusals();
-        const bool allocateInput = !batch->Input.IsValid() || batch->QueryRows < queries.size();
-        const std::size_t packedBytes = (queries.size() * k + queries.size()) * 8u;
-        const bool allocateOutput = !batch->PackedResult.IsValid() || batch->PackedBytes < packedBytes;
-        if (allocateInput || allocateOutput || !batch->Exclusions.IsValid())
-        {
-            auto ensure = [&](RHI::BufferManager::BufferLease& buffer, std::size_t bytes, bool host, bool grow)
-            {
-                if (buffer.IsValid() && !grow)
-                    return true;
-                auto replacement = s.Scratch->CreateScratch({.SizeBytes = bytes,
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                    .HostVisible = host,
-                    .DebugName = "SpatialIndex.QueryBatch"});
-                if (!replacement)
-                    return false;
-                buffer = std::move(*replacement);
-                return true;
-            };
-            batch->InputDirty = batch->InputDirty || allocateInput;
-            if (!ensure(batch->Input, queries.size() * 12, true, allocateInput) ||
-                !ensure(batch->PackedResult, packedBytes, false, allocateOutput) ||
-                !ensure(batch->Exclusions, queries.size() * 4, true, allocateInput))
-            {
-                batch->State->State = SpatialQueryState::Failed;
-                return fail(s.ScratchDiagnostic(refusals, "GPU spatial batch allocation failed."));
-            }
-            batch->QueryRows = std::max(batch->QueryRows, queries.size());
-            batch->PackedBytes = std::max(batch->PackedBytes, packedBytes);
-            ++s.Stats.GpuBatchAllocations;
-        }
-        if (transform)
-        {
-            auto allocate = [&](RHI::BufferManager::BufferLease& buffer,
-                                std::size_t bytes,
-                                bool host,
-                                RHI::BufferUsage usage,
-                                const char* name)
-            {
-                auto replacement = s.Scratch->CreateScratch(
-                    {.SizeBytes = bytes, .Usage = usage, .HostVisible = host, .DebugName = name});
-                if (replacement)
-                    buffer = std::move(*replacement);
-                return bool(replacement);
-            };
-            const auto transformUsage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst;
-            if (!batch->TransformBuffer.IsValid() &&
-                !allocate(
-                    batch->TransformBuffer, sizeof(glm::dmat4), true, transformUsage, "SpatialIndex.QueryTransform"))
-            {
-                batch->State->State = SpatialQueryState::Failed;
-                return fail(s.ScratchDiagnostic(refusals, "GPU query transform allocation failed."));
-            }
-            if (batch->TransformedRows < queries.size())
-            {
-                if (!allocate(batch->TransformedQueries,
-                        queries.size() * 12,
-                        false,
-                        transformUsage,
-                        "SpatialIndex.QueryTransform"))
-                {
-                    batch->State->State = SpatialQueryState::Failed;
-                    return fail(s.ScratchDiagnostic(refusals, "GPU transformed query allocation failed."));
-                }
-                batch->TransformedRows = queries.size();
-            }
-        }
-        batch->InputDirty = batch->InputDirty || allocateInput || !transform || batch->Queries.size() != queries.size() ||
-            !std::equal(batch->Queries.begin(), batch->Queries.end(), queries.begin(), queries.end());
-        batch->Transform = transform ? std::optional{*transform} : std::nullopt;
-        batch->Strategy = strategy;
-        batch->Target = *std::ranges::find_if(s.Entries, [&](const auto& e) { return e->Id == handle.Value; });
-        batch->Queries.assign(queries.begin(), queries.end());
-        batch->Capacity = k;
-        batch->Radius = radius;
-        batch->Excluded.assign(queries.size(), Geometry::PointLBVH::InvalidIndex);
-        if (!excludedSlots.empty()) std::ranges::copy(excludedSlots, batch->Excluded.begin());
-        batch->Headers.assign(queries.size()*2, 0);
-        batch->State->Counts.assign(queries.size(), 0);
-        batch->State->Capacity = k;
-        batch->State->Diagnostic.clear();
-        batch->State->Neighbors.resize(queries.size()*k);
-        batch->State->State = SpatialQueryState::Queued;
-        s.SubmitBatch(batch);
-        return batch->State;
     }
     std::shared_ptr<SpatialGpuIndexLease> SpatialIndexCache::PrepareGpuIndex(
         const SpatialIndexHandle handle, std::string& diagnostic)

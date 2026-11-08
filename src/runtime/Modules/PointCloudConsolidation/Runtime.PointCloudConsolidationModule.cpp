@@ -89,7 +89,7 @@ namespace Extrinsic::Runtime
         Graphics::GpuPropertyResidency* Residency{};
         RHI::IDevice* Device{};
         Graphics::GpuPropertyKey Key{};
-        std::uint32_t Count{};
+        std::uint32_t Count{}, PreviewBuffers{3u};
         std::uint64_t Ring{}; // the ring this run's previews made; 0: none
 
         [[nodiscard]] bool Possible() const noexcept
@@ -105,7 +105,7 @@ namespace Extrinsic::Runtime
             const auto layout = MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, Count);
             if (!layout)
                 return StepRunShow::Never;
-            if (!UploadGpuPropertyFront(*Residency, *Device, Key, *layout, 2u, std::as_bytes(values)))
+            if (!UploadGpuPropertyFront(*Residency, *Device, Key, *layout, PreviewBuffers, std::as_bytes(values)))
                 return StepRunShow::Later; // no free slot this frame
             Ring = Residency->RingGeneration(Key);
             return StepRunShow::Shown;
@@ -2939,7 +2939,8 @@ namespace Extrinsic::Runtime
                 r.Preview = {.Residency = ctx.Cache->PropertyResidency(),
                     .Device = ctx.Device,
                     .Key = MakeGpuPropertyKey(r.Snapshot.World, entity, request.Properties.OutputPositions),
-                    .Count = static_cast<std::uint32_t>(r.Snapshot.Positions.size())};
+                    .Count = static_cast<std::uint32_t>(r.Snapshot.Positions.size()),
+                    .PreviewBuffers = request.Config.Execution.PreviewBuffers};
             else if (request.Config.Execution.PreviewEvery != 0u)
                 r.Snapshot.BackendDiagnostic += std::string{r.Snapshot.BackendDiagnostic.empty() ? "" : " "} +
                     "Live preview shows only an in-place output of the same cardinality on an operational device; "
@@ -3076,6 +3077,7 @@ namespace Extrinsic::Runtime
                                          .Output = {.StableEntityId = request.StableEntityId,
                                              .Property = request.Properties.OutputPositions},
                                          .Execution = request.Config.Execution,
+                                         .DevicePreview = r.Preview.Possible(),
                                          .MetricNames = {"max_displacement", "average_displacement", "", ""}},
                 std::move(callbacks),
                 EditorStepRunJobs(RunJobCommands(ctx, r.Snapshot), identity, std::make_shared<JobToken>()),

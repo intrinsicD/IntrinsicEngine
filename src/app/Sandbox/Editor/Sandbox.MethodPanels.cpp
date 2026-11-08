@@ -1021,8 +1021,13 @@ namespace Extrinsic::Sandbox::Editor
                 0.0,
                 "%.6g");
             // The shared execution options; every consolidation backend runs as a step run.
-            changed |= Runtime::DrawStepRunExecutionOptions(
-                "PointCloudConsolidation", config.Execution, Runtime::kMaxPointCloudConsolidationIterations, true);
+            changed |= Runtime::DrawStepRunExecutionOptions("PointCloudConsolidation",
+                config.Execution,
+                Runtime::kMaxPointCloudConsolidationIterations,
+                true,
+                true,
+                1u,
+                true);
             changed |= ImGui::InputDouble(
                 "Convergence tolerance##PointCloudConsolidation",
                 &config.ConvergenceTolerance,
@@ -1864,7 +1869,9 @@ namespace Extrinsic::Sandbox::Editor
                 KMeans.Execution,
                 Runtime::kMaxKMeansIterations,
                 true,
-                OptionFromIndex(kKMeansBackends, KMeans.Backend) == Runtime::ClusteringBackend::VulkanCompute);
+                OptionFromIndex(kKMeansBackends, KMeans.Backend) == Runtime::ClusteringBackend::VulkanCompute,
+                1u,
+                true);
             configChanged |= ImGui::InputScalar(
                 "Seed##KMeans",
                 ImGuiDataType_U32,

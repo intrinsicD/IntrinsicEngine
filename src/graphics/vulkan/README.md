@@ -561,6 +561,17 @@ available through the Vulkan 1.2/1.3 feature chain.
   fence-safe and from fail-closed `EndFrame()` exits, so buffer/image/sampler/
   pipeline slots return to the free list after the frames-in-flight retirement
   window without collapsing the GPU-safe `DeletionQueue` lifetime.
+- ARCH-024: where no frame begins, `CollectCompletedResources()` releases the same
+  work without waiting. It flushes every slot's `DeletionQueue` (then the
+  compute-gated deletes) only once `vkGetFenceStatus` reports every slot's main,
+  async-compute and transfer fences signaled, no frame is recording and the
+  transfer service's graphics lane finished all it was given; handle slots killed
+  before the last submitted frame need only the fences. `IsFrameRetired(n)` reads
+  the same state: a submitted number retires once every frame slot finished (or
+  the frame-distance rule holds), an unsubmitted one once no frame records and the
+  graphics lane is idle. A lost device or any other fence status retires and frees
+  nothing. `VulkanGatedQueue::FrameCompute`/`FrameTransfer` hold the frames' own
+  async-compute and transfer queues for the held-fence tests.
 - `GRAPHICS-018` brought up all major guarded Vulkan paths: instance/surface/
   physical-device probing with required Vulkan 1.2/1.3 feature negotiation,
   logical-device/queue/allocator/per-frame resource acquisition, swapchain

@@ -212,7 +212,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                         case GpuTransactionPrepare::Ready: t->Prepared = true; break;
                         }
                     }
-                    if (!t->OwnerSteps && !t->Pages && !t->Recorded)
+                    if (!t->Pages && !t->Recorded)
                     {
                         auto driver = StepRunOf(*t);
                         if (!t->StepRun || !driver.MayStart())
@@ -235,9 +235,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                         return false;
                     t->Hooks.CompleteRun();
                     if (t->Phase == EditorGpuTransactionPhase::ReadyToAccept &&
-                        (t->OwnerSteps || t->Pages
-                                ? t->CommitWanted
-                                : t->Execution.AutoAccept != StepRunAutoAccept::Never && AutoAcceptAllowed(*t)))
+                        (t->Pages ? t->CommitWanted
+                                  : t->Execution.AutoAccept != StepRunAutoAccept::Never && AutoAcceptAllowed(*t)))
                     {
                         // Nothing waits for a user here: a refused automatic Accept ends the run.
                         if (auto refused = GpuTransactionAcceptRefusal(*t))
@@ -283,9 +282,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 diagnostic = "The inputs changed since the run; discard the result and start again.";
                 return false;
             }
-            if (t->OwnerSteps || (t->Pages && t->Phase == EditorGpuTransactionPhase::Running))
+            if (t->Pages && t->Phase == EditorGpuTransactionPhase::Running)
             {
-                if (t->Phase != EditorGpuTransactionPhase::Running || t->CommitWanted)
+                if (t->CommitWanted)
                 {
                     diagnostic = "The GPU transaction no longer computes.";
                     return false;
@@ -294,12 +293,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                     return false;
                 // A worker-stepped run keeps its leased capacity; its Init runs again for the new generation (the
                 // step run starts no segment before it), and its pages may be submitted again.
-                if (t->Pages)
-                {
-                    t->Prepared = false;
-                    t->StepCompleted.store(false, std::memory_order_relaxed); // nothing in flight
-                    t->Pages->ClearAbort();
-                }
+                t->Prepared = false;
+                t->StepCompleted.store(false, std::memory_order_relaxed); // nothing in flight
+                t->Pages->ClearAbort();
                 return true;
             }
             if (!t->Hooks.Restart(diagnostic))
@@ -349,7 +345,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                         diagnostic = "The GPU transaction ended.";
                         return StepRunCommit::Refused;
                     }
-                    if ((core->OwnerSteps || core->Pages) && core->Phase == EditorGpuTransactionPhase::Running)
+                    if (core->Pages && core->Phase == EditorGpuTransactionPhase::Running)
                     {
                         core->CommitWanted = true;
                         return StepRunCommit::Pending;
@@ -366,9 +362,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 },
                 // A one-shot's step run holds its transaction until the run ends (this callable goes then), so a
                 // run started without a caller that keeps the handle (an agent's start) still waits for Accept or
-                // Discard; an owner-stepped transaction stays its owner's.
+                // Discard.
                 .Discard =
-                    [weak, held = t->OwnerSteps ? GpuTransactionHandle{} : t]
+                    [weak, held = t]
                 {
                     const auto core = weak.lock();
                     if (!core)
@@ -444,11 +440,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 };
             // A batch's automatic Accept is the run's accept-at-end (the core's own Accept is then the run's one
             // Commit).
-            const auto execution = !t->OwnerSteps && t->Kind == GpuTransactionKind::OneShot
-                ? OneShotExecution(t->Execution)
-                : t->Execution;
+            const auto execution =
+                t->Kind == GpuTransactionKind::OneShot ? OneShotExecution(t->Execution) : t->Execution;
             std::string refusal;
-            t->StepRun = steps.Start({.Label = t->JobLabel, .Owner = "Runtime.GpuTransaction", .Execution = execution},
+            t->StepRun = steps.Start({.Label = t->JobLabel,
+                                         .Owner = t->Owner,
+                                         .Execution = execution,
+                                         .DevicePreview = t->Kind == GpuTransactionKind::Iterative},
                 std::move(callbacks),
                 EditorStepRunJobs(t->Context.JobCommands, control, std::make_shared<JobToken>()),
                 refusal);
@@ -563,51 +561,18 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         if (t.Delivered) return;
         t.Phase = EditorGpuTransactionPhase::ReadyToAccept;
         ReportOutcome(t, true, t.Label + " result awaits Accept or Discard.");
-        // A one-shot's one step completed: the step run ends converged and waits for Accept or Discard. An
-        // owner-stepped transaction counted its steps itself and is ready only for its Commit.
-        if (t.OwnerSteps || t.Pages) // a worker-stepped run's step run counted its steps itself
+        // A one-shot's one step completed: the step run ends converged and waits for Accept or Discard.
+        // A worker-stepped transaction already counted its steps and is ready only for its Commit.
+        if (t.Pages)
             return;
         auto driver = StepRunOf(t);
         (void)driver.Stepped({}, StepOutcome::Converged);
         driver.Recording(false);
     }
 
-    std::uint32_t GpuTransactionStepAllowance(const GpuTransactionCore& t)
-    {
-        return StepRunOf(t).Allowance();
-    }
-
     void GpuTransactionRecording(const GpuTransactionCore& t, const bool inFlight)
     {
         StepRunOf(t).Recording(inFlight);
-    }
-
-    bool GpuTransactionStepped(const GpuTransactionCore& t,
-        const std::uint32_t count,
-        const double metric,
-        const bool converged,
-        const bool failed)
-    {
-        return StepRunOf(t).Stepped({.Values = {metric, 0.0, 0.0, 0.0}},
-            failed          ? StepOutcome::Failed
-                : converged ? StepOutcome::Converged
-                            : StepOutcome::Continue,
-            count);
-    }
-
-    bool GpuTransactionMayPreview(const GpuTransactionCore& t)
-    {
-        return StepRunOf(t).MayPreview();
-    }
-
-    bool GpuTransactionMayPreviewAt(const GpuTransactionCore& t, const std::uint32_t step)
-    {
-        return StepRunOf(t).MayPreviewAt(step);
-    }
-
-    void GpuTransactionPreviewed(const GpuTransactionCore& t)
-    {
-        StepRunOf(t).Previewed();
     }
 
     void RestartGpuTransactionRings(GpuTransactionCore& t)

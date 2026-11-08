@@ -6,6 +6,7 @@
 //   auto_accept          never; converged (accept at convergence); end (a batch: accept at convergence or the cap)
 //                        Stop never accepts: a stopped run waits for Accept or Discard
 //   start                run (compute at once) or ready (initialized, nothing computed until run or step n)
+//   preview_buffers      live device ring capacity (2 or 3); no device ring is used by a CPU-only preview
 // A method embeds the struct in its config and keeps its algorithm parameters beside it (a derived config section binds
 // the rows to that member with BindStepRunExecution). An axis a path cannot honour is refused or reported by that path,
 // never accepted silently (a one-shot is one step without live preview and binds no cap or preview rows). Kept apart
@@ -52,6 +53,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t PreviewIntervalMs{33u};
         StepRunAutoAccept AutoAccept{StepRunAutoAccept::Never};
         StepRunStart Start{StepRunStart::Ready};
+        std::uint32_t PreviewBuffers{3u}; // device preview rings only; CPU-only previews allocate no ring
         friend constexpr bool operator==(const StepRunExecution&, const StepRunExecution&) = default;
     };
 
@@ -79,9 +81,9 @@ export namespace Extrinsic::Runtime
         return std::nullopt;
     }
 
-    // The five rows, in the order above, with the method's own iteration limit (its existing numerical bound). Every
+    // The six rows, in the order above, with the method's own iteration limit (its existing numerical bound). Every
     // codec, validator, schema and panel hint of the options reads these rows.
-    [[nodiscard]] constexpr std::array<ConfigFieldSpec, 5> StepRunExecutionFields(
+    [[nodiscard]] constexpr std::array<ConfigFieldSpec, 6> StepRunExecutionFields(
         const std::uint32_t maxIterationCap, const std::uint32_t minIterationCap = 1u)
     {
         return {{
@@ -109,10 +111,16 @@ export namespace Extrinsic::Runtime
                 .Type = ConfigFieldType::StringEnum,
                 .Description = "run: compute at once; ready: initialize only, then run or step n.",
                 .EnumValues = kStepRunStartTokens},
+            {.Name = "preview_buffers",
+                .Type = ConfigFieldType::UInt,
+                .Description =
+                    "Device live-preview ring slots: 2 (double) or 3 (triple); CPU-only previews use no device ring.",
+                .Min = 2,
+                .Max = 3},
         }};
     }
 
-    // The five rows bound to a config's StepRunExecution member, in StepRunExecutionFields' order, for a derived config
+    // The six rows bound to a config's StepRunExecution member, in StepRunExecutionFields' order, for a derived config
     // section to list beside its own rows (each, or only the ones its path honours).
     template <auto Member>
     [[nodiscard]] constexpr auto BindStepRunExecution(
@@ -120,7 +128,7 @@ export namespace Extrinsic::Runtime
     {
         using Cfg = typename BoundMember<decltype(Member)>::Command;
         const auto fields = StepRunExecutionFields(maxIterationCap, minIterationCap);
-        return std::array<BoundField<Cfg>, 5>{{
+        return std::array<BoundField<Cfg>, 6>{{
             {.Spec = fields[0],
                 .Get =
                     [](const Cfg& c)
@@ -176,6 +184,17 @@ export namespace Extrinsic::Runtime
                 {
                     (c.*Member).Start = static_cast<StepRunStart>(static_cast<std::uint8_t>(v));
                 }},
+            {.Spec = fields[5],
+                .Get =
+                    [](const Cfg& c)
+                {
+                    return double((c.*Member).PreviewBuffers);
+                },
+                .Set =
+                    [](Cfg& c, const double v)
+                {
+                    (c.*Member).PreviewBuffers = static_cast<std::uint32_t>(v);
+                }},
         }};
     }
 
@@ -188,6 +207,8 @@ export namespace Extrinsic::Runtime
             return "max_iterations is outside the method's range.";
         if (options.PreviewEvery > kMaxStepRunPreviewEvery)
             return "preview_every is too large.";
+        if (options.PreviewBuffers < 2u || options.PreviewBuffers > 3u)
+            return "preview_buffers must be 2 or 3.";
         if (options.PreviewIntervalMs > kMaxStepRunPreviewIntervalMs)
             return "preview_interval_ms is too large.";
         if (static_cast<std::size_t>(options.AutoAccept) >= kStepRunAutoAcceptTokens.size())

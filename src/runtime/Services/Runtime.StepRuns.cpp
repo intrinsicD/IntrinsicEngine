@@ -310,6 +310,9 @@ namespace Extrinsic::Runtime
                 .CanRestart = !Retired && bool(Callbacks.Restart),
                 .StepFailed = StepFailed,
                 .Execution = Options.Execution,
+                .DevicePreviewBuffers = Options.DevicePreview && Options.Execution.PreviewEvery != 0u
+                    ? Options.Execution.PreviewBuffers
+                    : 0u,
                 .ShownStep = ShownStep,
                 .Metrics = Log};
         }
@@ -946,11 +949,13 @@ namespace Extrinsic::Runtime
                     {"steps", run.Steps},
                     {"computing", run.SegmentInFlight},
                     {"preview_copies", run.PreviewCopies},
+                    {"device_preview_buffers", run.DevicePreviewBuffers},
                     {"can_restart", run.CanRestart},
                     {"execution",
                         {{"max_iterations", run.Execution.IterationCap},
                             {"preview_every", run.Execution.PreviewEvery},
                             {"preview_interval_ms", run.Execution.PreviewIntervalMs},
+                            {"preview_buffers", run.Execution.PreviewBuffers},
                             {"auto_accept", ToString(run.Execution.AutoAccept)},
                             {"start", ToString(run.Execution.Start)}}},
                     {"shown_step", run.ShownStep ? Json(*run.ShownStep) : Json(nullptr)},

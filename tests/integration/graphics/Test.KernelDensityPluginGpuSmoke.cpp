@@ -333,6 +333,10 @@ TEST(KernelDensityPluginGpuSmoke, AcceptDiscardStaleCancelAndACoincidentCluster)
                 const auto state = discarded->Analysis.Poll();
                 if (state.Phase != R::ScalarAnalysisPhase::ReadyToAccept)
                     return false;
+                const auto observed = gpu.H->Engine.Services().Find<R::StepRunsService>()->Observe(state.StepRun);
+                EXPECT_TRUE(observed);
+                if (observed)
+                    EXPECT_EQ(observed->Owner, "kernel_density");
                 previewSeen = state.CanAccept && HasRing(*gpu.H, cloud, config.Density) &&
                     std::as_const(props).Get<float>("density")[0] == 77.f;
                 undoBefore = gpu.H->History().UndoCount();

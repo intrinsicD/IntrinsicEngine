@@ -9,7 +9,10 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `ARCH-022` — Engine and feature modules: the architecture target (tasks/active/ARCH-022-engine-and-feature-modules-target.md)
+- `ARCH-024` — Complete shared plugin execution and measure its performance (tasks/active/ARCH-024-plugin-execution-completion-and-performance.md)
+- `BUG-262` — Correct worker-method sanitizer fixtures (tasks/active/BUG-262-worker-method-sanitizer-fixtures.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
+- `RUNTIME-355` — Retire method execution leftovers and align optional controls (tasks/active/RUNTIME-355-method-execution-retirement-and-consistency.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 
 ## Theme B — Rendering modernization
@@ -62,7 +65,12 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-324` — Octree split point Center/Mean/Median selectable in point spacing (tasks/backlog/runtime/RUNTIME-324-octree-median-split-selectable-variant.md)
 - unblocked: `RUNTIME-325` — Coroutine waits in JobService, or delete the coroutine path (tasks/backlog/runtime/RUNTIME-325-coroutine-waits-in-jobservice.md)
 - unblocked: `RUNTIME-352` — Clustering and consolidation modules reach the editor only through the framework module (tasks/backlog/runtime/RUNTIME-352-editor-internals-out-of-service-modules.md)
-- unblocked: `RUNTIME-355` — Retire method execution leftovers and align optional controls (tasks/backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md)
+- unblocked: `RUNTIME-356` — Point spacing: prove the complete GPU plugin adapter (tasks/backlog/runtime/RUNTIME-356-point-spacing-execution-completeness.md)
+- unblocked: `RUNTIME-357` — Kernel density: close adapter and lifecycle boundaries (tasks/backlog/runtime/RUNTIME-357-kernel-density-execution-completeness.md)
+- unblocked: `RUNTIME-358` — Density weights: initialize on the worker and close boundaries (tasks/backlog/runtime/RUNTIME-358-density-weights-execution-completeness.md)
+- unblocked: `RUNTIME-359` — Descriptor analysis: reserve every output atomically (tasks/backlog/runtime/RUNTIME-359-descriptor-analysis-execution-completeness.md)
+- unblocked: `RUNTIME-360` — Bilateral filter: prove resume equivalence and share metric curves (tasks/backlog/runtime/RUNTIME-360-bilateral-filter-execution-completeness.md)
+- unblocked: `RUNTIME-361` — CPD plugin: persist configuration and initialize on the worker (tasks/backlog/runtime/RUNTIME-361-coherent-point-drift-execution-completeness.md)
 - blocked by `RUNTIME-280`: `UI-061` — Select-by-query controls and "use selection as mask/source" (tasks/backlog/ui/UI-061-select-by-query-controls.md)
 - blocked by `RUNTIME-283`: `UI-063` — File > Properties import/export window (tasks/backlog/ui/UI-063-properties-import-export-window.md)
 - blocked by `RUNTIME-284`: `UI-064` — History window (tasks/backlog/ui/UI-064-history-window.md)
@@ -75,6 +83,8 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-259` — Local pytest cache fails repository-root hygiene (tasks/backlog/bugs/BUG-259-local-pytest-cache-root-hygiene.md)
 - unblocked: `BUG-260` — PR-fast stops at vcpkg tool download with HTTP 504 (tasks/backlog/bugs/BUG-260-pr-fast-vcpkg-download-504.md)
 - unblocked: `BUG-261` — Route Vulkan parity benchmark fixtures through the virtual display (tasks/backlog/bugs/BUG-261-vulkan-parity-benchmark-display-routing.md)
+- unblocked: `BUG-263` — Investigate operational Vulkan barrier validation in CI (tasks/backlog/bugs/BUG-263-vulkan-operational-barrier-validation.md)
+- unblocked: `BUG-264` — Retire superseded accepted position fronts without rendering (tasks/backlog/bugs/BUG-264-minimized-renderer-position-front-retention.md)
 
 ## Theme H — Agentic workflow hardening
 

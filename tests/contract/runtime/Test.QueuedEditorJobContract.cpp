@@ -458,7 +458,7 @@ TEST_F(QueuedEditorJobContract, VulkanConstructionPagesItsQuerySessionOnTheWorke
         ASSERT_EQ(queued.Status, R::EditorCommandStatus::Pending) << queued.Message;
         EXPECT_NE(queued.StepRun, 0u) << "the batch is a step run";
         // The session was prepared before the start: whatever the pages need exists already.
-        const auto allocations = Cache.Stats().GpuBatchAllocations, scratch = Cache.Stats().ScratchMisses;
+        const auto scratch = Cache.Stats().ScratchMisses;
         const auto buffers = Device.CreateBufferCount;
         for (int drain = 0; drain < 400 && !delivered; ++drain)
             (void)Jobs.DrainUntilTerminal(std::chrono::milliseconds{2});
@@ -499,7 +499,6 @@ TEST_F(QueuedEditorJobContract, VulkanConstructionPagesItsQuerySessionOnTheWorke
         EXPECT_EQ(delivered->CpuStageUploadBytes, 3u * 3u * 12u)
             << "every page uploads the full fixed page; the session's initial rows are not counted";
         EXPECT_EQ(delivered->CpuStageReadbackBytes, 8u * (width + 1u) * 8u);
-        EXPECT_EQ(Cache.Stats().GpuBatchAllocations, allocations) << "the pages allocate no query batch";
         EXPECT_EQ(Cache.Stats().ScratchMisses, scratch) << "nor method scratch";
         EXPECT_EQ(Device.CreateBufferCount, buffers) << "nor any device buffer";
         EXPECT_EQ(delivered->OutputVertexCount, expected.OutputVertexCount);

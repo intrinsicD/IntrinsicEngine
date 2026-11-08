@@ -80,12 +80,13 @@ namespace Intrinsic::Plugins::BilateralFilter
         staged.Operations.push_back({
             .Name = "bilateral_filter_start",
             .Title = "Start a bilateral point filter step run",
-            .Description = "Starts the bilateral point filter with the section sandbox.bilateral_filter as a step run "
-                           "(one filter pass a step) and answers its run id at once: the section's execution options "
-                           "apply unless the call names max_iterations, preview_every, preview_interval_ms, "
-                           "auto_accept or start (ready: captured, nothing computed). Drive it with run_control (run, "
-                           "pause, step, stop, restart, accept, discard) and watch it with run_observe; Accept writes "
-                           "the output with one undo entry. Live preview shows an in-place output's moving points.",
+            .Description =
+                "Starts the bilateral point filter with the section sandbox.bilateral_filter as a step run "
+                "(one filter pass a step) and answers its run id at once: the section's execution options "
+                "apply unless the call names max_iterations, preview_every, preview_interval_ms, preview_buffers, "
+                "auto_accept or start (ready: captured, nothing computed). Drive it with run_control (run, "
+                "pause, step, stop, restart, accept, discard) and watch it with run_observe; Accept writes "
+                "the output with one undo entry. Live preview shows an in-place output's moving points.",
             .InputSchemaJson = std::string{R"({"type":"object","properties":{)"} +
                 R::StepRunExecutionSchemaProperties(kMaxIterations, kMinIterations) +
                 R"(},"additionalProperties":false})",

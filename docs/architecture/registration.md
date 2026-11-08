@@ -52,10 +52,13 @@ than three correspondences) ends the run as converged. Without a job lane the
 run computes and accepts at once, which supports only `start=run` with
 `auto_accept=end`; with a job lane but no step-run service it is refused.
 `run_registration` runs the section at once and accepts at its end whatever
-its `start` and `auto_accept`; with `wait: false` (ICP only) it runs the
-section's own `start` and `auto_accept` and answers at once with the run's
-id (`run`), which `run_control` and `run_observe` drive. A ready CPD run starts
-through the CPD plugin's `coherent_point_drift_start`.
+its `start` and `auto_accept`, and refuses execution arguments then; with
+`wait: false` (ICP or CPD) it starts with the section's execution options, each
+of `max_iterations` (the method's own limit), `preview_every`,
+`preview_interval_ms`, `auto_accept` and `start` the call names replacing the
+section's for that run only, and answers at once with the run's id (`run`),
+which `run_control` and `run_observe` drive. The CPD plugin's
+`coherent_point_drift_start` starts a rigid CPD run from its own arguments.
 
 ## Ownership and backends
 

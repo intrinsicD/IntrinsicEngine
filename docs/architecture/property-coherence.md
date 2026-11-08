@@ -491,7 +491,7 @@ acquire only compute values `CollectCompleted` observed complete, never pending
 method work. Buffers are
 `CONCURRENT` across the families; readback slots are lane-private. Owners must
 not overwrite an input a compute submission reads until its token completed.
-`SpatialIndexCache` submits every query batch and method computation this way,
+`SpatialIndexCache` submits every query-session page and method computation this way,
 at once and never inside a frame (see [spatial indices](spatial-indices.md#submission-and-completion-arch-023)),
 and stamps the residency slots each submission used with its token.
 

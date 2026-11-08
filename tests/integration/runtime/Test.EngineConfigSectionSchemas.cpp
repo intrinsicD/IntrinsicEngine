@@ -95,6 +95,7 @@ TEST(EngineConfigSectionSchemas, StrictOwnerLiteralRangesRemainUnchanged)
         {"registration", "max_iterations", 1, 100000, true},
         {"registration", "preview_every", 0, 1000000, true},
         {"registration", "preview_interval_ms", 0, 60000, true},
+        {"registration", "preview_buffers", 2, 3, true},
         {"registration", "trajectory_step", 0, u32, true},
         {"registration", "inlier_ratio", 0, 1, false, true},
         {"registration", "convergence_threshold", 0, std::numeric_limits<double>::max(), false},
@@ -410,6 +411,7 @@ TEST(EngineConfigSectionSchemas, FallbackOwnerLiteralRangesRemainUnchanged)
         // ARCH-023: the shared execution rows (StepRunExecutionFields) with each method's iteration limit.
         {"clustering", "/preview_every", 0, 1000000, true}, // 0 = live preview off
         {"clustering", "/preview_interval_ms", 0, 60000, true},
+        {"clustering", "/preview_buffers", 2, 3, true},
         {"clustering", "/max_iterations", 1, 4096, true},
         {"clustering", "/seed", 0, std::numeric_limits<std::uint32_t>::max(), true},
         {"curvature_segmentation", "/fixed_component_count", 1, 1024, true},
@@ -438,6 +440,7 @@ TEST(EngineConfigSectionSchemas, FallbackOwnerLiteralRangesRemainUnchanged)
         {"point_cloud_consolidation", "/seed", 0, std::numeric_limits<std::uint32_t>::max(), true},
         {"point_cloud_consolidation", "/preview_every", 0, 1000000, true}, // ARCH-023: 0 = off
         {"point_cloud_consolidation", "/preview_interval_ms", 0, 60000, true},
+        {"point_cloud_consolidation", "/preview_buffers", 2, 3, true},
         {"point_cloud_consolidation", "/gpu_query_batch_size", 1, 16384, true},
         {"point_cloud_consolidation", "/gpu_radius_capacity", 1, 1024, true},
         {"point_cloud_consolidation", "/normal_angle_radians", 1.0e-6, std::numbers::pi_v<double> - 1.0e-6, false},
@@ -606,6 +609,7 @@ TEST(EngineConfigSectionSchemas, FallbackOwnerKeysPreserveDiagnosedAndSilentUnkn
                 "max_iterations",
                 "preview_every",
                 "preview_interval_ms",
+                "preview_buffers",
                 "auto_accept",
                 "start",
                 "seed",
@@ -656,6 +660,7 @@ TEST(EngineConfigSectionSchemas, FallbackOwnerKeysPreserveDiagnosedAndSilentUnkn
                 "max_iterations",
                 "preview_every",
                 "preview_interval_ms",
+                "preview_buffers",
                 "auto_accept",
                 "start",
                 "convergence_tolerance",

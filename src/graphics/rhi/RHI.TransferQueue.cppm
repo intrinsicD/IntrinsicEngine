@@ -38,8 +38,9 @@ import Extrinsic.RHI.Transfer;
 //     copy the requested device range/subresource into backend-owned staging
 //     and deliver bytes later through a ReadbackSink from CollectCompleted().
 //   IsComplete — safe from any thread (atomic read).
-//   CollectCompleted — render thread only, once per frame, after
-//     EndFrame().  Retires staging and delivers sinks; it never waits.
+//   CollectCompleted — render (device-owner) thread only, once per engine
+//     frame: after EndFrame(), or where no frame renders (minimized,
+//     BeginFrame refused). Retires staging and delivers sinks; it never waits.
 //   WaitCompute / TakeCompletedReadback / ReleaseReadback — any thread (ARCH-023):
 //     a method worker waits, bounded, for its own submission and consumes (or
 //     gives up) its pulled readback (ReadbackSink::Pull) without the render
@@ -209,8 +210,9 @@ export namespace Extrinsic::RHI
         // ---- Frame maintenance ---------------------------------------
 
         /// Retire completed staging allocations and reclaim staging memory.
-        /// Must be called exactly once per frame on the render thread,
-        /// after EndFrame().  Never call from a loader thread.
+        /// Called once per engine frame on the render (device-owner) thread:
+        /// after EndFrame(), or where no frame renders. Never call from a
+        /// loader thread.
         virtual void CollectCompleted() = 0;
 
         /// Non-blocking full texture-chain upload. `src` must be packed according

@@ -3941,14 +3941,10 @@ TEST(SandboxProcessingPanels, PropertySmoothingSessionSwitchesMethodsSolversAndI
     const auto idle = Action{[](ImGuiWindow*) {}};
     std::vector<Action> script;
     const auto add = [&](std::vector<Action> actions) { for (auto& a : actions) { script.push_back(std::move(a)); script.push_back(idle); script.push_back(idle); } };
-    // The worker run publishes a few frames after the click (its step and Accept are jobs).
+    // add() leaves two frames for ImGui activation; the job gate below waits through publication.
     const auto settle = [&](Action check)
     {
-        std::vector<Action> actions{click};
-        for (int i = 0; i < 12; ++i)
-            actions.push_back(idle);
-        actions.push_back(std::move(check));
-        return actions;
+        return std::vector<Action>{click, std::move(check)};
     };
     const auto run = [&](const char* step)
     {

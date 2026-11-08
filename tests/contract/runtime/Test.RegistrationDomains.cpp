@@ -647,12 +647,16 @@ TEST(RegistrationDomains, ADiscardedRunAnswersOnceTheSourceIsFree)
 TEST(RegistrationDomains, StepRunsStepExactlyAndAcceptOncePublishesTheChosenPose)
 {
     IcpRunFixture f;
-    const auto ready = f.Start(Execution(50u, R::StepRunStart::Ready, R::StepRunAutoAccept::Never));
+    auto execution = Execution(50u, R::StepRunStart::Ready, R::StepRunAutoAccept::Never);
+    execution.PreviewBuffers = 2u;
+    const auto ready = f.Start(execution);
     ASSERT_EQ(ready.Status, R::EditorCommandStatus::Pending) << ready.Message;
     for (int i = 0; i < 20; ++i)
         (void)f.Jobs.Jobs().DrainCompletions(f.Jobs.Events());
     EXPECT_EQ(f.Observe().Phase, R::StepRunPhase::Ready);
     EXPECT_EQ(f.Observe().Steps, 0u);
+    EXPECT_EQ(f.Observe().Execution.PreviewBuffers, 2u);
+    EXPECT_EQ(f.Observe().DevicePreviewBuffers, 0u) << "ICP previews a CPU pose";
     EXPECT_EQ(f.Jobs.Snapshot().Entries.size(), 1u) << "only the run's holder: no step was submitted";
     ASSERT_TRUE(f.Control(R::StepRunAction::Step, 2u));
     ASSERT_TRUE(f.Rest());

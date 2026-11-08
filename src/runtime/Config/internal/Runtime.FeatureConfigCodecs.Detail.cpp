@@ -680,7 +680,7 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "degeneracy_tolerance", .Type = FT::Float, .Min = std::numeric_limits<double>::min(), .Max = 1.0e30},
         };
         // ARCH-023: the shared execution rows (max_iterations, preview_every, preview_interval_ms, auto_accept,
-        // start) with each method's own iteration limit; ReadStepRunExecution and EncodeStepRunExecutionJson are their
+        // start, preview_buffers) with each method's own iteration limit; ReadStepRunExecution and EncodeStepRunExecutionJson are their
         // one codec.
         constexpr auto kKMeansExecutionFields = StepRunExecutionFields(kMaxKMeansIterations);
         constexpr auto kConsolidationExecutionFields = StepRunExecutionFields(kMaxPointCloudConsolidationIterations);
@@ -691,6 +691,7 @@ namespace Extrinsic::Runtime
             kKMeansExecutionFields[2],
             kKMeansExecutionFields[3],
             kKMeansExecutionFields[4],
+            kKMeansExecutionFields[5],
             ConfigFieldSpec{
                 .Name = "seed", .Type = FT::UInt, .Min = 0, .Max = std::numeric_limits<std::uint32_t>::max()},
             ConfigFieldSpec{
@@ -756,6 +757,7 @@ namespace Extrinsic::Runtime
             kConsolidationExecutionFields[2],
             kConsolidationExecutionFields[3],
             kConsolidationExecutionFields[4],
+            kConsolidationExecutionFields[5],
             ConfigFieldSpec{.Name = "convergence_tolerance", .Type = FT::Float, .Min = 0.0, .Max = 1.0e12},
             ConfigFieldSpec{.Name = "target_point_count",
                 .Type = FT::UInt,
@@ -1703,6 +1705,7 @@ namespace Extrinsic::Runtime
             integer("max_iterations", options.IterationCap);
             integer("preview_every", options.PreviewEvery);
             integer("preview_interval_ms", options.PreviewIntervalMs);
+            integer("preview_buffers", options.PreviewBuffers);
             if (ReadEnum(context, object, "auto_accept", ParseStepRunAutoAccept, options.AutoAccept))
                 CountParsed(context);
             if (ReadEnum(context, object, "start", ParseStepRunStart, options.Start))

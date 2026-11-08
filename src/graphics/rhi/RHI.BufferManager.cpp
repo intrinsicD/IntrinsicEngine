@@ -78,14 +78,12 @@ namespace Extrinsic::RHI
 
     RetirementStamp StampRetirement(IDevice& device)
     {
-        return {.SafeFrame = device.GetGlobalFrameNumber() + device.GetFramesInFlight() + 1u,
-            .ComputeFence = device.GetTransferQueue().ComputeFence()};
+        return {.Frame = device.GetGlobalFrameNumber(), .ComputeFence = device.GetTransferQueue().ComputeFence()};
     }
 
     bool IsRetired(IDevice& device, const RetirementStamp& stamp)
     {
-        return device.GetGlobalFrameNumber() >= stamp.SafeFrame &&
-            device.GetTransferQueue().IsComplete(stamp.ComputeFence);
+        return device.IsFrameRetired(stamp.Frame) && device.GetTransferQueue().IsComplete(stamp.ComputeFence);
     }
 
     // -----------------------------------------------------------------

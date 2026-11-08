@@ -3313,13 +3313,14 @@ TEST(SandboxEditorUi, KMeansExecutionOptionsValidateThenApplyAndRoundTripWithThe
     EXPECT_EQ(canonical.at("max_iterations"), 32);
     EXPECT_EQ(canonical.at("preview_every"), 5);
     EXPECT_EQ(canonical.at("preview_interval_ms"), 0);
+    EXPECT_EQ(canonical.at("preview_buffers"), 3);
     EXPECT_EQ(canonical.at("auto_accept"), "never");
     EXPECT_EQ(canonical.at("start"), "run");
     EXPECT_FALSE(canonical.contains("gpu_preview_interval")) << "no alias of the former name";
 
     const auto reference = Runtime::SerializeClusteringConfig(defaults);
     const auto valid = Runtime::ValidateClusteringConfigSection(
-        R"({"max_iterations":7,"preview_every":0,"preview_interval_ms":16,"auto_accept":"end","start":"ready"})",
+        R"({"max_iterations":7,"preview_every":0,"preview_interval_ms":16,"auto_accept":"end","start":"ready","preview_buffers":2})",
         reference,
         "test");
     ASSERT_EQ(valid.State, Core::Config::EngineConfigState::Valid);
@@ -3337,11 +3338,14 @@ TEST(SandboxEditorUi, KMeansExecutionOptionsValidateThenApplyAndRoundTripWithThe
             .PreviewEvery = 0u,
             .PreviewIntervalMs = 16u,
             .AutoAccept = Runtime::StepRunAutoAccept::End,
-            .Start = Runtime::StepRunStart::Ready}));
+            .Start = Runtime::StepRunStart::Ready,
+            .PreviewBuffers = 2u}));
     EXPECT_EQ(Runtime::SerializeClusteringConfig(*applied), valid.CanonicalPayloadJson) << "round-trips exactly";
 
     for (const char* bad : {R"({"max_iterations":4097})",
              R"({"preview_interval_ms":60001})",
+             R"({"preview_buffers":1})",
+             R"({"preview_buffers":4})",
              R"({"auto_accept":"sometimes"})",
              R"({"start":"later"})"})
     {

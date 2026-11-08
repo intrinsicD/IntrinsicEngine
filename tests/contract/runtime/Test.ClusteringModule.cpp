@@ -2056,6 +2056,7 @@ TEST_F(ClusteringModuleResident, PreviewCopiesOnlyAtCadenceAndPublishesAfterComp
         }));
     EXPECT_EQ(PreviewCopySubmissions.load(), copies);
     EXPECT_EQ(StepRun().PreviewCopies, 0u);
+    EXPECT_EQ(StepRun().DevicePreviewBuffers, 0u) << "terminal labels are not a live-preview ring";
     EXPECT_EQ(Observation().Previews, 1u);
 }
 TEST_F(ClusteringModuleResident, ReentrantDiscardDuringAcceptKeepsOneAppliedCompletion)
@@ -2469,6 +2470,7 @@ TEST_F(ClusteringModuleResident, MillionRowsRespectPairAndSerialBudgets)
 
 TEST_F(ClusteringModuleResident, AGpuRunIsAStepRunCountingItsIterations)
 {
+    Request.Parameters.Execution.PreviewBuffers = 2u;
     Start();ASSERT_TRUE(Until([&]{return Observation().ReadyToAccept;}));
     // Hierarchical seeds come from a worker job, not the main thread's start, and the job completes (ARCH-022 Q90).
     EXPECT_EQ(Module.Stats().GpuSeedingJobs,1u);EXPECT_EQ(Module.Stats().GpuSeedingMicros,0u);
@@ -2476,6 +2478,7 @@ TEST_F(ClusteringModuleResident, AGpuRunIsAStepRunCountingItsIterations)
     ASSERT_NE(StepRunId(),0u);
     auto run=StepRun();
     EXPECT_EQ(run.Owner,"Runtime.ClusteringModule");
+    EXPECT_EQ(run.DevicePreviewBuffers, 2u);
     EXPECT_EQ(run.Steps,4u);EXPECT_EQ(run.End,Runtime::StepRunEnd::IterationCap);
     EXPECT_EQ(run.Phase,Runtime::StepRunPhase::Paused)<<"an interactive run waits at its cap for Accept or Discard";
     ASSERT_EQ(run.Metrics->Records().size(),4u);
@@ -3125,6 +3128,7 @@ TEST_F(ClusteringModuleResident, ABusyLabelRingDropsLivePreviewsWithoutCountingT
         false)) // publish the completed copy before the owner reserves its next mailbox slot
         << "the copy after iteration 2 published";
     ASSERT_LT(Observation().Iterations, 4u);
+    EXPECT_EQ(StepRun().DevicePreviewBuffers, 3u);
     const auto dropped = residency->Stats().DroppedPreviews;
     const auto front = residency->Front(key);
     ASSERT_TRUE(front);
@@ -3425,8 +3429,8 @@ TEST_F(ClusteringModuleResident, AGpuRunRestartsAfterItsFinalLabelsBeforeAccept)
 // a transfer-queue upload), use AfterIssuedTransfers; the iterations between use LaneOrderOnly. Predictions, before
 // any run: first entry AfterIssuedTransfers; at least one upload-following submission (the reseed's; the Start uploads
 // precede the first entry), all AfterIssuedTransfers;
-// LaneOrderOnly pages present. Mutations: InputOrdered never set (no LaneOrderOnly page); not reset by the reseed
-// (the page after the reseed upload is LaneOrderOnly).
+// LaneOrderOnly pages present. Mutations: WorkerGpuPages never changes to LaneOrderOnly (none present); the reseed
+// omits OrderNextAfterIssuedTransfers (its next page uses LaneOrderOnly).
 TEST_F(ClusteringModuleResident, KMeansPagesWaitForIssuedTransfersOnlyAfterStartAndAReseed)
 {
     using O = Extrinsic::RHI::ComputeInputOrder;

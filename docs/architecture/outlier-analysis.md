@@ -134,8 +134,8 @@ run of the session's step-run service: the CPU backends as a worker step run thr
 operation runtime (`MeshSupport::StartOneShotCpuRun`), Vulkan as its transaction. `Apply`
 is the batch (it computes at once and accepts at its end).
 `StartEditorOutlierAnalysisRun` and `StartEditorConfiguredOutlierAnalysis` use the
-section's rows, as the panel and `run_operation` with `wait: false` do, and answer with the
-run's id. Without the step-run service the CPU batch runs as one queued job and a ready
+section's rows, as the panel and `run_operation` with `wait: false` do (the call's `auto_accept`
+and `start`, if named, replace the section's for that run), and answer with the run's id. Without the step-run service the CPU batch runs as one queued job and a ready
 start is refused. The removal mode stays immediate.
 
 The editor/config command surface is owned by

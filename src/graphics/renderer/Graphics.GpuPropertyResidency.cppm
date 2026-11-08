@@ -154,9 +154,9 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] bool HasRing(const GpuPropertyKey& key) const;
 
         // ---- completions and use -------------------------------------------------------
-        // Commands recorded in `frame` read or write the slot: it is reusable once
-        // GetGlobalFrameNumber() - frame > GetFramesInFlight() (the frame's fence is waited
-        // one BeginFrame after the counter reaches the distance).
+        // Work stamped with `frame` (a GetGlobalFrameNumber() value) reads or writes the slot: it is
+        // reusable once IDevice::IsFrameRetired(frame), without further frames when the device
+        // proves it. Each stamp is kept until its own frame retires; acquisitions stamp the same way.
         void NoteUse(RHI::BufferHandle slot, std::uint64_t frame);
         // Transfers into / readbacks from the slot: reusable once the token IsComplete. A
         // readback also counts `bytes` towards the readback counters.

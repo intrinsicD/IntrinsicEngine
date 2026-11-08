@@ -72,7 +72,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         // cancel won), so nothing is published and the transaction ends Discarded, as a transaction's own step run
         // decides at the same boundary.
         std::function<bool()> Publishing{};
-        // Optional, an owner-stepped transaction's (GpuTransactionCore::OwnerSteps) initializer for run_control
+        // Optional, a worker-stepped transaction's initializer for run_control
         // restart, called once nothing of the run is in flight: the typed state returns to its captured input (the
         // workspaces are begun again, RestartGpuTransactionRings drops the older fronts). False with the reason:
         // nothing changed.
@@ -137,25 +137,21 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         JobToken RunToken{}, AcceptToken{};
         // ARCH-023: the step run (of `Context.StepRuns`) that controls a transaction with a Run job, with `Execution`:
         // a one-shot's one logical step (restartable with its typed initializer), or an
-        // owner-stepped transaction's own steps and restart; then run_control/run_observe Accept or Discard as the
+        // worker-stepped transaction's own steps and restart; then run_control/run_observe Accept or Discard as the
         // panel's do. A transaction with a Run job is refused
         // without the service. 0: an Accept-only transaction, whose owner drives its own step run (K-Means, LOP).
         std::uint64_t StepRun{};
         // ARCH-023: the step run's execution options, the one place they are decided. A one-shot (Kind) uses only
         // their Start (ready: nothing recorded before run or step n) and AutoAccept (a batch: End, it accepts once
         // ready unless stopped), normalized to one step without live preview (OneShotExecution); an iterative or
-        // owner-stepped transaction passes its method's whole options. The default is an interactive one-shot's.
+        // worker-stepped transaction passes its method's whole options. The default is an interactive one-shot's.
         StepRunExecution Execution{kOneShotStepRunExecution};
-        // ARCH-023: the typed owner counts its logical steps itself (GpuTransactionStepped) and records only within
-        // GpuTransactionStepAllowance; its Run job lasts until the step run's Commit (automatic or run_control
-        // accept), which sets CommitWanted: Poll then returns true once the latest complete step is resident (or the
-        // run failed), and the Run job's publication starts Accept.
-        bool OwnerSteps{};
+        // Commit during worker execution requests publication once its latest complete result is resident.
         bool CommitWanted{};
         // ARCH-023: a worker-stepped transaction's page gate (Hooks.Step; null otherwise), whether its Init answered
         // Ready for this generation, and why its failing step failed (written by the step before it returns Failed,
         // read on the main thread once the segment ended). Its Run job lasts until Poll answers true; a Commit while
-        // it runs sets CommitWanted, as an owner-stepped transaction's does.
+        // it runs sets CommitWanted.
         std::shared_ptr<WorkerGpuPages> Pages{};
         // One logical step (scalar, normals, outliers, a producer's traversal) or the method's own steps (smoothing,
         // sampling). Not an option: the method's algorithm; its options are Execution's.
@@ -172,6 +168,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         // The operation's queued-job label, as its CPU run names it: the duplicate refusal and
         // the rejected-submission wording (`MeshSupport::QueuedJobRejectedMessage`) use it.
         std::string JobLabel{};
+        std::string Owner{"Runtime.GpuTransaction"}; // registered plugin identity, separate from the job label
         // The Accept job's debug name, the same for a user and an automatic Accept (jobs lists
         // and tests that intercept a submission name it).
         std::string AcceptJobName{};
@@ -230,16 +227,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     // an invalid token; the answer is `MeshSupport::QueuedJobRejectedMessage(JobLabel)`.
     [[nodiscard]] JobToken SubmitGpuTransactionRun(const GpuTransactionHandle&, std::string debugName);
 
-    // ARCH-023: an owner-stepped transaction's side of its step run (each ignored, or 0/false, without one): the
-    // logical steps it may record now, whether work is in flight, `count` completed steps (the last with
-    // `converged`; `failed` fails the run) and its own previews. Stepped is true while the next may be recorded.
-    [[nodiscard]] std::uint32_t GpuTransactionStepAllowance(const GpuTransactionCore&);
+    // Marks an owner-submitted terminal store as in flight until its completion is consumed.
     void GpuTransactionRecording(const GpuTransactionCore&, bool inFlight);
-    bool GpuTransactionStepped(
-        const GpuTransactionCore&, std::uint32_t count, double metric, bool converged = false, bool failed = false);
-    [[nodiscard]] bool GpuTransactionMayPreview(const GpuTransactionCore&);
-    [[nodiscard]] bool GpuTransactionMayPreviewAt(const GpuTransactionCore&, std::uint32_t step);
-    void GpuTransactionPreviewed(const GpuTransactionCore&);
     // A restart's fresh output: drops every ring this transaction holds (its fronts, backs and readbacks; buffers
     // are freed after their completions), so the next acquisition creates a new ring generation.
     void RestartGpuTransactionRings(GpuTransactionCore&);

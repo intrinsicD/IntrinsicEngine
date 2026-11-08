@@ -46,12 +46,13 @@ namespace Intrinsic::Plugins::PointSpacing
         R::ScalarAnalysisRequest Request(const Config& c)
         {
             return {.StableEntityId = c.StableEntityId,
-                    .Positions = c.Positions,
-                    .Output = c.Radii,
-                    .Params = {.Method = 1, .K = c.KNeighbors, .Scale = c.ScaleFactor},
-                    .Noun = "Radii",
-                    .Method = "Point spacing",
-                    .History = "Estimate point spacing and radii"};
+                .Positions = c.Positions,
+                .Output = c.Radii,
+                .Params = {.Method = 1, .K = c.KNeighbors, .Scale = c.ScaleFactor},
+                .Noun = "Radii",
+                .Method = "Point spacing",
+                .History = "Estimate point spacing and radii",
+                .Owner = "point_spacing"};
         }
 
         std::string Invalid(const Config& c)
@@ -214,6 +215,7 @@ namespace Intrinsic::Plugins::PointSpacing
                     .History = Request(config).History,
                     .Noun = "Radii",
                     .Method = "point spacing",
+                    .Owner = "point_spacing",
                     .Execution = config.Execution,
                     .Compute =
                         [w](std::vector<float>& radii)

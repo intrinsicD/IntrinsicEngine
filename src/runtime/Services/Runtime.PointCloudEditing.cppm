@@ -143,6 +143,7 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Output{}; // any scalar kind on the CPU; the GPU writes float outputs only
         Graphics::PointScalarGpuParams Params{};
         std::string Noun{}, Method{}, History{};
+        std::string Owner{"Runtime.GpuTransaction"}; // registered plugin name; runtime callers keep the default
         // Fewer live samples are refused with `TooFewSamples` (empty: "<Method> requires at least two live samples.").
         std::size_t MinimumLiveCount{2u};
         std::string TooFewSamples{};
@@ -237,6 +238,7 @@ export namespace Extrinsic::Runtime
         // The Jobs row ("Radii estimation"), the undo entry, the output's noun ("Radii") and the method in a sentence
         // ("point spacing").
         std::string Label{}, History{}, Noun{}, Method{};
+        std::string Owner{"point_cloud_editing"}; // registered plugin name, independent of Label
         StepRunExecution Execution{}; // its auto_accept and start apply
         // Worker: the column into `values`; false when it failed (the plugin keeps the reason).
         std::function<bool(std::vector<float>& values)> Compute{};
@@ -285,9 +287,9 @@ export namespace Extrinsic::Runtime
         // Main thread, an in-place output (the positions): shows `live` (one position per captured point) as the
         // positions' ring front, which the renderer draws, without changing the positions or the history. Busy or
         // Unavailable (no operational device, not in place, inputs changed) with the reason otherwise. The capture
-        // keeps its ring until DiscardPreview or Publish (which releases it first).
-        [[nodiscard]] PointPreviewStatus PreviewPositions(PointEdit& edit, std::span<const glm::vec3> live,
-                                                          std::string& diagnostic);
+        // keeps its ring until DiscardPreview or Publish (which releases it first); previewBuffers must be 2 or 3.
+        [[nodiscard]] PointPreviewStatus PreviewPositions(
+            PointEdit& edit, std::span<const glm::vec3> live, std::string& diagnostic, std::uint32_t previewBuffers);
         // Main thread: releases the capture's preview ring (only that ring; nothing without one).
         void DiscardPreview(PointEdit& edit);
         // Main thread: writes one column per scalar output (one value per captured point) for the live slots, all or

@@ -32,7 +32,10 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Glfw;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
@@ -44,7 +47,6 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.KernelEvents;
@@ -61,6 +63,8 @@ import Geometry.MeshSoup;
 import Geometry.Properties;
 #include "HeldFramesProgress.hpp"
 #include "HeldStepRunProbe.hpp"
+
+#include "MinimizedGpuCompletions.hpp"
 
 namespace
 {
@@ -1587,6 +1591,8 @@ namespace
         }
         void Frame(double, double) override
         {
+            if (Minimized && !Kernel().GetWindow().IsMinimized())
+                return;
             if (++Frames > 3'000u || std::chrono::steady_clock::now() - Started > std::chrono::seconds(50))
             {
                 TimedOut = true;
@@ -1601,6 +1607,8 @@ namespace
                 auto config = Config;
                 config.Execution.Start = mode;
                 config.Execution.AutoAccept = accept;
+                if (Minimized && i == 1u)
+                    config.Execution.PreviewEvery = 0u;
                 Correlations[i] =
                     Service->Run({.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entities[i]),
                         .Properties = Runtime::MakePointCloudConsolidationPropertyRefs(
@@ -1615,6 +1623,11 @@ namespace
             }
             else if (Phase == 1u)
             {
+                if (Minimized)
+                    EXPECT_EQ(std::as_const(Scene->Raw().get<GS::Vertices>(Entities[0]).Properties)
+                                  .Get<glm::vec3>(GS::PropertyNames::kPosition)
+                                  .Vector(),
+                        Input);
                 const auto observation = Service->GpuRun(Correlations[0]);
                 if (observation.StepRun == 0u)
                     return;
@@ -1629,8 +1642,13 @@ namespace
                     ReadyPhase = run->Phase;
                     ReadyIterations = observation.Iterations;
                 }
+                PreviewCopies = run->PreviewCopies;
+                if (run->ShownStep)
+                    ShownStep = *run->ShownStep;
                 if (run->End == Runtime::StepRunEnd::None)
                 {
+                    if (Minimized && run->Steps != 0u && run->ShownStep != run->Steps)
+                        return;
                     if (StepCounts.size() == run->Steps &&
                         Steps->Control(Run, Runtime::StepRunAction::Step, 1u, refusal))
                         StepCounts.push_back(run->Steps + 1u);
@@ -1662,7 +1680,9 @@ namespace
         std::uint64_t Run{};
         std::uint32_t ReadyIterations{UINT32_MAX}, StepsAtEnd{};
         Runtime::StepRunPhase ReadyPhase{Runtime::StepRunPhase::Failed};
-        bool Missing{}, TimedOut{}, ReadyObserved{};
+        bool Missing{}, TimedOut{}, ReadyObserved{}, Minimized{};
+        std::uint64_t PreviewCopies{};
+        std::uint32_t ShownStep{};
 
     private:
         Runtime::PointCloudConsolidationService* Service{};
@@ -1676,7 +1696,8 @@ namespace
     };
 
     // Runs a consolidation app on the device; false (skipped) without an operational Vulkan device.
-    template <class App, class Check> bool RunConsolidationApp(std::unique_ptr<App> app, Check&& check)
+    template <class App, class Check>
+    bool RunConsolidationApp(std::unique_ptr<App> app, Check&& check, bool minimized = false)
     {
         auto engineConfig = Runtime::CreateReferenceEngineConfig();
         engineConfig.Window.Width = 64;
@@ -1684,7 +1705,7 @@ namespace
         engineConfig.Render.EnableValidation = true;
         engineConfig.Render.EnableVSync = false;
         engineConfig.ReferenceScene.Enabled = false;
-        const auto* observed = app.get();
+        auto* observed = app.get();
         Intrinsic::Tests::RuntimeTestKernel engine(engineConfig, std::move(app));
         engine.EmplaceModule<Runtime::SpatialIndexCache>();
         engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
@@ -1697,7 +1718,14 @@ namespace
             return false;
         }
         const auto before = Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
-        engine.Run();
+        if (minimized)
+            Intrinsic::Tests::RunWithMinimizedGpuCompletions(engine,
+                [&]
+                {
+                    observed->FrameForComposition(0.0, 0.0);
+                });
+        else
+            engine.Run();
         check(*observed); // the engine owns the app and destroys it at shutdown
         engine.Shutdown();
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot().VulkanValidationErrorCount,
@@ -1930,5 +1958,45 @@ TEST(PointCloudConsolidationGpuParity, ResidentAndHybridRunsAdvanceWithGraphicsH
             GTEST_SKIP() << "Vulkan bootstrap unavailable";
         if (shared)
             GTEST_SKIP() << "No separate method compute queue: no-frame progress cannot be separated from graphics.";
+    }
+}
+
+// ARCH-024: simulated minimization; real device work and owner completion run through Engine::Run.
+TEST(PointCloudConsolidationGpuParity, MinimizedResidentInitPreviewsAndAcceptEqualPreviewOff)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    bool ran = false;
+    for (const std::uint32_t buffers : {2u, 3u})
+    {
+        SCOPED_TRACE(buffers);
+        auto config = MakeConfig(Runtime::PointCloudConsolidationStrategy::Lop, 0.32, 0u, 1907u);
+        config.InitialSampling.Method = Runtime::PointSamplingMethod::FarthestPoint;
+        config.InitialBackend = Runtime::PointSamplingBackend::Vulkan;
+        config.Execution.IterationCap = 5u;
+        config.Execution.PreviewEvery = 1u;
+        config.Execution.PreviewIntervalMs = 0u;
+        config.Execution.PreviewBuffers = buffers;
+        auto app = std::make_unique<StepEqualsRunApp>(config, MakePlane(16u, 12u, 1.3));
+        app->Minimized = true;
+        const bool available = RunConsolidationApp(
+            std::move(app),
+            [&](const StepEqualsRunApp& completed)
+            {
+                ExpectStepEqualsRun(completed, Runtime::PointCloudConsolidationBackend::VulkanCompute, 5u);
+                for (const auto& result : completed.Results)
+                {
+                    ASSERT_TRUE(result);
+                    EXPECT_EQ(result->InitialSamplingBackend, "gpu_vulkan_compute")
+                        << result->InitialSamplingDiagnostic;
+                }
+                EXPECT_GE(completed.PreviewCopies, 4u);
+                EXPECT_GE(completed.ShownStep, 4u);
+            },
+            true);
+        if (!ran && !available)
+            GTEST_SKIP() << "Vulkan bootstrap unavailable";
+        ASSERT_TRUE(available);
+        ran = true;
     }
 }

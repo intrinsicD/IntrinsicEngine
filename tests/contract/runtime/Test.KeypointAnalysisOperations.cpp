@@ -460,7 +460,8 @@ namespace
                 std::memcpy(data.data(),&h,sizeof(h));
             } else {
                 const auto& contents=Device.BufferContents[buffer.Index];
-                if(contents.size()>=bytes)std::memcpy(data.data(),contents.data(),bytes);
+                if (bytes != 0u && contents.size() >= bytes)
+                    std::memcpy(data.data(), contents.data(), bytes);
             }
             if (sink.Pulled)
                 Completions.push_back(

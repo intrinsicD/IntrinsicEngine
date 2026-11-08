@@ -1437,8 +1437,9 @@ while minimized remain queued until the next normal frame. The close/exit paths
 do not drain the queue.
 
 Minimized frames skip simulation, UI, extraction, render and normal maintenance.
-When modules registered `Idle`, the bounded idle path drains commands, pumps
-events, runs Idle hooks, drains completions, pumps again and reaps jobs. It does
+The bounded idle path always drains commands, pumps events, runs optional Idle
+hooks, collects GPU transfers, drains GPU participants, reclaims completed device
+resources, drains job completions, pumps again and reaps jobs. It does
 not flush transforms or advance the render frame index. The frame clock
 resamples after deliberate waiting; normal consumers use the previous completed
 frame's duration. Before the first completed frame the clock returns zero and

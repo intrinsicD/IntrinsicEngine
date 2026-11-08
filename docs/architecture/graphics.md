@@ -359,6 +359,6 @@ results already collected), tokens and readback slots are lane-specific, and
 deferred destruction waits for the compute fence as well as the frame cycle.
 `render.method_compute_graphics_queue` forces the graphics queue; the transfer
 diagnostics report the requested and actual lane. `SpatialIndexCache` submits
-all of its method computations and query batches on this lane and records none
+all of its method computations and query-session pages on this lane and records none
 into frames; see [spatial indices](spatial-indices.md#submission-and-completion-arch-023),
 [property coherence](property-coherence.md) and `src/graphics/vulkan/README.md`.

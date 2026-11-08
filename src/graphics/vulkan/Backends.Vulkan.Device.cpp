@@ -978,7 +978,16 @@ std::function<bool()> HoldVulkanQueue(RHI::IDevice* device, const VulkanGatedQue
         return {};
     if (which == VulkanGatedQueue::MethodCompute && vk->m_TransferQueue->ComputeLane() != TransferLane::Compute)
         return {};
-    const VkQueue queue = which == VulkanGatedQueue::MethodCompute ? vk->m_MethodComputeQueue : vk->m_GraphicsQueue;
+    VkQueue queue = vk->m_GraphicsQueue;
+    if (which == VulkanGatedQueue::MethodCompute)
+        queue = vk->m_MethodComputeQueue;
+    else if (which == VulkanGatedQueue::FrameCompute)
+        queue = vk->m_AsyncComputeQueue;
+    else if (which == VulkanGatedQueue::FrameTransfer)
+        queue = vk->m_TransferVkQueue;
+    // A frame queue the device lacks runs its batches on graphics: no gate of its own.
+    if (queue == VK_NULL_HANDLE || (which != VulkanGatedQueue::Graphics && queue == vk->m_GraphicsQueue))
+        return {};
     std::mutex& queueMutex = which == VulkanGatedQueue::MethodCompute ? vk->MethodQueueMutex() : vk->m_QueueMutex;
     VkSemaphoreTypeCreateInfo type{};
     type.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
@@ -1057,6 +1066,23 @@ bool WithVulkanFrameQueueLockHeld(RHI::IDevice* device, const std::function<void
         return false;
     std::scoped_lock lock{vk->m_QueueMutex};
     whileHeld();
+    return true;
+}
+
+bool FailNextVulkanRetirementQuery(RHI::IDevice* device, const VulkanRetirementQuery query, const bool deviceLost)
+{
+    if (!device)
+        return false;
+    auto* vk = static_cast<VulkanDevice*>(device);
+    if (vk->m_Device == VK_NULL_HANDLE || vk->IsDeviceLost())
+        return false;
+    const VkResult result = deviceLost ? VK_ERROR_DEVICE_LOST : VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (query == VulkanRetirementQuery::FrameFence)
+        vk->m_NextFrameRetirementResult = result;
+    else if (query == VulkanRetirementQuery::GraphicsTimeline && vk->m_TransferQueue)
+        vk->m_TransferQueue->FailNextGraphicsQuery(result);
+    else
+        return false;
     return true;
 }
 
@@ -2751,13 +2777,110 @@ void VulkanDevice::Shutdown()
     m_DeviceLost       = false;
 }
 
+namespace
+{
+    // Reclaims each pool's handle slots by a frame number (the frame-count rule) or a kill-frame predicate.
+    template <typename Rule, typename... Pools> void ProcessPoolDeletions(const Rule& rule, Pools&... pools)
+    {
+        (pools.ProcessDeletions(rule), ...);
+    }
+}
+
 void VulkanDevice::ProcessResourcePoolDeletions()
 {
-    m_Buffers.ProcessDeletions(m_GlobalFrameNumber);
-    m_Images.ProcessDeletions(m_GlobalFrameNumber);
-    m_MemoryBlocks.ProcessDeletions(m_GlobalFrameNumber);
-    m_Samplers.ProcessDeletions(m_GlobalFrameNumber);
-    m_Pipelines.ProcessDeletions(m_GlobalFrameNumber);
+    ProcessPoolDeletions(m_GlobalFrameNumber, m_Buffers, m_Images, m_MemoryBlocks, m_Samplers, m_Pipelines);
+}
+
+// ARCH-024: frame retirement read from the frame fences, without BeginFrame's wait. Each slot's last submission
+// signals its main, async-compute and transfer fences; BeginFrame waited the earlier ones before reusing the slot (a
+// resize waited for the device). Any status but VK_SUCCESS, a lost device's included, proves nothing.
+// shortcut: up to nine status queries per call and every frame slot, not only those up to the asked number; remember
+// a slot's finished submission if profiling shows the queries.
+VkResult VulkanDevice::FrameCompletionStatus() const
+{
+    if (m_NextFrameRetirementResult != VK_SUCCESS)
+        return std::exchange(m_NextFrameRetirementResult, VK_SUCCESS);
+    VkResult result = VK_SUCCESS;
+    for (const PerFrame& frame : m_Frames)
+        for (const VkFence fence : {frame.Fence, frame.AsyncComputeFence, frame.TransferFence})
+        {
+            if (fence == VK_NULL_HANDLE)
+                continue;
+            const VkResult status = vkGetFenceStatus(m_Device, fence);
+            if (status != VK_SUCCESS && status != VK_NOT_READY)
+                return status;
+            if (status == VK_NOT_READY)
+                result = status; // Keep checking: another fence can report an error.
+        }
+    return result;
+}
+
+// No frame records between a successful BeginFrame and its EndFrame (a failed submission keeps its frame open), and
+// the graphics lane finished every upload, download, graphics-lane method page and one-shot it was given: the work a
+// later frame's main fence would have covered in queue order.
+VkResult VulkanDevice::GraphicsCompletionStatus() const
+{
+    if (m_Frames[m_FrameSlot].ImageAcquiredForFrame)
+        return VK_NOT_READY;
+    if (!m_TransferQueue)
+        return VK_SUCCESS;
+    const uint64_t issued =
+        m_TransferQueue->LaneFor(TransferLane::Graphics).SubmittedTicket.load(std::memory_order_acquire);
+    if (issued == 0u)
+        return VK_SUCCESS;
+    VkResult status;
+    const uint64_t completed = m_TransferQueue->QueryLaneCompletedValue(TransferLane::Graphics, &status);
+    if (status != VK_SUCCESS)
+        return status;
+    return completed >= issued ? VK_SUCCESS : VK_NOT_READY;
+}
+
+bool VulkanDevice::IsFrameRetired(const uint64_t frameNumber) const
+{
+    if (m_Device == VK_NULL_HANDLE || !m_TransferQueue || IsDeviceLost())
+        return false;
+    if (RHI::IDevice::IsFrameRetired(frameNumber)) // BeginFrame already waited it (the frame-distance rule)
+        return true;
+    // A submitted frame: every frame up to it finished. A number no frame was submitted with: no frame work at all.
+    const VkResult status = frameNumber < m_GlobalFrameNumber ? FrameCompletionStatus() : GraphicsCompletionStatus();
+    if (status == VK_ERROR_DEVICE_LOST)
+        m_TransferQueue->MarkLost(); // A later query must not retire an older stamp after this observed loss.
+    return status == VK_SUCCESS;
+}
+
+void VulkanDevice::CollectCompletedResources()
+{
+    if (m_Device == VK_NULL_HANDLE || IsDeviceLost())
+        return;
+    const VkResult frameStatus = FrameCompletionStatus();
+    if (frameStatus != VK_SUCCESS && frameStatus != VK_NOT_READY)
+    {
+        NoteDeviceLostIfNeeded(frameStatus);
+        return;
+    }
+    const bool finished = frameStatus == VK_SUCCESS;
+    const VkResult graphicsStatus = finished ? GraphicsCompletionStatus() : VK_NOT_READY;
+    if (graphicsStatus != VK_SUCCESS && graphicsStatus != VK_NOT_READY)
+    {
+        NoteDeviceLostIfNeeded(graphicsStatus);
+        return;
+    }
+    if (IsDeviceLost())
+        return;
+    const bool idle = finished && graphicsStatus == VK_SUCCESS;
+    // A native deletion waits for every slot's frames (BeginFrame's per-slot flushes over a frame cycle) and, deferred
+    // after the last frame, for the graphics lane.
+    if (idle)
+        for (uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
+            FlushDeletionQueue(frameSlot);
+    ProcessComputeGatedDeletes(false);
+    if (!finished)
+        return;
+    const auto retired = [idle, submitted = m_GlobalFrameNumber](const uint64_t killFrame)
+    {
+        return idle || killFrame < submitted;
+    };
+    ProcessPoolDeletions(retired, m_Buffers, m_Images, m_MemoryBlocks, m_Samplers, m_Pipelines);
 }
 
 void VulkanDevice::WaitIdle()

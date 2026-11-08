@@ -499,8 +499,10 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    PointPreviewStatus PointCloudEditingService::PreviewPositions(PointEdit& edit, const std::span<const glm::vec3> live,
-                                                                  std::string& diagnostic)
+    PointPreviewStatus PointCloudEditingService::PreviewPositions(PointEdit& edit,
+        const std::span<const glm::vec3> live,
+        std::string& diagnostic,
+        const std::uint32_t previewBuffers)
     {
         const auto fail = [&](const PointPreviewStatus status, std::string why)
         {
@@ -508,6 +510,8 @@ namespace Extrinsic::Runtime
             return status;
         };
         constexpr auto kUnavailable = PointPreviewStatus::Unavailable;
+        if (previewBuffers < 2u || previewBuffers > 3u)
+            return fail(kUnavailable, "preview_buffers must be 2 or 3.");
         const auto& r = edit.Request;
         if (live.size() != edit.Capture.Slots.size()) return fail(kUnavailable, "One position per captured point is needed.");
         if (r.Output.Domain != r.Positions.Domain || r.Output.Name != r.Positions.Name)
@@ -526,7 +530,8 @@ namespace Extrinsic::Runtime
         for (std::size_t i = 0; i < live.size(); ++i) values[edit.Capture.Slots[i]] = live[i];
         const auto layout = MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, static_cast<std::uint32_t>(values.size()));
         if (!layout) return fail(kUnavailable, "The positions have no GPU layout.");
-        if (!UploadGpuPropertyFront(*residency, *context.Device, key, *layout, 2u, std::as_bytes(std::span(values))))
+        if (!UploadGpuPropertyFront(
+                *residency, *context.Device, key, *layout, previewBuffers, std::as_bytes(std::span(values))))
             return fail(PointPreviewStatus::Busy, "No free preview slot this frame.");
         edit.PreviewRing = residency->RingGeneration(key);
         return PointPreviewStatus::Shown;
@@ -760,7 +765,10 @@ namespace Extrinsic::Runtime
                 state,
                 {},
                 execution,
-                testResidency);
+                testResidency,
+                {},
+                {},
+                request.Owner);
             if (!transaction)
             {
                 refusal = {.Message = std::move(state.Message), .Busy = state.OutputBusy,
@@ -862,7 +870,7 @@ namespace Extrinsic::Runtime
         };
         const auto s = std::make_shared<State>(State{.Spec = std::move(spec)});
         StepRunOptions options{.Label = s->Spec.Label,
-            .Owner = "point_cloud_editing",
+            .Owner = s->Spec.Owner,
             .Output = s->Spec.Output,
             .Execution = s->Spec.Execution,
             .MetricNames = {"live_count", "", "", ""}};

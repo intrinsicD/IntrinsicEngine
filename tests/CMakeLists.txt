@@ -16,6 +16,9 @@ endif()
 # The compiled family and common capture owners must stay independent of session
 # composition and other method contracts. Inspect the configured Clang/CMake graph.
 find_program(INTRINSIC_TEST_PYTHON_EXECUTABLE NAMES python3 REQUIRED)
+add_test(NAME MethodExecutionCampaign.Script
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.MethodExecutionCampaign.py)
+set_tests_properties(MethodExecutionCampaign.Script PROPERTIES LABELS "contract;tooling;benchmark" TIMEOUT 30)
 
 function(intrinsic_add_module_boundary_test name)
     add_test(NAME "${name}"
@@ -670,7 +673,7 @@ intrinsic_add_module_boundary_test(RenderCompilationLocality.Extraction
 set_tests_properties(RenderCompilationLocality.Extraction
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
-# The spatial query interface publishes CPU snapshots and framed GPU queues; it
+# The spatial query interface publishes CPU snapshots and prepared GPU query sessions; it
 # borrows the world registry through a declaration only. A GPU LBVH workspace,
 # world-registry, job-service or RHI device/command edge here means a low-level
 # recording or composition surface moved back into every query caller's compile
@@ -1310,6 +1313,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PointScalarTransaction.cpp
         Test.OutlierTransaction.cpp
         Test.GpuTransactionLifecycleContract.cpp
+        Test.WorkerGpuPages.cpp
         Test.MethodTemplate.cpp
         Test.NormalTransaction.cpp
         Test.GpuPositionsAccept.cpp
@@ -1428,6 +1432,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxCurvatureSegmentationPanel.cpp
             Test.SandboxProcessingPanels.cpp
             Test.SandboxJobsWindow.cpp
+            Test.StartupPluginExecution.cpp
             Test.SandboxDiagnostics.cpp
             Test.SandboxAgentServer.cpp
             Test.EngineConfigSectionSchemas.cpp
@@ -2040,6 +2045,15 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
             ${_clustering_stall_measurement_sources}
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry glm::glm nlohmann_json::nlohmann_json
     )
+endif()
+
+# ARCH-024: opt-in fixed-cell measurement, driven only by a reviewed campaign packet.
+if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    intrinsic_resolve_test_sources(_method_execution_measurement_sources
+        SEARCH_DIRS benchmark FILES Test.MethodExecutionMeasurement.cpp)
+    intrinsic_test_object_lib(MethodExecutionMeasurementTestObjs
+        SOURCES ${_method_execution_measurement_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry glm::glm nlohmann_json::nlohmann_json)
 endif()
 
 # METHOD-020 — opt-in actual-Vulkan LOP/isotropic-WLOP parity against the
@@ -2693,6 +2707,14 @@ if(TARGET RuntimeClusteringServiceGpuSmokeTestObjs)
         LABELS gpu vulkan integration runtime geometry
     )
     intrinsic_add_glsl_shaders(IntrinsicRuntimeClusteringServiceGpuSmokeTests)
+endif()
+
+if(TARGET MethodExecutionMeasurementTestObjs)
+    intrinsic_test_executable(IntrinsicMethodExecutionMeasurement
+        OBJECTS MethodExecutionMeasurementTestObjs RuntimeTestModuleSupportObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry
+        LABELS gpu vulkan benchmark runtime)
+    intrinsic_add_glsl_shaders(IntrinsicMethodExecutionMeasurement)
 endif()
 
 if(TARGET ClusteringStallMeasurementTestObjs)

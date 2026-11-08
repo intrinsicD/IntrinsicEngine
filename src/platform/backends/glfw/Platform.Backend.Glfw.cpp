@@ -132,8 +132,8 @@ namespace Extrinsic::Platform::Backends::Glfw
 
     bool Window::IsMinimized() const
     {
-        return (m_Window && glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED) == GLFW_TRUE)
-            || m_FramebufferExtent.Width == 0 || m_FramebufferExtent.Height == 0;
+        return m_MinimizedForTesting || (m_Window && glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED) == GLFW_TRUE) ||
+            m_FramebufferExtent.Width == 0 || m_FramebufferExtent.Height == 0;
     }
 
     void Window::AcknowledgeResize()

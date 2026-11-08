@@ -48,6 +48,7 @@ export namespace Extrinsic::Runtime
     struct EditorPointScalarPublication
     {
         std::uint32_t EntityId{}, Count{};
+        std::uint32_t PreviewBuffers{3u};
         GeometryPropertyRef Output{};
         std::string Label{};
         std::function<bool()> Current{};

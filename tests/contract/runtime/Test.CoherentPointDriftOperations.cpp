@@ -355,7 +355,9 @@ TEST(CoherentPointDriftOperations, AffineWritesPositionsAndNonrigidWritesADispla
 TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAcceptsTheCurrentEstimate)
 {
     ShiftedPair pair;
-    const auto run = pair.Start(pair.Config());
+    auto config = pair.Config();
+    config.Execution.PreviewBuffers = 2u;
+    const auto run = pair.Start(config);
     ASSERT_TRUE(run);
     const auto id = R::SnapshotEditorCoherentPointDrift(run).StepRun;
     ASSERT_NE(id, 0u);
@@ -364,6 +366,8 @@ TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAcceptsTheCurre
         (void)pair.Jobs.Jobs().DrainCompletions(pair.Jobs.Events());
     EXPECT_EQ(pair.Observe(run)->Phase, R::StepRunPhase::Ready);
     EXPECT_EQ(pair.Observe(run)->Steps, 0u);
+    EXPECT_EQ(pair.Observe(run)->Execution.PreviewBuffers, 2u);
+    EXPECT_EQ(pair.Observe(run)->DevicePreviewBuffers, 0u) << "the built-in CPD preview is a CPU vector";
     EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(run).Trace.empty());
     EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Target->size(), 100u);
     std::string refusal;

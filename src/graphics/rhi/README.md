@@ -182,6 +182,17 @@ device dependency.
   device-local rows through `CopyBuffer` in the worker's next
   `SubmitComputeReadback` on the method lane, never through the graphics-lane
   `ITransferQueue::UploadBuffer`, whose staging only `CollectCompleted()` retires.
+- ARCH-024 actual retirement: `IDevice::IsFrameRetired(n)` answers, on the owner
+  thread and without blocking, whether work stamped with frame number `n` (the
+  `GetGlobalFrameNumber()` value at the use) finished. A submitted number needs
+  every frame up to it finished on every queue; an unsubmitted one needs no
+  recording frame and an idle graphics queue, so it does not wait for earlier
+  frames: owners keep each stamp instead of overwriting an earlier one
+  (`GpuPropertyResidency` keeps a list, `RetirementStamp` serves only buffers
+  frames never use). `CollectCompletedResources()` releases deferred destructions
+  and handle slots the same way where no frame begins. The defaults keep the
+  frame-distance rule and do nothing, so an unknown device never claims
+  completion.
 - `ITransferQueue::DownloadTexture(TextureHandle, TextureLayout, mip, layer,
   ReadbackSink)` is the GRAPHICS-097 texture readback seam over the same
   readback token/sink/drain contract. Callers must transition the source

@@ -12,8 +12,11 @@ export import Extrinsic.RHI.QueueAffinity;
 
 namespace Extrinsic::Backends::Vulkan
 {
-    // The queue a test gate holds (WithVulkanQueueGate): the separate method-compute queue, or graphics.
-    export enum class VulkanGatedQueue : std::uint8_t { MethodCompute, Graphics };
+    // The queue a test gate holds (WithVulkanQueueGate): the separate method-compute queue, graphics, or the frames'
+    // own async-compute or transfer queue where it is not the graphics queue.
+    export enum class VulkanGatedQueue : std::uint8_t { MethodCompute, Graphics, FrameCompute, FrameTransfer };
+    // The device-local query selected by the one-shot retirement failure test seam.
+    export enum class VulkanRetirementQuery : std::uint8_t { FrameFence, GraphicsTimeline };
 
     export struct MethodComputeQueueSelection
     {

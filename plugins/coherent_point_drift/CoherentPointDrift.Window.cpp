@@ -54,7 +54,7 @@ namespace Intrinsic::Plugins::CoherentPointDrift
             auto& draft = state.Draft;
             ImGui::InputScalar("Source", ImGuiDataType_U32, &draft.Source);
             ImGui::InputScalar("Target", ImGuiDataType_U32, &draft.Target);
-            (void)R::DrawStepRunExecutionOptions({}, draft.Execution, kMaxIterations, true);
+            (void)R::DrawStepRunExecutionOptions({}, draft.Execution, kMaxIterations, true, true, 1u, true);
             if (ImGui::Button("Start"))
             {
                 std::string refusal;

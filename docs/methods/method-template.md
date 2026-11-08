@@ -27,10 +27,40 @@ point LBVH can replace an existing scan, grid, tree or primitive oracle.
 
 ## Runtime execution contract
 
+Live device previews use the shared `preview_buffers` execution option: 2 for double buffering or 3
+(default) for triple buffering. Config files, UI and agent arguments validate the same range. Pass
+the selected capacity at initial reservation and every later acquisition; never grow an active ring
+implicitly. An occupied ring skips a preview without stalling computation. `preview_every: 0` makes
+no live preview copies. CPU previews without a device ring use no additional buffers, and terminal-only
+methods expose no preview-buffer option; their fixed result-ring capacities remain implementation details.
+`run_observe.device_preview_buffers` reports the configured capacity of the live device-ring route, or
+0 for ringless previews and `preview_every: 0`; `execution.preview_buffers` retains the requested value.
+The effective capacity is not an allocated-slot count: allocation is lazy, and terminal result rings may
+still exist when live preview is off. A temporarily unavailable device can prevent showing a preview.
+
 Use the existing [job and preview contract](../architecture/engine-and-feature-modules.md#jobs-preview-and-observation-operator-2026-10-30).
 The method owns its numerical state; `Runtime.StepRuns` owns its run controls. Do
 not copy a scheduler, publication state machine, buffer-retirement loop or MCP
 control handler into a new method.
+
+New method plugins must also register a persistent, serializable config section through the
+shared validate/apply path and add a scenario to
+[`Test.StartupPluginExecution.cpp`](../../tests/integration/runtime/Test.StartupPluginExecution.cpp).
+Its generated startup inventory rejects a registration without exactly one compatible
+scenario; stale and duplicate entries fail too. Supply real algorithm inputs (including
+normal columns, every descriptor output, or separate source/target clouds when needed).
+Use `OneShotLifecycleScript` only for one-shot shapes. Iterative methods must retain their
+own step semantics. The common test drives the real plugin tool and verifies no publication
+at Ready or before Accept, one undo for Accept, restoration by undo, and no publication on
+Discard. Set the registered plugin name explicitly in `StepRunOptions::Owner` or the shared
+scalar request/run options; job labels are not identities.
+
+Production plugin sources cannot directly call `SubmitPluginJob` or `StartPluginGpuWork`;
+use `PluginStepRunJobs` or a shared typed adapter. The source-rule guard covers new plugin
+sources automatically. Any temporary exception must name a current task and its exact
+missing capability; CPD's persistent-config exception is owned by
+[RUNTIME-361](../../tasks/backlog/runtime/RUNTIME-361-coherent-point-drift-execution-completeness.md). Actual GPU and live-preview support require their own backend tests;
+a terminal-only method does not implement a fictitious live preview to satisfy the template.
 
 Start from a working consumer whose execution shape matches the method:
 
@@ -158,7 +188,8 @@ refused as busy until the answer returned.
 Batch `Apply` entry points select Run and automatic Accept. Interactive starts read the
 section's `auto_accept` and `start` rows, the same config the panels, the plugin windows and
 the agent starts (`wait: false`, the `*_start` tools, a scalar tool naming either argument)
-use, and the run id is in every result under the one key `run`.
+use; an agent start may name either, replacing the section's for that run only, and a `run_*`
+call that waits refuses them. The run id is in every result under the one key `run`.
 [`OneShotLifecycleScript`](../../tests/support/OneShotLifecycleScript.hpp) asserts this
 sequence. It runs on the shared core, on the real scalar, outlier, point-normal and mesh
 vertex and face normal transactions and the Vulkan construction hybrid on the device,

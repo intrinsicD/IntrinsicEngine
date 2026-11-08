@@ -380,10 +380,18 @@ namespace Extrinsic::Runtime
         }
     }
 
-    EditorGpuPositionRunHandle BeginEditorGpuPositionRun(const EditorProcessingCommands& commands, const std::uint32_t id,
-                                                         GeometryPropertyRef positions, Graphics::GpuPropertyResidency& residency,
-                                                         std::string& diagnostic)
+    EditorGpuPositionRunHandle BeginEditorGpuPositionRun(const EditorProcessingCommands& commands,
+        const std::uint32_t id,
+        GeometryPropertyRef positions,
+        Graphics::GpuPropertyResidency& residency,
+        std::string& diagnostic,
+        const std::uint32_t previewBuffers)
     {
+        if (previewBuffers < 2u || previewBuffers > 3u)
+        {
+            diagnostic = "preview_buffers must be 2 or 3.";
+            return {};
+        }
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         if (!context.Scene || (context.AttachmentActive && !context.AttachmentActive()) ||
             !GP::EditorProcessingContextWorldCurrent(context))
@@ -419,10 +427,13 @@ namespace Extrinsic::Runtime
             diagnostic = "A GPU result for these positions awaits Accept or Discard.";
             return {};
         }
-        // The run owns the ring it creates: its first write slot is acquired here (depth 2:
-        // fronts are copied into a render block, ADR 0030 decision 4).
-        ring.Back = AcquireGpuPropertyOutput(residency, context.World, *entity, positions,
-                                             std::uint32_t(w->Capture.BeforeValues.size()), 2u);
+        // The run owns the ring it creates; fronts are copied into a render block (ADR 0030 decision 4).
+        ring.Back = AcquireGpuPropertyOutput(residency,
+            context.World,
+            *entity,
+            positions,
+            std::uint32_t(w->Capture.BeforeValues.size()),
+            previewBuffers);
         if (!ring.Back)
         {
             // Nothing this Begin created may stay behind (the residency leaves no slot-less

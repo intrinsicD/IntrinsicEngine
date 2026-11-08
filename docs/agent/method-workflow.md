@@ -34,6 +34,33 @@ against a partially-known system: run it under the experiment loop in
 each run, observations staged append-only in `ara/`, claims backtested
 against the full campaign record).
 
+## Mandatory method-plugin execution default
+
+Every new or migrated method plugin uses `StepRuns` directly or an existing typed adapter
+for Init/Step/Metrics/Preview/Finish and shared run controls. Reuse the shape in the
+[method template](../methods/method-template.md#runtime-execution-contract); do not add a
+private scheduler, direct low-level plugin job/GPU submission, or a second publication
+state machine. Forward the registered plugin name as the run owner independently of its
+user-facing label. Register persistent serializable configuration through the shared
+validate/apply path used by config tools and UI.
+
+Add an algorithm-compatible lifecycle scenario to
+[`Test.StartupPluginExecution.cpp`](../../tests/integration/runtime/Test.StartupPluginExecution.cpp)
+when registering the plugin. The generated startup inventory must have exactly one
+scenario per plugin, with no stale or duplicate entries. The scenario uses real inputs,
+the validated section and plugin tool, then exercises Ready with zero steps/no publication,
+Step/Run, Accept with one undo, undo restoration, and Discard without publication.
+Only one-shot algorithms use the one-shot script. Necessary temporary exceptions name an
+open owning task and the precise excluded capability; they do not exempt the rest of
+the lifecycle. CPD's missing persistent section is owned by
+[RUNTIME-361](../../tasks/backlog/runtime/RUNTIME-361-coherent-point-drift-execution-completeness.md).
+Existing capability follow-ups may be in the backlog; architecture exceptions still require
+an active task under AGENTS.md §13.
+
+State actual backend and preview support separately. This default is no GPU parity or
+performance claim, and does not require a live preview for a terminal-only algorithm.
+Retain the method-specific reference, cancellation, stale-input and GPU runtime tests.
+
 ## Required engine-integration matrix
 
 Every new or materially changed method task declares

@@ -18,12 +18,12 @@ namespace Extrinsic::Runtime
 
     namespace
     {
-        // The rows a method's arguments use: all five, or a one-shot's (cap 1) auto_accept and start.
+        // The rows a method's arguments use: all six, or a one-shot's (cap 1) auto_accept and start.
         std::span<const ConfigFieldSpec> ExecutionArgumentRows(
-            const std::array<ConfigFieldSpec, 5>& fields, const std::uint32_t maxIterationCap)
+            const std::array<ConfigFieldSpec, 6>& fields, const std::uint32_t maxIterationCap)
         {
             const std::span<const ConfigFieldSpec> rows{fields};
-            return maxIterationCap == 1u ? rows.subspan(3u) : rows;
+            return maxIterationCap == 1u ? rows.subspan(3u, 2u) : rows;
         }
     }
 
@@ -85,8 +85,10 @@ namespace Extrinsic::Runtime
                     read.IterationCap = value;
                 else if (field.Name == "preview_every")
                     read.PreviewEvery = value;
-                else
+                else if (field.Name == "preview_interval_ms")
                     read.PreviewIntervalMs = value;
+                else
+                    read.PreviewBuffers = value;
                 continue;
             }
             if (!found->is_string() || !AcceptsConfigFieldToken(field, found->get<std::string>()))

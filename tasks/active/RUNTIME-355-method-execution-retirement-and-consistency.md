@@ -38,11 +38,11 @@ The migrated methods already use the shared run lifecycle; this follow-up remove
 internal duplication and unused paths, and makes startup and optional tool arguments more uniform.
 
 ## Acceptance criteria
-- [ ] F1: Move K-Means' page submission/wait/readback onto WorkerGpuPages, preserving mid-run reseed ordering, stateful page planning, preview tokens and retirement.
-- [ ] F2: Remove the four superseded owner-thread QueueGpu nearest/kNN/radius APIs and migrate their test coverage to prepared query sessions; retain no compatibility facade.
-- [ ] F4: Remove unused OwnerSteps branches and GpuTransactionStepAllowance/Stepped/MayPreview helpers from the shared transaction core, preserving coverage of current worker paths.
-- [ ] F5: Make optional direct execution arguments consistent between start tools and nonwaiting run tools through the existing validated configuration path.
-- [ ] F6: Add focused removal probes for session-upload waiting and Abandon clearing Valid, Commit and Prepared; cover the other removal cases listed as unprobed in the coverage matrix's Verification limits, or record why a case cannot be probed. Preserve asserted predictions and restored-green checks.
+- [x] F1: Move K-Means' page submission/wait/readback onto WorkerGpuPages, preserving mid-run reseed ordering, stateful page planning, preview tokens and retirement.
+- [x] F2: Remove the four superseded owner-thread QueueGpu nearest/kNN/radius APIs and migrate their test coverage to prepared query sessions; retain no compatibility facade.
+- [x] F4: Remove unused OwnerSteps branches and GpuTransactionStepAllowance/Stepped/MayPreview helpers from the shared transaction core, preserving coverage of current worker paths.
+- [x] F5: Make optional direct execution arguments consistent between start tools and nonwaiting run tools through the existing validated configuration path.
+- [x] F6: Add focused removal probes for session-upload waiting and Abandon clearing Valid, Commit and Prepared; cover the other removal cases listed as unprobed in the coverage matrix's Verification limits, or record why a case cannot be probed. Preserve asserted predictions and restored-green checks.
 
 ## Engine integration
 | Surface | Required treatment |
@@ -78,4 +78,13 @@ The final ARCH-023 reviewer (Opus session `3bed78aa-f0ae-4a1b-bf64-1407f84919d8`
 `ee4ed57b0cd4c9951d31993427ade413889cb63d`) classified these as non-blocking. K-Means already
 shares the run protocol; its local transport loop predates the common worker-page helper.
 The owner-thread queue methods and OwnerSteps are no longer used by production method callers.
-The [coverage matrix](../../../docs/methods/gpu-method-coverage.md) records these limits explicitly.
+The [coverage matrix](../../docs/methods/gpu-method-coverage.md) records these limits explicitly.
+
+## Acceptance decision (2026-11-08)
+Independent reviewer `/root/worker_transport_review` returned: **“APPROVE — RUNTIME-355 kann
+nach Aktualisierung des Abschlussvermerks retired werden.”** It accepted F1, F2, F4, F5 and F6
+against restricted diff `9169520d339e50ff1e4a8e3838da77f6ca15895b19128267d6f565663e6a4dd8`
+and WorkerGpuPages test `aa08beb3bb85e9d3141d75e6fcf81d2a4991f22b045b63ba78b44b391386c230`.
+The combined implementation commit and task retirement remain to be recorded under ARCH-024.
+Temporary verification evidence is retained by active ARCH-024; its other acceptance criteria
+and BUG-263/264 are not closed by this decision.

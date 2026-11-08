@@ -1571,7 +1571,7 @@ TEST(PluginHost, StartupPluginsTheHostNeverCommittedGetTheirHookAndCallNothingAf
     EXPECT_EQ(log, (Log{"shutdown"})) << "the section's validator calls nothing after the discard";
 }
 
-// The contract's run protocol: stages join the first stage's run, the waiting tool's outcome, its cancel hook.
+// Deferred tool results: immediate completion, polling and cancellation remain host-owned.
 namespace
 {
     struct RunResult
@@ -1580,29 +1580,6 @@ namespace
     };
 
     std::string RunText(const RunResult& result) { return result.Status; }
-}
-
-TEST(PluginHost, RunStagesJoinTheFirstStagesRunAndTheWaitingToolsCancelEndsThem)
-{
-    WorkerState state{};
-    Harness harness{};
-    ASSERT_TRUE(harness.Loaded(340));
-    const auto run = std::make_shared<Runtime::PluginRun<RunResult>>();
-    std::string refusal;
-    ASSERT_TRUE(Runtime::SubmitPluginRunStage(*run, LoopingJob("first", state), refusal)) << refusal;
-    const auto first = run->Handle;
-    ASSERT_TRUE(Runtime::SubmitPluginRunStage(*run, LoopingJob("second", state), refusal)) << refusal;
-    EXPECT_EQ(run->Handle.Token, first.Token) << "the run keeps its first stage's handle";
-    const auto jobs = harness.Jobs();
-    const auto second = std::ranges::find_if(jobs, [](const auto& job) { return job.Name == "second"; });
-    ASSERT_NE(second, jobs.end());
-    EXPECT_EQ(second->Identity.Run, first.Token) << "a later stage joins the first stage's run";
-    auto outcome = Runtime::WaitForPluginRun(run, &RunText);
-    ASSERT_TRUE(outcome.Cancel);
-    EXPECT_EQ(outcome.Cancel(harness.Context), "cancel requested");
-    harness.Drain();
-    for (const auto& job : harness.Jobs()) EXPECT_EQ(job.State, Runtime::JobState::Cancelled) << job.Name;
-    EXPECT_EQ(outcome.Cancel(harness.Context), "the run is not active");
 }
 
 TEST(PluginHost, TheWaitingToolAnswersAtOnceOrWhenTheRunEnds)

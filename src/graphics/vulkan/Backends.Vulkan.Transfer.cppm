@@ -143,7 +143,11 @@ namespace Extrinsic::Backends::Vulkan
         {
             return m_Lost.load(std::memory_order_acquire);
         }
-        void MarkLost() noexcept;
+        void MarkLost() const noexcept;
+        void FailNextGraphicsQuery(VkResult result) noexcept
+        {
+            m_NextGraphicsQueryResult.store(result);
+        }
         // A device one-shot graphics submission (scene upload) that also signals the graphics lane at a fresh
         // ticket, so a later compute submission's wait on the last issued ticket orders after it. `submit` must
         // carry no signal of its own. The submission's VkResult.
@@ -193,7 +197,7 @@ namespace Extrinsic::Backends::Vulkan
         {
             return m_Lanes[static_cast<size_t>(lane)];
         }
-        [[nodiscard]] uint64_t QueryLaneCompletedValue(TransferLane lane) const;
+        [[nodiscard]] uint64_t QueryLaneCompletedValue(TransferLane lane, VkResult* status = nullptr) const;
         // A primary command buffer from the lane's pool, not begun. The caller holds the lane's Record mutex
         // until the buffer is submitted or freed (FreeCommandBuffer too).
         [[nodiscard]] VkCommandBuffer Allocate(TransferLane lane = TransferLane::Graphics);
@@ -302,7 +306,8 @@ namespace Extrinsic::Backends::Vulkan
         RHI::QueueAffinityResolution m_ComputeResolution{};
         bool m_ComputeSharesFrameComputeQueue = false;
         bool m_ComputeSharesFrameQueueLock = false;
-        std::atomic<bool> m_Lost{false};
+        mutable std::atomic<bool> m_Lost{false};
+        mutable std::atomic<VkResult> m_NextGraphicsQueryResult{VK_SUCCESS}; // One-shot device-local test injection.
         // The graphics lane's Record mutex also holds one pending staging transaction (uploads stage under it).
         std::unique_ptr<StagingBelt> m_Belt;
         // Slots, pending readbacks and the lanes' InFlight lists; never held while taking a queue lock.

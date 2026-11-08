@@ -68,7 +68,8 @@ extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 // power-of-two size class (at least MinScratchClassBytes) and the same
 // Usage/HostVisible/HostReadback. Its last release parks the buffer as
 // Returned; CollectScratch() stamps it Pending, and once the stamp is
-// retired (frames and compute lane) it is Idle: reusable by the next
+// retired (IDevice::IsFrameRetired and the compute lane, so without new
+// frames as well) it is Idle: reusable by the next
 // matching request, and the only state the LRU eviction may destroy.
 // Active, returned, pending and idle class bytes all count toward the
 // budget; a request that cannot fit even after evicting every idle
@@ -79,12 +80,13 @@ extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 export namespace Extrinsic::RHI
 {
-    // Proof that the device finished every submission recorded before the stamp: the frame after the frames in
-    // flight retired, and the compute-lane fence then current completed. Graphics-queue transfers (uploads and
-    // readbacks) precede a later frame's fence in queue submission order, so the frame stamp covers them.
+    // Proof that no submission made before the stamp still uses a released buffer that frames never record (method
+    // scratch, workspaces): its frame number retired (IDevice::IsFrameRetired: graphics-queue transfers, readbacks and
+    // graphics-lane compute) and the compute-lane fence then current completed. A stamp taken between frames does not
+    // wait for frames still in flight; a buffer a frame records needs that frame's own stamp.
     struct RetirementStamp
     {
-        std::uint64_t SafeFrame{};
+        std::uint64_t Frame{};
         ReadbackToken ComputeFence{};
     };
     [[nodiscard]] RetirementStamp StampRetirement(IDevice& device);

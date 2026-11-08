@@ -180,7 +180,7 @@ namespace Intrinsic::Plugins::BilateralFilter
         R::StepRunShow ShowPoints(Work& w, const std::span<const glm::vec3> points)
         {
             std::string diagnostic;
-            switch (w.Service->PreviewPositions(*w.Edit, points, diagnostic))
+            switch (w.Service->PreviewPositions(*w.Edit, points, diagnostic, w.Cfg.Execution.PreviewBuffers))
             {
             case R::PointPreviewStatus::Shown:       return R::StepRunShow::Shown;
             case R::PointPreviewStatus::Busy:        return R::StepRunShow::Later;
@@ -427,6 +427,7 @@ namespace Intrinsic::Plugins::BilateralFilter
             .Owner = "bilateral_filter",
             .Output = {.StableEntityId = config.StableEntityId, .Property = w->Current.Output},
             .Execution = config.Execution,
+            .DevicePreview = w->InPlace,
             .MetricNames = {"mean_displacement", "max_displacement", "points_filtered", "degenerate_normals"}};
         std::string refusal;
         w->RunId = w->Runs->Start(std::move(options), std::move(callbacks), R::PluginStepRunJobs(w->Holder), refusal);

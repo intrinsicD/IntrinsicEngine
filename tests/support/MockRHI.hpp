@@ -636,6 +636,19 @@ namespace Extrinsic::Tests
         [[nodiscard]] std::uint32_t GetFramesInFlight()    const override { return FramesInFlight; }
         [[nodiscard]] std::uint64_t GetGlobalFrameNumber() const override { return GlobalFrameNumber; }
 
+        // ARCH-024: a test's model of actual frame retirement (unset: the default frame-distance rule), and the
+        // device maintenance calls an owner made.
+        std::function<bool(std::uint64_t)> FrameRetired{};
+        int CollectCompletedResourcesCount = 0;
+        [[nodiscard]] bool IsFrameRetired(std::uint64_t frame) const override
+        {
+            return FrameRetired ? FrameRetired(frame) : RHI::IDevice::IsFrameRetired(frame);
+        }
+        void CollectCompletedResources() override
+        {
+            ++CollectCompletedResourcesCount;
+        }
+
         [[nodiscard]] RHI::ResourceMemoryRequirements GetBufferMemoryRequirements(
             const RHI::BufferDesc& desc) const noexcept override;
 

@@ -1710,15 +1710,122 @@ TEST(StepRuns, AnAbandonedRunDropsItsOwnersCallablesAtOnceWhateverIsInFlight)
     EXPECT_EQ(t.Gpu.Discards, 1);
 }
 
+// Each owner-only callback releases its capture before a held worker returns.
+TEST(StepRuns, AbandonDropsEachOwnerCallbackWhileTheWorkerIsHeld)
+{
+    auto problem = std::make_shared<Problem>();
+    Probe probe;
+    std::atomic<bool> inside{false}, release{false};
+    problem->InsideStep = [&]
+    {
+        inside = true;
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+        while (!release.load() && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(100us);
+    };
+    Fixture f;
+    auto valid = std::make_shared<int>(0), commit = std::make_shared<int>(0), prepared = std::make_shared<int>(0);
+    const std::weak_ptr<int> validAlive = valid, commitAlive = commit, preparedAlive = prepared;
+    auto callbacks = Callbacks(problem, probe);
+    callbacks.Valid = [valid]
+    {
+        return true;
+    };
+    callbacks.Commit = [commit](std::string&)
+    {
+        return R::StepRunCommit::Committed;
+    };
+    callbacks.Prepared = [prepared]
+    {
+        return true;
+    };
+    std::string refusal;
+    const auto id = f.Runs.Start({.Label = "held owner callbacks",
+                                     .Owner = "test",
+                                     .Execution = {.PreviewEvery = 0u, .Start = R::StepRunStart::Run}},
+        std::move(callbacks),
+        f.Jobs.Bind(),
+        refusal);
+    valid.reset();
+    commit.reset();
+    prepared.reset();
+    ASSERT_NE(id, 0u) << refusal;
+    const bool held = f.Jobs.FramesUntil(
+        [&]
+        {
+            return inside.load();
+        });
+    EXPECT_TRUE(held);
+    if (held)
+    {
+        EXPECT_FALSE(validAlive.expired());
+        EXPECT_FALSE(commitAlive.expired());
+        EXPECT_FALSE(preparedAlive.expired());
+        f.Runs.Driver(id).Abandon();
+        EXPECT_TRUE(validAlive.expired()) << "Valid is dropped before the worker returns";
+        EXPECT_TRUE(commitAlive.expired()) << "Commit is dropped before the worker returns";
+        EXPECT_TRUE(preparedAlive.expired()) << "Prepared is dropped before the worker returns";
+    }
+    release = true;
+    EXPECT_TRUE(f.Settle(id));
+}
+
 // MCP arguments, config rows and the run admission share one table: the reader accepts exactly the rows' ranges and
 // tokens, keeps an absent value and changes nothing on a refusal; the schema carries the same bounds; a start with
 // options outside them is refused. Mutation: a reader that clamps instead of refusing fails the second block.
+TEST(StepRuns, DevicePreviewObservationDistinguishesRinglessAndDisabledPreviews)
+{
+    for (const bool devicePreview : {false, true})
+        for (const std::uint32_t depth : {2u, 3u})
+            for (const std::uint32_t every : {0u, 1u})
+            {
+                Fixture f;
+                Probe probe;
+                const auto run = f.Start(std::make_shared<Problem>(),
+                    probe,
+                    {.Execution = {.PreviewEvery = every, .PreviewBuffers = depth}, .DevicePreview = devicePreview});
+                const auto observed = f.Observe(run);
+                EXPECT_EQ(observed.Execution.PreviewBuffers, depth);
+                EXPECT_EQ(observed.DevicePreviewBuffers, devicePreview && every ? depth : 0u);
+                R::AgentOperationRegistry registry;
+                f.Runs.RegisterOperations(registry);
+                const auto reply =
+                    R::InvokeAgentOperation(registry, "run_observe", {}, Json{{"run", run}}.dump(), false);
+                ASSERT_FALSE(reply.IsError) << reply.Text;
+                const auto json = Json::parse(reply.Text);
+                EXPECT_EQ(json["execution"]["preview_buffers"], depth);
+                EXPECT_EQ(json["device_preview_buffers"], observed.DevicePreviewBuffers);
+                EXPECT_TRUE(f.Control(run, R::StepRunAction::Discard));
+            }
+}
+
+TEST(StepRuns, RinglessPreviewUiKeepsCadenceButOmitsTheDeviceBufferControl)
+{
+    TestSupport::ImGuiFrameScope gui;
+    R::StepRunExecution options{.PreviewBuffers = 2u};
+    ImGui::SetNextWindowSize({600, 600});
+    ImGui::Begin("Execution rows");
+    const auto height = [&](const char* id, const bool preview, const bool device)
+    {
+        const float before = ImGui::GetCursorPosY();
+        EXPECT_FALSE(R::DrawStepRunExecutionOptions(id, options, 100u, true, preview, 1u, device));
+        return ImGui::GetCursorPosY() - before;
+    };
+    const float none = height("None", false, false);
+    const float ringless = height("CPU", true, false);
+    const float device = height("Device", true, true);
+    ImGui::End();
+    EXPECT_GT(ringless, none) << "CPU previews still configure their cadence";
+    EXPECT_GT(device, ringless) << "only a device ring offers its buffer count";
+    EXPECT_EQ(options.PreviewBuffers, 2u) << "hiding the control preserves the request";
+}
+
 TEST(StepRuns, ExecutionArgumentsAndAdmissionShareTheFieldRows)
 {
     R::StepRunExecution options{};
     std::string refusal;
     ASSERT_TRUE(R::ReadStepRunExecutionArguments(
-        R"({"max_iterations":7,"preview_every":0,"preview_interval_ms":16,"auto_accept":"end","start":"run"})",
+        R"({"max_iterations":7,"preview_every":0,"preview_interval_ms":16,"auto_accept":"end","start":"run","preview_buffers":2})",
         100u,
         options,
         refusal))
@@ -1728,12 +1835,16 @@ TEST(StepRuns, ExecutionArgumentsAndAdmissionShareTheFieldRows)
             .PreviewEvery = 0u,
             .PreviewIntervalMs = 16u,
             .AutoAccept = R::StepRunAutoAccept::End,
-            .Start = R::StepRunStart::Run}));
+            .Start = R::StepRunStart::Run,
+            .PreviewBuffers = 2u}));
     const auto kept = options;
     for (const char* bad : {R"({"max_iterations":101})",
              R"({"max_iterations":0})",
              R"({"preview_every":-1})",
              R"({"preview_interval_ms":60001})",
+             R"({"preview_buffers":1})",
+             R"({"preview_buffers":4})",
+             R"({"preview_buffers":2.5})",
              R"({"auto_accept":"sometimes"})",
              R"({"start":"later"})",
              R"({"start":1})"})
@@ -1749,10 +1860,19 @@ TEST(StepRuns, ExecutionArgumentsAndAdmissionShareTheFieldRows)
     EXPECT_EQ(schema["max_iterations"]["maximum"], 100);
     EXPECT_EQ(schema["preview_every"]["maximum"], R::kMaxStepRunPreviewEvery);
     EXPECT_EQ(schema["preview_interval_ms"]["maximum"], R::kMaxStepRunPreviewIntervalMs);
+    EXPECT_EQ(schema["preview_buffers"]["minimum"], 2);
+    EXPECT_EQ(schema["preview_buffers"]["maximum"], 3);
+    const auto oneShotSchema = Json::parse("{" + R::StepRunExecutionSchemaProperties(1u) + "}");
+    EXPECT_FALSE(oneShotSchema.contains("preview_buffers"));
+    EXPECT_FALSE(oneShotSchema.contains("preview_every"));
+    EXPECT_EQ(oneShotSchema.size(), 2u);
     EXPECT_EQ(schema["auto_accept"]["enum"], Json::array({"never", "converged", "end"}));
     EXPECT_EQ(schema["start"]["enum"], Json::array({"ready", "run"}));
 
     EXPECT_TRUE(R::StepRunExecutionRefusal({}, 100u).empty());
+    EXPECT_TRUE(R::StepRunExecutionRefusal({.PreviewBuffers = 2u}, 100u).empty());
+    EXPECT_FALSE(R::StepRunExecutionRefusal({.PreviewBuffers = 1u}, 100u).empty());
+    EXPECT_FALSE(R::StepRunExecutionRefusal({.PreviewBuffers = 4u}, 100u).empty());
     EXPECT_FALSE(R::StepRunExecutionRefusal({.IterationCap = 0u}, 100u).empty());
     Fixture f;
     auto problem = std::make_shared<Problem>();

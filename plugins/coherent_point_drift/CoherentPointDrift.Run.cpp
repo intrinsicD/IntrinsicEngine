@@ -148,13 +148,13 @@ namespace Intrinsic::Plugins::CoherentPointDrift
                 return true;
             },
             .Show =
-                [state](const R::StepPreview& preview)
+                [state, previewBuffers = request.Execution.PreviewBuffers](const R::StepPreview& preview)
             {
                 std::vector<glm::vec3> points(preview.Values.size() / 3u);
                 for (std::size_t i = 0; i < points.size(); ++i)
                     points[i] = {preview.Values[3 * i], preview.Values[3 * i + 1], preview.Values[3 * i + 2]};
                 std::string diagnostic;
-                switch (state->Editing->PreviewPositions(*state->Source, points, diagnostic))
+                switch (state->Editing->PreviewPositions(*state->Source, points, diagnostic, previewBuffers))
                 {
                 case R::PointPreviewStatus::Shown: return R::StepRunShow::Shown;
                 case R::PointPreviewStatus::Busy: return R::StepRunShow::Later;
@@ -202,6 +202,7 @@ namespace Intrinsic::Plugins::CoherentPointDrift
             .Owner = "coherent_point_drift",
             .Output = {.StableEntityId = request.Source, .Property = source.Output},
             .Execution = request.Execution,
+            .DevicePreview = true,
             .MetricNames = {"sigma2", "objective", "matched", "nll"}};
         const auto run = runs->Start(std::move(options), std::move(callbacks), R::PluginStepRunJobs(), refusal);
         if (run != 0u) g_LastRun = run;

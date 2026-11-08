@@ -1,5 +1,5 @@
 // ARCH-023: the worker side of a resident method's own GPU pages, shared by the shared GPU transaction core,
-// resident LOP/WLOP and the CPD E-step (the pattern K-Means' worker step introduced). A page is recorded and
+// resident LOP/WLOP, K-Means and the CPD E-step. A page is recorded and
 // submitted on the calling thread (a step run's worker, or the owner at a rest) with a pulled readback, waited for
 // in bounded slices that check the run's abort, and its bytes are taken exactly once or given up, so a page never
 // needs CollectCompleted or a frame. The owner seals the run before releasing what pages read or write: once Seal
@@ -108,6 +108,13 @@ namespace Extrinsic::Runtime
                 m_InputOrder = initialOrder;
                 m_Aborted.store(false, std::memory_order_release);
             }
+        }
+        // Worker, after its own mid-run upload (a K-Means restart's reseed): the next accepted page or copy waits for
+        // every transfer issued before it. Never clears an abort: an owner abort meanwhile still ends the run.
+        void OrderNextAfterIssuedTransfers() noexcept
+        {
+            const std::scoped_lock lock{m_Mutex};
+            m_InputOrder = RHI::ComputeInputOrder::AfterIssuedTransfers;
         }
 
         // Every page's and copy's last token (0: none), how many were submitted and the bytes taken.

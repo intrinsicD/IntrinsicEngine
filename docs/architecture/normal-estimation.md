@@ -88,7 +88,8 @@ session's step-run service: the CPU backends as a worker step run
 transaction. `ApplyEditorNormalEstimationCommand` is the batch (it computes at once and
 accepts at its end); `StartEditorNormalEstimationRun` and
 `StartEditorConfiguredNormalEstimation` use the section's `auto_accept` and `start`, as the
-panel and `run_operation` with `wait: false` do, and answer with the run's id. Without the
+panel and `run_operation` with `wait: false` do (the call's, if named, replace them for that
+run), and answer with the run's id. Without the
 step-run service the CPU batch runs as one queued job, and a synchronous path serves CPU
 direct/headless callers without a job lane; a ready start is refused there. Vulkan
 requests require the spatial-index GPU queue, a float64-capable device and JobService. The

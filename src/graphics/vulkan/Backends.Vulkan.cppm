@@ -173,9 +173,10 @@ namespace Extrinsic::Backends::Vulkan
         const RHI::IDevice* device,
         const RHI::ICommandContext* context) noexcept;
 
-    // Deterministic GPU-test seams: hold `queue` (the separate method queue, or graphics) behind a host-signaled
-    // semaphore. HoldVulkanQueue returns its release (empty without an operational device, or for MethodCompute
-    // without a separate lane): call it once, on the device-owner thread, before the device shuts down; it signals,
+    // Deterministic GPU-test seams: hold `queue` (the separate method queue, graphics, or a frame async-compute or
+    // transfer queue) behind a host-signaled semaphore. HoldVulkanQueue returns its release (empty without an
+    // operational device, for MethodCompute without a separate lane, or for a frame queue the device lacks or shares
+    // with graphics): call it once, on the device-owner thread, before the device shuts down; it signals,
     // waits for the gate's own batch and reports success. WithVulkanQueueGate holds while invoking the callback,
     // which must not wait for the held queue's work or destroy the device (false: callback not invoked).
     // `device` must come from CreateVulkanDevice().
@@ -187,6 +188,10 @@ namespace Extrinsic::Backends::Vulkan
     // TransferQueueDiagnostics::ComputeSharesFrameQueueLock reports the same.
     export [[nodiscard]] bool WithVulkanFrameQueueLockHeld(
         RHI::IDevice* device, const std::function<void()>& whileHeld);
+    // Owner-thread test seam: the next selected query reports device loss, or a host-memory error when false.
+    // `device` must come from CreateVulkanDevice(); loss remains latched through the ordinary device-loss path.
+    export [[nodiscard]] bool FailNextVulkanRetirementQuery(
+        RHI::IDevice* device, VulkanRetirementQuery query, bool deviceLost);
 
     // Factory — creates the Vulkan backend IDevice.
     // Call once during engine initialization; the returned device owns all

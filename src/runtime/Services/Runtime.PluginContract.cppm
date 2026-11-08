@@ -121,8 +121,8 @@ export namespace Extrinsic::Runtime
         return services != nullptr ? services->Find<T>() : nullptr;
     }
 
-    // A plugin's run of one or more stages, shared by its window and a waiting MCP call: `Final` is its one terminal
-    // result, set on the main thread. `Handle` is the first stage's job; later stages join its run.
+    // A plugin's result shared by its window and a waiting MCP call: `Final` is its one terminal result, set on
+    // the main thread. `Handle` is the shared run's holder job, used for cancellation.
     template <class Result>
     struct PluginRun
     {
@@ -130,17 +130,6 @@ export namespace Extrinsic::Runtime
         std::optional<Result> Final{};
         PluginJobHandle Handle{};
     };
-
-    // Submits a stage of `run` (main thread): the first becomes the run's handle, a later one joins its run. False with
-    // the host's reason in `refusal` (possibly empty) when it was refused.
-    template <class Result>
-    [[nodiscard]] bool SubmitPluginRunStage(PluginRun<Result>& run, PluginJob job, std::string& refusal)
-    {
-        job.Run = run.Handle; // invalid for the first stage
-        const auto handle = SubmitPluginJob({}, std::move(job), &refusal);
-        if (!run.Handle.IsValid()) run.Handle = handle;
-        return handle.IsValid();
-    }
 
     // Cancels the run's jobs, as the Jobs window does; false when nothing is active.
     template <class Result>

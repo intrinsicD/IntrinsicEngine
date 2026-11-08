@@ -99,7 +99,7 @@ plugins/marching_cubes/
                                generated v1 entry points (shared builds), a startup plugin of the Sandbox
   MarchingCubes.cppm           module Intrinsic.Plugin.MarchingCubes: config rows, the section, Register, Shutdown
   MarchingCubes.Plugin.cpp     Register adds everything through PluginRegistrations
-  MarchingCubes.Run.cpp        its runs (PluginRun, SubmitPluginRunStage), on the module services
+  MarchingCubes.Run.cpp        its StepRuns callbacks or shared typed run adapter, on the module services
   MarchingCubes.Tools.cpp      its MCP tools (a waiting tool: WaitForPluginRun)
   MarchingCubes.Window.cpp     its window; buttons start runs as the tools do
 ```
@@ -116,8 +116,17 @@ tests share `tests/support/PluginHarness.hpp`)
   - a plugin hands callables to the host through these APIs only, so the host holds every one of them and
     removes them all before it closes the image;
   - a deferred result (a continuation, progress or cancel) is held by the host, so an unload drains it; the
-    contract's run protocol (`PluginRun`, `SubmitPluginRunStage`, `CancelPluginRun`, `WaitForPluginRun`) gives a
-    plugin's multi-stage runs and its waiting MCP tools;
+    contract's result holders (`PluginRun`, `CancelPluginRun`, `WaitForPluginRun`) support waiting MCP tools.
+    Method execution uses `StepRuns` and its typed adapters. Production plugins cannot submit low-level
+    `SubmitPluginJob` or `StartPluginGpuWork` calls directly; `RuntimeReuseDriftGuard.PluginsUseSharedStepRuns`
+    enforces that source boundary (the host fixture is excluded);
+- **New method plugins** register a persistent validated section and supply an algorithm-specific scenario in
+  [`Test.StartupPluginExecution.cpp`](../../tests/integration/runtime/Test.StartupPluginExecution.cpp).
+  The test consumes CMake's generated startup inventory: missing, duplicate and stale scenarios fail.
+  Real tools start each run; Ready/Step/Run, Accept with one undo, undo restoration and Discard share a driver.
+  Scalar hosts forward the registered plugin name as `Owner`, separately from the job label. CPD's request-only
+  configuration is the bounded exception owned by ARCH-024; its two-cloud lifecycle still participates.
+  This CPU contract does not establish GPU or preview coverage; each backend keeps its own runtime tests.
 - **v1 means the same build:** the build id is a sha256 over the toolchain, standard library, compile flags and
   definitions, build type, sanitizers, shared-engine setting and every engine module interface (`src/**/*.cppm`). The host refuses another
   id (`abi_mismatch`) and a missing entry point (`dlsym_failed`). There is no compatibility layer beyond that; a
@@ -269,8 +278,11 @@ ARCH-023 makes it the one control owner of GPU method runs.
   names through one codec reader and encoder (`Runtime.FeatureConfigCodecs.Detail.cpp`); a derived plugin section
   binds the rows to its member with `BindStepRunExecution` (the bilateral filter all five, the one-step descriptor
   analysis `auto_accept` and `start` only); every start tool (the CPD, bilateral, descriptor and scalar plugins',
-  `start_kmeans`, `start_point_cloud_consolidation`) takes them through the one reader and schema of the leaf
-  `Extrinsic.Runtime.StepRunExecution` (`ReadStepRunExecutionArguments`, `StepRunExecutionSchemaProperties`), and
+  `start_kmeans`, `start_point_cloud_consolidation`, and the `wait: false` starts of `run_operation`,
+  `run_registration`, `run_point_sampling` and `run_keypoint_analysis`, which take the rows their sections bind and
+  refuse them when they wait) takes them through the one reader and schema of the leaf
+  `Extrinsic.Runtime.StepRunExecution` (`ReadStepRunExecutionArguments`; `StepRunExecutionSchemaProperties` or, for
+  generated tool schemas, the `StepRunExecutionFields` rows), and
   panels edit them with `DrawStepRunExecutionOptions` (preview rows only where the path previews, no cap for a
   one-step run). Every consolidation backend uses the shared step-run execution options; the agent's waiting `run_kmeans`,
   `run_point_cloud_consolidation`, `bilateral_filter` and `descriptor_analysis` run at once and accept at the end

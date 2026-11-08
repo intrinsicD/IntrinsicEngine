@@ -103,3 +103,12 @@ retired task records. The directory indexes are
 Operator direction 2026-09-27; architecture decision in
 [ARCH-019](../../done/ARCH-019-agent-control-lane-mcp.md). The registry
 [RUNTIME-287](../../done/RUNTIME-287-agent-operations-registry.md) is done.
+
+## Method plugin execution completion
+
+- [RUNTIME-356 — Point spacing: prove the complete GPU plugin adapter](RUNTIME-356-point-spacing-execution-completeness.md)
+- [RUNTIME-357 — Kernel density: close adapter and lifecycle boundaries](RUNTIME-357-kernel-density-execution-completeness.md)
+- [RUNTIME-358 — Density weights: initialize on the worker and close boundaries](RUNTIME-358-density-weights-execution-completeness.md)
+- [RUNTIME-359 — Descriptor analysis: reserve every output atomically](RUNTIME-359-descriptor-analysis-execution-completeness.md)
+- [RUNTIME-360 — Bilateral filter: prove resume equivalence and share metric curves](RUNTIME-360-bilateral-filter-execution-completeness.md)
+- [RUNTIME-361 — CPD plugin: persist configuration and initialize on the worker](RUNTIME-361-coherent-point-drift-execution-completeness.md)

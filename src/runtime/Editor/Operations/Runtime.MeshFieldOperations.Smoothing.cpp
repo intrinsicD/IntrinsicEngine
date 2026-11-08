@@ -267,6 +267,7 @@ namespace Extrinsic::Runtime
             kExecutionFields[2],
             kExecutionFields[3],
             kExecutionFields[4],
+            kExecutionFields[5],
         };
         using PropertyGraphDetail::Snapshot;
         using PropertyGraphDetail::Channels;
@@ -342,6 +343,7 @@ namespace Extrinsic::Runtime
             // The merged document passed the field table: the tokens parse.
             c.Execution.PreviewEvery = doc.at("preview_every").get<std::uint32_t>();
             c.Execution.PreviewIntervalMs = doc.at("preview_interval_ms").get<std::uint32_t>();
+            c.Execution.PreviewBuffers = doc.at("preview_buffers").get<std::uint32_t>();
             c.Execution.AutoAccept =
                 ParseStepRunAutoAccept(doc.at("auto_accept").get<std::string>()).value_or(StepRunAutoAccept::Never);
             c.Execution.Start = ParseStepRunStart(doc.at("start").get<std::string>()).value_or(StepRunStart::Ready);
@@ -528,6 +530,7 @@ namespace Extrinsic::Runtime
             {"fit_tolerance", c.Filter.FitTolerance},
             {"preview_every", c.Execution.PreviewEvery},
             {"preview_interval_ms", c.Execution.PreviewIntervalMs},
+            {"preview_buffers", c.Execution.PreviewBuffers},
             {"auto_accept", std::string{ToString(c.Execution.AutoAccept)}},
             {"start", std::string{ToString(c.Execution.Start)}}}
             .dump();
@@ -786,7 +789,6 @@ namespace Extrinsic::Runtime
     {
         using Work = std::shared_ptr<EditorPropertySmoothingTransaction>;
         using PreviewSlot = EditorPropertySmoothingTransaction::PreviewSlot;
-        constexpr std::uint32_t kRingDepth = 3u;   // fronts bound directly by the renderer (ADR 0030 decision 4)
         constexpr const char* kRefused = "Vulkan property smoothing could not queue its device work; previous output retained.";
 
         // The captured inputs and the output are unchanged (an edit or undo of either while
@@ -870,11 +872,13 @@ namespace Extrinsic::Runtime
         {
             const auto& c = w->Publication.Config;
             const auto entity = w->Publication.Entity;
-            if (GP::AcquireGpuTransactionBack(w->Core, 0, entity, c.Output, w->Count, kRingDepth) != GP::GpuRingAcquisition::Ready)
+            if (GP::AcquireGpuTransactionBack(w->Core, 0, entity, c.Output, w->Count, c.Execution.PreviewBuffers) !=
+                GP::GpuRingAcquisition::Ready)
                 return false;
             return !w->Presentation ||
-                   GP::AcquireGpuTransactionBack(w->Core, 1, entity, GpuPropertyPresentationRef(c.Output), w->Count, kRingDepth) ==
-                       GP::GpuRingAcquisition::Ready;
+                GP::AcquireGpuTransactionBack(
+                    w->Core, 1, entity, GpuPropertyPresentationRef(c.Output), w->Count, c.Execution.PreviewBuffers) ==
+                GP::GpuRingAcquisition::Ready;
         }
         // The run fails (CompleteRun reports it) without queueing more work.
         bool Fail(const Work& w, std::string diagnostic)
@@ -932,9 +936,8 @@ namespace Extrinsic::Runtime
                     }));
         }
         // One bounded chunk (GRAPHICS-150) of the chained solves below `limit`; each chunk reads back only the
-        // reports. It stores the latest complete time step into the ring when a write slot is held and live preview
-        // takes it, or always with `force` (Accept's store, a resting preview).
-        void QueueImplicit(const Work& w, const std::uint32_t limit, const bool force)
+        // reports. It stores the latest complete time step into the ring when a write slot is held.
+        void QueueImplicit(const Work& w, const std::uint32_t limit)
         {
             const auto& ctx = w->Core.Context;
             w->Limit = limit;
@@ -942,7 +945,7 @@ namespace Extrinsic::Runtime
             Queued(w,
                 ctx.SpatialIndices->QueueGpuCompute(
                     Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(TotalSolves(w)),
-                    [w, limit, force, solver = w->Solver, filter = w->Filter](
+                    [w, limit, solver = w->Solver, filter = w->Filter](
                         RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle
                     {
                         if (w->Core.Abandoned)
@@ -969,8 +972,7 @@ namespace Extrinsic::Runtime
                         if (!buffer.IsValid())
                             return {};
                         const auto steps = solver->CompletedSolves() / channels;
-                        if (Output(w).Back && steps > 0u && steps > w->Stored.value_or(0u) &&
-                            (force || GP::GpuTransactionMayPreviewAt(w->Core, steps)))
+                        if (Output(w).Back && steps > 0u && steps > w->Stored.value_or(0u))
                         {
                             NoteUses(w);
                             const auto io = ResidentIo(w);
@@ -980,8 +982,6 @@ namespace Extrinsic::Runtime
                                     commands, io, channels, solver->ResultBuffer(), solutions, 1u, rows))
                             {
                                 w->Storing = steps;
-                                if (!force)
-                                    GP::GpuTransactionPreviewed(w->Core);
                             }
                         }
                         return buffer;
@@ -1008,7 +1008,7 @@ namespace Extrinsic::Runtime
             if (!AcquireBack(w))
                 return Defer(w);
             if (w->Implicit)
-                QueueImplicit(w, w->Done.load() * ChannelCount(w), true);
+                QueueImplicit(w, w->Done.load() * ChannelCount(w));
             else
                 QueueExplicitStore(w);
             return false;
@@ -2146,14 +2146,20 @@ namespace Extrinsic::Runtime
         if (residency)
         {
             auto& output = t.Rings[0];
-            if (const auto back = AcquireGpuPropertyOutput(*residency, context.World, prepared->Entity, c.Output, w->Count, PS::kRingDepth);
+            if (const auto back = AcquireGpuPropertyOutput(
+                    *residency, context.World, prepared->Entity, c.Output, w->Count, c.Execution.PreviewBuffers);
                 back && residency->Publish(output.Key))
                 ++w->Previews;
             output.Generation = residency->RingGeneration(output.Key);
             if (w->Presentation)
             {
                 auto& presentation = t.Rings[1];
-                if (AcquireGpuPropertyOutput(*residency, context.World, prepared->Entity, GpuPropertyPresentationRef(c.Output), w->Count, PS::kRingDepth))
+                if (AcquireGpuPropertyOutput(*residency,
+                        context.World,
+                        prepared->Entity,
+                        GpuPropertyPresentationRef(c.Output),
+                        w->Count,
+                        c.Execution.PreviewBuffers))
                     (void)residency->Publish(presentation.Key);
                 presentation.Generation = residency->RingGeneration(presentation.Key);
             }

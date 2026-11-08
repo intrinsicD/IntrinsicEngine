@@ -353,6 +353,29 @@ namespace Extrinsic::RHI
         [[nodiscard]] virtual std::uint32_t GetFramesInFlight()    const = 0;
         [[nodiscard]] virtual std::uint64_t GetGlobalFrameNumber() const = 0;
 
+        // ---- Actual retirement (ARCH-024) ------------------------------
+        /// Device-owner thread, nonblocking: whether the GPU work a use stamped with `frameNumber` (the
+        /// GetGlobalFrameNumber() value read at the use) may name has finished. A number a submitted frame carries
+        /// (below GetGlobalFrameNumber()) retires once every frame up to it finished on every queue it used, which
+        /// also covers each earlier graphics-queue submission. A number no frame was submitted with yet retires
+        /// while no frame is being recorded (between a successful BeginFrame and its EndFrame) and every
+        /// graphics-queue submission so far finished; it does not wait for earlier frames still in flight, so an
+        /// owner keeps an earlier frame's stamp beside a later one instead of overwriting it. Neither covers the
+        /// compute lane (ITransferQueue::ComputeFence and tokens do). The default is the frame-distance rule: frame
+        /// N's fences are waited by BeginFrame(N + GetFramesInFlight()), one frame after the counter reaches that
+        /// distance, so a device that cannot tell never claims completion.
+        [[nodiscard]] virtual bool IsFrameRetired(std::uint64_t frameNumber) const
+        {
+            const std::uint64_t current = GetGlobalFrameNumber();
+            return !IsDeviceLost() && current > frameNumber && current - frameNumber > GetFramesInFlight();
+        }
+        /// Device-owner thread, nonblocking (no wait, no frame-counter change): releases deferred destructions and
+        /// handle slots once every frame up to their destruction finished (and, after the last submitted frame, no
+        /// frame records and the graphics queue is idle), which BeginFrame otherwise does after its fence wait. For
+        /// owner calls where no frame begins (minimized, BeginFrame refused), after the transfer queue's
+        /// CollectCompleted. Frees nothing on a lost device. The default does nothing.
+        virtual void CollectCompletedResources() {}
+
         // ---- Queue submit planning -----------------------------------
         // Backend-neutral queue seam used by the renderer's multi-queue
         // submit planner. The default preserves the historical single graphics

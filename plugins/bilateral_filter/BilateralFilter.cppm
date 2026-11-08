@@ -91,6 +91,7 @@ export namespace Intrinsic::Plugins::BilateralFilter
         kExecutionRows[2],
         kExecutionRows[3],
         kExecutionRows[4],
+        kExecutionRows[5],
         R::Bind<&Config::Backend>({.Name = "backend",
             .Type = R::ConfigFieldType::StringEnum,
             .Description = "Backend.",

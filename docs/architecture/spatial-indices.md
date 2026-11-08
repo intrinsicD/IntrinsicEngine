@@ -26,27 +26,29 @@ destroyed worlds and entities. Shutdown withdraws the service and releases
 its GPU resources before device teardown.
 
 `Nearest`, `KNearest` and `Radius` return CPU results or `nullopt` for stale handles or
-invalid queries. `PrepareQuerySession` is the reusable GPU query interface for worker-stepped
-methods; kernels that traverse the index directly retain a `PrepareGpuIndex` view.
-The old `QueueGpuNearest`, `QueueGpuKNearest`, `QueueGpuRadius` and
-`QueueGpuNearestTransformed` batches are test-only until RUNTIME-355 removes them;
-source rules prohibit production callers. The cache keeps lazy build and query recording private: it uploads live positions and the source-slot mapping, then
-records whatever the target still lacks (canonical-slot gather, hierarchy build)
-and the batched query into one submission. A queue never substitutes a CPU result
-when the device or target is unavailable; the batch fails with a diagnostic instead.
+invalid queries. `PrepareQuerySession` is the cache's only GPU query interface, for
+worker-stepped methods; kernels that traverse the index directly retain a `PrepareGpuIndex`
+view. The owner-thread `QueueGpuNearest`, `QueueGpuKNearest`, `QueueGpuRadius` and
+`QueueGpuNearestTransformed` batches were removed (RUNTIME-355); a source rule keeps them
+deleted. The cache keeps lazy build and query recording private: a session's preparation
+(or a computation) uploads live positions and the source-slot mapping and records whatever
+the target still lacks (canonical-slot gather, hierarchy build) into one owner submission;
+pages record only their queries. Nothing substitutes a CPU result when the device or target
+is unavailable; the preparation or page fails with a diagnostic instead.
 
 ### Submission and completion (ARCH-023)
 
-Every query batch and every `QueueGpuCompute` is submitted inside the queue call
-through `IDevice::SubmitComputeReadback`: the method compute lane on the async
-compute queue, or the graphics queue where the device has none or
+Every `QueueGpuCompute`, fixed-target session or index preparation and every session page
+is submitted at once through `IDevice::SubmitComputeReadback`: the method compute
+lane on the async compute queue, or the graphics queue where the device has none or
 `render.method_compute_graphics_queue` forces it. Both use the same backend path;
 the transfer queue's `ComputeLane` diagnostic reports which one ran. Nothing in
 the cache records into a graphics frame, and there is no latency choice. A
-request is `Submitted` once the device accepted it and `Ready` (or `Failed`) when
-its own readback sink ran in the transfer queue's `CollectCompleted`, never after
-a count of frames. A batch reads back one packed buffer: `queries x capacity`
-neighbor rows followed by one header per query.
+computation is `Submitted` once the device accepted it and `Ready` (or `Failed`)
+when its own readback sink ran in the transfer queue's `CollectCompleted`, never
+after a count of frames; a session page is pulled by the worker that waits for it.
+A page reads back one packed buffer: `queries x capacity` neighbor rows followed by
+one header per query.
 
 Producer state is a receipt, not a recording. An entry counts its gather and its
 hierarchy (and `GpuBuilds`) only after a submission that recorded them was
@@ -57,8 +59,8 @@ have advanced a cursor): an invalid token means nothing was submitted, the entry
 stays unbuilt, a late sink publishes nothing, and the next new request records
 the gather and build again. Host preparation comes first, outside the recorder:
 the entry's buffers, its canonical slot (`AcquireInput`, whose upload is issued on
-the graphics lane then), the hierarchy storage and pipelines, and the batch's host
-writes; the recorder only records the gather, build and query. Each owner
+the graphics lane then), the hierarchy storage and pipelines, and the session's host
+writes; the recorder only records the gather, the build and a computation's own commands. Each owner
 submission waits for every transfer issued before it
 (`ComputeInputOrder::AfterIssuedTransfers`), so those uploads precede it on either
 lane; producers recorded into a frame that has not been submitted yet are not
@@ -77,9 +79,10 @@ token however many graphics frames pass, and an exhausted ring drops the
 preview instead of waiting. The stamp is a safety completion; readback counters
 count only transfers. Recorders must `NoteUse` every residency slot they bind
 while recording (canonical inputs held by a lease are also covered by the
-lease). Batches and computations stay owned by the cache, with their recorders'
-leases, until their sink ran; shutdown fails what is still pending after the
-device-idle wait. Rendering never waits for unfinished method compute.
+lease). Computations stay owned by the cache, with their recorders' leases, until
+their sink ran, and a dropped session until its last page completed; after the
+device-idle wait, shutdown fails pending computations and stops held sessions.
+Rendering never waits for unfinished method compute.
 
 `QueueGpuCompute` records a consumer callback over the cached node, compact-point
 and original-slot buffers, then reads back one bounded final result. The cache
@@ -221,13 +224,12 @@ coordinates or `Min > Max`; a failed build leaves an empty tree, never the
 previous hierarchy. Octree overlap queries use a growable traversal stack, so
 caller-chosen depth limits are not bounded by a fixed stack size.
 
-## Consumer leases and GPU batches
+## Consumer leases and GPU sessions
 
 ICP uses prepared query sessions; point PCA uses a retained `PrepareGpuIndex` view.
 Their immutable snapshot and GPU leases keep the source entries alive until submitted work
 completes. Session pages reuse their prepared buffers, while the cache owns producer/readback
-ordering and device shutdown. The test-only legacy batch API also retains its entries until
-completion; it is not a route for new method consumers (RUNTIME-355).
+ordering and device shutdown.
 Results retain original property row IDs; CPU snapshot indices are compact and
 carry an explicit `Slots` mapping.
 `SpatialIndexSnapshotMatches` is the compiled comparison shared by the nine
@@ -257,24 +259,24 @@ means no exclusion. Headers report the actual returned kNN count (at most k),
 with unused result entries marked invalid. Radius headers still count every
 eligible hit even when result capacity truncates storage.
 
-`QueueGpuKNearest(handle, queries, k, excludedSlots, reuse)` submits through the
-compute lane with one asynchronous readback. Exclusions are empty or have the
-query count; unsupported sizes fail explicitly. On `Ready`, query i has
+A kNN session (`SpatialQuerySessionDesc::Capacity` = k, 1..64) submits each page
+through the compute lane with one pulled readback. Exclusions are empty or have the
+query count; unsupported sizes are refused at preparation. On `Ready`, query i has
 `Counts[i]` valid neighbors in its `Capacity`-wide result slice. A target that is
-stale at the queue call fails the batch; a submitted batch retains its input
-snapshot until completion and answers for the revision it was submitted against.
-Consumers still own result-publication freshness.
+stale at preparation is refused; a prepared session keeps its target entry and
+device buffers until it is dropped and its last page completed. Consumers still own
+result-publication freshness.
 
-`QueueGpuRadius(handle, queries, radius, capacity, excludedSlots, reuse)` uses
-the same submission and readback with capacity 1..1024. On `Ready`,
-`Counts[i]` is the total hit count; only `min(Counts[i], Capacity)` entries
-are stored, ordered by source ID. Consumers requiring complete support must
-reject overflow. `GpuQueriesAvailable()` reports an operational device and the
-cache's queue participant; per-request validation still checks sizes, bounds and freshness.
+A radius session (`Radius`, capacity 1..1024, each page giving its inclusive radius)
+uses the same pages and readback. On `Ready`, `Counts[i]` is the total hit count;
+only `min(Counts[i], Capacity)` entries are stored, ordered by source ID. Consumers
+requiring complete support must reject overflow. `GpuQueriesAvailable()` reports an
+operational device and the cache's queue participant; per-request validation still
+checks sizes, bounds and freshness.
 
 ## GPU query strategies
 
-Every recorded or batched GPU point query takes an explicit
+Every recorded or session GPU point query takes an explicit
 `Graphics::PointQueryStrategy`; callers choose it and report it. `Lbvh` (the
 default) builds and traverses the hierarchy above. `BruteForce` scans the
 resident float3 samples in input order with
@@ -300,13 +302,12 @@ any device check). LBVH limits are unchanged. The double-precision
 method kernels (`point_lbvh_double.glsl`) and K-Means' fused paged scan keep
 their own contracts.
 
-`SpatialIndexCache` forwards the strategy on `QueueGpuNearest`,
-`QueueGpuKNearest`, `QueueGpuRadius` and `QueueGpuNearestTransformed`. Both
-strategies read the same resident samples (canonical slot or gathered live
-rows) and the same row mapping; brute force leaves `GpuBuilds` unchanged, and
-after `UpdateWorkspace` it rewrites only the points while the hierarchy stays
-marked for rebuild, which the next LBVH submission (batch or `QueueGpuCompute`)
-records before its query. Recording composes into a
+`SpatialQuerySessionDesc::Strategy` selects it for a session. Both strategies
+read the same resident samples (canonical slot or gathered live rows) and the
+same row mapping; brute force leaves `GpuBuilds` unchanged, and after
+`UpdateWorkspace` its preparation rewrites only the points while the hierarchy
+stays marked for rebuild, which the next LBVH submission (a session's preparation
+or `QueueGpuCompute`) records before its queries. Recording composes into a
 caller's command buffer without CPU readback. There is no automatic selection
 threshold: no measured comparison exists. Consumers with an explicit strategy
 choice are ICP (`vulkan_brute_force`, see [registration](registration.md)) and
@@ -358,20 +359,20 @@ Vulkan preserves the extra candidate (k<=63) and canonical-domain publication.
 
 ## Private moving-point working sets
 
-`SpatialIndexCache::CreateWorkspace` creates an owned immutable point index with identity source IDs. The returned snapshot is the caller's lifetime lease; releasing the final caller lease expires the handle, and `Prune` evicts the entry. Queued/submitted batches retain the underlying entry and GPU resources through safe completion. Calls and GPU resource retirement stay on the device-owner thread. Immutable CPU snapshots can outlive cache eviction.
+`SpatialIndexCache::CreateWorkspace` creates an owned immutable point index with identity source IDs. The returned snapshot is the caller's lifetime lease; releasing the final caller lease expires the handle, and `Prune` evicts the entry. Query sessions, index leases and pending computations retain the underlying entry and GPU resources through safe completion. Calls and GPU resource retirement stay on the device-owner thread. Immutable CPU snapshots can outlive cache eviction.
 
 A cached entity index only GPU queries read is acquired GPU-only (`Acquire(..., cpuIndex = false)`, ARCH-023: ICP's Vulkan target, the bilateral and descriptor plugins' Vulkan captures, Vulkan keypoints). The entry keeps its live rows' slots and points, keyed and revision-checked exactly like a CPU entry, and builds no CPU hierarchy; `Stats().Builds` does not count it and CPU queries answer nullopt. Its snapshot (`Cpu` false) still matches its rows and points (`SpatialIndexSnapshot::Points`). A later CPU acquisition of the same current entry builds the hierarchy once into a new snapshot. The handle, rows, revision keys, device buffers and earlier snapshot leases (and the worker sessions reading the entry) stay.
 
 [Bilateral point filtering](bilateral-point-filter.md) uses the entity cache for its first pass and a moving `SpatialQuerySession` (no CPU hierarchy, its device LBVH rebuilt on the worker into storage prepared at the start and reused by every pass) for later Vulkan passes. Original ECS revisions independently guard publication at Accept. Lower-layer methods can still own direct geometry/graphics workspaces without runtime dependencies.
 
-`QueueGpuNearestTransformed` retains immutable source coordinates in its reusable
-query batch and uploads only a double-precision matrix when those values are
-unchanged. Its transform dispatch requires shader float64; ordinary queries keep
-their existing capability requirements. Transformed nearest-query batches return to the
-workspace pool after completion and retirement, and their buffers to the method
-scratch cache; an idle batch retains neither the target scene index nor buffers. `GpuQueryUploadBytes` counts query input writes (including
-poses), separately from index-build uploads and result readbacks.
+A transformed session (`Transformed`: nearest queries on a fixed target) writes its
+source rows once at preparation and then only a double-precision pose per page,
+in-command. Its transform dispatch requires shader float64; ordinary sessions keep
+their existing capability requirements. A session's buffers are method scratch fixed
+at preparation and return to the scratch cache once it is dropped and its last page
+completed. `GpuQueryUploadBytes` counts sessions' query input writes (rows,
+exclusions, poses, uploads), separately from index-build uploads and result readbacks.
 
 Property smoothing leases its explicit filter and implicit conjugate-gradient
-workspaces from the same pool. A run takes retired scratch of sufficient size class;
+workspaces from the `LeaseGpuWorkspace` pool. A run takes retired scratch of sufficient size class;
 each run refreshes its operator data, channel state, row map and restore mask.

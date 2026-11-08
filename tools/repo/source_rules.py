@@ -603,24 +603,19 @@ RULES: list[Rule] = [
                      "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
                  )),)),
 
+    # Production methods enter through StepRuns and the shared typed adapters; only the host fixture exercises
+    # low-level admission directly. Tree coverage includes new plugins without maintaining another allowlist.
+    Rule("RuntimeReuseDriftGuard", "PluginsUseSharedStepRuns",
+         trees=("plugins",), exts=(".cpp", ".cppm", ".hpp", ".h"), exclude=("plugins/fixture/",),
+         forbid=("SubmitPluginJob", "StartPluginGpuWork", "SubmitPluginRunStage")),
+
     # --- RuntimeReuseDriftGuard (ARCH-023) ------------------------------------------
-    # GPU kNN/radius rows run in a worker query session (SpatialIndexCache::PrepareQuerySession, stepped by a step
-    # run's worker), not through the frame-paced QueueGpu* jobs. The retired pager has no remaining owner.
+    # GPU nearest/kNN/radius rows run in a worker query session (SpatialIndexCache::PrepareQuerySession, stepped by a
+    # step run's worker). The retired pager and the owner-thread QueueGpu* query batches (RUNTIME-355) stay deleted.
     Rule("RuntimeReuseDriftGuard", "GpuNeighbourQueriesUseWorkerQuerySessions",
          trees=("src", "plugins", "methods", "benchmarks"),
-         forbid=("struct GpuRowPages", "AdvanceGpuRowPages("),
-         owners=(("QueueGpuKNearest(", (
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")),
-                 ("QueueGpuRadius(", (
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")),
-                 ("QueueGpuNearest(", (
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")),
-                 ("QueueGpuNearestTransformed(", (
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm",
-                     "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp")))),
+         forbid=("struct GpuRowPages", "AdvanceGpuRowPages(", "QueueGpuNearest(", "QueueGpuKNearest(",
+                 "QueueGpuRadius(", "QueueGpuNearestTransformed(")),
 ]
 
 RULES += ENGINE_LAYERING_RULES

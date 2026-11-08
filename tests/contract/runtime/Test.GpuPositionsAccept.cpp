@@ -77,7 +77,7 @@ namespace
         R::EditorGpuPositionRunHandle Ready()
         {
             std::string why;
-            auto run = R::BeginEditorGpuPositionRun(Commands(), Id(), Positions, Residency, why);
+            auto run = R::BeginEditorGpuPositionRun(Commands(), Id(), Positions, Residency, why, 2u);
             EXPECT_TRUE(run) << why;
             if (!run) return {};
             EXPECT_TRUE(R::EditorGpuPositionRunFirstBack(run).has_value()) << "Begin acquired the ring's first write slot";
@@ -99,6 +99,36 @@ namespace
         }
         void ClearDirty() { Scene.Raw().remove<D::DirtyVertexPositions, D::GpuDirty>(Entity); }
     };
+}
+
+TEST(GpuPositionsAccept, RequestedPreviewDepthBoundsTheLeasedRing)
+{
+    for (const std::uint32_t depth : {2u, 3u})
+    {
+        Harness h;
+        std::string why;
+        auto run = R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, depth);
+        ASSERT_TRUE(run) << why;
+        auto first = R::EditorGpuPositionRunFirstBack(run);
+        ASSERT_TRUE(first);
+        std::vector<G::GpuPropertyView> held{*first};
+        for (std::uint32_t slot = 1u; slot < depth; ++slot)
+        {
+            auto next = h.Residency.AcquireBack(h.Key(), first->Layout, depth);
+            ASSERT_TRUE(next) << "slot " << slot << " of " << depth;
+            held.push_back(*next);
+        }
+        EXPECT_FALSE(h.Residency.AcquireBack(h.Key(), first->Layout, depth));
+        R::DiscardEditorGpuPositionRun(h.Commands(), run, h.Residency);
+    }
+    Harness h;
+    std::string why;
+    for (const std::uint32_t invalid : {0u, 1u, 4u})
+    {
+        EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, invalid));
+        EXPECT_FALSE(h.Residency.HasRing(h.Key()));
+        EXPECT_EQ(h.Residency.Stats().Slots, 0u);
+    }
 }
 
 TEST(GpuPositionsAccept, AcceptPublishesEveryRowUndoablyAndBindsTheFrontAsTheCanonicalRevision)
@@ -624,7 +654,7 @@ TEST(GpuPositionsAccept, DiscardOfATerminalRunLeavesALaterRunsRingAlone)
     const auto a = h.Ready();
     ASSERT_TRUE(a);
     std::string why;
-    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why))
+    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, 2u))
         << "a second run cannot begin while a ring waits";
     EXPECT_NE(why.find("awaits Accept or Discard"), std::string::npos) << why;
     std::optional<R::EditorGpuPositionAcceptResult> delivered;
@@ -663,11 +693,11 @@ TEST(GpuPositionsAccept, ABeginRefusedByTheDeviceLeavesNoRingBehind)
     Harness h;
     std::string why;
     h.Device.FailNextBufferCreate = true;
-    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why));
+    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, 2u));
     EXPECT_NE(why.find("refused a write slot"), std::string::npos) << why;
     EXPECT_FALSE(h.Residency.HasRing(h.Key()));
     why.clear();
-    const auto run = R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why);
+    const auto run = R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, 2u);
     ASSERT_TRUE(run) << why;
     EXPECT_TRUE(h.Residency.HasRing(h.Key()));
     R::DiscardEditorGpuPositionRun(h.Commands(), run, h.Residency);

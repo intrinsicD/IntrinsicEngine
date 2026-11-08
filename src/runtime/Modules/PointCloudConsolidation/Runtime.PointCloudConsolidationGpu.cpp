@@ -673,7 +673,8 @@ namespace Extrinsic::Runtime
                     snapshot.Request.StableEntityId,
                     snapshot.Request.Properties.OutputPositions,
                     *residency,
-                    why);
+                    why,
+                    snapshot.Request.Config.Execution.PreviewBuffers);
                 if (!run)
                     return {.Refused = true, .Diagnostic = std::move(why)};
             }
@@ -748,6 +749,7 @@ namespace Extrinsic::Runtime
                                     // ARCH-023: no frame paces the iterations; previews PreviewEvery iterations apart
                                     // when the owner offered a free slot (an in-place run only).
                                     .Execution = request.Config.Execution,
+                                    .DevicePreview = bool(Active->PositionRun),
                                     .MetricNames = {"max_displacement", "", "", ""}},
                     {.Step =
                             [op = Active](StepRunMetric& metric)
@@ -1571,7 +1573,9 @@ namespace Extrinsic::Runtime
             if (a.Phase == LopPhase::Publish)
             {
                 if (!a.Back)
-                    a.Back = Residency().AcquireBack(EditorGpuPositionRunKey(a.PositionRun), a.Input->Layout, 2u);
+                    a.Back = Residency().AcquireBack(EditorGpuPositionRunKey(a.PositionRun),
+                        a.Input->Layout,
+                        a.Snapshot.Request.Config.Execution.PreviewBuffers);
                 // A terminal front must be retained: a busy ring defers it.
                 if (!a.Back)
                     return;
@@ -1607,7 +1611,9 @@ namespace Extrinsic::Runtime
                 return;
             auto back = std::exchange(a.Back, std::nullopt); // the position run's first back serves first
             if (!back)
-                back = Residency().AcquireBack(EditorGpuPositionRunKey(a.PositionRun), a.Input->Layout, 2u);
+                back = Residency().AcquireBack(EditorGpuPositionRunKey(a.PositionRun),
+                    a.Input->Layout,
+                    a.Snapshot.Request.Config.Execution.PreviewBuffers);
             if (back)
                 (void)a.Mailbox.Offer(std::move(*back));
         }

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 import Extrinsic.Core.Error;
 import Extrinsic.RHI.Device;
@@ -237,6 +238,62 @@ TEST(RHIBufferManagerScratch, RetiredFramesDoNotProveComputeLaneCompletion)
     auto warm = *mgr.CreateScratch(ScratchDesc(256u));
     EXPECT_EQ(warm.GetHandle(), handle);
     EXPECT_EQ(mgr.GetScratchStats().Hits, 1u);
+}
+
+// ARCH-024: minimized, the frame counter is frozen; returned scratch is recycled through the device's actual retirement.
+// Predictions, before any run: the stamp carries the current frame number and the retirement check asks the device
+// about exactly that number; while the device reports it unretired the buffer stays pending and committed, so the
+// next request under a one-buffer budget is refused; once retired, three compute-only release/collect/create cycles
+// all hit the first buffer (one device allocation) with the counter still at 7. Mutation: the former counter-distance
+// stamp (counter + FramesInFlight + 1) ignores the device and refuses the first cycle.
+TEST(RHIBufferManagerScratch, DefaultFrameRetirementRefusesDeviceLoss)
+{
+    MockDevice dev;
+    dev.GlobalFrameNumber = dev.FramesInFlight + 1u;
+    const RHI::RetirementStamp stamp{.Frame = 0u};
+    EXPECT_TRUE(dev.IsFrameRetired(stamp.Frame));
+    EXPECT_TRUE(RHI::IsRetired(dev, stamp));
+    dev.DeviceLost = true;
+    EXPECT_FALSE(dev.IsFrameRetired(stamp.Frame));
+    EXPECT_FALSE(RHI::IsRetired(dev, stamp));
+}
+
+TEST(RHIBufferManagerScratch, DeviceRetirementRecyclesScratchWhileTheFrameCounterIsFrozen)
+{
+    MockDevice dev;
+    dev.GlobalFrameNumber = 7u;
+    bool retired = false;
+    std::vector<std::uint64_t> asked;
+    dev.FrameRetired = [&](const std::uint64_t frame)
+    {
+        asked.push_back(frame);
+        return retired;
+    };
+    RHI::BufferManager mgr{dev};
+    mgr.SetScratchBudget(256u);
+    EXPECT_EQ(RHI::StampRetirement(dev).Frame, 7u);
+    auto lease = *mgr.CreateScratch(ScratchDesc(200u));
+    const auto handle = lease.GetHandle();
+    lease = {};
+    mgr.CollectScratch(RHI::StampRetirement(dev));
+    EXPECT_EQ(asked, (std::vector<std::uint64_t>{7u}));
+    const auto refused = mgr.CreateScratch(ScratchDesc(200u));
+    ASSERT_FALSE(refused.has_value()) << "an unretired frame keeps the buffer pending and committed";
+    EXPECT_EQ(refused.error(), Core::ErrorCode::ResourceBudgetExceeded);
+
+    retired = true;
+    for (int cycle = 0; cycle < 3; ++cycle)
+    {
+        mgr.CollectScratch(RHI::StampRetirement(dev));
+        const auto again = mgr.CreateScratch(ScratchDesc(200u)); // released at the end of the iteration
+        ASSERT_TRUE(again.has_value()) << cycle;
+        EXPECT_EQ(again->GetHandle(), handle) << cycle;
+    }
+    const auto stats = mgr.GetScratchStats();
+    EXPECT_EQ(dev.CreateBufferCount, 1);
+    EXPECT_EQ(stats.Hits, 3u);
+    EXPECT_EQ(stats.Refusals, 1u);
+    EXPECT_EQ(dev.GlobalFrameNumber, 7u) << "no frame advanced";
 }
 
 TEST(RHIBufferManagerScratch, UsageAndMemoryClassMustMatchForReuse)

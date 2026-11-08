@@ -87,7 +87,8 @@ namespace Extrinsic::Runtime
         const std::uint32_t maxIterationCap,
         const bool stepRun,
         const bool livePreview,
-        const std::uint32_t minIterationCap)
+        const std::uint32_t minIterationCap,
+        const bool devicePreview)
     {
         const auto fields = StepRunExecutionFields(maxIterationCap, minIterationCap);
         bool changed = false;
@@ -129,6 +130,8 @@ namespace Extrinsic::Runtime
         {
             number(fields[1], "Preview every k iterations (0: off)", options.PreviewEvery);
             number(fields[2], "Preview interval (ms)", options.PreviewIntervalMs);
+            if (devicePreview)
+                number(fields[5], "Device preview buffers", options.PreviewBuffers);
         }
         choice(fields[3], "Accept automatically", options.AutoAccept);
         choice(fields[4], "Start", options.Start);

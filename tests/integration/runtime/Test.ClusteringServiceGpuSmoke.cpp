@@ -27,7 +27,10 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Glfw;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.StepRuns;
@@ -42,6 +45,8 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.KMeans;
 import Geometry.Properties;
+
+#include "MinimizedGpuCompletions.hpp"
 
 namespace
 {
@@ -486,7 +491,11 @@ namespace
             RunWithPauses,
             StepOnceAccept,
             RestartAtEnd,
-            HeldWithoutFrames
+            HeldWithoutFrames,
+            PreviewSteps,
+            DiscardReady,
+            StaleReady,
+            ShutdownReady
         };
         struct Outcome
         {
@@ -495,6 +504,8 @@ namespace
             std::vector<std::uint32_t> RestSteps{}; // the step count of each frame the run was seen paused, before it ended
             std::vector<Runtime::StepRunMetric> Metrics{}; // the run's per-step metrics (inertia, max shift)
             std::uint64_t PreviewCopies{}; // separate optional submissions, excluded from the numerical paging oracle
+            std::vector<std::uint32_t> ShownSteps{};
+            bool TerminatedAtReady{};
             bool Restarted{}; // RestartAtEnd: the restart was requested
             // HeldWithoutFrames: frames that ran while the method queue was held and the steps made meanwhile; the
             // steps the worker completed with graphics held and the main thread blocked; whether both gates held.
@@ -508,7 +519,8 @@ namespace
         std::vector<Runtime::KMeansPagingLimits> Limits{}; // when set, the paging budgets of each drive
         Runtime::KMeansParameters Parameters{};
         std::vector<Outcome> Outcomes{};
-        bool TimedOut{};
+        bool TimedOut{}, Minimized{}, ShutdownAfterRun{};
+        std::uint64_t ShutdownRun{};
         std::uint64_t CaptureReuses{};
 
         void Resolve() override
@@ -525,6 +537,8 @@ namespace
         void Frame(double, double) override
         {
             auto& engine = Kernel();
+            if (Minimized && !engine.GetWindow().IsMinimized())
+                return;
             if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(60)) TimedOut = true;
             if (TimedOut || Outcomes.size() == Drives.size() || Service == nullptr || Steps == nullptr)
             {
@@ -573,7 +587,19 @@ namespace
             const auto observed = id != 0u ? Steps->Observe(id) : std::nullopt;
             if (!observed || Accepted) return;
             const auto& run = *observed;
+            if (Minimized)
+            {
+                EXPECT_FALSE(engine.Worlds()
+                        .Get(engine.ActiveWorld())
+                        ->Raw()
+                        .get<GS::Vertices>(Entity)
+                        .Properties.Exists("p:kmeans_label"));
+                if (run.Phase == Runtime::StepRunPhase::Ready)
+                    EXPECT_EQ(run.Steps, 0u);
+            }
             Current.PreviewCopies = run.PreviewCopies;
+            if (run.ShownStep && (Current.ShownSteps.empty() || Current.ShownSteps.back() != *run.ShownStep))
+                Current.ShownSteps.push_back(*run.ShownStep);
             if (run.Metrics)
                 Current.Metrics.assign(run.Metrics->Records().begin(), run.Metrics->Records().end());
             const bool resting = run.Phase == Runtime::StepRunPhase::Paused && !run.SegmentInFlight;
@@ -590,6 +616,31 @@ namespace
                     (void)Service->GpuRun(Correlation, Runtime::KMeansGpuAction::Accept);
                 Accepted = true;
             };
+            if (run.Phase == Runtime::StepRunPhase::Ready && !run.SegmentInFlight)
+            {
+                const auto drive = Drives[Outcomes.size()];
+                if (drive == Drive::DiscardReady || drive == Drive::StaleReady || drive == Drive::ShutdownReady)
+                {
+                    EXPECT_EQ(run.Steps, 0u);
+                    Current.TerminatedAtReady = true;
+                    Accepted = true; // wait only for the terminal completion (shutdown has none)
+                    if (drive == Drive::DiscardReady)
+                        control(Runtime::StepRunAction::Discard);
+                    else if (drive == Drive::StaleReady)
+                        engine.Worlds()
+                            .Get(engine.ActiveWorld())
+                            ->Raw()
+                            .get<GS::Vertices>(Entity)
+                            .Properties.Get<glm::vec3>("v:position")[0]
+                            .x += 1.f;
+                    else
+                    {
+                        ShutdownRun = id;
+                        engine.RequestExit();
+                    }
+                    return;
+                }
+            }
             // Vulkan: the final labels are prepared once the ended run rests (its terminal readback landed).
             const bool labelsReady = Cpu || (gpu.ReadyToAccept && !gpu.Running);
             if (run.End != Runtime::StepRunEnd::None)
@@ -612,7 +663,10 @@ namespace
             switch (Drives[Outcomes.size()])
             {
             case Drive::Run:
-            case Drive::RestartAtEnd: break;
+            case Drive::RestartAtEnd:
+            case Drive::DiscardReady:
+            case Drive::StaleReady:
+            case Drive::ShutdownReady: break;
             case Drive::StepsOfOne:
                 if (!Paused) control(Runtime::StepRunAction::Pause), Paused = true;
                 else if (resting) control(Runtime::StepRunAction::Step, 1u);
@@ -633,10 +687,29 @@ namespace
                     accept();
                 break;
             case Drive::HeldWithoutFrames: HoldWithoutFrames(engine, gpu.StepRun, run, resting, control); break;
+            case Drive::PreviewSteps:
+                if (resting && (run.Steps == 0u || run.ShownStep == run.Steps))
+                    control(Runtime::StepRunAction::Step, 1u);
+                break;
             }
         }
 
-        void Shutdown() override {}
+        void Shutdown() override
+        {
+            if (ShutdownRun == 0u)
+                return;
+            EXPECT_FALSE(Kernel()
+                    .Worlds()
+                    .Get(Kernel().ActiveWorld())
+                    ->Raw()
+                    .get<GS::Vertices>(Entity)
+                    .Properties.Exists("p:kmeans_label"));
+            EXPECT_EQ(Service->Stats().LabelsCommitted, 0u);
+            const auto run = Steps->Observe(ShutdownRun);
+            ASSERT_TRUE(run.has_value());
+            EXPECT_EQ(run->Phase, Runtime::StepRunPhase::Discarded);
+            EXPECT_FALSE(Kernel().Jobs().HasGpuQueueWork());
+        }
 
     private:
         void HoldWithoutFrames(Extrinsic::Runtime::Engine& engine,
@@ -724,6 +797,7 @@ namespace
         std::vector<ClusteringStepDrivesApp::Outcome> Outcomes{};
         bool TimedOut{};
         std::uint64_t CaptureReuses{};
+        bool ShutdownReadyObserved{};
     };
 
     // Runs `app` in a Vulkan engine (which owns it); nullopt (skipped) without a device.
@@ -735,9 +809,20 @@ namespace
         EmplaceKMeansModules(engine);
         engine.Initialize();
         if (!VulkanReady(engine)) return std::nullopt;
-        engine.Run();
-        StepDriveResults results{
-            .Outcomes = appPtr->Outcomes, .TimedOut = appPtr->TimedOut, .CaptureReuses = appPtr->CaptureReuses};
+        if (appPtr->Minimized)
+            Intrinsic::Tests::RunWithMinimizedGpuCompletions(
+                engine,
+                [&]
+                {
+                    appPtr->Frame(0.0, 0.0);
+                },
+                appPtr->ShutdownAfterRun);
+        else
+            engine.Run();
+        StepDriveResults results{.Outcomes = appPtr->Outcomes,
+            .TimedOut = appPtr->TimedOut,
+            .CaptureReuses = appPtr->CaptureReuses,
+            .ShutdownReadyObserved = appPtr->ShutdownRun != 0u};
         engine.Shutdown();
         return results;
     }
@@ -1195,4 +1280,107 @@ TEST(ClusteringStepRunGpuSmoke, IterationsCompleteWithoutFramesAndTheAcceptedRun
     EXPECT_EQ(held.Labels, uninterrupted.Labels) << "labels exact";
     EXPECT_EQ(held.Completion.Centroids, uninterrupted.Completion.Centroids) << "centroids bitwise";
     EXPECT_EQ(held.Completion.Inertia, uninterrupted.Completion.Inertia);
+}
+
+namespace
+{
+    std::unique_ptr<ClusteringStepDrivesApp> MinimizedKMeansApp(const bool minimized, const std::uint32_t buffers)
+    {
+        using Drive = ClusteringStepDrivesApp::Drive;
+        auto app = std::make_unique<ClusteringStepDrivesApp>();
+        app->Minimized = minimized;
+        app->Drives = {minimized ? Drive::PreviewSteps : Drive::Run};
+        app->Points = Jittered(
+            600u,
+            29u,
+            [](const unsigned i)
+            {
+                return glm::vec3{float(i % 6) * 3.f, float(i % 4) * 2.f, 0.f};
+            },
+            2.f);
+        app->Parameters = {.ClusterCount = 7u,
+            .Seed = 5u,
+            .Initialization = Runtime::KMeansInitialization::Random,
+            .Execution = {.IterationCap = 5u,
+                .PreviewEvery = minimized ? 1u : 0u,
+                .PreviewIntervalMs = 0u,
+                .AutoAccept = Runtime::StepRunAutoAccept::Never,
+                .Start = Runtime::StepRunStart::Run,
+                .PreviewBuffers = buffers}};
+        return app;
+    }
+}
+
+// ARCH-024: simulated minimization; real device work and owner completion run through Engine::Run.
+TEST(ClusteringStepRunGpuSmoke, MinimizedInitPreviewAndAcceptNeedNoIdleHook)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    const auto reference = RunStepDrives(MinimizedKMeansApp(false, 3u));
+    if (!reference)
+        GTEST_SKIP() << "Vulkan bootstrap unavailable";
+    ASSERT_FALSE(reference->TimedOut);
+    ASSERT_EQ(reference->Outcomes.size(), 1u);
+    const auto& expected = reference->Outcomes.front();
+    ASSERT_TRUE(expected.Completion.Succeeded()) << expected.Completion.Message;
+    ASSERT_EQ(expected.Completion.Iterations, 5u);
+    for (const std::uint32_t buffers : {2u, 3u})
+    {
+        SCOPED_TRACE(buffers);
+        const auto result = RunStepDrives(MinimizedKMeansApp(true, buffers));
+        ASSERT_TRUE(result.has_value());
+        ASSERT_FALSE(result->TimedOut);
+        ASSERT_EQ(result->Outcomes.size(), 1u);
+        const auto& actual = result->Outcomes.front();
+        ASSERT_TRUE(actual.Completion.Succeeded()) << actual.Completion.Message;
+        EXPECT_GE(actual.PreviewCopies, 4u);
+        for (const std::uint32_t step : {1u, 2u, 3u, 4u})
+            EXPECT_NE(std::ranges::find(actual.ShownSteps, step), actual.ShownSteps.end());
+        EXPECT_EQ(actual.Labels, expected.Labels);
+        EXPECT_EQ(actual.Completion.Iterations, expected.Completion.Iterations);
+        EXPECT_EQ(actual.Completion.Centroids, expected.Completion.Centroids);
+        EXPECT_EQ(actual.Completion.Inertia, expected.Completion.Inertia);
+    }
+}
+
+TEST(ClusteringStepRunGpuSmoke, MinimizedDiscardAndStaleSourcePublishNothing)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    using Drive = ClusteringStepDrivesApp::Drive;
+    bool ran = false;
+    for (const auto drive : {Drive::DiscardReady, Drive::StaleReady})
+    {
+        SCOPED_TRACE(static_cast<int>(drive));
+        auto app = MinimizedKMeansApp(true, 2u);
+        app->Drives = {drive};
+        const auto result = RunStepDrives(std::move(app));
+        if (!ran && !result)
+            GTEST_SKIP() << "Vulkan bootstrap unavailable";
+        ASSERT_TRUE(result.has_value());
+        ran = true;
+        ASSERT_FALSE(result->TimedOut);
+        ASSERT_EQ(result->Outcomes.size(), 1u);
+        const auto& outcome = result->Outcomes.front();
+        EXPECT_TRUE(outcome.TerminatedAtReady);
+        EXPECT_EQ(outcome.Completion.Status,
+            drive == Drive::DiscardReady ? Runtime::KMeansRunStatus::Cancelled : Runtime::KMeansRunStatus::StaleSource);
+        EXPECT_EQ(outcome.Completion.Iterations, 0u);
+        EXPECT_TRUE(outcome.Labels.empty());
+    }
+}
+
+TEST(ClusteringStepRunGpuSmoke, MinimizedShutdownDiscardsAnInitializedGpuRun)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    auto app = MinimizedKMeansApp(true, 2u);
+    app->Drives = {ClusteringStepDrivesApp::Drive::ShutdownReady};
+    app->ShutdownAfterRun = true;
+    const auto result = RunStepDrives(std::move(app));
+    if (!result)
+        GTEST_SKIP() << "Vulkan bootstrap unavailable";
+    ASSERT_FALSE(result->TimedOut);
+    EXPECT_TRUE(result->ShutdownReadyObserved);
+    EXPECT_TRUE(result->Outcomes.empty());
 }

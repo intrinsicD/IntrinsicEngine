@@ -46,12 +46,13 @@ namespace Intrinsic::Plugins::KernelDensity
         R::ScalarAnalysisRequest Request(const Config& c)
         {
             return {.StableEntityId = c.StableEntityId,
-                    .Positions = c.Positions,
-                    .Output = c.Density,
-                    .Params = {.Method = 0, .K = c.KNeighbors, .Bandwidth = c.Bandwidth},
-                    .Noun = "Density",
-                    .Method = "Kernel density",
-                    .History = "Estimate kernel density"};
+                .Positions = c.Positions,
+                .Output = c.Density,
+                .Params = {.Method = 0, .K = c.KNeighbors, .Bandwidth = c.Bandwidth},
+                .Noun = "Density",
+                .Method = "Kernel density",
+                .History = "Estimate kernel density",
+                .Owner = "kernel_density"};
         }
 
         std::string Invalid(const Config& c)
@@ -208,6 +209,7 @@ namespace Intrinsic::Plugins::KernelDensity
                     .History = Request(config).History,
                     .Noun = "Density",
                     .Method = "kernel density",
+                    .Owner = "kernel_density",
                     .Execution = config.Execution,
                     .Compute =
                         [w](std::vector<float>& densities)

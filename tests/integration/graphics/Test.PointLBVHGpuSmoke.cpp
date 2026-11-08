@@ -1043,10 +1043,14 @@ TEST(PointLBVHGpuSmoke, BruteForceMatchesLbvhAndOracleWithoutBuildingAHierarchy)
 }
 namespace
 {
-    class KnnBatchApp final : public Intrinsic::Tests::RuntimeTestModule
+    // The cache's GPU known answers through prepared query sessions, one round per frame (each page waits for itself;
+    // nothing is framed): a compacted target gathered from its canonical slot, coincident rows with distinct source
+    // IDs, exclusions, inclusive radius overflow counts, admission refusals, a stale target refused at preparation,
+    // rebuild. A session has no reuse handle (its buffers are fixed at prepare), so every round prepares its own.
+    class KnnSessionApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        explicit KnnBatchApp(bool radius = false, G::PointQueryStrategy strategy = G::PointQueryStrategy::Lbvh)
+        explicit KnnSessionApp(bool radius = false, G::PointQueryStrategy strategy = G::PointQueryStrategy::Lbvh)
             : RadiusMode(radius), Strategy(strategy)
         {
         }
@@ -1073,107 +1077,137 @@ namespace
         {
             // Below the registered 30 s CTest TIMEOUT, so a stall fails with its round and frame.
             if (std::chrono::steady_clock::now()-Started>std::chrono::seconds(20))
-            { ADD_FAILURE()<<"Framed batch timeout after 20 s round="<<Round<<" frame="<<Kernel().GetLastFramePacingDiagnostics().FrameIndex;
-              TimedOut=true; Kernel().RequestExit();return; }
+            {
+                ADD_FAILURE() << "Query session timeout after 20 s round=" << Round
+                              << " frame=" << Kernel().GetLastFramePacingDiagnostics().FrameIndex;
+                TimedOut = true;
+                Kernel().RequestExit();
+                return;
+            }
             if (!Kernel().GetDevice().IsOperational())
             {
                 if (RadiusMode && ++ColdFrames > 4) { TimedOut=true;Kernel().RequestExit(); }
                 return;
             }
             const std::vector<glm::vec3> queries{{0,0,0},{0,0,0}};
-            if (Batch)
+            const std::vector<std::uint32_t> exclusions{Round == 0 ? 0u : 2u, 1u};
+            const std::uint32_t capacity = RadiusMode ? 1u : 4u;
+            std::string why;
+            const auto prepare =
+                [&](const std::uint32_t slots, const bool radius, const std::span<const std::uint32_t> excluded)
             {
-                if (Batch->State==Runtime::SpatialQueryState::Queued || Batch->State==Runtime::SpatialQueryState::Submitted) return;
-                if (Round==2)
+                return Cache->PrepareQuerySession(Handle,
+                    {.Strategy = Strategy,
+                        .Radius = radius,
+                        .Capacity = slots,
+                        .PageQueries = 2u,
+                        .Queries = queries,
+                        .Excluded = excluded},
+                    why);
+            };
+            if (Round == 0)
+            {
+                // The shared admission refuses k outside 1..64 and exclusions that are not one per query.
+                EXPECT_FALSE(prepare(0u, false, {}));
+                EXPECT_FALSE(prepare(65u, false, {}));
+                EXPECT_FALSE(prepare(4u, false, std::span(exclusions).first(1u)));
+            }
+            if (Round == 2)
+            {
+                // A target edited after its acquisition is refused at preparation: no session reads a stale source.
+                Positions[4] = {-2, 0, 0};
+                EXPECT_FALSE(prepare(capacity, RadiusMode, exclusions));
+                EXPECT_FALSE(why.empty());
+                EXPECT_EQ(Cache->Stats().GpuBuilds, Builds(1u));
+                // Reacquiring rebuilds the moved source; round 3 drops the identity expectation rounds 0 and 1 keep.
+                Handle = Cache
+                             ->Acquire(Kernel().ActiveWorld(),
+                                 Entity,
+                                 {.Domain = Runtime::GeometryElementDomain::PointCloudPoint,
+                                     .Name = "samples",
+                                     .ValueKind = Geometry::PropertyValueKind::Vec3})
+                             .Handle;
+                EXPECT_NE(Handle.Value, 0u);
+                if (Handle.Value == 0u)
                 {
-                    EXPECT_EQ(Batch->State,Runtime::SpatialQueryState::Failed);
-                    EXPECT_FALSE(Batch->Diagnostic.empty());
-                    EXPECT_EQ(Cache->Stats().GpuBuilds, Builds(1u));
-                    // Reacquiring rebuilds the moved source. A failed batch is not
-                    // reusable, so round 3 submits a fresh one and drops the identity
-                    // expectation that rounds 1 and 2 keep.
-                    Handle=Cache->Acquire(Kernel().ActiveWorld(),Entity,
-                        {.Domain=Runtime::GeometryElementDomain::PointCloudPoint,.Name="samples",.ValueKind=Geometry::PropertyValueKind::Vec3}).Handle;
-                    EXPECT_NE(Handle.Value,0u);
-                    if (Handle.Value==0u) { Kernel().RequestExit();return; }
-                    Batch.reset();
-                    ++Round;
+                    Kernel().RequestExit();
+                    return;
                 }
-                else
+                ++Round;
+                return;
+            }
+            const auto session = prepare(capacity, RadiusMode, exclusions);
+            const float pageRadius = RadiusMode ? (Round == 0 ? .5f : 1.f) : -1.f;
+            const std::atomic<bool> abort{false};
+            Runtime::SpatialNearestBatch page;
+            if (!session ||
+                session->Query(0u, 2u, pageRadius, nullptr, abort, page) != Runtime::SpatialPageStatus::Ready)
+            {
+                ADD_FAILURE() << "round " << Round << ": " << (session ? page.Diagnostic : why);
+                Kernel().RequestExit();
+                return;
+            }
+            if (RadiusMode)
+            {
+                EXPECT_EQ(page.Counts,
+                    Round == 0       ? (std::vector<std::uint32_t>{1, 2})
+                        : Round == 3 ? (std::vector<std::uint32_t>{2, 3})
+                                     : (std::vector<std::uint32_t>{3, 4}));
+                EXPECT_EQ(page.Neighbors.size(), 2);
+                if (page.Neighbors.size() != 2)
                 {
-                EXPECT_EQ(Batch->State,Runtime::SpatialQueryState::Ready) << Batch->Diagnostic;
-                if (Batch->State!=Runtime::SpatialQueryState::Ready) { Kernel().RequestExit();return; }
-                if (RadiusMode)
-                {
-                    EXPECT_EQ(Batch->Counts, Round==0 ? (std::vector<std::uint32_t>{1,2})
-                                           : Round==3 ? (std::vector<std::uint32_t>{2,3})
-                                                       : (std::vector<std::uint32_t>{3,4}));
-                    EXPECT_EQ(Batch->Neighbors.size(),2);
-                    if (Batch->Neighbors.size()!=2) { Kernel().RequestExit();return; }
-                    EXPECT_EQ(Batch->Neighbors[0].Index,Round==0?2u:0u);
-                    EXPECT_EQ(Batch->Neighbors[1].Index,0u);
+                    Kernel().RequestExit();
+                    return;
                 }
-                else
-                {
-                EXPECT_EQ(Batch->Counts,(std::vector<std::uint32_t>{3,4}));
+                EXPECT_EQ(page.Neighbors[0].Index, Round == 0 ? 2u : 0u);
+                EXPECT_EQ(page.Neighbors[1].Index, 0u);
+            }
+            else
+            {
+                EXPECT_EQ(page.Counts, (std::vector<std::uint32_t>{3, 4}));
                 const std::vector<std::uint32_t> expected=Round==0?
                     std::vector<std::uint32_t>{2,3,4,LB::InvalidIndex,0,2,3,4}:
                     std::vector<std::uint32_t>{0,3,4,LB::InvalidIndex,0,2,3,4};
-                EXPECT_EQ(Batch->Neighbors.size(),expected.size());
-                if (Batch->Neighbors.size()!=expected.size()) { Kernel().RequestExit();return; }
-                for (std::size_t i=0;i<expected.size();++i) EXPECT_EQ(Batch->Neighbors[i].Index,expected[i]);
+                EXPECT_EQ(page.Neighbors.size(), expected.size());
+                if (page.Neighbors.size() != expected.size())
+                {
+                    Kernel().RequestExit();
+                    return;
+                }
+                for (std::size_t i = 0; i < expected.size(); ++i)
+                    EXPECT_EQ(page.Neighbors[i].Index, expected[i]);
                 // Rebuilding must preserve deterministic ties; row 4 moves farther away.
                 if (Round==3)
                 {
-                    EXPECT_NEAR(Batch->Neighbors[2].SquaredDistance,4.f,1e-5f);
-                    EXPECT_NEAR(Batch->Neighbors[7].SquaredDistance,4.f,1e-5f);
-                }
-                }
-                if (Round==3)
-                {
-                    EXPECT_EQ(Cache->Stats().Builds,2u);
-                    EXPECT_EQ(Cache->Stats().GpuBuilds, Builds(2u));
-                    // A destroyed and pruned target rejects CPU and queued work alike,
-                    // without recording a third GPU build.
-                    auto& scene=*Kernel().Worlds().Get(Kernel().ActiveWorld());
-                    scene.Destroy(Entity);
-                    Cache->Prune();
-                    EXPECT_FALSE(Cache->Nearest(Handle,{0,0,0}).has_value());
-                    const std::vector<std::uint32_t> retired{2u,1u};
-                    const auto rejected = RadiusMode
-                        ? Cache->QueueGpuRadius(Handle, queries, 1.f, 1, retired, {}, Strategy)
-                        : Cache->QueueGpuKNearest(Handle, queries, 4, retired, {}, Strategy);
-                    EXPECT_EQ(rejected->State,Runtime::SpatialQueryState::Failed);
-                    EXPECT_FALSE(rejected->Diagnostic.empty());
-                    Stats=Cache->Stats();
-                    EXPECT_EQ(Stats.GpuBuilds, Builds(2u));
-                    Done=true;Kernel().RequestExit();return;
-                }
-                ++Round;
+                    EXPECT_NEAR(page.Neighbors[2].SquaredDistance, 4.f, 1e-5f);
+                    EXPECT_NEAR(page.Neighbors[7].SquaredDistance, 4.f, 1e-5f);
                 }
             }
-            const std::vector<std::uint32_t> exclusions{Round==0?0u:2u,1u};
-            if (Round==0)
+            if (Round == 3)
             {
-                EXPECT_EQ(Cache->QueueGpuKNearest(Handle,queries,0)->State,Runtime::SpatialQueryState::Failed);
-                EXPECT_EQ(Cache->QueueGpuKNearest(Handle,queries,65)->State,Runtime::SpatialQueryState::Failed);
-                EXPECT_EQ(Cache->QueueGpuKNearest(Handle,queries,4,std::vector<std::uint32_t>{0})->State,Runtime::SpatialQueryState::Failed);
+                EXPECT_EQ(Cache->Stats().Builds, 2u);
+                EXPECT_EQ(Cache->Stats().GpuBuilds, Builds(2u));
+                // A destroyed and pruned target refuses CPU queries and new sessions alike, without a third GPU build.
+                auto& scene = *Kernel().Worlds().Get(Kernel().ActiveWorld());
+                scene.Destroy(Entity);
+                Cache->Prune();
+                EXPECT_FALSE(Cache->Nearest(Handle, {0, 0, 0}).has_value());
+                EXPECT_FALSE(prepare(capacity, RadiusMode, exclusions));
+                EXPECT_FALSE(why.empty());
+                Stats = Cache->Stats();
+                EXPECT_EQ(Stats.GpuBuilds, Builds(2u));
+                Done = true;
+                Kernel().RequestExit();
+                return;
             }
-            // ARCH-023: a batch is submitted inside the queue call, so a target that became stale is rejected
-            // there (formerly the edit could follow the call and still precede the framed recording).
-            if (Round == 2)
-                Positions[4] = {-2, 0, 0};
-            auto old=Batch;
-            Batch = RadiusMode
-                ? Cache->QueueGpuRadius(Handle, queries, Round == 0 ? .5f : 1.f, 1, exclusions, Batch, Strategy)
-                : Cache->QueueGpuKNearest(Handle, queries, 4, exclusions, Batch, Strategy);
-            if (old && Round != 2)
-                EXPECT_EQ(old, Batch);
+            ++Round;
         }
-        void Shutdown() override { Batch.reset();Cache=nullptr; }
+        void Shutdown() override
+        {
+            Cache = nullptr;
+        }
         Runtime::SpatialIndexCache* Cache{};
         Runtime::SpatialIndexHandle Handle{};
-        std::shared_ptr<Runtime::SpatialNearestBatch> Batch{};
         Geometry::Property<glm::vec3> Positions{};
         Runtime::SpatialIndexCacheStats Stats{};
         entt::entity Entity{};
@@ -1182,13 +1216,14 @@ namespace
         G::PointQueryStrategy Strategy{};
     };
 }
-TEST(PointLBVHGpuSmoke, FramedKNearestReusesBuffersAndRejectsStaleTarget)
+TEST(PointLBVHGpuSmoke, SessionKNearestKeepsTiesAndRefusesStaleTarget)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
     auto config=Runtime::CreateReferenceEngineConfig();
     config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
     config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
-    auto app=std::make_unique<KnnBatchApp>();auto* run=app.get();
+    auto app = std::make_unique<KnnSessionApp>();
+    auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.Initialize();Shutdown shutdown{engine};
@@ -1208,11 +1243,10 @@ TEST(PointLBVHGpuSmoke, FramedKNearestReusesBuffersAndRejectsStaleTarget)
         std::cout << "PointLBVHGpuSmoke: no async compute queue; the compute lane resolved to graphics\n";
 }
 
-// ARCH-023 B4: the same cache known answers (compacted target gathered from its canonical slot, LBVH build and
-// kNN recorded into the first submission, coincident ties, exclusions, batch reuse, stale rejection, rebuild;
-// brute-force radius overflow without a hierarchy) with method compute forced onto the graphics queue: the
-// identical SubmitComputeReadback path on the other lane, reported as such. The default-configured smokes
-// cover the separate compute lane.
+// ARCH-023 B4: the same cache known answers (compacted target gathered from its canonical slot and its LBVH built by
+// the first session's preparation, coincident ties, exclusions, stale refusal, rebuild; brute-force radius overflow
+// without a hierarchy) with method compute forced onto the graphics queue: the identical SubmitComputeReadback path on
+// the other lane, reported as such. The default-configured smokes cover the separate compute lane.
 TEST(PointLBVHGpuSmoke, ForcedGraphicsLaneKeepsCacheQueryKnownAnswers)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
@@ -1227,7 +1261,7 @@ TEST(PointLBVHGpuSmoke, ForcedGraphicsLaneKeepsCacheQueryKnownAnswers)
         config.Render.EnableVSync = false;
         config.ReferenceScene.Enabled = false;
         config.Render.MethodComputeOnGraphicsQueue = true;
-        auto app = std::make_unique<KnnBatchApp>(
+        auto app = std::make_unique<KnnSessionApp>(
             radius, radius ? G::PointQueryStrategy::BruteForce : G::PointQueryStrategy::Lbvh);
         auto* run = app.get();
         Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
@@ -1492,13 +1526,14 @@ TEST(PointLBVHGpuSmoke, QuerySessionPagesIgnoreLaterGraphicsUploadsWithGraphicsH
     RunSessionPageSmoke(false, true);
 }
 
-TEST(PointLBVHGpuSmoke, FramedRadiusPreservesOverflowExclusionAndBufferReuse)
+TEST(PointLBVHGpuSmoke, SessionRadiusPreservesOverflowAndExclusion)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
     auto config=Runtime::CreateReferenceEngineConfig();
     config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
     config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
-    auto app=std::make_unique<KnnBatchApp>(true);auto* run=app.get();
+    auto app = std::make_unique<KnnSessionApp>(true);
+    auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.Initialize();Shutdown shutdown{engine};
@@ -1507,10 +1542,10 @@ TEST(PointLBVHGpuSmoke, FramedRadiusPreservesOverflowExclusionAndBufferReuse)
     EXPECT_EQ(run->Stats.Builds,2);EXPECT_EQ(run->Stats.GpuBuilds,2);
 }
 
-// The same framed known answers (deleted row gathered from the canonical slot, coincident rows with distinct
-// source IDs, exclusions, inclusive radius overflow counts, batch reuse, stale-target rejection) through the
-// cache's brute-force strategy, which never builds a GPU hierarchy.
-TEST(PointLBVHGpuSmoke, FramedBruteForceKNearestAndRadiusMatchWithoutGpuBuilds)
+// The same session known answers (deleted row gathered from the canonical slot, coincident rows with distinct
+// source IDs, exclusions, inclusive radius overflow counts, stale-target refusal) through the cache's brute-force
+// strategy, which never builds a GPU hierarchy.
+TEST(PointLBVHGpuSmoke, SessionBruteForceKNearestAndRadiusMatchWithoutGpuBuilds)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
         GTEST_SKIP() << "GLFW unavailable";
@@ -1523,7 +1558,7 @@ TEST(PointLBVHGpuSmoke, FramedBruteForceKNearestAndRadiusMatchWithoutGpuBuilds)
         config.Render.EnableValidation = true;
         config.Render.EnableVSync = false;
         config.ReferenceScene.Enabled = false;
-        auto app = std::make_unique<KnnBatchApp>(radius, G::PointQueryStrategy::BruteForce);
+        auto app = std::make_unique<KnnSessionApp>(radius, G::PointQueryStrategy::BruteForce);
         auto* run = app.get();
         Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
         engine.EmplaceModule<Runtime::SpatialIndexCache>();

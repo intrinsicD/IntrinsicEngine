@@ -23,6 +23,10 @@ explicit backend modules under `backends/`.
   to platform event buffering, resize handling, clipboard, cursor modes, and
   input state updates.
 
+The concrete GLFW window's `SetMinimizedForTesting` seam lets GPU integration
+tests exercise minimized runtime completion across event polls. It changes no
+native window state; tests restore it on exit and do not claim window-manager coverage.
+
 `Platform.CreateWindow.cpp` is the only selected-backend bridge for the public
 `Extrinsic::Platform::CreateWindow` factory. Configure with:
 

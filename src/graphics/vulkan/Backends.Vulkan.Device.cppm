@@ -155,6 +155,8 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::IProfiler*      GetProfiler()      override { return m_Profiler.get(); }
         [[nodiscard]] uint32_t GetFramesInFlight()    const override { return kMaxFramesInFlight; }
         [[nodiscard]] uint64_t GetGlobalFrameNumber() const override { return m_GlobalFrameNumber; }
+        [[nodiscard]] bool IsFrameRetired(uint64_t frameNumber) const override;
+        void CollectCompletedResources() override;
 
     private:
         // GRAPHICS-033A: `EvaluateVulkanDeviceOperationalStatus` is the
@@ -176,6 +178,7 @@ namespace Extrinsic::Backends::Vulkan
             const RHI::ICommandContext* context) noexcept;
         friend std::function<bool()> HoldVulkanQueue(RHI::IDevice* device, VulkanGatedQueue queue);
         friend bool WithVulkanFrameQueueLockHeld(RHI::IDevice* device, const std::function<void()>& whileHeld);
+        friend bool FailNextVulkanRetirementQuery(RHI::IDevice* device, VulkanRetirementQuery query, bool deviceLost);
 
         [[nodiscard]] static VulkanProfilerCommandContextView
         ResolveProfilerCommandContext(
@@ -319,6 +322,11 @@ namespace Extrinsic::Backends::Vulkan
         // Runs deferred deletes whose compute fence completed (all of them once the device is idle).
         void ProcessComputeGatedDeletes(bool deviceIdle);
         void ProcessResourcePoolDeletions();
+        // ARCH-024, owner thread, nonblocking: every frame slot's submissions finished (vkGetFenceStatus); no frame
+        // records and the graphics lane finished all it was given.
+        [[nodiscard]] VkResult FrameCompletionStatus() const;
+        [[nodiscard]] VkResult GraphicsCompletionStatus() const;
+        mutable VkResult m_NextFrameRetirementResult = VK_SUCCESS; // One-shot owner-thread test injection.
 
         VkInstance               m_Instance       = VK_NULL_HANDLE;
         VkDebugUtilsMessengerEXT m_Messenger      = VK_NULL_HANDLE;

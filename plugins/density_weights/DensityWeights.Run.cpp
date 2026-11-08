@@ -52,19 +52,20 @@ namespace Intrinsic::Plugins::DensityWeights
         R::ScalarAnalysisRequest Request(const Config& c, const Result& r = {})
         {
             return {.StableEntityId = c.StableEntityId,
-                    .Positions = c.Positions,
-                    .Output = c.Weights,
-                    .Params = {.Method = 2,
-                               .Capacity = c.GpuRadiusCapacity,
-                               .Kernel = std::uint32_t(c.Kernel),
-                               .Inverse = std::uint32_t(c.Mode),
-                               .QueryRadius = r.QueryRadius,
-                               .SupportRadius = r.SupportRadius},
-                    .Noun = "Density-weight",
-                    .Method = "Density weights",
-                    .History = "Estimate density weights",
-                    .MinimumLiveCount = 1u,
-                    .TooFewSamples = kTooFewSamples};
+                .Positions = c.Positions,
+                .Output = c.Weights,
+                .Params = {.Method = 2,
+                    .Capacity = c.GpuRadiusCapacity,
+                    .Kernel = std::uint32_t(c.Kernel),
+                    .Inverse = std::uint32_t(c.Mode),
+                    .QueryRadius = r.QueryRadius,
+                    .SupportRadius = r.SupportRadius},
+                .Noun = "Density-weight",
+                .Method = "Density weights",
+                .History = "Estimate density weights",
+                .Owner = "density_weights",
+                .MinimumLiveCount = 1u,
+                .TooFewSamples = kTooFewSamples};
         }
 
         std::string Invalid(const Config& c)
@@ -282,6 +283,7 @@ namespace Intrinsic::Plugins::DensityWeights
                     .History = "Compute compact density weights",
                     .Noun = "Density-weight",
                     .Method = "density weight",
+                    .Owner = "density_weights",
                     .Execution = config.Execution,
                     .Compute =
                         [w](std::vector<float>& weights)

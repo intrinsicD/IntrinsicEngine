@@ -3587,8 +3587,13 @@ namespace Extrinsic::Sandbox::Editor
             changed |= DrawSpecInputUInt(
                 "Iterations", fields, "iterations", config.Filter.Iterations, defaults.Filter.Iterations);
         // The shared execution options; the cap is the iterations above, and only Vulkan shows a live preview.
-        changed |= Runtime::DrawStepRunExecutionOptions(
-            "Smoothing", config.Execution, 0u, true, config.Backend == Runtime::PropertySmoothingBackend::Vulkan);
+        changed |= Runtime::DrawStepRunExecutionOptions("Smoothing",
+            config.Execution,
+            0u,
+            true,
+            config.Backend == Runtime::PropertySmoothingBackend::Vulkan,
+            1u,
+            true);
         if (config.Weight != S::PropertyWeight::Cotangent && config.Weight != S::PropertyWeight::MeshUniform)
         {
             changed |= DrawSpecInputUInt("Neighbors", fields, "neighbors", config.Neighbors, defaults.Neighbors);

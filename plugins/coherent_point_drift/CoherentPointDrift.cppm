@@ -2,7 +2,7 @@
 // CoherentPointDrift, rigid) moves a source cloud onto a target cloud in world space, one EM iteration at a time,
 // shows the moving source in the viewport, and runs, pauses, steps, stops, restarts, accepts or discards from its window
 // (the host's shared step-run row) or over MCP (coherent_point_drift_start, then run_control and run_observe). Its
-// execution options are the shared StepRunExecution (max_iterations, preview_every, preview_interval_ms, auto_accept,
+// execution options are the shared StepRunExecution (max_iterations, preview_every, preview_interval_ms, preview_buffers, auto_accept,
 // start; default start ready). Accept writes the source's positions, mapped back
 // into its local frame, with one undo entry. It runs beside the editor's built-in CPD until that feature migrates.
 module;

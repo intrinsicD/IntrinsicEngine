@@ -147,7 +147,7 @@ export namespace Extrinsic::Runtime
         // An empty name serializes as null; the binding is only resolved when per-row bounds are used.
         GeometryPropertyRef BoundRadii{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Double};
         PropertySmoothingBackend Backend{PropertySmoothingBackend::Cpu};
-        // ARCH-023: the shared execution options (preview_every, preview_interval_ms, auto_accept, start; the
+        // ARCH-023: the shared execution options (preview_every, preview_interval_ms, preview_buffers, auto_accept, start; the
         // logical cap is the method's own `iterations`, so IterationCap is not configured here: a run's cap is
         // Filter.Iterations, or 1 for the variational fit, solved whole). One step is one explicit pass or one
         // implicit time step over every channel. Vulkan previews through the output ring; the CPU run has no live

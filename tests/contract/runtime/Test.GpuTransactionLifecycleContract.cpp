@@ -865,3 +865,23 @@ TEST(GpuTransactionLifecycle, OnlyTheFirstAcceptedPageOfAGenerationOrdersGraphic
         Order::LaneOrderOnly};
     EXPECT_EQ(device.ComputeInputOrders, expected);
 }
+
+// Owner identity is explicit and independent of the user-facing job label; runtime callers retain their default.
+TEST(GpuTransactionLifecycle, ExplicitOwnerReachesTheStepRunObservation)
+{
+    for (const auto* owner : {"Runtime.GpuTransaction", "point_spacing", "kernel_density", "density_weights"})
+    {
+        Harness h;
+        auto f = h.Make();
+        EXPECT_EQ(f->Core.Owner, "Runtime.GpuTransaction");
+        f->Core.Owner = owner;
+        f->Core.JobLabel = "User supplied label";
+        f->Core.Execution.Start = R::StepRunStart::Ready;
+        ASSERT_TRUE(GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(f), "Worker stage label").IsValid());
+        const auto observed = h.Jobs.StepRuns().Observe(f->Core.StepRun);
+        ASSERT_TRUE(observed);
+        EXPECT_EQ(observed->Owner, owner);
+        EXPECT_EQ(observed->Label, "User supplied label");
+        GP::DiscardGpuTransaction(f->Core, R::EditorCommandStatus::NoChange, "discarded");
+    }
+}

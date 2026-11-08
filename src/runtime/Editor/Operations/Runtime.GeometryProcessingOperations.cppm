@@ -217,12 +217,15 @@ export namespace Extrinsic::Runtime
         // The block kept the front: no position upload follows the publication.
         bool RenderAcknowledged{};
     };
-    // Creates the positions' ring with its first write slot (depth 2) and owns it. Null with
+    // Creates the positions' ring with its first write slot (previewBuffers: 2 or 3) and owns it. Null with
     // `diagnostic` when the positions do not resolve on a live entity, a ring already waits
     // for Accept or Discard, or the residency refuses a slot.
-    [[nodiscard]] EditorGpuPositionRunHandle BeginEditorGpuPositionRun(
-        const EditorProcessingCommands&, std::uint32_t stableEntityId, GeometryPropertyRef positions,
-        Graphics::GpuPropertyResidency&, std::string& diagnostic);
+    [[nodiscard]] EditorGpuPositionRunHandle BeginEditorGpuPositionRun(const EditorProcessingCommands&,
+        std::uint32_t stableEntityId,
+        GeometryPropertyRef positions,
+        Graphics::GpuPropertyResidency&,
+        std::string& diagnostic,
+        std::uint32_t previewBuffers);
     // The write slot Begin acquired, handed out once (later slots come from
     // `AcquireGpuPropertyOutput` as usual); the method fills it and publishes.
     [[nodiscard]] std::optional<Graphics::GpuPropertyView> EditorGpuPositionRunFirstBack(const EditorGpuPositionRunHandle&);

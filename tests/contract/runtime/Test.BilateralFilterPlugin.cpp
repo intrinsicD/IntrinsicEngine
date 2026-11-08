@@ -420,7 +420,7 @@ TEST(BilateralFilterPlugin, AStepRunStepsStopsRestartsAndAcceptsLikeTheBatchRun)
     config.Execution.AutoAccept = R::StepRunAutoAccept::Never;
     config.Execution.Start = R::StepRunStart::Ready;
     ASSERT_TRUE(harness.Apply(config));
-    const auto started = harness.Call("bilateral_filter_start", {{"max_iterations", 3}});
+    const auto started = harness.Call("bilateral_filter_start", {{"max_iterations", 3}, {"preview_buffers", 2}});
     ASSERT_FALSE(started.IsError) << started.Text;
     const auto run = Json::parse(started.Text)["run"].get<std::uint64_t>();
     ASSERT_NE(run, 0u);
@@ -431,6 +431,8 @@ TEST(BilateralFilterPlugin, AStepRunStepsStopsRestartsAndAcceptsLikeTheBatchRun)
     EXPECT_EQ(observed["steps"], 0u) << "a ready run computes nothing";
     EXPECT_TRUE(observed["can_restart"].get<bool>());
     EXPECT_EQ(observed["execution"]["max_iterations"], 3u);
+    EXPECT_EQ(observed["execution"]["preview_buffers"], 2u);
+    EXPECT_EQ(observed["device_preview_buffers"], 0u) << "live preview is off";
     EXPECT_FALSE(props.Exists("filtered"));
 
     (void)Control(harness, run, "step", 2u);

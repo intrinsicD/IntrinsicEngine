@@ -30,7 +30,7 @@ export namespace Extrinsic::Runtime
 
     // Edits `options` within StepRunExecutionFields(maxIterationCap): iteration cap and, when `stepRun` (the chosen
     // path runs as a step run), live preview cadence and time limit (only with `livePreview`: the path shows its
-    // state while computing), automatic Accept and start mode; a whole-solve path shows the cap alone (no inert
+    // state while computing), device ring capacity only with `devicePreview`, automatic Accept and start mode; a whole-solve path shows the cap alone (no inert
     // control). A method whose cap is its own parameter (smoothing's iterations, sampling's count) passes
     // maxIterationCap 0: no cap row. A one-step run (cap 1) also hides the cap. Labels "<field>##<suffix>". True when a value changed.
     bool DrawStepRunExecutionOptions(std::string_view idSuffix,
@@ -38,5 +38,6 @@ export namespace Extrinsic::Runtime
         std::uint32_t maxIterationCap,
         bool stepRun,
         bool livePreview = true,
-        std::uint32_t minIterationCap = 1u);
+        std::uint32_t minIterationCap = 1u,
+        bool devicePreview = false);
 }

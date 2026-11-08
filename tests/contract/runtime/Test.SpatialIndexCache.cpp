@@ -110,8 +110,11 @@ TEST(SpatialIndexCache, ReusesOnlyUnchangedPropertyAndLiveElementIdentity)
     EXPECT_EQ(cache.Radius(first.Handle, {}, 3, 0, 1)->TotalCount, 1);
     EXPECT_EQ(cache.KNearest(first.Handle, {}, 8, 0)->size(), 2); // Deleted slot excludes nothing.
     EXPECT_TRUE(cache.KNearest(first.Handle, {}, 0)->empty());
-    EXPECT_EQ(cache.QueueGpuKNearest(first.Handle, std::vector<glm::vec3>{{}}, 3)->State,
-              R::SpatialQueryState::Failed);
+    std::string why;
+    EXPECT_FALSE(cache.PrepareQuerySession(
+        first.Handle, {.Capacity = 3u, .PageQueries = 1u, .Queries = std::vector<glm::vec3>{{}}}, why))
+        << "no device: no GPU kNN session";
+    EXPECT_FALSE(why.empty());
     auto second = cache.Acquire(world, entity, Ref(D::PointCloudPoint));
     EXPECT_TRUE(second.Reused);
     EXPECT_EQ(first.Handle.Value, second.Handle.Value);
@@ -216,14 +219,12 @@ TEST(SpatialIndexCache, GpuWorkWithoutDeviceFailsExplicitly)
         });
     ASSERT_TRUE(immediate);
     EXPECT_EQ(immediate->State,R::SpatialQueryState::Failed);
+    // A radius session needs no index when its target moves: only the missing device refuses it.
     const std::vector<glm::vec3> queries{{0,0,0}};
-    for (float radius : {-1.f, 0.f, 1.f})
-    {
-        const auto batch = cache.QueueGpuRadius({}, queries, radius, 2);
-        ASSERT_TRUE(batch);
-        EXPECT_EQ(batch->State, R::SpatialQueryState::Failed);
-        EXPECT_FALSE(batch->Diagnostic.empty());
-    }
+    std::string why;
+    EXPECT_FALSE(cache.PrepareQuerySession(
+        {}, {.Radius = true, .Capacity = 2u, .PageQueries = 1u, .Queries = queries, .Moving = true}, why));
+    EXPECT_FALSE(why.empty());
 }
 
 // GRAPHICS-153: an iterative caller updates its private workspace in place; old snapshot leases
@@ -442,6 +443,26 @@ namespace
                 Released.push_back(token);
             };
         }
+        // One nearest page of `queries` over `target` on a fresh session (UseWorkerLane), then the session dropped and
+        // drained: its page completed, so the cache lets it, and its pin on the target, go. False (reported) otherwise.
+        bool PageOnce(const R::SpatialIndexHandle target,
+            const std::span<const glm::vec3> queries,
+            const Extrinsic::Graphics::PointQueryStrategy strategy = Extrinsic::Graphics::PointQueryStrategy::Lbvh)
+        {
+            std::string why;
+            auto session = Cache.PrepareQuerySession(
+                target, {.Strategy = strategy, .PageQueries = std::uint32_t(queries.size()), .Queries = queries}, why);
+            std::atomic<bool> abort{false};
+            R::SpatialNearestBatch page;
+            const bool ready = session &&
+                session->Query(0u, std::uint32_t(queries.size()), -1.f, nullptr, abort, page) ==
+                    R::SpatialPageStatus::Ready;
+            if (!ready)
+                ADD_FAILURE() << (session ? page.Diagnostic : why);
+            session.reset();
+            (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
+            return ready;
+        }
         // Index of the last `kind` event on `context` at or after `from`, or -1.
         static std::ptrdiff_t First(const Extrinsic::Tests::MockCommandContext& context,
             Extrinsic::Tests::MockCommandContext::EventKind kind,
@@ -633,67 +654,6 @@ TEST_F(SpatialWorkspaceLeases, CancelledRunDoesNotRecycleWorkspaceBeforeItsSubmi
     EXPECT_TRUE(watched.expired());
 }
 
-TEST_F(SpatialWorkspaceLeases, TransformedQueriesUploadOnlyChangedInputsAndReuseRetiredScratch)
-{
-    Device.ShaderFloat64 = true;
-    std::vector<glm::vec3> source{{0,0,0}, {1,0,0}, {2,0,0}};
-    const auto target = Cache.CreateWorkspace(source);
-    ASSERT_TRUE(target.Ready());
-    glm::dmat4 pose{1.0};
-    auto batch = Cache.QueueGpuNearestTransformed(target.Handle, source, pose);
-    // Ready from its own readback in the next maintenance (formerly after the frames in flight).
-    auto complete = [&]
-    {
-        EXPECT_EQ(batch->State, R::SpatialQueryState::Submitted) << batch->Diagnostic;
-        Frame();
-        EXPECT_EQ(batch->State, R::SpatialQueryState::Ready) << batch->Diagnostic;
-    };
-    complete();
-    EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes, 3u * 12u + sizeof(pose));
-    auto uploaded = Cache.Stats().GpuQueryUploadBytes;
-    auto allocations = Cache.Stats().GpuBatchAllocations;
-    pose[3].x = 0.125;
-    batch = Cache.QueueGpuNearestTransformed(target.Handle, source, pose, batch);
-    complete();
-    EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes - uploaded, sizeof(pose));
-    EXPECT_EQ(Cache.Stats().GpuBatchAllocations, allocations);
-    batch = Cache.QueueGpuNearestTransformed(target.Handle, source, pose, batch);
-    ASSERT_EQ(InFlight.size(), 1u);
-    EXPECT_EQ(InFlight.front().Bytes, source.size() * 16u) << "one packed readback: neighbors, then headers";
-    EXPECT_EQ(Cache.Stats().GpuQuerySubmissions, 3u) << "every batch, including the first, used the lane";
-    complete();
-    source[0].y = 1.f;
-    uploaded = Cache.Stats().GpuQueryUploadBytes;
-    batch = Cache.QueueGpuNearestTransformed(target.Handle, source, pose, batch);
-    complete();
-    EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes - uploaded, source.size()*12u + sizeof(pose));
-    source.resize(5, {1,1,1});
-    batch = Cache.QueueGpuNearestTransformed(target.Handle, source, pose, batch);
-    complete();
-    EXPECT_EQ(Cache.Stats().GpuBatchAllocations, allocations + 1u);
-    source.resize(2);
-    batch = Cache.QueueGpuNearestTransformed(target.Handle, source, pose, batch);
-    complete();
-    EXPECT_EQ(batch->Neighbors.size(), 2u);
-    EXPECT_EQ(Cache.Stats().GpuBatchAllocations, allocations + 1u);
-    batch.reset();
-    Frame();
-    Cache.Prune();
-    RetireFrames();
-    uploaded = Cache.Stats().GpuQueryUploadBytes;
-    const auto hits = Cache.Stats().ScratchHits;
-    const auto created = Device.CreateBufferCount;
-    batch = Cache.QueueGpuNearestTransformed(target.Handle, source, pose);
-    complete();
-    EXPECT_GT(Cache.Stats().WorkspaceReuses, 0u);
-    // ARCH-023: the parked batch gave its five buffers back to the scratch cache; the warm lease
-    // takes retired ones from there (no device allocation) and uploads its inputs again.
-    EXPECT_EQ(Cache.Stats().GpuBatchAllocations, allocations + 2u);
-    EXPECT_EQ(Cache.Stats().ScratchHits - hits, 5u);
-    EXPECT_EQ(Device.CreateBufferCount, created);
-    EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes - uploaded, source.size() * 12u + sizeof(pose));
-}
-
 // ARCH-023: a returned workspace keeps its pipeline but holds no budgeted bytes once the owner
 // thread parked it; its buffers wait for the shared retirement stamp and then serve the next lease.
 TEST_F(SpatialWorkspaceLeases, ParkedWorkspaceGivesBackItsScratchButKeepsItsPipeline)
@@ -781,16 +741,28 @@ TEST_F(SpatialWorkspaceLeases, ShutdownDrainsParkedScratchAndLaterReleasesDestro
     EXPECT_EQ(Device.DestroyBufferCount - destroyed, 6);
 }
 
+// Without shader float64 a transformed session is refused before it allocates or writes anything; a non-finite pose
+// fails its page before submission, so only the rows written at prepare count as uploaded.
 TEST_F(SpatialWorkspaceLeases, TransformedQueriesRefuseUnsupportedAndNonfiniteTransforms)
 {
     const std::vector<glm::vec3> points{{0,0,0}, {1,0,0}};
     const auto target = Cache.CreateWorkspace(points);
-    glm::dmat4 pose{1.0};
-    EXPECT_EQ(Cache.QueueGpuNearestTransformed(target.Handle, points, pose)->State, R::SpatialQueryState::Failed);
-    Device.ShaderFloat64 = true;
-    pose[3].x = std::numeric_limits<double>::quiet_NaN();
-    EXPECT_EQ(Cache.QueueGpuNearestTransformed(target.Handle, points, pose)->State, R::SpatialQueryState::Failed);
+    const R::SpatialQuerySessionDesc desc{.Capacity = 1u, .PageQueries = 2u, .Queries = points, .Transformed = true};
+    std::string why;
+    EXPECT_FALSE(Cache.PrepareQuerySession(target.Handle, desc, why));
+    EXPECT_NE(why.find("float64"), std::string::npos) << why;
     EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes, 0u);
+    Device.ShaderFloat64 = true;
+    const auto session = Cache.PrepareQuerySession(target.Handle, desc, why);
+    ASSERT_TRUE(session) << why;
+    glm::dmat4 pose{1.0};
+    pose[3].x = std::numeric_limits<double>::quiet_NaN();
+    std::atomic<bool> abort{false};
+    R::SpatialNearestBatch page;
+    EXPECT_EQ(session->Query(0u, 2u, -1.f, &pose, abort, page), R::SpatialPageStatus::Failed);
+    EXPECT_NE(page.Diagnostic.find("finite"), std::string::npos) << page.Diagnostic;
+    EXPECT_EQ(session->Pages(), 0u);
+    EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes, points.size() * 12u) << "the rows only: no pose was uploaded";
 }
 
 // The one brute-force work budget shared by the recorder, the cache, ICP and the bilateral filter: each limit
@@ -826,33 +798,53 @@ namespace
     }
 }
 
-TEST_F(SpatialWorkspaceLeases, BruteForceAdmissionRefusesOverBudgetBatchesAndRecordsAtTheLimit)
+// A brute-force session's admission takes its page against the target; LBVH admits the same request. The pages at
+// both boundaries record and complete without a hierarchy.
+TEST_F(SpatialWorkspaceLeases, BruteForceAdmissionRefusesOverBudgetSessionsAndRecordsAtTheLimit)
 {
     using S = Extrinsic::Graphics::PointQueryStrategy;
+    UseWorkerLane();
     std::vector<glm::vec3> targets(1024);
     for (std::size_t i = 0; i < targets.size(); ++i)
         targets[i] = {float(i), 0, 0};
     const auto target = Cache.CreateWorkspace(targets);
     ASSERT_TRUE(target.Ready());
     const std::vector<glm::vec3> one{{0.5f, 0, 0}};
+    std::string why;
+    const auto radius = [&](const S strategy, const std::uint32_t capacity)
+    {
+        return Cache.PrepareQuerySession(target.Handle,
+            {.Strategy = strategy, .Radius = true, .Capacity = capacity, .PageQueries = 1u, .Queries = one},
+            why);
+    };
     // Radius with 1024 retained slots: serial 1024 x 1025 > 2^20 is refused; the same request is admitted by LBVH.
-    const auto refused = Cache.QueueGpuRadius(target.Handle, one, 1.f, 1024u, {}, {}, S::BruteForce);
-    EXPECT_EQ(refused->State, R::SpatialQueryState::Failed);
-    EXPECT_NE(refused->Diagnostic.find("2^20"), std::string::npos) << refused->Diagnostic;
-    EXPECT_EQ(
-        Cache.QueueGpuRadius(target.Handle, one, 1.f, 1024u, {}, {}, S::Lbvh)->State, R::SpatialQueryState::Submitted);
-    // Dispatch work: 8192 queries x 1024 targets x (1 + 1) = 2^24 is the boundary.
+    EXPECT_FALSE(radius(S::BruteForce, 1024u));
+    EXPECT_NE(why.find("2^20"), std::string::npos) << why;
+    EXPECT_TRUE(radius(S::Lbvh, 1024u)) << why;
+    // Dispatch work: a page of 8192 queries x 1024 targets x (1 + 1) = 2^24 is the boundary.
     std::vector<glm::vec3> queries(8192, glm::vec3(0.5f, 0, 0));
-    const auto atLimit = Cache.QueueGpuNearest(target.Handle, queries, {}, S::BruteForce);
-    EXPECT_EQ(atLimit->State, R::SpatialQueryState::Submitted) << atLimit->Diagnostic;
+    const auto nearest = [&]
+    {
+        return Cache.PrepareQuerySession(target.Handle,
+            {.Strategy = S::BruteForce, .PageQueries = std::uint32_t(queries.size()), .Queries = queries},
+            why);
+    };
+    const auto atLimit = nearest();
+    ASSERT_TRUE(atLimit) << why;
     queries.push_back({0.5f, 0, 0});
-    const auto beyond = Cache.QueueGpuNearest(target.Handle, queries, {}, S::BruteForce);
-    EXPECT_EQ(beyond->State, R::SpatialQueryState::Failed);
-    EXPECT_NE(beyond->Diagnostic.find("2^24"), std::string::npos) << beyond->Diagnostic;
-    const auto lastRadius = Cache.QueueGpuRadius(target.Handle, one, 1.f, 1023u, {}, {}, S::BruteForce);
-    // The recorder accepted both boundary batches without a hierarchy.
-    EXPECT_EQ(lastRadius->State, R::SpatialQueryState::Submitted) << "1024 x 1024 = 2^20 serial";
-    EXPECT_EQ(Cache.Stats().GpuBuilds, 1u) << "only the LBVH radius batch built";
+    EXPECT_FALSE(nearest());
+    EXPECT_NE(why.find("2^24"), std::string::npos) << why;
+    const auto lastRadius = radius(S::BruteForce, 1023u);
+    ASSERT_TRUE(lastRadius) << "1024 x 1024 = 2^20 serial: " << why;
+    std::atomic<bool> abort{false};
+    R::SpatialNearestBatch page;
+    EXPECT_EQ(lastRadius->Query(0u, 1u, -1.f, nullptr, abort, page), R::SpatialPageStatus::Failed);
+    EXPECT_NE(page.Diagnostic.find("radius"), std::string::npos) << page.Diagnostic;
+    EXPECT_EQ(lastRadius->Pages(), 0u) << "a radius outside [0, 1e18] is refused before it submits";
+    // The recorder accepts both boundary pages without a hierarchy.
+    EXPECT_EQ(atLimit->Query(0u, 8192u, -1.f, nullptr, abort, page), R::SpatialPageStatus::Ready) << page.Diagnostic;
+    EXPECT_EQ(lastRadius->Query(0u, 1u, 1.f, nullptr, abort, page), R::SpatialPageStatus::Ready) << page.Diagnostic;
+    EXPECT_EQ(Cache.Stats().GpuBuilds, 1u) << "only the LBVH radius session's preparation built";
     EXPECT_EQ(Bound(Device.AsyncComputeContext, "lbvh_build"), 1);
 }
 
@@ -881,30 +873,24 @@ TEST_F(SpatialWorkspaceLeases, BruteForceRecorderSharesTheAdmissionBoundary)
 TEST_F(SpatialWorkspaceLeases, MixedStrategiesRebuildOnlyTheLbvhAfterAnUpdate)
 {
     using S = Extrinsic::Graphics::PointQueryStrategy;
+    UseWorkerLane();
     const std::vector<glm::vec3> before{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}}, after{{5, 0, 0}, {6, 0, 0}, {7, 0, 0}};
     const std::vector<glm::vec3> queries{{0.5f, 0, 0}};
     auto workspace = Cache.CreateWorkspace(before);
     ASSERT_TRUE(workspace.Ready());
-    std::shared_ptr<R::SpatialNearestBatch> batch;
-    auto run = [&](S strategy)
-    {
-        batch = Cache.QueueGpuNearest(workspace.Handle, queries, batch, strategy);
-        Frame();
-        EXPECT_EQ(batch->State, R::SpatialQueryState::Ready) << batch->Diagnostic;
-    };
-    run(S::Lbvh);
+    ASSERT_TRUE(PageOnce(workspace.Handle, queries, S::Lbvh));
     EXPECT_EQ(Cache.Stats().GpuBuilds, 1u);
     EXPECT_EQ(WritesOf(Device, before), 1);
     ASSERT_TRUE(Cache.UpdateWorkspace(workspace, after));
-    run(S::BruteForce);
+    ASSERT_TRUE(PageOnce(workspace.Handle, queries, S::BruteForce));
     EXPECT_EQ(Cache.Stats().GpuBuilds, 1u) << "brute force reads the rewritten points without a build";
     EXPECT_EQ(WritesOf(Device, after), 1) << "the update reached the device points";
     EXPECT_EQ(Bound(Device.AsyncComputeContext, "point_brute_force_query"), 1);
-    run(S::Lbvh);
+    ASSERT_TRUE(PageOnce(workspace.Handle, queries, S::Lbvh));
     EXPECT_EQ(Cache.Stats().GpuBuilds, 2u) << "the stale hierarchy is rebuilt after the brute-force query";
     EXPECT_EQ(WritesOf(Device, after), 1) << "the rebuild reads the points brute force already wrote";
-    run(S::BruteForce);
-    run(S::Lbvh);
+    ASSERT_TRUE(PageOnce(workspace.Handle, queries, S::BruteForce));
+    ASSERT_TRUE(PageOnce(workspace.Handle, queries, S::Lbvh));
     EXPECT_EQ(Cache.Stats().GpuBuilds, 2u) << "same revision: no rebuild";
     EXPECT_EQ(WritesOf(Device, before), 1) << "same revision: no rewrite";
     EXPECT_EQ(WritesOf(Device, after), 1) << "same revision: no rewrite";
@@ -917,16 +903,14 @@ TEST_F(SpatialWorkspaceLeases, MixedStrategiesRebuildOnlyTheLbvhAfterAnUpdate)
 TEST_F(SpatialWorkspaceLeases, ComputeRebuildsAStaleHierarchyInItsOwnSubmission)
 {
     using S = Extrinsic::Graphics::PointQueryStrategy;
+    UseWorkerLane();
     const std::vector<glm::vec3> before{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}}, after{{5, 0, 0}, {6, 0, 0}, {7, 0, 0}};
+    const std::vector<glm::vec3> queries{{0.5f, 0, 0}};
     auto workspace = Cache.CreateWorkspace(before);
     ASSERT_TRUE(workspace.Ready());
-    auto batch = Cache.QueueGpuNearest(workspace.Handle, std::vector<glm::vec3>{{0.5f, 0, 0}});
-    Frame();
-    ASSERT_EQ(batch->State, R::SpatialQueryState::Ready) << batch->Diagnostic;
+    ASSERT_TRUE(PageOnce(workspace.Handle, queries, S::Lbvh));
     ASSERT_TRUE(Cache.UpdateWorkspace(workspace, after));
-    batch = Cache.QueueGpuNearest(workspace.Handle, std::vector<glm::vec3>{{0.5f, 0, 0}}, batch, S::BruteForce);
-    Frame();
-    ASSERT_EQ(batch->State, R::SpatialQueryState::Ready) << batch->Diagnostic;
+    ASSERT_TRUE(PageOnce(workspace.Handle, queries, S::BruteForce));
     ASSERT_EQ(Cache.Stats().GpuBuilds, 1u);
     std::ptrdiff_t buildsRecorded = 0;
     const auto output = Device.CreateBuffer({.SizeBytes = 16});
@@ -959,12 +943,22 @@ namespace
 }
 
 // ARCH-023 B4: a computation on an index that was never built, without any latency choice (formerly framed by
-// default), and every untransformed query shape on both strategies submit at once through
-// IDevice::SubmitComputeReadback; the frame's command context records nothing. The missing build is recorded
+// default), and every untransformed session shape on both strategies (a preparation and a page each) submit at once
+// through IDevice::SubmitComputeReadback; the frame's command context records nothing. The missing build is recorded
 // into the computation's own submission before its recorder, and LBVH builds once for all later work.
 TEST_F(SpatialWorkspaceLeases, FirstUnbuiltTargetAndEveryStrategySubmitThroughTheComputeLane)
 {
     using S = Extrinsic::Graphics::PointQueryStrategy;
+    UseWorkerLane();
+    std::vector<std::uint32_t> answer; // the next page's packed words, served after the fixture's bookkeeping
+    Device.TransferQueue.TakeReadback = [&answer, take = Device.TransferQueue.TakeReadback](
+                                            const Extrinsic::RHI::ReadbackToken token, const std::span<std::byte> out)
+    {
+        if (!take(token, out) || out.size() != answer.size() * 4u)
+            return false;
+        std::memcpy(out.data(), answer.data(), out.size());
+        return true;
+    };
     const auto target = Cache.CreateWorkspace(std::vector<glm::vec3>{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}});
     ASSERT_TRUE(target.Ready());
     std::uint64_t nodes = 0;
@@ -988,43 +982,52 @@ TEST_F(SpatialWorkspaceLeases, FirstUnbuiltTargetAndEveryStrategySubmitThroughTh
     const std::vector<std::uint32_t> excluded{0u, Geometry::PointLBVH::InvalidIndex};
     struct Shape
     {
-        std::shared_ptr<R::SpatialNearestBatch> Batch;
+        bool Radius;
         std::uint32_t Capacity, Total;
+        std::span<const std::uint32_t> Excluded;
     };
-    std::vector<Shape> shapes;
+    const Shape shapes[]{{false, 1u, 1u, {}}, {false, 2u, 2u, excluded}, {true, 3u, 2u, excluded}};
+    std::atomic<bool> abort{false};
     for (const S strategy : {S::Lbvh, S::BruteForce})
-    {
-        shapes.push_back({Cache.QueueGpuNearest(target.Handle, queries, {}, strategy), 1u, 1u});
-        shapes.push_back({Cache.QueueGpuKNearest(target.Handle, queries, 2u, excluded, {}, strategy), 2u, 2u});
-        shapes.push_back({Cache.QueueGpuRadius(target.Handle, queries, 1.f, 3u, excluded, {}, strategy), 3u, 2u});
-    }
-    EXPECT_EQ(LaneSubmissions, 7);
+        for (const auto& shape : shapes)
+        {
+            SCOPED_TRACE(::testing::Message() << "brute force " << (strategy == S::BruteForce) << " radius "
+                                              << shape.Radius << " capacity " << shape.Capacity);
+            std::string why;
+            const auto session = Cache.PrepareQuerySession(target.Handle,
+                {.Strategy = strategy,
+                    .Radius = shape.Radius,
+                    .Capacity = shape.Capacity,
+                    .PageQueries = 2u,
+                    .Queries = queries,
+                    .Excluded = shape.Excluded},
+                why);
+            ASSERT_TRUE(session) << why;
+            answer = Packed(queries.size(), shape.Capacity, shape.Total);
+            R::SpatialNearestBatch page;
+            ASSERT_EQ(
+                session->Query(0u, 2u, shape.Radius ? 1.f : -1.f, nullptr, abort, page), R::SpatialPageStatus::Ready)
+                << page.Diagnostic;
+            EXPECT_EQ(session->ReadbackBytes(), answer.size() * 4u) << "one packed readback: rows, then headers";
+            EXPECT_EQ(page.Counts, (std::vector<std::uint32_t>{shape.Total, shape.Total}));
+        }
+    EXPECT_EQ(LaneSubmissions, 13) << "the computation, then a preparation and a page per shape";
     EXPECT_EQ(Cache.Stats().GpuQuerySubmissions, 6u);
-    EXPECT_EQ(Cache.Stats().GpuBuilds, 1u) << "LBVH queries reuse the accepted build; brute force builds none";
+    EXPECT_EQ(Cache.Stats().GpuBuilds, 1u) << "LBVH sessions reuse the accepted build; brute force builds none";
     EXPECT_EQ(Bound(Device.AsyncComputeContext, "lbvh_query"), 3);
     EXPECT_EQ(Bound(Device.AsyncComputeContext, "point_brute_force_query"), 3);
-    ASSERT_EQ(InFlight.size(), 7u);
-    for (std::size_t i = 0; i < shapes.size(); ++i)
-    {
-        EXPECT_EQ(shapes[i].Batch->State, R::SpatialQueryState::Submitted) << i << shapes[i].Batch->Diagnostic;
-        auto& submission = InFlight[i + 1u];
-        const auto words = Packed(queries.size(), shapes[i].Capacity, shapes[i].Total);
-        ASSERT_EQ(submission.Bytes, words.size() * 4u) << i;
-        submission.Sink.Deliver(std::as_bytes(std::span(words)));
-        EXPECT_EQ(shapes[i].Batch->State, R::SpatialQueryState::Ready) << i << shapes[i].Batch->Diagnostic;
-        EXPECT_EQ(shapes[i].Batch->Counts, (std::vector<std::uint32_t>{shapes[i].Total, shapes[i].Total}));
-    }
-    InFlight.resize(1u); // delivered above; Frame() delivers the computation
-    Frame();
+    Frame(); // delivers the computation (the pages were pulled)
     EXPECT_EQ(compute->State, R::SpatialQueryState::Ready);
     EXPECT_TRUE(FrameRecordedNothing());
 }
 
 // A submission refused after recording (or whose recorder failed after the gather and build were recorded)
 // leaves the entry's producer state unset and publishes nothing, even if its sink were delivered late; the next
-// new request records the gather and build again, and only its accepted submission counts the build.
+// new request records the gather and build again, and only its accepted submission counts the build. A query
+// session's preparation is such a submission: refused, it leaves no session.
 TEST_F(SpatialWorkspaceLeases, RefusedRecordingLeavesTheProducerStaleAndNeverPublishes)
 {
+    UseWorkerLane();
     Device.TransferQueue.AcceptBufferUploads = true;
     const auto entity = Worlds.Get(World())->Create();
     auto& props = Worlds.Get(World())->Raw().emplace<GS::Vertices>(entity).Properties;
@@ -1058,8 +1061,10 @@ TEST_F(SpatialWorkspaceLeases, RefusedRecordingLeavesTheProducerStaleAndNeverPub
     const auto refused = Cache.QueueGpuCompute(index.Handle, 4u, recorder);
     EXPECT_EQ(refused->State, R::SpatialQueryState::Failed);
     EXPECT_NE(refused->Diagnostic.find("after recording"), std::string::npos) << refused->Diagnostic;
-    const auto refusedQuery = Cache.QueueGpuNearest(index.Handle, std::vector<glm::vec3>{{0.5f, 0, 0}});
-    EXPECT_EQ(refusedQuery->State, R::SpatialQueryState::Failed);
+    const std::vector<glm::vec3> queries{{0.5f, 0, 0}};
+    std::string why;
+    EXPECT_FALSE(Cache.PrepareQuerySession(index.Handle, {.PageQueries = 1u, .Queries = queries}, why));
+    EXPECT_NE(why.find("after recording"), std::string::npos) << why;
     EXPECT_EQ(recorded, 1) << "a refused recorder is never replayed";
     EXPECT_EQ(lane.CopyBufferRecords.size(), 6u) << "each refused attempt re-recorded the gather";
     EXPECT_EQ(Bound(lane, "lbvh_build"), 3);
@@ -1073,7 +1078,6 @@ TEST_F(SpatialWorkspaceLeases, RefusedRecordingLeavesTheProducerStaleAndNeverPub
     }
     EXPECT_EQ(refused->State, R::SpatialQueryState::Failed);
     EXPECT_EQ(refused->Data, std::vector<std::byte>(4u)) << "a refused submission publishes no bytes";
-    EXPECT_EQ(refusedQuery->State, R::SpatialQueryState::Failed);
 
     // A later new request records gather and build again; once accepted they are reused.
     RefuseAfterRecording = false;
@@ -1082,12 +1086,11 @@ TEST_F(SpatialWorkspaceLeases, RefusedRecordingLeavesTheProducerStaleAndNeverPub
     EXPECT_EQ(lane.CopyBufferRecords.size(), 8u);
     EXPECT_EQ(Bound(lane, "lbvh_build"), 4);
     EXPECT_EQ(Cache.Stats().GpuBuilds, 1u);
-    const auto query = Cache.QueueGpuNearest(index.Handle, std::vector<glm::vec3>{{0.5f, 0, 0}});
+    EXPECT_TRUE(PageOnce(index.Handle, queries));
     EXPECT_EQ(lane.CopyBufferRecords.size(), 8u) << "the accepted gather is not repeated";
     EXPECT_EQ(Bound(lane, "lbvh_build"), 4) << "nor the accepted build";
     Frame();
     EXPECT_EQ(accepted->State, R::SpatialQueryState::Ready);
-    EXPECT_EQ(query->State, R::SpatialQueryState::Ready) << query->Diagnostic;
     EXPECT_TRUE(FrameRecordedNothing());
 }
 
@@ -1158,38 +1161,46 @@ TEST_F(SpatialWorkspaceLeases, ComputeTokenGuardsCanonicalAndRingSlotsBeyondGrap
     EXPECT_EQ(residency->Stats().Readbacks, 0u) << "a compute token is a safety completion, not a transfer";
 }
 
-// A dropped (cancelled) batch stays owned by the cache until its readback arrived: the workspace refuses
-// updates meanwhile and the queue keeps reporting work. Shutdown after device idle fails what is still pending.
+// A dropped (cancelled) session whose abandoned page is still on the device stays owned by the cache until that page
+// completed: the workspace refuses updates meanwhile and the queue keeps reporting work. Shutdown after device idle
+// fails a computation still pending; its late sink publishes nothing. (Held sessions at shutdown:
+// ShutdownStopsHeldSessionsAndALaterDropReleasesNoDeviceObject.)
 TEST_F(SpatialWorkspaceLeases, CancelledAndShutdownWorkWaitForTheDevice)
 {
-    Hold = true;
+    UseWorkerLane();
     const std::vector<glm::vec3> points{{0, 0, 0}, {1, 0, 0}};
     auto workspace = Cache.CreateWorkspace(points);
-    (void)Cache.QueueGpuNearest(workspace.Handle, points); // the caller drops its result at once
-    Frame();
+    std::string why;
+    auto session = Cache.PrepareQuerySession(workspace.Handle, {.PageQueries = 2u, .Queries = points}, why);
+    ASSERT_TRUE(session) << why;
+    std::atomic<bool> abort{false};
+    HoldWorker = true;
+    AbortOnHold = &abort; // the run is discarded during the page's wait
+    R::SpatialNearestBatch page;
+    ASSERT_EQ(session->Query(0u, 2u, -1.f, nullptr, abort, page), R::SpatialPageStatus::Abandoned);
+    session.reset(); // the run drops it at once
+    (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
     RetireFrames();
     EXPECT_TRUE(Jobs.Jobs().HasGpuQueueWork());
     EXPECT_FALSE(Cache.UpdateWorkspace(workspace, points)) << "the device may still read its points";
-    Hold = false;
-    Frame();
+    Device.TransferQueue.PendingReadbacks.clear(); // the device finished the page
+    (void)Jobs.Jobs().DrainGpuQueueCompletedTransfers();
     EXPECT_FALSE(Jobs.Jobs().HasGpuQueueWork());
     EXPECT_TRUE(Cache.UpdateWorkspace(workspace, points));
 
     Hold = true;
-    const auto pending = Cache.QueueGpuNearest(workspace.Handle, points);
     const auto computation = Cache.QueueGpuCompute(workspace.Handle,
         4u,
         [output = Device.CreateBuffer({.SizeBytes = 16})](auto&, const auto&)
         {
             return output;
         });
-    ASSERT_EQ(pending->State, R::SpatialQueryState::Submitted) << pending->Diagnostic;
+    ASSERT_EQ(computation->State, R::SpatialQueryState::Submitted) << computation->Diagnostic;
     Shutdown();
-    EXPECT_EQ(pending->State, R::SpatialQueryState::Failed);
     EXPECT_EQ(computation->State, R::SpatialQueryState::Failed);
     EXPECT_NE(computation->Diagnostic.find("stopped"), std::string::npos);
-    Deliver(0); // a sink arriving after shutdown publishes nothing
-    EXPECT_EQ(pending->State, R::SpatialQueryState::Failed);
+    Deliver(InFlight.size() - 1u); // the computation's sink, arriving after shutdown, publishes nothing
+    EXPECT_EQ(computation->State, R::SpatialQueryState::Failed);
 }
 
 TEST(SpatialIndexCache, PopulatedCloudExcludesDeletedRowsFromSpatialQueries)
@@ -1278,8 +1289,9 @@ TEST_F(SpatialWorkspaceLeases, AMovingQuerySessionPagesChangedRowsOnTheComputeLa
 
 // The ICP shape: a fixed private target, one source uploaded at prepare, a pose per page written in-command (32
 // FillBuffer words) with the hierarchy built once by the owner's preparation; while the session lives the target
-// refuses UpdateWorkspace. Mutations: a host write of the pose (MappedWrites grows); a build per page (lbvh_build bound
-// more than once); no session guard in UpdateWorkspace (it succeeds while pages read the hierarchy).
+// refuses UpdateWorkspace. The cache's query traffic counts the rows once and one pose per page, every page one
+// submission and one packed readback. Mutations: a host write of the pose (MappedWrites grows); a build per page
+// (lbvh_build bound more than once); no session guard in UpdateWorkspace (it succeeds while pages read the hierarchy).
 TEST_F(SpatialWorkspaceLeases, AFixedTargetSessionTransformsEachPageInCommandAndPinsItsTarget)
 {
     UseWorkerLane();
@@ -1293,6 +1305,7 @@ TEST_F(SpatialWorkspaceLeases, AFixedTargetSessionTransformsEachPageInCommandAnd
     ASSERT_TRUE(session) << why;
     EXPECT_EQ(LaneSubmissions, 1) << "the owner's preparation: resident samples and the hierarchy";
     EXPECT_EQ(Bound(Device.AsyncComputeContext, "lbvh_build"), 1);
+    EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes, source.size() * 12u) << "the rows, once";
     const auto fills = Device.AsyncComputeContext.FillBufferCalls;
     std::atomic<bool> abort{false};
     R::SpatialNearestBatch page;
@@ -1302,6 +1315,12 @@ TEST_F(SpatialWorkspaceLeases, AFixedTargetSessionTransformsEachPageInCommandAnd
         pose[3][0] = 0.1 * step;
         ASSERT_EQ(session->Query(0u, 2u, -1.f, &pose, abort, page), R::SpatialPageStatus::Ready) << page.Diagnostic;
         EXPECT_EQ(page.Counts, (std::vector<std::uint32_t>{1u, 1u}));
+        const auto pages = std::uint64_t(step) + 1u;
+        EXPECT_EQ(Cache.Stats().GpuQueryUploadBytes, source.size() * 12u + pages * sizeof(glm::dmat4))
+            << "and then only each page's pose";
+        EXPECT_EQ(Cache.Stats().GpuQueryTransformUploads, pages);
+        EXPECT_EQ(Cache.Stats().GpuQuerySubmissions, pages) << "every page, including the first, used the lane";
+        EXPECT_EQ(session->ReadbackBytes(), pages * source.size() * 16u) << "one packed readback: neighbors, headers";
     }
     EXPECT_EQ(Device.AsyncComputeContext.FillBufferCalls, fills + 3 * 32);
     EXPECT_TRUE(Device.MappedWrites.empty()) << "no host write per page";
@@ -1502,13 +1521,6 @@ TEST_F(SpatialWorkspaceLeases, HostPreparationPrecedesRecordingOnEveryCachePath)
         return Device.TransferQueue.BufferUploads.size() > before;
     };
     std::size_t uploads = Device.TransferQueue.BufferUploads.size();
-    for (const S strategy : {S::Lbvh, S::BruteForce})
-    {
-        const auto batch = Cache.QueueGpuKNearest(fresh(), queries, 1u, {}, {}, strategy);
-        EXPECT_EQ(batch->State, R::SpatialQueryState::Submitted) << batch->Diagnostic;
-        EXPECT_TRUE(uploaded(uploads)) << "the batch's canonical slot was uploaded";
-        uploads = Device.TransferQueue.BufferUploads.size();
-    }
     const auto output = Device.CreateBuffer({.SizeBytes = 16});
     const auto computation = Cache.QueueGpuCompute(fresh(),
         4u,
@@ -1531,12 +1543,12 @@ TEST_F(SpatialWorkspaceLeases, HostPreparationPrecedesRecordingOnEveryCachePath)
         R::SpatialNearestBatch page;
         EXPECT_EQ(session->Query(0u, 2u, -1.f, nullptr, abort, page), R::SpatialPageStatus::Ready) << page.Diagnostic;
     }
-    EXPECT_EQ(recorded, 7) << "two batches, a computation, two preparations and two pages";
+    EXPECT_EQ(recorded, 5) << "a computation, two preparations and two pages";
     EXPECT_EQ(violations, 0) << "nothing uploaded, created or compiled while recording";
 }
 
-// B2: owner submissions (batches, computations, a session's preparation) wait for every transfer issued before them;
-// a prepared session's pages follow the compute lane alone. A fixed target's preparation submits even when the entry
+// B2: owner submissions (computations, a session's preparation) wait for every transfer issued before them; a
+// prepared session's pages follow the compute lane alone. A fixed target's preparation submits even when the entry
 // needs nothing recorded, so its pages always follow an AfterIssuedTransfers submission; a moving target (host rows
 // only) needs none. Mutations: Query without LaneOrderOnly (a page reports AfterIssuedTransfers); preparation skipped
 // for a built entry (LaneSubmissions unchanged, the first page then unordered after the canonical upload).
@@ -1548,10 +1560,15 @@ TEST_F(SpatialWorkspaceLeases, OwnerSubmissionsWaitForIssuedTransfersAndPrepared
     const auto entity = FreshPropertyEntity(Worlds, World());
     const auto handle = Cache.Acquire(World(), entity, Ref(D::PointCloudPoint)).Handle;
     const std::vector<glm::vec3> queries{{0.9f, 0, 0}, {2.1f, 0, 0}};
-    const auto batch = Cache.QueueGpuNearest(handle, queries);
-    ASSERT_EQ(batch->State, R::SpatialQueryState::Submitted) << batch->Diagnostic;
+    const auto output = Device.CreateBuffer({.SizeBytes = 16});
+    const auto recorder = [output](auto&, const auto&)
+    {
+        return output;
+    };
+    const auto build = Cache.QueueGpuCompute(handle, 4u, recorder); // gathers and builds the entry
+    ASSERT_EQ(build->State, R::SpatialQueryState::Submitted) << build->Diagnostic;
     Frame();
-    ASSERT_EQ(batch->State, R::SpatialQueryState::Ready) << batch->Diagnostic;
+    ASSERT_EQ(build->State, R::SpatialQueryState::Ready) << build->Diagnostic;
     const int built = LaneSubmissions;
     std::string why;
     const auto fixed = Cache.PrepareQuerySession(handle, {.Capacity = 1u, .PageQueries = 1u, .Queries = queries}, why);
@@ -1565,15 +1582,7 @@ TEST_F(SpatialWorkspaceLeases, OwnerSubmissionsWaitForIssuedTransfersAndPrepared
         Cache.PrepareQuerySession({}, {.Capacity = 1u, .PageQueries = 2u, .Queries = queries, .Moving = true}, why);
     ASSERT_TRUE(moving) << why;
     ASSERT_EQ(moving->Query(0u, 2u, -1.f, nullptr, abort, page), R::SpatialPageStatus::Ready) << page.Diagnostic;
-    const auto output = Device.CreateBuffer({.SizeBytes = 16});
-    EXPECT_EQ(Cache
-                  .QueueGpuCompute(4u,
-                      [output](auto&, const auto&)
-                      {
-                          return output;
-                      })
-                  ->State,
-        R::SpatialQueryState::Submitted);
+    EXPECT_EQ(Cache.QueueGpuCompute(4u, recorder)->State, R::SpatialQueryState::Submitted);
     EXPECT_EQ(Device.ComputeInputOrders,
         (std::vector<O>{O::AfterIssuedTransfers,
             O::AfterIssuedTransfers,
@@ -1581,7 +1590,7 @@ TEST_F(SpatialWorkspaceLeases, OwnerSubmissionsWaitForIssuedTransfersAndPrepared
             O::LaneOrderOnly,
             O::LaneOrderOnly,
             O::AfterIssuedTransfers}))
-        << "batch, preparation, two fixed pages, a moving page, a computation";
+        << "a computation, a preparation, two fixed pages, a moving page, a computation";
 }
 
 // N5: a run still holding sessions at cache shutdown (after device idle). Shutdown releases their device objects on

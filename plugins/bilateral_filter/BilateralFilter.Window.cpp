@@ -93,7 +93,8 @@ namespace Intrinsic::Plugins::BilateralFilter
                 kMaxIterations,
                 true,
                 draft.Output.Name == draft.Positions.Name,
-                kMinIterations);
+                kMinIterations,
+                true);
             ImGui::InputFloat("Spatial sigma (0: auto)", &draft.SpatialSigma);
             ImGui::InputFloat("Normal sigma", &draft.NormalSigma);
             if (IsVulkan(draft.Backend))

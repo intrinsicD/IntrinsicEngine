@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <span>
+#include <vector>
 
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.RHI.Handles;
@@ -173,6 +174,85 @@ TEST(GpuPropertyResidency, AUseIsCompleteOnlyOneFramePastTheFramesInFlightDistan
     device.GlobalFrameNumber = 8u;
     residency.Tick();
     EXPECT_EQ(device.DestroyBufferCount, 1);
+}
+
+// ARCH-024: minimized, no frame advances; a back slot is reused once its transfers completed and the device reports
+// its frame stamps retired. Predictions, before any run, at depths 2 and 3: six acquire/publish rounds drop nothing
+// and need only the front and one back (two buffers, the first written again in round 2), the counter still 0; with
+// an upload pending on both, the next back is dropped at depth 2 and a third allocation at depth 3, and once the
+// uploads completed an existing slot serves again. Mutation: the former counter distance (LastFrame + FramesInFlight)
+// drops round 2 at depth 2 and round 3 at depth 3.
+TEST(GpuPropertyResidency, DeviceRetirementReusesRingSlotsBeyondTheirDepthWhileTheFrameCounterIsFrozen)
+{
+    for (const std::uint32_t depth : {2u, 3u})
+    {
+        SCOPED_TRACE(depth);
+        MOCK_DEVICE_ACCEPTING_UPLOADS(device);
+        device.FrameRetired = [](std::uint64_t)
+        {
+            return true;
+        };
+        GpuPropertyResidency residency(device);
+        const auto layout = Scalar(GpuScalarType::Float32, 4);
+        std::vector<Extrinsic::RHI::BufferHandle> written;
+        for (int round = 0; round < 6; ++round)
+        {
+            const auto back = residency.AcquireBack(Key(1), layout, depth);
+            ASSERT_TRUE(back) << round;
+            written.push_back(back->Buffer);
+            ASSERT_TRUE(residency.Publish(Key(1)));
+        }
+        EXPECT_EQ(device.CreateBufferCount, 2) << "a back is allocated only while every other slot is busy";
+        EXPECT_EQ(written[2], written[0]);
+        EXPECT_EQ(residency.Stats().DroppedPreviews, 0u);
+        EXPECT_EQ(device.GlobalFrameNumber, 0u);
+
+        device.TransferQueue.AlwaysComplete = false;
+        for (const auto buffer : written)
+            residency.AddCompletion(buffer, Extrinsic::RHI::TransferToken{1u});
+        const auto busy = residency.AcquireBack(Key(1), layout, depth);
+        EXPECT_EQ(busy.has_value(), depth == 3u) << "a pending upload keeps its slot";
+        EXPECT_EQ(device.CreateBufferCount, int(depth));
+        EXPECT_EQ(residency.Stats().DroppedPreviews, depth == 2u ? 1u : 0u);
+        device.TransferQueue.AlwaysComplete = true;
+        const auto served = residency.AcquireBack(Key(1), layout, depth);
+        ASSERT_TRUE(served);
+        EXPECT_NE(std::ranges::find(written, served->Buffer), written.end());
+    }
+}
+
+// ARCH-024 hazard: the front a frame still in flight renders gets a later stamp (a front readback between frames,
+// whose own number the device already reports retired). Predictions, before any run: once the front moved on, the old
+// front is not handed out while frame 4 is in flight (the depth-2 ring drops the preview) and is reused after frame 4
+// retired. Mutation: merging stamps into one latest frame (the former LastFrame = max) hands the old front out while
+// frame 4 still reads it.
+TEST(GpuPropertyResidency, ALaterStampDoesNotHideAnEarlierFrameStillReadingTheSlot)
+{
+    MOCK_DEVICE_ACCEPTING_UPLOADS(device);
+    std::uint64_t inFlight = 4u;
+    device.FrameRetired = [&](const std::uint64_t frame)
+    {
+        return frame != inFlight;
+    };
+    GpuPropertyResidency residency(device);
+    const auto layout = Scalar(GpuScalarType::Float32, 4);
+    device.GlobalFrameNumber = 3u;
+    const auto shown = residency.AcquireBack(Key(1), layout, 2u)->Buffer; // computed between frames
+    ASSERT_TRUE(residency.Publish(Key(1)));
+    device.GlobalFrameNumber = 4u;
+    residency.MarkObserved(Key(1)); // frame 4 renders the front
+    device.GlobalFrameNumber = 5u;  // frame 4 submitted, still in flight
+    residency.NoteUse(shown, 5u);   // a front readback recorded between frames
+    const auto next = residency.AcquireBack(Key(1), layout, 2u);
+    ASSERT_TRUE(next);
+    EXPECT_NE(next->Buffer, shown);
+    ASSERT_TRUE(residency.Publish(Key(1)));
+    EXPECT_FALSE(residency.AcquireBack(Key(1), layout, 2u)) << "frame 4 still reads the old front";
+    EXPECT_EQ(residency.Stats().DroppedPreviews, 1u);
+    inFlight = ~std::uint64_t{0}; // frame 4 retired
+    const auto reused = residency.AcquireBack(Key(1), layout, 2u);
+    ASSERT_TRUE(reused);
+    EXPECT_EQ(reused->Buffer, shown);
 }
 
 TEST(GpuPropertyResidency, ARevisionBumpUploadsOnceMoreAndReleasesTheOldSlotOnceUnheldAndComplete)

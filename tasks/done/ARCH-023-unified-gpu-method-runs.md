@@ -175,7 +175,7 @@ completion record, including packet digest, test results, negative checks, limit
 
 The [coverage matrix](../../docs/methods/gpu-method-coverage.md) owns the family inventory and necessary
 exceptions; the [method template](../../docs/methods/method-template.md) owns the reusable adapter.
-[RUNTIME-355](../backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md) owns the
+[RUNTIME-355](../active/RUNTIME-355-method-execution-retirement-and-consistency.md) owns the
 reviewed non-blocking internal simplifications and unprobed cases. Pure CPU methods without a GPU
 counterpart are outside this task. No measured speedup or cross-device guarantee is claimed.
 Temporary evidence was retired after review and final checks; worktrees and unrelated evidence were preserved.

@@ -550,7 +550,8 @@ namespace Extrinsic::Runtime
                 const StepRunExecution& execution,
                 Graphics::GpuPropertyResidency* testResidency,
                 const EditorPointScalarTransactionSnapshot& testResult,
-                std::function<void(EditorPointScalarTransactionSnapshot)> retain)
+                std::function<void(EditorPointScalarTransactionSnapshot)> retain,
+                std::string owner)
             {
                 auto* residency = testResidency
                     ? testResidency
@@ -573,6 +574,7 @@ namespace Extrinsic::Runtime
                 w->Label = std::move(label);
                 t.Execution = OneShotExecution(execution);
                 t.JobLabel = std::string(jobLabel);
+                t.Owner = std::move(owner);
                 t.Rings[kTyped] = {.Key = MakeGpuPropertyKey(ctx.World, entity, w->Capture->Output), .ReadBack = true};
                 t.RingCount = 1;
                 t.Identity = {.EntityId = stableId,
@@ -743,6 +745,8 @@ namespace Extrinsic::Runtime
                 .Message = why};
             return {};
         };
+        if (publication.PreviewBuffers < 2u || publication.PreviewBuffers > 3u)
+            return refuse("preview_buffers must be 2 or 3.");
         if (!residency || !publication.Current || (!publication.Companion && !publication.Publish) ||
             (publication.Companion && !publication.PublishPair) || !publication.Count ||
             !context.JobCommands.Available() || GeometryPropertyComponentCount(publication.Output.ValueKind) != 1 ||
@@ -773,8 +777,8 @@ namespace Extrinsic::Runtime
             GP::FailGpuTransaction(t, {});
             return refuse(why);
         };
-        typed.Back =
-            AcquireGpuPropertyOutput(*residency, context.World, w->Entity, publication.Output, publication.Count, 3);
+        typed.Back = AcquireGpuPropertyOutput(
+            *residency, context.World, w->Entity, publication.Output, publication.Count, publication.PreviewBuffers);
         typed.Generation = residency->RingGeneration(typed.Key);
         if (!typed.Back)
             return rollback("Typed scalar output reservation failed.");
@@ -785,7 +789,7 @@ namespace Extrinsic::Runtime
                 w->Entity,
                 GpuPropertyPresentationRef(publication.Output),
                 publication.Count,
-                3);
+                publication.PreviewBuffers);
             presentation.Generation = residency->RingGeneration(presentation.Key);
             if (!view)
                 return rollback("Scalar presentation reservation failed.");
@@ -795,8 +799,12 @@ namespace Extrinsic::Runtime
             companion = {.Key = MakeGpuPropertyKey(context.World, w->Entity, *publication.Companion), .ReadBack = true};
             if (residency->HasRing(companion.Key))
                 return rollback("Companion output awaits Accept or Discard.");
-            companion.Back = AcquireGpuPropertyOutput(
-                *residency, context.World, w->Entity, *publication.Companion, publication.Count, 3);
+            companion.Back = AcquireGpuPropertyOutput(*residency,
+                context.World,
+                w->Entity,
+                *publication.Companion,
+                publication.Count,
+                publication.PreviewBuffers);
             companion.Generation = residency->RingGeneration(companion.Key);
             if (!companion.Back)
                 return rollback("Companion output reservation failed.");
@@ -816,14 +824,19 @@ namespace Extrinsic::Runtime
         auto& t = w->Core;
         auto& residency = *t.Residency;
         Typed(w).Back.reset(); // Drop the admission lease before selecting a preview back.
-        auto typed = AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, p.Output, p.Count, 3);
+        auto typed =
+            AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, p.Output, p.Count, p.PreviewBuffers);
         if (!typed)
             return std::nullopt;
         Typed(w).Generation = residency.RingGeneration(Typed(w).Key);
         auto presentation = p.Output.ValueKind == Geometry::PropertyValueKind::Float
             ? typed
-            : AcquireGpuPropertyOutput(
-                  residency, t.Context.World, w->Entity, GpuPropertyPresentationRef(p.Output), p.Count, 3);
+            : AcquireGpuPropertyOutput(residency,
+                  t.Context.World,
+                  w->Entity,
+                  GpuPropertyPresentationRef(p.Output),
+                  p.Count,
+                  p.PreviewBuffers);
         if (!presentation)
             return std::nullopt;
         if (p.Output.ValueKind != Geometry::PropertyValueKind::Float)
@@ -832,7 +845,8 @@ namespace Extrinsic::Runtime
         if (p.Companion)
         {
             t.Rings[kCompanion].Back.reset();
-            companion = AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, *p.Companion, p.Count, 3);
+            companion = AcquireGpuPropertyOutput(
+                residency, t.Context.World, w->Entity, *p.Companion, p.Count, p.PreviewBuffers);
             if (!companion)
                 return std::nullopt;
             t.Rings[kCompanion].Generation = residency.RingGeneration(t.Rings[kCompanion].Key); // renewed on restart

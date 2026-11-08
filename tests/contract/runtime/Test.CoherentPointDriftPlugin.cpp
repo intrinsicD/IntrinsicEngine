@@ -389,7 +389,7 @@ TEST(CoherentPointDriftPlugin, RestartAndTheStartModeFollowTheSharedExecutionOpt
     const auto reference = Solve();
     ASSERT_GT(reference.Trace.size(), 3u);
     Harness harness;
-    const auto run = harness.Start();
+    const auto run = harness.Start({{"preview_buffers", 2}});
     ASSERT_NE(run, 0u);
     for (int frame = 0; frame < 5; ++frame)
         harness.Frame();
@@ -399,6 +399,8 @@ TEST(CoherentPointDriftPlugin, RestartAndTheStartModeFollowTheSharedExecutionOpt
     EXPECT_EQ(observed["can_restart"], true);
     EXPECT_EQ(observed["execution"]["start"], "ready");
     EXPECT_EQ(observed["execution"]["max_iterations"], 200);
+    EXPECT_EQ(observed["execution"]["preview_buffers"], 2);
+    EXPECT_EQ(observed["device_preview_buffers"], 0u) << "live preview is off";
     ASSERT_FALSE(harness.Control(run, "step", 3).contains("error"));
     ASSERT_TRUE(harness.Stopped(run));
     ASSERT_FALSE(harness.Control(run, "restart").contains("error"));

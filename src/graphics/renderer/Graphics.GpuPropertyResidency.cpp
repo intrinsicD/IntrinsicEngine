@@ -25,7 +25,9 @@ namespace Extrinsic::Graphics
         {
             GpuPropertyView View{};
             std::shared_ptr<int> Lease{std::make_shared<int>(0)};
-            std::optional<std::uint64_t> LastFrame{};
+            // Frame stamps (IDevice::IsFrameRetired), each retired on its own: a later stamp's retirement proves
+            // nothing about an earlier frame still in flight, so stamps are kept side by side, never merged.
+            std::vector<std::uint64_t> Frames{};
             std::vector<RHI::TransferToken> Transfers{};
             std::vector<RHI::ReadbackToken> Readbacks{};
             double LastUse{};
@@ -81,18 +83,33 @@ namespace Extrinsic::Graphics
             return nullptr;
         }
         static bool Leased(const Slot& slot) { return slot.Lease.use_count() > 1; }
-        // Drops finished tokens; true when nothing recorded on the slot is still in flight.
+        // Drops finished tokens and retired frame stamps; true when nothing recorded on the slot is still in flight.
         bool Complete(Slot& slot)
         {
             auto& queue = Device.GetTransferQueue();
             std::erase_if(slot.Transfers, [&](const RHI::TransferToken t) { return queue.IsComplete(t); });
             std::erase_if(slot.Readbacks, [&](const RHI::ReadbackToken t) { return queue.IsComplete(t); });
             if (!slot.Transfers.empty() || !slot.Readbacks.empty()) return false;
-            // The frame counter advances at EndFrame, but frame N's fence is waited only by
-            // BeginFrame(N + FramesInFlight): at a distance of exactly FramesInFlight the use
-            // may still be executing, so one more frame is required.
-            const auto frame = Device.GetGlobalFrameNumber();
-            return !slot.LastFrame || (frame >= *slot.LastFrame && frame - *slot.LastFrame > Device.GetFramesInFlight());
+            DropRetiredFrames(slot);
+            return slot.Frames.empty();
+        }
+        void DropRetiredFrames(Slot& slot)
+        {
+            std::erase_if(slot.Frames,
+                [&](const std::uint64_t frame)
+                {
+                    return Device.IsFrameRetired(frame);
+                });
+        }
+        void StampFrame(Slot& slot, const std::uint64_t frame)
+        {
+            if (std::ranges::find(slot.Frames, frame) != slot.Frames.end())
+                return;
+            // A front is stamped every frame but checked only once replaced: pruning past a few stamps bounds the
+            // list by the unretired ones (the frames in flight and the current number).
+            if (slot.Frames.size() >= 8u)
+                DropRetiredFrames(slot);
+            slot.Frames.push_back(frame);
         }
         // A tightly packed stride and stride 0 name the same bytes; one identity for both.
         static GpuPropertyLayout Normalized(GpuPropertyLayout layout)
@@ -109,7 +126,7 @@ namespace Extrinsic::Graphics
         GpuPropertyView Use(Slot& slot)
         {
             NoteSubmissionUse(slot.View.Buffer);
-            slot.LastFrame = Device.GetGlobalFrameNumber();
+            StampFrame(slot, Device.GetGlobalFrameNumber());
             slot.LastUse = Now();
             auto view = slot.View;
             view.Lease = slot.Lease;
@@ -344,7 +361,7 @@ namespace Extrinsic::Graphics
         m_Impl->NoteSubmissionUse(slot);
         if (auto* found = m_Impl->FindSlot(slot))
         {
-            found->LastFrame = std::max(found->LastFrame.value_or(0u), frame);
+            m_Impl->StampFrame(*found, frame);
             found->LastUse = m_Impl->Now();
         }
     }
