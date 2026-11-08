@@ -2896,6 +2896,8 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.CancelledAndRefusedComputationsKeepTheirWorkspaceUntilDoneAndFailClosed|3"
     "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.SerialRequestsSettleTheirLatencyAndAClosedBrokerRefusesLaterOnes|3"
     "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.AStepRunKeepsItsTargetResidentAcrossStepsAndPauses|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.TimedOutEStepClosesTheBrokerOnItsWorker|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.ACancelledOwnerDrivenRunAnswersOnceItsHeldIterationReturned|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.ReadyJobsHonorPriorityAndEqualPrioritySubmissionOrder|2"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce|3"
