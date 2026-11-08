@@ -73,6 +73,7 @@ picking backlog work; theme priorities and rationale live in
 ## Theme G — Active bugs
 
 - unblocked: `BUG-259` — Local pytest cache fails repository-root hygiene (tasks/backlog/bugs/BUG-259-local-pytest-cache-root-hygiene.md)
+- unblocked: `BUG-260` — PR-fast stops at vcpkg tool download with HTTP 504 (tasks/backlog/bugs/BUG-260-pr-fast-vcpkg-download-504.md)
 
 ## Theme H — Agentic workflow hardening
 
