@@ -131,8 +131,8 @@ Initial farthest-point orders use `PointSamplingGpuRun`'s own worker pages. A ru
 with a Vulkan subsample backend holds its ordering workspace and resident input from its start to
 its settled end (an interactive run included), as its Vulkan E-step workspace is held; an editor
 detach ends it as stale ("inputs changed"), like every worker CPD run.
-[RUNTIME-355](../../tasks/active/RUNTIME-355-method-execution-retirement-and-consistency.md)
-tracks verification of these simplifications and the remaining removal cases above. The
+[RUNTIME-355](../../tasks/done/RUNTIME-355-method-execution-retirement-and-consistency.md)
+records the accepted verification of these simplifications and the documented removal-probe limits above. The
 obsolete owner-thread query APIs and owner-step branches have been removed; the shared
 run-control protocol remains the same.
 

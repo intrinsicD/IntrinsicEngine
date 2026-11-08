@@ -72,7 +72,7 @@ The architecture scorecard found layer imports, CMake links, downward-facing API
 ownership and exception ownership sound. Typed pass IDs and new recipe edges were not applicable.
 Maturity is **Operational**, bounded to these deterministic backend tests; scorecard row 7 passed. There are no new layer-policy exceptions.
 
-[RUNTIME-355](../../tasks/active/RUNTIME-355-method-execution-retirement-and-consistency.md)
+[RUNTIME-355](../../tasks/done/RUNTIME-355-method-execution-retirement-and-consistency.md)
 records the explicitly non-blocking simplifications: K-Means' local page transport, unused
 test-only queue APIs and owner-step helpers, optional agent argument shape and remaining removal
 probes. Initial sampling now uses the shared worker sampler, and runtime CPD with Vulkan subsampling

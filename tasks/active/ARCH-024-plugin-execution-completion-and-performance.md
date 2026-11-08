@@ -100,14 +100,14 @@ that search gap. Algorithm mathematics and existing accepted element domains sta
 
 ## Acceptance criteria
 - [ ] PR #1046 integrated after its required checks pass; BUG-260 outcome recorded.
-- [ ] RUNTIME-355 criteria independently verified and its task retired.
+- [x] RUNTIME-355 criteria independently verified and its task retired.
 - [ ] GPU Init, preview completion and Accept progress on the owner without rendering, with
       deterministic CPU and real-Vulkan tests for cancellation, stale input and shutdown.
 - [ ] Reviewed performance campaign executed with matched controls, valid machine-readable results,
       raw-derived HTML report, uncertainty and clearly bounded conclusions.
-- [ ] Every actual plugin is inventoried; each incomplete plugin has one scoped task or explicitly
+- [x] Every actual plugin is inventoried; each incomplete plugin has one scoped task or explicitly
       refined existing owner, with necessary exceptions and missing evidence distinguished.
-- [ ] New method-plugin creation uses the shared execution/configuration path by default and
+- [x] New method-plugin creation uses the shared execution/configuration path by default and
       executable checks reject bypasses while preserving explicit capability exceptions.
 - [ ] Independent final review accepts the exact implementation, test evidence, report and task coverage.
 
@@ -186,3 +186,13 @@ runtime backlog. RUNTIME-360 owns shared metric curves and RUNTIME-361 consumes 
 existing method-to-plugin GPU migrations remain separately owned.
 Its preview experiment measures publication under a rendered triangle workload, not consumption
 of the method preview by the renderer. Final experiment preflight remains outstanding.
+
+## Engineering checkpoint review (2026-11-08)
+Independent reviewer `/root/agent_execution_review` returned: **“APPROVE: safe to commit and
+push this explicitly incomplete ARCH-024 engineering checkpoint.”** Reviewed manifest
+`893334ec33917c5a0277e392d2038a1cbdb21fe9a117b7c2e67844af996c05fc`, tracked diff
+`d032ad6505392542cc62ce5c458619055f413d6fd1635d27e6e08ad1d4392ee7`; implementation
+commit `b7e83f13d`. The reviewer accepted plugin inventory/follow-up ownership and the
+new-plugin default criteria. It did not approve PR #1046 merge, BUG-263/264 closure,
+performance results or overall task completion. Full CPU CI at `f9bcae578` also passed;
+separate hosted sanitizer gates were still running at this checkpoint.

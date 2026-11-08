@@ -85,6 +85,7 @@ Independent reviewer `/root/worker_transport_review` returned: **“APPROVE — 
 nach Aktualisierung des Abschlussvermerks retired werden.”** It accepted F1, F2, F4, F5 and F6
 against restricted diff `9169520d339e50ff1e4a8e3838da77f6ca15895b19128267d6f565663e6a4dd8`
 and WorkerGpuPages test `aa08beb3bb85e9d3141d75e6fcf81d2a4991f22b045b63ba78b44b391386c230`.
-The combined implementation commit and task retirement remain to be recorded under ARCH-024.
+Completed 2026-11-08. Commit reference: `b7e83f13d` (unchanged source tree after
+base-branch merge `fd8e63bf9`). This is a refactoring closure, with no new performance claim.
 Temporary verification evidence is retained by active ARCH-024; its other acceptance criteria
 and BUG-263/264 are not closed by this decision.
