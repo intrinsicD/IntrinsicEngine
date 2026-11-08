@@ -32,4 +32,4 @@ fails at markdown links. Reproduced 2026-11-07: review document links to
 `src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp`, which no longer exists.
 Completed 2026-11-07. Commit: the implementation commit whose message names BUG-257
 (`git log --grep BUG-257`). The retirement log records the correction.
-Temporary outputs stay under ARCH-023 while that task consumes its baseline and repaired link checks.
+Temporary outputs were retired with ARCH-023 after its final acceptance and checks.

@@ -1,6 +1,6 @@
 # Unified GPU method execution: verification and review
 
-Scope: [ARCH-023](../../tasks/active/ARCH-023-unified-gpu-method-runs.md), the existing GPU/hybrid
+Scope: [ARCH-023](../../tasks/done/ARCH-023-unified-gpu-method-runs.md), the existing GPU/hybrid
 methods and their CPU counterparts. This is an engineering refactor and deterministic contract
 verification, not a new scientific result, a performance measurement or a cross-device guarantee.
 The [coverage matrix](../methods/gpu-method-coverage.md) owns the current method inventory and
@@ -61,19 +61,23 @@ plugins, one-shot adapters, construction and ownership corrections. The fresh fi
 (session `3bed78aa-f0ae-4a1b-bf64-1407f84919d8`) inspected the shared mechanisms and cross-checked
 family consumers against those reviews and approved the core at tree
 `a85668cebdebad9186cb8643230b94f8ac6c6592`. Its explicit CPD-subsampling caveat was carried into
-the final worker slice below. Overall acceptance remains pending that slice's independent review.
-The reviewer decides the task's checkboxes; source approval alone is not backend verification.
+the final worker slice below, committed as `da3ca8b8a36234fb4847b4d73436a7da9f48da07`. On 2026-11-08 the same final
+reviewer returned **“Final verdict: APPROVE.”** for tree `1ca7f8ed443bbd5afbe43ffe1e23ddb12f1d4c74`,
+judging all nine acceptance criteria met and the Q9 CPD condition closed. Review packet SHA-256:
+`ed054ba3b787f0001496176bbd6a9faf361cfed27fa63c425bf391196e48ff93`. Requested model/effort: Claude Opus 5.5/max; reported
+model: `claude-opus-5-5` (effort not independently echoed). Read-only access and no further delegation
+were enforced by the CLI tool whitelist. The verdict includes the bounded closure edits recorded here.
 
 The architecture scorecard found layer imports, CMake links, downward-facing APIs, renderer
 ownership and exception ownership sound. Typed pass IDs and new recipe edges were not applicable.
-Maturity closure awaits the final acceptance verdict. There are no new layer-policy exceptions.
+Maturity is **Operational**, bounded to these deterministic backend tests; scorecard row 7 passed. There are no new layer-policy exceptions.
 
 [RUNTIME-355](../../tasks/backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md)
 records the explicitly non-blocking simplifications: K-Means' local page transport, unused
 test-only queue APIs and owner-step helpers, optional agent argument shape and remaining removal
 probes. Initial sampling now uses the shared worker sampler, and runtime CPD with Vulkan subsampling
-uses worker steps. GPU Accept and preview collection still need frames;
-minimizing the window does not stop worker iterations, but defers owner-side GPU publication.
+uses worker steps. GPU Init, Accept and preview collection still need frames;
+minimizing the window does not stop worker iterations, but defers owner-side GPU Init and publication.
 Only this GPU/driver was exercised; no measured speedup or general numerical proof is claimed.
 
 ## Final initial-sampling and CPD worker slice
@@ -91,7 +95,7 @@ the design and ownership. Those corrections were implemented. The code review, b
 checks and a small unused-import/comment cleanup, the same reviewer returned **“F3 code, behaviour
 and verification: APPROVE.”** for tree `e031b367d8a5529ce69cf4b5d45022bf5b1374a8`.
 Its required summary correction below explicitly combines the CPU Ready contract with the GPU
-no-frame check; overall closure review remains pending. Review tools enforce read-only access
+no-frame check; the final reviewer accepted that correction in the overall approval above. Review tools enforce read-only access
 and prohibit further delegation. Requested model/effort: Claude Opus 5.5/max; the CLI reported
 `claude-opus-5-5` (effort is not independently echoed).
 
@@ -131,6 +135,18 @@ The sampler's residency stamp has no independent removal proof because the poole
 retained input view masks removal. CPD shutdown relies on device completion, including an ordering
 page submitted after the pre-drain idle wait. Initial ordering has no separate Jobs-window row or
 stage text; its time is included in step one. No TSan run was performed. These limits are also recorded in the coverage matrix.
+
+The final tooling sweep exposed a separate local root-hygiene failure: an existing
+`.pytest_cache/` directory dated 2026-10-07 is not an allowed root entry. It was preserved;
+[BUG-259](../../tasks/backlog/bugs/BUG-259-local-pytest-cache-root-hygiene.md) owns that local setup issue.
+This does not establish a hosted-CI failure. All 39 tooling regression scripts selected by
+`ci-docs.yml`, including all 13 root-hygiene test methods, passed unchanged in an isolated snapshot
+of maintained tree `4ef92eb0f0241d28672dfea8afd1bf0b90f41e27`, before this closure narrative.
+Strict task policy, state links, documentation links, claims, mirrors
+and session-brief checks also passed. The local-cache failure remains open under BUG-259.
+The same final reviewer (session `3bed78aa-f0ae-4a1b-bf64-1407f84919d8`) approved the
+docs/task closure delta at tree `c48e05aed758d25891f2bc0c10e3130dbfc4bbd5` with verdict **“APPROVE”**
+(packet SHA-256 `c904782e22606cffdb1cecbac80697a72ca986d8fd544b9c6b5f08fff03ba6cd`), including the evidence retention boundary and the three applied wording/ordering corrections.
 
 Raw logs, probe outputs and review transcripts are temporary. After acceptance they are removed
 under the task-retirement policy; this note preserves the source identity, commands, negative

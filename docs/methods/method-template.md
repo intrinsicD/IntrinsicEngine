@@ -43,7 +43,7 @@ Start from a working consumer whose execution shape matches the method:
 
 The [GPU method coverage matrix](gpu-method-coverage.md) records the shared lifecycle,
 CPU counterparts and necessary exceptions for every existing GPU or hybrid family.
-[ARCH-023](../../tasks/active/ARCH-023-unified-gpu-method-runs.md) owns the integration and verification.
+[ARCH-023](../../tasks/done/ARCH-023-unified-gpu-method-runs.md) records the completed integration and verification.
 
 ### Executable template
 

@@ -41,6 +41,5 @@ Independent Opus reviewer session `3bed78aa-f0ae-4a1b-bf64-1407f84919d8`, tree
 `a85668cebdebad9186cb8643230b94f8ac6c6592`: "Criterion 1 (citation bound, statement and status unchanged): met."
 and "Criterion 2 (strict claims pass, no checker exception): met." Read-only and no delegation
 enforced. The verified historical object exists and strict validation passes for 125 claims.
-Temporary review/check files remain at their exact paths under `tasks/evidence/ARCH-023/` because
-active ARCH-023 still consumes them; its final cleanup owns their deletion. No raw files are removed
-by this task's retirement. No method or scientific claim changed.
+Temporary review/check files were retired with ARCH-023 after its final acceptance and checks.
+No method or scientific claim changed.

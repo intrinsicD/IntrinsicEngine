@@ -110,7 +110,8 @@ a nonblocking mailbox. Keep ECS, residency mutation and publication on the owner
 K-Means first, then all resident/paged GPU and hybrid owners through that same substrate. Shared
 native queues retain a truthful hardware limitation. Tests must prove multiple logical steps
 without frames, producer visibility, loose preview, cancellation and shutdown. No measured speedup
-is claimed. Exact review/session/packet are in ignored `compute-progress-plan-review` evidence.
+is claimed. Temporary review packets and logs were retired at completion; the durable verification note
+below records the source identities, decisions and limits.
 
 ## Spatial acceleration review
 Existing owners are Graphics.PointLBVH and its shared GLSL includes, composed by
@@ -119,15 +120,15 @@ missing explicit exhaustive GPU strategy and resident recording path; do not mer
 precision contracts or replace K-Means' fused scan. Queries remain composable without CPU readback.
 
 ## Acceptance criteria
-- [ ] Method compute uses a separate available queue and correct GPU-to-GPU ordering; fallback is reported.
-- [ ] All existing method entry points have the common lifecycle or a documented, tested necessary exception.
-- [ ] CPU, GPU and hybrid Run/Step agree; pause/stop/accept/discard have common semantics across UI and MCP.
-- [ ] Preview cannot stall computation or expose incomplete/reused data; disabling it preserves results.
-- [ ] Shared run configuration validates and round-trips; requested/actual backend and hybrid traffic are visible.
-- [ ] Resident state survives steps and waits for acceptance; safe workspace/buffer reuse obeys resource budgets.
-- [ ] Brute-force and LBVH GPU queries are reusable by multiple methods through one checked contract.
-- [ ] New methods have a small working template and shared behavior tests; existing numerical contracts remain intact.
-- [ ] Focused CPU and deterministic real-GPU tests pass, new tests fail without their mechanisms, final independent review approves the exact diff.
+- [x] Method compute uses a separate available queue and correct GPU-to-GPU ordering; fallback is reported.
+- [x] All existing method entry points have the common lifecycle or a documented, tested necessary exception.
+- [x] CPU, GPU and hybrid Run/Step agree; pause/stop/accept/discard have common semantics across UI and MCP.
+- [x] Preview cannot stall computation or expose incomplete/reused data; disabling it preserves results.
+- [x] Shared run configuration validates and round-trips; requested/actual backend and hybrid traffic are visible.
+- [x] Resident state survives steps and waits for acceptance; safe workspace/buffer reuse obeys resource budgets.
+- [x] Brute-force and LBVH GPU queries are reusable by multiple methods through one checked contract.
+- [x] New methods have a small working template and shared behavior tests; existing numerical contracts remain intact.
+- [x] Focused CPU and deterministic real-GPU tests pass, new tests fail without their mechanisms, final independent review approves the exact diff.
 
 ## Engine integration
 | Surface | Required treatment |
@@ -145,6 +146,10 @@ All currently supported domains remain supported. New query variants operate on 
 runtime owns element-slot mapping. No integration surface is deferred outside this task.
 
 ## Verification
+Real-backend evidence: the [verification note](../../docs/reviews/2026-11-08-unified-gpu-method-runs.md)
+records the RTX 3050 separate-queue Vulkan runs, the CPU and sanitizer checks, exact source identities
+and their limits. These deterministic runs support the bounded Operational closure.
+
 Target selection is expanded from the registered source inventory for each finished block; never
 claim a command below ran before recording its actual output. Queue/RHI and broad interface changes
 may require the full CPU gate; local method slices use focused targets.
@@ -159,33 +164,18 @@ ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(StepRuns|GpuPro
 cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests
 ```
 
-## State
-The shared lifecycle and queue implementation has passed deterministic verification and independent
-review. Before closing the operator’s full Q9 scope, this task now completes render-independent
-initial GPU sampling for consolidation/CPD and worker stepping for runtime CPD with Vulkan subsampling
-(the review’s F3). That slice is implemented and deterministically verified; independent Opus review approved
-its code, behaviour and verification at tree e031b367d8a5529ce69cf4b5d45022bf5b1374a8.
-Overall closure review remains pending. The accepted core is frozen at tree a85668cebdebad9186cb8643230b94f8ac6c6592.
-The independent Opus counter-review accepts the new slice's design and ownership, requiring
-case-budget synchronization and bounded failure cleanup in the cancellation tests. These corrections
-are implemented, including red-before-fix and mechanism-removal checks. The [verification/review note](../../docs/reviews/2026-11-08-unified-gpu-method-runs.md)
-records the exact source trees, commands, combined GPU result, corrected fixture, skips and limits.
-The [coverage matrix](../../docs/methods/gpu-method-coverage.md) owns the current family inventory;
-the [method template](../../docs/methods/method-template.md) owns the reusable adapter pattern.
+## Completion — 2026-11-08
+Commit: `da3ca8b8a36234fb4847b4d73436a7da9f48da07` (final worker slice), `81269bd14` (core), `c1fa06c32` (CPU test budgets).
+[PR #1046](https://github.com/intrinsicD/IntrinsicEngine/pull/1046). Maturity: **Operational**.
+Independent Opus reviewer session `3bed78aa-f0ae-4a1b-bf64-1407f84919d8`, tree
+`1ca7f8ed443bbd5afbe43ffe1e23ddb12f1d4c74`: **“Final verdict: APPROVE.”** All nine criteria were judged
+met, including the CPD Vulkan-subsampling worker-pacing condition; the checkboxes record those decisions.
+The [verification/review note](../../docs/reviews/2026-11-08-unified-gpu-method-runs.md) is the canonical
+completion record, including packet digest, test results, negative checks, limits and review scope.
 
-All production GPU/hybrid families and their CPU counterparts use the shared controls. Raster
-texture bake and unsupported GPU requests retain their truthful behavior. Owner-side GPU Init,
-preview collection and Accept still require frame transfer collection; worker iterations do not.
-The other non-blocking internal simplifications are tracked in
-[RUNTIME-355](../backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md).
-
-The factory template is instantiated by nine typed callers in seven engine owner units; one
-private erased entry point preserves the opaque cache implementation. Pool, fence and release
-logic remain shared. CMake enforces the private host boundary, including a negative plugin-import
-probe; the unchanged feature-boundary ceiling passes at 27. No new layer exception is introduced.
-
-The operator's scope includes GPU/hybrid methods and their CPU counterparts. Pure CPU methods
-without a GPU counterpart remain outside this implementation. Existing numerical contracts and
-page budgets are preserved; no quantitative performance claim is made. Pre-existing documentation
-failures are addressed separately by BUG-257 and the operator-approved BUG-258 historical citation
-repair. Temporary evidence remains under ignored `tasks/evidence/ARCH-023/` until final acceptance.
+The [coverage matrix](../../docs/methods/gpu-method-coverage.md) owns the family inventory and necessary
+exceptions; the [method template](../../docs/methods/method-template.md) owns the reusable adapter.
+[RUNTIME-355](../backlog/runtime/RUNTIME-355-method-execution-retirement-and-consistency.md) owns the
+reviewed non-blocking internal simplifications and unprobed cases. Pure CPU methods without a GPU
+counterpart are outside this task. No measured speedup or cross-device guarantee is claimed.
+Temporary evidence was retired after review and final checks; worktrees and unrelated evidence were preserved.

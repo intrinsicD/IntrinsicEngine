@@ -213,9 +213,10 @@ contract_review: tracker only; each slice declares its own contracts
 ## State
 - 2026-11-07: the operator requested a separate compute queue and consistent method lifecycle,
   configuration, preview and reusable GPU queries, with extensive Claude Opus delegation.
-  [ARCH-023](ARCH-023-unified-gpu-method-runs.md) owns this implementation order ahead of the
-  remaining Q95 blocks and coordinates the existing RUNTIME-311/GRAPHICS-153 work. No completion
-  or new performance claim is implied.
+  [ARCH-023](../done/ARCH-023-unified-gpu-method-runs.md) completed this slice on 2026-11-08
+  at bounded Operational maturity after independent review. Its verification note records limits;
+  the remaining Q95 blocks and RUNTIME-311/GRAPHICS-153 criteria remain with their owners.
+  No new performance claim is implied.
 - 2026-10-30: the target was written and accepted by the operator.
   - All earlier target documents are archived (`docs/archive/README.md`).
   - ADR 0031 is superseded; the moonshot program (`ARCH-020`) is closed by this decision.

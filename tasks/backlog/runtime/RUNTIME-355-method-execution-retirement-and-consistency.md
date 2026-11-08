@@ -42,7 +42,7 @@ internal duplication and unused paths, and makes startup and optional tool argum
 - [ ] F2: Remove the four superseded owner-thread QueueGpu nearest/kNN/radius APIs and migrate their test coverage to prepared query sessions; retain no compatibility facade.
 - [ ] F4: Remove unused OwnerSteps branches and GpuTransactionStepAllowance/Stepped/MayPreview helpers from the shared transaction core, preserving coverage of current worker paths.
 - [ ] F5: Make optional direct execution arguments consistent between start tools and nonwaiting run tools through the existing validated configuration path.
-- [ ] F6: Add focused removal probes for session-upload waiting and Abandon clearing Valid, Commit and Prepared; preserve asserted predictions and restored-green checks.
+- [ ] F6: Add focused removal probes for session-upload waiting and Abandon clearing Valid, Commit and Prepared; cover the other removal cases listed as unprobed in the coverage matrix's Verification limits, or record why a case cannot be probed. Preserve asserted predictions and restored-green checks.
 
 ## Engine integration
 | Surface | Required treatment |
