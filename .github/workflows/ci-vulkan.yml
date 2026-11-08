@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VULKAN_READBACK_TEST: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload
-      VULKAN_OPERATIONAL_TEST_REGEX: '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload|IntrinsicLopFamilyGpuBenchmarkSmoke\.(Run|Validate))$'
+      VULKAN_OPERATIONAL_TEST_REGEX: '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload|IntrinsicLopFamilyGpuBenchmarkSmoke\.(Run|Validate)|GEOM081VulkanPropertySmoothingBenchmark\.(Run|Validate)|RUNTIME269VulkanSparseSolveBenchmark\.(Run|Validate))$'
 
     steps:
       - name: Checkout
@@ -62,7 +62,7 @@ jobs:
       # intersection. The readback remains `slow`, is built explicitly outside
       # the fast aggregate, and joins the two Sandbox contracts in the
       # operational lavapipe/Xvfb batch below. The positive LOP-family
-      # benchmark and validator also require that display; its explicit
+      # benchmark and the smoothing/sparse-solve parity benchmark pairs also require that display; the LOP
       # unavailable-environment regression remains in this displayless batch.
       - name: Run gpu;vulkan opt-in fixtures
         run: |
@@ -87,8 +87,8 @@ jobs:
             -R "$VULKAN_OPERATIONAL_TEST_REGEX" \
             -L "gpu" -L "vulkan" \
             | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"
-          if [[ "$operational_test_count" -ne 5 ]]; then
-            echo "Expected two Sandbox contracts, the readback smoke, and the LOP benchmark pair; found $operational_test_count" >&2
+          if [[ "$operational_test_count" -ne 9 ]]; then
+            echo "Expected two Sandbox contracts, the readback smoke, and three benchmark pairs; found $operational_test_count" >&2
             exit 1
           fi
           operational_junit="${GITHUB_WORKSPACE}/build/ci-vulkan/ci-timing/result/operational-vulkan.junit.xml"

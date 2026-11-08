@@ -1135,6 +1135,9 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             r"IntrinsicLopFamilyGpuBenchmarkSmoke\.(Run|Validate)",
             operational_regex,
         )
+        for producer in ("GEOM081VulkanPropertySmoothingBenchmark", "RUNTIME269VulkanSparseSolveBenchmark"):
+            for phase in ("Run", "Validate"):
+                self.assertRegex(producer + "." + phase, operational_regex)
         self.assertNotIn(
             "UnavailableEnvironmentFailsClosed",
             operational_regex,
@@ -1146,7 +1149,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             2,
         )
         self.assertIn(
-            'if [[ "$operational_test_count" -ne 5 ]]',
+            'if [[ "$operational_test_count" -ne 9 ]]',
             vulkan,
         )
         self.assertIn(
