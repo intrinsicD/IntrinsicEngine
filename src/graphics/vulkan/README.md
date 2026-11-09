@@ -588,9 +588,9 @@ available through the Vulkan 1.2/1.3 feature chain.
   The backend-local framegraph sampled-texture binding writes postprocess sampled
   inputs to bindless descriptor slot 0, default `Pass.DebugView`'s selected
   texture to slot 1, canonical `Pass.Present`'s `FrameRecipe.PresentSource`
-  to slot 2, `SelectionOutlinePass`'s `EntityId` texture to slot 3, and the
-  object-space normal-bake dilation output/scratch pair to slots 4/5 via
-  `VulkanCommandContext::BindFrameSampledTextureAt(...)`. The Vulkan bindless
+  to slot 2, `SelectionOutlinePass`'s `EntityId` texture to slot 3, and
+  `HZBBuildPass`'s `SceneDepth` source to slot 4 via
+  `VulkanCommandContext::BindFrameSampledTextureAt(...)`; slot 5 is unused. The Vulkan bindless
   allocator starts real texture leases at slot 6 so retained textures such as
   the ImGui font atlas cannot be overwritten by those framegraph bridge updates.
   The split slots keep debug-view, present, and selection-outline fullscreen
@@ -609,6 +609,19 @@ available through the Vulkan 1.2/1.3 feature chain.
   sample its own black output instead of `SceneColorHDR`. For the same reason
   the `ImGuiPass` — which samples only its own retained font-atlas/user-texture
   leases (slots >= 6) — does not bind the shared bridge slot 0.
+  The same holds across frames: the set is update-after-bind, so a frame still
+  pending on the GPU samples whatever a slot holds when it executes, which can be
+  after the next frame's writes. A slot must therefore keep one texture frame
+  after frame. Only a pass's `ShaderRead` textures are published (depth read as
+  an attachment is not), and `HZBBuildPass` samples `SceneDepth` from slot 4; a
+  depth write to slot 0 showed the previous frame's tonemap output as red.
+  When a slot's texture has to change (a resize, or a pick or selection that
+  changes the graph's textures), the renderer waits for the pending frames first
+  (`IDevice::WaitIdle()`); otherwise the pending frame showed the new, unrendered
+  texture as black or stale frames.
+  The one-texture rule holds for the default recipe (forward, no anti-aliasing). Reconstruction,
+  FXAA/SMAA, deferred composition and a debug view without a selection still
+  publish other textures to slot 0 and need their own slots before they ship.
   GRAPHICS-079 Slice C does not add a Vulkan-specific ImGui upload helper:
   the promoted path follows the existing transient-debug / visualization-overlay
   precedent and keeps the concrete helper renderer-owned

@@ -1197,6 +1197,7 @@ namespace Extrinsic::Graphics
         PassIndex = other.PassIndex;
         ExplicitDependencyPasses = other.ExplicitDependencyPasses;
         ReadTextures = other.ReadTextures;
+        SampledTextures = other.SampledTextures;
         WriteTextures = other.WriteTextures;
         ReadBuffers = other.ReadBuffers;
         WriteBuffers = other.WriteBuffers;
@@ -1213,6 +1214,7 @@ namespace Extrinsic::Graphics
         PassIndex = other.PassIndex;
         ExplicitDependencyPasses = std::move(other.ExplicitDependencyPasses);
         ReadTextures = std::move(other.ReadTextures);
+        SampledTextures = std::move(other.SampledTextures);
         WriteTextures = std::move(other.WriteTextures);
         ReadBuffers = std::move(other.ReadBuffers);
         WriteBuffers = std::move(other.WriteBuffers);
@@ -1845,6 +1847,8 @@ namespace Extrinsic::Graphics
                                 queueHandoffs,
                                 resourceHandoffs);
                     passDeclarations[passIndex].ReadTextures.push_back(access.Ref.Index);
+                    if (access.Usage == TextureUsage::ShaderRead)
+                        passDeclarations[passIndex].SampledTextures.push_back(access.Ref.Index);
                 }
                 UpdateLifetime(textureLifetimes[access.Ref.Index], passIndex);
             }
@@ -2003,6 +2007,7 @@ namespace Extrinsic::Graphics
                 values.erase(std::unique(values.begin(), values.end()), values.end());
             };
             sortUnique(passDeclarations[passIndex].ReadTextures);
+            sortUnique(passDeclarations[passIndex].SampledTextures);
             sortUnique(passDeclarations[passIndex].WriteTextures);
             sortUnique(passDeclarations[passIndex].ReadBuffers);
             sortUnique(passDeclarations[passIndex].WriteBuffers);

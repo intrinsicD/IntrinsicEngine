@@ -70,8 +70,11 @@ at least once, several more than once:
   so the *last* host-side write to a slot is what **every** recorded draw
   observes. The renderer's explicit per-pass `BindFrameSampledTextureAt` is
   the **single authority** for bridge slots; nothing else (barrier paths,
-  passes with their own leases) may write them. Bridge slots 0..2 are
-  reserved; texture leases start at slot 3. This exact defect class shipped
+  passes with their own leases) may write them. Bridge slots 0..5 are
+  reserved; texture leases start at slot 6. The set is update-after-bind, so a
+  frame still pending on the GPU also sees the *next* frame's writes: a slot
+  must keep one texture frame after frame (a depth write to slot 0 flashed the
+  previous frame's tonemap output red). This exact defect class shipped
   three times: `BUG-014` (font atlas clobbered), `BUG-016` (barrier auto-bind
   + ImGuiPass racing slot 0), `BUG-019` (a fix re-colliding on slot 0). The
   contract is documented in `src/graphics/vulkan/README.md`.

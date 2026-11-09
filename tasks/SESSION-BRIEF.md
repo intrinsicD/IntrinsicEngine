@@ -12,6 +12,7 @@ picking backlog work; theme priorities and rationale live in
 - `ARCH-024` — Complete shared plugin execution and measure its performance (tasks/active/ARCH-024-plugin-execution-completion-and-performance.md)
 - `BUG-262` — Correct worker-method sanitizer fixtures (tasks/active/BUG-262-worker-method-sanitizer-fixtures.md)
 - `BUG-265` — Include the new RHI retirement cases in the routing baseline (tasks/active/BUG-265-rhi-retirement-test-routing-baseline.md)
+- `BUG-266` — Frame-sampled slot flicker on click, and compiler warnings (tasks/active/BUG-266-frame-sampled-slot-flicker-and-warning-cleanup.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 

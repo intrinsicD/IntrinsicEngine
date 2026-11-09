@@ -1236,6 +1236,36 @@ TEST(RuntimeTextureBakeModule, RunJobsEndOnDeviceLossSceneReplacementAndShutdown
     }
 }
 
+// A bake the atlas checks refuse is a failed editor command, not an applied one.
+TEST(RuntimeTextureBakeModule, EditorBakeCommandFailsWhenTheAtlasIsRefused)
+{
+    BakeHarness harness{};
+    ASSERT_TRUE(harness.Start());
+    const ECS::EntityHandle entity = MakeSeamedQuad(harness.Scene());
+    // Face 1 folded inside face 0's texels, as in OverlappingUnderresolvedAndUncoveredAtlasesFailExplicitly.
+    SetTriangleCornerUvs(harness.Scene(), entity, "h:texcoord", kAtlasExtent,
+                         {{7.0f, 1.0f}, {7.0f, 7.0f}, {1.0f, 1.0f},
+                          {6.0f, 6.0f}, {6.0f, 2.0f}, {2.0f, 2.0f}});
+    Runtime::EditorWorkspaceAttachment attachment{};
+    attachment.Attach(harness.Worlds, harness.Services);
+    ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
+
+    const auto result = Runtime::ApplyEditorTextureBakeCommand(
+        Runtime::PrepareEditorVisualizationEditingFrame(attachment).Commands,
+        Runtime::EditorTextureBakeCommand{
+            .StableEntityId = Runtime::StableEntityLookup::ToRenderId(entity),
+            .SourceDomain = GeometryElementDomain::MeshVertex,
+            .PropertyName = "v:heat",
+            .Width = 16u,
+            .Height = 16u,
+            .OutputName = "heat",
+            .BindGeneratedTexture = false,
+        });
+    ASSERT_EQ(result.BakeStatus, PropertyTextureBakeStatus::OverlappingUvCharts) << result.Diagnostic;
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    EXPECT_FALSE(result.Succeeded());
+}
+
 // The editor's bake command submits the run through the session's job
 // surface, so the shared progress read model finds it by token or by the
 // output it writes, only for its own entity, and its cancel ends the bake.

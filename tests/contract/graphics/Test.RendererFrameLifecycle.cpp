@@ -5048,6 +5048,99 @@ TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDedicatedSampledSlot
     renderer->Shutdown();
 }
 
+// A submitted frame samples the bridge slots when the GPU executes it, which can be after the next frame
+// started recording. Slot 0 therefore holds the postprocess input only: a depth write there (HZB source,
+// depth read as an attachment) turns the previous frame's tonemap output red.
+TEST(RendererFrameLifecycle, DefaultBridgeSlotOnlyEverHoldsThePostProcessInput)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{297u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    const std::uint32_t selectedIds[] = {42u}; // the outline's PickingPass reads depth as an attachment
+    world.Selection.SelectedStableIds = std::span<const std::uint32_t>(selectedIds);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::RHI::TextureHandle hdr = FindCreatedTextureByDebugName(device, "SceneColorHDR");
+    const Extrinsic::RHI::TextureHandle depth = FindCreatedTextureByDebugName(device, "SceneDepth");
+    ASSERT_TRUE(hdr.IsValid());
+    ASSERT_TRUE(depth.IsValid());
+    std::size_t defaultSlotWrites = 0u;
+    std::size_t depthWrites = 0u;
+    for (const auto& binding : device.CommandContext.SampledTextureBindings)
+    {
+        if (binding.DescriptorIndex == 0u)
+        {
+            ++defaultSlotWrites;
+            EXPECT_EQ(binding.Texture, hdr) << "slot 0 is what post_tonemap.frag samples";
+        }
+        if (binding.Texture == depth)
+        {
+            ++depthWrites;
+            EXPECT_EQ(binding.DescriptorIndex, 4u) << "hzb_build.comp samples depth from its own slot";
+        }
+    }
+    EXPECT_GT(defaultSlotWrites, 0u);
+    EXPECT_GT(depthWrites, 0u) << "HZBBuildPass must still publish its depth source";
+
+    renderer->Shutdown();
+}
+
+// The same hazard when a slot's texture has to change (a new viewport size here; a pick or a selection
+// changes the graph's textures the same way): the frames still pending on the GPU finish first.
+TEST(RendererFrameLifecycle, BridgeSlotChangesWaitForPendingFrames)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{299u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const auto lastDefaultSlotTexture = [&device]
+    {
+        Extrinsic::RHI::TextureHandle last{};
+        for (const auto& binding : device.CommandContext.SampledTextureBindings)
+            if (binding.DescriptorIndex == 0u)
+                last = binding.Texture;
+        return last;
+    };
+    const auto runFrame = [&](const decltype(Extrinsic::Graphics::RenderFrameInput{}.Viewport.Width) width)
+    {
+        Extrinsic::RHI::FrameHandle frame{};
+        ASSERT_TRUE(renderer->BeginFrame(frame));
+        Extrinsic::Graphics::RenderWorld world =
+            renderer->ExtractRenderWorld({.Viewport = {.Width = width, .Height = 240}});
+        renderer->PrepareFrame(world);
+        renderer->ExecuteFrame(frame, world);
+        (void)renderer->EndFrame(frame);
+    };
+
+    runFrame(320);
+    const Extrinsic::RHI::TextureHandle first = lastDefaultSlotTexture();
+    ASSERT_TRUE(first.IsValid());
+    EXPECT_EQ(device.WaitIdleCalls, 0u) << "the first publication has no pending reader";
+    runFrame(320);
+    EXPECT_EQ(lastDefaultSlotTexture(), first);
+    EXPECT_EQ(device.WaitIdleCalls, 0u) << "an unchanged slot must not stall the frame";
+
+    runFrame(640);
+    ASSERT_NE(lastDefaultSlotTexture(), first) << "the new size must give the postprocess input a new texture";
+    EXPECT_GT(device.WaitIdleCalls, 0u) << "pending frames finish before a slot shows another texture";
+
+    renderer->Shutdown();
+}
+
 // ---------------------------------------------------------------------------
 // GRAPHICS-074 Slice D.4 — outline push-constant plumbing from
 // `RenderWorld::Selection`. The default-recipe `"SelectionOutlinePass"`

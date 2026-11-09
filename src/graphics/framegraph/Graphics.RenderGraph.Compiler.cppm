@@ -121,6 +121,8 @@ namespace Extrinsic::Graphics
         std::uint32_t PassIndex = 0;
         std::vector<std::uint32_t> ExplicitDependencyPasses{};
         std::vector<std::uint32_t> ReadTextures{};
+        // The ReadTextures a shader samples (TextureUsage::ShaderRead); attachment reads are not in it.
+        std::vector<std::uint32_t> SampledTextures{};
         std::vector<std::uint32_t> WriteTextures{};
         std::vector<std::uint32_t> ReadBuffers{};
         std::vector<std::uint32_t> WriteBuffers{};

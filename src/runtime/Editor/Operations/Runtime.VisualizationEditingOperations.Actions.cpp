@@ -2847,6 +2847,8 @@ ApplyEditorTextureBakeCommand(
             case PropertyTextureBakeStatus::DegenerateAllTriangles:
             case PropertyTextureBakeStatus::DegenerateUvTriangles:
             case PropertyTextureBakeStatus::ZeroCoverageBake:
+            case PropertyTextureBakeStatus::OverlappingUvCharts:
+            case PropertyTextureBakeStatus::UnderresolvedAtlas:
             case PropertyTextureBakeStatus::BakeFailed:
             case PropertyTextureBakeStatus::JobSubmitFailed:
             case PropertyTextureBakeStatus::StaleCompletion:

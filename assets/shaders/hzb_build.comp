@@ -15,7 +15,8 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-layout(set = 0, binding = 0) uniform sampler2D uDepthSource;
+layout(set = 0, binding = 0) uniform sampler2D uTextures[];
+const uint kHZBSourceFrameSampledDescriptorSlot = 4u;
 
 layout(push_constant) uniform HZBBuildPush
 {
@@ -41,7 +42,7 @@ float LoadSourceDepth(ivec2 pixel)
     }
 
     vec2 uv = (vec2(pixel) + vec2(0.5)) / vec2(float(pc.RenderWidth), float(pc.RenderHeight));
-    return textureLod(uDepthSource, uv, float(pc.SourceMip)).r;
+    return textureLod(uTextures[kHZBSourceFrameSampledDescriptorSlot], uv, float(pc.SourceMip)).r;
 }
 
 float LoadConservativeDepthForTargetPixel(uvec2 targetPixel)

@@ -534,7 +534,8 @@ namespace Extrinsic::Tests
 
         void Initialize(const RHI::DeviceCreateDesc&) override {}
         void Shutdown() override {}
-        void WaitIdle() override {}
+        void WaitIdle() override { ++WaitIdleCalls; }
+        std::uint32_t WaitIdleCalls{0};
 
         bool BeginFrame(RHI::FrameHandle& out) override;
         void EndFrame(const RHI::FrameHandle&) override;

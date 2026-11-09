@@ -151,6 +151,7 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotSelectionOutline = 3u;
+        constexpr std::uint32_t kFrameSampledDescriptorSlotHZBSource = 4u;
         // GRAPHICS-119 Slice C.6: pass callbacks route shared renderer state
         // through guarded helpers, so accepted parallel command contexts may
         // record on scheduler workers while serial submit order stays fixed.
@@ -507,61 +508,40 @@ namespace Extrinsic::Graphics
         [[nodiscard]] constexpr std::uint32_t FrameSampledDescriptorSlotForPass(
             const FramePassId passId) noexcept
         {
-            return passId == ToFramePassId(FrameRecipePassKind::Present)
-                ? kFrameSampledDescriptorSlotPresent
-                : kFrameSampledDescriptorSlotDefault;
+            // A submitted frame samples these slots when the GPU executes it, possibly after the next
+            // frame's writes: a slot keeps one texture frame after frame. Slot 0 is the postprocess input.
+            if (passId == ToFramePassId(FrameRecipePassKind::Present))
+                return kFrameSampledDescriptorSlotPresent;
+            if (passId == ToFramePassId(FrameRecipePassKind::HZBBuild))
+                return kFrameSampledDescriptorSlotHZBSource;
+            return kFrameSampledDescriptorSlotDefault;
         }
 
-        bool BindFrameSampledTextureByResourceId(RHI::ICommandContext& cmd,
-                                                 const CompiledRenderGraph& compiled,
-                                                 const FrameResourceId id,
-                                                 const std::uint32_t descriptorSlot)
+        [[nodiscard]] RHI::TextureHandle FrameSampledTextureByResourceId(const CompiledRenderGraph& compiled,
+                                                                         const FrameResourceId id)
         {
             const std::optional<std::uint32_t> textureIndex =
                 FindCompiledTextureIndexByResourceId(compiled, id);
             if (!textureIndex.has_value() || *textureIndex >= compiled.TextureHandles.size())
             {
-                return false;
+                return {};
             }
-
-            const RHI::TextureHandle texture = compiled.TextureHandles[*textureIndex];
-            if (!texture.IsValid())
-            {
-                return false;
-            }
-
-            cmd.BindFrameSampledTextureAt(texture, descriptorSlot);
-            return true;
+            return compiled.TextureHandles[*textureIndex];
         }
 
-        bool BindFrameSampledDeclaredTexture(RHI::ICommandContext& cmd,
-                                             const CompiledRenderGraph& compiled,
-                                             const std::uint32_t textureIndex,
-                                             const std::uint32_t descriptorSlot)
+        [[nodiscard]] RHI::TextureHandle FrameSampledDeclaredTexture(const CompiledRenderGraph& compiled,
+                                                                     const std::uint32_t textureIndex)
         {
             if (textureIndex >= compiled.TextureHandles.size())
             {
-                return false;
+                return {};
             }
-
             if (textureIndex < compiled.TextureResourceIds.size() &&
                 compiled.TextureResourceIds[textureIndex].IsValid())
             {
-                return BindFrameSampledTextureByResourceId(
-                    cmd,
-                    compiled,
-                    compiled.TextureResourceIds[textureIndex],
-                    descriptorSlot);
+                return FrameSampledTextureByResourceId(compiled, compiled.TextureResourceIds[textureIndex]);
             }
-
-            const RHI::TextureHandle texture = compiled.TextureHandles[textureIndex];
-            if (!texture.IsValid())
-            {
-                return false;
-            }
-
-            cmd.BindFrameSampledTextureAt(texture, descriptorSlot);
-            return true;
+            return compiled.TextureHandles[textureIndex];
         }
 
         [[nodiscard]] bool IsContractOutputDiagnostic(
@@ -1800,6 +1780,7 @@ namespace Extrinsic::Graphics
             // through the manager.
             m_PostProcessHistogramPipelineLease.reset();
             m_HZBBuildPipelineLease.reset();
+            m_FrameSampledSlotTextures = {};
             m_ClusterGridBuildPipelineLease.reset();
             m_ClusterLightAssignmentPipelineLease.reset();
             m_ClusterGridAABBBuffer.reset();
@@ -3328,27 +3309,40 @@ namespace Extrinsic::Graphics
                     // pipeline variants must match the swapchain format.
                     if (targetsBackbuffer)
                         activeRenderPass.FirstColorFormat = m_BackbufferFormat;
+                    const auto publishFrameSampledTexture =
+                        [&](const RHI::TextureHandle texture, const std::uint32_t descriptorSlot) -> bool
+                        {
+                            if (!texture.IsValid())
+                                return false;
+                            std::lock_guard<std::mutex> descriptorLock(m_FrameSampledDescriptorMutex);
+                            // A frame still pending on the GPU samples this slot when it executes, so it
+                            // finishes before the slot changes (a pick or selection changes the graph's
+                            // textures; without this the pending frame showed the new, unrendered one).
+                            // shortcut: WaitIdle also waits for method compute, wait on the frame fences
+                            // only if a click during a long GPU run stalls.
+                            if (descriptorSlot < m_FrameSampledSlotTextures.size() &&
+                                m_FrameSampledSlotTextures[descriptorSlot] != texture)
+                            {
+                                if (m_FrameSampledSlotTextures[descriptorSlot].IsValid() && m_Device != nullptr)
+                                    m_Device->WaitIdle();
+                                m_FrameSampledSlotTextures[descriptorSlot] = texture;
+                            }
+                            graphicsContext.BindFrameSampledTextureAt(texture, descriptorSlot);
+                            return true;
+                        };
                     const auto bindFrameSampledTextureByResource =
                         [&](const FrameResourceId resourceId,
                             const std::uint32_t descriptorSlot) -> bool
                         {
-                            std::lock_guard<std::mutex> descriptorLock(m_FrameSampledDescriptorMutex);
-                            return BindFrameSampledTextureByResourceId(
-                                graphicsContext,
-                                *compiled,
-                                resourceId,
-                                descriptorSlot);
+                            return publishFrameSampledTexture(
+                                FrameSampledTextureByResourceId(*compiled, resourceId), descriptorSlot);
                         };
                     const auto bindFrameSampledDeclaredTexture =
                         [&](const std::uint32_t textureIndex,
                             const std::uint32_t descriptorSlot) -> bool
                         {
-                            std::lock_guard<std::mutex> descriptorLock(m_FrameSampledDescriptorMutex);
-                            return BindFrameSampledDeclaredTexture(
-                                graphicsContext,
-                                *compiled,
-                                textureIndex,
-                                descriptorSlot);
+                            return publishFrameSampledTexture(
+                                FrameSampledDeclaredTexture(*compiled, textureIndex), descriptorSlot);
                         };
                     if (passIndex < compiled->PassDeclarations.size())
                     {
@@ -3392,11 +3386,11 @@ namespace Extrinsic::Graphics
                         // bind for it.
                         const bool bindsFrameSampledBridge =
                             !sampledTextureBound &&
-                            !declarations.ReadTextures.empty() &&
+                            !declarations.SampledTextures.empty() &&
                             passId != ToFramePassId(FrameRecipePassKind::ImGui);
                         if (bindsFrameSampledBridge)
                         {
-                            const std::uint32_t textureIndex = declarations.ReadTextures.front();
+                            const std::uint32_t textureIndex = declarations.SampledTextures.front();
                             const std::uint32_t descriptorSlot =
                                 FrameSampledDescriptorSlotForPass(passId);
                             (void)bindFrameSampledDeclaredTexture(textureIndex, descriptorSlot);
@@ -10595,6 +10589,7 @@ namespace Extrinsic::Graphics
         // GRAPHICS-119 Slice C.6: frame-sampled bridge descriptors update
         // shared backend descriptor-set state before pass route dispatch.
         std::mutex m_FrameSampledDescriptorMutex;
+        std::array<RHI::TextureHandle, 6> m_FrameSampledSlotTextures{}; // last texture published per bridge slot
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;

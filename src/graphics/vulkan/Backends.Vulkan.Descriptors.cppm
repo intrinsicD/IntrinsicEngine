@@ -19,7 +19,7 @@ namespace Extrinsic::Backends::Vulkan
     // textures updated directly by VulkanCommandContext:
     //   0 = default sampled input, 1 = DebugView, 2 = Present,
     //   3 = SelectionOutline EntityId,
-    //   4/5 = object-space normal bake dilation output/scratch ping-pong.
+    //   4 = HZB build depth source, 5 = unused.
     // Real bindless texture leases start after this backend-owned range.
     constexpr RHI::BindlessIndex kFirstTextureBindlessSlot = 6;
 
