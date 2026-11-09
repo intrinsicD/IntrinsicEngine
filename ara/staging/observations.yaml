@@ -4548,3 +4548,19 @@ observations:
     promoted_to: logic/claims.md:C125
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O273
+    timestamp: "2026-10-23T14:11+02:00"
+    provenance: ai-suggested
+    content: >
+      Proposed geometry-method adoption priorities and their source-to-engine mapping
+      are recorded in docs/research/geometry-methods-2026-10-23.md.
+    context: >
+      Operator-requested literature review and plan only. Recommendations remain
+      unadopted; no engine experiment, performance result or new capability claim.
+      Source notes are in Zotero; search coverage and unavailable Trending access
+      are recorded in the canonical document rather than duplicated here.
+    potential_type: heuristic
+    bound_to: []
+    promoted: false
+    stale: false

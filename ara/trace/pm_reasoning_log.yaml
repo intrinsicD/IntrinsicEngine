@@ -1,4 +1,9 @@
 entries:
+  - turn: "2026-10-23_001#1"
+    notes:
+      - "O273 points to the canonical literature proposal; source notes stay in Zotero."
+      - "A request for a plan is not adoption or experiment authorization; no claims promoted."
+      - "MCP setup and documentation checks are engineering actions, not separate research events."
   - turn: "2026-06-15_001#1"
     notes:
       - "Initialized ara/ because no prior research artifact existed and this turn contained implementation, verification, and task-retirement events."
