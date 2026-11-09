@@ -90,10 +90,10 @@ export namespace Extrinsic::Graphics::Components
         // ----- ScalarField --------------------------------------------------
         /// Key in GpuSceneSlot::Buffers identifying the float scalar buffer.
         /// e.g. "geodesic", "curvature", "scalars".
-        std::string ScalarFieldName;
+        std::string ScalarFieldName{};
 
         /// Colourmap configuration (map type, range, isolines, binning).
-        ScalarFieldConfig Scalar;
+        ScalarFieldConfig Scalar{};
 
         /// Which element domain the scalar buffer addresses.
         enum class Domain : std::uint8_t
@@ -107,7 +107,7 @@ export namespace Extrinsic::Graphics::Components
         /// Key in GpuSceneSlot::Buffers identifying the RGBA colour buffer.
         /// Used when Source is PerVertex/Edge/FaceBuffer.
         /// e.g. "colors", "edge_colors", "face_colors".
-        std::string ColorBufferName;
+        std::string ColorBufferName{};
         ColorInterpretation Interpretation{ColorInterpretation::Components};
 
         // Surface rendering may use a baked copy of the selected property.

@@ -1359,10 +1359,10 @@ namespace
                  Domain == Runtime::GeometryElementDomain::MeshHalfedge || Domain == Runtime::GeometryElementDomain::GraphHalfedge)
                     ? "e:deleted" : "v:deleted";
             deletion.GetOrAdd<bool>(deletionName, false)[0] = true;
-            props.GetOrAdd<std::uint64_t>("labels", 9223372036854775809ull);
-            props.GetOrAdd<glm::vec4>("colors", glm::vec4(0.25f));
-            if (RejectConversion) props.GetOrAdd<bool>("scalar_labels", true);
-            else props.GetOrAdd<double>("scalar_labels", -3.0);
+            (void)props.GetOrAdd<std::uint64_t>("labels", 9223372036854775809ull);
+            (void)props.GetOrAdd<glm::vec4>("colors", glm::vec4(0.25f));
+            if (RejectConversion) (void)props.GetOrAdd<bool>("scalar_labels", true);
+            else (void)props.GetOrAdd<double>("scalar_labels", -3.0);
             auto* service = engine.Services().Find<Runtime::ClusteringService>();
             Subscription = service->SubscribeRunCompleted([this](const auto& completion) { Completion = completion; });
             auto command = MakePointCloudRequest(Runtime::SelectionController::ToStableEntityId(Entity));
@@ -2275,14 +2275,14 @@ TEST_F(ClusteringModuleResident, AChangeDuringTheAcceptThroughAnyMutablePathEnds
         remove.template operator()<glm::vec4>(colors);
         remove.template operator()<double>(scalars);
         Request = base;
-        if (path == 8) Properties().GetOrAdd<std::uint32_t>(labels, 0u);
-        if (path == 9) Properties().GetOrAdd<glm::vec4>(colors, glm::vec4(0));
+        if (path == 8) (void)Properties().GetOrAdd<std::uint32_t>(labels, 0u);
+        if (path == 9) (void)Properties().GetOrAdd<glm::vec4>(colors, glm::vec4(0));
         if (path == 10)
         {
             Request.Properties.OutputScalarLabels = Runtime::GeometryPropertyRef{
                 .Domain = Runtime::GeometryElementDomain::PointCloudPoint, .Name = scalars,
                 .ValueKind = Geometry::PropertyValueKind::Double};
-            Properties().GetOrAdd<double>(scalars, 0.0);
+            (void)Properties().GetOrAdd<double>(scalars, 0.0);
         }
         auto retained = Properties().Get<glm::vec3>("v:position");
         const auto span = retained.Span(); // marks now, before the run's capture
@@ -2297,7 +2297,7 @@ TEST_F(ClusteringModuleResident, AChangeDuringTheAcceptThroughAnyMutablePathEnds
         case 3: Properties().Get<glm::vec3>("v:position").Data()[0].x += 1; break;
         case 4: span[0].x += 1; retained.MarkModified(); break;
         case 5: Properties().GetOrAdd<bool>("v:deleted",false)[4] = true; break;
-        case 6: Properties().GetOrAdd<glm::vec4>(colors, glm::vec4(0)); break;
+        case 6: (void)Properties().GetOrAdd<glm::vec4>(colors, glm::vec4(0)); break;
         case 7: Properties().Resize(13); break;
         case 8: Properties().Get<std::uint32_t>(labels)[0] = 7u; break;
         case 9: Properties().Get<glm::vec4>(colors)[0] = glm::vec4(7); break;
@@ -2906,7 +2906,7 @@ TEST_F(ClusteringModuleResident, ARequestOnAnUnchangedCloudReusesTheCaptureAndEv
     fresh("a position write",12);
     {
         auto other=Request;other.Properties.InputPositions.Name="p:other_input";
-        Properties().GetOrAdd<glm::vec3>("p:other_input",glm::vec3(4,5,6));
+        (void)Properties().GetOrAdd<glm::vec3>("p:other_input",glm::vec3(4,5,6));
         std::swap(Request,other);fresh("another positions property",12);std::swap(Request,other);
         fresh("back to the first positions",12);
     }

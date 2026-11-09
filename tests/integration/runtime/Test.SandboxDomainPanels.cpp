@@ -779,7 +779,7 @@ TEST(SandboxDomainPanels, VectorFieldSectionAddsEditsAndRemovesFieldsWithoutVisi
     const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
     (void)mesh.AddTriangle(a, b, c);
     GS::PopulateFromMesh(raw, entity, mesh);
-    raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    (void)raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
     auto* selection = engine.Services().Find<Runtime::SelectionController>();
     ASSERT_NE(selection, nullptr);
     ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
@@ -890,7 +890,7 @@ TEST(SandboxDomainPanels, VectorFieldColorPropertyKeepsTheRememberedUniformColor
     const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
     (void)mesh.AddTriangle(a, b, c);
     GS::PopulateFromMesh(raw, entity, mesh);
-    raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    (void)raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
     (void)raw.get<GS::Faces>(entity).Properties.GetOrAdd<float>("f:heat", 2.0f);
     const glm::vec4 remembered{0.2f, 0.4f, 0.6f, 1.0f};
     raw.emplace<Runtime::GeometryPresentationRecipe>(entity,

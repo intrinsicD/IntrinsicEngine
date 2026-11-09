@@ -4075,7 +4075,7 @@ TEST(SandboxProcessingPanels, PropertySmoothingControlsClampToTheFieldTableAndSh
     const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
     ASSERT_TRUE(mesh.AddTriangle(a, b, c));
     GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-    scene.Raw().get<GS::Vertices>(entity).Properties.GetOrAdd<double>("v:mean_curvature", 0.0);
+    (void)scene.Raw().get<GS::Vertices>(entity).Properties.GetOrAdd<double>("v:mean_curvature", 0.0);
     R::PropertySmoothingConfig smoothing;
     smoothing.Weight = Geometry::Smoothing::PropertyWeight::Uniform; // shows the Neighbors input
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
@@ -5416,7 +5416,7 @@ TEST(SandboxProcessingPanels, DerivedJobCellsAndUvStatusLineShowTheSharedWidget)
     bound.Rows.push_back(row("finished", State::Published, 1.0f, true));
     bound.Rows.push_back(row("broken", State::Dropped, 0.0f, false));
     R::EditorTextureBakeControlsModel model;
-    model.Uv.UvRegenerationJob = R::EditorJobRecord{.State = State::Running, .Name = "UV atlas",
+    model.Uv.UvRegenerationJob = R::EditorJobRecord{.Name = "UV atlas", .State = State::Running,
                                                     .ProgressDeterminate = false, .ElapsedMilliseconds = 2500u};
     std::optional<R::EditorUvRegenerationCommandResult> result, adoption;
     std::int32_t width = 1024, height = 1024, padding = 2;

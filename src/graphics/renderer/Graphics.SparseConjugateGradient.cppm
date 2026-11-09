@@ -45,12 +45,12 @@ export namespace Extrinsic::Graphics
         SparseCgMatrix Matrix{};
         std::uint32_t Solves{1};
         // Solves x Rows each: right-hand sides and initial guesses (warm starts).
-        std::span<const double> RightHandSides;
-        std::span<const double> InitialGuesses;
+        std::span<const double> RightHandSides{};
+        std::span<const double> InitialGuesses{};
         // Optional chaining for sequences of solves such as implicit time steps: when set, solve
         // k > 0 uses b = RhsDiagonal * x_(k - ChainStride) + RhsConstant (per row) and starts
         // from that previous solution; the first ChainStride solves use RightHandSides.
-        std::span<const double> RhsDiagonal, RhsConstant;
+        std::span<const double> RhsDiagonal{}, RhsConstant{};
         std::uint32_t ChainStride{0};
         // Chained solves whose first ChainStride seeds live on the device (ADR 0030): the caller
         // records them into the solution block (SolutionsAddress) after RecordUpload and before

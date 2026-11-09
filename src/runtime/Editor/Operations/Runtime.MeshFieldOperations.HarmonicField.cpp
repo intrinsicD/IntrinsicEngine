@@ -87,9 +87,6 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "lumped_mass", .Type = FT::Bool, .Description = "Weight by lumped mesh areas (orders above harmonic and the source)."},
         };
 
-        bool Floating(K k) { return k == K::Float || k == K::Double || k == K::Vec2 || k == K::Vec3 || k == K::Vec4; }
-        bool Scalar(K k) { return k == K::Float || k == K::Double; }
-
         Json EncodeOptional(const GeometryPropertyRef& ref)
         { return ref.Name.empty() ? Json(nullptr) : ConfigDetail::EncodePointPropertyRef(ref); }
         void DecodeOptional(const Json& value, GeometryPropertyRef& ref)

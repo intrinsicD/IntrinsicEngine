@@ -66,9 +66,9 @@ namespace Extrinsic::Runtime
 
     export struct SceneReplacementParticipantDesc
     {
-        std::string Name;
-        std::function<void(const SceneReplacementContext&)> BeforeReplace;
-        std::function<void(const SceneReplacementContext&)> AfterReplace;
+        std::string Name{};
+        std::function<void(const SceneReplacementContext&)> BeforeReplace{};
+        std::function<void(const SceneReplacementContext&)> AfterReplace{};
     };
 
     export struct SceneReplacementParticipantTag;

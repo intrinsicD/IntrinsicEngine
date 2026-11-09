@@ -64,7 +64,7 @@ export namespace Extrinsic::Graphics::Components
             /// first ValueCount entries are used.
             std::array<float, kMaxIsolineValues> Values{};
             std::uint32_t ValueCount = 0;
-        } Isolines;
+        } Isolines{};
     };
 
     // ----------------------------------------------------------------

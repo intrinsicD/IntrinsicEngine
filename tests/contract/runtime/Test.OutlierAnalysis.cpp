@@ -703,7 +703,7 @@ TEST(OutlierAnalysis, EveryRunReachesTheOperationResultStore)
     R::SelectionController selection;
     R::OperationResultStore store;
     bool active = true;
-    R::EditorProcessingContext context{.Scene = &scene, .Selection = &selection, .CommandHistory = &history};
+    R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history, .Selection = &selection};
     context.OperationResults = &store;
     context.AttachmentActive = [&]
     {

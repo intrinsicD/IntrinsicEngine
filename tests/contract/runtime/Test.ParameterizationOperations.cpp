@@ -992,7 +992,7 @@ TEST(ParameterizationOperations, ViewModelDrawsAuthoritativeCornerUvs)
 {
     ParameterizationHarness harness{};
     ASSERT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
-    harness.Halfedges()
+    (void)harness.Halfedges()
         .Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.25f, 0.5f});
 
     const Runtime::EditorParameterizationViewModel model =

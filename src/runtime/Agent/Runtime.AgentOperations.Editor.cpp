@@ -193,9 +193,10 @@ namespace Extrinsic::Runtime
                 // A reaped job is unknown to the service (state Invalid): it ended too.
                 if (current.Jobs != nullptr && (current.Jobs->IsComplete(token) || current.Jobs->GetState(token) == JobState::Invalid))
                 {
-                    out = {.IsError = true, .ErrorCode = "result_unavailable",
+                    out = {.IsError = true,
                            .Text = "The scene file job ended without a result for this call (a later scene file operation replaced it, or "
-                                   "the document changed while it ran); check the file and the scene."};
+                                   "the document changed while it ran); check the file and the scene.",
+                           .ErrorCode = "result_unavailable"};
                     return true;
                 }
                 return false;
@@ -1084,7 +1085,7 @@ namespace Extrinsic::Runtime
 
         struct SectionUpdate
         {
-            std::string Section, Canonical;
+            std::string Section{}, Canonical{};
             const Core::Config::EngineConfigSectionRegistration* Registration{nullptr};
             Core::Config::EngineConfigSectionValidationResult Validation{};
         };

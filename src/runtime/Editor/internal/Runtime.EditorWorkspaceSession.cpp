@@ -647,7 +647,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     return JobToken{};
                 // The job publishes on a later frame; keep the submitting call's label prefix (agent calls).
                 CarryEditorLabelPrefix(desc, history, history != nullptr ? history->LabelPrefix() : std::string{},
-                                       [epoch, this] { return AttachmentEpochIsActive(epoch); });
+                                       [epoch] { return AttachmentEpochIsActive(epoch); });
                 desc.Scope = m_Worlds->ActiveWorld();
                 const JobToken token = m_Jobs->Submit(std::move(desc));
                 if (token.IsValid())

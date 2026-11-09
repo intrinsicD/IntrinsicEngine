@@ -214,7 +214,7 @@ TEST(GeometryPropertyStatistics, EmptyAllDeletedAndAllNonFiniteHaveDefinedResult
     EXPECT_TRUE(emptyResult.Components[0].Histogram.Edges.empty());
 
     auto deleted = MakeProperty<double>({10});
-    auto marker = deleted.Add<bool>("custom:deleted", true);
+    (void)deleted.Add<bool>("custom:deleted", true);
     EXPECT_EQ(Statistics(deleted).Status, Status::Empty);
     EXPECT_EQ(Statistics(deleted).DeletedCount, 1u);
 
@@ -396,7 +396,7 @@ TEST(GeometryPropertyStatistics, ComparisonRejectsShapeCardinalityAndUnsupported
                                              Geometry::ConstPropertySet(one), "samples").Status,
               Status::PropertyNotFound);
     auto invalidMask = MakeProperty<double>({1});
-    auto mask = invalidMask.Add<float>("v:deleted");
+    (void)invalidMask.Add<float>("v:deleted");
     EXPECT_EQ(Compare(one, invalidMask).Status, Status::InvalidDeletionMask);
     auto corrupt = MakeProperty<double>({1});
     corrupt.Get<double>("samples").Vector().clear();

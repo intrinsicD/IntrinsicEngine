@@ -1703,7 +1703,7 @@ TEST(RuntimeSceneSerialization, AttributeBindingsRoundTripAndStaleSourcesLoadAsR
     namespace RT = Runtime;
     ECS::Scene::Registry source;
     const ECS::EntityHandle mesh = AddMeshEntity(source);
-    source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
+    (void)source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
         std::string{PN::kNormal}, glm::vec3{0.0f, 0.0f, 1.0f});
     (void)source.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>(
         "v:scratch", glm::vec3{1.0f, 0.0f, 0.0f});  // processed property (RUNTIME-319)

@@ -449,7 +449,7 @@ TEST(GeodesicsOperations, SourceVertexPropertyAddsMarkedVerticesAsSources)
     EXPECT_EQ(Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command).Status,
               Runtime::EditorCommandStatus::InvalidProcessingParameters);
     h.Command.Config.SourceVertices.clear();
-    h.Properties().GetOrAdd<std::uint32_t>("v:none", 0u);
+    (void)h.Properties().GetOrAdd<std::uint32_t>("v:none", 0u);
     h.Command.Config.SourceVertexProperty = {Runtime::GeometryElementDomain::MeshVertex,
                                              "v:none", Geometry::PropertyValueKind::UInt32};
     EXPECT_EQ(Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command).Status,

@@ -270,7 +270,7 @@ namespace
             Frames->OnFrame = [&](R::Engine& kernel) {
                 if (EveryFrame) EveryFrame(kernel);
                 if (Minimized) static_cast<P::Backends::Null::NullWindow&>(kernel.GetWindow()).QueueResize(0, 0);
-                if (!Minimized && Done.load() || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
+                if ((!Minimized && Done.load()) || std::chrono::steady_clock::now() > deadline) kernel.RequestExit();
             };
             Engine->Run();
             client.join();
@@ -1691,7 +1691,7 @@ TEST(SandboxAgentServer, RunOperationTakesExplicitParamsAndUndoes)
             const auto preview = c.Tool("preview_operation", {{"operation", operation}, {"entity", grid}, {"params", params}}, &isError);
             rig.Check(!isError && preview["enabled"].is_boolean(), std::string("preview ") + operation + ": " + preview.dump());
             const auto run = c.Tool("run_operation", {{"operation", operation}, {"entity", grid}, {"params", params}}, &isError);
-            rig.Check(!isError && run["succeeded"] == true && run["input_faces"] == 50 || std::string(operation) == "mesh_denoise",
+            rig.Check((!isError && run["succeeded"] == true && run["input_faces"] == 50) || std::string(operation) == "mesh_denoise",
                       std::string(operation) + ": " + run.dump());
             rig.Check(expected(faces()), std::string(operation) + " left " + std::to_string(faces()) + " faces");
             rig.Check(run["dropped_properties"].is_array(), std::string(operation) + " reports dropped_properties: " + run.dump());
@@ -2729,13 +2729,13 @@ TEST(SandboxAgentServer, PropertyInspectionRejectsInvalidArgumentsAndUnavailable
             const auto reply = c.Tool(tool, args, &error);
             rig.Check(error && (!diagnostic || hasDiagnostic(reply, diagnostic)), std::string(reason) + ": " + reply.dump());
         };
-        for (const Json value : {Json(0), Json(65537), Json(-1), Json(1.5), Json("2")})
+        for (const Json& value : {Json(0), Json(65537), Json(-1), Json(1.5), Json("2")})
         {
             auto args = valid;
             args["limit"] = value;
             rejected("property_values", args, "invalid limit");
         }
-        for (const Json value : {Json(-1), Json(0.5), Json("0")})
+        for (const Json& value : {Json(-1), Json(0.5), Json("0")})
         {
             auto args = valid;
             args["offset"] = value;

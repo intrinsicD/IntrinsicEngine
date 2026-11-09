@@ -285,9 +285,9 @@ export namespace Extrinsic::RHI
     {
         // Shader sources — the backend interprets the path format
         // (e.g. Vulkan expects SPIR-V .spv, a future Metal backend .metal, etc.)
-        std::string VertexShaderPath;
-        std::string FragmentShaderPath;
-        std::string ComputeShaderPath;   // non-empty → compute pipeline
+        std::string VertexShaderPath{};
+        std::string FragmentShaderPath{};
+        std::string ComputeShaderPath{};   // non-empty → compute pipeline
 
         // BDA-ONLY: vertex input state is intentionally absent.
         // All geometry is read from device-local buffers via Buffer Device Address

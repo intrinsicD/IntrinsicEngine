@@ -41,12 +41,12 @@ export namespace Extrinsic::Graphics
 
     struct PropertyFilterGpuInput
     {
-        std::span<const double> Values;       // rows x channels
+        std::span<const double> Values{};       // rows x channels
         std::uint32_t Channels{1};
-        std::span<const std::uint32_t> Edges; // endpoint pairs, one per undirected edge
-        std::span<const double> Weights;      // one per edge
-        std::span<const double> Degree;       // initial weighted degree per row
-        std::span<const std::uint32_t> Fixed; // nonzero: the row keeps its value
+        std::span<const std::uint32_t> Edges{}; // endpoint pairs, one per undirected edge
+        std::span<const double> Weights{};      // one per edge
+        std::span<const double> Degree{};       // initial weighted degree per row
+        std::span<const std::uint32_t> Fixed{}; // nonzero: the row keeps its value
     };
 
     // A resident property buffer as a kernel endpoint: the property's own scalar type (float

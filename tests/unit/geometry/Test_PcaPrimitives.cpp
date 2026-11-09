@@ -168,7 +168,7 @@ TEST(PcaPrimitives, RankOneCovarianceDoesNotSplitRepeatedZeroEigenvalues)
 
 TEST(PcaPrimitives, RepeatedEigenvaluesKeepAnOrthonormalRightHandedFrame)
 {
-    for(const auto result:{Geometry::PCA::SymmetricEigen3(1,0,0,0,0,0),
+    for(const auto& result:{Geometry::PCA::SymmetricEigen3(1,0,0,0,0,0),
                            Geometry::PCA::SymmetricEigen3(1,.5,.25,.25,.125,.0625),
                            Geometry::PCA::SymmetricEigen3(1,0,0,1,0,0),
                            Geometry::PCA::SymmetricEigen3(3,0,0,1,0,1)})

@@ -136,7 +136,8 @@ TEST(CoreHandleLease, SelfMoveAssignmentIsSafeNoExtraRelease)
     MockManager manager;
     auto lease = MockLease::Adopt(manager, ValidHandle());
 
-    lease = std::move(lease);
+    auto& self = lease; // through a reference: the self-move is the case under test (-Wself-move)
+    lease = std::move(self);
     EXPECT_TRUE(lease.IsValid());
     EXPECT_EQ(manager.ReleaseCalls, 0);
 

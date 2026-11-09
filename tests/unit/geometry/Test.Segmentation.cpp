@@ -856,8 +856,8 @@ TEST(Segmentation, GuideBindingsRejectMissingMisSizedAndTooWideInputs)
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     auto& mesh = fixture.Mesh;
     const auto params = FixedParams(2u);
-    mesh.VertexProperties().GetOrAdd<std::uint32_t>("v:ids", 0u);
-    mesh.VertexProperties().GetOrAdd<glm::vec3>("v:triple", glm::vec3{0.0f});
+    (void)mesh.VertexProperties().GetOrAdd<std::uint32_t>("v:ids", 0u);
+    (void)mesh.VertexProperties().GetOrAdd<glm::vec3>("v:triple", glm::vec3{0.0f});
     mesh.VertexProperties().GetOrAdd<double>("v:k1", 0.0).Vector() = fixture.K1;
     for (const char* name : {"v:absent", "v:ids"})
     {

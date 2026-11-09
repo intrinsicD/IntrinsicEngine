@@ -573,7 +573,7 @@ namespace
         explicit ConsolidationStaleSourceApp(
             const Runtime::GeometryElementDomain domain,
             Runtime::PointCloudConsolidationBackend backend = Runtime::PointCloudConsolidationBackend::CpuReference)
-            : Domain(domain), Backend(backend)
+            : Backend(backend), Domain(domain)
         {
         }
 

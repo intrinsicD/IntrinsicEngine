@@ -3189,11 +3189,11 @@ TEST(SandboxEditorUi, ProgressivePoissonScalarKindsRoundTripPublishAndUndoExactl
         const auto cloud = MakePointCloudEntity(registry, "TypedPoisson",
             {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 1.f, 0.f}});
         auto& props = registry.Raw().get<GS::Vertices>(cloud).Properties;
-        props.GetOrAdd<std::int32_t>("levels", -9);
-        props.GetOrAdd<double>("ranks", -8.0);
-        props.GetOrAdd<double>("radii", -7.0);
-        props.GetOrAdd<bool>("visible", true);
-        props.GetOrAdd<std::uint64_t>("unrelated", 9223372036854775809ull);
+        (void)props.GetOrAdd<std::int32_t>("levels", -9);
+        (void)props.GetOrAdd<double>("ranks", -8.0);
+        (void)props.GetOrAdd<double>("radii", -7.0);
+        (void)props.GetOrAdd<bool>("visible", true);
+        (void)props.GetOrAdd<std::uint64_t>("unrelated", 9223372036854775809ull);
         Runtime::EditorProgressivePoissonCommand command{
             .StableEntityId = Runtime::SelectionController::ToStableEntityId(cloud)};
         command.Config.Level = {Runtime::GeometryElementDomain::PointCloudPoint, "levels", Geometry::PropertyValueKind::Int32};

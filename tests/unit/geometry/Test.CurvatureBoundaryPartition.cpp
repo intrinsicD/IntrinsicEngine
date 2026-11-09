@@ -465,7 +465,7 @@ TEST(CurvatureBoundaryPartition, SurfacePreflightFailsClosedWithoutChangingInput
         std::numeric_limits<float>::infinity();
     check(nonfinite, C::BoundaryPartitionStatus::NonFinitePosition);
     auto isolated = grid.Mesh;
-    isolated.AddVertex({100, 100, 100});
+    (void)isolated.AddVertex({100, 100, 100});
     check(isolated, C::BoundaryPartitionStatus::InvalidTopology);
     Geometry::HalfedgeMesh::Mesh degenerate;
     auto a = degenerate.AddVertex({0, 0, 0});

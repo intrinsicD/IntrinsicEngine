@@ -246,8 +246,8 @@ namespace
                     .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
                     .Score = Ref("saliency", Geometry::PropertyValueKind::Float), .MinimumNeighbors = 1}, done); });
             check("Point construction", [&](auto done) {
-                return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Positions = Positions(),
-                    .Method = R::PointConstructionMethod::KnnGraph, .KNeighbors = 2}, done); });
+                return R::ApplyEditorPointConstructionCommand(commands, {.StableEntityId = Id, .Method = R::PointConstructionMethod::KnnGraph,
+                    .Positions = Positions(), .KNeighbors = 2}, done); });
         }
     };
 }
@@ -342,11 +342,11 @@ TEST_F(QueuedEditorJobContract, VulkanKeypointsWithoutStepRunsAreRefusedNotChain
     unsigned calls{0u};
     const auto result = R::ApplyEditorKeypointAnalysisCommand(Commands(),
         {.StableEntityId = Id,
+            .Backend = R::KeypointAnalysisBackend::VulkanLBVH,
             .Positions = Positions(),
             .Mask = Ref("keypoints", Geometry::PropertyValueKind::UInt32),
             .Score = Ref("saliency", Geometry::PropertyValueKind::Float),
-            .MinimumNeighbors = 1,
-            .Backend = R::KeypointAnalysisBackend::VulkanLBVH},
+            .MinimumNeighbors = 1},
         [&](auto)
         {
             ++calls;

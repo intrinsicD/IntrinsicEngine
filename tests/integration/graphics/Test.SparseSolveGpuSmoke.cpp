@@ -46,16 +46,16 @@ namespace
 
     struct Problem
     {
-        std::string Name;
-        Sp::SparseMatrix Matrix;
+        std::string Name{};
+        Sp::SparseMatrix Matrix{};
         std::uint32_t Solves{1}, ChainStride{0}, MaxIterations{2000};
         double Tolerance{1e-8};
-        std::vector<double> Rhs, Guesses, RhsDiagonal, RhsConstant;
+        std::vector<double> Rhs{}, Guesses{}, RhsDiagonal{}, RhsConstant{};
         bool WellConditioned{true};
         // GPU copies of the CSR structure.
-        std::vector<std::uint32_t> Offsets, Columns;
-        std::shared_ptr<G::SparseConjugateGradientWorkspace> Workspace;
-        std::shared_ptr<Runtime::SpatialGpuResult> Gpu;
+        std::vector<std::uint32_t> Offsets{}, Columns{};
+        std::shared_ptr<G::SparseConjugateGradientWorkspace> Workspace{};
+        std::shared_ptr<Runtime::SpatialGpuResult> Gpu{};
     };
 
     // alpha M + beta A exactly as Sparse::SolveCGShifted assembles it.

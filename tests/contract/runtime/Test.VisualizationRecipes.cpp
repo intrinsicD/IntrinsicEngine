@@ -388,7 +388,7 @@ TEST(VisualizationRecipes, FragmentBakeTexcoordStampFollowsTheOwningDomain)
 
     // Vertex-owned UVs: the stamp comes from the vertex property, not the
     // authored fallback.
-    vertices.Properties.Add<glm::vec2>("v:texcoord", glm::vec2{0.0f});
+    (void)vertices.Properties.Add<glm::vec2>("v:texcoord", glm::vec2{0.0f});
     const R::GeometryEntityAvailability vertexOwned =
         R::BuildGeometryAvailability(GS::ConstSourceView{
             .ActiveDomain = GS::Domain::Mesh,
@@ -404,8 +404,8 @@ TEST(VisualizationRecipes, FragmentBakeTexcoordStampFollowsTheOwningDomain)
     EXPECT_EQ(bakeStamp(vertexOwned), *vertexRevision);
 
     // Corner-owned UVs win, even while the vertex property is still present.
-    halfedges.Properties.Add<float>("h:filler", 0.0f);
-    halfedges.Properties.Add<glm::vec2>("h:texcoord", glm::vec2{0.0f});
+    (void)halfedges.Properties.Add<float>("h:filler", 0.0f);
+    (void)halfedges.Properties.Add<glm::vec2>("h:texcoord", glm::vec2{0.0f});
     const R::GeometryEntityAvailability cornerOwned =
         R::BuildGeometryAvailability(GS::ConstSourceView{
             .ActiveDomain = GS::Domain::Mesh,

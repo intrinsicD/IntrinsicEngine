@@ -280,7 +280,7 @@ TEST(PointCloudEditing, AScalarPublicationRefusesAnOutputChangedThroughAnyMutabl
             auto& scene = harness.Scene();
             const auto entity = Make(scene, D::MeshVertex);
             auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-            props.GetOrAdd<float>("a", 5.f);
+            (void)props.GetOrAdd<float>("a", 5.f);
             auto request = Request(entity, D::MeshVertex);
             request.ScalarOutputs = {{.Domain = D::MeshVertex, .Name = "a", .ValueKind = Geometry::PropertyValueKind::Float}};
             auto retained = props.Get<float>("a");
@@ -330,7 +330,7 @@ TEST(PointCloudEditing, AScalarPublicationChecksOutputRevisionsNotValues)
     auto& scene = harness.Scene();
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-    props.GetOrAdd<float>("a", 5.f);
+    (void)props.GetOrAdd<float>("a", 5.f);
     auto request = Request(entity, D::MeshVertex);
     request.ScalarOutputs = {{.Domain = D::MeshVertex, .Name = "a", .ValueKind = Geometry::PropertyValueKind::Float}};
     const auto unmarked = props.Get<float>("a").Span(); // marks now, before the capture
@@ -412,7 +412,7 @@ TEST(PointCloudEditing, AnEmptyNormalNameTakesThePositionsAlone)
     auto& scene = harness.Scene();
     const auto oriented = Make(scene, D::PointCloudPoint);
     const auto bare = Intrinsic::Tests::MakePointDomainSource(scene, D::PointCloudPoint);
-    PointDomainProperties(scene, bare, D::PointCloudPoint).GetOrAdd<glm::vec3>("samples", glm::vec3{1.f});
+    (void)PointDomainProperties(scene, bare, D::PointCloudPoint).GetOrAdd<glm::vec3>("samples", glm::vec3{1.f});
     harness.Frame(60);
     std::string diagnostic;
     for (const auto entity : {oriented, bare})

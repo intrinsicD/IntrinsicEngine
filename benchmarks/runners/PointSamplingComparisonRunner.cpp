@@ -33,8 +33,8 @@ namespace
 
     struct Cloud
     {
-        std::string Name;
-        std::vector<double> X, Y, Z;
+        std::string Name{};
+        std::vector<double> X{}, Y{}, Z{};
         [[nodiscard]] PS::PointView View() const { return {X, Y, Z}; }
         [[nodiscard]] std::size_t Size() const { return X.size(); }
     };

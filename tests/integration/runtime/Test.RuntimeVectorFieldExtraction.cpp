@@ -134,9 +134,9 @@ namespace
         auto& vertices = raw.get<GS::Vertices>(entity).Properties;
         auto& edges = raw.get<GS::Edges>(entity).Properties;
         auto& faces = raw.get<GS::Faces>(entity).Properties;
-        vertices.GetOrAdd<glm::vec3>("v:dir", glm::vec3{0, 0, 1});
-        edges.GetOrAdd<glm::vec3>("e:dir", glm::vec3{0, 1, 0});
-        faces.GetOrAdd<glm::vec3>("f:dir", glm::vec3{1, 0, 0});
+        (void)vertices.GetOrAdd<glm::vec3>("v:dir", glm::vec3{0, 0, 1});
+        (void)edges.GetOrAdd<glm::vec3>("e:dir", glm::vec3{0, 1, 0});
+        (void)faces.GetOrAdd<glm::vec3>("f:dir", glm::vec3{1, 0, 0});
         return entity;
     }
 
@@ -327,8 +327,8 @@ TEST(RuntimeVectorFieldExtraction, MutationsInvalidateOnlyDependentCaches)
     ASSERT_TRUE(mesh.AddQuad(a, b, c, d));
     ASSERT_TRUE(mesh.AddTriangle(c, b, e));
     GS::PopulateFromMesh(raw, entity, mesh);
-    raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:dir", glm::vec3{0, 0, 1});
-    raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:dir", glm::vec3{1, 0, 0});
+    (void)raw.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:dir", glm::vec3{0, 0, 1});
+    (void)raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:dir", glm::vec3{1, 0, 0});
     const auto replaced = fixture.Extract();
     EXPECT_EQ(replaced.Stats.VectorFieldAnchorCacheBuilds, 2u);
     EXPECT_EQ(replaced.Stats.VectorFieldPayloadCacheBuilds, 2u);
@@ -415,8 +415,8 @@ TEST(RuntimeVectorFieldExtraction, SteadyFramesDoNotRevisitLiveRowsOfSharedDelet
 {
     Fixture fixture;
     const ECS::EntityHandle entity = AddMesh(fixture.Scene, /*deleteTriangle=*/true);
-    fixture.Scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<glm::vec3>("e:other", glm::vec3{1, 0, 0});
-    fixture.Scene.Raw().get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:other", glm::vec3{0, 1, 0});
+    (void)fixture.Scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<glm::vec3>("e:other", glm::vec3{1, 0, 0});
+    (void)fixture.Scene.Raw().get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:other", glm::vec3{0, 1, 0});
     Recipe(fixture.Scene, entity).VectorFields = {
         Layer(D::MeshEdge, "e:dir"), Layer(D::MeshEdge, "e:other"),
         Layer(D::MeshFace, "f:dir"), Layer(D::MeshFace, "f:other")};

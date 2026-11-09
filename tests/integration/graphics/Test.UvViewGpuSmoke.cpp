@@ -526,14 +526,14 @@ private:
                 .BackgroundTexture = textureBackground
                     ? m_TextureBackgroundBindlessIndex
                     : Extrinsic::RHI::kInvalidBindlessIndex,
-                .ShowDistortionHeatmap = checkerHeatmap,
-                .LineIndices = m_LineIndices,
-                .TriangleConformalDistortion = m_ConformalDistortion,
                 .BakedTexture = {
                     .Texture = m_TextureBackgroundBindlessIndex,
                     .CoverageTexture = m_CoverageIndex,
                     .Mode = Extrinsic::Graphics::UvViewTextureDisplayMode::Color,
                 },
+                .ShowDistortionHeatmap = checkerHeatmap,
+                .LineIndices = m_LineIndices,
+                .TriangleConformalDistortion = m_ConformalDistortion,
             });
     }
 

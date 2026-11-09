@@ -127,7 +127,7 @@ TEST(PropertyInspection, StatisticsAndComparisonShareDeletionAndShapeContracts)
     EXPECT_EQ(stats.Statistics.DeletedCount, 1u);
     EXPECT_EQ(stats.Statistics.Components[0].Histogram.Counts, (std::vector<std::size_t>{2, 2}));
     EXPECT_FALSE(R::GetEditorPropertyStatistics(f.Context, id, input, R::MaxEditorPropertyHistogramBins + 1).Success);
-    p.GetOrAdd<glm::vec2>("vector");
+    (void)p.GetOrAdd<glm::vec2>("vector");
     EXPECT_FALSE(R::CompareEditorProperties(f.Context, id, input, {D::PointCloudPoint, "vector", K::Vec2}).Success);
 }
 
@@ -137,7 +137,7 @@ TEST(PropertyInspection, MissingStaleAndMismatchedInputsProduceDiagnostics)
     const auto entity = Intrinsic::Tests::MakePointDomainSource(f.Scene, D::PointCloudPoint);
     const auto id = R::SelectionController::ToStableEntityId(entity);
     auto& p = Intrinsic::Tests::PointDomainProperties(f.Scene, entity, D::PointCloudPoint);
-    p.GetOrAdd<float>("scalar");
+    (void)p.GetOrAdd<float>("scalar");
     R::GeometryPropertyRef ref{D::PointCloudPoint, "scalar", K::Double};
     auto statistics = R::GetEditorPropertyStatistics(f.Context, id, ref);
     EXPECT_FALSE(statistics.Success);
@@ -172,7 +172,7 @@ TEST(PropertyInspection, MalformedStorageAndDeletionMasksFailClosed)
     EXPECT_FALSE(R::ReadEditorPropertyValues(f.Context, id, ref).Success);
     EXPECT_FALSE(R::GetEditorPropertyStatistics(f.Context, id, ref).Success);
     scalar.Vector().resize(p.Size());
-    p.GetOrAdd<float>("bad:deleted");
+    (void)p.GetOrAdd<float>("bad:deleted");
     EXPECT_FALSE(R::ReadEditorPropertyValues(f.Context, id, ref).Success);
     EXPECT_FALSE(R::GetEditorPropertyStatistics(f.Context, id, ref).Success);
 }

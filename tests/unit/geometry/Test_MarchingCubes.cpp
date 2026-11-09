@@ -57,7 +57,7 @@ TEST(MarchingCubes, EmptyIsosurfaceReturnsNullopt)
     dims.Spacing = glm::vec3(1);
 
     DenseGrid grid(dims);
-    grid.AddProperty<float>("scalar", 10.0f);
+    (void)grid.AddProperty<float>("scalar", 10.0f);
 
     auto result = Extract(grid);
     EXPECT_FALSE(result.has_value());

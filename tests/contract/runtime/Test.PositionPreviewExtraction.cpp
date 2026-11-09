@@ -272,7 +272,7 @@ TEST(PositionPreviewExtraction, EachLanePreviewsTheFrontOfItsOwnDisplayedPositio
     auto cornerNormals = corners.GetOrAdd<glm::vec3>("h:normal", glm::vec3{0.f, 0.f, 1.f});
     for (std::size_t h = 0; h < cornerFaces.size(); ++h)
         cornerNormals[h] = cornerFaces[h] == 1u ? glm::vec3{0.f, 1.f, 0.f} : glm::vec3{0.f, 0.f, 1.f};
-    scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f, 0.f, 5.f});
+    (void)scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f, 0.f, 5.f});
     scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
         Extrinsic::Runtime::VertexChannelBindingSet{
             .Points = {
@@ -346,7 +346,7 @@ TEST(PositionPreviewExtraction, AGraphPointLaneUploadIsRestoredWhenItsPreviewEnd
     (void)graph.AddEdge(v0, v1);
     (void)graph.AddEdge(v1, v2);
     gs::PopulateFromGraph(scene.Raw(), entity, graph);
-    scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f, 0.f, 5.f});
+    (void)scene.Raw().get<gs::Vertices>(entity).Properties.GetOrAdd<glm::vec3>("v:offset", glm::vec3{0.f, 0.f, 5.f});
     scene.Raw().emplace<Extrinsic::Runtime::VertexChannelBindingSet>(entity,
         Extrinsic::Runtime::VertexChannelBindingSet{
             .Points = {

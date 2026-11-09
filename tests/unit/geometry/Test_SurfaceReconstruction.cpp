@@ -59,67 +59,6 @@ static std::vector<glm::vec3> MakeSphereNormals(const std::vector<glm::vec3>& po
 }
 
 // =============================================================================
-// Helper: create a DenseGrid from a sphere SDF
-// =============================================================================
-
-static Geometry::Grid::DenseGrid MakeSphereSDF(
-    std::size_t nx, std::size_t ny, std::size_t nz,
-    float radius = 1.0f,
-    glm::vec3 center = {0.0f, 0.0f, 0.0f})
-{
-    Geometry::Grid::GridDimensions dims;
-    dims.NX = nx;
-    dims.NY = ny;
-    dims.NZ = nz;
-
-    float extent = radius * 2.0f;
-    dims.Origin = center - glm::vec3(extent);
-    dims.Spacing = glm::vec3(2.0f * extent / static_cast<float>(nx));
-
-    Geometry::Grid::DenseGrid grid(dims);
-    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
-
-    for (std::size_t z = 0; z <= nz; ++z)
-        for (std::size_t y = 0; y <= ny; ++y)
-            for (std::size_t x = 0; x <= nx; ++x)
-            {
-                glm::vec3 pos = grid.WorldPosition(x, y, z);
-                float dist = glm::length(pos - center) - radius;
-                grid.Set(scalar, x, y, z, dist);
-            }
-
-    return grid;
-}
-
-// =============================================================================
-// Helper: create a DenseGrid from a plane SDF (z = 0)
-// =============================================================================
-
-static Geometry::Grid::DenseGrid MakePlaneSDF(
-    std::size_t nx, std::size_t ny, std::size_t nz)
-{
-    Geometry::Grid::GridDimensions dims;
-    dims.NX = nx;
-    dims.NY = ny;
-    dims.NZ = nz;
-    dims.Origin = {-1.0f, -1.0f, -1.0f};
-    dims.Spacing = glm::vec3(2.0f / static_cast<float>(nx));
-
-    Geometry::Grid::DenseGrid grid(dims);
-    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
-
-    for (std::size_t z = 0; z <= nz; ++z)
-        for (std::size_t y = 0; y <= ny; ++y)
-            for (std::size_t x = 0; x <= nx; ++x)
-            {
-                glm::vec3 pos = grid.WorldPosition(x, y, z);
-                grid.Set(scalar, x, y, z, pos.z);
-            }
-
-    return grid;
-}
-
-// =============================================================================
 // Surface Reconstruction — Basic Tests
 // =============================================================================
 

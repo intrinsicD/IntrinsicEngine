@@ -1495,15 +1495,6 @@ namespace {
             return signature;
         }
 
-        void AppendVec4Signature(std::uint64_t& signature,
-                                 const glm::vec4& value) noexcept
-        {
-            MixSignatureFloat(signature, value.x);
-            MixSignatureFloat(signature, value.y);
-            MixSignatureFloat(signature, value.z);
-            MixSignatureFloat(signature, value.w);
-        }
-
         void AppendVisualizationConfigSignature(
             std::uint64_t& signature,
             const std::optional<G::VisualizationConfig>& config)

@@ -8421,9 +8421,9 @@ void AddReferenceTriangleVectorFields(Engine& engine)
     const auto triangle = FindEntityByName(scene, "ReferenceTriangle");
     EXPECT_TRUE(IsReferenceTriangleEntityValid(scene, triangle));
     auto& raw = scene.Raw();
-    raw.get<gs::Faces>(triangle).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
-    raw.get<gs::Vertices>(triangle).Properties.GetOrAdd<glm::vec3>("v:up", glm::vec3{0.0f, 1.0f, 0.0f});
-    raw.get<gs::Edges>(triangle).Properties.GetOrAdd<glm::vec3>("e:down", glm::vec3{0.0f, -1.0f, 0.0f});
+    (void)raw.get<gs::Faces>(triangle).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    (void)raw.get<gs::Vertices>(triangle).Properties.GetOrAdd<glm::vec3>("v:up", glm::vec3{0.0f, 1.0f, 0.0f});
+    (void)raw.get<gs::Edges>(triangle).Properties.GetOrAdd<glm::vec3>("e:down", glm::vec3{0.0f, -1.0f, 0.0f});
     using D = RT::GeometryElementDomain;
     EXPECT_EQ(ApplyVectorFieldCommand(engine, RT::EditorVectorFieldOperation::Add,
                                       VectorFieldSmokeLayer(D::MeshFace, "f:flow", {1, 0, 1, 1}, false)),

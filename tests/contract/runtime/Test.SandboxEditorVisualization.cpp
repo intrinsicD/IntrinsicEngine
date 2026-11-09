@@ -121,37 +121,6 @@ namespace
         return *service;
     }
 
-    // A small deterministic, asymmetric point lattice — distinct extents per axis
-    // give ICP a well-conditioned correspondence problem (UI-029).
-
-void SetVec3Property(Geometry::PropertySet& properties,
-                         const std::string& name,
-                         const std::vector<glm::vec3>& values)
-    {
-        auto prop = properties.GetOrAdd<glm::vec3>(name, glm::vec3{0.0f});
-        prop.Vector() = values;
-    }
-
-void SetVec4Property(Geometry::PropertySet& properties,
-                         const std::string& name,
-                         const std::vector<glm::vec4>& values)
-    {
-        auto prop = properties.GetOrAdd<glm::vec4>(name, glm::vec4{1.0f});
-        prop.Vector() = values;
-    }
-
-void SetFloatProperty(Geometry::PropertySet& properties,
-                          const std::string& name,
-                          const std::vector<float>& values)
-    {
-        auto prop = properties.GetOrAdd<float>(name, 0.0f);
-        prop.Vector() = values;
-    }
-
-
-
-
-
 [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -2302,9 +2271,9 @@ TEST(SandboxEditorUi, VectorFieldCommandsValidateAndUseCommandHistory)
     const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldCommands");
     AddTriangleMeshSource(registry, mesh);
     auto& raw = registry.Raw();
-    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
-    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:heat", 0.0f);
-    raw.get<GS::Faces>(mesh).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    (void)raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    (void)raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:heat", 0.0f);
+    (void)raw.get<GS::Faces>(mesh).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
     // No authored presentation yet: the first vector field creates one.
     ASSERT_FALSE(raw.all_of<Runtime::GeometryPresentationRecipe>(mesh));
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
@@ -2423,7 +2392,7 @@ TEST(SandboxEditorUi, VectorFieldCommandRejectsBadColormapsAndRanges)
     Runtime::SelectionController selection;
     const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldColorRange");
     AddTriangleMeshSource(registry, mesh);
-    registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    (void)registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Runtime::EditorCommandHistory history;
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
@@ -2491,9 +2460,9 @@ TEST(SandboxEditorUi, VectorFieldModelListsDomainsCandidatesAndLayerStatus)
     const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldModel");
     AddTriangleMeshSource(registry, mesh);
     auto& raw = registry.Raw();
-    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f});
-    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:heat", 0.0f);
-    raw.get<GS::Edges>(mesh).Properties.GetOrAdd<glm::vec3>("e:tangent", glm::vec3{0.0f});
+    (void)raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f});
+    (void)raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:heat", 0.0f);
+    (void)raw.get<GS::Edges>(mesh).Properties.GetOrAdd<glm::vec3>("e:tangent", glm::vec3{0.0f});
     Runtime::GeometryPresentationRecipe recipe{};
     recipe.VectorFields.push_back(Runtime::GeometryVectorFieldLayerRecipe{
         .Vector = VectorRef(D::MeshVertex, "v:normal")});
@@ -2539,7 +2508,7 @@ TEST(SandboxEditorUi, VectorFieldModelOffersExactlyTheVectorsTheCommandAccepts)
     const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldParity");
     AddTriangleMeshSource(registry, mesh);
     auto& raw = registry.Raw();
-    raw.get<GS::Faces>(mesh).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    (void)raw.get<GS::Faces>(mesh).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
@@ -2682,7 +2651,7 @@ TEST(SandboxEditorUi, VectorFieldStyleNamesResolveOnceAndReportTheirFallback)
     EXPECT_NE(rowStatus({}).find("v:f"), std::string::npos) << rowStatus({});
 
     // A bound color property that loses an element falls back and says so.
-    vertices.GetOrAdd<float>("v:g", 1.0f);
+    (void)vertices.GetOrAdd<float>("v:g", 1.0f);
     layer.ColorProperty = "v:g";
     ASSERT_EQ(apply(Op::Update, layer), Runtime::EditorCommandStatus::Applied);
     vertices.Get<float>("v:g").Vector().resize(2u);

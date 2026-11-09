@@ -35,7 +35,7 @@ double pcaCos(double x)
 }
 // The fallback uses largest-off-diagonal Jacobi rotations with deterministic ties.
 // It is needed for repeated roots where independent row cross products lose rank.
-void pcaStable(precise dmat3 a, out precise dvec3 values, out precise dmat3 vectors)
+void pcaStable(dmat3 a, out precise dvec3 values, out precise dmat3 vectors)
 {
     vectors=dmat3(1.0lf);
     precise double scale=0.0lf;
@@ -74,7 +74,7 @@ void pcaStable(precise dmat3 a, out precise dvec3 values, out precise dmat3 vect
     }
     if(pcaDot(pcaCross(vectors[0],vectors[1]),vectors[2])<0.0lf)vectors[2]=-vectors[2];
 }
-dvec3 pcaVector(precise dmat3 a, double lambda)
+dvec3 pcaVector(dmat3 a, double lambda)
 {
     a[0][0]-=lambda;a[1][1]-=lambda;a[2][2]-=lambda;
     precise dvec3 c01=pcaCross(a[0],a[1]),c02=pcaCross(a[0],a[2]),c12=pcaCross(a[1],a[2]);

@@ -1841,8 +1841,6 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
     };
     constexpr std::string_view typed = "positions needs a canonical typed property reference.";
     constexpr std::string_view domain = "Unknown element domain.";
-    constexpr std::string_view density =
-        "Position and weight bindings need distinct canonical vec3/float properties on the same domain.";
     const std::array families{
         Family{"KernelDensity", Runtime::ValidateDerivedSection<KD::kSection>, typed, domain},
         Family{"PointSpacing", Runtime::ValidateDerivedSection<PS::kSection>, typed, domain},

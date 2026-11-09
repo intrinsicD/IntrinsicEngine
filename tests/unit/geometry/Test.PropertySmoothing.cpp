@@ -241,7 +241,7 @@ TEST(PropertySmoothing, AStepIsOnePassAndAPrefixOfStepsEqualsTheShorterFilter)
     const std::vector<double> values{0, 1, 4, 9, 16, 25, 1, 0, 2, 3, 5, 8};
     const std::vector<S::PropertyEdge> chain{{0, 1, 1}, {1, 2, 2}, {2, 3, 1}, {3, 4, 0.5}, {4, 5, 1}};
     const std::vector<std::size_t> fixed{5};
-    for (const S::PropertyFilterParams base :
+    for (const S::PropertyFilterParams& base :
         {S::PropertyFilterParams{.Method = S::PropertyFilter::Averaging, .Lambda = 0.4},
             S::PropertyFilterParams{.Method = S::PropertyFilter::Taubin, .Lambda = 0.3, .Mu = -0.31},
             S::PropertyFilterParams{.Method = S::PropertyFilter::Bilateral, .Lambda = 0.5, .RangeSigma = 3},

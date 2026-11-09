@@ -173,10 +173,10 @@ TEST(GpuWorldPositionPreviewContract, CopiesTheFrontOnceAtTheCullingHeadAndMarks
     EXPECT_TRUE(f.View(geometry).PositionShadowStale);
 
     // The same front is not copied again; a new stamp is.
-    f.World.SetGeometryPositionPreview(geometry, f.Preview(1u));
+    (void)f.World.SetGeometryPositionPreview(geometry, f.Preview(1u));
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 1u);
-    f.World.SetGeometryPositionPreview(geometry, f.Preview(2u));
+    (void)f.World.SetGeometryPositionPreview(geometry, f.Preview(2u));
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 2u);
 
@@ -203,7 +203,7 @@ TEST(GpuWorldPositionPreviewContract, APositionUploadDuringThePreviewIsCopiedOve
     ASSERT_TRUE(f.World.UpdateGeometryChannels(
         geometry, TriangleUpload(), Graphics::GpuWorld::GeometryChannelUpdateMask{.Position = true}).Succeeded());
     EXPECT_FALSE(f.View(geometry).PositionShadowStale);
-    f.World.SetGeometryPositionPreview(geometry, f.Preview(1u));
+    (void)f.World.SetGeometryPositionPreview(geometry, f.Preview(1u));
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 2u);
     EXPECT_TRUE(f.View(geometry).PositionShadowStale);
@@ -313,11 +313,11 @@ TEST(GpuWorldPositionPreviewContract, SeamSplitBlocksGatherThroughTheUploadedRem
     EXPECT_TRUE(f.View(geometry).PositionShadowStale);
 
     // The same remap revision is not uploaded again; a new one is, and gathers again.
-    f.World.SetGeometryPositionPreview(geometry, f.Preview(1u, kMap, 1u));
+    (void)f.World.SetGeometryPositionPreview(geometry, f.Preview(1u, kMap, 1u));
     EXPECT_EQ(f.Device.BufferWrites.size(), writesBefore + 1u);
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.DispatchRecords.size(), 1u);
-    f.World.SetGeometryPositionPreview(geometry, f.Preview(1u, kMap, 2u));
+    (void)f.World.SetGeometryPositionPreview(geometry, f.Preview(1u, kMap, 2u));
     EXPECT_EQ(f.Device.BufferWrites.size(), writesBefore + 2u);
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.DispatchRecords.size(), 2u);
@@ -464,7 +464,7 @@ TEST(GpuWorldPositionPreviewContract, AStaleHandleDoesNotClearTheReusingSlotsPre
     EXPECT_TRUE(f.View(b).PositionShadowStale);
 
     f.World.ClearGeometryPositionPreview(b);
-    f.World.SetGeometryPositionPreview(b, f.Preview(3u));
+    (void)f.World.SetGeometryPositionPreview(b, f.Preview(3u));
     f.World.ClearGeometryPositionPreview(b);
     f.World.SubmitPendingUploadBarriers(f.Commands);
     EXPECT_EQ(f.Commands.CopyBufferRecords.size(), 1u) << "a live handle clears its own preview";
