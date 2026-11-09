@@ -196,3 +196,11 @@ commit `b7e83f13d`. The reviewer accepted plugin inventory/follow-up ownership a
 new-plugin default criteria. It did not approve PR #1046 merge, BUG-263/264 closure,
 performance results or overall task completion. Full CPU CI at `f9bcae578` also passed;
 separate hosted sanitizer gates were still running at this checkpoint.
+
+## PR restart correction (2026-11-09)
+The PR review on `037ff5dca5` identified retained CPU farthest-point coordinate vectors
+after Restart. The existing restart/prefix/undo test now uses nonuniform property weights
+and a matching weighted reference; it failed after Restart before the correction. The
+existing restart callback clears all three vectors after destroying the sieve, retaining
+capacity. All 29 PointSamplingOperations/ResidentPointSampling cases pass after the fix.
+No new execution abstraction, API or GPU algorithm is introduced.

@@ -464,6 +464,9 @@ namespace Extrinsic::Runtime
                     if (!r)
                         return false;
                     r->Sieve.reset();
+                    r->X.clear();
+                    r->Y.clear();
+                    r->Z.clear();
                     r->Order = {};
                     r->Failure.clear();
                     r->Milliseconds = 0.0;

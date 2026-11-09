@@ -331,9 +331,14 @@ TEST(PointSamplingOperations, CpuFarthestPointStepsOnAWorkerAndAcceptsItsPrefix)
     using namespace std::chrono_literals;
     Scene s;
     const auto cloud = MakeCloud(s, 200);
+    auto weights = s.Registry.Raw().get<GS::Vertices>(cloud).Properties.GetOrAdd<float>("v:importance");
+    for (std::size_t i = 0; i < weights.Vector().size(); ++i)
+        weights.Vector()[i] = 1.0f + float(i % 7);
+    const std::vector<double> referenceWeights(weights.Vector().begin(), weights.Vector().end());
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(s.Context);
-    const R::PointSamplingOperationConfig config{.SourceStableEntityId = Id(cloud), .Count = 30};
+    const R::PointSamplingOperationConfig config{
+        .SourceStableEntityId = Id(cloud), .Count = 30, .WeightsName = "v:importance"};
     unsigned calls = 0;
     R::EditorPointSamplingResult last;
     const auto sink = [&](R::EditorPointSamplingResult result)
@@ -390,7 +395,8 @@ TEST(PointSamplingOperations, CpuFarthestPointStepsOnAWorkerAndAcceptsItsPrefix)
     EXPECT_EQ(last.StepRun, started.StepRun);
     const auto points =
         std::as_const(s.Registry.Raw().get<GS::Vertices>(cloud).Properties).Get<glm::vec3>("v:position");
-    const auto reference = Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {}, 30u);
+    const auto reference =
+        Geometry::PointSampling::Order(std::span<const glm::vec3>(points.Vector()), {.Weights = referenceWeights}, 30u);
     const auto rank = [&]
     {
         return std::as_const(s.Registry.Raw().get<GS::Vertices>(cloud).Properties).Get<float>("v:sample_rank").Vector();
