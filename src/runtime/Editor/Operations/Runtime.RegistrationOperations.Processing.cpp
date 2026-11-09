@@ -1,7 +1,7 @@
 module;
-#include <mutex>
-#include <chrono>
 #include <atomic>
+#include <chrono>
+#include <cstring>
 #include <functional>
 #include <entt/entity/fwd.hpp>
 
@@ -49,6 +49,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.RHI.Device;
 import Geometry.Registration;
 import Geometry.PointLBVH;
@@ -63,43 +64,10 @@ import Geometry.PointLBVH;
 
 namespace Extrinsic::Runtime
 {
-    // UI-067: the live view of one ICP solve (see EditorRegistrationProgressSnapshot).
+    // The panel's view of one ICP run: written on the main thread only (the run's start and its Show).
     struct EditorRegistrationProgress
     {
-        std::atomic<bool> CancelRequested{false};
-        mutable std::mutex Mutex{};
         EditorRegistrationProgressSnapshot Snapshot{};
-        std::chrono::steady_clock::time_point Started{}, Last{};
-
-        void Begin(std::shared_ptr<const std::vector<glm::vec3>> source)
-        {
-            std::scoped_lock lock{Mutex};
-            Started = Last = std::chrono::steady_clock::now();
-            Snapshot.Running = true;
-            Snapshot.Trace.clear();
-            Snapshot.SourceWorld = std::move(source);
-            Snapshot.Pose = glm::mat4(1.0f);
-            ++Snapshot.Revision;
-        }
-        void Publish(const Geometry::Registration::IterationTrace& trace)
-        {
-            const auto now = std::chrono::steady_clock::now();
-            std::scoped_lock lock{Mutex};
-            Snapshot.Trace.push_back({.Iteration = std::uint32_t(trace.Iteration),
-                                      .Seconds = std::chrono::duration<double>(now - Started).count(),
-                                      .IterationSeconds = std::chrono::duration<double>(now - Last).count(),
-                                      .RMSE = trace.RMSE, .InlierCount = std::uint64_t(trace.InlierCount)});
-            Snapshot.Pose = glm::mat4(trace.Transform);
-            Last = now;
-            ++Snapshot.Revision;
-        }
-        void End()
-        {
-            std::scoped_lock lock{Mutex};
-            if (!Snapshot.Running) return;
-            Snapshot.Running = false;
-            ++Snapshot.Revision;
-        }
     };
 
 extern "C++"
@@ -119,47 +87,6 @@ namespace GeometryProcessingDetail::MeshSupport
 
         namespace ECSC = Extrinsic::ECS::Components;
 namespace Reg = Geometry::Registration;
-
-struct RegistrationAlignmentOutcome {
-  bool HasResult{false};
-  Reg::RegistrationResult Result{};
-  std::vector<Reg::IterationTrace> Traces{};
-
-  [[nodiscard]] std::size_t IterationCount() const noexcept {
-    return Traces.size();
-  }
-};
-
-[[nodiscard]] RegistrationAlignmentOutcome
-AlignPointClouds(const std::span<const glm::vec3> sourcePoints,
-                 const std::span<const glm::vec3> targetPoints,
-                 const std::span<const glm::vec3> targetNormals,
-                 const Reg::RegistrationParams &params, const Reg::NearestQuery& query = {},
-                 const Reg::IterationObserver& also = {}) {
-  RegistrationAlignmentOutcome outcome;
-  outcome.Traces.reserve(params.MaxIterations);
-  const Reg::IterationObserver observe = [&outcome, &also](const Reg::IterationTrace& trace) {
-    outcome.Traces.push_back(trace);
-    if (also) also(trace);
-  };
-  const auto result = query ? Reg::AlignICPWithQueries(sourcePoints, targetPoints, targetNormals, params, query, observe)
-                            : Reg::AlignICP(sourcePoints, targetPoints, targetNormals, params, observe);
-  if (result) {
-    outcome.HasResult = true;
-    outcome.Result = *result;
-  }
-  return outcome;
-}
-
-[[nodiscard]] glm::mat4
-TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
-               const std::size_t index) {
-  if (index == 0u || outcome.Traces.empty())
-    return glm::mat4(1.0f);
-
-  const std::size_t clamped = std::min(index, outcome.Traces.size());
-  return glm::mat4(outcome.Traces[clamped - 1u].Transform);
-}
 
         // Point-to-plane ICP requires a validated target-normal span. Invalid
         // normals fail closed before `Geometry.Registration` can select its
@@ -308,6 +235,11 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             return glm::vec3(sum / static_cast<double>(points.size()));
         }
 
+        [[nodiscard]] bool IsVulkanRegistrationBackend(const RegistrationBackend backend) noexcept
+        {
+            return backend == RegistrationBackend::VulkanLBVH || backend == RegistrationBackend::VulkanBruteForce;
+        }
+
         // Why Vulkan ICP correspondences cannot run here (empty: they can). Each iteration's
         // queries are queued from the main thread, so they need the job lane, the spatial index
         // service and an operational device.
@@ -361,37 +293,53 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                     if (SupportsGeometryElementDomain(available, domain)) { ref.Domain = domain; break; }
             return ref;
         }
-        struct EditorRegistrationCpuJobState
+        // One ICP run (ARCH-023): a step run whose step is one ICP iteration (Geometry::Registration::AdvanceICP),
+        // always on a worker. A CPU run queries the shared LBVH snapshot or its KD-tree; a Vulkan run queries the
+        // target through the worker query session prepared at its start (one page per iteration, submitted and waited
+        // for on the worker: no pump, frame or main-thread callback). Nothing is published before the run's one Accept.
+        //
+        // Written once on the main thread before the run starts: the context, command, captures, solve inputs, Base
+        // and Session. Query, Solve, Trajectory, Started/Last and StepFailure are the iteration state the Step changes
+        // on a worker; Preview, Commit and Restart touch them only while no step runs (StepRunsService's guarantee).
+        // Valid, Show and Discard read the captures alone (Discard sets Abort, which a waiting page observes; the
+        // result waits for Finished). Sink and Delivered are main-thread state.
+        struct IcpRun
         {
-            std::uint32_t SourceStableEntityId{0u};
-            std::uint32_t TargetStableEntityId{0u};
+            EditorProcessingContext Context{};
             EditorRegistrationCommand Command{};
-            PointInputCapture SourceBinding{}, TargetBinding{};
-            // Point-to-point leaves normals empty. Every binding owns local rows,
-            // source-row IDs and revision watches for publication revalidation.
-            PointInputCapture NormalBinding{};
+            ECS::EntityHandle SourceEntity{entt::null}, TargetEntity{entt::null};
+            // Every binding owns local rows, source-row IDs and revision watches; point-to-point leaves normals empty.
+            PointInputCapture SourceBinding{}, TargetBinding{}, NormalBinding{};
             ECSC::Transform::Component SourceBeforeTransform{};
             bool TargetHadTransform{false};
             ECSC::Transform::Component TargetBeforeTransform{};
-            EditorRegistrationResult Result{};
-            // A rejected publication also runs the unpublished finalizer;
-            // Delivered prevents a second terminal callback.
-            std::function<void(EditorRegistrationResult)> Sink{};
-            bool Delivered{false};
-            // Last answer this job's `ValidateBeforeApply` gave the drain. The
-            // finalizer takes no arguments, so the reason a completion was
-            // refused has to be recorded where it was decided.
-            JobApplyValidation LastApplyValidation{JobApplyValidation::Current};
-            ECSC::Transform::Component SourceAfterTransform{};
-            SpatialIndexHandle TargetIndex{};
-            std::shared_ptr<const SpatialIndexSnapshot> IndexSnapshot{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
-            std::vector<glm::vec3> SourceWorld{}, TargetWorld{}, WorldNormals{};
+            EditorRegistrationResult Base{}; // backends, counts and effective variant; no iteration data
+            std::vector<glm::vec3> SourceWorld{}, TargetWorld{}, WorldNormals{}; // the source pre-aligned
             glm::mat4 PrealignPose{1.f};
             Reg::RegistrationParams Params{};
-            RegistrationAlignmentOutcome Outcome{};
-            EditorRegistrationProgressHandle Progress{}; // UI-067, optional
+            SpatialIndexHandle TargetIndex{};
+            std::shared_ptr<const SpatialIndexSnapshot> IndexSnapshot{};
+
+            Reg::NearestQuery Query{}; // a CPU run's correspondences, built by its first step
+            Reg::RegistrationResult Solve{};
+            std::vector<glm::dmat4> Trajectory{}; // the cumulative pose after each iteration
+            std::chrono::steady_clock::time_point Started{}, Last{};
+            std::string StepFailure{}; // why a failed step failed
+
+            // Vulkan: the prepared correspondence session (its target, poses or uploads, one page an iteration), kept
+            // across iterations and restarts and released by the cache once this run is gone and its page completed.
+            std::shared_ptr<SpatialQuerySession> Session{};
+            bool Float64{false}; // the device transforms the queries (the pose per page); else the step uploads them
+            std::atomic<bool> Abort{false};
+            SpatialNearestBatch Page{}; // the worker's page scratch
+            StepRunDriver Driver{};
+            std::uint64_t Run{0u};
+            std::function<void(EditorRegistrationResult)> Sink{};
+            bool Delivered{false};
+            EditorRegistrationProgressHandle Progress{}; // the panel's view, optional
         };
+
+        inline constexpr std::string_view kIcpJobLabel = "Sandbox.RegistrationICP";
 
         [[nodiscard]] std::vector<glm::vec3> TransformPointsToWorld(
             const std::vector<glm::vec3>& points,
@@ -405,461 +353,527 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             return world;
         }
 
-        [[nodiscard]] JobApplyValidation
-        ValidateRegistrationCpuJobApply(
-            const EditorProcessingContext& context,
-            const EditorRegistrationCpuJobState& job)
+        // The solve inputs in world space, the source pre-aligned to the target's centroid. O(n) on the main thread,
+        // like the capture itself. False with the reason when the normals cannot be carried into world space.
+        [[nodiscard]] bool PrepareIcpRun(IcpRun& run, std::string& rejection)
         {
-            // Epoch first: after detachment the borrowed scene pointer may name
-            // a freed registry, so nothing below may read it.
+            run.SourceWorld = TransformPointsToWorld(run.SourceBinding.Points, run.SourceBeforeTransform);
+            run.TargetWorld = run.TargetHadTransform
+                ? TransformPointsToWorld(run.TargetBinding.Points, run.TargetBeforeTransform)
+                : run.TargetBinding.Points;
+            const glm::vec3 delta = ComputePointCentroid(run.TargetWorld) - ComputePointCentroid(run.SourceWorld);
+            for (glm::vec3& point : run.SourceWorld)
+                point += delta;
+            run.PrealignPose = glm::mat4(1.0f);
+            run.PrealignPose[3] = glm::vec4(delta, 1.0f);
+            if (!run.NormalBinding.Points.empty())
+            {
+                const glm::mat4 model =
+                    run.TargetHadTransform ? ECSC::Transform::GetMatrix(run.TargetBeforeTransform) : glm::mat4(1.0f);
+                const RegistrationNormalStatus status =
+                    TransformRegistrationNormalsToWorld(run.NormalBinding.Points, model, &run.WorldNormals);
+                if (status != RegistrationNormalStatus::Ok)
+                {
+                    rejection = BuildRegistrationNormalRejectionMessage(status);
+                    return false;
+                }
+            }
+            run.Base.TargetNormalCount = run.WorldNormals.size();
+            run.Base.EffectiveVariant = run.WorldNormals.size() == run.TargetWorld.size() && !run.WorldNormals.empty()
+                ? EditorICPVariant::PointToPlane
+                : EditorICPVariant::PointToPoint;
+            run.Params.Variant = ToGeometryICPVariant(run.Command.Variant);
+            run.Params.MaxIterations = run.Command.Execution.IterationCap; // the run's cap is the solver's
+            run.Params.ConvergenceThreshold = run.Command.ConvergenceThreshold;
+            run.Params.MaxCorrespondenceDistance =
+                run.Command.MaxCorrespondenceDistance > 0.0 ? run.Command.MaxCorrespondenceDistance : 1.0e6;
+            run.Params.InlierRatio = run.Command.InlierRatio;
+            return true;
+        }
+
+        [[nodiscard]] double Seconds(const std::chrono::steady_clock::duration duration) noexcept
+        {
+            return std::chrono::duration<double>(duration).count();
+        }
+
+        void BeginIcpTiming(IcpRun& run)
+        {
+            if (run.Started == std::chrono::steady_clock::time_point{})
+                run.Started = run.Last = std::chrono::steady_clock::now();
+        }
+
+        // One ICP iteration from `indices` (per source point a compact target index, or UINT32_MAX). Metrics: rmse,
+        // inliers, seconds since the first step and this step's seconds. A solve that ends without iterating (fewer
+        // than three correspondences) cannot move further and ends the run as converged; the iteration cap is the
+        // run's own (Params.MaxIterations is Execution.IterationCap), so the solver's cap continues into it.
+        [[nodiscard]] StepOutcome AdvanceIcpRun(
+            IcpRun& run, const std::span<const std::uint32_t> indices, StepRunMetric& metric)
+        {
+            const std::size_t before = run.Solve.IterationsPerformed;
+            const auto status = Reg::AdvanceICP(run.SourceWorld,
+                run.TargetWorld,
+                run.WorldNormals,
+                run.Params,
+                indices,
+                run.Solve,
+                [&run](const Reg::IterationTrace& trace)
+                {
+                    run.Trajectory.push_back(trace.Transform);
+                });
+            if (status == Reg::ICPStepStatus::InvalidInput)
+            {
+                run.StepFailure = "ICP rejected its correspondences";
+                return StepOutcome::Failed;
+            }
+            const auto now = std::chrono::steady_clock::now();
+            metric.Values = {run.Solve.FinalRMSE,
+                double(run.Solve.FinalInlierCount),
+                Seconds(now - run.Started),
+                Seconds(now - run.Last)};
+            run.Last = now;
+            if (status == Reg::ICPStepStatus::Finished &&
+                (run.Solve.Converged || run.Solve.IterationsPerformed == before))
+                return StepOutcome::Converged;
+            return StepOutcome::Continue;
+        }
+
+        // A CPU run's step, on a worker: the shared target LBVH snapshot, else the KD-tree AlignICP builds.
+        [[nodiscard]] StepOutcome StepIcpOnCpu(IcpRun& run, StepRunMetric& metric)
+        {
+            BeginIcpTiming(run);
+            if (!run.Query)
+            {
+                if (run.IndexSnapshot)
+                    run.Query = [index = run.IndexSnapshot](
+                                    std::span<const glm::vec3> queries, std::span<std::uint32_t> ids)
+                    {
+                        for (std::size_t i = 0; i < queries.size(); ++i)
+                        {
+                            if (!Geometry::PointLBVH::ValidPoint(queries[i]))
+                                return false;
+                            ids[i] = index->Index.Nearest(queries[i]).Index;
+                        }
+                        return true;
+                    };
+                else
+                    run.Query = Reg::MakeKDTreeNearestQuery(run.TargetWorld, run.Params.KDTreeLeafSize);
+                if (!run.Query)
+                {
+                    run.StepFailure = "the target KD-tree could not be built";
+                    return StepOutcome::Failed;
+                }
+            }
+            const auto queries = Reg::MakeICPQueries(run.SourceWorld, run.Solve.Transform);
+            std::vector<std::uint32_t> indices(queries.size(), std::numeric_limits<std::uint32_t>::max());
+            if (!run.Query(queries, indices))
+            {
+                run.StepFailure = "a correspondence query was refused (a non-finite point)";
+                return StepOutcome::Failed;
+            }
+            return AdvanceIcpRun(run, indices, metric);
+        }
+
+        void ShowIcpPose(IcpRun& run, const glm::mat4& pose)
+        {
+            if (!run.Progress)
+                return;
+            run.Progress->Snapshot.Pose = pose;
+            ++run.Progress->Snapshot.Revision;
+        }
+
+        // A Vulkan run's step, on a worker: one correspondence page over the prepared session (the device's query
+        // precision: a float64 device transforms the fixed source by the pose itself, else the transformed queries are
+        // uploaded on the compute lane), waited for here, then the iteration solved here. Owner state is never touched.
+        [[nodiscard]] StepOutcome StepIcpOnGpu(IcpRun& run, StepRunMetric& metric)
+        {
+            BeginIcpTiming(run);
+            auto& session = *run.Session;
+            if (!run.Float64 &&
+                !session.UploadQueries(Reg::MakeICPQueries(run.SourceWorld, run.Solve.Transform), run.StepFailure))
+                return StepOutcome::Failed;
+            const auto status = session.Query(
+                0u, session.Rows(), -1.f, run.Float64 ? &run.Solve.Transform : nullptr, run.Abort, run.Page);
+            if (status == SpatialPageStatus::Abandoned)
+                return StepOutcome::Failed; // discarded: the run ended already, nothing to report
+            if (status == SpatialPageStatus::Failed)
+            {
+                run.StepFailure = run.Page.Diagnostic;
+                return StepOutcome::Failed;
+            }
+            std::vector<std::uint32_t> indices;
+            indices.reserve(run.Page.Neighbors.size());
+            const auto& slots = run.IndexSnapshot->Slots;
+            for (const auto neighbor : run.Page.Neighbors)
+            {
+                const auto found = std::lower_bound(slots.begin(), slots.end(), neighbor.Index);
+                indices.push_back(found != slots.end() && *found == neighbor.Index
+                        ? static_cast<std::uint32_t>(found - slots.begin())
+                        : std::numeric_limits<std::uint32_t>::max());
+            }
+            return AdvanceIcpRun(run, indices, metric);
+        }
+
+        // Full revalidation before publication (the run's Valid checks revisions every frame; values, row maps and
+        // transforms are compared here, once). The scene is read only after the attachment epoch check.
+        [[nodiscard]] JobApplyValidation ValidateIcpRunInputs(const IcpRun& run)
+        {
+            const auto& context = run.Context;
             if (context.AttachmentActive && !context.AttachmentActive())
                 return JobApplyValidation::StaleWorld;
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
-
             entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> sourceEntity =
-                ResolveStableEntity(raw, job.SourceStableEntityId);
-            const std::optional<ECS::EntityHandle> targetEntity =
-                ResolveStableEntity(raw, job.TargetStableEntityId);
-            if (!sourceEntity.has_value() || !targetEntity.has_value())
+            const auto sourceEntity = ResolveStableEntity(raw, run.Command.SourceStableEntityId);
+            const auto targetEntity = ResolveStableEntity(raw, run.Command.TargetStableEntityId);
+            if (!sourceEntity || !targetEntity || *sourceEntity != run.SourceEntity ||
+                *targetEntity != run.TargetEntity)
                 return JobApplyValidation::MissingTarget;
-
-            const auto current = [&](ECS::EntityHandle entity, GeometryPropertyRef ref,
-                                     const PointInputCapture& before)
+            const auto current = [&](ECS::EntityHandle entity, GeometryPropertyRef ref, const PointInputCapture& before)
             {
                 PointInputCapture now;
                 std::string diagnostic;
                 return CapturePointInput(BuildGeometryAvailability(raw, entity), ref, true, now, diagnostic) &&
-                       now.Inputs == before.Inputs && now.Slots == before.Slots &&
-                       SameGeometryPositions(now.Points, before.Points);
+                    now.Inputs == before.Inputs && now.Slots == before.Slots &&
+                    SameGeometryPositions(now.Points, before.Points);
             };
-            if (!current(*sourceEntity, job.Command.SourcePositions, job.SourceBinding) ||
-                !current(*targetEntity, job.Command.TargetPositions, job.TargetBinding) ||
-                (!job.NormalBinding.Points.empty() &&
-                 !current(*targetEntity, job.Command.TargetNormals, job.NormalBinding)))
+            if (!current(*sourceEntity, run.Command.SourcePositions, run.SourceBinding) ||
+                !current(*targetEntity, run.Command.TargetPositions, run.TargetBinding) ||
+                (!run.NormalBinding.Points.empty() &&
+                    !current(*targetEntity, run.Command.TargetNormals, run.NormalBinding)))
                 return JobApplyValidation::StaleGeneration;
-
-            const ECSC::Transform::Component* sourceTransform =
-                raw.try_get<ECSC::Transform::Component>(*sourceEntity);
-            if (sourceTransform == nullptr ||
-                !SameTransformComponent(*sourceTransform,
-                                        job.SourceBeforeTransform))
-            {
+            const auto* sourceTransform = raw.try_get<ECSC::Transform::Component>(*sourceEntity);
+            if (sourceTransform == nullptr || !SameTransformComponent(*sourceTransform, run.SourceBeforeTransform))
                 return JobApplyValidation::StaleGeneration;
-            }
-
-            const ECSC::Transform::Component* targetTransform =
-                raw.try_get<ECSC::Transform::Component>(*targetEntity);
+            const auto* targetTransform = raw.try_get<ECSC::Transform::Component>(*targetEntity);
             if (targetTransform == nullptr)
-                return job.TargetHadTransform
-                    ? JobApplyValidation::StaleGeneration
-                    : JobApplyValidation::Current;
-            if (!job.TargetHadTransform ||
-                !SameTransformComponent(*targetTransform,
-                                        job.TargetBeforeTransform))
-            {
+                return run.TargetHadTransform ? JobApplyValidation::StaleGeneration : JobApplyValidation::Current;
+            if (!run.TargetHadTransform || !SameTransformComponent(*targetTransform, run.TargetBeforeTransform))
                 return JobApplyValidation::StaleGeneration;
-            }
-
             return JobApplyValidation::Current;
         }
 
-        void PublishRegistrationResultSink(
-            EditorRegistrationCpuJobState& job,
-            EditorRegistrationResult result)
+        // The run's Valid, every frame: the world, both entities, the input revisions and both transforms.
+        [[nodiscard]] bool IcpCapturesCurrent(const IcpRun& run)
         {
-            if (job.Delivered)
-                return;
-            job.Delivered = true;
-            if (job.Sink)
-                job.Sink(std::move(result));
-        }
-
-        void FinishRegistrationSolve(EditorRegistrationCpuJobState& state)
-        {
-            auto& result = state.Result;
-            const auto& outcome = state.Outcome;
-            result.HasResult = true;
-            result.IterationsPerformed = outcome.Result.IterationsPerformed;
-            result.TrajectoryLength = outcome.IterationCount();
-            result.FinalRMSE = outcome.Result.FinalRMSE;
-            result.Converged = outcome.Result.Converged;
-            result.FinalInlierCount = outcome.Result.FinalInlierCount;
-
-            const std::size_t step =
-                std::min(state.Command.TrajectoryStep,
-                         outcome.IterationCount());
-            result.AppliedStep = step;
-            const glm::mat4 pose =
-                step == 0u ? glm::mat4(1.0f)
-                           : TrajectoryPose(outcome, step) * state.PrealignPose;
-
-            state.SourceAfterTransform = state.SourceBeforeTransform;
-            // Compose the rigid delta directly; decomposing column lengths would
-            // erase signed scale and lose the orientation of collapsed axes.
-            state.SourceAfterTransform.Position = glm::vec3(
-                pose * glm::vec4(state.SourceBeforeTransform.Position, 1.f));
-            state.SourceAfterTransform.Rotation = glm::normalize(
-                glm::quat_cast(glm::mat3(pose)) * state.SourceBeforeTransform.Rotation);
-
-            result.Status = EditorCommandStatus::Applied;
-            result.Error = Core::ErrorCode::Success;
-        }
-
-        [[nodiscard]] JobResultEnvelope RunRegistrationCpuWorker(
-            const std::shared_ptr<EditorRegistrationCpuJobState>& state)
-        {
-            EditorRegistrationResult& result = state->Result;
-            result.SourcePointCount = state->SourceBinding.Points.size();
-            result.TargetPointCount = state->TargetBinding.Points.size();
-
-            const std::vector<glm::vec3> sourceWorld =
-                TransformPointsToWorld(state->SourceBinding.Points,
-                                       state->SourceBeforeTransform);
-            const std::vector<glm::vec3> targetWorld =
-                state->TargetHadTransform
-                    ? TransformPointsToWorld(state->TargetBinding.Points,
-                                             state->TargetBeforeTransform)
-                    : state->TargetBinding.Points;
-
-            const glm::vec3 prealignDelta =
-                ComputePointCentroid(std::span<const glm::vec3>(targetWorld)) -
-                ComputePointCentroid(std::span<const glm::vec3>(sourceWorld));
-            std::vector<glm::vec3> prealignedSourceWorld = sourceWorld;
-            for (glm::vec3& point : prealignedSourceWorld)
-                point += prealignDelta;
-            glm::mat4 prealignPose(1.0f);
-            prealignPose[3] = glm::vec4(prealignDelta, 1.0f);
-
-            std::vector<glm::vec3> targetWorldNormals{};
-            if (!state->NormalBinding.Points.empty())
-            {
-                const glm::mat4 targetModel = state->TargetHadTransform
-                    ? ECSC::Transform::GetMatrix(state->TargetBeforeTransform)
-                    : glm::mat4(1.0f);
-                const RegistrationNormalStatus worldStatus =
-                    TransformRegistrationNormalsToWorld(
-                        state->NormalBinding.Points,
-                        targetModel,
-                        &targetWorldNormals);
-                if (worldStatus != RegistrationNormalStatus::Ok)
-                {
-                    result.Status =
-                        EditorCommandStatus::InvalidProcessingParameters;
-                    result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message =
-                        BuildRegistrationNormalRejectionMessage(worldStatus);
-                    return JobResultEnvelope::Make<EditorJobResult>(
-                        EditorJobResult{
-                            .Diagnostic = result.Message,
-                        });
-                }
-            }
-            result.TargetNormalCount = targetWorldNormals.size();
-
-            Reg::RegistrationParams params{};
-            params.Variant = ToGeometryICPVariant(state->Command.Variant);
-            params.MaxIterations = state->Command.MaxIterations;
-            params.ConvergenceThreshold = state->Command.ConvergenceThreshold;
-            params.MaxCorrespondenceDistance =
-                state->Command.MaxCorrespondenceDistance > 0.0
-                    ? state->Command.MaxCorrespondenceDistance
-                    : 1.0e6;
-            params.InlierRatio = state->Command.InlierRatio;
-            result.EffectiveVariant =
-                targetWorldNormals.size() == targetWorld.size() &&
-                        !targetWorldNormals.empty()
-                    ? EditorICPVariant::PointToPlane
-                    : EditorICPVariant::PointToPoint;
-
-            state->SourceWorld = std::move(prealignedSourceWorld);
-            state->TargetWorld = targetWorld;
-            state->WorldNormals = std::move(targetWorldNormals);
-            state->PrealignPose = prealignPose;
-            if (state->Progress)
-            {
-                state->Progress->Begin(std::make_shared<const std::vector<glm::vec3>>(state->SourceWorld));
-                params.Cancelled = [progress = state->Progress] { return progress->CancelRequested.load(); };
-            }
-            state->Params = params;
-            if (result.ActualBackend == RegistrationBackend::VulkanLBVH)
-                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = "ICP GPU correspondences ready to queue"});
-            Reg::NearestQuery query;
-            if (state->IndexSnapshot)
-                query = [index = state->IndexSnapshot](std::span<const glm::vec3> queries, std::span<std::uint32_t> ids) {
-                    for (std::size_t i = 0; i < queries.size(); ++i)
-                    {
-                        if (!Geometry::PointLBVH::ValidPoint(queries[i])) return false;
-                        ids[i] = index->Index.Nearest(queries[i]).Index;
-                    }
-                    return true;
-                };
-            const auto publish = [progress = state->Progress](const Reg::IterationTrace& trace) {
-                if (progress) progress->Publish(trace);
-            };
-            const RegistrationAlignmentOutcome outcome = AlignPointClouds(
-                state->SourceWorld, state->TargetWorld, state->WorldNormals, params, query, publish);
-            if (state->Progress) state->Progress->End();
-            if (outcome.HasResult && outcome.Result.Cancelled)
-            {
-                result.Status = EditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "ICP was cancelled; nothing was applied.";
-                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = result.Message});
-            }
-            if (!outcome.HasResult)
-            {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = "ICP rejected the selected point clouds (fewer than 3 "
-                                 "points or invalid parameters).";
-                return JobResultEnvelope::Make<EditorJobResult>(
-                    EditorJobResult{
-                        .Diagnostic = result.Message,
-                    });
-            }
-
-            state->Outcome = outcome;
-            FinishRegistrationSolve(*state);
-            return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = "ICP registration result ready"});
-        }
-
-        bool AdvanceRegistrationGpu(const EditorProcessingContext& context,
-                                    EditorRegistrationCpuJobState& state)
-        {
-            if (state.Result.ActualBackend != RegistrationBackend::VulkanLBVH ||
-                state.Result.Status != EditorCommandStatus::NoChange) return true;
-            auto fail = [&](std::string message) {
-                if (state.Progress) state.Progress->End();
-                state.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
-                state.Result.Error = Core::ErrorCode::InvalidState;
-                state.Result.BackendDiagnostic = message;
-                state.Result.Message = std::move(message);
-                // Release this job's share of the borrowed query lease; the
-                // cache owns the batch and may be torn down right after.
-                state.Batch.reset();
-                return true;
-            };
-            // The spatial cache is borrowed from the session: once the epoch
-            // closes, neither the pointer nor the batch it handed out may be
-            // read, so the readiness gate closes before any of them.
-            if (context.AttachmentActive && !context.AttachmentActive())
-                return fail("ICP GPU correspondences were abandoned when the world detached.");
-            if (state.Progress && state.Progress->CancelRequested.load())
-            {
-                state.Progress->End();
-                state.Result.Status = EditorCommandStatus::StaleEntity;
-                state.Result.Error = Core::ErrorCode::InvalidState;
-                state.Result.Message = "ICP was cancelled; nothing was applied.";
-                state.Batch.reset();
-                return true;
-            }
-            if (!context.SpatialIndices || ValidateRegistrationCpuJobApply(context, state) != JobApplyValidation::Current)
-                return fail("ICP inputs changed while GPU correspondences were pending.");
-            if (state.Batch)
-            {
-                if (state.Batch->State == SpatialQueryState::Failed) return fail(state.Batch->Diagnostic);
-                if (state.Batch->State != SpatialQueryState::Ready) return false;
-                std::vector<std::uint32_t> indices;
-                const auto& slots = state.IndexSnapshot->Slots;
-                for (const auto neighbor : state.Batch->Neighbors)
-                {
-                    const auto found = std::lower_bound(slots.begin(), slots.end(), neighbor.Index);
-                    indices.push_back(found != slots.end() && *found == neighbor.Index
-                        ? static_cast<std::uint32_t>(found - slots.begin()) : ~0u);
-                }
-                const auto status = Reg::AdvanceICP(state.SourceWorld, state.TargetWorld, state.WorldNormals,
-                    state.Params, indices, state.Outcome.Result,
-                    [&](const Reg::IterationTrace& trace) {
-                        state.Outcome.Traces.push_back(trace);
-                        if (state.Progress) state.Progress->Publish(trace);
-                    });
-                if (status == Reg::ICPStepStatus::InvalidInput) return fail("ICP rejected GPU correspondences.");
-                if (status == Reg::ICPStepStatus::Finished)
-                {
-                    if (state.Progress) state.Progress->End();
-                    state.Outcome.HasResult = true;
-                    FinishRegistrationSolve(state);
-                    state.Batch.reset();
-                    return true;
-                }
-            }
-            if (context.Device && context.Device->SupportsShaderFloat64())
-                state.Batch = context.SpatialIndices->QueueGpuNearestTransformed(state.TargetIndex,
-                    state.SourceWorld, state.Outcome.Result.Transform, state.Batch);
-            else
-                state.Batch = context.SpatialIndices->QueueGpuNearest(state.TargetIndex,
-                    Reg::MakeICPQueries(state.SourceWorld, state.Outcome.Result.Transform), state.Batch);
-            if (state.Batch->State == SpatialQueryState::Failed) return fail(state.Batch->Diagnostic);
-            return false;
-        }
-
-        [[nodiscard]] Core::Result PublishRegistrationCpuJob(
-            const EditorProcessingContext& context,
-            EditorRegistrationCpuJobState& job)
-        {
-            EditorRegistrationResult result = job.Result;
-            if (!result.Succeeded())
-            {
-                job.Result = result;
-                PublishRegistrationResultSink(job, result);
-                return Core::Err(ResultErrorOrUnknown(result.Error));
-            }
-
-            if (context.Scene == nullptr)
-            {
-                result.Status = EditorCommandStatus::MissingScene;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message = "ICP registration requires an attached scene.";
-                job.Result = result;
-                PublishRegistrationResultSink(job, result);
-                return Core::Err(result.Error);
-            }
-
+            const auto& context = run.Context;
+            if ((context.AttachmentActive && !context.AttachmentActive()) || context.Scene == nullptr ||
+                !EditorProcessingContextWorldCurrent(context))
+                return false;
             entt::registry& raw = context.Scene->Raw();
-            const std::optional<ECS::EntityHandle> sourceEntity =
-                ResolveStableEntity(raw, job.SourceStableEntityId);
-            if (!sourceEntity.has_value())
-            {
-                result.Status = EditorCommandStatus::StaleEntity;
-                result.Error = Core::ErrorCode::ResourceNotFound;
-                result.Message =
-                    "ICP registration source entity is stale or no longer live.";
-                job.Result = result;
-                PublishRegistrationResultSink(job, result);
-                return Core::Err(result.Error);
-            }
-
-            ECSC::Transform::Component* transform =
-                raw.try_get<ECSC::Transform::Component>(*sourceEntity);
-            if (transform == nullptr)
-            {
-                result.Status = EditorCommandStatus::MissingTransform;
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "ICP registration source entity has no Transform to drive.";
-                job.Result = result;
-                PublishRegistrationResultSink(job, result);
-                return Core::Err(result.Error);
-            }
-
-            if (context.CommandHistory != nullptr)
-            {
-                const EditorCommandHistoryResult history =
-                    ExecuteEditorTransformMutation(
-                        *context.CommandHistory,
-                        context.Scene,
-                        context.World,
-                        job.SourceStableEntityId,
-                        job.SourceBeforeTransform,
-                        job.SourceAfterTransform,
-                        "Align point clouds (ICP)");
-                result.Status = ToEditorCommandStatus(history.Status);
-            }
-            else
-            {
-                *transform = job.SourceAfterTransform;
-                raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
-                    *sourceEntity);
-                result.Status = EditorCommandStatus::Applied;
-            }
-
-            if (result.Status != EditorCommandStatus::Applied)
-            {
-                result.Error = Core::ErrorCode::Unknown;
-                result.Message =
-                    "ICP registration pose failed during editor history commit.";
-                job.Result = result;
-                PublishRegistrationResultSink(job, result);
-                return Core::Err(result.Error);
-            }
-
-            result.Error = Core::ErrorCode::Success;
-            result.Message = BuildRegistrationSuccessMessage(result);
-            job.Result = result;
-                PublishRegistrationResultSink(job, result);
-            return Core::Ok();
+            const auto source = ResolveStableEntity(raw, run.Command.SourceStableEntityId);
+            const auto target = ResolveStableEntity(raw, run.Command.TargetStableEntityId);
+            if (!source || !target || *source != run.SourceEntity || *target != run.TargetEntity ||
+                !GeometryPropertiesCurrent(context, *source, run.SourceBinding.Inputs) ||
+                !GeometryPropertiesCurrent(context, *target, run.TargetBinding.Inputs) ||
+                !GeometryPropertiesCurrent(context, *target, run.NormalBinding.Inputs))
+                return false;
+            const auto* sourceTransform = raw.try_get<ECSC::Transform::Component>(*source);
+            const auto* targetTransform = raw.try_get<ECSC::Transform::Component>(*target);
+            return sourceTransform != nullptr && SameTransformComponent(*sourceTransform, run.SourceBeforeTransform) &&
+                (run.TargetHadTransform ? targetTransform != nullptr &&
+                            SameTransformComponent(*targetTransform, run.TargetBeforeTransform)
+                                        : targetTransform == nullptr);
         }
 
-        // A queued ICP job that terminates without publishing — cancelled,
-        // stale, detached, or dropped — still owes the editor exactly one
-        // terminal result, otherwise its panel row stays `Pending` forever.
-        // Reads only the job's own state: the scene and the spatial cache may
-        // already be gone, and no pose or history entry is published here.
-        void FinalizeUnpublishedRegistrationJob(
-            EditorRegistrationCpuJobState& job)
+        void DeliverIcpResult(IcpRun& run, EditorRegistrationResult result)
         {
-            if (job.Progress) job.Progress->End();
-            if (job.Delivered)
+            if (std::exchange(run.Delivered, true))
                 return;
-            auto failure = BuildUnpublishedEditorJobFailure(
-                job.LastApplyValidation,
-                "Sandbox.RegistrationICP",
-                !job.Result.Succeeded()
-                    ? std::string_view{job.Result.Message} : std::string_view{});
-            EditorRegistrationResult result = job.Result;
+            if (run.Sink)
+                run.Sink(std::move(result));
+        }
+
+        [[nodiscard]] EditorRegistrationResult IcpFailure(
+            const IcpRun& run, const JobApplyValidation validation, std::string_view detail = {})
+        {
+            auto failure = BuildUnpublishedEditorJobFailure(validation, kIcpJobLabel, detail);
+            EditorRegistrationResult result = run.Base;
+            result.StepRun = run.Run;
             result.Status = failure.Status;
             result.Error = failure.Error;
             result.Message = std::move(failure.Message);
-            job.Result = result;
-            PublishRegistrationResultSink(job, std::move(result));
+            return result;
         }
 
-        // Output identity serializes requests on a source/domain; binding and
-        // transform snapshots are revalidated immediately before publication.
-        [[nodiscard]] EditorJobIdentity MakeRegistrationCpuJobIdentity(
-            const EditorRegistrationCpuJobState& state)
+        // Accept (no step runs): after the full revalidation, one undoable transform of the source: the configured
+        // trajectory step's pose (0: the start; clamped to the iterations done) composed with the pre-alignment.
+        // Rigid deltas compose directly; decomposing column lengths would erase signed scale.
+        [[nodiscard]] EditorRegistrationResult PublishIcpRun(IcpRun& run)
+        {
+            if (const auto validation = ValidateIcpRunInputs(run); validation != JobApplyValidation::Current)
+                return IcpFailure(run, validation);
+            EditorRegistrationResult result = run.Base;
+            result.StepRun = run.Run;
+            result.HasResult = true;
+            result.IterationsPerformed = run.Solve.IterationsPerformed;
+            result.TrajectoryLength = run.Trajectory.size();
+            result.FinalRMSE = run.Solve.FinalRMSE;
+            result.Converged = run.Solve.Converged;
+            result.FinalInlierCount = run.Solve.FinalInlierCount;
+            const std::size_t step = std::min(run.Command.TrajectoryStep, run.Trajectory.size());
+            result.AppliedStep = step;
+            const glm::mat4 pose =
+                step == 0u ? glm::mat4(1.0f) : glm::mat4(run.Trajectory[step - 1u]) * run.PrealignPose;
+            ECSC::Transform::Component after = run.SourceBeforeTransform;
+            after.Position = glm::vec3(pose * glm::vec4(run.SourceBeforeTransform.Position, 1.f));
+            after.Rotation = glm::normalize(glm::quat_cast(glm::mat3(pose)) * run.SourceBeforeTransform.Rotation);
+
+            const auto& context = run.Context;
+            if (context.CommandHistory != nullptr)
+                result.Status = ToEditorCommandStatus(ExecuteEditorTransformMutation(*context.CommandHistory,
+                    context.Scene,
+                    context.World,
+                    run.Command.SourceStableEntityId,
+                    run.SourceBeforeTransform,
+                    after,
+                    "Align point clouds (ICP)")
+                        .Status);
+            else
+            {
+                context.Scene->Raw().get<ECSC::Transform::Component>(run.SourceEntity) = after;
+                context.Scene->Raw().emplace_or_replace<ECSC::Transform::IsDirtyTag>(run.SourceEntity);
+                result.Status = EditorCommandStatus::Applied;
+            }
+            if (result.Status != EditorCommandStatus::Applied)
+            {
+                result.Error = Core::ErrorCode::Unknown;
+                result.Message = "ICP registration pose failed during editor history commit.";
+                return result;
+            }
+            result.Error = Core::ErrorCode::Success;
+            result.Message = BuildRegistrationSuccessMessage(result);
+            return result;
+        }
+
+        // The run's settled end (StepRunCallbacks::Finished: no step runs and the holder released the source, so a new
+        // run there is admitted from here on), from its final observation. Without a commit (discarded, cancelled,
+        // stale or failed) nothing is published and the caller gets its one terminal result; after a Commit its
+        // answer was delivered already.
+        void EndIcpRun(IcpRun& run, const StepRunObservation& observed)
+        {
+            if (run.Delivered)
+                return;
+            const std::string& reason = observed.Diagnostic;
+            if (observed.Phase == StepRunPhase::Failed)
+            {
+                EditorRegistrationResult result = run.Base;
+                result.StepRun = run.Run;
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.BackendDiagnostic = run.StepFailure.empty() ? run.Base.BackendDiagnostic : run.StepFailure;
+                result.Message =
+                    "ICP registration failed: " + (run.StepFailure.empty() ? reason : run.StepFailure) + ".";
+                DeliverIcpResult(run, std::move(result));
+                return;
+            }
+            if (reason.starts_with("stale"))
+            {
+                DeliverIcpResult(run, IcpFailure(run, JobApplyValidation::StaleGeneration));
+                return;
+            }
+            EditorRegistrationResult result = run.Base;
+            result.StepRun = run.Run;
+            result.Status = EditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message = "ICP was cancelled; nothing was applied.";
+            DeliverIcpResult(run, std::move(result));
+        }
+
+        // Restart (no step runs): a new generation from the captured inputs; the correspondence query and the
+        // device session are kept (the target did not change).
+        void RestartIcpRun(IcpRun& run)
+        {
+            run.Solve = {};
+            run.Trajectory.clear();
+            run.Started = run.Last = {};
+            run.StepFailure.clear();
+            ShowIcpPose(run, glm::mat4(1.0f));
+        }
+
+        [[nodiscard]] StepRunCallbacks MakeIcpCallbacks(const std::shared_ptr<IcpRun>& run)
+        {
+            StepRunCallbacks callbacks{
+                .Valid =
+                    [run]
+                {
+                    return IcpCapturesCurrent(*run);
+                },
+                .Commit =
+                    [run](std::string& diagnostic)
+                {
+                    auto result = PublishIcpRun(*run);
+                    const bool applied = result.Succeeded();
+                    if (!applied)
+                        diagnostic = result.Message;
+                    DeliverIcpResult(*run, std::move(result));
+                    return applied ? StepRunCommit::Committed : StepRunCommit::Refused;
+                },
+                // At once, also while a step runs: a waiting Vulkan page gives up (its bytes are released).
+                .Discard =
+                    [run]
+                {
+                    run->Abort.store(true, std::memory_order_release);
+                },
+                .Restart =
+                    [run](std::string&)
+                {
+                    RestartIcpRun(*run);
+                    return true;
+                },
+                .Finished =
+                    [run](const StepRunObservation& observed)
+                {
+                    EndIcpRun(*run, observed);
+                },
+            };
+            callbacks.Step = [run](StepRunMetric& metric)
+            {
+                return run->Session ? StepIcpOnGpu(*run, metric) : StepIcpOnCpu(*run, metric);
+            };
+            if (run->Progress)
+            {
+                // The pose alone (16 floats): the pre-aligned source stays with the panel's view.
+                callbacks.Preview = [run](StepPreview& preview)
+                {
+                    const glm::mat4 pose{run->Solve.Transform};
+                    preview.Values.assign(&pose[0][0], &pose[0][0] + 16);
+                    return true;
+                };
+                callbacks.Show = [run](const StepPreview& preview)
+                {
+                    if (preview.Values.size() != 16u)
+                        return StepRunShow::Never;
+                    glm::mat4 pose{};
+                    std::memcpy(&pose[0][0], preview.Values.data(), sizeof(pose));
+                    ShowIcpPose(*run, pose);
+                    return StepRunShow::Shown;
+                };
+            }
+            return callbacks;
+        }
+
+        // Output identity serializes requests on a source/domain; every job of the run joins its holder.
+        [[nodiscard]] EditorJobIdentity MakeRegistrationJobIdentity(const IcpRun& run)
         {
             return EditorJobIdentity{
-                .EntityId = state.SourceStableEntityId,
-                .Scope = ToEditorJobScope(state.Command.SourcePositions.Domain),
+                .EntityId = run.Command.SourceStableEntityId,
+                .Scope = ToEditorJobScope(run.Command.SourcePositions.Domain),
                 .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "registration_transform",
-                .RequestedDomain = EditorJobDomainOfBackend(ToString(state.Command.Backend)),
+                .RequestedDomain = EditorJobDomainOfBackend(ToString(run.Command.Backend)),
             };
         }
 
-        [[nodiscard]] JobDesc MakeRegistrationCpuJobDesc(
-            const EditorProcessingContext& context,
-            const std::shared_ptr<EditorRegistrationCpuJobState>& state)
+        // Without a job lane the run computes and accepts at once (the immediate outcome); it has no controls, so
+        // only start=run with auto_accept=end is honoured there.
+        [[nodiscard]] EditorRegistrationResult RunIcpInline(IcpRun& run)
         {
-            return JobDesc{
-                .DebugName = "Sandbox.RegistrationICP",
-                .Scope = context.World,
-                .Priority = Core::Dag::TaskPriority::Normal,
-                .Work =
-                    [state](const JobCancellation&) -> JobResultEnvelope
-                    {
-                        return RunRegistrationCpuWorker(state);
-                    },
-                .IsReadyToApply = [context, state]() { return AdvanceRegistrationGpu(context, *state); },
-                .ValidateBeforeApply =
-                    [context, state]()
-                    {
-                        const JobApplyValidation validation =
-                            ValidateRegistrationCpuJobApply(context, *state);
-                        state->LastApplyValidation = validation;
-                        return validation;
-                    },
-                .PublishCompletion =
-                    [context, state](KernelEventBus&,
-                                     const JobResultEnvelope& result) -> bool
-                    {
-                        if (result.TryGet<EditorJobResult>() == nullptr)
-                            return false;
-                        return PublishRegistrationCpuJob(context, *state)
-                            .has_value();
-                    },
-                .FinalizeUnpublishedOnMainThread =
-                    [state]() { FinalizeUnpublishedRegistrationJob(*state); },
-            };
+            if (run.Command.Execution.Start != StepRunStart::Run ||
+                run.Command.Execution.AutoAccept != StepRunAutoAccept::End)
+            {
+                EditorRegistrationResult result = run.Base;
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Without the job lane ICP computes and accepts at once: start=ready and an "
+                                 "auto_accept other than end need the session's step runs.";
+                return result;
+            }
+            StepRunMetric metric{};
+            for (std::uint32_t step = 0u; step < run.Command.Execution.IterationCap; ++step)
+            {
+                const StepOutcome outcome = StepIcpOnCpu(run, metric);
+                if (outcome == StepOutcome::Failed)
+                {
+                    EditorRegistrationResult result = run.Base;
+                    result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message = "ICP rejected the selected point clouds (" + run.StepFailure + ").";
+                    return result;
+                }
+                if (outcome == StepOutcome::Converged)
+                    break;
+            }
+            return PublishIcpRun(run);
         }
 
-        [[nodiscard]] EditorRegistrationResult
-        SubmitRegistrationCpuJob(
-            const EditorProcessingContext& context,
+        [[nodiscard]] EditorRegistrationResult StartIcpRun(const EditorProcessingContext& context,
+            const std::shared_ptr<IcpRun>& run,
+            std::function<void(EditorRegistrationResult)> onComplete)
+        {
+            if (!context.JobCommands.Available())
+                return RunIcpInline(*run);
+            const auto refuse = [&](std::string message)
+            {
+                EditorRegistrationResult result = run->Base;
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = std::move(message);
+                return result;
+            };
+            if (context.StepRuns == nullptr)
+                return refuse("ICP registration needs the session's step runs.");
+            EditorJobIdentity identity = MakeRegistrationJobIdentity(*run);
+            if (const auto active = ActiveOutputJobRefusal(context, identity, "ICP registration"))
+            {
+                // The active run keeps delivering to its own caller; this request registers no callback.
+                EditorRegistrationResult pending = MakePendingRegistrationResult(
+                    run->Command, run->SourceBinding.Points.size(), run->TargetBinding.Points.size(), active->Token);
+                pending.Message = active->Message;
+                return pending;
+            }
+            const bool gpu = IsVulkanRegistrationBackend(run->Base.ActualBackend);
+            if (gpu)
+            {
+                // The correspondence session, prepared once here on the main thread (resident target, hierarchy for
+                // LBVH, every buffer and pipeline); the worker's iterations then need no frame.
+                run->Float64 = context.Device && context.Device->SupportsShaderFloat64();
+                std::string diagnostic;
+                run->Session = context.SpatialIndices
+                    ? context.SpatialIndices->PrepareQuerySession(run->TargetIndex,
+                          {.Strategy = run->Base.ActualBackend == RegistrationBackend::VulkanBruteForce
+                                  ? Graphics::PointQueryStrategy::BruteForce
+                                  : Graphics::PointQueryStrategy::Lbvh,
+                              .Capacity = 1u,
+                              .PageQueries = std::uint32_t(std::min<std::size_t>(run->SourceWorld.size(), 1u << 20)),
+                              .Queries = run->SourceWorld,
+                              .Transformed = run->Float64,
+                              .Uploads = !run->Float64},
+                          diagnostic)
+                    : nullptr;
+                if (!run->Session)
+                    return refuse("ICP registration could not prepare its Vulkan correspondences: " +
+                        (diagnostic.empty() ? std::string("the spatial index cache is unavailable.") : diagnostic));
+            }
+            const auto holder = std::make_shared<JobToken>();
+            std::string refusal;
+            run->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
+            run->Run = context.StepRuns->Start({.Label = "ICP registration",
+                                                   .Owner = "Runtime.RegistrationOperations",
+                                                   .Output = {.StableEntityId = run->Command.SourceStableEntityId},
+                                                   .Execution = run->Command.Execution,
+                                                   .MetricNames = {"rmse", "inliers", "seconds", "iteration_seconds"}},
+                MakeIcpCallbacks(run),
+                EditorStepRunJobs(context.JobCommands, identity, holder),
+                refusal);
+            if (run->Run == 0u)
+            {
+                run->Delivered = true; // never started: no callback is owed
+                return refuse(QueuedJobRejectedMessage("ICP registration") + " " + refusal);
+            }
+            run->Driver = context.StepRuns->Driver(run->Run);
+            if (run->Progress)
+                run->Progress->Snapshot = {.StepRun = run->Run,
+                    .SourceWorld = std::make_shared<const std::vector<glm::vec3>>(run->SourceWorld),
+                    .Revision = run->Progress->Snapshot.Revision + 1u};
+            EditorRegistrationResult pending = run->Base;
+            pending.StepRun = run->Run;
+            pending.Status = EditorCommandStatus::Pending;
+            pending.Message = "ICP registration queued (" + std::string(ToString(pending.ActualBackend)) + ")";
+            AppendDerivedJobHandleToMessage(pending.Message, *holder);
+            return pending;
+        }
+
+        [[nodiscard]] EditorRegistrationResult SubmitRegistrationRun(const EditorProcessingContext& context,
             const EditorRegistrationCommand& command,
             PointInputCapture source,
             PointInputCapture target,
@@ -869,12 +883,13 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             std::function<void(EditorRegistrationResult)> onComplete,
             EditorRegistrationProgressHandle progress)
         {
-            auto state =
-                std::make_shared<EditorRegistrationCpuJobState>();
+            auto state = std::make_shared<IcpRun>();
+            state->Context = context;
             state->Progress = std::move(progress);
-            state->SourceStableEntityId = command.SourceStableEntityId;
-            state->TargetStableEntityId = command.TargetStableEntityId;
             state->Command = command;
+            entt::registry& raw = context.Scene->Raw();
+            state->SourceEntity = *ResolveStableEntity(raw, command.SourceStableEntityId);
+            state->TargetEntity = *ResolveStableEntity(raw, command.TargetStableEntityId);
             state->SourceBinding = std::move(source);
             state->TargetBinding = std::move(target);
             state->NormalBinding = std::move(normals);
@@ -884,95 +899,68 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 state->TargetHadTransform = true;
                 state->TargetBeforeTransform = *targetTransform;
             }
-            state->Result = MakeRegistrationBaseResult(command);
-            state->Result.SourcePointCount = state->SourceBinding.Points.size();
-            state->Result.TargetPointCount = state->TargetBinding.Points.size();
+            state->Base = MakeRegistrationBaseResult(command);
+            state->Base.SourcePointCount = state->SourceBinding.Points.size();
+            state->Base.TargetPointCount = state->TargetBinding.Points.size();
 
-            const auto targetEntity = ResolveStableEntity(context.Scene->Raw(), command.TargetStableEntityId);
             if (command.Backend != RegistrationBackend::CpuKDTree)
             {
+                // The Vulkan admission that needs no index first (brute-force work needs no device, so it is reported
+                // even without one): a run that will query on the device acquires a GPU-only target, no CPU hierarchy
+                // (ARCH-023); a CPU or fallen-back run acquires the CPU LBVH it steps with.
+                const bool vulkan = IsVulkanRegistrationBackend(command.Backend);
+                const auto count = [](std::size_t n)
+                {
+                    return std::uint32_t(std::min<std::size_t>(n, ~0u));
+                };
+                std::string reason = !vulkan || command.Backend != RegistrationBackend::VulkanBruteForce
+                    ? std::string{}
+                    : std::string(Graphics::PointBruteForceRefusal(
+                          count(state->SourceBinding.Points.size()), count(state->TargetBinding.Points.size()), 1u));
+                if (vulkan && reason.empty())
+                    reason = VulkanCorrespondencesUnavailable(context);
+                const bool gpuOnly = vulkan && reason.empty() && state->TargetBinding.Points.size() <= (1u << 20);
                 if (context.SpatialIndices)
                 {
-                    const auto acquired = context.SpatialIndices->Acquire(context.World, *targetEntity,
-                        command.TargetPositions, SpatialIndexSpace::EntityTransform);
+                    const auto acquired = context.SpatialIndices->Acquire(context.World,
+                        state->TargetEntity,
+                        command.TargetPositions,
+                        SpatialIndexSpace::EntityTransform,
+                        !gpuOnly);
                     state->TargetIndex = acquired.Handle;
                     state->IndexSnapshot = context.SpatialIndices->Snapshot(acquired.Handle);
-                    state->Result.TargetIndexReused = acquired.Reused;
-                    state->Result.BackendDiagnostic = acquired.Diagnostic;
+                    state->Base.TargetIndexReused = acquired.Reused;
+                    state->Base.BackendDiagnostic = acquired.Diagnostic;
                 }
                 if (state->IndexSnapshot)
-                    state->Result.ActualBackend = RegistrationBackend::CpuLBVH;
+                    state->Base.ActualBackend = RegistrationBackend::CpuLBVH;
                 else
-                    state->Result.BackendDiagnostic = "Shared target index unavailable; using CPU KD-tree.";
-                if (command.Backend == RegistrationBackend::VulkanLBVH)
+                    state->Base.BackendDiagnostic = "Shared target index unavailable; using CPU KD-tree.";
+                if (vulkan)
                 {
-                    std::string reason = VulkanCorrespondencesUnavailable(context);
                     if (reason.empty() && !state->IndexSnapshot) reason = "No shared target index";
                     if (reason.empty() && state->TargetBinding.Points.size() > (1u << 20))
                         reason = "More than 2^20 target points";
                     if (reason.empty())
-                        state->Result.ActualBackend = RegistrationBackend::VulkanLBVH;
+                        state->Base.ActualBackend = command.Backend; // the requested strategy, never swapped
                     else
                     {
-                        state->Result.FellBackToCPU = true;
-                        state->Result.BackendDiagnostic = reason + "; Vulkan correspondences unavailable, using " +
-                            std::string(ToString(state->Result.ActualBackend)) + ".";
+                        state->Base.FellBackToCPU = true;
+                        state->Base.BackendDiagnostic = reason + "; Vulkan correspondences unavailable, using " +
+                            std::string(ToString(state->Base.ActualBackend)) + ".";
                     }
                 }
             }
-            if (!context.JobCommands.Available())
+            std::string rejection;
+            if (!PrepareIcpRun(*state, rejection))
             {
-                // Immediate outcome: the caller gets it as the return value and
-                // no completion callback is registered for it.
-                (void)RunRegistrationCpuWorker(state);
-                (void)PublishRegistrationCpuJob(context, *state);
-                return state->Result;
-            }
-
-            const EditorJobIdentity identity =
-                MakeRegistrationCpuJobIdentity(*state);
-            if (const auto active =
-                    ActiveOutputJobRefusal(context, identity, "ICP registration CPU"))
-            {
-                // The active job already owns the callback that will deliver
-                // this output's terminal result; a duplicate request registers
-                // none, so this state is discarded without a sink.
-                EditorRegistrationResult pending =
-                    MakePendingRegistrationResult(
-                        command,
-                        state->SourceBinding.Points.size(),
-                        state->TargetBinding.Points.size(),
-                        active->Token);
-                pending.Message =
-                    active->Message;
-                return pending;
-            }
-
-            state->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
-            JobDesc desc = MakeRegistrationCpuJobDesc(context, state);
-            auto pending = state->Result;
-            const JobToken handle = context.JobCommands.Submit(
-                std::move(desc),
-                identity);
-            if (!handle.IsValid())
-            {
-                // The job was never enqueued, so no finalizer will run for it
-                // and this state dies here with its sink uncalled.
-                EditorRegistrationResult result =
-                    MakeRegistrationBaseResult(command);
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.SourcePointCount = state->SourceBinding.Points.size();
-                result.TargetPointCount = state->TargetBinding.Points.size();
-                result.Error = Core::ErrorCode::InvalidState;
-                result.Message          = GeometryProcessingDetail::MeshSupport::QueuedJobRejectedMessage("ICP registration CPU");
+                EditorRegistrationResult result = state->Base;
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = std::move(rejection);
                 return result;
             }
-
-            pending.Status = EditorCommandStatus::Pending;
-            pending.Message = "ICP registration job queued (" + std::string(ToString(pending.ActualBackend)) + ")";
-            AppendDerivedJobHandleToMessage(pending.Message, handle);
-            return pending;
+            return StartIcpRun(context, state, std::move(onComplete));
         }
 }
 } // extern "C++"
@@ -1019,19 +1007,23 @@ ApplyRegistrationChecked(
                 "ICP registration requires two distinct source and target entities.";
             return result;
         }
-        if (!ValidEditorICPVariant(command.Variant) ||
-            command.MaxIterations == 0u ||
-            !(command.InlierRatio > 0.0 && command.InlierRatio <= 1.0) ||
-            !std::isfinite(command.MaxCorrespondenceDistance) ||
-            !std::isfinite(command.ConvergenceThreshold) || command.ConvergenceThreshold < 0 ||
-            command.Backend > RegistrationBackend::VulkanLBVH)
+        if (const auto refusal = StepRunExecutionRefusal(command.Execution, kMaxRegistrationIterations);
+            !refusal.empty())
+        {
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message = "ICP registration: " + std::string(refusal);
+            return result;
+        }
+        if (!ValidEditorICPVariant(command.Variant) || !(command.InlierRatio > 0.0 && command.InlierRatio <= 1.0) ||
+            !std::isfinite(command.MaxCorrespondenceDistance) || !std::isfinite(command.ConvergenceThreshold) ||
+            command.ConvergenceThreshold < 0 || command.Backend > RegistrationBackend::VulkanBruteForce)
         {
             result.Status =
                 EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "ICP registration requires a valid variant, a positive "
-                             "iteration count, an inlier ratio in (0, 1], and a finite "
-                             "correspondence distance.";
+            result.Message = "ICP registration requires a valid variant, an inlier ratio in (0, 1], "
+                             "and a finite correspondence distance.";
             return result;
         }
 
@@ -1178,8 +1170,15 @@ ApplyRegistrationChecked(
             result.Message = "Ready to register the selected property domains.";
             return result;
         }
-        return SubmitRegistrationCpuJob(context, command, std::move(source), std::move(target), std::move(normals),
-            *transform, targetTransform, std::move(onComplete), std::move(progress));
+        return SubmitRegistrationRun(context,
+            command,
+            std::move(source),
+            std::move(target),
+            std::move(normals),
+            *transform,
+            targetTransform,
+            std::move(onComplete),
+            std::move(progress));
     }
 
     EditorRegistrationResult ApplyEditorRegistrationCommand(
@@ -1224,14 +1223,7 @@ ApplyRegistrationChecked(
 
     EditorRegistrationProgressSnapshot SnapshotEditorRegistrationProgress(const EditorRegistrationProgressHandle& progress)
     {
-        if (!progress) return {};
-        std::scoped_lock lock{progress->Mutex};
-        return progress->Snapshot;
-    }
-
-    void CancelEditorRegistration(const EditorRegistrationProgressHandle& progress)
-    {
-        if (progress) progress->CancelRequested = true;
+        return progress ? progress->Snapshot : EditorRegistrationProgressSnapshot{};
     }
     GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
         const EditorProcessingCommands& commands, std::uint32_t stableId)

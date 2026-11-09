@@ -31,6 +31,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
@@ -1094,6 +1095,7 @@ namespace
             FrameProbe = &Intrinsic::Tests::AddRuntimeTestModule(
                 Engine, std::make_unique<PointReadinessFrameProbe>());
             Engine.EmplaceModule<Runtime::AsyncWorkModule>();
+            Engine.EmplaceModule<Runtime::StepRunsModule>();
             Engine.EmplaceModule<Runtime::SceneInteractionModule>();
             Engine.EmplaceModule<Runtime::SpatialIndexCache>();
             Engine.EmplaceModule<Runtime::PointCloudEditingModule>();
@@ -1727,7 +1729,7 @@ TEST_F(EditorPointReadiness, ConstructionRetainsBackendCoordinateGatesWithoutRes
     Drain();
     ASSERT_TRUE(PreviewConstruction().Ready);
     Construction.Backend = Runtime::PointConstructionBackend::VulkanLBVH;
-    EXPECT_EQ(PreviewConstruction().Diagnostic, "Vulkan construction requires framed GPU queries and editor jobs.");
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Vulkan construction requires GPU queries and editor jobs.");
     Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::denorm_min();
     EXPECT_EQ(PreviewConstruction().Diagnostic, "Checking live point samples. Wait for input validation.");
     Drain();
@@ -3485,9 +3487,8 @@ TEST_F(EditorKeypointAgent, EditorJobMcpCancelCancelsTheCallsJob)
     EXPECT_FALSE(Properties().Exists(Keypoints.Mask.Name)) << "a cancelled run publishes nothing";
 }
 
-// A wait ends when the scene is replaced, when the window minimizes (refused
-// while minimized, a pending one answered) and when the workspace detaches.
-TEST(SandboxEditorSession, EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach)
+// A wait survives minimizing; scene replacement or workspace detach still ends it.
+TEST(SandboxEditorSession, EditorJobWaitSurvivesMinimizeAndEndsOnSceneReplacementOrDetach)
 {
     Runtime::Engine engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
@@ -3515,13 +3516,19 @@ TEST(SandboxEditorSession, EditorJobWaitEndsOnSceneReplacementMinimizeAndDetach)
 
     Runtime::AgentProtocol protocol{registry, false};
     const Runtime::AgentOperationContext minimized{.Attachment = &attachment, .Jobs = &jobs, .ViewportPresentable = false};
-    const auto refused = protocol.Handle(ToolCall(1, "jobs_wait", AgentJson::parse(arguments)), minimized);
-    ASSERT_TRUE(refused.has_value());
-    EXPECT_EQ(AgentJson::parse(*refused)["result"]["structuredContent"]["error"]["code"], "viewport_not_presentable");
+    EXPECT_FALSE(protocol.Handle(ToolCall(1, "jobs_wait", AgentJson::parse(arguments)), minimized).has_value());
     ASSERT_FALSE(protocol.Handle(ToolCall(2, "jobs_wait", AgentJson::parse(arguments)), context).has_value());
-    const auto answered = protocol.PollPending(minimized);
-    ASSERT_EQ(answered.size(), 1u);
-    EXPECT_EQ(AgentJson::parse(answered.front())["result"]["structuredContent"]["error"]["code"], "viewport_not_presentable");
+    EXPECT_TRUE(protocol.PollPending(minimized).empty());
+    EXPECT_EQ(protocol.PendingCount(), 2u);
+    for (int id : {1, 2})
+        EXPECT_FALSE(protocol
+                .Handle(
+                    AgentJson{
+                        {"jsonrpc", "2.0"}, {"method", "notifications/cancelled"}, {"params", {{"requestId", id}}}}
+                        .dump(),
+                    minimized)
+                .has_value());
+    EXPECT_TRUE(protocol.PollPending(minimized).empty());
     EXPECT_EQ(protocol.PendingCount(), 0u);
 
     auto detached = Runtime::InvokeAgentOperation(registry, "jobs_wait", context, arguments, false);
@@ -3873,6 +3880,18 @@ TEST_F(EditorKeypointAgent, OnlyARequestedCancelRelabelsTheRunsFailure)
     const auto staleAnswer = finish(stale);
     EXPECT_TRUE(staleAnswer.IsError) << staleAnswer.Text;
     EXPECT_NE(staleAnswer.ErrorCode, "cancelled") << staleAnswer.Text;
+    ASSERT_TRUE(WaitFor(
+        [&]
+        {
+            (void)jobs.DrainCompletions(Engine.Events());
+            const auto records = Runtime::GetEditorJobs(Commands);
+            return std::none_of(records.begin(),
+                records.end(),
+                [](const auto& job)
+                {
+                    return Runtime::IsActiveEditorJobState(job.State);
+                });
+        })); // delivery precedes the holder and cancelled worker's retirement
 
     // A job cancelled by the job service itself (not an editor cancel request).
     release.store(false, std::memory_order_release);
@@ -3905,6 +3924,37 @@ TEST_F(EditorKeypointAgent, OnlyARequestedCancelRelabelsTheRunsFailure)
         (void)jobs.DrainCompletions(Engine.Events());
         return jobs.IsComplete(foreign) && jobs.IsComplete(holder) && jobs.IsComplete(holder2);
     }));
+}
+
+// ARCH-023: a step run retiring the jobs of its ended run (here a stale source) cancels its holder,
+// but that is the run's own lifecycle, not a cancel request remembered for the run.
+TEST_F(EditorKeypointAgent, AStepRunRetiringItsEndedRunIsNotACancelRequest)
+{
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, Keypoints).Succeeded());
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    ASSERT_EQ(
+        Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints).Status, Runtime::EditorCommandStatus::Pending);
+    Runtime::JobToken holder{};
+    for (const auto& job : Runtime::GetEditorJobs(Commands))
+        if (Runtime::IsActiveEditorJobState(job.State) && !holder.IsValid())
+            holder = job.Identity.Run.IsValid() ? job.Identity.Run : job.Token;
+    ASSERT_TRUE(holder.IsValid());
+    Properties().Get<glm::vec3>("samples")[0].x += 0.5f;
+    ASSERT_TRUE(WaitFor(
+        [&]
+        {
+            (void)jobs.DrainCompletions(Engine.Events());
+            const auto records = Runtime::GetEditorJobs(Commands);
+            return jobs.IsComplete(holder) &&
+                std::none_of(records.begin(),
+                    records.end(),
+                    [](const auto& job)
+                    {
+                        return Runtime::IsActiveEditorJobState(job.State);
+                    });
+        }));
+    EXPECT_EQ(jobs.GetState(holder), Runtime::JobState::Cancelled) << "the ended run's holder is retired";
+    EXPECT_FALSE(Runtime::IsEditorRunCancelRequested(Commands, holder));
 }
 
 // RUNTIME-313: a duplicate of a guarded run reaches the agent as every duplicate does: Pending
@@ -4315,4 +4365,183 @@ TEST_F(EditorParameterizationAgent, PreviewOperationUsesTheActiveParameterizatio
     Drain();
     EXPECT_EQ(preview()["enabled"], true);
     EXPECT_FALSE(Properties().Exists("fresh_configured_uvs"));
+}
+
+// RUNTIME-355: a nonwaiting run tool starts with its section's execution options, each one the call names replacing it
+// for that run only (the section is unchanged), within the method's own rows. Each section here starts at once and
+// accepts by itself, so both the call's start ready and the section's auto_accept (an absent argument, not a start's
+// default never) show in the run's options. A ready start computes and publishes nothing.
+namespace
+{
+    class EditorExecutionAgent : public EditorPointReadiness
+    {
+    protected:
+        void SetUp() override
+        {
+            Runtime::RuntimeEngineConfigSectionRegistry sections;
+            ASSERT_TRUE(sections.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()));
+            ASSERT_TRUE(sections.Register(Runtime::MakePointSamplingConfigSectionRegistration()));
+            ASSERT_TRUE(sections.Register(Runtime::MakeRegistrationConfigSectionRegistration()));
+            ASSERT_TRUE(sections.Register(Runtime::MakeCoherentPointDriftConfigSectionRegistration()));
+            ASSERT_TRUE(sections.Register(Runtime::MakePointConstructionConfigSectionRegistration()));
+            ASSERT_TRUE(sections.Register(Runtime::MakePropertySmoothingConfigSectionRegistration()));
+            Engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+            EditorPointReadiness::SetUp();
+            Runtime::RegisterEditorAgentOperations(Registry);
+        }
+        Runtime::AgentOperationOutcome Invoke(const char* tool, const AgentJson& arguments)
+        {
+            const Runtime::AgentOperationContext context{.Attachment = &Attachment};
+            return Runtime::InvokeAgentOperation(Registry, tool, context, arguments.dump(), false);
+        }
+        // The run a start answered, observed at once: nothing ran in between.
+        std::optional<Runtime::StepRunObservation> Observe(const Runtime::AgentOperationOutcome& started)
+        {
+            EXPECT_FALSE(started.IsError) << started.Text;
+            const auto run = AgentResult(started).value("run", std::uint64_t{0});
+            EXPECT_NE(run, 0u) << started.Text;
+            return RequiredEngineService<Runtime::StepRunsService>(Engine).Observe(run);
+        }
+        Runtime::AgentOperationRegistry Registry{};
+    };
+}
+
+TEST_F(EditorExecutionAgent, OneShotAndSamplingStartsTakeTheCallsAutoAcceptAndStart)
+{
+    auto keypoints = Keypoints;
+    keypoints.Execution.Start = Runtime::StepRunStart::Run;
+    keypoints.Execution.AutoAccept = Runtime::StepRunAutoAccept::Converged;
+    ASSERT_TRUE(Runtime::ApplyEditorKeypointAnalysisConfig(Commands, keypoints).Succeeded());
+    const auto analysis = Observe(Invoke("run_keypoint_analysis", {{"wait", false}, {"start", "ready"}}));
+    ASSERT_TRUE(analysis);
+    EXPECT_EQ(analysis->Phase, Runtime::StepRunPhase::Ready);
+    EXPECT_EQ(analysis->Steps, 0u);
+    EXPECT_EQ(analysis->Execution,
+        Runtime::OneShotExecution(
+            {.AutoAccept = Runtime::StepRunAutoAccept::Converged, .Start = Runtime::StepRunStart::Ready}))
+        << "the call's start, the section's auto_accept, one step without live preview";
+    EXPECT_FALSE(Properties().Exists(Keypoints.Mask.Name));
+    const auto keypointSection = Runtime::GetEditorKeypointAnalysisConfig(Commands);
+    ASSERT_TRUE(keypointSection);
+    EXPECT_EQ(keypointSection->Execution, keypoints.Execution) << "the section is unchanged";
+
+    Runtime::PointSamplingOperationConfig sampling{
+        .SourceStableEntityId = Keypoints.StableEntityId, .Positions = Keypoints.Positions, .Count = 2u};
+    sampling.Execution.Start = Runtime::StepRunStart::Run;
+    sampling.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+    ASSERT_TRUE(Runtime::ApplyEditorPointSamplingConfig(Commands, sampling).Succeeded());
+    const auto sampled = Observe(Invoke("run_point_sampling", {{"wait", false}, {"start", "ready"}}));
+    ASSERT_TRUE(sampled);
+    EXPECT_EQ(sampled->Phase, Runtime::StepRunPhase::Ready);
+    EXPECT_EQ(sampled->Execution.Start, Runtime::StepRunStart::Ready);
+    EXPECT_EQ(sampled->Execution.AutoAccept, Runtime::StepRunAutoAccept::End);
+    EXPECT_EQ(sampled->Execution.IterationCap, 2u) << "exact farthest point: the count is the cap";
+    EXPECT_EQ(sampled->Execution.PreviewEvery, 0u);
+    EXPECT_FALSE(Properties().Exists(sampling.RankName));
+    const auto samplingSection = Runtime::GetEditorPointSamplingConfig(Commands);
+    ASSERT_TRUE(samplingSection);
+    EXPECT_EQ(samplingSection->Execution, sampling.Execution);
+}
+
+TEST_F(EditorExecutionAgent, RegistrationStartsTakeTheCallsExecutionArguments)
+{
+    SetRegistrationInputs();
+    ASSERT_TRUE(Runtime::ApplyEditorRegistrationConfig(Commands, Registration).Succeeded());
+    const auto icpSection = Registration.Execution; // the default: at once, accepted at the end, every step previewed
+    const auto icp = Observe(Invoke("run_registration",
+        {{"method", "icp"}, {"wait", false}, {"max_iterations", 7}, {"preview_interval_ms", 250}, {"start", "ready"}}));
+    ASSERT_TRUE(icp);
+    EXPECT_EQ(icp->Phase, Runtime::StepRunPhase::Ready);
+    EXPECT_EQ(icp->Steps, 0u);
+    EXPECT_EQ(icp->Execution,
+        (Runtime::StepRunExecution{.IterationCap = 7u,
+            .PreviewEvery = icpSection.PreviewEvery,
+            .PreviewIntervalMs = 250u,
+            .AutoAccept = icpSection.AutoAccept,
+            .Start = Runtime::StepRunStart::Ready}));
+    const auto icpStored = Runtime::GetEditorRegistrationConfig(Commands);
+    ASSERT_TRUE(icpStored);
+    EXPECT_EQ(icpStored->Execution, icpSection);
+
+    // CPD moves the ICP target, so the two runs never share an output.
+    Runtime::CoherentPointDriftConfig cpd{.SourceStableEntityId = Registration.TargetStableEntityId,
+        .TargetStableEntityId = Registration.SourceStableEntityId,
+        .SourcePositions = Keypoints.Positions,
+        .TargetPositions = Keypoints.Positions};
+    cpd.Execution.Start = Runtime::StepRunStart::Run;
+    cpd.Execution.AutoAccept = Runtime::StepRunAutoAccept::Converged;
+    ASSERT_TRUE(Runtime::ApplyEditorCoherentPointDriftConfig(Commands, cpd).Succeeded());
+    const auto drift = Observe(Invoke("run_registration",
+        {{"method", "cpd"}, {"wait", false}, {"max_iterations", 9}, {"preview_every", 0}, {"start", "ready"}}));
+    ASSERT_TRUE(drift);
+    EXPECT_EQ(drift->Phase, Runtime::StepRunPhase::Ready);
+    EXPECT_EQ(drift->Execution,
+        (Runtime::StepRunExecution{.IterationCap = 9u,
+            .PreviewEvery = 0u,
+            .PreviewIntervalMs = cpd.Execution.PreviewIntervalMs,
+            .AutoAccept = Runtime::StepRunAutoAccept::Converged,
+            .Start = Runtime::StepRunStart::Ready}));
+    const auto cpdStored = Runtime::GetEditorCoherentPointDriftConfig(Commands);
+    ASSERT_TRUE(cpdStored);
+    EXPECT_EQ(cpdStored->Execution, cpd.Execution);
+}
+
+TEST_F(EditorExecutionAgent, RunOperationStartsTakeTheRowsTheirSectionsBind)
+{
+    auto construction = Construction;
+    construction.Execution.Start = Runtime::StepRunStart::Run;
+    construction.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+    const auto constructionCommands = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
+    ASSERT_TRUE(Runtime::ApplyEditorPointConstructionConfig(constructionCommands, construction).Succeeded());
+    // A one-shot is one step without live preview: a preview row is refused, not ignored.
+    const auto refused =
+        Invoke("run_operation", {{"operation", "point_construction"}, {"wait", false}, {"preview_every", 2}});
+    EXPECT_EQ(refused.ErrorCode, "invalid_params") << refused.Text;
+    EXPECT_NE(refused.Text.find("one step without live preview"), std::string::npos) << refused.Text;
+    const auto constructing =
+        Observe(Invoke("run_operation", {{"operation", "point_construction"}, {"wait", false}, {"start", "ready"}}));
+    ASSERT_TRUE(constructing);
+    EXPECT_EQ(constructing->Phase, Runtime::StepRunPhase::Ready);
+    EXPECT_EQ(constructing->Execution,
+        Runtime::OneShotExecution(
+            {.AutoAccept = Runtime::StepRunAutoAccept::End, .Start = Runtime::StepRunStart::Ready}));
+    EXPECT_TRUE(Scene->Raw().view<ECS::Components::StableId>().empty()) << "ready creates no entity";
+    const auto constructionSection = Runtime::GetEditorPointConstructionConfig(constructionCommands);
+    ASSERT_TRUE(constructionSection);
+    EXPECT_EQ(constructionSection->Execution, construction.Execution);
+
+    // Property smoothing also takes the preview rows; its cap is the section's iterations, and its CPU run, which has
+    // no live preview, says so.
+    using K = Geometry::PropertyValueKind;
+    constexpr auto domain = Runtime::GeometryElementDomain::PointCloudPoint;
+    Properties().GetOrAdd<double>("height").Vector() = {0.0, 1.0, 2.0, 3.0, 0.0};
+    Runtime::PropertySmoothingConfig smoothing;
+    smoothing.Input = {domain, "height", K::Double};
+    smoothing.Output = {domain, "height_smooth", K::Double};
+    smoothing.Positions = Keypoints.Positions;
+    smoothing.Neighbors = 2u;
+    smoothing.Filter.Iterations = 3u;
+    smoothing.Execution.Start = Runtime::StepRunStart::Run;
+    smoothing.Execution.AutoAccept = Runtime::StepRunAutoAccept::End;
+    ASSERT_TRUE(Runtime::ApplyEditorPropertySmoothingConfig(Commands, smoothing).Succeeded());
+    const auto started = Invoke("run_operation",
+        {{"operation", "property_smoothing"},
+            {"entity", Keypoints.StableEntityId},
+            {"wait", false},
+            {"preview_interval_ms", 250},
+            {"start", "ready"}});
+    EXPECT_NE(AgentResult(started).value("message", "").find("no live preview"), std::string::npos) << started.Text;
+    const auto smoothed = Observe(started);
+    ASSERT_TRUE(smoothed);
+    EXPECT_EQ(smoothed->Phase, Runtime::StepRunPhase::Ready);
+    EXPECT_EQ(smoothed->Execution,
+        (Runtime::StepRunExecution{.IterationCap = 3u,
+            .PreviewEvery = 0u,
+            .PreviewIntervalMs = 250u,
+            .AutoAccept = Runtime::StepRunAutoAccept::End,
+            .Start = Runtime::StepRunStart::Ready}));
+    EXPECT_FALSE(Properties().Exists("height_smooth"));
+    const auto smoothingSection = Runtime::GetEditorPropertySmoothingConfig(Commands);
+    ASSERT_TRUE(smoothingSection);
+    EXPECT_EQ(smoothingSection->Execution, smoothing.Execution);
 }

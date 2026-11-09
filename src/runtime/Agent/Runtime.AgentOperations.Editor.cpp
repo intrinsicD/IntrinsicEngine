@@ -1207,8 +1207,8 @@ namespace Extrinsic::Runtime
 
         // Waits on frames, never on the main thread: an immediate answer, or a continuation that the
         // server polls once per frame until the job completed (its terminal result delivered), the
-        // deadline passed, the scene was replaced or the workspace detached. The tool needs a
-        // presented frame, so a minimized window ends it too (`viewport_not_presentable`).
+        // deadline passed, the scene was replaced or the workspace detached. Owner-thread polling
+        // also continues while the window is minimized.
         AgentOperationOutcome JobsWait(const AgentOperationContext& context, std::string_view arguments)
         {
             const auto args = ParseObject(arguments);
@@ -1626,11 +1626,10 @@ namespace Extrinsic::Runtime
                 .Description = "Job token from jobs_list: two decimal numbers joined by ':', e.g. 3:1."}};
         add("jobs_wait",
             "Wait for a job",
-            "Wait until a job ended (finished: true) or timeout_ms passed (timed_out: true), while frames keep running. Name the "
+            "Wait until a job ended (finished: true) or timeout_ms passed (timed_out: true), including while minimized. Name the "
             "job by token, or by entity and output (the newest editor run writing that output when called). A job that ended "
             "and was reaped between two polls answers finished with reaped: true (its last seen terminal state, or \"ended\" when it was last seen still running; scene_replaced if the scene changed meanwhile). Ends with an error "
-            "when the job is unknown or already reaped when called (unknown_job), the scene is replaced (scene_replaced), the workspace detaches or "
-            "the window is minimized (viewport_not_presentable).",
+            "when the job is unknown or already reaped when called (unknown_job), the scene is replaced (scene_replaced), or the workspace detaches.",
             ArgumentsSchema(
                 {token,
                     EntityArgument(false),
@@ -1641,9 +1640,7 @@ namespace Extrinsic::Runtime
                 {},
                 {{"token"}, {"entity", "output"}}),
             true,
-            JobsWait,
-            false,
-            true);
+            JobsWait);
         add("jobs_cancel",
             "Cancel a job",
             "Cancel an editor job (a jobs_list row with cancellable: true). It ends cancelled on a later frame and publishes "

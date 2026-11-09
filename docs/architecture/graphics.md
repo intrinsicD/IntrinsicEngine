@@ -344,6 +344,21 @@ The phased path from the current 2025-era foundation (explicit RHI, render graph
 
 `IDevice::SubmitComputeReadback` accepts zero bytes for a completion callback
 without readback storage or a copy. The recorder still returns a valid buffer
-as its success signal. Vulkan uses its existing timeline and callback retirement;
-`SpatialIndexCache` provides the frame-fence fallback. Resident FPS uses this
+as its success signal. Vulkan uses its existing timeline and callback retirement. Resident FPS uses this
 between bounded chunks; see [property coherence](property-coherence.md#resident-farthest-point-sampling).
+
+## Method-compute lane
+
+`IDevice::SubmitComputeReadback` runs on the async compute queue when the
+device has one, using a spare queue index independently of framegraph compute
+when the hardware permits it. `ComputeSharesFrameComputeQueue` reports when those
+queues must be shared. The Vulkan transfer service keeps a second lane with its own
+command pool and timeline. Cross-queue ordering is explicit (compute waits for
+the graphics queue's submitted tail; graphics submissions acquire only compute
+results already collected), tokens and readback slots are lane-specific, and
+deferred destruction waits for the compute fence as well as the frame cycle.
+`render.method_compute_graphics_queue` forces the graphics queue; the transfer
+diagnostics report the requested and actual lane. `SpatialIndexCache` submits
+all of its method computations and query-session pages on this lane and records none
+into frames; see [spatial indices](spatial-indices.md#submission-and-completion-arch-023),
+[property coherence](property-coherence.md) and `src/graphics/vulkan/README.md`.

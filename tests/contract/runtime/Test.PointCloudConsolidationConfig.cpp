@@ -14,20 +14,21 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
     Runtime::PointCloudConsolidationConfig configured{
         .Backend = Runtime::PointCloudConsolidationBackend::VulkanCompute,
         .Strategy = Runtime::PointCloudConsolidationStrategy::Ear,
-        .SupportRadiusMode = Runtime::
-            PointCloudConsolidationSupportRadiusMode::Manual,
+        .SupportRadiusMode = Runtime::PointCloudConsolidationSupportRadiusMode::Manual,
         .SupportRadius = 0.75,
         .MaxSupportNeighbors = 2'048u,
         .MaxPredictedContributions = 12'345'678u,
         .RepulsionWeight = 0.2,
-        .MaxIterations = 12u,
+        .Execution = {.IterationCap = 12u,
+            .PreviewEvery = 3u,
+            .PreviewIntervalMs = 0u,
+            .AutoAccept = Runtime::StepRunAutoAccept::End,
+            .Start = Runtime::StepRunStart::Run},
         .ConvergenceTolerance = 1.0e-3,
         .TargetPointCount = 31u,
         .Seed = 91u,
-        .GpuPreviewInterval = 3u,
         .WlopAnisotropic = true,
-        .NormalSource = Runtime::PointCloudConsolidationNormalSource::
-            RequireAuthored,
+        .NormalSource = Runtime::PointCloudConsolidationNormalSource::RequireAuthored,
         .NormalAngleRadians = 0.4,
         .NormalRefinementRounds = 4u,
         .ClopMixtureComponentCount = 9u,
@@ -42,7 +43,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
     const auto decoded =
         Runtime::GetPointCloudConsolidationConfig(document);
     ASSERT_TRUE(decoded.has_value());
-    EXPECT_EQ(decoded->GpuPreviewInterval, 3u);
+    EXPECT_EQ(decoded->Execution, configured.Execution) << "every shared execution option round-trips";
     EXPECT_EQ(decoded->Backend, configured.Backend);
     EXPECT_EQ(decoded->Strategy, configured.Strategy);
     EXPECT_EQ(decoded->SupportRadiusMode, configured.SupportRadiusMode);
@@ -60,7 +61,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
 
     const CoreConfig::EngineConfigSectionValidationResult validation =
         Runtime::ValidatePointCloudConsolidationConfigSection(
-            R"({"gpu_preview_interval":0,"backend":"unknown","strategy":"clop","support_radius_mode":"unknown","support_radius":0,"max_support_neighbors":0,"max_predicted_contributions":0,"max_iterations":7,"normal_refinement_rounds":9,"ear_edge_sensitivity":6,"unknown_field":true})",
+            R"({"preview_every":1000001,"backend":"unknown","strategy":"clop","support_radius_mode":"unknown","support_radius":0,"max_support_neighbors":0,"max_predicted_contributions":0,"max_iterations":7,"normal_refinement_rounds":9,"ear_edge_sensitivity":6,"unknown_field":true})",
             Runtime::SerializePointCloudConsolidationConfig(configured),
             "app.sections.sandbox.point_cloud_consolidation.payload");
     EXPECT_EQ(validation.State, CoreConfig::EngineConfigState::FallbackApplied);
@@ -81,7 +82,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
     const auto fallback =
         Runtime::GetPointCloudConsolidationConfig(canonical);
     ASSERT_TRUE(fallback.has_value());
-    EXPECT_EQ(fallback->GpuPreviewInterval, 3u);
+    EXPECT_EQ(fallback->Execution.PreviewEvery, 3u) << "an out-of-range preview_every keeps the reference";
     EXPECT_EQ(fallback->Backend, configured.Backend);
     EXPECT_EQ(fallback->Strategy,
               Runtime::PointCloudConsolidationStrategy::Clop);
@@ -91,7 +92,7 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
               configured.MaxSupportNeighbors);
     EXPECT_EQ(fallback->MaxPredictedContributions,
               configured.MaxPredictedContributions);
-    EXPECT_EQ(fallback->MaxIterations, 7u);
+    EXPECT_EQ(fallback->Execution.IterationCap, 7u);
     EXPECT_EQ(fallback->NormalRefinementRounds, 9u); // CLOP does not consume normal rounds.
     EXPECT_DOUBLE_EQ(fallback->EarEdgeSensitivity, 6.0);
 
@@ -210,7 +211,7 @@ TEST(PointCloudConsolidationConfig, ShortLopPreservesUnusedNormalSettings)
 {
     Runtime::PointCloudConsolidationConfig config{};
     config.Strategy = Runtime::PointCloudConsolidationStrategy::Lop;
-    config.MaxIterations = 1u;
+    config.Execution.IterationCap = 1u;
     config.NormalRefinementRounds = 3u;
     const auto validation = Runtime::ValidatePointCloudConsolidationConfigSection(
         Runtime::SerializePointCloudConsolidationConfig(config),
@@ -220,6 +221,6 @@ TEST(PointCloudConsolidationConfig, ShortLopPreservesUnusedNormalSettings)
     Runtime::SetPointCloudConsolidationConfig(document, config);
     const auto decoded = Runtime::GetPointCloudConsolidationConfig(document);
     ASSERT_TRUE(decoded);
-    EXPECT_EQ(decoded->MaxIterations, 1u);
+    EXPECT_EQ(decoded->Execution.IterationCap, 1u);
     EXPECT_EQ(decoded->NormalRefinementRounds, 3u);
 }

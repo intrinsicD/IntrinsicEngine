@@ -9,6 +9,7 @@ extern "C++"
 namespace Extrinsic::Runtime
 {
     struct EditorPointCloudServicePreparedFrame;
+    class StepRunsService;
 }
 
 namespace Extrinsic::Sandbox::Editor
@@ -306,6 +307,9 @@ namespace Extrinsic::Sandbox::Editor
     // UI-071: the one Stop/Accept/Discard row of a two-phase GPU transaction (Run, then Accept or
     // Discard). Families adapt their snapshot to this view; the helper owns which buttons are
     // enabled in which phase, where an Accept refusal is shown and how the upload counters read.
+    // ARCH-023: a transaction controlled by a step run (its observation's StepRun and the session's
+    // GetEditorStepRuns) draws the runtime's shared step-run row instead (Run, Pause, Step n, Stop,
+    // Restart where the owner offers it, Accept, Discard), whose buttons issue run_control's calls.
     struct GpuTransactionIo
     {
         std::uint64_t UploadBytes{}, CacheHits{};
@@ -320,6 +324,9 @@ namespace Extrinsic::Sandbox::Editor
         std::string_view AcceptRefusal{};
         bool HasStop{false}; // the family can stop a run early and keep its preview (else Discard cancels)
         std::optional<GpuTransactionIo> Io{};
+        // The step run that controls the transaction (0 or no service: the Stop/Accept/Discard row).
+        Runtime::StepRunsService* StepRuns{};
+        std::uint64_t StepRun{};
     };
     enum class GpuTransactionRowAction : std::uint8_t { None, Stop, Accept, Discard };
     struct GpuTransactionRowState
@@ -345,7 +352,9 @@ namespace Extrinsic::Sandbox::Editor
     static_assert(GpuTransactionPhaseOf(true, true) == Runtime::EditorGpuTransactionPhase::Accepting, "accepting wins over ready");
     // Draws [Stop] Accept Discard on one line (IDs suffixed `##idSuffix`), the Accept refusal as a
     // tooltip on the disabled button plus one inline line, and the counters line. Returns the
-    // button pressed this frame; the caller invokes its family's command.
+    // button pressed this frame; the caller invokes its family's command. With a step run the
+    // shared row issues the control itself and only its Discard is returned (the family forgets
+    // the run; its discard of an already discarded run changes nothing).
     [[nodiscard]] GpuTransactionRowAction DrawGpuTransactionControls(const GpuTransactionRowView& view, const char* idSuffix);
 
     // UI-074: shared "Color interpretation" combo and its help text. Behavior documented here is the

@@ -128,6 +128,16 @@ Output names cannot replace topology or deletion properties.
 `operation` is `analyze` or `remove_marked`. Preview does not build an index or
 mutate properties. Point-cloud menu actions open this same analysis window.
 
+The section also binds the shared one-shot rows `auto_accept` (default `never`) and
+`start` (default `ready`, every one-shot's: the panel's CPU start computes on Run or Step), ARCH-023. An analysis runs on every backend as a one-shot step
+run of the session's step-run service: the CPU backends as a worker step run through the
+operation runtime (`MeshSupport::StartOneShotCpuRun`), Vulkan as its transaction. `Apply`
+is the batch (it computes at once and accepts at its end).
+`StartEditorOutlierAnalysisRun` and `StartEditorConfiguredOutlierAnalysis` use the
+section's rows, as the panel and `run_operation` with `wait: false` do (the call's `auto_accept`
+and `start`, if named, replace the section's for that run), and answer with the run's id. Without the step-run service the CPU batch runs as one queued job and a ready
+start is refused. The removal mode stays immediate.
+
 The editor/config command surface is owned by
 `Extrinsic.Runtime.PointAnalysisOperations`. It uses the shared
 `EditorProcessingCommands` handle and explicit completion callbacks for newly

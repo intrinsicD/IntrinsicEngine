@@ -272,7 +272,8 @@ TEST(CoherentPointDriftPluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWri
                 {
                     std::vector<glm::vec3> bad(h.Editing().View(*edit).Points.begin(), h.Editing().View(*edit).Points.end());
                     bad[3].x = std::numeric_limits<float>::quiet_NaN();
-                    EXPECT_EQ(h.Editing().PreviewPositions(*edit, bad, diagnostic), R::PointPreviewStatus::Unavailable);
+                    EXPECT_EQ(
+                        h.Editing().PreviewPositions(*edit, bad, diagnostic, 3u), R::PointPreviewStatus::Unavailable);
                     EXPECT_FALSE(spatial->PropertyResidency()->HasRing(key)) << "nothing uploaded";
                 }
             }
@@ -293,8 +294,11 @@ TEST(CoherentPointDriftPluginGpuSmoke, APausedRunShowsItsPreviewAndOnlyAcceptWri
             EXPECT_FALSE(h.History().CanUndo());
             std::string refusal;
             EXPECT_FALSE(R::BeginEditorGpuPositionRun(R::PrepareEditorProcessingCommands(h.Shell),
-                                                      R::SelectionController::ToStableEntityId(source), positions,
-                                                      *spatial->PropertyResidency(), refusal));
+                R::SelectionController::ToStableEntityId(source),
+                positions,
+                *spatial->PropertyResidency(),
+                refusal,
+                3u));
             EXPECT_NE(refusal.find("awaits Accept or Discard"), std::string::npos) << refusal;
             EXPECT_TRUE(control(first, "discard"));
             settle = 0;

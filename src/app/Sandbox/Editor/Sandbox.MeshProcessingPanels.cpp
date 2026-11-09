@@ -36,6 +36,7 @@ import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.StepRunControls;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.PointFieldOperations;
@@ -61,6 +62,7 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.StepRunControls;
 
 #include "Sandbox.PanelSupport.hpp"
 #include "Sandbox.PointSamplingControls.hpp"
@@ -184,6 +186,22 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
+        // ARCH-023: the host's step-run row of a CPU one-shot run while it goes (its Pending result names it), so a
+        // CPU run takes the Run, Step, Restart, Accept and Discard a GPU transaction takes.
+        template <class Result>
+        void DrawCpuStepRunRow(const Runtime::EditorProcessingCommands& commands,
+            const std::optional<Result>& result,
+            const std::string_view suffix,
+            Runtime::StepRunControlsState& row)
+        {
+            auto* runs = Runtime::GetEditorStepRuns(commands);
+            if (!result || runs == nullptr || result->StepRun == 0u ||
+                result->Status != Runtime::EditorCommandStatus::Pending)
+                return;
+            if (const auto observed = runs->Observe(result->StepRun); observed && !Runtime::IsTerminal(observed->Phase))
+                (void)Runtime::DrawStepRunControls(*runs, result->StepRun, suffix, row);
+        }
+
         template <class State>
         bool DrawPointScalarTransaction(const Runtime::EditorProcessingCommands& commands,
             Runtime::EditorPointScalarTransactionHandle& run,
@@ -206,8 +224,11 @@ namespace Extrinsic::Sandbox::Editor
                 return false;
             }
             ImGui::TextWrapped("%s", snapshot.Message.c_str());
-            GpuTransactionRowView row{
-                .Phase = phase, .CanAccept = snapshot.CanAccept, .AcceptRefusal = snapshot.AcceptRefusalReason};
+            GpuTransactionRowView row{.Phase = phase,
+                .CanAccept = snapshot.CanAccept,
+                .AcceptRefusal = snapshot.AcceptRefusalReason,
+                .StepRuns = Runtime::GetEditorStepRuns(commands),
+                .StepRun = snapshot.StepRun};
             switch (DrawGpuTransactionControls(row, "Scalar"))
             {
             case GpuTransactionRowAction::Accept: (void)Runtime::AcceptEditorPointScalar(commands, run); break;
@@ -323,11 +344,12 @@ namespace Extrinsic::Sandbox::Editor
             std::string ConfigDiagnostic{};
             Runtime::RegistrationConfig Draft{};
             std::string LastApplied{};
-            // UI-067: the live view of the last run, its preview and plots.
+            // UI-067: the live view of the last run, its preview and plots; its step-run row.
             Runtime::EditorRegistrationProgressHandle Progress{};
             std::uint32_t RunMaxIterations{0u}; // iteration cap of the run in flight, captured at its start
             std::chrono::steady_clock::time_point RunStarted{}; // when that run was started
             OperationRunSlot Run{};
+            Runtime::StepRunControlsState Controls{};
             bool LivePreview{true}, PlotBySeconds{false}, PreviewShown{false};
             std::uint64_t PreviewRevision{0u};
         };
@@ -342,6 +364,8 @@ namespace Extrinsic::Sandbox::Editor
             // Written by the (possibly deferred) completion of the last run.
             std::shared_ptr<std::optional<Runtime::EditorPointSamplingResult>> LastResult =
                 std::make_shared<std::optional<Runtime::EditorPointSamplingResult>>();
+            // ARCH-023: the interactive run's step run (either backend); the shared row drives it.
+            std::uint64_t StepRun{};
         };
 
         struct CoherentPointDriftState
@@ -352,8 +376,8 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorCoherentPointDriftRunHandle Run{};
             std::uint32_t RunMaxIterations{0u}; // iteration cap of the run in flight, captured at its start
             OperationRunSlot ProgressSlot{};
+            Runtime::StepRunControlsState Controls{};
             std::string RunMessage{}, ExportMessage{};
-            std::optional<Runtime::EditorCoherentPointDriftResult> LastResult{};
             bool LivePreview{true};
             bool ShowSubsamples{true};
             bool PlotBySeconds{false};
@@ -380,6 +404,8 @@ namespace Extrinsic::Sandbox::Editor
         // The interactive Vulkan run (ADR 0030): its preview shows in the viewport until the
         // user accepts or discards it.
         Runtime::EditorPropertySmoothingTransactionHandle SmoothingTransaction{};
+        // ARCH-023: the interactive run's step run (either backend); the shared row drives it.
+        std::uint64_t SmoothingStepRun{};
         std::uint32_t SmoothingEntity{};
         ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
         std::uint32_t HarmonicEntity{};
@@ -407,6 +433,8 @@ namespace Extrinsic::Sandbox::Editor
             std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
         Runtime::EditorOutlierTransactionHandle OutlierTransaction{};
+        // ARCH-023: the step-run rows of the CPU normals and outlier runs (their results name the run).
+        Runtime::StepRunControlsState NormalCpuRow{}, OutlierCpuRow{}, KeypointCpuRow{}, ConstructionRow{};
         Runtime::EditorPointScalarTransactionHandle KeypointTransaction{};
         KeypointsState Keypoints{};
         ConstructionState Construction{};
@@ -451,8 +479,9 @@ namespace Extrinsic::Sandbox::Editor
         void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
         void DrawPointSamplingWindow(bool&, const SandboxEditorContext&);
         void ClearCoherentPointDriftPreview();
-        void DrawRegistrationProgress(
-            const Runtime::EditorRegistrationProgressSnapshot& live, std::uint32_t maxIterations);
+        void DrawRegistrationProgress(const Runtime::EditorProcessingCommands& commands,
+            const Runtime::EditorRegistrationProgressSnapshot& live,
+            std::uint32_t maxIterations);
 
         void DrawDenoiseControls(const Runtime::EditorDomainWindowModel&, const SandboxEditorContext&);
         void DrawCurvatureControls(const SandboxEditorContext&);
@@ -630,6 +659,7 @@ namespace Extrinsic::Sandbox::Editor
         if (SmoothingTransaction)
             Runtime::DiscardEditorPropertySmoothing({}, SmoothingTransaction);
         SmoothingTransaction.reset();
+        SmoothingStepRun = 0u;
         if (NormalTransaction)
             Runtime::DiscardEditorNormalEstimation({}, NormalTransaction);
         NormalTransaction.reset();
@@ -1875,6 +1905,8 @@ namespace Extrinsic::Sandbox::Editor
                 "Collinear eigenvalue ratio##Normals", &config.CollinearEigenvalueRatioEpsilon, 0, 0, "%.8g");
             ImGui::TreePop();
         }
+        // ARCH-023: every backend runs as a one-shot step run with the section's auto_accept and start rows.
+        changed |= Runtime::DrawStepRunExecutionOptions("Normals", config.Execution, 1u, true, false);
         // A pending GPU result blocks the next run until it is accepted or discarded.
         using Phase = Runtime::EditorGpuTransactionPhase;
         const auto transaction = Runtime::SnapshotEditorNormalEstimation(context.Normals.Commands, NormalTransaction);
@@ -1938,7 +1970,8 @@ namespace Extrinsic::Sandbox::Editor
                     },
                     [&]
                     {
-                        return Runtime::ApplyEditorConfiguredNormalEstimation(
+                        // The CPU step run of the applied section (its auto_accept and start).
+                        return Runtime::StartEditorConfiguredNormalEstimation(
                             context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation);
                     },
                     context.Normals.ResultSinks.NormalEstimation,
@@ -1947,6 +1980,8 @@ namespace Extrinsic::Sandbox::Editor
                     config.Output.Name);
         }
         Normals.Run.AwaitingAccept(NormalTransaction && transaction.Phase == Phase::ReadyToAccept);
+        if (!NormalTransaction)
+            DrawCpuStepRunRow(context.Normals.Commands, Normals.LastResult, "NormalsCpu", NormalCpuRow);
         const Runtime::EditorOutputRef normalsDraft{config.StableEntityId, config.Output.Name};
         Normals.Run.Draw(context.Normals.Commands, config.StableEntityId, "normals_progress", &normalsDraft);
         const auto outputProperty = config.Output;
@@ -2112,7 +2147,8 @@ namespace Extrinsic::Sandbox::Editor
                 },
                 [&]
                 {
-                    return Runtime::ApplyEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, noSessionSink);
+                    // The CPU step run of the applied section (its auto_accept and start).
+                    return Runtime::StartEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, noSessionSink);
                 },
                 noSessionSink,
                 "Outlier config was rejected.",
@@ -2149,6 +2185,8 @@ namespace Extrinsic::Sandbox::Editor
         }
         Outliers.Run.AwaitingAccept(
             OutlierTransaction && transaction.Phase == Runtime::EditorGpuTransactionPhase::ReadyToAccept);
+        if (!OutlierTransaction)
+            DrawCpuStepRunRow(context.PointAnalysis.Commands, Outliers.LastResult, "OutliersCpu", OutlierCpuRow);
         const Runtime::EditorOutputRef outliersDraft{config.StableEntityId, config.Mask.Name};
         Outliers.Run.Draw(context.PointAnalysis.Commands, config.StableEntityId, "outliers_progress", &outliersDraft);
         if (outlierActive)
@@ -2158,7 +2196,9 @@ namespace Extrinsic::Sandbox::Editor
                 .CanAccept = transaction.CanAccept,
                 .AcceptRefusal = transaction.AcceptDisabledReason,
                 .Io = GpuTransactionIo{.UploadBytes = transaction.Result.GpuInputUploadBytes,
-                    .CacheHits = transaction.Result.GpuInputCacheHits}};
+                    .CacheHits = transaction.Result.GpuInputCacheHits},
+                .StepRuns = Runtime::GetEditorStepRuns(context.PointAnalysis.Commands),
+                .StepRun = transaction.Result.StepRun};
             switch (DrawGpuTransactionControls(row, "Outliers"))
             {
             case GpuTransactionRowAction::Accept:
@@ -2286,6 +2326,8 @@ namespace Extrinsic::Sandbox::Editor
         else if (config.Backend == Runtime::KeypointAnalysisBackend::VulkanCompute)
             ImGui::TextWrapped(
                 "Spacing, covariance, saliency and suppression run on Vulkan in bounded traversal pages. Requires shader double precision.");
+        // ARCH-023: every backend runs as a one-shot step run with the section's auto_accept and start rows.
+        changed |= Runtime::DrawStepRunExecutionOptions("Keypoints", config.Execution, 1u, true, false);
         const bool keypointActive =
             DrawPointScalarTransaction(context.PointAnalysis.Commands, KeypointTransaction, Keypoints);
         DrawProcessingExecution(
@@ -2312,7 +2354,8 @@ namespace Extrinsic::Sandbox::Editor
                             context.PointAnalysis.ResultSinks.KeypointAnalysis);
                     return result;
                 }
-                return Runtime::ApplyEditorConfiguredKeypointAnalysis(
+                // The CPU step run of the applied section (its auto_accept and start).
+                return Runtime::StartEditorConfiguredKeypointAnalysis(
                     context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.KeypointAnalysis);
             },
             context.PointAnalysis.ResultSinks.KeypointAnalysis,
@@ -2324,6 +2367,8 @@ namespace Extrinsic::Sandbox::Editor
                 return std::pair{c.StableEntityId, c.Mask.Name};
             },
             keypointActive);
+        if (!KeypointTransaction)
+            DrawCpuStepRunRow(context.PointAnalysis.Commands, Keypoints.LastResult, "KeypointsCpu", KeypointCpuRow);
         const Runtime::EditorOutputRef keypointsDraft{config.StableEntityId, config.Mask.Name};
         Keypoints.Run.Draw(
             context.PointAnalysis.Commands, config.StableEntityId, "keypoints_progress", &keypointsDraft);
@@ -2469,6 +2514,8 @@ namespace Extrinsic::Sandbox::Editor
         integer("Query batch size", config.GpuQueryBatchSize);
         ImGui::TextWrapped("Creates a separate, selectable entity in the source's current world "
                            "position. Distances are measured in the input property's coordinates.");
+        // ARCH-023: every backend runs as a one-shot step run with the section's auto_accept and start rows.
+        changed |= Runtime::DrawStepRunExecutionOptions("Construction", config.Execution, 1u, true, false);
         if (changed)
         {
             const auto applied =
@@ -2496,7 +2543,8 @@ namespace Extrinsic::Sandbox::Editor
                 },
                 [&]
                 {
-                    return Runtime::ApplyEditorConfiguredPointConstruction(
+                    // The step run of the applied section (its auto_accept and start); Accept creates the entity.
+                    return Runtime::StartEditorConfiguredPointConstruction(
                         context.PointConstruction.Commands, context.PointConstruction.ResultSinks.PointConstruction);
                 },
                 context.PointConstruction.ResultSinks.PointConstruction,
@@ -2506,6 +2554,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         const Runtime::EditorOutputRef constructionDraft{
             config.StableEntityId, std::string("construct:") + std::string(Runtime::ToString(config.Method))};
+        DrawCpuStepRunRow(context.PointConstruction.Commands, Construction.LastResult, "Construction", ConstructionRow);
         Construction.Run.Draw(
             context.PointConstruction.Commands, config.StableEntityId, "construction_progress", &constructionDraft);
         if (Construction.LastResult)
@@ -2525,6 +2574,10 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("CPU %.3f ms; GPU batch latency %.3f ms",
                 result.CpuComputeMilliseconds,
                 result.GpuNeighborhoodMilliseconds);
+            if (result.CpuStageUploadBytes || result.CpuStageReadbackBytes)
+                ImGui::Text("Hybrid traffic: %llu B query rows up, %llu B neighbour rows back",
+                    static_cast<unsigned long long>(result.CpuStageUploadBytes),
+                    static_cast<unsigned long long>(result.CpuStageReadbackBytes));
             ImGui::TextWrapped("%s", result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Construction",
                 Construction.LastResult,
@@ -2608,19 +2661,22 @@ namespace Extrinsic::Sandbox::Editor
         int backend = int(config.Backend);
         if (ImGui::Combo("Backend##ICP",
                 &backend,
-                OwnerConfigEnumLabels<Runtime::RegistrationBackend, 3>(
+                OwnerConfigEnumLabels<Runtime::RegistrationBackend, 4>(
                     Runtime::RegistrationConfigFieldSpecs(), "backend")
                     .data(),
-                3))
+                4))
         {
             config.Backend = Runtime::RegistrationBackend(backend);
             changed = true;
         }
-        if (config.Backend == Runtime::RegistrationBackend::VulkanLBVH)
+        if (config.Backend == Runtime::RegistrationBackend::VulkanLBVH ||
+            config.Backend == Runtime::RegistrationBackend::VulkanBruteForce)
             if (const auto reason = Runtime::RegistrationVulkanUnavailableReason(context.Registration.Commands);
                 !reason.empty())
                 ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.3f, 1.0f), "%s: the run will use the CPU.", reason.c_str());
-        changed |= ImGui::InputScalar("Max iterations##ICP", ImGuiDataType_U32, &config.MaxIterations);
+        // The shared execution options: one step is one ICP iteration (CPU and Vulkan correspondences alike).
+        changed |=
+            Runtime::DrawStepRunExecutionOptions("ICP", config.Execution, Runtime::kMaxRegistrationIterations, true);
         changed |= ImGui::InputDouble("Max distance (0 = 1e6)##ICP", &config.MaxCorrespondenceDistance);
         changed |= ImGui::InputDouble("Inlier ratio##ICP", &config.InlierRatio);
         changed |= ImGui::InputDouble("Convergence threshold##ICP", &config.ConvergenceThreshold, 0, 0, "%.8g");
@@ -2634,7 +2690,7 @@ namespace Extrinsic::Sandbox::Editor
         applyTrajectory = ImGui::IsItemDeactivatedAfterEdit();
         if (ImGui::Button("Use final pose"))
         {
-            config.TrajectoryStep = config.MaxIterations;
+            config.TrajectoryStep = config.Execution.IterationCap;
             changed = true;
         }
         if (changed)
@@ -2650,14 +2706,16 @@ namespace Extrinsic::Sandbox::Editor
         if (!readiness.Enabled)
             ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         const auto live = Runtime::SnapshotEditorRegistrationProgress(Registration.Progress);
-        const bool runFinal = DrawProcessingActionButton("Run ICP##ICP", readiness) && !live.Running;
+        auto* runs = Runtime::GetEditorStepRuns(context.Registration.Commands);
+        const auto liveRun = runs != nullptr && live.StepRun != 0u ? runs->Observe(live.StepRun) : std::nullopt;
+        const bool running = liveRun && !Runtime::IsTerminal(liveRun->Phase);
+        const bool runFinal = DrawProcessingActionButton("Run ICP##ICP", readiness) && !running;
         if (runFinal)
-            config.TrajectoryStep = config.MaxIterations;
-        if (runFinal || (applyTrajectory && readiness.Enabled && !live.Running))
+            config.TrajectoryStep = config.Execution.IterationCap;
+        if (runFinal || (applyTrajectory && readiness.Enabled && !running))
         {
             Registration.Progress = Runtime::MakeEditorRegistrationProgress();
-            Registration.RunMaxIterations =
-                static_cast<std::uint32_t>(config.MaxIterations); // the run's cap, not the editable draft
+            Registration.RunMaxIterations = config.Execution.IterationCap; // the run's cap, not the editable draft
             Registration.RunStarted = std::chrono::steady_clock::now();
             Registration.Run.WatchOutput(config.SourceStableEntityId, "registration_transform");
             ApplyQueuedProcessingExecution(
@@ -2679,7 +2737,7 @@ namespace Extrinsic::Sandbox::Editor
                 config.SourceStableEntityId,
                 "registration_transform");
         }
-        DrawRegistrationProgress(live, Registration.RunMaxIterations);
+        DrawRegistrationProgress(context.Registration.Commands, live, Registration.RunMaxIterations);
 
         if (!Registration.LastResult.has_value())
         {
@@ -2730,38 +2788,45 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::End();
     }
 
-    // UI-067: the running ICP job's iteration, cancel, moving-source preview and plots.
-    void MeshProcessingPanels::Impl::DrawRegistrationProgress(
-        const Runtime::EditorRegistrationProgressSnapshot& live, const std::uint32_t maxIterations)
+    // UI-067: the ICP run's step-run row (Run, Pause, Step n, Stop, Restart, Accept, Discard), its iteration, the
+    // moving-source preview (the run's shown pose on the pre-aligned source) and the plots of its metric log.
+    void MeshProcessingPanels::Impl::DrawRegistrationProgress(const Runtime::EditorProcessingCommands& commands,
+        const Runtime::EditorRegistrationProgressSnapshot& live,
+        const std::uint32_t maxIterations)
     {
         auto& state = Registration;
         if (!state.Progress)
             return;
-        // The run is the panel's own (not a job of the session), so the slot draws the bar the panel builds.
+        auto* runs = Runtime::GetEditorStepRuns(commands);
+        const auto run = runs != nullptr && live.StepRun != 0u ? runs->Observe(live.StepRun) : std::nullopt;
+        const bool active = run && !Runtime::IsTerminal(run->Phase);
+        if (active)
+            (void)Runtime::DrawStepRunControls(*runs, live.StepRun, "ICP", state.Controls);
         Runtime::EditorOperationProgress bar{};
-        if (live.Running)
-            bar = MakeIterationProgress(live.Trace.size(),
+        if (run && run->Phase == Runtime::StepRunPhase::Running)
+            bar = MakeIterationProgress(run->Steps,
                 maxIterations,
                 std::chrono::duration<double>(std::chrono::steady_clock::now() - state.RunStarted).count(),
-                "ICP iteration " + std::to_string(live.Trace.size()));
+                "ICP iteration " + std::to_string(run->Steps));
+        // The run is the panel's own (not a job of the session), so the slot draws the bar the panel builds.
         state.Run.DrawLive(
             bar,
             OperationRunSlot::kAnyEntity,
             [&]
             {
-                Runtime::CancelEditorRegistration(state.Progress);
+                std::string refusal;
+                if (runs != nullptr)
+                    (void)runs->Control(live.StepRun, Runtime::StepRunAction::Discard, 1u, refusal);
             },
             "icp_progress");
-        if (live.Running)
-        {
-            const auto* last = live.Trace.empty() ? nullptr : &live.Trace.back();
+        const auto records = run && run->Metrics ? run->Metrics->Records() : std::span<const Runtime::StepRunMetric>{};
+        if (active && !records.empty())
             ImGui::TextDisabled("RMSE %.6g   inliers %llu",
-                last ? last->RMSE : 0.0,
-                static_cast<unsigned long long>(last ? last->InlierCount : 0u));
-        }
+                records.back().Values[0],
+                static_cast<unsigned long long>(records.back().Values[1]));
         ImGui::Checkbox("Preview moving source##ICP", &state.LivePreview);
         auto* interaction = Shell != nullptr ? Shell->SceneInteraction() : nullptr;
-        const bool show = state.LivePreview && live.Running && live.SourceWorld && !live.SourceWorld->empty();
+        const bool show = state.LivePreview && active && live.SourceWorld && !live.SourceWorld->empty();
         if (interaction != nullptr && show && live.Revision != state.PreviewRevision)
         {
             const auto& source = *live.SourceWorld;
@@ -2790,17 +2855,18 @@ namespace Extrinsic::Sandbox::Editor
             state.PreviewShown = false;
             state.PreviewRevision = 0u;
         }
-        if (live.Trace.empty())
+        if (records.empty())
             return;
+        // Metrics: rmse, inliers, seconds since the first step, the step's seconds.
         std::vector<double> iteration, seconds;
         std::vector<RegistrationTraceSeries> series{{"RMSE", {}, true}, {"inliers"}, {"iteration time [s]"}};
-        for (const auto& t : live.Trace)
+        for (const auto& metric : records)
         {
-            iteration.push_back(double(t.Iteration));
-            seconds.push_back(t.Seconds);
-            series[0].Values.push_back(t.RMSE);
-            series[1].Values.push_back(double(t.InlierCount));
-            series[2].Values.push_back(t.IterationSeconds);
+            iteration.push_back(double(metric.Step - 1u));
+            seconds.push_back(metric.Values[2]);
+            series[0].Values.push_back(metric.Values[0]);
+            series[1].Values.push_back(metric.Values[1]);
+            series[2].Values.push_back(metric.Values[3]);
         }
         DrawRegistrationTracePlots("ICPTrace", iteration, seconds, series, state.PlotBySeconds);
     }
@@ -3007,8 +3073,9 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (ImGui::TreeNode("Convergence##CPD"))
         {
-            changed |= DrawSpecInputUInt(
-                "Max iterations##CPD", fields, "max_iterations", config.MaxIterations, defaults.MaxIterations);
+            // The shared execution options: one step is one EM iteration.
+            changed |= Runtime::DrawStepRunExecutionOptions(
+                "CPD", config.Execution, Runtime::kMaxCoherentPointDriftIterations, true);
             changed |= DrawSpecInputDouble(
                 "Tolerance##CPD", fields, "tolerance", config.Tolerance, defaults.Tolerance, "%.2e");
             changed |= DrawSpecInputDouble(
@@ -3049,77 +3116,54 @@ namespace Extrinsic::Sandbox::Editor
 
         ImGui::SeparatorText("Run");
         const auto snapshot = Runtime::SnapshotEditorCoherentPointDrift(state.Run);
-        using Phase = Runtime::EditorCoherentPointDriftPhase;
+        auto* runs = Runtime::GetEditorStepRuns(commands);
+        const auto observed =
+            runs != nullptr && snapshot.StepRun != 0u ? runs->Observe(snapshot.StepRun) : std::nullopt;
         const bool hasRun = state.Run != nullptr;
-        const bool running = hasRun && snapshot.Phase == Phase::Running;
-        // Restart, Apply and Discard make this frame's snapshot stale; it must not redraw the preview.
+        const bool live = observed && !Runtime::IsTerminal(observed->Phase);
+        const bool running = observed && observed->Phase == Runtime::StepRunPhase::Running;
+        // A new run, Restart and Discard make this frame's snapshot stale; it must not redraw the preview.
         bool snapshotStale = false;
-        const bool steppable = hasRun && (snapshot.Phase == Phase::Ready || snapshot.Phase == Phase::Paused);
-        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-            commands, Runtime::PreviewEditorCoherentPointDriftCommand(commands, config));
-        if (!hasRun || !steppable)
+        if (!live && state.PreviewRevision != 0u)
+            ClearCoherentPointDriftPreview(); // the run ended (accepted, discarded, stale or failed)
+        if (!live)
         {
-            if (DrawProcessingActionButton(hasRun ? "Restart##CPD" : "Start##CPD", readiness) && !running)
+            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+                commands, Runtime::PreviewEditorCoherentPointDriftCommand(commands, config));
+            if (DrawProcessingActionButton(hasRun ? "New run##CPD" : "Start##CPD", readiness))
             {
                 ClearCoherentPointDriftPreview();
                 snapshotStale = true;
                 Runtime::EditorCoherentPointDriftResult failure;
                 state.Run = Runtime::StartEditorCoherentPointDrift(commands, config, failure);
-                state.RunMaxIterations = config.MaxIterations; // the run's cap, not the editable draft
+                state.RunMaxIterations = config.Execution.IterationCap; // the run's cap, not the editable draft
                 state.ProgressSlot.WatchOutput(config.SourceStableEntityId, "coherent_point_drift");
                 state.RunMessage = state.Run ? std::string{} : failure.Message;
             }
             if (!readiness.Enabled && !readiness.DisabledReason.empty())
                 ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         }
-        if (hasRun)
+        else
         {
-            const auto step = [&](std::uint32_t count)
+            // The step run's row: the calls run_control makes (start mode and automatic Accept are the config's).
+            const auto issued = Runtime::DrawStepRunControls(*runs, snapshot.StepRun, "CPD", state.Controls);
+            if (issued == Runtime::StepRunAction::Discard || issued == Runtime::StepRunAction::Restart)
             {
-                const auto status = Runtime::StepEditorCoherentPointDrift(commands, state.Run, count);
-                state.RunMessage =
-                    status == Runtime::EditorCommandStatus::Pending ? std::string{} : "This run takes no more steps.";
-            };
-            const auto stepReadiness = Runtime::ResolveEditorCoherentPointDriftStepReadiness(snapshot);
-            if (DrawProcessingActionButton("Step##CPD", stepReadiness))
-                step(1u);
-            ImGui::SameLine();
-            if (DrawProcessingActionButton("Step 10##CPD", stepReadiness))
-                step(10u);
-            ImGui::SameLine();
-            if (DrawProcessingActionButton("Run to end##CPD", stepReadiness))
-                step(0u);
-            if (DrawProcessingActionButton(
-                    "Apply##CPD", Runtime::ResolveEditorCoherentPointDriftApplyReadiness(snapshot)))
-            {
-                state.LastResult = Runtime::ApplyEditorCoherentPointDrift(commands, state.Run);
-                if (state.LastResult->Succeeded())
-                {
-                    ClearCoherentPointDriftPreview();
-                    snapshotStale = true;
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Discard##CPD"))
-            {
-                if (running)
-                    Runtime::CancelEditorCoherentPointDrift(state.Run);
-                state.Run.reset();
                 ClearCoherentPointDriftPreview();
                 snapshotStale = true;
             }
         }
         if (!state.RunMessage.empty())
             ImGui::TextWrapped("%s", state.RunMessage.c_str());
-        // Shown next to the buttons so a rejected apply (e.g. stale inputs) is not missed below the plots.
-        if (state.LastResult)
+        // The ended run's result next to the buttons, so a refused Accept (stale inputs, say) is not missed.
+        if (observed && Runtime::IsTerminal(observed->Phase))
         {
-            const bool ok = state.LastResult->Succeeded();
+            const bool ok = snapshot.Result.Succeeded();
             ImGui::PushStyleColor(
                 ImGuiCol_Text, ok ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : ImVec4(1.0f, 0.55f, 0.3f, 1.0f));
-            ImGui::TextWrapped("Last apply: %s - %s",
-                Runtime::DebugNameForEditorCommandStatus(state.LastResult->Status),
-                state.LastResult->Message.c_str());
+            ImGui::TextWrapped("Last run: %s - %s",
+                Runtime::DebugNameForEditorCommandStatus(snapshot.Result.Status),
+                snapshot.Result.Message.c_str());
             ImGui::PopStyleColor();
         }
         if (ImGui::Checkbox("Preview in viewport##CPD", &state.LivePreview) && !state.LivePreview)
@@ -3134,10 +3178,12 @@ namespace Extrinsic::Sandbox::Editor
         if (hasRun)
         {
             const auto& r = snapshot.Result;
-            ImGui::Text("Phase: %s   backend: %s", Runtime::ToString(snapshot.Phase), r.Backend.c_str());
+            ImGui::Text("Phase: %s   backend: %s",
+                observed ? std::string(Runtime::ToString(observed->Phase)).c_str() : "-",
+                r.Backend.c_str());
             // UI-067: what a running step is doing right now, and for how long.
             Runtime::EditorOperationProgress iteration{};
-            if (snapshot.Phase == Phase::Running)
+            if (running)
             {
                 const double elapsed = snapshot.RunStarted == std::chrono::steady_clock::time_point{}
                     ? 0.0
@@ -3153,7 +3199,9 @@ namespace Extrinsic::Sandbox::Editor
                 OperationRunSlot::kAnyEntity,
                 [&]
                 {
-                    Runtime::CancelEditorCoherentPointDrift(state.Run);
+                    std::string refusal;
+                    if (runs != nullptr)
+                        (void)runs->Control(snapshot.StepRun, Runtime::StepRunAction::Discard, 1u, refusal);
                 },
                 "cpd_progress");
             ImGui::Text("Points: %zu -> %zu   iterations: %u   stop: %s",
@@ -3182,12 +3230,10 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TextWrapped("%s", r.SubsampleBackendDiagnostic.c_str());
             if (r.KernelRank > 0u)
                 ImGui::Text("Kernel rank: %u   kernel error: %.2g", r.KernelRank, r.KernelApproximationError);
-            if (!r.Message.empty() && (snapshot.Phase == Phase::Failed || snapshot.Phase == Phase::Cancelled))
-                ImGui::TextWrapped("%s", r.Message.c_str());
 
             // Overlay the moving source (orange) whenever the run published new positions.
             if (state.LivePreview && !snapshotStale && Shell != nullptr && snapshot.Revision != state.PreviewRevision &&
-                snapshot.Phase != Phase::Applied && snapshot.SourcePreview && snapshot.Target)
+                live && snapshot.SourcePreview && snapshot.Target)
                 if (auto* interaction = Shell->SceneInteraction())
                 {
                     std::vector<Runtime::SceneInteractionModule::PreviewPoint> points;
@@ -3337,7 +3383,9 @@ namespace Extrinsic::Sandbox::Editor
             .AcceptRefusal = transaction.AcceptDisabledReason,
             .Io = GpuTransactionIo{.UploadBytes = transaction.Result.GpuInputUploadBytes,
                 .CacheHits = transaction.Result.GpuInputCacheHits,
-                .CpuReadbackBytes = transaction.Result.CpuStageReadbackBytes}};
+                .CpuReadbackBytes = transaction.Result.CpuStageReadbackBytes},
+            .StepRuns = Runtime::GetEditorStepRuns(commands),
+            .StepRun = transaction.Result.StepRun};
         switch (DrawGpuTransactionControls(row, "Normals"))
         {
         case GpuTransactionRowAction::Accept:
@@ -3538,6 +3586,14 @@ namespace Extrinsic::Sandbox::Editor
         if (!fit)
             changed |= DrawSpecInputUInt(
                 "Iterations", fields, "iterations", config.Filter.Iterations, defaults.Filter.Iterations);
+        // The shared execution options; the cap is the iterations above, and only Vulkan shows a live preview.
+        changed |= Runtime::DrawStepRunExecutionOptions("Smoothing",
+            config.Execution,
+            0u,
+            true,
+            config.Backend == Runtime::PropertySmoothingBackend::Vulkan,
+            1u,
+            true);
         if (config.Weight != S::PropertyWeight::Cotangent && config.Weight != S::PropertyWeight::MeshUniform)
         {
             changed |= DrawSpecInputUInt("Neighbors", fields, "neighbors", config.Neighbors, defaults.Neighbors);
@@ -3596,64 +3652,47 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (changed)
             readiness = previewReadiness();
-        // A pending GPU result blocks the next run until it is accepted or discarded.
+        // A run that has not ended (ready, computing, paused or awaiting Accept) blocks the next one on the output.
         using Phase = Runtime::EditorGpuTransactionPhase;
         const auto transaction =
             Runtime::SnapshotEditorPropertySmoothing(context.MeshFields.Commands, SmoothingTransaction);
+        auto* const stepRuns = Runtime::GetEditorStepRuns(context.MeshFields.Commands);
+        const auto observed = stepRuns && SmoothingStepRun ? stepRuns->Observe(SmoothingStepRun)
+                                                           : std::optional<Runtime::StepRunObservation>{};
         const bool hadTransaction = static_cast<bool>(SmoothingTransaction); // before a terminal phase retires it below
-        const bool transactionPending = SmoothingTransaction &&
-            (transaction.Phase == Phase::Running || transaction.Phase == Phase::ReadyToAccept ||
-                transaction.Phase == Phase::Accepting);
+        const bool transactionPending = (observed && !Runtime::IsTerminal(observed->Phase)) ||
+            (SmoothingTransaction &&
+                (transaction.Phase == Phase::Running || transaction.Phase == Phase::ReadyToAccept ||
+                    transaction.Phase == Phase::Accepting));
         readiness = ReadinessWhileGpuRunPending(std::move(readiness), transactionPending);
         if (DrawProcessingActionButton("Smooth property", readiness))
         {
             Smoothing.Run.ClearNote(); // an own submission replaces an earlier duplicate refusal
-            if (config.Backend == Runtime::PropertySmoothingBackend::Vulkan)
+            // Either backend starts its step run (ready by default); the shared row runs, steps, accepts it.
+            Smoothing.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Smoothing configuration was rejected.";
+            if (Smoothing.ConfigDiagnostic.empty())
             {
-                // Interactive Vulkan runs preview on the device and publish on Accept.
-                Smoothing.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Smoothing configuration was rejected.";
-                if (Smoothing.ConfigDiagnostic.empty())
-                {
-                    // A finished transaction is retired before the new one takes its place.
-                    SmoothingTransaction.reset();
-                    Runtime::EditorPropertySmoothingResult failure;
-                    SmoothingTransaction = Runtime::StartEditorPropertySmoothing(
-                        context.MeshFields.Commands, model.SelectedStableId, config, failure);
-                    // A Pending refusal without a handle: the output's active run keeps its callback.
-                    if (!SmoothingTransaction && failure.Status == Runtime::EditorCommandStatus::Pending)
-                        Smoothing.Run.WatchDuplicate(model.SelectedStableId, config.Output.Name, failure.Message);
-                    else
+                // A finished run is retired before the new one takes its place.
+                SmoothingTransaction.reset();
+                Runtime::EditorPropertySmoothingResult started;
+                SmoothingTransaction = Runtime::StartEditorPropertySmoothing(context.MeshFields.Commands,
+                    model.SelectedStableId,
+                    config,
+                    started,
+                    [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result)
                     {
-                        Smoothing.LastResult = SmoothingTransaction
-                            ? Runtime::SnapshotEditorPropertySmoothing(
-                                  context.MeshFields.Commands, SmoothingTransaction)
-                                  .Result
-                            : failure;
-                        Smoothing.Run.WatchOutputIfQueued(
-                            Smoothing.LastResult, model.SelectedStableId, config.Output.Name);
-                    }
+                        *completion = std::move(result);
+                    });
+                SmoothingStepRun = started.StepRun;
+                // A Pending refusal without a run: the output's active run keeps its callback.
+                if (!started.StepRun && started.Status == Runtime::EditorCommandStatus::Pending)
+                    Smoothing.Run.WatchDuplicate(model.SelectedStableId, config.Output.Name, started.Message);
+                else
+                {
+                    Smoothing.LastResult = started;
+                    Smoothing.Run.WatchOutputIfQueued(Smoothing.LastResult, model.SelectedStableId, config.Output.Name);
                 }
             }
-            else
-                ApplyQueuedProcessingExecution(
-                    context.MeshFields.Commands,
-                    Smoothing,
-                    config,
-                    apply,
-                    [&]
-                    {
-                        return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands,
-                            model.SelectedStableId,
-                            config,
-                            [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result)
-                            {
-                                *completion = std::move(result);
-                            });
-                    },
-                    std::function<void(Runtime::EditorPropertySmoothingResult)>{},
-                    "Smoothing configuration was rejected.",
-                    model.SelectedStableId,
-                    config.Output.Name);
         }
         if (!readiness.Enabled)
         {
@@ -3661,7 +3700,7 @@ namespace Extrinsic::Sandbox::Editor
             if (!reasons.empty())
                 ImGui::TextWrapped("%s", reasons.c_str());
         }
-        if (SmoothingTransaction)
+        if (SmoothingTransaction || SmoothingStepRun)
             DrawSmoothingTransaction(context);
         // The GPU transaction reports its own jobs; a CPU run is found by its output. Either way the
         // finished run stays until the next one.
@@ -3701,19 +3740,18 @@ namespace Extrinsic::Sandbox::Editor
         const auto& commands = context.MeshFields.Commands;
         // A fresh snapshot: the handle may have been replaced by a start this frame.
         const auto transaction = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction);
-        ImGui::SeparatorText("GPU result");
-        // The progress widget (drawn by the panel) reports a running or accepting job.
-        if (transaction.Phase != Phase::Running && transaction.Phase != Phase::Accepting)
-            ImGui::TextDisabled("State: %s%s",
-                Runtime::ToString(transaction.Phase),
-                transaction.Phase == Phase::ReadyToAccept && transaction.Stale ? " (stale)" : "");
+        auto* const stepRuns = Runtime::GetEditorStepRuns(commands);
+        ImGui::SeparatorText(SmoothingTransaction ? "GPU run" : "Run");
+        // ARCH-023: one step is one pass (implicit: one time step over every channel); the shared row runs, steps,
+        // pauses, stops (keeping the last complete step), restarts, accepts once and discards.
         const GpuTransactionRowView row{.Phase = transaction.Phase,
             .CanAccept = transaction.CanAccept,
             .AcceptRefusal = transaction.AcceptDisabledReason,
-            .HasStop = true};
+            .StepRuns = stepRuns,
+            .StepRun = SmoothingStepRun};
+        // Without a step run (a transaction injected ready to accept) the row's own Accept and Discard act here.
         switch (DrawGpuTransactionControls(row, "Smoothing"))
         {
-        case GpuTransactionRowAction::Stop: Runtime::StopEditorPropertySmoothing(SmoothingTransaction); break;
         case GpuTransactionRowAction::Accept:
             Smoothing.LastResult = Runtime::AcceptEditorPropertySmoothing(commands,
                 SmoothingTransaction,
@@ -3725,19 +3763,24 @@ namespace Extrinsic::Sandbox::Editor
         case GpuTransactionRowAction::Discard:
             Runtime::DiscardEditorPropertySmoothing(commands, SmoothingTransaction);
             Smoothing.Run.Forget(); // a discarded result is not a finished run
-            Smoothing.LastResult = Runtime::SnapshotEditorPropertySmoothing(commands, SmoothingTransaction).Result;
             break;
         default: break;
         }
-        if (transaction.AcceptDisabledReason.empty() && transaction.Phase == Phase::ReadyToAccept)
+        if (SmoothingTransaction && transaction.Previews > 0u)
             ImGui::TextWrapped(
-                "The viewport shows the device result; Accept publishes it (undoable), Discard keeps the CPU property.");
-        if (transaction.Phase == Phase::Applied || transaction.Phase == Phase::Discarded ||
-            transaction.Phase == Phase::Failed)
+                "The viewport shows the latest complete step; Accept publishes it (undoable), Discard keeps the CPU property.");
+        const auto observed = stepRuns && SmoothingStepRun ? stepRuns->Observe(SmoothingStepRun)
+                                                           : std::optional<Runtime::StepRunObservation>{};
+        const bool runEnded = !observed || Runtime::IsTerminal(observed->Phase);
+        const bool transactionEnded = !SmoothingTransaction || transaction.Phase == Phase::Applied ||
+            transaction.Phase == Phase::Discarded || transaction.Phase == Phase::Failed;
+        if (runEnded && transactionEnded)
         {
-            // Terminal: the result line below reports it; the next run may start.
-            Smoothing.LastResult = transaction.Result;
+            // Terminal: the result line (the completion) reports it; the next run may start.
+            if (SmoothingTransaction)
+                Smoothing.LastResult = transaction.Result;
             SmoothingTransaction.reset();
+            SmoothingStepRun = 0u;
         }
     }
 
@@ -4661,6 +4704,8 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::SeparatorText("Output");
         changed |= DrawSpecEnumCombo("Output##Sampling", fields, "output", config.Output, defaults.Output);
         changed |= DrawSpecEnumCombo("Backend##Sampling", fields, "backend", config.Backend, defaults.Backend);
+        // The shared execution options sampling honours: the count is the cap and there is no live preview.
+        changed |= Runtime::DrawStepRunExecutionOptions("Sampling", config.Execution, 0u, true, false);
         if (config.Output == Runtime::PointSamplingOutput::Properties)
         {
             if (ImGui::InputText("Rank property##Sampling", state.RankName.data(), state.RankName.size()))
@@ -4687,18 +4732,35 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!state.ConfigDiagnostic.empty())
             ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.3f, 1.0f), "%s", state.ConfigDiagnostic.c_str());
-        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-            commands, Runtime::PreviewEditorPointSamplingCommand(commands, config));
+        auto* const stepRuns = Runtime::GetEditorStepRuns(commands);
+        const auto observed =
+            stepRuns && state.StepRun ? stepRuns->Observe(state.StepRun) : std::optional<Runtime::StepRunObservation>{};
+        if (!observed || Runtime::IsTerminal(observed->Phase))
+            state.StepRun = 0u; // ended: its completion reported the result
+        // A run that has not ended (ready, computing, paused) blocks the next one.
+        const auto readiness =
+            ReadinessWhileGpuRunPending(Runtime::ResolveEditorProcessingActionReadiness(
+                                            commands, Runtime::PreviewEditorPointSamplingCommand(commands, config)),
+                state.StepRun != 0u);
         if (DrawProcessingActionButton("Sample##Sampling", readiness))
         {
             auto slot = state.LastResult;
-            *slot = Runtime::ApplyEditorPointSamplingCommand(commands,
+            *slot = Runtime::StartEditorPointSampling(commands,
                 config,
                 [slot](Runtime::EditorPointSamplingResult result)
                 {
                     *slot = std::move(result);
                 });
+            state.StepRun = (*slot)->StepRun;
             state.Run.WatchOutputIfQueued(*slot, config.SourceStableEntityId, config.RankName);
+        }
+        if (state.StepRun)
+        {
+            // One step is one selected sample of exact farthest point (any other method: one step); Stop keeps the
+            // samples so far, Accept publishes them once.
+            const GpuTransactionRowView row{.StepRuns = stepRuns, .StepRun = state.StepRun};
+            if (DrawGpuTransactionControls(row, "Sampling") == GpuTransactionRowAction::Discard)
+                state.Run.Forget();
         }
         const Runtime::EditorOutputRef samplingDraft{config.SourceStableEntityId, config.RankName};
         state.Run.Draw(commands, config.SourceStableEntityId, "sampling_progress", &samplingDraft);

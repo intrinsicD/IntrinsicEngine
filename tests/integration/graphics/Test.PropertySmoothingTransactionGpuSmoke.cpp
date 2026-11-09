@@ -23,6 +23,7 @@
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
@@ -102,6 +103,13 @@ namespace
             Context.CommandHistory = &History;
             Context.JobCommands.Submit = [this](Runtime::JobDesc desc, Runtime::EditorJobIdentity) {
                 return Kernel().Jobs().Submit(std::move(desc));
+            };
+            // ARCH-023: a GPU transaction is a step run of the composed service, its holder cancelled like the run's jobs.
+            Context.StepRuns = Kernel().Services().Find<Runtime::StepRunsService>();
+            Context.JobCommands.Cancel = [this](const Runtime::JobToken token)
+            {
+                return Kernel().Jobs().Cancel(token) ? Runtime::EditorJobCancelStatus::Requested
+                                                     : Runtime::EditorJobCancelStatus::NotActive;
             };
             Extraction = Kernel().Services().Find<Runtime::RenderExtractionCache>();
             // A rendered point cloud whose appearance shows the smoothed scalar; one row is deleted.
@@ -328,11 +336,13 @@ namespace
             const auto front = Residency()->Front(key);
             ASSERT_TRUE(front);
             FrontReadback = Context.SpatialIndices->QueueGpuCompute(std::size_t(front->Bytes),
-                [buffer = front->Buffer, lease = front->Lease](Extrinsic::RHI::ICommandContext& commands, const Runtime::SpatialGpuIndexView&) {
+                [buffer = front->Buffer, lease = front->Lease](
+                    Extrinsic::RHI::ICommandContext& commands, const Runtime::SpatialGpuIndexView&)
+                {
                     commands.BufferBarrier(buffer, Extrinsic::RHI::MemoryAccess::ShaderRead | Extrinsic::RHI::MemoryAccess::ShaderWrite |
                                                    Extrinsic::RHI::MemoryAccess::TransferRead, Extrinsic::RHI::MemoryAccess::TransferRead);
                     return buffer;
-                }, Runtime::SpatialGpuLatency::Immediate);
+                });
         }
         // True once the readback landed in FrontValues; fails the run on a readback failure.
         bool FrontReady()
@@ -343,27 +353,56 @@ namespace
             std::memcpy(FrontValues.data(), FrontReadback->Data.data(), FrontValues.size() * sizeof(float));
             return true;
         }
+        // ARCH-023: the run's step run; Accept and Stop are the shared controls (run_control's).
+        std::optional<Runtime::StepRunObservation> Observed()
+        {
+            return Context.StepRuns->Observe(Snapshot().Result.StepRun);
+        }
+        void Control(const Runtime::StepRunAction action, const char* what)
+        {
+            std::string refusal;
+            if (!Context.StepRuns->Control(Snapshot().Result.StepRun, action, 1u, refusal))
+                Fail(std::string{what} + " refused: " + refusal);
+        }
         void Accept()
         {
             Accepted.reset();
-            const auto accepted = Runtime::AcceptEditorPropertySmoothing(Commands(), Run,
-                [this](Runtime::EditorPropertySmoothingResult result) { Accepted = std::move(result); });
-            if (accepted.Status != Runtime::EditorCommandStatus::Pending) Fail("accept refused: " + accepted.Message);
+            Control(Runtime::StepRunAction::Accept, "accept");
         }
+        // Starts computing at once with every step previewed (no time limit); a busy ring still drops previews, so
+        // Ready waits for the resting preview of the last step. The terminal result goes to Accepted.
         bool Start(const std::uint32_t id, const Runtime::PropertySmoothingConfig& config, const char* what)
         {
+            auto running = config;
+            running.Execution.Start = Runtime::StepRunStart::Run;
+            running.Execution.PreviewEvery = 1u;
+            running.Execution.PreviewIntervalMs = 0u;
             Runtime::EditorPropertySmoothingResult failure;
-            Run = Runtime::StartEditorPropertySmoothing(Commands(), id, config, failure);
+            Run = Runtime::StartEditorPropertySmoothing(Commands(),
+                id,
+                running,
+                failure,
+                [this](Runtime::EditorPropertySmoothingResult result)
+                {
+                    Accepted = std::move(result);
+                });
             if (!Run) Fail(std::string{what} + " start rejected: " + failure.Message);
             return Run != nullptr;
         }
-        // False while the run computes; fails the scenario when it ended without a result.
+        // False while the run computes; true once its step run rests at an end (cap or stop) with nothing in
+        // flight and the front shows its last step (the state Accept publishes); fails the scenario when the
+        // transaction ended without a result.
         bool Ready(const char* what)
         {
             const auto snapshot = Snapshot();
-            if (snapshot.Phase == Phase::Running) return false;
-            if (snapshot.Phase != Phase::ReadyToAccept) { Fail(std::string{what} + " ended without a result: " + snapshot.Result.Message); return false; }
-            return true;
+            if (snapshot.Phase != Phase::Running)
+            {
+                Fail(std::string{what} + " ended without a result: " + snapshot.Result.Message);
+                return false;
+            }
+            const auto run = Observed();
+            return run && run->Phase == Runtime::StepRunPhase::Paused && run->End != Runtime::StepRunEnd::None &&
+                !run->SegmentInFlight && snapshot.Previews > 0u && run->ShownStep == run->Steps;
         }
         void ExpectBytewise(const std::vector<float>& cpu, const char* what)
         {
@@ -407,7 +446,10 @@ namespace
                 auto reference = Config;
                 reference.Backend = Runtime::PropertySmoothingBackend::Cpu;
                 reference.Output.Name = "cpu_out";
-                const auto result = Runtime::ApplyEditorPropertySmoothingCommand(Commands(), Id, reference);
+                auto referenceContext = Context;
+                referenceContext.StepRuns = nullptr; // The independent CPU reference uses the inline batch path.
+                const auto result = Runtime::ApplyEditorPropertySmoothingCommand(
+                    Runtime::BindEditorProcessingCommands(referenceContext), Id, reference);
                 if (!result.Succeeded()) return Fail("CPU reference failed: " + result.Message);
                 Expected = Signal("cpu_out");
                 StatsBefore = Residency()->Stats();
@@ -418,7 +460,7 @@ namespace
             case 1: // Ready: the first run uploaded its input once; the front exists.
             {
                 if (!Ready("run 1")) return;
-                EXPECT_TRUE(Snapshot().CanAccept) << Snapshot().AcceptDisabledReason;
+                EXPECT_EQ(Observed()->End, Runtime::StepRunEnd::IterationCap) << "every pass ran";
                 EXPECT_EQ(Residency()->Stats().Uploads, StatsBefore.Uploads + 1u) << "the first run uploads the input once";
                 const auto front = Residency()->Front(Key());
                 if (!front || !Residency()->HasRing(Key())) return Fail("no ring front after run 1");
@@ -660,15 +702,16 @@ namespace
             }
             case 3: // Stop after the first preview; the stopped run waits for Accept.
             {
-                const auto snapshot = Snapshot();
-                if (snapshot.Phase == Phase::Running)
+                if (Snapshot().Previews >= 1u && !StopRequested)
                 {
-                    if (snapshot.Previews >= 1u && !StopRequested) { Runtime::StopEditorPropertySmoothing(Run); StopRequested = true; }
-                    return;
+                    Control(Runtime::StepRunAction::Stop, "stop");
+                    StopRequested = true;
                 }
-                if (snapshot.Phase != Phase::ReadyToAccept) return Fail("stopped run ended without a result: " + snapshot.Result.Message);
+                if (!Ready("stopped run"))
+                    return;
                 EXPECT_TRUE(StopRequested) << "the solve finished before Stop could take effect; raise the iteration count";
-                EXPECT_TRUE(snapshot.CanAccept) << snapshot.AcceptDisabledReason;
+                EXPECT_EQ(Observed()->End, Runtime::StepRunEnd::Stopped);
+                EXPECT_LT(Observed()->Steps, 600u) << "Stop keeps the last complete time step";
                 QueueFrontReadback(Key());
                 ++Step;
                 return;
@@ -752,6 +795,7 @@ namespace
         run->StopScenario = stopScenario;
         Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
         engine.EmplaceModule<Runtime::SpatialIndexCache>();
+        engine.EmplaceModule<Runtime::StepRunsModule>();
         engine.EmplaceModule<Runtime::CameraModule>(); // the main camera the seed drives
         engine.Initialize();
         Shutdown shutdown{engine};

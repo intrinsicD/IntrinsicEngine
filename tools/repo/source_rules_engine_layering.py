@@ -92,9 +92,14 @@ RULES: list[Rule] = [
          first_order=("RuntimeFrameContext frameContext{};", "m_Impl->m_Window->PollEvents()",
                       "RunFixedStepSimulationTicks(", "FramePhase::Simulation", "FramePhase::UiBuild",
                       BEGIN_FRAME, "m_Impl->m_Device->Present(frame);", COLLECT_TRANSFERS)),
-    # The last clock EndFrame (rfind) follows maintenance; the transfer collect is unique in the file.
+    # Anchor the rendered maintenance block; non-rendering completion also collects transfers.
     rule("RunFrameOwnsDocumentedBroadPhaseOrder/clock-end", files=(ENGINE,),
-         slice=(COLLECT_TRANSFERS, RUN_FRAME[1]), require=("m_Impl->m_FrameClock.EndFrame();",)),
+         slice=("const auto maintenanceBegin", RUN_FRAME[1]), require=("m_Impl->m_FrameClock.EndFrame();",)),
+    rule("NonRenderingCompletionKeepsOwnerOrdering", files=(ENGINE,),
+         slice=("void Engine::CollectGpuCompletions(", "void Engine::RunMinimizedFrameWork("),
+         order=(COLLECT_TRANSFERS, "m_Impl->m_JobService.DrainGpuQueueCompletedTransfers()",
+                "m_Impl->m_Device->CollectCompletedResources()"),
+         forbid=("WaitIdle", "TickGeometryResidency")),
 
     rule("PhysicsModuleIsAppComposedAndThePublicBridgeSurfaceIsRetired/engine",
          files=(ENGINE_INTERFACE, ENGINE), forbid=("PhysicsModule",)),
@@ -373,9 +378,11 @@ RULES: list[Rule] = [
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/geometry-operations",
          files=(OPERATIONS + "Runtime.PointSetOperations.Processing.cpp",),
          count=(("JobDesc desc{", 1), (".Scope = context.World", 1))),
+    # ARCH-023 B8: the CPU run is a step run of editor jobs (the session stamps the active world); the
+    # seeding job is the module's one direct submission.
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/clustering",
          files=("src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",),
-         count=(("MakeCpuJobDesc<KMeansJobResult>(", 1), ("const WorldHandle world = snapshot.World", 1))),
+         count=(("MakeCpuJobDesc", 0), ("JobDesc job{}", 1), ("job.Scope = world;", 1))),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/clustering-snapshot",
          files=("src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp",), compact=True,
          require=("returnKMeansSnapshot{.Command=command,.World=world",)),
@@ -388,7 +395,11 @@ RULES: list[Rule] = [
              "Runtime.MeshFieldOperations.Curvature.cpp", "Runtime.MeshFieldOperations.Geodesics.cpp",
              "Runtime.MeshTopologyOperations.Topology.cpp")),
          forbid=("return DerivedJobDesc{",),
-         count=(("return JobDesc{", 4), (".Scope = context.World", 4))),
+         # ARCH-023: ICP's CPU and GPU steps use the world's shared step-run jobs; no correspondence pump remains.
+         count=(("return JobDesc{", 3), ("JobDesc pump{", 0), (".Scope = context.World", 3))),
+    rule("ProductionAsyncSubmissionsCarryOwningWorldScope/registration-step-run",
+         files=(OPERATIONS + "Runtime.RegistrationOperations.Processing.cpp",),
+         require=("EditorStepRunJobs(context.JobCommands",)),
     rule("ProductionAsyncSubmissionsCarryOwningWorldScope/normal-operations",
          files=(OPERATIONS + "Runtime.NormalOperations.Processing.cpp",),
          count=(("JobDesc desc{", 1), ("JobDesc ", 1), (".Scope = context.World", 1))),
@@ -714,6 +725,7 @@ RULES: list[Rule] = [
     # Slices above start at the first marker in the whole file; the C++ sliced inside RunFrame.
     Rule(SUITE, "SliceMarkersStayUnique",
          files=(ENGINE,),
-         count=((COLLECT_TRANSFERS, 1), ("if (platformShouldClose)", 1),
-                ("RunMinimizedFrameWork(frameContext", 1))),
+         count=((COLLECT_TRANSFERS, 2), ("const auto maintenanceBegin", 1),
+                ("void Engine::CollectGpuCompletions(", 1), ("CollectGpuCompletions(pacing)", 2),
+                ("if (platformShouldClose)", 1), ("RunMinimizedFrameWork(frameContext", 1))),
 ]

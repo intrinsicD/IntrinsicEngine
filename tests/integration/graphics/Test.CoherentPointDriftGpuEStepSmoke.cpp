@@ -39,6 +39,7 @@ import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 import Extrinsic.Runtime.CoherentPointDriftConfig;
 import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -58,15 +59,27 @@ namespace
     namespace T = Extrinsic::ECS::Components::Transform;
     namespace CPD = Geometry::CoherentPointDrift;
 
-    // Parity/scaling arms are synchronous reference callers; the editor arm below uses
-    // JobService's coroutine lane and never blocks a worker on this event.
+    // ARCH-023: the parity/scaling arms evaluate on their own worker thread, as a run's step does: each E-step page
+    // is submitted and waited for there (no frame or pump).
     bool EvaluateBrokerBlocking(Runtime::CoherentPointDriftGpuEStep& broker,
                                 const CPD::EStep::ExternalRequest& request)
     {
-        auto ready = broker.Queue(request);
-        if (!ready) return false;
-        ready->WaitForProgress(1u);
-        return broker.Complete(ready, request);
+        return broker.Evaluate(request);
+    }
+
+    // The scaling sizes (INTRINSIC_METHOD056_SCALING_SIZES, else 1k, 10k, 100k).
+    std::vector<std::size_t> ScalingSizes()
+    {
+        std::vector<std::size_t> sizes;
+        if (const char* text = std::getenv("INTRINSIC_METHOD056_SCALING_SIZES"))
+        {
+            std::istringstream in(text);
+            for (std::size_t v; in >> v;)
+                sizes.push_back(v);
+        }
+        if (sizes.empty())
+            sizes = {1'000, 10'000, 100'000};
+        return sizes;
     }
 
     struct Shutdown
@@ -153,6 +166,7 @@ namespace
             Context.SpatialIndices = Kernel().Services().Find<Runtime::SpatialIndexCache>();
             Context.Device = &Kernel().GetDevice();
             Context.CommandHistory = &History;
+            Context.StepRuns = &StepRuns; // ARCH-023: a queued CPD run is a step run of the session's service
             Context.JobCommands.Submit = [this](Runtime::JobDesc desc, Runtime::EditorJobIdentity) {
                 return Kernel().Jobs().Submit(std::move(desc));
             };
@@ -297,7 +311,15 @@ namespace
             ++Frames;
             if (Phase == 0)
             {
-                Broker = std::make_shared<Runtime::CoherentPointDriftGpuEStep>(*Context.SpatialIndices);
+                Broker = std::make_shared<Runtime::CoherentPointDriftGpuEStep>(
+                    *Context.SpatialIndices, Kernel().GetDevice());
+                // The parity arm's largest request: 1500 targets, 1400 sources (the run's Init on the main thread).
+                if (!Broker->Prepare(1500u, 1400u))
+                {
+                    ADD_FAILURE() << "the E-step workspace was not prepared: " << Broker->Diagnostic();
+                    Kernel().RequestExit();
+                    return;
+                }
                 PhaseStarted = std::chrono::steady_clock::now();
                 Worker = std::thread([this] { ParityWork(); ParityDone = true; });
                 Phase = 1;
@@ -305,7 +327,6 @@ namespace
             }
             if (Phase == 1)
             {
-                Broker->Pump();
                 if (!ParityDone) return;
                 Worker.join();
                 Broker->ReleaseDeviceResources();
@@ -352,6 +373,7 @@ namespace
             Context = {};
         }
 
+        Runtime::StepRunsService StepRuns{};
         Runtime::EditorProcessingContext Context{};
         Runtime::EditorCommandHistory History{};
         std::shared_ptr<Runtime::CoherentPointDriftGpuEStep> Broker{};
@@ -431,13 +453,7 @@ namespace
 
         void Work()
         {
-            std::vector<std::size_t> sizes;
-            if (const char* text = std::getenv("INTRINSIC_METHOD056_SCALING_SIZES"))
-            {
-                std::istringstream in(text);
-                for (std::size_t v; in >> v;) sizes.push_back(v);
-            }
-            if (sizes.empty()) sizes = {1'000, 10'000, 100'000};
+            const auto sizes = ScalingSizes();
             const auto external = [broker = Broker](const CPD::EStep::ExternalRequest& r) { return EvaluateBrokerBlocking(*broker, r); };
             const CPD::Params base{.OutlierWeight = 0.05, .MaxIterations = 100, .EStepTolerance = 1e-6};
             {
@@ -514,11 +530,22 @@ namespace
             if (!Broker)
             {
                 Broker = std::make_shared<Runtime::CoherentPointDriftGpuEStep>(
-                    *Kernel().Services().Find<Runtime::SpatialIndexCache>(), std::chrono::minutes{10});
+                    *Kernel().Services().Find<Runtime::SpatialIndexCache>(),
+                    Kernel().GetDevice(),
+                    std::chrono::minutes{10});
+                // The run's Init: the largest fixture (targets and sources of one size) fits every request.
+                const auto sizes = ScalingSizes();
+                const std::size_t largest = std::max<std::size_t>(1'000u, *std::ranges::max_element(sizes));
+                if (!Broker->Prepare(largest, largest))
+                {
+                    ADD_FAILURE() << "the E-step workspace was not prepared: " << Broker->Diagnostic();
+                    Passed = false;
+                    Kernel().RequestExit();
+                    return;
+                }
                 Worker = std::thread([this] { Work(); Finished = true; });
                 return;
             }
-            Broker->Pump();
             if (Finished && Worker.joinable())
             {
                 Worker.join();

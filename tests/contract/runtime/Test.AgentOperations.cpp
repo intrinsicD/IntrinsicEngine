@@ -20,6 +20,7 @@ import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -768,16 +769,22 @@ TEST(AgentOperations, AnnotationsReflectUndoability)
     EXPECT_TRUE(sawCapture);
 }
 
-// Every tool that may dispatch GPU work is refused on a minimized frame instead of waiting.
-TEST(AgentOperations, GpuCapableEditorToolsNeedAPresentedFrame)
+// Compute jobs and owner completion progress without a presented frame.
+TEST(AgentOperations, ComputeEditorToolsDoNotNeedAPresentedFrame)
 {
     R::AgentOperationRegistry registry;
     R::RegisterEditorAgentOperations(registry);
-    for (const char* name : {"run_registration", "run_point_sampling", "run_keypoint_analysis", "run_kmeans",
-                             "run_point_cloud_consolidation", "run_mesh_operation"})
+    for (const char* name : {"run_registration",
+             "run_point_sampling",
+             "run_keypoint_analysis",
+             "run_kmeans",
+             "start_kmeans",
+             "run_point_cloud_consolidation",
+             "start_point_cloud_consolidation",
+             "run_mesh_operation"})
     {
         ASSERT_NE(registry.Find(name), nullptr) << name;
-        EXPECT_TRUE(registry.Find(name)->NeedsPresentedFrame) << name;
+        EXPECT_FALSE(registry.Find(name)->NeedsPresentedFrame) << name;
     }
     for (const char* name : {"preview_registration", "preview_mesh_operation", "scene_entities", "select_entity"})
     {
@@ -788,7 +795,7 @@ TEST(AgentOperations, GpuCapableEditorToolsNeedAPresentedFrame)
     const auto refused = R::InvokeAgentOperation(registry, "run_mesh_operation", minimized,
                                                  R"({"operation":"property_smoothing","entity":1})", false);
     EXPECT_TRUE(refused.IsError);
-    EXPECT_EQ(refused.ErrorCode, "viewport_not_presentable");
+    EXPECT_NE(refused.ErrorCode, "viewport_not_presentable") << "missing workspace is checked instead";
 }
 
 // Tools that name an element domain share one enum, generated from GeometryElementDomain.
@@ -1044,7 +1051,7 @@ TEST(AgentOperations, ConfiguredOperationEnumMatchesTable)
     // The mesh aliases keep their four-operation enum, all of which the table serves.
     EXPECT_EQ(enumOf("run_mesh_operation"), (Json{"property_smoothing", "spectral_modes", "harmonic_field", "scalar_gradient"}));
     EXPECT_EQ(enumOf("preview_mesh_operation"), enumOf("run_mesh_operation"));
-    EXPECT_TRUE(registry.Find("run_operation")->NeedsPresentedFrame);
+    EXPECT_FALSE(registry.Find("run_operation")->NeedsPresentedFrame);
     EXPECT_FALSE(registry.Find("run_operation")->ReadOnly);
     EXPECT_TRUE(registry.Find("preview_operation")->ReadOnly);
     EXPECT_FALSE(registry.Find("preview_operation")->NeedsPresentedFrame);
@@ -1247,7 +1254,7 @@ TEST(AgentOperations, CancelNotificationCancelsTheCallsJobsOnceAndKeepsTheTombst
 }
 
 // The job tools: list and wait are read-only, cancel mutates editor state but no scene data or
-// file (not destructive); a wait needs presented frames, so a minimize ends it.
+// file (not destructive); a wait keeps polling while minimized.
 TEST(AgentOperations, JobToolsClassifyAndValidateTheirArguments)
 {
     R::AgentOperationRegistry registry;
@@ -1258,7 +1265,7 @@ TEST(AgentOperations, JobToolsClassifyAndValidateTheirArguments)
     const auto* cancel = registry.Find("jobs_cancel");
     ASSERT_TRUE(list && wait && cancel);
     EXPECT_TRUE(list->ReadOnly && !list->Destructive && !list->NeedsPresentedFrame);
-    EXPECT_TRUE(wait->ReadOnly && !wait->Destructive && wait->NeedsPresentedFrame);
+    EXPECT_TRUE(wait->ReadOnly && !wait->Destructive && !wait->NeedsPresentedFrame);
     EXPECT_TRUE(!cancel->ReadOnly && !cancel->Destructive && !cancel->NeedsPresentedFrame);
     const auto schema = Json::parse(wait->InputSchemaJson);
     EXPECT_EQ(schema["properties"]["timeout_ms"]["maximum"], 60000);
@@ -1378,16 +1385,57 @@ TEST(AgentArgumentSchema, EveryRegisteredSchemaIsSupportedAndClosed)
 {
     const auto registry = FullAgentRegistry();
     // Listed from the registration sources (2026-10-27), so a schema refused at registration shows as a missing tool.
-    for (const char* name : {"attribute_bindings", "bind_attribute", "config_apply", "config_get", "config_preview", "config_schema",
-             "config_sections", "device_status", "diagnostics_read", "entity_properties", "history", "import_file", "jobs_cancel",
-             "jobs_list", "jobs_wait", "load_scene", "log", "preview_keypoint_analysis", "preview_kmeans", "preview_mesh_operation",
-             "preview_operation", "preview_point_cloud_consolidation", "preview_point_sampling", "preview_registration", "property_compare",
-             "property_list", "property_stats", "property_values", "redo", "run_keypoint_analysis", "run_kmeans", "run_mesh_operation",
-             "run_operation", "run_point_cloud_consolidation", "run_point_sampling", "run_registration", "save_scene", "scene_entities",
-             "select_entity", "set_camera", "set_visibility", "show_property", "undo", "vector_field", "vector_fields", "view_capture",
+    for (const char* name : {"attribute_bindings",
+             "bind_attribute",
+             "config_apply",
+             "config_get",
+             "config_preview",
+             "config_schema",
+             "config_sections",
+             "device_status",
+             "diagnostics_read",
+             "entity_properties",
+             "history",
+             "import_file",
+             "jobs_cancel",
+             "jobs_list",
+             "jobs_wait",
+             "load_scene",
+             "log",
+             "preview_keypoint_analysis",
+             "preview_kmeans",
+             "preview_mesh_operation",
+             "preview_operation",
+             "preview_point_cloud_consolidation",
+             "preview_point_sampling",
+             "preview_registration",
+             "property_compare",
+             "property_list",
+             "property_stats",
+             "property_values",
+             "redo",
+             "run_keypoint_analysis",
+             "run_kmeans",
+             "run_mesh_operation",
+             "run_operation",
+             "run_point_cloud_consolidation",
+             "run_point_sampling",
+             "run_registration",
+             "save_scene",
+             "scene_entities",
+             "select_entity",
+             "set_camera",
+             "start_kmeans",
+             "start_point_cloud_consolidation",
+             "set_visibility",
+             "show_property",
+             "undo",
+             "vector_field",
+             "vector_fields",
+             "view_capture",
              "view_screenshot"})
         EXPECT_NE(registry.Find(name), nullptr) << name;
-    EXPECT_EQ(registry.Entries().size(), 48u);
+    EXPECT_EQ(registry.Entries().size(), 50u); // ARCH-023: start_point_cloud_consolidation
     for (const auto& spec : registry.Entries())
     {
         SCOPED_TRACE(spec.Name);
@@ -1563,7 +1611,7 @@ TEST(AgentOperations, DeclaredSchemasEqualTheHandWrittenBaseline)
         EXPECT_EQ(actual, expected);
     }
     EXPECT_EQ(declared, baseline.size()) << "every baseline entry is a registered declared tool";
-    EXPECT_EQ(declared, 48u) << "declared input schemas of " << registry.Entries().size() << " tools";
+    EXPECT_EQ(declared, 50u) << "declared input schemas of " << registry.Entries().size() << " tools";
     EXPECT_EQ(declared, registry.Entries().size()) << "RUNTIME-342: every tool's input schema is generated";
 }
 
@@ -1664,4 +1712,100 @@ TEST(AgentArgumentSchema, RegisteredDeclaredArgumentsKeepTheirRules)
     EXPECT_FALSE(accepts("run_operation", R"({"entity":1})"));
     EXPECT_FALSE(accepts("preview_operation", R"({"operation":"no_such_operation"})"));
     EXPECT_TRUE(accepts("preview_operation", R"({"operation":"geodesics","params":{}})"));
+}
+
+// RUNTIME-355: each nonwaiting run tool offers the shared execution rows its sections bind, with the method's own
+// bounds: point sampling and keypoints auto_accept and start (no cap or live preview row), ICP and CPD all five with
+// their own iteration limits, run_operation property smoothing's preview rows and both tokens but no cap row
+// (smoothing's cap is its iterations, a one-shot's 1). Preview tools and the run_mesh_operation alias (it always
+// waits) offer none.
+TEST(AgentArgumentSchema, NonwaitingRunToolsOfferTheirSectionsExecutionRows)
+{
+    const auto registry = FullAgentRegistry();
+    const auto accepts = [&](const char* tool, const Json& arguments)
+    {
+        const auto* spec = registry.Find(tool);
+        return spec != nullptr && !R::ValidateAgentArgumentsJson(spec->InputSchemaJson, arguments.dump()).has_value();
+    };
+    for (const char* tool : {"run_point_sampling", "run_keypoint_analysis"})
+    {
+        SCOPED_TRACE(tool);
+        EXPECT_TRUE(accepts(tool, {{"wait", false}, {"auto_accept", "converged"}, {"start", "ready"}}));
+        EXPECT_FALSE(accepts(tool, {{"wait", false}, {"start", "later"}}));
+        EXPECT_FALSE(accepts(tool, {{"wait", false}, {"auto_accept", "sometimes"}}));
+        for (const char* row : {"max_iterations", "preview_every", "preview_interval_ms"})
+            EXPECT_FALSE(accepts(tool, {{"wait", false}, {row, 1}})) << row;
+    }
+    const auto registration = [&](const char* method, Json arguments)
+    {
+        arguments["method"] = method;
+        return accepts("run_registration", arguments);
+    };
+    EXPECT_TRUE(registration("icp",
+        {{"wait", false},
+            {"max_iterations", R::kMaxRegistrationIterations},
+            {"preview_every", R::kMaxStepRunPreviewEvery},
+            {"preview_interval_ms", R::kMaxStepRunPreviewIntervalMs},
+            {"auto_accept", "never"},
+            {"start", "ready"}}));
+    EXPECT_FALSE(registration("icp", {{"max_iterations", R::kMaxRegistrationIterations + 1u}}));
+    EXPECT_FALSE(registration("icp", {{"max_iterations", 0}}));
+    EXPECT_TRUE(registration("cpd", {{"max_iterations", R::kMaxCoherentPointDriftIterations}}));
+    EXPECT_FALSE(registration("cpd", {{"max_iterations", R::kMaxCoherentPointDriftIterations + 1u}}))
+        << "CPD's own limit, not ICP's";
+    EXPECT_FALSE(registration("icp", {{"preview_every", R::kMaxStepRunPreviewEvery + 1u}}));
+    EXPECT_FALSE(registration("icp", {{"preview_interval_ms", R::kMaxStepRunPreviewIntervalMs + 1u}}));
+    const auto smoothing = [&](Json arguments)
+    {
+        arguments["operation"] = "property_smoothing";
+        arguments["entity"] = 1;
+        return accepts("run_operation", arguments);
+    };
+    EXPECT_TRUE(smoothing({{"wait", false},
+        {"preview_every", 0},
+        {"preview_interval_ms", R::kMaxStepRunPreviewIntervalMs},
+        {"auto_accept", "end"},
+        {"start", "run"}}));
+    EXPECT_FALSE(smoothing({{"preview_every", R::kMaxStepRunPreviewEvery + 1u}}));
+    EXPECT_FALSE(smoothing({{"wait", false}, {"max_iterations", 3}})) << "no start of the table binds a cap row";
+    EXPECT_TRUE(
+        accepts("run_operation", {{"operation", "normal_estimation"}, {"wait", false}, {"auto_accept", "end"}}));
+    const std::pair<const char*, const char*> offerNone[] = {
+        {"preview_operation", R"({"operation":"normal_estimation","start":"ready"})"},
+        {"preview_point_sampling", R"({"start":"ready"})"},
+        {"preview_keypoint_analysis", R"({"start":"ready"})"},
+        {"preview_registration", R"({"method":"icp","start":"ready"})"},
+        {"run_mesh_operation", R"({"operation":"property_smoothing","entity":1,"start":"ready"})"}};
+    for (const auto& [tool, arguments] : offerNone)
+        EXPECT_FALSE(accepts(tool, Json::parse(arguments))) << tool;
+}
+
+// RUNTIME-355: a waiting call (wait true or absent) runs at once and accepts at its end, so it refuses execution
+// arguments (invalid_params) instead of ignoring them, before it touches the workspace; a row without a step run
+// refuses wait false whatever it names.
+TEST(AgentOperations, WaitingRunsRefuseExecutionArguments)
+{
+    const auto registry = FullAgentRegistry();
+    R::EditorCommandHistory history;
+    const R::AgentOperationContext context{.History = &history};
+    const std::pair<const char*, const char*> waiting[] = {{"run_point_sampling", R"({"start":"ready"})"},
+        {"run_keypoint_analysis", R"({"wait":true,"auto_accept":"never"})"},
+        {"run_registration", R"({"method":"icp","max_iterations":7})"},
+        {"run_registration", R"({"method":"cpd","wait":true,"preview_every":0})"},
+        {"run_operation", R"({"operation":"normal_estimation","start":"ready"})"},
+        {"run_operation", R"({"operation":"property_smoothing","entity":1,"wait":true,"preview_interval_ms":5})"},
+        {"run_operation", R"({"operation":"mesh_curvature","auto_accept":"end"})"}};
+    for (const auto& [tool, arguments] : waiting)
+    {
+        SCOPED_TRACE(std::string(tool) + " " + arguments);
+        const auto outcome = R::InvokeAgentOperation(registry, tool, context, arguments, false);
+        EXPECT_EQ(outcome.ErrorCode, "invalid_params") << outcome.Text;
+        EXPECT_NE(outcome.Text.find("only with wait false"), std::string::npos) << outcome.Text;
+        EXPECT_FALSE(outcome.Continuation);
+    }
+    const auto unsupported = R::InvokeAgentOperation(
+        registry, "run_operation", context, R"({"operation":"mesh_curvature","wait":false,"start":"ready"})", false);
+    EXPECT_EQ(unsupported.ErrorCode, "invalid_params") << unsupported.Text;
+    EXPECT_NE(unsupported.Text.find("step-run operations only"), std::string::npos) << unsupported.Text;
+    EXPECT_EQ(history.UndoCount(), 0u);
 }

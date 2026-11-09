@@ -186,7 +186,8 @@ available through the Vulkan 1.2/1.3 feature chain.
   mapped host-visible `TRANSFER_DST` staging slot, signal the transfer timeline,
   and deliver bytes to the `ReadbackSink` only from `CollectCompleted()`.
   Until the RHI exposes an explicit graphics-to-transfer producer timeline
-  token, this public transfer service uses the Vulkan graphics queue/family.
+  token, uploads and downloads of this public transfer service use the Vulkan
+  graphics queue/family (method compute has its own lane, below).
   Consequently a buffer producer must already be submitted before
   `DownloadBuffer(...)`; the readback command's own all-write-to-transfer-read
   barrier then forms the memory dependency in the same queue serialization
@@ -196,7 +197,62 @@ available through the Vulkan 1.2/1.3 feature chain.
   state and records no automatic source layout transition. `IsComplete(ReadbackToken)`
   reports delivery completion, not just queue signal completion, and
   `TransferQueueDiagnostics` exposes queued/completed/dropped downloads, staged
-  bytes, and readback-ring high-water bytes. The legacy
+  bytes, and readback-ring high-water bytes.
+- ARCH-023 method-compute lane. `SubmitComputeReadback` records on the transfer
+  service's second lane: its own command pool and timeline on the acquired async
+  compute queue, preferring an unused queue index in the frame-compute or graphics
+  family so method work does not share the framegraph queue, or the graphics
+  lane when `render.method_compute_graphics_queue` forces it or no async queue
+  exists. `TransferQueueDiagnostics::ComputeLane` reports requested/resolved/
+  demoted in the queue-affinity vocabulary; `ComputeSharesFrameComputeQueue` reports
+  the hardware fallback when both use the same queue. Readback tokens carry their lane in
+  the top bit and complete against that lane only; readback slots are
+  lane-private (EXCLUSIVE, never handed across families). Ordering: a compute
+  submission with `RHI::ComputeInputOrder::AfterIssuedTransfers` (the default)
+  waits on the graphics lane's last submitted transfer ticket, which every upload,
+  download and device one-shot upload (`EndOneShot` draws one too) issued before it
+  holds. No frame is waited for directly (frames produce no method input), but the
+  ticket is a graphics-queue signal and so also covers every earlier graphics batch,
+  frames and their swapchain-image waits included: after a renderer or preview
+  upload the default order can wait for the preceding frame. A `LaneOrderOnly`
+  submission (valid only for prepared inputs: a worker page after its run's first
+  submission) carries no wait and follows the lane's earlier submissions in queue
+  order, so a later graphics-queue upload does not hold it. Where the method lane
+  shares a queue with frames (graphics lane, `ComputeSharesFrameComputeQueue`),
+  queue order behind earlier frame work applies to both orders. Nothing is
+  submitted to the graphics queue. Its copy and
+  host-read barrier run on the compute lane. The recorder runs under its lane's
+  record mutex: a nested `SubmitComputeReadback` on that lane, and on the graphics
+  lane an upload, download, one-shot submission or retirement, from inside it is
+  refused and logged instead of self-deadlocking (recorders only record; a
+  thread-local scope, restored after the call, so other threads and lanes still
+  progress in parallel). Host synchronization is per VkQueue: a method queue
+  that is none of the frame queues has its own lock (`ComputeSharesFrameQueueLock`
+  reports otherwise), so a blocked present never delays its submission; `WaitIdle`,
+  `Resize` and `ReadBuffer` take both locks together. Each lane's command pool is
+  guarded by its record mutex from allocation to submission and at retirement.
+  `SubmitComputeReadback` reads only state fixed between `Initialize` and
+  `Shutdown` (liveness is an atomic lost flag), so a method worker may call it;
+  the worker waits with `WaitCompute` (`vkWaitSemaphores`, bounded). A pulled
+  readback (`ReadbackSink::Pull`) is skipped by `CollectCompleted`; the worker's
+  `TakeCompletedReadback` erases its record, frees its slot and retires the lane's
+  completed command buffers, and `ReleaseReadback` drops it once complete. The
+  per-lane readback watermark stops below the first unresolved entry, so lane FIFO
+  completion stays truthful. `CollectCompleted`
+  publishes the completed compute value before invoking readback callbacks, and every later graphics-queue
+  submission (transfer lane and frame batches) waits on exactly that already
+  signaled value, never on pending method work. Counters: `ComputeSubmissions`,
+  `ComputeGraphicsWaits`, `ComputeHostBarriers`, `ComputeVisibilityWaits`.
+  Lifetime: deferred deletes stamped with `ComputeFence()` (the last accepted
+  compute ticket, never a reserved one a refusal hands back) run only after the
+  frame cycle and that fence completed. Synchronous uploads acquire only published
+  compute work; their caller owns the destination range. They wait for their own
+  fence without holding a queue lock. The synchronous inspection
+  API `ReadBuffer` and shutdown still wait for device completion. Buffers are created `CONCURRENT` across
+  the distinct families, so no ownership transfer is needed; images are not, so
+  compute-lane recorders touch buffers only (bindless image descriptors are
+  update-after-bind and unused by them, so slot recycling stays frame-driven).
+  The legacy
   `VulkanDevice::ReadBuffer()` helper remains for old opt-in smokes and is not
   used by this ring.
 - `VulkanDevice::CreatePipeline()` now has a guarded concrete Vulkan path once
@@ -505,6 +561,17 @@ available through the Vulkan 1.2/1.3 feature chain.
   fence-safe and from fail-closed `EndFrame()` exits, so buffer/image/sampler/
   pipeline slots return to the free list after the frames-in-flight retirement
   window without collapsing the GPU-safe `DeletionQueue` lifetime.
+- ARCH-024: where no frame begins, `CollectCompletedResources()` releases the same
+  work without waiting. It flushes every slot's `DeletionQueue` (then the
+  compute-gated deletes) only once `vkGetFenceStatus` reports every slot's main,
+  async-compute and transfer fences signaled, no frame is recording and the
+  transfer service's graphics lane finished all it was given; handle slots killed
+  before the last submitted frame need only the fences. `IsFrameRetired(n)` reads
+  the same state: a submitted number retires once every frame slot finished (or
+  the frame-distance rule holds), an unsubmitted one once no frame records and the
+  graphics lane is idle. A lost device or any other fence status retires and frees
+  nothing. `VulkanGatedQueue::FrameCompute`/`FrameTransfer` hold the frames' own
+  async-compute and transfer queues for the held-fence tests.
 - `GRAPHICS-018` brought up all major guarded Vulkan paths: instance/surface/
   physical-device probing with required Vulkan 1.2/1.3 feature negotiation,
   logical-device/queue/allocator/per-frame resource acquisition, swapchain
@@ -566,6 +633,12 @@ available through the Vulkan 1.2/1.3 feature chain.
   and gates a `vmaFlushAllocation` fallback on the fast path so non-coherent
   mappings stay visible to the device without slowing the typical coherent
   desktop/integrated configuration (GRAPHICS-082).
+- `VulkanDevice::WriteMappedBuffer` (ARCH-023) is the worker-safe form of that
+  fast path. It reads only the locked buffer pool, the transfer service's atomic
+  loss flag and the VMA allocator (internally synchronized). It does not check the
+  swapchain or readiness state that `WriteBuffer` checks and the owner writes on
+  resize, so a method worker's write is not refused while the window resizes or is
+  minimized. A failed flush on non-coherent memory returns false.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 

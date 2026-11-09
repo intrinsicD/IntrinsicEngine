@@ -322,7 +322,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 92)
+        self.assertEqual(len(declared), 96)
         self.assertEqual(
             {
                 budget: sum(
@@ -330,7 +330,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 )
                 for budget in (2, 3, 4, 8)
             },
-            {2: 5, 3: 63, 4: 22, 8: 2},
+            {2: 5, 3: 67, 4: 22, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "
@@ -1135,6 +1135,9 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             r"IntrinsicLopFamilyGpuBenchmarkSmoke\.(Run|Validate)",
             operational_regex,
         )
+        for producer in ("GEOM081VulkanPropertySmoothingBenchmark", "RUNTIME269VulkanSparseSolveBenchmark"):
+            for phase in ("Run", "Validate"):
+                self.assertRegex(producer + "." + phase, operational_regex)
         self.assertNotIn(
             "UnavailableEnvironmentFailsClosed",
             operational_regex,
@@ -1146,7 +1149,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             2,
         )
         self.assertIn(
-            'if [[ "$operational_test_count" -ne 5 ]]',
+            'if [[ "$operational_test_count" -ne 9 ]]',
             vulkan,
         )
         self.assertIn(

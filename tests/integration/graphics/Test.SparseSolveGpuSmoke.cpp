@@ -221,7 +221,8 @@ namespace
                 QueuedAt = std::chrono::steady_clock::now();
                 for (auto& p : Problems)
                 {
-                    p.Workspace = std::make_shared<G::SparseConjugateGradientWorkspace>(Kernel().GetDevice());
+                    p.Workspace = std::make_shared<G::SparseConjugateGradientWorkspace>(
+                        Kernel().GetDevice(), *Cache->MethodScratch());
                     ASSERT_TRUE(p.Workspace->Begin({.Matrix = {.Rows = std::uint32_t(p.Matrix.Rows), .RowOffsets = p.Offsets,
                         .Columns = p.Columns, .Values = p.Matrix.Values}, .Solves = p.Solves, .RightHandSides = p.Rhs,
                         .InitialGuesses = p.Guesses, .RhsDiagonal = p.RhsDiagonal, .RhsConstant = p.RhsConstant,
@@ -251,7 +252,9 @@ namespace
         // readback: smaller and larger systems, chained and failing solves share its buffers.
         void SharedFrame()
         {
-            if (!Workspace) Workspace = std::make_shared<G::SparseConjugateGradientWorkspace>(Kernel().GetDevice());
+            if (!Workspace)
+                Workspace = std::make_shared<G::SparseConjugateGradientWorkspace>(
+                    Kernel().GetDevice(), *Cache->MethodScratch());
             auto& p = Problems[Current];
             if (!p.Gpu)
             {

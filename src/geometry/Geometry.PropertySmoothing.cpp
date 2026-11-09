@@ -160,130 +160,194 @@ namespace Geometry::Smoothing
         return plan;
     }
 
-    PropertyFilterResult FilterProperty(std::span<const double> input, std::size_t channels,
-        std::span<const PropertyEdge> edges, const PropertyFilterParams& p,
-        std::span<const std::size_t> fixedRows, std::span<const double> lumpedMass)
+    bool PropertyFilterRun::Begin(std::span<const double> input,
+        std::size_t channels,
+        std::span<const PropertyEdge> edges,
+        const PropertyFilterParams& p,
+        std::span<const std::size_t> fixedRows,
+        std::span<const double> lumpedMass,
+        std::string& diagnostic)
     {
-        PropertyFilterResult result;
-        const auto fail = [&](std::string diagnostic) {
-            result.Success = false;
-            result.Values.clear();
-            result.Diagnostic = std::move(diagnostic);
-            return result;
-        };
-        std::string planDiagnostic;
-        const auto plan = PlanPropertyFilter(input, channels, edges, p, fixedRows, lumpedMass, planDiagnostic);
-        if (!plan) return fail(std::move(planDiagnostic));
-        const std::size_t count = plan->Count;
-        const auto& fixed = plan->Fixed;
-        const double rate = plan->Rate;
-        std::vector<double> degree = plan->Degree, weights;
-        weights.reserve(edges.size());
-        for (const auto& edge : edges) weights.push_back(edge.Weight);
-        std::vector<double> values(input.begin(), input.end()), next(input.size()), delta(input.size());
-        const auto apply = [&](const std::vector<double>& source, std::vector<double>& target, double step) {
-            std::fill(delta.begin(), delta.end(), 0.0);
-            for (std::size_t e = 0; e < edges.size(); ++e)
-                for (std::size_t c = 0; c < channels; ++c)
-                {
-                    const auto a = edges[e].A * channels + c, b = edges[e].B * channels + c;
-                    const double difference = weights[e] * (source[b] - source[a]);
-                    delta[a] += difference;
-                    delta[b] -= difference;
-                }
-            for (std::size_t i = 0; i < count; ++i)
-                for (std::size_t c = 0; c < channels; ++c)
-                {
-                    const auto j = i * channels + c;
-                    const double divisor = p.Laplacian == PropertyLaplacian::RandomWalk ? degree[i] : 1.0;
-                    target[j] = source[j] + (!fixed[i] && divisor > 0 ? step * delta[j] / divisor : 0.0);
-                }
-            ++result.OperatorApplications;
-        };
+        *this = PropertyFilterRun{}; // a run begun again starts over
+        auto plan = PlanPropertyFilter(input, channels, edges, p, fixedRows, lumpedMass, diagnostic);
+        if (!plan)
+            return false;
+        m_Params = p;
+        m_Plan = std::move(*plan);
+        m_Input.assign(input.begin(), input.end());
+        m_Edges.assign(edges.begin(), edges.end());
+        m_Degree = m_Plan.Degree;
+        m_Weights.reserve(edges.size());
+        for (const auto& edge : edges)
+            m_Weights.push_back(edge.Weight);
+        m_Values = m_Input;
+        m_Next.resize(input.size());
+        m_Delta.resize(input.size());
         if (p.Method == PropertyFilter::Implicit)
         {
-            std::string diagnostic;
-            const auto system = AssemblePropertyImplicitSystem(*plan, input, edges, p, lumpedMass, diagnostic);
-            if (!system) return fail(std::move(diagnostic));
-            Sparse::SparseLLT cholesky;
-            const bool direct = p.Solver == PropertySolver::Direct && cholesky.factor(system->Matrix).Succeeded();
+            auto system = AssemblePropertyImplicitSystem(m_Plan, input, edges, p, lumpedMass, diagnostic);
+            if (!system)
+                return false;
+            m_System = std::move(*system);
+            m_Direct = p.Solver == PropertySolver::Direct && m_Cholesky.factor(m_System.Matrix).Succeeded();
+            m_Rhs.resize(m_Plan.Count);
+            m_Solved.resize(m_Plan.Count);
+            m_Backend = m_Direct                     ? "cpu_sparse_cholesky"
+                : p.Solver == PropertySolver::Direct ? "cpu_reference (Cholesky factorization failed; used CG)"
+                                                     : "cpu_reference";
+        }
+        else
+        {
+            if (p.Method == PropertyFilter::SpectralHeat)
+            {
+                m_Term.resize(input.size());
+                m_Sum.resize(input.size());
+            }
+            m_Backend = "cpu_reference";
+        }
+        m_Began = true;
+        return true;
+    }
+
+    void PropertyFilterRun::Apply(const std::vector<double>& source, std::vector<double>& target, const double step)
+    {
+        const std::size_t channels = m_Plan.Channels;
+        std::fill(m_Delta.begin(), m_Delta.end(), 0.0);
+        for (std::size_t e = 0; e < m_Edges.size(); ++e)
+            for (std::size_t c = 0; c < channels; ++c)
+            {
+                const auto a = m_Edges[e].A * channels + c, b = m_Edges[e].B * channels + c;
+                const double difference = m_Weights[e] * (source[b] - source[a]);
+                m_Delta[a] += difference;
+                m_Delta[b] -= difference;
+            }
+        for (std::size_t i = 0; i < m_Plan.Count; ++i)
+            for (std::size_t c = 0; c < channels; ++c)
+            {
+                const auto j = i * channels + c;
+                const double divisor = m_Params.Laplacian == PropertyLaplacian::RandomWalk ? m_Degree[i] : 1.0;
+                target[j] = source[j] + (!m_Plan.Fixed[i] && divisor > 0 ? step * m_Delta[j] / divisor : 0.0);
+            }
+        ++m_Applications;
+    }
+
+    bool PropertyFilterRun::Step(std::string& diagnostic)
+    {
+        const auto& p = m_Params;
+        if (!m_Began || m_Failed || m_Steps >= p.Iterations)
+        {
+            diagnostic = m_Failed ? "The filter run failed earlier." : "The filter run has no step left.";
+            return false;
+        }
+        const std::size_t count = m_Plan.Count, channels = m_Plan.Channels;
+        const double rate = m_Plan.Rate;
+        if (p.Method == PropertyFilter::Implicit)
+        {
             const Sparse::CGParams solver{p.MaxSolverIterations, p.SolverTolerance};
-            std::vector<double> rhs(count), solved(count);
-            for (std::size_t iteration = 0; iteration < p.Iterations; ++iteration)
-                for (std::size_t c = 0; c < channels; ++c)
+            for (std::size_t c = 0; c < channels; ++c)
+            {
+                for (std::size_t i = 0; i < count; ++i)
                 {
-                    for (std::size_t i = 0; i < count; ++i)
-                    {
-                        solved[i] = values[i * channels + c];
-                        rhs[i] = system->RhsDiagonal[i] * solved[i] + system->RhsConstant[c * count + i];
-                    }
-                    if (direct)
-                    {
-                        if (!cholesky.solve(rhs, solved).Succeeded())
-                            return fail("Implicit Cholesky solve failed; no property was changed.");
-                        ++result.OperatorApplications;
-                    }
-                    else
-                    {
-                        const auto status = Sparse::SolveCG(system->Matrix, rhs, solved, solver);
-                        result.OperatorApplications += status.Iterations + 1;
-                        if (!status.Converged) return fail("Implicit solver failed to converge; no property was changed.");
-                    }
-                    for (std::size_t i = 0; i < count; ++i) values[i * channels + c] = solved[i];
+                    m_Solved[i] = m_Values[i * channels + c];
+                    m_Rhs[i] = m_System.RhsDiagonal[i] * m_Solved[i] + m_System.RhsConstant[c * count + i];
                 }
-            result.Diagnostic = direct ? "cpu_sparse_cholesky"
-                : p.Solver == PropertySolver::Direct ? "cpu_reference (Cholesky factorization failed; used CG)" : "cpu_reference";
+                if (m_Direct)
+                {
+                    if (!m_Cholesky.solve(m_Rhs, m_Solved).Succeeded())
+                    {
+                        m_Failed = true;
+                        diagnostic = "Implicit Cholesky solve failed; no property was changed.";
+                        return false;
+                    }
+                    ++m_Applications;
+                }
+                else
+                {
+                    const auto status = Sparse::SolveCG(m_System.Matrix, m_Rhs, m_Solved, solver);
+                    m_Applications += status.Iterations + 1;
+                    if (!status.Converged)
+                    {
+                        m_Failed = true;
+                        diagnostic = "Implicit solver failed to converge; no property was changed.";
+                        return false;
+                    }
+                }
+                for (std::size_t i = 0; i < count; ++i)
+                    m_Values[i * channels + c] = m_Solved[i];
+            }
         }
         else if (p.Method == PropertyFilter::SpectralHeat && rate > 0)
-        {
-            std::vector<double> term(input.size()), sum(input.size());
-            for (std::size_t iteration = 0; iteration < p.Iterations; ++iteration)
-                for (std::size_t split = 0; split < plan->HeatSplits; ++split)
-                {
-                    term = values;
-                    for (std::size_t j = 0; j < values.size(); ++j) sum[j] = plan->HeatCoefficients[0] * term[j];
-                    for (unsigned k = 1; k <= 18; ++k)
-                    {
-                        apply(term, next, 1.0 / rate);
-                        term.swap(next);
-                        for (std::size_t j = 0; j < values.size(); ++j) sum[j] += plan->HeatCoefficients[k] * term[j];
-                    }
-                    for (std::size_t j = 0; j < values.size(); ++j) values[j] = sum[j] / plan->HeatMass;
-                }
-        }
-        else if (rate > 0)
-            for (std::size_t iteration = 0; iteration < p.Iterations; ++iteration)
+            for (std::size_t split = 0; split < m_Plan.HeatSplits; ++split)
             {
-                if (p.Method == PropertyFilter::Bilateral)
+                m_Term = m_Values;
+                for (std::size_t j = 0; j < m_Values.size(); ++j)
+                    m_Sum[j] = m_Plan.HeatCoefficients[0] * m_Term[j];
+                for (unsigned k = 1; k <= 18; ++k)
                 {
-                    std::fill(degree.begin(), degree.end(), 1.0);
-                    for (std::size_t e = 0; e < edges.size(); ++e)
-                    {
-                        double norm = 0;
-                        for (std::size_t c = 0; c < channels; ++c)
-                        {
-                            const double d = (values[edges[e].A * channels + c] - values[edges[e].B * channels + c]) / p.RangeSigma;
-                            norm += d * d;
-                        }
-                        weights[e] = edges[e].Weight * std::exp(-0.5 * norm);
-                        degree[edges[e].A] += weights[e];
-                        degree[edges[e].B] += weights[e];
-                    }
+                    Apply(m_Term, m_Next, 1.0 / rate);
+                    m_Term.swap(m_Next);
+                    for (std::size_t j = 0; j < m_Values.size(); ++j)
+                        m_Sum[j] += m_Plan.HeatCoefficients[k] * m_Term[j];
                 }
-                // Combinatorial explicit steps use the maximum-degree stability bound.
-                const double scale = p.Laplacian == PropertyLaplacian::Combinatorial ? rate : 1.0;
-                apply(values, next, p.Lambda / scale);
-                values.swap(next);
-                if (p.Method == PropertyFilter::Taubin)
+                for (std::size_t j = 0; j < m_Values.size(); ++j)
+                    m_Values[j] = m_Sum[j] / m_Plan.HeatMass;
+            }
+        else if (p.Method != PropertyFilter::SpectralHeat && rate > 0)
+        {
+            if (p.Method == PropertyFilter::Bilateral)
+            {
+                std::fill(m_Degree.begin(), m_Degree.end(), 1.0);
+                for (std::size_t e = 0; e < m_Edges.size(); ++e)
                 {
-                    apply(values, next, p.Mu / scale);
-                    values.swap(next);
+                    double norm = 0;
+                    for (std::size_t c = 0; c < channels; ++c)
+                    {
+                        const double d =
+                            (m_Values[m_Edges[e].A * channels + c] - m_Values[m_Edges[e].B * channels + c]) /
+                            p.RangeSigma;
+                        norm += d * d;
+                    }
+                    m_Weights[e] = m_Edges[e].Weight * std::exp(-0.5 * norm);
+                    m_Degree[m_Edges[e].A] += m_Weights[e];
+                    m_Degree[m_Edges[e].B] += m_Weights[e];
                 }
             }
-        auto completed = CompletePropertyFilter(*plan, input, std::move(values),
-            result.Diagnostic.empty() ? std::string{"cpu_reference"} : std::move(result.Diagnostic));
-        completed.OperatorApplications = result.OperatorApplications;
+            // Combinatorial explicit steps use the maximum-degree stability bound.
+            const double scale = p.Laplacian == PropertyLaplacian::Combinatorial ? rate : 1.0;
+            Apply(m_Values, m_Next, p.Lambda / scale);
+            m_Values.swap(m_Next);
+            if (p.Method == PropertyFilter::Taubin)
+            {
+                Apply(m_Values, m_Next, p.Mu / scale);
+                m_Values.swap(m_Next);
+            }
+        }
+        ++m_Steps;
+        return true;
+    }
+
+    PropertyFilterResult PropertyFilterRun::Finish() const
+    {
+        auto completed = CompletePropertyFilter(m_Plan, m_Input, m_Values, m_Backend);
+        completed.OperatorApplications = m_Applications;
         return completed;
+    }
+
+    PropertyFilterResult FilterProperty(std::span<const double> input,
+        std::size_t channels,
+        std::span<const PropertyEdge> edges,
+        const PropertyFilterParams& p,
+        std::span<const std::size_t> fixedRows,
+        std::span<const double> lumpedMass)
+    {
+        PropertyFilterResult result;
+        PropertyFilterRun run;
+        if (!run.Begin(input, channels, edges, p, fixedRows, lumpedMass, result.Diagnostic))
+            return result;
+        while (run.Steps() < p.Iterations)
+            if (!run.Step(result.Diagnostic))
+                return result;
+        return run.Finish();
     }
 
     std::optional<PropertyImplicitSystem> AssemblePropertyImplicitSystem(const PropertyFilterPlan& plan,

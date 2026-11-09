@@ -9,6 +9,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -45,12 +46,13 @@ namespace Intrinsic::Plugins::PointSpacing
         R::ScalarAnalysisRequest Request(const Config& c)
         {
             return {.StableEntityId = c.StableEntityId,
-                    .Positions = c.Positions,
-                    .Output = c.Radii,
-                    .Params = {.Method = 1, .K = c.KNeighbors, .Scale = c.ScaleFactor},
-                    .Noun = "Radii",
-                    .Method = "Point spacing",
-                    .History = "Estimate point spacing and radii"};
+                .Positions = c.Positions,
+                .Output = c.Radii,
+                .Params = {.Method = 1, .K = c.KNeighbors, .Scale = c.ScaleFactor},
+                .Noun = "Radii",
+                .Method = "Point spacing",
+                .History = "Estimate point spacing and radii",
+                .Owner = "point_spacing"};
         }
 
         std::string Invalid(const Config& c)
@@ -95,24 +97,29 @@ namespace Intrinsic::Plugins::PointSpacing
             r.Centroid = {float(s.Statistics.CentroidX), float(s.Statistics.CentroidY), float(s.Statistics.CentroidZ)};
         }
 
-        // A CPU run's state; the worker touches it only inside Work, the main thread everywhere else.
+        // A CPU run's state; the worker touches it (Current, through Compute) only inside the step, the main thread
+        // everywhere else.
         struct Work
         {
             Config Cfg{};
             R::PointCloudEditingService* Service{nullptr};
             std::shared_ptr<R::PointEdit> Edit{};
             std::vector<glm::vec3> Points{};
-            std::vector<float> Radii{};
-            Result Current{};
-            bool Failed{false};
+            Result Initial{}, Current{}; // Initial: as captured (a restart's step starts from it)
             std::shared_ptr<Run> Shared{};
         };
 
-        // Worker: the neighbourhoods (the octree's own, or k+1 rows of the cached LBVH, self included, as the
-        // editor's LBVH runs query them) and the radii.
-        void Compute(Work& w)
+        // Worker, the one step: the neighbourhoods (the octree's own, or k+1 rows of the cached LBVH, self included,
+        // as the editor's LBVH runs query them) and the radii into `radii`; false with the reason in Current.
+        bool Compute(Work& w, std::vector<float>& radii)
         {
             const auto started = std::chrono::steady_clock::now();
+            w.Current = w.Initial;
+            const auto fail = [&](const char* why)
+            {
+                w.Current.Message = why;
+                return false;
+            };
             const PC::RadiusEstimationParams params{.KNeighbors = w.Cfg.KNeighbors, .ScaleFactor = w.Cfg.ScaleFactor};
             std::optional<PC::RadiusEstimationResult> analysis;
             if (w.Cfg.Backend == SpacingBackend::CpuOctree)
@@ -120,98 +127,45 @@ namespace Intrinsic::Plugins::PointSpacing
             else
             {
                 const auto* index = w.Service->CpuIndex(*w.Edit);
+                if (index == nullptr)
+                    return fail("The point spacing CPU index is unavailable.");
                 const auto width = std::uint32_t(
                     std::min<std::size_t>(w.Points.size(), std::max<std::size_t>(w.Cfg.KNeighbors, 1) + 1));
                 std::vector<std::uint32_t> rows;
                 rows.reserve(w.Points.size() * width);
                 for (const auto& point : w.Points)
                 {
-                    if (index == nullptr) break;
                     const auto row = index->KNearest(point, width, Geometry::PointLBVH::InvalidIndex, true);
                     if (row.size() != width)
-                    {
-                        w.Failed = true;
-                        w.Current.Message = "Incomplete CPU kNN neighborhood.";
-                        return;
-                    }
+                        return fail("Incomplete CPU kNN neighborhood.");
                     for (const auto& neighbor : row) rows.push_back(neighbor.Index);
-                }
-                if (index == nullptr)
-                {
-                    w.Failed = true;
-                    w.Current.Message = "The point spacing CPU index is unavailable.";
-                    return;
                 }
                 analysis = PC::EstimateRadiiFromNeighbors(w.Points, rows, params);
             }
             if (!analysis || analysis->Radii.size() != w.Points.size())
-            {
-                w.Failed = true;
-                w.Current.Message = "Point spacing failed: invalid neighborhoods or unrepresentable float distances/radii.";
-                return;
-            }
+                return fail("Point spacing failed: invalid neighborhoods or unrepresentable float distances/radii.");
             FoldStatistics(w.Current, *analysis);
-            w.Radii = std::move(analysis->Radii);
+            radii = std::move(analysis->Radii);
             w.Current.CpuComputeMilliseconds =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+            return true;
         }
 
-        // Main thread: the run's completion.
-        bool Complete(Work& w, const bool applied)
+        // Main thread, the run's one settled end (ScalarCpuRun::Finish; the host frees `w` when the run retires).
+        void Finish(Work& w, const std::string_view status, std::string message, const bool ownResult)
         {
-            auto& run = *w.Shared;
-            if (run.Final) return false;
-            auto& r = w.Current;
-            if (applied && !w.Failed && !w.Service->SessionCurrent(run.Session))
+            auto r = ownResult ? w.Current : w.Shared->Pending;
+            if (status == "applied")
             {
-                // The service no longer works in the run's editor session (a release or a switch of its workspace,
-                // or a detach): nothing of it may land in another one.
-                r.Status = "cancelled";
-                r.Message = "The editor session of the point spacing run ended; nothing was written.";
+                r.WrittenCount = r.LiveCount;
+                message =
+                    "Radii computed using " + r.ActualBackend + " neighborhoods and CPU spacing/radius evaluation.";
             }
-            else if (!applied || w.Failed || !w.Service->Current(*w.Edit))
-            {
-                // The job gate's check before publication, as the removed engine operation's: a cancel, or an input or
-                // the output changed while the run went.
-                r.Status = w.Failed ? "failed" : !w.Service->Current(*w.Edit) ? "stale" : "cancelled";
-                if (!w.Failed) r.Message = "Radii estimation was cancelled or its source became stale; nothing was applied.";
-            }
-            else
-            {
-                const std::vector<std::vector<float>> columns{std::move(w.Radii)};
-                const auto status = w.Service->PublishScalars(*w.Edit, columns, Request(w.Cfg).History);
-                switch (status)
-                {
-                case R::PointPublishStatus::Applied:
-                    r.Status = "applied";
-                    r.WrittenCount = r.LiveCount;
-                    r.Message = "Radii computed using " + r.ActualBackend +
-                        " neighborhoods and CPU spacing/radius evaluation.";
-                    break;
-                case R::PointPublishStatus::Stale:
-                    r.Status = "stale";
-                    r.Message = "Radii input or output changed before publication.";
-                    break;
-                case R::PointPublishStatus::Unrepresentable:
-                    r.Status = "invalid";
-                    r.Message = "Output values are not exactly representable in the selected scalar storage.";
-                    break;
-                case R::PointPublishStatus::Rejected:
-                    r.Status = "failed";
-                    r.Message = "Radii publication rejected by history checks.";
-                    break;
-                }
-            }
-            if (run.Handle.IsValid()) R::ReportPluginJobOutcome(run.Handle, R::PluginJobDomain::Cpu, r.Message);
-            g_Runs.Finish(run, r);
-            // The job's callables keep `w` until the host reaps them: release the copies and the index lease now.
-            w.Edit.reset();
-            w.Points = std::vector<glm::vec3>{};
-            w.Radii = std::vector<float>{};
-            return r.Status == "applied";
+            R::FinishScalarCpuPluginRun(g_Runs, *w.Shared, std::move(r), status, std::move(message));
         }
 
-        // A CPU run: the capture (with the method's own checks and texts after the service's), one plugin job.
+        // A CPU run: the capture (with the method's own checks and texts after the service's), then the host's
+        // one-shot step run.
         void StartCpu(const std::shared_ptr<Run>& run, const Config& config, R::PointCloudEditingService& service)
         {
             auto fail = [&](std::string status, std::string message)
@@ -242,22 +196,43 @@ namespace Intrinsic::Plugins::PointSpacing
                 view = service.View(*w->Edit);
             }
             w->Points.assign(view.Points.begin(), view.Points.end());
-            w->Current = run->Pending;
-            w->Current.ActualBackend = ToString(config.Backend);
-            w->Current.Radii = view.ScalarOutputs.front();
-            w->Current.SlotCount = view.SlotCount;
-            w->Current.LiveCount = view.LiveCount;
-            w->Current.IndexReused = view.IndexReused;
-            run->Pending = w->Current;
+            auto& r = w->Initial;
+            r = run->Pending;
+            r.ActualBackend = ToString(config.Backend);
+            r.Radii = view.ScalarOutputs.front();
+            r.SlotCount = view.SlotCount;
+            r.LiveCount = view.LiveCount;
+            r.IndexReused = view.IndexReused;
+            w->Current = r;
+            run->Pending = r;
             std::string refusal;
-            if (!R::SubmitPluginRunStage(*run, {.Label = "Radii estimation",
-                                                .Output = R::PluginJobOutput{.StableEntityId = config.StableEntityId,
-                                                                             .Property = w->Current.Radii},
-                                                .Domain = R::PluginJobDomain::Cpu,
-                                                .Work = [w](const std::function<bool()>&) { Compute(*w); },
-                                                .Completion = [w](const bool applied) { return Complete(*w, applied); }},
-                                         refusal))
-                fail("busy", refusal.empty() ? "The point spacing run was not queued." : refusal);
+            const auto holder = std::make_shared<R::PluginJobHandle>();
+            const auto id = service.StartScalarCpuRun(
+                {.Edit = w->Edit,
+                    .Session = run->Session,
+                    .Output = {.StableEntityId = config.StableEntityId, .Property = r.Radii},
+                    .Label = "Radii estimation",
+                    .History = Request(config).History,
+                    .Noun = "Radii",
+                    .Method = "point spacing",
+                    .Owner = "point_spacing",
+                    .Execution = config.Execution,
+                    .Compute =
+                        [w](std::vector<float>& radii)
+                    {
+                        return Compute(*w, radii);
+                    },
+                    .Finish =
+                        [w](const std::string_view status, std::string message, const bool ownResult)
+                    {
+                        Finish(*w, status, std::move(message), ownResult);
+                    }},
+                R::PluginStepRunJobs(holder),
+                refusal);
+            if (id == 0u)
+                return fail("busy", refusal.empty() ? "The point spacing run was not queued." : refusal);
+            run->Handle = *holder;
+            run->Pending.StepRun = id;
         }
     }
 
@@ -275,7 +250,7 @@ namespace Intrinsic::Plugins::PointSpacing
         return service->ScalarAnalysisReadiness(Request(config), BackendOf(config.Backend));
     }
 
-    std::shared_ptr<Run> Start(const Config& config, const bool autoAccept)
+    std::shared_ptr<Run> Start(const Config& config)
     {
         auto run = std::make_shared<Run>();
         run->Pending = {.Status = "pending", .Message = "Radii estimation queued.", .RequestedBackend = config.Backend,
@@ -298,7 +273,7 @@ namespace Intrinsic::Plugins::PointSpacing
             return g_Runs.Keep(run, run->Final && run->Final->Status == "busy");
         }
         R::ScalarAnalysisRefusal refusal;
-        run->Analysis = service->StartScalarAnalysis(Request(config), autoAccept, refusal);
+        run->Analysis = service->StartScalarAnalysis(Request(config), config.Execution, refusal);
         if (!run->Analysis)
             return fail(refusal.Busy ? "busy" : refusal.Failed ? "failed" : "invalid", std::move(refusal.Message), refusal.Busy);
         g_Runs.Keep(run);

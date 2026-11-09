@@ -1,0 +1,24 @@
+benchmark_id: runtime.method_execution.controls
+method: runtime.method_execution.controls
+dataset: builtin.seeded_seven_clusters
+params:
+  intent: performance
+  runner: IntrinsicMethodExecutionMeasurement
+  seeds: [11]
+  point_counts: [100000, 1000000]
+  queues: [graphics, separate]
+  preview: triple
+  clusters: 7
+  initialization: Random
+  maximum_iterations: 20
+  warmup_iterations: 0
+  measured_iterations: 1
+  sequence: run_pause_settled_step1_run_stop_settled_accept
+  process_timeout_seconds: 20
+  rendered_load: reference_triangle_640x480_no_vsync
+  quality: compare_cpu_reference_at_actual_stopped_iteration
+  memory_scope: readback_ring_staging_high_water_bytes_not_total_device_memory
+metrics: [runtime_ms, throughput_items_per_sec, memory_peak_bytes, quality_error_linf, sample_count, avgFrameTimeMs, p99FrameTimeMs, totalFrames]
+thresholds:
+  quality_error_linf_max: 1.0e-5
+  sample_count_min: 4

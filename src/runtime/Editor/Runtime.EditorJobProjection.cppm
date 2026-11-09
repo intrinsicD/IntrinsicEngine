@@ -222,6 +222,9 @@ export namespace Extrinsic::Runtime
         std::function<std::vector<EditorJobRecord>()> SnapshotAll{};
         // Cancels a job submitted through `Submit`; never any other job.
         std::function<EditorJobCancelStatus(JobToken)> Cancel{};
+        // `Cancel` for a run's own lifecycle (a step run retiring the jobs of its ended run): the same answer, never
+        // remembered as a cancel request (RunCancelRequested). Unbound: Cancel.
+        std::function<EditorJobCancelStatus(JobToken)> Retire{};
         // True when `Cancel` accepted a cancel for a job of the run named by its
         // first job's token (`EditorJobIdentity::Run`, or the job's own token).
         // Remembered past the job's reaping for the most recent runs, so a caller

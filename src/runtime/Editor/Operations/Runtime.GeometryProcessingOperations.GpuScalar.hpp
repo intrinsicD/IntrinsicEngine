@@ -16,10 +16,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         std::string_view jobLabel,
         EditorPointScalarTransactionSnapshot&,
         std::function<void(EditorPointScalarTransactionSnapshot)>,
-        bool automatic,
+        const StepRunExecution& execution,
         Graphics::GpuPropertyResidency* testResidency = nullptr,
         const EditorPointScalarTransactionSnapshot& testResult = {},
         // Called before the sink at the terminal delivery and kept when Accept replaces the sink.
-        std::function<void(EditorPointScalarTransactionSnapshot)> retain = {});
+        std::function<void(EditorPointScalarTransactionSnapshot)> retain = {},
+        std::string owner = "Runtime.GpuTransaction");
 }
 }

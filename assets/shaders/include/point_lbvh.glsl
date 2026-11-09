@@ -1,4 +1,5 @@
-// Scalar-layout LBVH ABI shared by standalone queries and method consumers.
+// Scalar-layout point-query ABI (LBVH traversal and exhaustive scan) shared by standalone queries and
+// method consumers.
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
@@ -25,6 +26,22 @@ float lbvhDistance(vec3 a,vec3 b)
     return squared;
 }
 float lbvhBoxDistance(LbvhNode node,vec3 q) { return lbvhDistance(q,clamp(q,node.lo,node.hi)); }
+// Ranking shared by every strategy: nearest/kNN order by (squared float distance, original ID);
+// radius retains the lowest original IDs. Each invocation owns its neighbor slice.
+bool lbvhPrecedes(LbvhNeighbor a,LbvhNeighbor b) { return a.distance<b.distance || (a.distance==b.distance && a.index<b.index); }
+void lbvhInsertNearest(LbvhNeighbors neighbors,uint base,uint capacity,LbvhNeighbor value)
+{
+    for(uint k=0;k<capacity;++k)
+    {
+        LbvhNeighbor old=neighbors.v[base+k];
+        if(lbvhPrecedes(value,old)){ neighbors.v[base+k]=value;value=old; }
+    }
+}
+void lbvhInsertLowestIndex(LbvhNeighbors neighbors,uint base,uint capacity,LbvhNeighbor value)
+{
+    for(uint k=0;k<capacity;++k)
+        if(value.index<neighbors.v[base+k].index){LbvhNeighbor old=neighbors.v[base+k];neighbors.v[base+k]=value;value=old;}
+}
 // Orders an internal node's children by box distance. Pushing the far child first visits the
 // near one first, so nearest/kNN limits shrink early; strict pruning keeps results order-independent.
 void lbvhOrderChildren(LbvhNodes tree,LbvhNode node,vec3 q,out uint nearChild,out float nearDistance,
@@ -48,8 +65,8 @@ LbvhNeighbor lbvhNearest(uint64_t nodes,uint count,vec3 q,uint excluded)
         if(node.object!=LBVH_INVALID)
         {
             if(node.object==excluded) continue;
-            float d=lbvhDistance(q,node.lo);
-            if(d<best.distance || (d==best.distance && node.object<best.index)) best=LbvhNeighbor(node.object,d);
+            LbvhNeighbor candidate=LbvhNeighbor(node.object,lbvhDistance(q,node.lo));
+            if(lbvhPrecedes(candidate,best)) best=candidate;
             continue;
         }
         uint nearChild,farChild;float nearDistance,farDistance;
@@ -88,23 +105,44 @@ uint lbvhQuery(uint64_t nodes,uint pointCount,vec3 q,uint excluded,
         float distance=lbvhDistance(q,node.lo);if(distance>limit)continue;
         if(kNearestCount>0)
         {
-            LbvhNeighbor value=LbvhNeighbor(node.object,distance);
-            // One invocation owns this result slice. Equal-distance candidates remain traversable.
-            for(uint k=0;k<capacity;++k)
-            {
-                LbvhNeighbor old=neighbors.v[base+k];
-                if(value.distance<old.distance || (value.distance==old.distance && value.index<old.index))
-                { neighbors.v[base+k]=value;value=old; }
-            }
+            // Equal-distance candidates remain traversable.
+            lbvhInsertNearest(neighbors,base,capacity,LbvhNeighbor(node.object,distance));
             count=min(count+1,capacity);
             if(count==capacity)limit=neighbors.v[base+capacity-1].distance;
             continue;
         }
         ++count;
-        LbvhNeighbor value=LbvhNeighbor(node.object,distance);
         // Keep the lowest source indices, independent of Morton/traversal ordering.
-        for(uint k=0;k<capacity;++k)
-            if(value.index<neighbors.v[base+k].index){LbvhNeighbor old=neighbors.v[base+k];neighbors.v[base+k]=value;value=old;}
+        lbvhInsertLowestIndex(neighbors,base,capacity,LbvhNeighbor(node.object,distance));
     }
     return count;
+}
+
+// Exhaustive strategy over resident samples in input order: no hierarchy is built or read. Same
+// ranking, exclusion by original ID and inclusive radius as the traversal (nearest is kNN with k=1).
+// Optional object indices map compact input rows to original IDs. False when any sample is invalid,
+// the condition under which the LBVH bounds pass marks the whole query batch invalid.
+bool lbvhBruteQuery(uint64_t points,uint stride,uint64_t objectIndices,uint pointCount,vec3 q,uint excluded,
+                    float radius,uint kNearestCount,uint capacity,LbvhNeighbors neighbors,uint base,out uint count)
+{
+    for(uint j=0;j<capacity;++j)neighbors.v[base+j]=LbvhNeighbor(LBVH_INVALID,uintBitsToFloat(0x7f800000u));
+    count=0;float limit=kNearestCount>0?uintBitsToFloat(0x7f800000u):radius*radius;
+    for(uint i=0;i<pointCount;++i)
+    {
+        vec3 p=lbvhPoint(points,stride,i);
+        if(!lbvhValid(p))return false;
+        uint object=objectIndices==uint64_t(0)?i:LbvhIndices(objectIndices).v[i];
+        float distance=lbvhDistance(q,p);
+        if(object==excluded || distance>limit)continue;
+        if(kNearestCount>0)
+        {
+            lbvhInsertNearest(neighbors,base,capacity,LbvhNeighbor(object,distance));
+            count=min(count+1,capacity);
+            if(count==capacity)limit=neighbors.v[base+capacity-1].distance;
+            continue;
+        }
+        ++count;
+        lbvhInsertLowestIndex(neighbors,base,capacity,LbvhNeighbor(object,distance));
+    }
+    return true;
 }

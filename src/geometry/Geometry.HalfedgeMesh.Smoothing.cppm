@@ -72,6 +72,53 @@ export namespace Geometry::Smoothing
     // FilterProperty and GPU backends so both publish under the same rules.
     [[nodiscard]] PropertyFilterResult CompletePropertyFilter(const PropertyFilterPlan& plan,
         std::span<const double> input, std::vector<double> values, std::string backend);
+    // ARCH-023: one run of the explicit and implicit filters, a logical step at a time: a step is one explicit pass,
+    // or one backward-Euler time step over every channel. FilterProperty is Begin, Params.Iterations steps and
+    // Finish, so a stepped run's result equals it bitwise after as many steps. The run copies its inputs.
+    class PropertyFilterRun
+    {
+    public:
+        // False, with the reason, for whatever FilterProperty refuses (the variational fit included).
+        [[nodiscard]] bool Begin(std::span<const double> values,
+            std::size_t channels,
+            std::span<const PropertyEdge> edges,
+            const PropertyFilterParams& params,
+            std::span<const std::size_t> fixedRows,
+            std::span<const double> lumpedMass,
+            std::string& diagnostic);
+        // The next step; false, with the reason, when a solve fails (the run then refuses further steps) or every
+        // step of the run is done.
+        [[nodiscard]] bool Step(std::string& diagnostic);
+        [[nodiscard]] std::uint32_t Steps() const noexcept
+        {
+            return m_Steps;
+        }
+        // The working values after Steps() steps (fixed and isolated rows are restored only by Finish).
+        [[nodiscard]] std::span<const double> Values() const noexcept
+        {
+            return m_Values;
+        }
+        // CompletePropertyFilter of the current values, with the backend id and the operator applications so far.
+        [[nodiscard]] PropertyFilterResult Finish() const;
+
+    private:
+        void Apply(const std::vector<double>& source, std::vector<double>& target, double step);
+
+        PropertyFilterParams m_Params{};
+        PropertyFilterPlan m_Plan{};
+        std::vector<double> m_Input{}, m_Values{}, m_Next{}, m_Delta{}, m_Term{}, m_Sum{};
+        std::vector<PropertyEdge> m_Edges{};
+        std::vector<double> m_Degree{}, m_Weights{};
+        // Implicit: the system, the factorization when the direct solver factored, and its scratch.
+        PropertyImplicitSystem m_System{};
+        Sparse::SparseLLT m_Cholesky{};
+        bool m_Direct{}, m_Began{}, m_Failed{};
+        std::vector<double> m_Rhs{}, m_Solved{};
+        std::string m_Backend{};
+        std::size_t m_Applications{};
+        std::uint32_t m_Steps{};
+    };
+
     // Values are row-major, with 1..4 channels. Failure never returns partial values.
     // Fixed rows retain their input values; implicit solves eliminate them exactly.
     // LumpedMass is implicit-only and requires one positive finite mass per row.

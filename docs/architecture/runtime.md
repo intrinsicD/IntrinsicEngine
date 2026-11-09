@@ -349,11 +349,12 @@ the resulting live surface.
 this contract. Sandbox composes it from app startup, not from the kernel engine:
 the module provides the sole typed `ClusteringService::RunKMeans` operation,
 copies active-world geometry/property identities into a world-scoped snapshot,
-and routes CPU-reference or Vulkan-compute work from one request. CPU work uses
-`JobService`; Vulkan work uses one private GPU participant, a non-exported
+and routes CPU-reference or Vulkan-compute work from one request. Both are step
+runs (`Runtime.StepRuns`): the CPU reference steps Lloyd iterations on a worker
+through editor jobs; Vulkan work uses one private GPU participant, a non-exported
 recorder/cache partition, and shared transfer readback. Both paths rejoin the
 same cancellation/stale validation gate, publish `KMeansRunCompleted`, commit
-labels/colors during the main-thread event pump, and emit
+labels/colors on the main thread at the run's Accept, and emit
 `ClusterLabelsChanged` as the standing visualization refresh reaction.
 `Runtime.Engine.cppm` and `Runtime.Engine.cpp` do not import or name the K-Means
 module. The focused editor workspace and geometry-operation paths borrow the
@@ -489,8 +490,9 @@ LOP can also lease the selected property index from `SpatialIndexCache` via
 config and UI choose that backend, and completion reports index reuse without
 silent fallback. Other strategies retain their existing backend eligibility.
 The `vulkan_lbvh` choice covers LOP, isotropic/anisotropic WLOP, CLOP and EAR.
-It uses framed complete radius queries against the leased source and a private
-moving workspace per iteration, then reuses CPU projection arithmetic. WLOP/EAR
+It is a hybrid step run: each iteration queues complete radius queries against
+the leased source and a private moving workspace on the main thread, reads the
+rows back and runs the CPU projection arithmetic in a worker job. WLOP/EAR
 source density is computed once; self-inclusive moving rows feed density and
 normal refinement before repulsion excludes self. CLOP's mixture fitting and
 continuous attraction, initial normal estimation and EAR's progressive insertion
@@ -1435,8 +1437,9 @@ while minimized remain queued until the next normal frame. The close/exit paths
 do not drain the queue.
 
 Minimized frames skip simulation, UI, extraction, render and normal maintenance.
-When modules registered `Idle`, the bounded idle path drains commands, pumps
-events, runs Idle hooks, drains completions, pumps again and reaps jobs. It does
+The bounded idle path always drains commands, pumps events, runs optional Idle
+hooks, collects GPU transfers, drains GPU participants, reclaims completed device
+resources, drains job completions, pumps again and reaps jobs. It does
 not flush transforms or advance the render frame index. The frame clock
 resamples after deliberate waiting; normal consumers use the previous completed
 frame's duration. Before the first completed frame the clock returns zero and
@@ -1521,18 +1524,28 @@ terminal telemetry for point-cloud consolidation.
 `Extrinsic.Runtime.RegistrationOperations` also owns Coherent Point Drift (RUNTIME-273,
 reference `Geometry.Registration.CoherentPointDrift`). `StartEditorCoherentPointDrift`
 validates `sandbox.coherent_point_drift` (`Extrinsic.Runtime.CoherentPointDriftConfig`,
-declared in a `ConfigFieldSpec` table) and captures both operands in world space;
-`StepEditorCoherentPointDrift` queues one job running N iterations or to the end, with
-cancellation checked every iteration; the worker alone touches the solver and publishes a
-mutex-guarded snapshot (phase, trace, moving source positions) after each iteration, read by
-`SnapshotEditorCoherentPointDrift`. `ApplyEditorCoherentPointDrift` revalidates captured
-property revisions and both entity transforms, then publishes one history entry: the source
+declared in a `ConfigFieldSpec` table with the shared step-run execution rows; by default a
+run starts ready and waits for Accept), captures both operands in world space and starts a
+step run of the session's `StepRunsService` (ARCH-023), controlled by `run_control` and the
+panel's shared row. One step is one EM iteration, and every run steps on a worker (StepRuns
+segments): its `Step` calls `Solver::Step` there; a Vulkan E-step run evaluates each device E-step
+on that worker, and a Vulkan subsample backend's orders are computed by the first step on that
+worker before the solver samples (ARCH-023, RUNTIME-355 F3). Iterations write a mutex-guarded trace and running scalars; the moving
+source is copied into the snapshot (`SnapshotEditorCoherentPointDrift`) only at the run's
+preview cadence. Accept revalidates captured property revisions, entity
+identity and both entity transforms, then publishes one history entry: the source
 Transform for rigid results (mirrored results are refused), or the source positions or a
 named vec3 displacement property in source-local space for affine and nonrigid results.
 Writing mesh-vertex positions also recomputes a stored `v:normal` (area-weighted, in the
 same history entry). Operands are mapped with their local Transform only, so parented
-entities are refused. `ApplyEditorCoherentPointDriftCommand` chains start, a full run and publication with one
-terminal callback; agents reach it through `run_registration`.
+entities are refused. `ApplyEditorCoherentPointDriftCommand` starts the same run computing at once
+and accepting at its end, whatever the section's `start` and `auto_accept`, with one terminal
+callback; agents reach it through `run_registration`. A run that ends without a commit answers
+that callback (and its snapshot result) at its settled end (`StepRunCallbacks::Finished`, from the
+final observation), so a same-source run started from inside it is admitted; its Discard only stops
+the solver, closes a pending device E-step and gives a waiting subsample-ordering page up. A
+detached editor session makes its captures stale, which ends the run like changed inputs. Without a
+job lane it iterates and publishes at once.
 
 The section also selects the METHOD-049 backends: `e_step` (reference, dense, truncated,
 auto, fast Gauss, and the approximate METHOD-053 Nystroem with `nystrom_landmarks` and
@@ -1542,19 +1555,20 @@ carry the backend that actually ran (`cpu_auto` or `cpu_mixed` when iterations u
 different policies); each trace row carries the E-step policy that ran and its error bound;
 low-rank runs report the kernel rank and its sampled approximation error. The `vulkan`
 E-step (METHOD-056) runs the dense two-pass form on the device while the kernel is wide:
-`Extrinsic.Runtime.CoherentPointDriftGpuEStep` is a per-run broker whose `Queue`
-returns an owned request event. The JobService coroutine uses the solver's
-`BeginStep`/`PendingExternalRequest`/`CompleteExternalStep` path, parks while a
-companion main-thread pump submits through `SpatialIndexCache::QueueGpuCompute`
-as an immediate request (GRAPHICS-150),
-and hands the readback back, usually within the frame. The broker leases its workspace from
-`SpatialIndexCache::LeaseGpuWorkspace` for each step and returns it when the step's pump ends;
-workspace buffers only grow, the float-float target is converted once and uploaded only when
-the workspace last held another target generation, and the per-iteration source staging is
-reused. Only the E-step is on the device: the M-step, objective and exactly evaluated rows stay
+`Extrinsic.Runtime.CoherentPointDriftGpuEStep` is a per-run broker. ARCH-023: the run's Init (main
+thread) leases its workspace from `SpatialIndexCache::LeaseGpuWorkspace` and prepares its pipelines
+and buffers for the run's full sets (`Prepare`); the step's worker then uses the solver's
+`BeginStep`/`PendingExternalRequest`/`CompleteExternalStep` path and `Evaluate`s the E-step itself:
+it writes the prepared host-visible inputs, records and submits one immediate page (GRAPHICS-150)
+with a pulled readback, waits for it in bounded slices (`Runtime.WorkerGpuPages.hpp`) and takes the
+statistics, with no frame or main-thread pump. The lease spans every step, pause and restart, the
+float-float target is converted and uploaded once, and the per-iteration source staging is reused.
+Discard closes the broker at once (a waiting E-step gives its page up without a CPU fallback); the
+Commit or the broker's destruction returns the workspace, which the pool reuses only after the
+compute fence. Only the E-step is on the device: the M-step, objective and exactly evaluated rows stay
 on the CPU, so each iteration still uploads the moved source (32 bytes per point, plus 4 bytes
 per row of skip flags when any) and reads back `2n + 4m` doubles. Without the job
-lane, an operational device with shader float64, or after a device failure or a timeout observed by the owner pump, the
+lane, an operational device with shader float64, or after a device failure or a timeout observed by the waiting worker, the
 iterations run the exact CPU choice; results count them in `e_step_fallbacks` and say why in
 `gpu_diagnostic`, and count device iterations in `e_step_device_iterations` (kernels too narrow
 for fp32 terms stay on the CPU by design and are not fallbacks). The `bayesian`
@@ -1568,19 +1582,25 @@ landmarks are picked (every `Geometry.PointSampling` method; exact farthest poin
 cloud consolidation takes the same block as `initial_*` for its initial samples (Random keeps
 the seeded legacy subsample; CPU and Vulkan paths share `SelectInitialSamples`).
 `subsample_backend` (CPD) and `initial_backend` (consolidation, `"cpu"` / `"vulkan"`) order
-those samples on the device: a framed job runs exact farthest point through
-`Extrinsic.Runtime.PointSamplingGpu` on the resident positions (CPD: captured live rows and
-model; consolidation: local rows) before the solver job, which depends on it and takes the
-verified order (`CPD::Params::SubsampleTargetOrder` / `SubsampleSourceOrder`,
+those samples on the device: exact farthest point through `Extrinsic.Runtime.PointSamplingGpu`
+on the resident positions (CPD: captured live rows and model; consolidation: local rows). The
+owner prepares the order (`PointSamplingGpuRun::PrepareWorker`: workspace, pipeline, buffers and
+its page gate); a worker computes it in bounded pages it submits and waits for itself
+(`OrderOnWorker`, ARCH-023 RUNTIME-355 F3), with no frame or owner poll, and checks the
+leading samples against the CPU there. CPD's first step does this before its solver samples;
+consolidation runs it as a job its solve job depends on, which publishes the result on the main
+thread. The verified order is taken (`CPD::Params::SubsampleTargetOrder` / `SubsampleSourceOrder`,
 `Consolidation::Params::InitialOrder`; the geometry rejects orders that repeat or exceed an
-index). Any other case orders on the CPU and says why. CPD reports
+index). Any other case orders on the CPU and says why; a cancelled or stale run takes no order
+and does not order on the CPU either. Once the ordering has ended, the owner seals its pages and
+stamps the resident input with the compute fence before the workspace goes. CPD reports
 `subsample_requested_backend`, `subsample_target_backend`, `subsample_source_backend` (empty
 when that set is not subsampled) and `subsample_backend_diagnostic`; consolidation reports
 `initial_sampling_requested_backend`, `initial_sampling_backend` (empty for the random
 subsample) and `initial_sampling_diagnostic`, apart from its solve backend. A run that ends
 before solving (cancelled, rejected input) reports the backend that was to order its samples.
-CPD landmarks always stay on the CPU. Cancellation wakes the parked coroutine and
-abandons the pending step before CPU fallback or the M-step. Request latency
+CPD landmarks always stay on the CPU. A discard makes a waiting device E-step or ordering page
+give up and abandons the pending step before CPU fallback or the M-step. Request latency
 statistics do not measure blocked worker time.
 
 
@@ -1594,18 +1614,21 @@ priority scores), and the output — a float rank plus a bool selection property
 (one undoable step) or a new point-cloud entity with the samples in world space. Points are
 sampled in the entity's world frame, so parented entities are refused. The editor's "Point
 Sampling" window and the agent tools `preview_point_sampling` / `run_point_sampling` use it.
-CPU runs are synchronous. `backend` = Vulkan (RUNTIME-290) goes through the seam
+ARCH-023: with the session's step runs and job lane both backends are step runs (`run`
+and `steps` in the result; `auto_accept` and `start` in the section): one selected sample is one
+step of exact farthest point (the CPU sieve on a worker, extended a sample at a time), any other
+method one step that orders whole. The batch command (`ApplyEditorPointSamplingCommand`, the agent)
+runs at once and accepts at its end; `StartEditorPointSampling` (the panel) starts ready. Without the
+service the CPU orders inline. `backend` = Vulkan (RUNTIME-290) goes through the seam
 `Extrinsic.Runtime.PointSamplingGpu`: methods with a device kernel (exact, optionally weighted,
-farthest point via `Extrinsic.Graphics.FarthestPointSampling`) run as a framed GPU job in
-bounded chunks whose order prefixes only grow; the first 64 samples are recomputed on the CPU
-before the result may report `gpu_vulkan_compute`. Every other case (another method, no job
+farthest point via `Extrinsic.Graphics.FarthestPointSampling`) run as an owner-stepped GPU
+transaction in bounded chunks, each adding at most the steps the run allows within the pair
+budget; a chunk in flight counts every sample it adds even after a pause or stop. Only the chunk
+that adds the last sample, or Accept after a stop, reads the order back (sampling has no live
+preview); the first 64 samples (fewer for a shorter prefix) are recomputed on the CPU before the
+result may report `gpu_vulkan_compute`. Every other case (another method, no job
 lane or device, no shader float64, a device failure or mismatch) runs the CPU order and
 reports `requested_backend`, `backend` and `backend_diagnostic`.
-
-Framed GPU jobs of editor operations share `EditorFeatureDetail::MakeFramedGpuJobDesc`
-(`Editor/internal/Runtime.EditorFramedGpuJob.hpp`): the worker does nothing, the main thread
-queues `SpatialIndexCache::QueueGpuCompute` chunks from `IsReadyToApply` until the operation's
-`Observe` says done, then publishes (keypoints and point sampling use it).
 
 ## Render artifact publication
 

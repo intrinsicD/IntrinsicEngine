@@ -11,7 +11,15 @@ module;
 export module Extrinsic.Graphics.CoherentPointDriftEStep;
 import Extrinsic.RHI.Handles;
 
-extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+        class ICommandContext;
+        class BufferManager;
+    }
+}
 
 export namespace Extrinsic::Graphics
 {
@@ -30,7 +38,8 @@ export namespace Extrinsic::Graphics
     class CoherentPointDriftEStepWorkspace
     {
     public:
-        explicit CoherentPointDriftEStepWorkspace(RHI::IDevice& device);
+        // Device buffers are cached scratch leases of `scratch`, which must outlive the workspace.
+        CoherentPointDriftEStepWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch);
         ~CoherentPointDriftEStepWorkspace();
         // Readback layout, all doubles: LogDenominator (n), Pt1 (n), P1, PXx, PXy, PXz (m each).
         [[nodiscard]] static std::size_t ReadbackBytes(std::size_t targets, std::size_t sources) noexcept;
@@ -44,8 +53,19 @@ export namespace Extrinsic::Graphics
         // uploaded only when its generation or size differs from the last upload. The caller
         // keeps the workspace alive, and does not record again, until the readback has completed.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext& commands, const CoherentPointDriftEStepGpuInput& input);
+        // ARCH-023, device-owner thread: creates both pipelines, device-local inputs of `targets` x `sources` (the row
+        // flags included) with one retained host-visible staging buffer each, and resolves every address. A later
+        // Record of at most that shape then creates nothing and makes no device call but IDevice::WriteMappedBuffer
+        // (a method worker records it): it writes the rows into the staging and copies them on the compute lane.
+        // False on refusal (no device, no float64, budget).
+        [[nodiscard]] bool Prepare(std::size_t targets, std::size_t sources);
+        // Returns every buffer to its cache and forgets the uploaded target; the pipelines stay.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
+        [[nodiscard]] RHI::BufferHandle RecordPrepared(
+            RHI::ICommandContext& commands, const CoherentPointDriftEStepGpuInput& input, std::size_t n, std::size_t m);
     };
 }

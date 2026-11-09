@@ -37,5 +37,12 @@ namespace Extrinsic::Core::Config
         // go first, size-weighted (0 = no budget). Read at boot by the residency owner.
         std::uint32_t GpuPropertyIdleEvictSeconds{60u};
         std::uint32_t GpuPropertyBudgetMegabytes{256u};
+        // ARCH-023: method scratch buffers (SpatialIndexCache::MethodScratch) in use, awaiting GPU completion or
+        // idle stay within this many MiB (1..1048576); a run that would exceed it is refused. An engineering
+        // budget, not a tuned value. Boot-only.
+        std::uint32_t GpuMethodBufferBudgetMegabytes{1024u};
+        // ARCH-023: method compute (IDevice::SubmitComputeReadback) runs on the async compute queue when the
+        // device has one; true forces the graphics queue (fallback testing, driver workarounds). Boot-only.
+        bool MethodComputeOnGraphicsQueue{false};
     };
 }

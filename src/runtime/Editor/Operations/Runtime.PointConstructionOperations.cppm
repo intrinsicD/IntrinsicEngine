@@ -28,6 +28,13 @@ export namespace Extrinsic::Runtime
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
+        // ARCH-023, Vulkan LBVH, the hybrid traffic of this generation's step (a restart counts afresh): query rows
+        // written (every page uploads the session's full fixed page of 12-byte rows, its unused tail included; the
+        // zero rows written when the session was prepared are excluded) and packed neighbour rows read back.
+        std::uint64_t CpuStageUploadBytes{}, CpuStageReadbackBytes{};
+        // ARCH-023: the run's step run (run_control, run_observe; one step, its bounded pages within); 0 for an
+        // inline or queued-job run and a refusal.
+        std::uint64_t StepRun{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied; }
     };
     struct EditorPointConstructionReadiness
@@ -65,7 +72,16 @@ export namespace Extrinsic::Runtime
     // additional callback. Configured Apply follows the same delivery contract.
     [[nodiscard]] EditorPointConstructionReadiness PreviewEditorPointConstructionCommand(const EditorProcessingCommands&, const PointConstructionConfig&);
     [[nodiscard]] EditorPointConstructionResult ApplyEditorPointConstructionCommand(const EditorProcessingCommands&, const PointConstructionConfig&, std::function<void(EditorPointConstructionResult)> onComplete = {});
+    // ARCH-023: an interactive start of every backend with the section's execution (`config.Execution`: start and
+    // auto_accept), a one-shot step run that run_control and the panel's row drive; Accept creates the entity (one
+    // undo entry). It needs the session's step runs and a job lane. Apply is the batch (runs at once, accepts at its
+    // end).
+    [[nodiscard]] EditorPointConstructionResult StartEditorPointConstructionRun(const EditorProcessingCommands&,
+        const PointConstructionConfig&,
+        std::function<void(EditorPointConstructionResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(const EditorProcessingCommands&, const PointConstructionConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<PointConstructionConfig> GetEditorPointConstructionConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorPointConstructionResult ApplyEditorConfiguredPointConstruction(const EditorProcessingCommands&, std::function<void(EditorPointConstructionResult)> onComplete = {});
+    [[nodiscard]] EditorPointConstructionResult StartEditorConfiguredPointConstruction(
+        const EditorProcessingCommands&, std::function<void(EditorPointConstructionResult)> onComplete = {});
 }

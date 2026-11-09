@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -19,6 +20,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "OneShotLifecycleScript.hpp"
 #include "PointDomainFixture.hpp"
 #include "PointSpacingHarness.hpp"
 #include "PluginWindowHarness.hpp"
@@ -61,9 +63,10 @@ namespace
     PS::Config Settings(const entt::entity entity, const D domain)
     {
         return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
-                .Positions = {.Domain = domain, .Name = "samples", .ValueKind = K::Vec3},
-                .Radii = {.Domain = domain, .Name = "radii", .ValueKind = K::Float},
-                .KNeighbors = 2};
+            .Positions = {.Domain = domain, .Name = "samples", .ValueKind = K::Vec3},
+            .Radii = {.Domain = domain, .Name = "radii", .ValueKind = K::Float},
+            .KNeighbors = 2,
+            .Execution = R::kOneShotBatchExecution}; // a batch: computes at once, accepts at its end
     }
 
     const char* DeletedName(const D d)
@@ -77,6 +80,21 @@ namespace
         "Vulkan scalar analysis supports float outputs only; select the CPU backend for other scalar storage.";
     const std::string kParameters = "Vulkan scalar analysis requires k<=63 and normal or zero parameters.";
     const std::string kDevice = "Vulkan scalar analysis requires an operational float64 device and framed spatial cache/jobs.";
+
+    // ARCH-023: an interactive start's one-shot options (the section's auto_accept and start rows).
+    PS::Config Interactive(PS::Config config, const R::StepRunStart start)
+    {
+        config.Execution = R::OneShotExecution({.AutoAccept = R::StepRunAutoAccept::Never, .Start = start});
+        return config;
+    }
+
+    // Frames until `done` holds (or they ran out).
+    template <class Done> bool Until(Harness& harness, Done done, const int frames = 2000)
+    {
+        for (int frame = 0; !done() && frame < frames; ++frame)
+            harness.Frame();
+        return done();
+    }
 }
 
 TEST(PointSpacingPlugin, TheSectionKeepsItsNameBoundsTokensAndStorageKinds)
@@ -198,7 +216,7 @@ TEST(PointSpacingPlugin, EveryDomainPublishesNamedRadiiKeepsDeletedRowsAndTheBac
                 EXPECT_EQ(harness.Settled(config), "");
                 const auto catalog = editing->InputCatalog(config.StableEntityId, 2u);
                 EXPECT_TRUE(std::ranges::any_of(catalog.Entries, [&](const auto& e) { return e.Ref == config.Positions; }));
-                const auto reference = harness.Wait(*PS::Start(config, false));
+                const auto reference = harness.Wait(*PS::Start(config));
                 ASSERT_EQ(reference.Status, "applied") << reference.Message;
                 EXPECT_EQ(reference.ActualBackend, "cpu_octree");
                 const auto values = std::as_const(props).Get<float>("radii").Vector();
@@ -212,7 +230,7 @@ TEST(PointSpacingPlugin, EveryDomainPublishesNamedRadiiKeepsDeletedRowsAndTheBac
                 ASSERT_TRUE(harness.History().Redo().Succeeded());
                 EXPECT_EQ(std::as_const(props).Get<float>("keep")[0], 99);
                 config.Backend = PS::SpacingBackend::CpuLBVH;
-                const auto indexed = harness.Wait(*PS::Start(config, false));
+                const auto indexed = harness.Wait(*PS::Start(config));
                 ASSERT_EQ(indexed.Status, "applied") << indexed.Message;
                 EXPECT_EQ(indexed.ActualBackend, "cpu_lbvh");
                 const auto actual = std::as_const(props).Get<float>("radii");
@@ -223,7 +241,7 @@ TEST(PointSpacingPlugin, EveryDomainPublishesNamedRadiiKeepsDeletedRowsAndTheBac
                 EXPECT_EQ(indexed.Centroid, reference.Centroid);
                 EXPECT_FLOAT_EQ(indexed.BoundingBoxDiagonal, reference.BoundingBoxDiagonal);
                 EXPECT_FLOAT_EQ(indexed.MeanRadius, reference.MeanRadius);
-                EXPECT_TRUE(harness.Wait(*PS::Start(config, false)).IndexReused);
+                EXPECT_TRUE(harness.Wait(*PS::Start(config)).IndexReused);
                 props.Get<float>("radii")[0] = 123; // a foreign edit of the output: undo is refused
                 EXPECT_FALSE(harness.History().Undo().Succeeded());
                 std::string diagnostic; // Show records its own undo entry (the visualization recipe)
@@ -269,7 +287,7 @@ TEST(PointSpacingPlugin, AnInvalidDeletionMaskRefusesPreviewAndRun)
             const char* expected =
                 fault < 3 ? "Deletion mask must be a count-matched bool property." : "Invalid deletion domain/cardinality.";
             EXPECT_EQ(harness.Settled(config), expected);
-            const auto run = PS::Start(config, false);
+            const auto run = PS::Start(config);
             ASSERT_TRUE(run->Final);
             EXPECT_EQ(run->Final->Status, "invalid");
             EXPECT_EQ(run->Final->Message, expected);
@@ -290,7 +308,7 @@ TEST(PointSpacingPlugin, AChangedInputOrOutputOrACancelEndsTheRunWithoutAWrite)
         auto& scene = harness.Scene();
         const auto entity = Make(scene, D::MeshVertex);
         auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-        const auto run = PS::Start(Settings(entity, D::MeshVertex), false);
+        const auto run = PS::Start(Settings(entity, D::MeshVertex));
         ASSERT_FALSE(run->Final) << run->Final->Message;
         switch (change)
         {
@@ -328,14 +346,14 @@ TEST(PointSpacingPlugin, InvalidOutputsTheGpuWithoutADeviceAndNumericalFailuresK
     unrelated.Radii.Name = "h:next";
     EXPECT_EQ(harness.Settled(unrelated), "");
     config.Backend = PS::SpacingBackend::VulkanLBVH;
-    EXPECT_EQ(harness.Wait(*PS::Start(config, true)).Status, "invalid");
+    EXPECT_EQ(harness.Wait(*PS::Start(config)).Status, "invalid");
     config.Backend = PS::SpacingBackend::CpuOctree;
     config.ScaleFactor = std::numeric_limits<float>::max();
-    EXPECT_EQ(harness.Wait(*PS::Start(config, false)).Status, "failed");
+    EXPECT_EQ(harness.Wait(*PS::Start(config)).Status, "failed");
     EXPECT_EQ(std::as_const(props).Get<float>("radii")[0], 77);
     config.ScaleFactor = 1;
     config.KNeighbors = std::numeric_limits<std::uint32_t>::max();
-    EXPECT_EQ(harness.Wait(*PS::Start(config, false)).Status, "applied");
+    EXPECT_EQ(harness.Wait(*PS::Start(config)).Status, "applied");
 }
 
 // Without a device here, the Vulkan backend answers the GPU admission of the operation runtime through both entry
@@ -376,7 +394,7 @@ TEST(PointSpacingPlugin, TheVulkanBackendAnswersTheGpuAdmissionThroughBothTools)
         auto cpu = wide;
         cpu.Backend = backend;
         cpu.KNeighbors = 64;
-        EXPECT_EQ(harness.Wait(*PS::Start(cpu, false)).Status, "applied") << PS::ToString(backend);
+        EXPECT_EQ(harness.Wait(*PS::Start(cpu)).Status, "applied") << PS::ToString(backend);
     }
 }
 
@@ -389,13 +407,13 @@ TEST(PointSpacingPlugin, UndoRedoAndAPositionEditRebuildTheIndex)
     config.Backend = PS::SpacingBackend::CpuLBVH;
     config.KNeighbors = std::numeric_limits<std::uint32_t>::max();
     auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
-    ASSERT_EQ(harness.Wait(*PS::Start(config, false)).Status, "applied");
+    ASSERT_EQ(harness.Wait(*PS::Start(config)).Status, "applied");
     ASSERT_TRUE(harness.History().Undo().Succeeded());
     EXPECT_FALSE(props.Exists("radii"));
     ASSERT_TRUE(harness.History().Redo().Succeeded());
     EXPECT_TRUE(props.Exists("radii"));
     props.Get<glm::vec3>("samples")[0].x += .1f;
-    const auto rerun = harness.Wait(*PS::Start(config, false));
+    const auto rerun = harness.Wait(*PS::Start(config));
     ASSERT_EQ(rerun.Status, "applied") << rerun.Message;
     EXPECT_FALSE(rerun.IndexReused);
 }
@@ -410,7 +428,7 @@ TEST(PointSpacingPlugin, AReplacedStorageMakesUndoStale)
         const auto entity = Make(scene, D::PointCloudPoint);
         const auto config = Settings(entity, D::PointCloudPoint);
         auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
-        ASSERT_EQ(harness.Wait(*PS::Start(config, false)).Status, "applied");
+        ASSERT_EQ(harness.Wait(*PS::Start(config)).Status, "applied");
         const auto computed = std::as_const(props).Get<float>("radii").Vector();
         if (replaceOutput)
         {
@@ -445,7 +463,7 @@ TEST(PointSpacingPlugin, ScalarStoragePublishesWithCheckedConversionAndExactUndo
         auto config = Settings(entity, D::PointCloudPoint);
         config.KNeighbors = 1;
         config.Radii.ValueKind = kind;
-        const auto result = harness.Wait(*PS::Start(config, false));
+        const auto result = harness.Wait(*PS::Start(config));
         ASSERT_EQ(result.Status, "applied") << result.Message;
         EXPECT_EQ(R::DetectGeometryPropertyValueKind(props, "radii"), kind);
         EXPECT_EQ(harness.History().Undo().Status, R::EditorCommandHistoryStatus::Undone);
@@ -458,7 +476,7 @@ TEST(PointSpacingPlugin, ScalarStoragePublishesWithCheckedConversionAndExactUndo
         const auto entity = Make(scene, D::PointCloudPoint);
         auto config = Settings(entity, D::PointCloudPoint);
         config.Radii.ValueKind = K::Int32; // 0.01-spaced radii are not integers
-        const auto result = harness.Wait(*PS::Start(config, false));
+        const auto result = harness.Wait(*PS::Start(config));
         EXPECT_EQ(result.Status, "invalid");
         EXPECT_EQ(result.Message, "Output values are not exactly representable in the selected scalar storage.");
         EXPECT_FALSE(PointDomainProperties(scene, entity, D::PointCloudPoint).Exists("radii"));
@@ -473,7 +491,7 @@ TEST(PointSpacingPlugin, ScalarStoragePublishesWithCheckedConversionAndExactUndo
         props.Get<double>("radii")[4] = std::numeric_limits<double>::quiet_NaN();
         auto config = Settings(entity, D::PointCloudPoint);
         config.Radii.ValueKind = K::Double;
-        ASSERT_EQ(harness.Wait(*PS::Start(config, false)).Status, "applied");
+        ASSERT_EQ(harness.Wait(*PS::Start(config)).Status, "applied");
         EXPECT_TRUE(std::isnan(std::as_const(props).Get<double>("radii")[4])) << "the deleted row keeps its NaN";
         props.Get<float>("keep")[0] = 99;
         ASSERT_TRUE(harness.History().Undo().Succeeded());
@@ -495,19 +513,19 @@ TEST(PointSpacingPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSession
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
     const auto config = Settings(entity, D::MeshVertex);
-    const auto older = PS::Start(config, false);
+    const auto older = PS::Start(config);
     ASSERT_FALSE(older->Final);
     auto elsewhere = config;
     elsewhere.StableEntityId = 0xFFFFFFF0u;
-    const auto newer = PS::Start(elsewhere, false); // refused at once: a newer result while the older run goes on
+    const auto newer = PS::Start(elsewhere); // refused at once: a newer result while the older run goes on
     ASSERT_TRUE(newer->Final);
     EXPECT_EQ(harness.Wait(*older).Status, "applied");
     EXPECT_EQ(PS::Latest(), newer) << "the older run's completion never replaces a newer result";
-    const auto first = PS::Start(config, false);
+    const auto first = PS::Start(config);
     ASSERT_FALSE(first->Final);
     EXPECT_EQ(PS::Latest(), first) << "a started run is the latest at once";
     ASSERT_EQ(PS::Active().size(), 1u);
-    const auto busy = PS::Start(config, false);
+    const auto busy = PS::Start(config);
     ASSERT_TRUE(busy->Final);
     EXPECT_EQ(busy->Final->Status, "busy") << busy->Final->Message;
     EXPECT_EQ(PS::Latest(), first) << "a busy refusal answers for the other run";
@@ -516,7 +534,7 @@ TEST(PointSpacingPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSession
     EXPECT_TRUE(PS::Active().empty());
     auto missing = config;
     missing.StableEntityId = 0xFFFFFFF0u;
-    const auto refused = PS::Start(missing, false);
+    const auto refused = PS::Start(missing);
     ASSERT_TRUE(refused->Final);
     EXPECT_EQ(refused->Final->Status, "invalid");
     EXPECT_EQ(refused->Final->Message, "Radii target entity is stale or missing.") << "the removed operation's text";
@@ -528,7 +546,7 @@ TEST(PointSpacingPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSession
 
     auto other = config;
     other.Radii.Name = "radii_of_the_old_session";
-    const auto outlived = PS::Start(other, false);
+    const auto outlived = PS::Start(other);
     ASSERT_FALSE(outlived->Final);
     EXPECT_EQ(PS::Latest(), outlived);
     const auto undo = harness.History().UndoCount();
@@ -540,7 +558,7 @@ TEST(PointSpacingPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSession
     EXPECT_EQ(PS::Latest(), nullptr) << "an old session's delivery does not come back";
     EXPECT_FALSE(props.Exists("radii_of_the_old_session"));
     EXPECT_EQ(harness.History().UndoCount(), undo);
-    const auto fresh = PS::Start(config, false);
+    const auto fresh = PS::Start(config);
     EXPECT_EQ(harness.Wait(*fresh).Status, "applied");
     EXPECT_EQ(PS::Latest(), fresh);
 }
@@ -553,7 +571,7 @@ TEST(PointSpacingPlugin, ARunOfAReleasedWorkspaceWritesNothing)
     auto& scene = harness.Scene();
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-    const auto run = PS::Start(Settings(entity, D::MeshVertex), false);
+    const auto run = PS::Start(Settings(entity, D::MeshVertex));
     ASSERT_FALSE(run->Final);
     harness.Editing().ReleaseEditorWorkspace(harness.Shell);
     EXPECT_EQ(harness.Wait(*run).Status, "cancelled") << run->Final->Message;
@@ -574,7 +592,7 @@ TEST(PointSpacingPlugin, AnOutOfRangeCoordinateIsRefusedWithTheMethodsLbvhText)
     config.Backend = PS::SpacingBackend::CpuLBVH;
     const std::string limits = "LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.";
     EXPECT_EQ(harness.Settled(config), limits);
-    const auto run = PS::Start(config, false);
+    const auto run = PS::Start(config);
     ASSERT_TRUE(run->Final);
     EXPECT_EQ(run->Final->Status, "invalid");
     EXPECT_EQ(run->Final->Message, limits);
@@ -586,7 +604,7 @@ TEST(PointSpacingPlugin, TheJobsWindowCancelsARun)
     auto& scene = harness.Scene();
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-    const auto run = PS::Start(Settings(entity, D::MeshVertex), false);
+    const auto run = PS::Start(Settings(entity, D::MeshVertex));
     ASSERT_FALSE(run->Final);
     const auto jobs = harness.Jobs();
     const auto row = std::ranges::find_if(jobs, [](const auto& job) { return job.Name == "Radii estimation"; });
@@ -677,7 +695,7 @@ TEST(PointSpacingPlugin, CpuOutputsAreBitwiseTheGeometryFunctions)
             config.Backend = backend;
             config.ScaleFactor = scale;
             config.KNeighbors = k;
-            ASSERT_EQ(harness.Wait(*PS::Start(config, false)).Status, "applied");
+            ASSERT_EQ(harness.Wait(*PS::Start(config)).Status, "applied");
             const auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
             const auto samples = std::as_const(props).Get<glm::vec3>("samples").Vector();
             const auto deleted = std::as_const(props).Get<bool>("v:deleted").Vector();
@@ -723,4 +741,236 @@ TEST(PointSpacingPlugin, TheWindowFollowsSettingsAppliedElsewhere)
         harness, "view.point_spacing", "Point Spacing and Radii###view.point_spacing", first, elsewhere);
     ASSERT_TRUE(active);
     EXPECT_EQ(active->Radii.Name, "window_elsewhere") << "the window applied a stale draft";
+}
+
+// ARCH-023: a CPU run is a one-shot step run of the host's step-run service, with the run controls a Vulkan run takes:
+// the common script (ready computes nothing, Step 1 computes exactly the one step, Stop keeps the result, Restart
+// starts generation 1 ready from the same capture, Run computes the one step again, Accept commits once). Nothing is
+// written before Accept; the restarted result equals a batch run's over the same input, with one undo entry each.
+TEST(PointSpacingPlugin, ACpuRunFollowsTheCommonOneShotLifecycle)
+{
+    for (const auto backend : {PS::SpacingBackend::CpuOctree, PS::SpacingBackend::CpuLBVH})
+    {
+        SCOPED_TRACE(PS::ToString(backend));
+        Harness harness{};
+        auto& scene = harness.Scene();
+        const auto entity = Make(scene, D::PointCloudPoint);
+        auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
+        auto batch = Settings(entity, D::PointCloudPoint);
+        batch.Backend = backend;
+        batch.Radii.Name = "batch_radii";
+        ASSERT_EQ(harness.Wait(*PS::Start(batch)).Status, "applied");
+        auto config = Interactive(batch, R::StepRunStart::Ready);
+        config.Radii.Name = "radii";
+        const auto run = PS::Start(config);
+        ASSERT_FALSE(run->Final) << run->Final->Message;
+        ASSERT_NE(run->Pending.StepRun, 0u) << "a CPU run names its step run at once";
+        auto* runs = harness.Engine.Services().Find<R::StepRunsService>();
+        ASSERT_NE(runs, nullptr);
+        const auto nothing = [&]
+        {
+            EXPECT_FALSE(props.Exists("radii")) << "nothing is written before Accept";
+        };
+        Intrinsic::Tests::OneShotLifecycleScript script{.OnReadyHeld = nothing,
+            .OnFirstResult = nothing,
+            .OnRestartedReady = nothing,
+            .OnRestartedResult = nothing};
+        ASSERT_TRUE(Until(harness,
+            [&]
+            {
+                return script.Advance(*runs, run->Pending.StepRun);
+            }));
+        EXPECT_EQ(script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
+        ASSERT_TRUE(Until(harness,
+            [&]
+            {
+                return run->Final.has_value();
+            }));
+        EXPECT_EQ(run->Final->Status, "applied") << run->Final->Message;
+        EXPECT_EQ(run->Final->StepRun, run->Pending.StepRun);
+        EXPECT_EQ(
+            std::as_const(props).Get<float>("radii").Vector(), std::as_const(props).Get<float>("batch_radii").Vector())
+            << "the restarted step computes from the same capture";
+        EXPECT_EQ(harness.History().UndoCount(), 2u) << "one undo entry per Accept";
+    }
+}
+
+// ARCH-023 (the scalar run_control bypass): a detach after the one step ended discards the run at its next check, so
+// an Accept issued through run_control, as an agent issues it, publishes nothing; no plugin poll is needed.
+TEST(PointSpacingPlugin, ARunControlAcceptAfterADetachPublishesNothing)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    const auto run = PS::Start(Interactive(Settings(entity, D::MeshVertex), R::StepRunStart::Run));
+    ASSERT_FALSE(run->Final);
+    auto* runs = harness.Engine.Services().Find<R::StepRunsService>();
+    const auto id = run->Pending.StepRun;
+    ASSERT_TRUE(Until(harness,
+        [&]
+        {
+            const auto o = runs->Observe(id);
+            return o && o->Phase == R::StepRunPhase::Paused && !o->SegmentInFlight;
+        }));
+    ASSERT_EQ(runs->Observe(id)->End, R::StepRunEnd::Converged) << "the one step ended; the run waits for Accept";
+    {
+        // The named metric carries the capture's live samples, not a placeholder zero (no deleted rows here).
+        const auto observed = runs->Observe(id);
+        ASSERT_TRUE(observed->Metrics && !observed->Metrics->Records().empty());
+        EXPECT_EQ(observed->MetricNames[0], "live_count");
+        EXPECT_EQ(observed->Metrics->Records().back().Values[0], double(props.Get<glm::vec3>("samples").Size()));
+    }
+    harness.Shell.Detach();
+    std::string refusal;
+    EXPECT_TRUE(runs->Control(id, R::StepRunAction::Accept, 1u, refusal)) << refusal;
+    // The same workspace attached again is a new session; the run's capture is still the current input.
+    harness.Shell.Attach(harness.Engine.Worlds(), harness.Engine.Services());
+    (void)R::PrepareEditorWorkspaceSnapshotFrame(harness.Shell);
+    harness.Frame(5);
+    ASSERT_TRUE(run->Final) << "the detached run ended";
+    EXPECT_EQ(run->Final->Status, "cancelled") << run->Final->Message;
+    EXPECT_EQ(run->Final->Message, "The editor session of the point spacing run ended; nothing was written.");
+    EXPECT_NE(runs->Observe(id)->Phase, R::StepRunPhase::Committed);
+    EXPECT_FALSE(props.Exists("radii"));
+    EXPECT_FALSE(harness.History().CanUndo());
+}
+
+// ARCH-023: an unload while a CPU run waits for Accept: its holder and step jobs are the plugin's, so the drain ends
+// the step run (discarded), nothing is written, and the host drops the plugin's state with the run.
+TEST(PointSpacingPlugin, AnUnloadDrainsAWaitingCpuRunWithoutWriting)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    std::uint64_t id = 0u;
+    std::weak_ptr<PS::Run> waiting;
+    {
+        const auto run = PS::Start(Interactive(Settings(entity, D::MeshVertex), R::StepRunStart::Run));
+        ASSERT_FALSE(run->Final);
+        id = run->Pending.StepRun;
+        waiting = run;
+    }
+    auto* runs = harness.Engine.Services().Find<R::StepRunsService>();
+    ASSERT_TRUE(Until(harness,
+        [&]
+        {
+            const auto o = runs->Observe(id);
+            return o && o->End == R::StepRunEnd::Converged && !o->SegmentInFlight;
+        }));
+    const auto unloaded = harness.Call("plugin_unload");
+    EXPECT_FALSE(unloaded.IsError) << unloaded.Text;
+    harness.Frame(5);
+    const auto o = runs->Observe(id);
+    ASSERT_TRUE(o);
+    EXPECT_EQ(o->Phase, R::StepRunPhase::Discarded) << o->Diagnostic;
+    EXPECT_TRUE(waiting.expired()) << "the host dropped the plugin's callables with the run";
+    EXPECT_FALSE(props.Exists("radii"));
+    EXPECT_FALSE(harness.History().CanUndo());
+}
+
+// ARCH-023: the tool's nonwaiting start on the CPU: start ready answers at once with the run's id, run (status
+// pending, nothing computed or written); run_control steps and accepts it; the default call still waits.
+TEST(PointSpacingPlugin, TheToolStartsAReadyCpuRunAndAnswersItsRunBeforeItsEnd)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    ASSERT_TRUE(harness.Apply(Settings(entity, D::MeshVertex)));
+    const auto started = harness.Call("point_spacing", Json{{"start", "ready"}, {"auto_accept", "never"}});
+    ASSERT_FALSE(started.IsError) << started.Text;
+    EXPECT_FALSE(started.Continuation) << "a ready start answers at once";
+    const auto answer = Json::parse(started.Text);
+    EXPECT_EQ(answer["status"], "pending");
+    EXPECT_FALSE(answer.contains("step_run")) << "one key names the run";
+    const auto id = answer["run"].get<std::uint64_t>();
+    ASSERT_NE(id, 0u);
+    auto* runs = harness.Engine.Services().Find<R::StepRunsService>();
+    harness.Frame(3);
+    EXPECT_EQ(runs->Observe(id)->Phase, R::StepRunPhase::Ready);
+    EXPECT_EQ(runs->Observe(id)->Steps, 0u);
+    EXPECT_FALSE(props.Exists("radii"));
+    const auto control = [&](const char* action)
+    {
+        return harness.Call("run_control", Json{{"run", id}, {"action", action}});
+    };
+    EXPECT_FALSE(control("step").IsError);
+    ASSERT_TRUE(Until(harness,
+        [&]
+        {
+            return runs->Observe(id)->End == R::StepRunEnd::Converged;
+        }));
+    EXPECT_FALSE(props.Exists("radii"));
+    EXPECT_FALSE(control("accept").IsError);
+    ASSERT_TRUE(Until(harness,
+        [&]
+        {
+            return runs->Observe(id)->Phase == R::StepRunPhase::Committed;
+        }));
+    EXPECT_TRUE(props.Exists("radii"));
+    EXPECT_EQ(harness.History().UndoCount(), 1u);
+    const auto waited = harness.Call("point_spacing");
+    ASSERT_FALSE(waited.IsError) << waited.Text;
+    EXPECT_EQ(Json::parse(waited.Text)["status"], "applied") << "the default call is a batch that waits";
+    EXPECT_FALSE(harness.Call("point_spacing", Json{{"start", "later"}}).ErrorCode.empty()) << "the rows refuse it";
+}
+
+// ARCH-023: the one-shot options are the section's rows: they round-trip through the config document, refuse an
+// unknown token, and the section keeps no cap or preview row (a one-shot is one step without live preview).
+TEST(PointSpacingPlugin, TheSectionPersistsItsOneShotOptions)
+{
+    auto config = Settings(entt::entity{}, D::PointCloudPoint);
+    config.Execution = R::OneShotExecution({.AutoAccept = R::StepRunAutoAccept::End, .Start = R::StepRunStart::Ready});
+    auto document = HeadlessConfig();
+    R::SetDerivedSection<PS::kSection>(document, config);
+    const auto decoded = R::GetDerivedSection<PS::kSection>(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Execution, config.Execution);
+    EXPECT_TRUE(Usable(R"({"start":"ready","auto_accept":"converged"})"));
+    EXPECT_FALSE(Usable(R"({"start":"later"})"));
+    EXPECT_FALSE(Usable(R"({"auto_accept":"always"})"));
+    EXPECT_FALSE(Usable(R"({"max_iterations":2})")) << "no cap row";
+    EXPECT_FALSE(Usable(R"({"preview_every":1})")) << "no live preview row";
+    EXPECT_EQ(PS::Config{}.Execution, R::kOneShotStepRunExecution) << "the one-shot default: ready, waits for Accept";
+}
+
+// ARCH-023 (B2): an agent start that names only start layers it over the section's options, as every agent start
+// does: the section's auto_accept never stays, so the converged step waits for an explicit Accept. Fails when the
+// tool layers the call over the batch default (accept at the end), which publishes without any Accept.
+TEST(PointSpacingPlugin, AToolStartNamingOnlyStartKeepsTheSectionsAutoAccept)
+{
+    Harness harness{};
+    auto& scene = harness.Scene();
+    const auto entity = Make(scene, D::MeshVertex);
+    auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
+    auto config = Settings(entity, D::MeshVertex);
+    config.Execution = PS::Config{}.Execution; // the section's default: auto_accept never
+    ASSERT_EQ(config.Execution.AutoAccept, R::StepRunAutoAccept::Never);
+    ASSERT_TRUE(harness.Apply(config));
+    const auto started = harness.Call("point_spacing", Json{{"start", "ready"}});
+    ASSERT_FALSE(started.IsError) << started.Text;
+    EXPECT_FALSE(started.Continuation) << "not a batch: it answers at once";
+    const auto id = Json::parse(started.Text)["run"].get<std::uint64_t>();
+    ASSERT_NE(id, 0u);
+    auto* runs = harness.Engine.Services().Find<R::StepRunsService>();
+    EXPECT_EQ(runs->Observe(id)->Execution.AutoAccept, R::StepRunAutoAccept::Never) << "the section's";
+    ASSERT_FALSE(harness.Call("run_control", Json{{"run", id}, {"action", "step"}}).IsError);
+    ASSERT_TRUE(Until(harness,
+        [&]
+        {
+            return runs->Observe(id)->End == R::StepRunEnd::Converged;
+        }));
+    harness.Frame(5);
+    EXPECT_NE(runs->Observe(id)->Phase, R::StepRunPhase::Committed) << "nothing accepted it";
+    EXPECT_FALSE(props.Exists("radii")) << "nothing published";
+    ASSERT_FALSE(harness.Call("run_control", Json{{"run", id}, {"action", "accept"}}).IsError);
+    ASSERT_TRUE(Until(harness,
+        [&]
+        {
+            return runs->Observe(id)->Phase == R::StepRunPhase::Committed;
+        }));
+    EXPECT_TRUE(props.Exists("radii"));
+    EXPECT_EQ(harness.History().UndoCount(), 1u);
 }

@@ -41,7 +41,8 @@ namespace Extrinsic::Runtime
         std::string BackendDiagnostic{};
         // RUNTIME-289: why a Vulkan initial order ran on the CPU. A device order arrives through
         // InitialOrdering from the job InitialOrderJob, which the worker job depends on; RunWorker
-        // moves it into Params.InitialOrder, from which results report the backend.
+        // moves it into Params.InitialOrder, from which results report the backend. ARCH-023: that job
+        // orders on its worker but writes InitialOrdering only on the main thread, as it publishes.
         std::string InitialSamplingDiagnostic{};
         struct InitialOrderingState
         {
@@ -52,6 +53,9 @@ namespace Extrinsic::Runtime
         JobToken InitialOrderJob{};
     };
 
+    // A CPU or hybrid run (the module's NeighborhoodProjection owner), defined by the module implementation.
+    struct PointCloudConsolidationProjectionRun;
+
     struct PointCloudConsolidationJobResult
     {
         PointCloudConsolidationSnapshot Snapshot{};
@@ -60,17 +64,15 @@ namespace Extrinsic::Runtime
         std::optional<ECS::Components::GeometrySources::Vertices>
             PointCloudReplacementAfter{};
         bool GpuPrepared{false};
+        // A CPU preparation that initialized its projection (it owns the snapshot): the run starts from it.
+        std::shared_ptr<PointCloudConsolidationProjectionRun> Projection{};
+        // The published positions are a stopped run's last iteration (not the iteration cap's).
+        bool Stopped{false};
     };
 
     struct PointCloudConsolidationJobCompleted
     {
         std::shared_ptr<PointCloudConsolidationJobResult> Result{};
-    };
-
-    enum class PointCloudConsolidationGpuResultStatus : std::uint8_t
-    {
-        Completed,
-        FallbackRequired,
     };
 
     struct PointCloudConsolidationGpuSubmission
@@ -80,32 +82,22 @@ namespace Extrinsic::Runtime
         std::string Diagnostic{};
     };
 
+    // A finished resident run: `Published` when it ended itself (accepted in place, discarded or failed), else the
+    // read-back positions of a new output that the module publishes, answering the pending Commit through `Driver`.
     struct PointCloudConsolidationGpuResult
     {
-        PointCloudConsolidationGpuResultStatus Status{
-            PointCloudConsolidationGpuResultStatus::FallbackRequired};
         PointCloudConsolidationSnapshot Snapshot{};
-        std::optional<Geometry::PointCloud::Consolidation::Result>
-            Consolidated{};
-        std::string Diagnostic{};
+        std::optional<Geometry::PointCloud::Consolidation::Result> Consolidated{};
         std::optional<PointCloudConsolidationResult> Published{};
         PointCloudConsolidationResult Metrics{};
-
-        [[nodiscard]] inline bool HasGpuResult() const noexcept
-        {
-            return Status ==
-                       PointCloudConsolidationGpuResultStatus::Completed &&
-                   Consolidated.has_value();
-        }
+        StepRunDriver Driver{};
     };
 
     class PointCloudConsolidationGpuState
     {
     public:
-        PointCloudConsolidationGpuState(
-            RHI::IDevice& device,
-            RHI::BufferManager& buffers,
-            RHI::ITransferQueue& transferQueue);
+        // Buffers come from the run context's SpatialIndexCache::MethodScratch.
+        explicit PointCloudConsolidationGpuState(RHI::IDevice& device);
         ~PointCloudConsolidationGpuState();
 
         PointCloudConsolidationGpuState(
@@ -115,6 +107,8 @@ namespace Extrinsic::Runtime
 
         // Moves the snapshot only when accepted so the caller can submit an
         // honest CPU-reference fallback after a planning/device rejection.
+        // Every resident LOP or isotropic WLOP run is a step run of this service.
+        void UseStepRuns(StepRunsService* steps) noexcept;
         [[nodiscard]] PointCloudConsolidationGpuSubmission Start(
             PointCloudConsolidationSnapshot& snapshot, const EditorProcessingContext& context,
             const PointCloudConsolidationResult& prepared);

@@ -15,6 +15,15 @@ export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Graphics.PointScalarAnalysis;
 export import Extrinsic.Graphics.GpuPropertyResidency;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+export import Extrinsic.Runtime.StepRunExecution;
+import Extrinsic.RHI.Handles;
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class ICommandContext;
+    }
+}
 export namespace Extrinsic::Runtime
 {
     struct EditorPointScalarTransaction;
@@ -32,12 +41,14 @@ export namespace Extrinsic::Runtime
         std::uint32_t GpuQueryBatches{};
         std::size_t LiveCount{};
         Graphics::PointScalarGpuStats Statistics{};
+        std::uint64_t StepRun{}; // the run's step run (run_control, run_observe); 0: an accept-only transaction
     };
     // External producers retain their numerical workspace; this transaction owns the
     // typed ring, float presentation ring, Accept readback and exactly-once delivery.
     struct EditorPointScalarPublication
     {
         std::uint32_t EntityId{}, Count{};
+        std::uint32_t PreviewBuffers{3u};
         GeometryPropertyRef Output{};
         std::string Label{};
         std::function<bool()> Current{};
@@ -53,6 +64,44 @@ export namespace Extrinsic::Runtime
     // A publication transaction's Accept stage joins the run that computes its front: it is
     // submitted under `identity` (the output, with `Run` set to that run's first job).
     void JoinEditorPointScalarRun(const EditorPointScalarTransactionHandle&, EditorJobIdentity identity);
+    // ARCH-023: a publication transaction's own producer, a one-shot of bounded internal pages: one logical step of
+    // the transaction's step run. Start begins the device work once the step run allows the step (acquire the back
+    // here: a restart renews the rings); Poll (main thread, while started) is true once the work ended; Outcome then
+    // is empty when the front was published (PublishEditorPointScalarBack, not ready) or says why it failed; Reset
+    // returns the producer to before Start for run_control restart (nothing of it is in flight then).
+    // ARCH-023: one page of a worker-stepped producer: records it, submits it with a pulled readback of `out.size()`
+    // bytes and waits for it (the transaction's page gate, no frame); false: refused, failed or abandoned.
+    using EditorPointScalarPage = std::function<bool(
+        const std::function<RHI::BufferHandle(RHI::ICommandContext&)>& record, std::span<std::byte> out)>;
+    // A publication transaction's producer of one logical step.
+    struct EditorPointScalarProducer
+    {
+        // Owner, the run's Init (once it computes; again after a restart): acquires the write slots and prepares the
+        // workspace and index its pages read, capturing what they record with. False: Outcome() says why.
+        std::function<bool()> Prepare{};
+        // Worker: the step, every page through `page`, touching only what Prepare captured; empty on success, else
+        // why it failed.
+        std::function<std::string(const EditorPointScalarPage& page)> Step{};
+        // Owner, once the step ended: publishes its preview; empty on success, else why it failed.
+        std::function<std::string()> Outcome{};
+        std::function<void()> Reset{};
+        // Optional, owner: the residency slots its pages read or write (stamped with the compute fence before the
+        // transaction releases them).
+        std::function<void(std::vector<RHI::BufferHandle>& buffers)> Uses{};
+        // Optional, owner: drops what Prepare captured for the worker (its workspace and index references), once no
+        // step can run any more (the transaction's Release), so a finished handle pins no lease.
+        std::function<void()> Release{};
+    };
+    // Queues the transaction's owner-stepped Run job under `identity` (the output) and its step run with
+    // `execution` (cap 1; a batch passes start=run, auto_accept=end): Accept, Discard and Restart through the shared
+    // controls, the one Accept reading the fronts back. False when refused (no step-run service, a rejected job:
+    // the transaction is closed, `refusal` says why).
+    [[nodiscard]] bool SubmitEditorPointScalarRun(const EditorPointScalarTransactionHandle&,
+        EditorJobIdentity identity,
+        StepRunExecution execution,
+        EditorPointScalarProducer producer,
+        std::string debugName,
+        std::string& refusal);
     struct EditorPointScalarBack
     {
         Graphics::GpuPropertyView Typed{}, Presentation{}, Companion{};

@@ -23,6 +23,7 @@ import Extrinsic.Core.Error;
 // RetirementFrames: slots deleted via Remove() are not immediately recycled.
 // ProcessDeletions(frameNumber) must be called each frame; a slot is only
 // returned to the free-list after `RetirementFrames` frames have elapsed.
+// ProcessDeletions(retired) reclaims by a kill-frame predicate instead.
 // For GPU-facing pools set RetirementFrames to the swapchain frames-in-flight
 // count (typically 2–3); for CPU-only pools use 0 for immediate reclamation.
 //
@@ -87,24 +88,36 @@ export namespace Extrinsic::Core
         // Must be called once per frame on the maintenance thread.
         void ProcessDeletions(uint64_t globalFrameNumber)
         {
+            ProcessDeletions(
+                [globalFrameNumber](const uint64_t killFrame)
+                {
+                    return globalFrameNumber > killFrame + RetirementFrames;
+                });
+        }
+
+        // Reclaims the slots whose Remove() frame `retired` reports finished (an owner that proves GPU completion
+        // without counting frames); same maintenance thread.
+        template <std::predicate<uint64_t> Retired> void ProcessDeletions(Retired&& retired)
+        {
             std::unique_lock lock(m_Mutex);
             if (m_PendingKill.empty())
                 return;
-            std::erase_if(m_PendingKill, [&](const PendingKill& k)
-            {
-                if (globalFrameNumber <= k.KillFrame + RetirementFrames)
-                    return false;
-                if (k.SlotIndex < m_Slots.size())
+            std::erase_if(m_PendingKill,
+                [&](const PendingKill& k)
                 {
-                    Slot& slot = m_Slots[k.SlotIndex];
-                    if (!slot.IsActive && slot.Generation == k.Generation)
+                    if (!retired(k.KillFrame))
+                        return false;
+                    if (k.SlotIndex < m_Slots.size())
                     {
-                        slot.Data.reset();
-                        m_Free.push_back(k.SlotIndex);
+                        Slot& slot = m_Slots[k.SlotIndex];
+                        if (!slot.IsActive && slot.Generation == k.Generation)
+                        {
+                            slot.Data.reset();
+                            m_Free.push_back(k.SlotIndex);
+                        }
                     }
-                }
-                return true;
-            });
+                    return true;
+                });
         }
 
         void Clear()

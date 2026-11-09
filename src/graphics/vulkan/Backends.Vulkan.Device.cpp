@@ -80,11 +80,33 @@ namespace
                 std::chrono::steady_clock::now() - start).count());
     }
 
+    void RecordHostReadBarrier(VkCommandBuffer cmd, VkBuffer buffer, std::uint64_t offset, std::uint64_t size)
+    {
+        VkBufferMemoryBarrier2 toHost{};
+        toHost.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        toHost.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        toHost.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        toHost.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+        toHost.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+        toHost.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        toHost.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        toHost.buffer = buffer;
+        toHost.offset = offset;
+        toHost.size = size;
+        VkDependencyInfo dependency{};
+        dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependency.bufferMemoryBarrierCount = 1u;
+        dependency.pBufferMemoryBarriers = &toHost;
+        vkCmdPipelineBarrier2(cmd, &dependency);
+    }
+
     struct QueueFamilyProbe
     {
         std::uint32_t Graphics = 0;
         std::uint32_t AsyncCompute = 0;
         std::uint32_t AsyncComputeQueueIndex = 0;
+        MethodComputeQueueSelection MethodCompute{};
+        std::uint32_t GraphicsComputeQueueCount = 0, FrameComputeQueueCount = 0;
         std::uint32_t Present = 0;
         std::uint32_t Transfer = 0;
         bool GraphicsFound = false;
@@ -297,6 +319,16 @@ namespace
             probe.AsyncComputeDedicated = false;
         }
 
+        probe.GraphicsComputeQueueCount =
+            probe.GraphicsFound && (families[probe.Graphics].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0
+            ? families[probe.Graphics].queueCount
+            : 0u;
+        probe.FrameComputeQueueCount = probe.AsyncComputeFound ? families[probe.AsyncCompute].queueCount : 0u;
+        probe.MethodCompute = SelectMethodComputeQueue(probe.Graphics,
+            probe.GraphicsComputeQueueCount,
+            probe.AsyncCompute,
+            probe.AsyncComputeQueueIndex,
+            probe.FrameComputeQueueCount);
         return probe;
     }
 
@@ -521,6 +553,8 @@ namespace
             addRequest(queueProbe.Graphics, 1u);
         if (queueProbe.AsyncComputeFound)
             addRequest(queueProbe.AsyncCompute, queueProbe.AsyncComputeQueueIndex + 1u);
+        if (queueProbe.MethodCompute.Available)
+            addRequest(queueProbe.MethodCompute.Family, queueProbe.MethodCompute.Index + 1u);
         if (queueProbe.PresentFound)
             addRequest(queueProbe.Present, 1u);
         if (queueProbe.TransferFound)
@@ -935,6 +969,123 @@ VulkanOperationalDiagnosticsSnapshot GetVulkanOperationalDiagnosticsSnapshot() n
     return snapshot;
 }
 
+std::function<bool()> HoldVulkanQueue(RHI::IDevice* device, const VulkanGatedQueue which)
+{
+    if (!device)
+        return {};
+    auto* vk = static_cast<VulkanDevice*>(device);
+    if (!vk->IsOperational() || !vk->m_TransferQueue)
+        return {};
+    if (which == VulkanGatedQueue::MethodCompute && vk->m_TransferQueue->ComputeLane() != TransferLane::Compute)
+        return {};
+    VkQueue queue = vk->m_GraphicsQueue;
+    if (which == VulkanGatedQueue::MethodCompute)
+        queue = vk->m_MethodComputeQueue;
+    else if (which == VulkanGatedQueue::FrameCompute)
+        queue = vk->m_AsyncComputeQueue;
+    else if (which == VulkanGatedQueue::FrameTransfer)
+        queue = vk->m_TransferVkQueue;
+    // A frame queue the device lacks runs its batches on graphics: no gate of its own.
+    if (queue == VK_NULL_HANDLE || (which != VulkanGatedQueue::Graphics && queue == vk->m_GraphicsQueue))
+        return {};
+    std::mutex& queueMutex = which == VulkanGatedQueue::MethodCompute ? vk->MethodQueueMutex() : vk->m_QueueMutex;
+    VkSemaphoreTypeCreateInfo type{};
+    type.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    VkSemaphoreCreateInfo create{};
+    create.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    create.pNext = &type;
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VkSemaphore gate{};
+    VkFence fence{};
+    if (vkCreateSemaphore(vk->m_Device, &create, nullptr, &gate) != VK_SUCCESS)
+        return {};
+    if (vkCreateFence(vk->m_Device, &fenceInfo, nullptr, &fence) != VK_SUCCESS)
+    {
+        vkDestroySemaphore(vk->m_Device, gate, nullptr);
+        return {};
+    }
+    VkSemaphoreSubmitInfo wait{};
+    wait.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    wait.semaphore = gate;
+    wait.value = 1u;
+    wait.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkSubmitInfo2 submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.waitSemaphoreInfoCount = 1u;
+    submit.pWaitSemaphoreInfos = &wait;
+    VkResult result;
+    {
+        std::scoped_lock lock{queueMutex};
+        result = vkQueueSubmit2(queue, 1u, &submit, fence); // later work on `queue` queues behind this batch
+    }
+    if (result != VK_SUCCESS)
+    {
+        vk->NoteDeviceLostIfNeeded(result);
+        vkDestroyFence(vk->m_Device, fence, nullptr);
+        vkDestroySemaphore(vk->m_Device, gate, nullptr);
+        return {};
+    }
+    // Copies of the release share one state: the gate is signaled and destroyed once.
+    return [vk, gate, fence, released = std::make_shared<bool>(false)]
+    {
+        if (std::exchange(*released, true))
+            return false;
+        VkSemaphoreSignalInfo signal{};
+        signal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+        signal.semaphore = gate;
+        signal.value = 1u;
+        VkResult outcome = vkSignalSemaphore(vk->m_Device, &signal);
+        if (outcome == VK_SUCCESS)
+            outcome = vkWaitForFences(vk->m_Device, 1u, &fence, VK_TRUE, UINT64_MAX);
+        vk->NoteDeviceLostIfNeeded(outcome);
+        vkDestroyFence(vk->m_Device, fence, nullptr);
+        vkDestroySemaphore(vk->m_Device, gate, nullptr);
+        return outcome == VK_SUCCESS;
+    };
+}
+
+bool WithVulkanQueueGate(RHI::IDevice* device, const VulkanGatedQueue which, const std::function<void()>& whilePending)
+{
+    if (!whilePending)
+        return false;
+    auto release = HoldVulkanQueue(device, which);
+    if (!release)
+        return false;
+    whilePending();
+    return release();
+}
+
+bool WithVulkanFrameQueueLockHeld(RHI::IDevice* device, const std::function<void()>& whileHeld)
+{
+    if (!device || !whileHeld)
+        return false;
+    auto* vk = static_cast<VulkanDevice*>(device);
+    if (!vk->m_TransferQueue || vk->m_TransferQueue->GetDiagnostics().ComputeSharesFrameQueueLock)
+        return false;
+    std::scoped_lock lock{vk->m_QueueMutex};
+    whileHeld();
+    return true;
+}
+
+bool FailNextVulkanRetirementQuery(RHI::IDevice* device, const VulkanRetirementQuery query, const bool deviceLost)
+{
+    if (!device)
+        return false;
+    auto* vk = static_cast<VulkanDevice*>(device);
+    if (vk->m_Device == VK_NULL_HANDLE || vk->IsDeviceLost())
+        return false;
+    const VkResult result = deviceLost ? VK_ERROR_DEVICE_LOST : VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (query == VulkanRetirementQuery::FrameFence)
+        vk->m_NextFrameRetirementResult = result;
+    else if (query == VulkanRetirementQuery::GraphicsTimeline && vk->m_TransferQueue)
+        vk->m_TransferQueue->FailNextGraphicsQuery(result);
+    else
+        return false;
+    return true;
+}
+
 VulkanOperationalStatus EvaluateVulkanDeviceOperationalStatus(
     const RHI::IDevice* device) noexcept
 {
@@ -1194,6 +1345,8 @@ void VulkanDevice::NoteDeviceLostIfNeeded(const VkResult result) noexcept
     if (result == VK_ERROR_DEVICE_LOST)
     {
         m_DeviceLost = true;
+        if (m_TransferQueue)
+            m_TransferQueue->MarkLost(); // method workers stop submitting and waiting
         if (m_Profiler)
         {
             m_Profiler->NotifyDeviceLost();
@@ -1413,29 +1566,57 @@ RHI::ITransferQueue& VulkanDevice::GetTransferQueue()
     return m_FallbackTransferQueue;
 }
 
-RHI::ReadbackToken VulkanDevice::SubmitComputeReadback(
-    std::function<RHI::BufferHandle(RHI::ICommandContext&)> record, const std::uint64_t readbackBytes,
-    RHI::ReadbackSink sink)
+RHI::ReadbackToken VulkanDevice::SubmitComputeReadback(std::function<RHI::BufferHandle(RHI::ICommandContext&)> record,
+    const std::uint64_t readbackBytes,
+    RHI::ReadbackSink sink,
+    const RHI::ComputeInputOrder order)
 {
-    if (!record || !HasLiveOperationalPrerequisites() || !m_TransferQueue ||
-        !m_TransferQueue->IsValid() || !m_BindlessHeap || !m_BindlessHeap->IsValid())
+    // Any thread (ARCH-023): only state fixed between Initialize and Shutdown is read here (no swapchain, frame or
+    // operational fields); liveness is the transfer service's atomic lost flag.
+    if (!record || !m_TransferQueue || !m_TransferQueue->ComputeLive() || !m_BindlessHeap ||
+        !m_BindlessHeap->IsValid() || m_GlobalPipelineLayout == VK_NULL_HANDLE)
         return {};
-    // GRAPHICS-150: a transfer-pool command buffer on the graphics queue, so the work is ordered
-    // after every submitted frame and its readback arrives with the next CollectCompleted.
-    VkCommandBuffer cmd = m_TransferQueue->Allocate();
+    // GRAPHICS-150/ARCH-023: a command buffer of the transfer service's compute lane (the async compute queue,
+    // or graphics when forced/unavailable). Unless `order` is LaneOrderOnly, the lane waits on the graphics lane's
+    // last issued transfer ticket, so the work is ordered after every upload issued before; its readback arrives
+    // with the next CollectCompleted, or a worker waits for it (WaitCompute) and takes it (TakeCompletedReadback).
+    const TransferLane lane = m_TransferQueue->ComputeLane();
+    // A recorder's own SubmitComputeReadback on its lane would take the lock held below: refused, not deadlocked.
+    if (m_TransferQueue->RefuseInsideRecorder(lane, "A nested SubmitComputeReadback"))
+        return {};
+    std::scoped_lock recording{m_TransferQueue->RecordMutex(lane)}; // the lane's pool, until submitted
+    VkCommandBuffer cmd = m_TransferQueue->Allocate(lane);
     if (cmd == VK_NULL_HANDLE)
         return {};
-    const VulkanFrameGraphBarrierQueueFamilies families = ResolveFrameGraphBarrierQueueFamilies(
-        m_GraphicsFamily, m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
-        m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED, m_PresentFamily,
-        GetQueueCapabilityProfile());
+    // Set under the Record mutex for this submission alone (graphics: queue order already orders it).
+    m_TransferQueue->LaneFor(lane).LaneOrderOnly =
+        lane == TransferLane::Compute && order == RHI::ComputeInputOrder::LaneOrderOnly;
     VulkanCommandContext context;
-    context.Bind(m_Device, cmd, m_GlobalPipelineLayout, m_BindlessHeap->GetSet(), &m_Buffers, &m_Images, &m_Samplers,
-                 &m_Pipelines, m_DefaultSamplerHandle, m_GraphicsFamily, families.Graphics, families.AsyncCompute,
-                 families.Present, families.Transfer);
+    // Bound to the lane's family, so barrier stages a compute queue lacks are sanitized away.
+    context.Bind(m_Device,
+        cmd,
+        m_GlobalPipelineLayout,
+        m_BindlessHeap->GetSet(),
+        &m_Buffers,
+        &m_Images,
+        &m_Samplers,
+        &m_Pipelines,
+        m_DefaultSamplerHandle,
+        lane == TransferLane::Compute ? m_MethodComputeFamily : m_GraphicsFamily,
+        m_MethodBarrierFamilies[0],
+        m_MethodBarrierFamilies[1],
+        m_MethodBarrierFamilies[2],
+        m_MethodBarrierFamilies[3]);
     context.Begin();
-    const RHI::BufferHandle output = context.IsRecordingForProfiler() ? record(context) : RHI::BufferHandle{};
-    return m_TransferQueue->SubmitRecordedDownload(cmd, output, readbackBytes, std::move(sink));
+    RHI::BufferHandle output{};
+    if (context.IsRecordingForProfiler())
+    {
+        // A nested submission on this lane, or a graphics-lane upload or download, would take the lock held here:
+        // refused instead.
+        const VulkanTransferQueue::RecorderScope scope{*m_TransferQueue, lane};
+        output = record(context);
+    }
+    return m_TransferQueue->SubmitRecordedDownload(cmd, output, readbackBytes, std::move(sink), lane);
 }
 
 RHI::IBindlessHeap& VulkanDevice::GetBindlessHeap()
@@ -1631,6 +1812,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         m_GraphicsFamily = queueProbe.Graphics;
         m_AsyncComputeFamily = queueProbe.AsyncCompute;
         m_AsyncComputeQueueIndex = queueProbe.AsyncComputeQueueIndex;
+        m_MethodComputeFamily = queueProbe.MethodCompute.Family;
         m_PresentFamily = queueProbe.Present;
         m_TransferFamily = queueProbe.Transfer;
 
@@ -1643,6 +1825,11 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         diagnostics.TransferQueueFound = queueProbe.TransferFound;
         diagnostics.GraphicsQueueFamily = queueProbe.Graphics;
         diagnostics.AsyncComputeQueueFamily = queueProbe.AsyncCompute;
+        diagnostics.AsyncComputeQueueIndex = queueProbe.AsyncComputeQueueIndex;
+        diagnostics.MethodComputeQueueFamily = queueProbe.MethodCompute.Family;
+        diagnostics.MethodComputeQueueIndex = queueProbe.MethodCompute.Index;
+        diagnostics.GraphicsComputeQueueCount = queueProbe.GraphicsComputeQueueCount;
+        diagnostics.FrameComputeQueueCount = queueProbe.FrameComputeQueueCount;
         diagnostics.PresentQueueFamily = queueProbe.Present;
         diagnostics.TransferQueueFamily = queueProbe.Transfer;
         diagnostics.SwapchainExtensionSupported = swapchainExtensionSupported;
@@ -1709,16 +1896,20 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                              &m_AsyncComputeQueue);
         }
         vkGetDeviceQueue(m_Device, m_PresentFamily, 0, &m_PresentQueue);
+        if (queueProbe.MethodCompute.Available)
+            vkGetDeviceQueue(m_Device, m_MethodComputeFamily, queueProbe.MethodCompute.Index, &m_MethodComputeQueue);
         vkGetDeviceQueue(m_Device, m_TransferFamily, 0, &m_TransferVkQueue);
 
         diagnostics.GraphicsQueueAcquired = m_GraphicsQueue != VK_NULL_HANDLE;
         diagnostics.AsyncComputeQueueAcquired =
             queueProbe.AsyncComputeFound && m_AsyncComputeQueue != VK_NULL_HANDLE;
+        diagnostics.MethodComputeQueueAcquired = m_MethodComputeQueue != VK_NULL_HANDLE;
         diagnostics.PresentQueueAcquired = m_PresentQueue != VK_NULL_HANDLE;
         diagnostics.TransferQueueAcquired = m_TransferVkQueue != VK_NULL_HANDLE;
         if (!diagnostics.GraphicsQueueAcquired || !diagnostics.PresentQueueAcquired ||
             !diagnostics.TransferQueueAcquired ||
-            (queueProbe.AsyncComputeFound && !diagnostics.AsyncComputeQueueAcquired))
+            (queueProbe.AsyncComputeFound && !diagnostics.AsyncComputeQueueAcquired) ||
+            (queueProbe.MethodCompute.Available && m_MethodComputeQueue == VK_NULL_HANDLE))
         {
             Core::Log::Error("[VulkanDevice::Initialize] vkGetDeviceQueue did not return all required queues; promoted Vulkan device remains non-operational.");
             fail(VulkanBootstrapStatus::FailedLogicalDeviceCreation, VK_ERROR_INITIALIZATION_FAILED);
@@ -1968,6 +2159,15 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             return;
         }
 
+        VkFenceCreateInfo oneShotFenceInfo{};
+        oneShotFenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        result = vkCreateFence(m_Device, &oneShotFenceInfo, nullptr, &m_OneShotFence);
+        if (result != VK_SUCCESS)
+        {
+            fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+            return;
+        }
+
         diagnostics.PerFrameResourcesCreated =
             diagnostics.FrameCommandPoolCount == kMaxFramesInFlight &&
             diagnostics.FrameCommandBufferCount == kMaxFramesInFlight &&
@@ -2210,7 +2410,20 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         // can return once the RHI carries an explicit cross-queue handoff.
         transferConfig.Queue = m_GraphicsQueue;
         transferConfig.QueueFamily = m_GraphicsFamily;
+        // ARCH-023: method compute gets a spare queue when possible, separate from framegraph compute,
+        // ordered against this graphics lane by timeline waits; render.method_compute_graphics_queue forces
+        // it back to graphics (reported through the transfer diagnostics' ComputeLane).
+        transferConfig.ComputeQueue = m_MethodComputeQueue;
+        transferConfig.ComputeQueueFamily = m_MethodComputeFamily;
+        transferConfig.FrameComputeQueue =
+            m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeQueue : m_GraphicsQueue;
+        transferConfig.ForceGraphicsCompute = config.MethodComputeOnGraphicsQueue;
         transferConfig.QueueSubmitMutex = &m_QueueMutex;
+        // A method queue that is none of the frame queues gets its own host lock (ARCH-023).
+        m_MethodQueueOwnsLock = m_MethodComputeQueue != VK_NULL_HANDLE && m_MethodComputeQueue != m_GraphicsQueue &&
+            m_MethodComputeQueue != m_PresentQueue && m_MethodComputeQueue != m_AsyncComputeQueue &&
+            m_MethodComputeQueue != m_TransferVkQueue;
+        transferConfig.ComputeQueueSubmitMutex = &MethodQueueMutex();
         m_TransferQueue = std::make_unique<VulkanTransferQueue>(transferConfig);
         serviceDiagnostics.TransferQueueCreated = m_TransferQueue && m_TransferQueue->IsValid();
         if (!serviceDiagnostics.TransferQueueCreated)
@@ -2259,6 +2472,10 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                     m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED,
                     m_PresentFamily,
                     GetQueueCapabilityProfile());
+            m_MethodBarrierFamilies = {barrierFamilies.Graphics,
+                barrierFamilies.AsyncCompute,
+                barrierFamilies.Present,
+                barrierFamilies.Transfer};
             m_CmdContexts[frameSlot].Bind(m_Device,
                                           m_Frames[frameSlot].CmdBuffer,
                                           m_GlobalPipelineLayout,
@@ -2342,6 +2559,7 @@ void VulkanDevice::Shutdown()
     // pool drain is responsible for releasing it exactly once.
     for (uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
         FlushDeletionQueue(frameSlot);
+    ProcessComputeGatedDeletes(true); // WaitIdle above covered the compute lane too
 
     m_TransferQueue.reset();
     // WaitIdle above is the device-lifetime completion proof. Destroy the
@@ -2447,6 +2665,10 @@ void VulkanDevice::Shutdown()
     m_OneShotCmdBuffer = VK_NULL_HANDLE;
     m_OneShotRecording = false;
 
+    if (device != VK_NULL_HANDLE && m_OneShotFence != VK_NULL_HANDLE)
+        vkDestroyFence(device, m_OneShotFence, nullptr);
+    m_OneShotFence = VK_NULL_HANDLE;
+
     for (std::uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
     {
         PerFrame& frame = m_Frames[frameSlot];
@@ -2529,10 +2751,12 @@ void VulkanDevice::Shutdown()
     m_Device = VK_NULL_HANDLE;
     m_GraphicsQueue = VK_NULL_HANDLE;
     m_AsyncComputeQueue = VK_NULL_HANDLE;
+    m_MethodComputeQueue = VK_NULL_HANDLE;
     m_PresentQueue = VK_NULL_HANDLE;
     m_TransferVkQueue = VK_NULL_HANDLE;
     m_GraphicsFamily = 0;
     m_AsyncComputeFamily = 0;
+    m_MethodComputeFamily = 0;
     m_AsyncComputeQueueIndex = 0;
     m_PresentFamily = 0;
     m_TransferFamily = 0;
@@ -2553,19 +2777,135 @@ void VulkanDevice::Shutdown()
     m_DeviceLost       = false;
 }
 
+namespace
+{
+    // Reclaims each pool's handle slots by a frame number (the frame-count rule) or a kill-frame predicate.
+    template <typename Rule, typename... Pools> void ProcessPoolDeletions(const Rule& rule, Pools&... pools)
+    {
+        (pools.ProcessDeletions(rule), ...);
+    }
+}
+
 void VulkanDevice::ProcessResourcePoolDeletions()
 {
-    m_Buffers.ProcessDeletions(m_GlobalFrameNumber);
-    m_Images.ProcessDeletions(m_GlobalFrameNumber);
-    m_MemoryBlocks.ProcessDeletions(m_GlobalFrameNumber);
-    m_Samplers.ProcessDeletions(m_GlobalFrameNumber);
-    m_Pipelines.ProcessDeletions(m_GlobalFrameNumber);
+    ProcessPoolDeletions(m_GlobalFrameNumber, m_Buffers, m_Images, m_MemoryBlocks, m_Samplers, m_Pipelines);
+}
+
+// ARCH-024: frame retirement read from the frame fences, without BeginFrame's wait. Each slot's last submission
+// signals its main, async-compute and transfer fences; BeginFrame waited the earlier ones before reusing the slot (a
+// resize waited for the device). Any status but VK_SUCCESS, a lost device's included, proves nothing.
+// shortcut: up to nine status queries per call and every frame slot, not only those up to the asked number; remember
+// a slot's finished submission if profiling shows the queries.
+VkResult VulkanDevice::FrameCompletionStatus() const
+{
+    if (m_NextFrameRetirementResult != VK_SUCCESS)
+        return std::exchange(m_NextFrameRetirementResult, VK_SUCCESS);
+    VkResult result = VK_SUCCESS;
+    for (const PerFrame& frame : m_Frames)
+        for (const VkFence fence : {frame.Fence, frame.AsyncComputeFence, frame.TransferFence})
+        {
+            if (fence == VK_NULL_HANDLE)
+                continue;
+            const VkResult status = vkGetFenceStatus(m_Device, fence);
+            if (status != VK_SUCCESS && status != VK_NOT_READY)
+                return status;
+            if (status == VK_NOT_READY)
+                result = status; // Keep checking: another fence can report an error.
+        }
+    return result;
+}
+
+// No frame records between a successful BeginFrame and its EndFrame (a failed submission keeps its frame open), and
+// the graphics lane finished every upload, download, graphics-lane method page and one-shot it was given: the work a
+// later frame's main fence would have covered in queue order.
+VkResult VulkanDevice::GraphicsCompletionStatus() const
+{
+    if (m_Frames[m_FrameSlot].ImageAcquiredForFrame)
+        return VK_NOT_READY;
+    if (!m_TransferQueue)
+        return VK_SUCCESS;
+    const uint64_t issued =
+        m_TransferQueue->LaneFor(TransferLane::Graphics).SubmittedTicket.load(std::memory_order_acquire);
+    if (issued == 0u)
+        return VK_SUCCESS;
+    VkResult status;
+    const uint64_t completed = m_TransferQueue->QueryLaneCompletedValue(TransferLane::Graphics, &status);
+    if (status != VK_SUCCESS)
+        return status;
+    return completed >= issued ? VK_SUCCESS : VK_NOT_READY;
+}
+
+bool VulkanDevice::IsFrameRetired(const uint64_t frameNumber) const
+{
+    if (m_Device == VK_NULL_HANDLE || !m_TransferQueue || IsDeviceLost())
+        return false;
+    if (RHI::IDevice::IsFrameRetired(frameNumber)) // BeginFrame already waited it (the frame-distance rule)
+        return true;
+    // A submitted frame: every frame up to it finished. A number no frame was submitted with: no frame work at all.
+    const VkResult status = frameNumber < m_GlobalFrameNumber ? FrameCompletionStatus() : GraphicsCompletionStatus();
+    if (status == VK_ERROR_DEVICE_LOST)
+        m_TransferQueue->MarkLost(); // A later query must not retire an older stamp after this observed loss.
+    return status == VK_SUCCESS;
+}
+
+void VulkanDevice::CollectCompletedResources()
+{
+    if (m_Device == VK_NULL_HANDLE || IsDeviceLost())
+        return;
+    const VkResult frameStatus = FrameCompletionStatus();
+    if (frameStatus != VK_SUCCESS && frameStatus != VK_NOT_READY)
+    {
+        NoteDeviceLostIfNeeded(frameStatus);
+        return;
+    }
+    const bool finished = frameStatus == VK_SUCCESS;
+    const VkResult graphicsStatus = finished ? GraphicsCompletionStatus() : VK_NOT_READY;
+    if (graphicsStatus != VK_SUCCESS && graphicsStatus != VK_NOT_READY)
+    {
+        NoteDeviceLostIfNeeded(graphicsStatus);
+        return;
+    }
+    if (IsDeviceLost())
+        return;
+    const bool idle = finished && graphicsStatus == VK_SUCCESS;
+    // A native deletion waits for every slot's frames (BeginFrame's per-slot flushes over a frame cycle) and, deferred
+    // after the last frame, for the graphics lane.
+    if (idle)
+        for (uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
+            FlushDeletionQueue(frameSlot);
+    ProcessComputeGatedDeletes(false);
+    if (!finished)
+        return;
+    const auto retired = [idle, submitted = m_GlobalFrameNumber](const uint64_t killFrame)
+    {
+        return idle || killFrame < submitted;
+    };
+    ProcessPoolDeletions(retired, m_Buffers, m_Images, m_MemoryBlocks, m_Samplers, m_Pipelines);
 }
 
 void VulkanDevice::WaitIdle()
 {
     if (m_Device != VK_NULL_HANDLE)
+    {
+        const auto locks = LockAllQueues();
         vkDeviceWaitIdle(m_Device);
+    }
+}
+
+VulkanDevice::AllQueueLocks VulkanDevice::LockAllQueues()
+{
+    // vkDeviceWaitIdle externally synchronizes every queue: both locks, taken deadlock-free together.
+    AllQueueLocks locks{std::unique_lock{m_QueueMutex, std::defer_lock}, {}};
+    if (m_MethodQueueOwnsLock)
+    {
+        locks.Method = std::unique_lock{m_MethodQueueMutex, std::defer_lock};
+        std::lock(locks.Frame, locks.Method);
+    }
+    else
+    {
+        locks.Frame.lock();
+    }
+    return locks;
 }
 
 bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
@@ -2748,6 +3088,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     m_ParallelCommandContexts[m_FrameSlot].clear();
 
     FlushDeletionQueue(m_FrameSlot);
+    ProcessComputeGatedDeletes(false);
 
     result = vkResetCommandPool(m_Device, frame.CmdPool, 0u);
     if (result != VK_SUCCESS)
@@ -3048,6 +3389,13 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
                 waitInfos.push_back(waitAcquire);
             }
 
+            // ARCH-023: every batch acquires the compute results published so far (already signaled, so this
+            // orders and makes them visible without waiting for pending method work).
+            const VkSemaphoreSubmitInfo publishedCompute =
+                m_TransferQueue ? m_TransferQueue->PublishedComputeWait() : VkSemaphoreSubmitInfo{};
+            if (publishedCompute.semaphore != VK_NULL_HANDLE)
+                waitInfos.push_back(publishedCompute);
+
             for (const RHI::QueueTimelineWaitDesc& wait : batch.Waits)
             {
                 const std::uint32_t signalSlot = QueueSlot(wait.SignalQueue);
@@ -3140,6 +3488,10 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             {
                 break;
             }
+            for (std::uint32_t wait = 0; wait < submitInfo.waitSemaphoreInfoCount; ++wait)
+                if (publishedCompute.semaphore != VK_NULL_HANDLE &&
+                    submitInfo.pWaitSemaphoreInfos[wait].semaphore == publishedCompute.semaphore)
+                    m_TransferQueue->NoteComputeVisibilityWait();
         }
 
         if (result != VK_SUCCESS)
@@ -3167,12 +3519,27 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 
     // BUG-255: wait for the acquire at every stage, as the batched path does, so the
     // backbuffer's first layout transition (source stage NONE) is ordered after it.
-    const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    // ARCH-023: plus the published compute results (timeline value; binary acquire ignores it).
+    const VkSemaphoreSubmitInfo publishedCompute =
+        m_TransferQueue ? m_TransferQueue->PublishedComputeWait() : VkSemaphoreSubmitInfo{};
+    const bool acquiresCompute = publishedCompute.semaphore != VK_NULL_HANDLE;
+    const std::array<VkSemaphore, 2> waitSemaphores{perFrame.ImageAcquired, publishedCompute.semaphore};
+    const std::array<VkPipelineStageFlags, 2> waitStages{
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
+    const std::array<std::uint64_t, 2> waitValues{0u, publishedCompute.value};
+    const std::uint64_t signalValue = 0u;
+    VkTimelineSemaphoreSubmitInfo timelineInfo{};
+    timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    timelineInfo.waitSemaphoreValueCount = 2u;
+    timelineInfo.pWaitSemaphoreValues = waitValues.data();
+    timelineInfo.signalSemaphoreValueCount = 1u;
+    timelineInfo.pSignalSemaphoreValues = &signalValue;
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount = 1u;
-    submitInfo.pWaitSemaphores = &perFrame.ImageAcquired;
-    submitInfo.pWaitDstStageMask = &waitStage;
+    submitInfo.pNext = acquiresCompute ? &timelineInfo : nullptr;
+    submitInfo.waitSemaphoreCount = acquiresCompute ? 2u : 1u;
+    submitInfo.pWaitSemaphores = waitSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
     submitInfo.commandBufferCount = 1u;
     submitInfo.pCommandBuffers = &perFrame.CmdBuffer;
     submitInfo.signalSemaphoreCount = 1u;
@@ -3193,6 +3560,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
         ProcessResourcePoolDeletions();
         return;
     }
+    if (acquiresCompute && submitInfo.waitSemaphoreCount == 2u && submitInfo.pNext == &timelineInfo)
+        m_TransferQueue->NoteComputeVisibilityWait();
 
     perFrame.SubmittedForPresent = true;
     // Rotate from the slot returned by BeginFrame, then advance the global
@@ -3358,7 +3727,11 @@ void VulkanDevice::Resize(uint32_t width, uint32_t height)
         return;
     }
 
-    VkResult result = vkDeviceWaitIdle(m_Device);
+    VkResult result;
+    {
+        const auto locks = LockAllQueues();
+        result = vkDeviceWaitIdle(m_Device);
+    }
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
@@ -4441,6 +4814,22 @@ void VulkanDevice::DestroyBuffer(RHI::BufferHandle handle)
     });
 }
 
+// ARCH-023: the worker-safe host path. Unlike WriteBuffer it reads no swapchain or readiness state the owner
+// writes (a resize or minimize does not refuse it): the buffer pool lookup is locked, the loss flag atomic, VMA
+// internally synchronized, and the mapping persistent for the buffer's lifetime.
+bool VulkanDevice::WriteMappedBuffer(RHI::BufferHandle handle, const void* data, uint64_t size, uint64_t offset)
+{
+    if (!data || size == 0 || m_Vma == VK_NULL_HANDLE || (m_TransferQueue && m_TransferQueue->Lost()))
+        return false;
+    VulkanBuffer* buf = m_Buffers.GetIfValid(handle);
+    if (!buf || !buf->HostVisible || !buf->MappedPtr || offset > buf->SizeBytes || size > buf->SizeBytes - offset)
+        return false;
+    std::memcpy(static_cast<char*>(buf->MappedPtr) + offset, data, size);
+    if (!buf->HostCoherent && vmaFlushAllocation(m_Vma, buf->Allocation, offset, size) != VK_SUCCESS)
+        return false; // the device may not see the bytes: the caller must not submit work reading them
+    return true;
+}
+
 void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
                                 uint64_t size, uint64_t offset)
 {
@@ -4528,7 +4917,7 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
             region.dstOffset = offset;
             region.size      = size;
             vkCmdCopyBuffer(cmd, stagingBuf, buf->Buffer, 1, &region);
-            uploadComplete = EndOneShot(cmd);  // submits + vkQueueWaitIdle → GPU work is complete when true
+            uploadComplete = EndOneShot(cmd); // submits and waits for this copy's fence
         }
     }
     (void)uploadComplete;
@@ -4553,20 +4942,29 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
     if (!buf) return;
     if (offset > buf->SizeBytes || size > buf->SizeBytes - offset) return;
 
+    // The synchronous inspection API promises completed bytes on either memory type.
+    {
+        const auto locks = LockAllQueues();
+        const VkResult idle = vkDeviceWaitIdle(m_Device);
+        if (idle != VK_SUCCESS)
+        {
+            NoteDeviceLostIfNeeded(idle);
+            return;
+        }
+    }
+
     if (buf->HostVisible)
     {
         assert(buf->MappedPtr && "HostVisible buffer has null MappedPtr");
-
-        // WaitIdle bounds the readback to GPU-completed bytes. The in-flight
-        // command buffer that wrote into this buffer is submitted by EndFrame
-        // and signals through the present semaphore chain; vkDeviceWaitIdle is
-        // the most defensive synchronisation primitive available without
-        // exposing per-frame fences here. The smoke calls ReadBuffer after
-        // Run(), so the throughput cost is irrelevant.
-        if (m_Device != VK_NULL_HANDLE)
         {
-            std::scoped_lock lock{m_QueueMutex};
-            (void)vkDeviceWaitIdle(m_Device);
+            std::scoped_lock oneShotLock{m_OneShotMutex};
+            const VkCommandBuffer cmd = BeginOneShot();
+            if (cmd == VK_NULL_HANDLE)
+                return;
+            RecordHostReadBarrier(cmd, buf->Buffer, offset, size);
+            if (!EndOneShot(cmd))
+                return;
+            g_ReadBufferHostBarriers.fetch_add(1u, std::memory_order_relaxed);
         }
 
         if (m_Vma != VK_NULL_HANDLE && buf->Allocation != VK_NULL_HANDLE)
@@ -4634,20 +5032,7 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
             vkCmdCopyBuffer(cmd, buf->Buffer, stagingBuf, 1, &region);
 
             // The copy's writes become visible to the host before it reads the staging buffer.
-            VkBufferMemoryBarrier2 toHost{};
-            toHost.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-            toHost.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-            toHost.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            toHost.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
-            toHost.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
-            toHost.buffer = stagingBuf;
-            toHost.offset = 0;
-            toHost.size = size;
-            VkDependencyInfo hostDependency{};
-            hostDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            hostDependency.bufferMemoryBarrierCount = 1;
-            hostDependency.pBufferMemoryBarriers = &toHost;
-            vkCmdPipelineBarrier2(cmd, &hostDependency);
+            RecordHostReadBarrier(cmd, stagingBuf, 0u, size);
             copyComplete = EndOneShot(cmd);
             if (copyComplete) g_ReadBufferHostBarriers.fetch_add(1, std::memory_order_relaxed);
         }
@@ -5301,6 +5686,7 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
                         static_cast<int>(flushResult));
     }
 
+    std::scoped_lock oneShotLock{m_OneShotMutex};
     VkCommandBuffer cmd = BeginOneShot();
     if (cmd == VK_NULL_HANDLE)
     {
@@ -5725,7 +6111,7 @@ void VulkanDevice::DestroyPipeline(RHI::PipelineHandle handle)
 VkCommandBuffer VulkanDevice::BeginOneShot()
 {
     if (!HasLiveOperationalPrerequisites() || m_OneShotCmdPool == VK_NULL_HANDLE ||
-        m_OneShotCmdBuffer == VK_NULL_HANDLE || m_OneShotRecording)
+        m_OneShotCmdBuffer == VK_NULL_HANDLE || m_OneShotFence == VK_NULL_HANDLE || m_OneShotRecording)
         return VK_NULL_HANDLE;
 
     VkResult result = vkResetCommandPool(m_Device, m_OneShotCmdPool, 0u);
@@ -5764,14 +6150,27 @@ bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
         return false;
     }
 
-    VkSubmitInfo submit{};
-    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &cmd;
+    // Uploads own their destination; they acquire published results without waiting for unrelated pending jobs.
+    const VkSemaphoreSubmitInfo published =
+        m_TransferQueue ? m_TransferQueue->PublishedComputeWait() : VkSemaphoreSubmitInfo{};
+    VkCommandBufferSubmitInfo command{};
+    command.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    command.commandBuffer = cmd;
+    VkSubmitInfo2 submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.waitSemaphoreInfoCount = published.semaphore != VK_NULL_HANDLE ? 1u : 0u;
+    submit.pWaitSemaphoreInfos = &published;
+    submit.commandBufferInfoCount = 1u;
+    submit.pCommandBufferInfos = &command;
 
     if (m_GraphicsQueue != VK_NULL_HANDLE)
     {
-        result = vkQueueSubmit(m_GraphicsQueue, 1, &submit, VK_NULL_HANDLE);
+        result = vkResetFences(m_Device, 1u, &m_OneShotFence);
+        // ARCH-023: the copy also signals a graphics-lane ticket, so method compute issued after it waits for it
+        // (a host fence alone gives no cross-queue memory dependency).
+        if (result == VK_SUCCESS)
+            result = m_TransferQueue ? m_TransferQueue->SubmitGraphicsTicketed(submit, m_OneShotFence)
+                                     : VK_ERROR_INITIALIZATION_FAILED;
         if (result != VK_SUCCESS)
         {
             NoteDeviceLostIfNeeded(result);
@@ -5779,7 +6178,10 @@ bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
                 (void)vkResetCommandPool(m_Device, m_OneShotCmdPool, 0u);
             return false;
         }
-        result = vkQueueWaitIdle(m_GraphicsQueue);
+        if (submit.waitSemaphoreInfoCount != 0u)
+            m_TransferQueue->NoteComputeVisibilityWait();
+        // A scene upload waits for its own copy, without blocking other queues' CPU submissions.
+        result = vkWaitForFences(m_Device, 1u, &m_OneShotFence, VK_TRUE, UINT64_MAX);
         if (result != VK_SUCCESS)
         {
             NoteDeviceLostIfNeeded(result);
@@ -5800,6 +6202,20 @@ void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
         action();
         g_DeferredDeletesExecuted.fetch_add(1, std::memory_order_relaxed);
     };
+    // ARCH-023: a frame's retirement does not cover the compute lane. The object outlives every compute
+    // submission accepted before this point as well; until then it waits in m_ComputeGatedDeletes.
+    if (const RHI::ReadbackToken computeFence =
+            m_TransferQueue ? m_TransferQueue->ComputeFence() : RHI::ReadbackToken{};
+        computeFence.IsValid())
+    {
+        fn = [this, computeFence, action = std::move(fn)]() mutable
+        {
+            if (m_TransferQueue && !m_TransferQueue->IsComplete(computeFence))
+                m_ComputeGatedDeletes.push_back({computeFence, std::move(action)});
+            else
+                action();
+        };
+    }
 
     std::uint32_t remaining = 0;
     if (m_Device != VK_NULL_HANDLE)
@@ -5825,6 +6241,21 @@ void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
         frame.DeletionQueue.push_back([pending] {
             if (--pending->Remaining == 0) pending->Action();
         });
+    }
+}
+
+void VulkanDevice::ProcessComputeGatedDeletes(const bool deviceIdle)
+{
+    if (m_ComputeGatedDeletes.empty())
+        return;
+    auto gated = std::move(m_ComputeGatedDeletes);
+    m_ComputeGatedDeletes.clear();
+    for (auto& [fence, action] : gated)
+    {
+        if (deviceIdle || !m_TransferQueue || m_TransferQueue->IsComplete(fence))
+            action();
+        else
+            m_ComputeGatedDeletes.push_back({fence, std::move(action)});
     }
 }
 

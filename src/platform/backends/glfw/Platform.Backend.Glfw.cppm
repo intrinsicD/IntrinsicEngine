@@ -28,6 +28,11 @@ namespace Extrinsic::Platform::Backends::Glfw
         void PollEvents() override;
         [[nodiscard]] bool ShouldClose() const override;
         [[nodiscard]] bool IsMinimized() const override;
+        // Simulates minimization across event polls without changing native window state; tests restore false.
+        void SetMinimizedForTesting(bool minimized) noexcept
+        {
+            m_MinimizedForTesting = minimized;
+        }
         [[nodiscard]] bool WasResized() const override { return m_WasResized; }
         void AcknowledgeResize() override;
         [[nodiscard]] Platform::Extent2D GetWindowExtent() const override { return m_WindowExtent; }
@@ -55,6 +60,7 @@ namespace Extrinsic::Platform::Backends::Glfw
         bool m_ShouldClose{false};
         bool m_WasResized{false};
         bool m_IsValid{false};
+        bool m_MinimizedForTesting{false};
         Platform::CursorMode m_CursorMode{Platform::CursorMode::Normal};
         GLFWwindow* m_Window{nullptr};
         EventCallbackFn m_Callback{};

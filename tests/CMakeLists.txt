@@ -16,6 +16,9 @@ endif()
 # The compiled family and common capture owners must stay independent of session
 # composition and other method contracts. Inspect the configured Clang/CMake graph.
 find_program(INTRINSIC_TEST_PYTHON_EXECUTABLE NAMES python3 REQUIRED)
+add_test(NAME MethodExecutionCampaign.Script
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/regression/tooling/Test.MethodExecutionCampaign.py)
+set_tests_properties(MethodExecutionCampaign.Script PROPERTIES LABELS "contract;tooling;benchmark" TIMEOUT 30)
 
 function(intrinsic_add_module_boundary_test name)
     add_test(NAME "${name}"
@@ -670,7 +673,7 @@ intrinsic_add_module_boundary_test(RenderCompilationLocality.Extraction
 set_tests_properties(RenderCompilationLocality.Extraction
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
-# The spatial query interface publishes CPU snapshots and framed GPU queues; it
+# The spatial query interface publishes CPU snapshots and prepared GPU query sessions; it
 # borrows the world registry through a declaration only. A GPU LBVH workspace,
 # world-registry, job-service or RHI device/command edge here means a low-level
 # recording or composition surface moved back into every query caller's compile
@@ -1310,6 +1313,8 @@ if(TARGET ExtrinsicRuntime)
         Test.PointScalarTransaction.cpp
         Test.OutlierTransaction.cpp
         Test.GpuTransactionLifecycleContract.cpp
+        Test.WorkerGpuPages.cpp
+        Test.MethodTemplate.cpp
         Test.NormalTransaction.cpp
         Test.GpuPositionsAccept.cpp
         Test.RegistrationDomains.cpp
@@ -1393,8 +1398,11 @@ if(TARGET ExtrinsicRuntime)
         SOURCES
             ${_runtime_contract_test_sources}
             support/SandboxEditorJobHarness.cpp
+            # ARCH-023: the executable future-method template, built and tested here (Test.MethodTemplate.cpp).
+            ${CMAKE_SOURCE_DIR}/methods/_template/src/TemplateMethod.cpp
         DEPS ExtrinsicRuntime IntrinsicProgressivePoissonReference imgui_core_lib nlohmann_json::nlohmann_json
     )
+    target_include_directories(RuntimeContractTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/methods/_template/include)
     # Test.QueuedEditorJobContract.cpp scans the editor operation sources (RUNTIME-313 drift guard).
     target_compile_definitions(RuntimeContractTestObjs PRIVATE INTRINSIC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     # ARCH-022: the plugin tests link the plugins' objects (in-process plugins).
@@ -1424,6 +1432,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxCurvatureSegmentationPanel.cpp
             Test.SandboxProcessingPanels.cpp
             Test.SandboxJobsWindow.cpp
+            Test.StartupPluginExecution.cpp
             Test.SandboxDiagnostics.cpp
             Test.SandboxAgentServer.cpp
             Test.EngineConfigSectionSchemas.cpp
@@ -1875,6 +1884,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.ComputeCapabilitiesGpuSmoke.cpp
                 integration/graphics/Test.CoherentPointDriftGpuEStepSmoke.cpp
                 integration/graphics/Test.PointSamplingGpuSmoke.cpp
+                integration/graphics/Test.WorkerProducersNoFrameGpuSmoke.cpp
                 integration/graphics/Test.LowLatencyComputeSmoke.cpp
                 integration/graphics/Test.GpuPropertyResidencySmoke.cpp
                 integration/graphics/Test.PropertySmoothingTransactionGpuSmoke.cpp
@@ -1892,12 +1902,15 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.KernelDensityPluginGpuSmoke.cpp
                 integration/graphics/Test.DensityWeightsPluginGpuSmoke.cpp
                 integration/graphics/Test.PointSpacingPluginGpuSmoke.cpp
+                # ARCH-023: the method template's one-shot on its resident GPU producer (Test.PointCloudEditingScalarAnalysisGpuSmoke.cpp).
+                ${CMAKE_SOURCE_DIR}/methods/_template/src/TemplateMethod.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
              IntrinsicBilateralFilterPluginObjects IntrinsicDescriptorAnalysisPluginObjects
              IntrinsicCoherentPointDriftPluginObjects IntrinsicKernelDensityPluginObjects IntrinsicPointSpacingPluginObjects IntrinsicDensityWeightsPluginObjects
     )
     # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
-    target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners)
+    target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners
+        ${CMAKE_SOURCE_DIR}/methods/_template/include)
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
         OBJECTS PointLBVHGpuTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicBilateralFilterPluginObjects
@@ -2032,6 +2045,15 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
             ${_clustering_stall_measurement_sources}
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry glm::glm nlohmann_json::nlohmann_json
     )
+endif()
+
+# ARCH-024: opt-in fixed-cell measurement, driven only by a reviewed campaign packet.
+if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    intrinsic_resolve_test_sources(_method_execution_measurement_sources
+        SEARCH_DIRS benchmark FILES Test.MethodExecutionMeasurement.cpp)
+    intrinsic_test_object_lib(MethodExecutionMeasurementTestObjs
+        SOURCES ${_method_execution_measurement_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry glm::glm nlohmann_json::nlohmann_json)
 endif()
 
 # METHOD-020 — opt-in actual-Vulkan LOP/isotropic-WLOP parity against the
@@ -2687,6 +2709,14 @@ if(TARGET RuntimeClusteringServiceGpuSmokeTestObjs)
     intrinsic_add_glsl_shaders(IntrinsicRuntimeClusteringServiceGpuSmokeTests)
 endif()
 
+if(TARGET MethodExecutionMeasurementTestObjs)
+    intrinsic_test_executable(IntrinsicMethodExecutionMeasurement
+        OBJECTS MethodExecutionMeasurementTestObjs RuntimeTestModuleSupportObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry
+        LABELS gpu vulkan benchmark runtime)
+    intrinsic_add_glsl_shaders(IntrinsicMethodExecutionMeasurement)
+endif()
+
 if(TARGET ClusteringStallMeasurementTestObjs)
     intrinsic_test_executable(IntrinsicClusteringStallMeasurement
         OBJECTS ClusteringStallMeasurementTestObjs RuntimeTestModuleSupportObjs
@@ -2885,8 +2915,12 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.QueuedImportRejectsAwayAndBackBindingEpoch|3"
     "IntrinsicRuntimeContractTests|RuntimeAssetImportFormatCoverage.RetiredWorldImportTerminalizesQueueState|3"
     "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.StepsAndRunsReuseThePooledWorkspaceAndUploadEachTargetOnce|3"
-    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.CancelledAndRefusedComputationsKeepTheirLeaseUntilDoneAndFailClosed|3"
-    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.RequestEventsKeepTheirIdentityAndSettledLatency|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.CancelledAndRefusedComputationsKeepTheirWorkspaceUntilDoneAndFailClosed|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.SerialRequestsSettleTheirLatencyAndAClosedBrokerRefusesLaterOnes|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.AStepRunKeepsItsTargetResidentAcrossStepsAndPauses|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.TimedOutEStepClosesTheBrokerOnItsWorker|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.ACancelledSubsampledRunWakesItsHeldOrderingAndAnswersOnce|3"
+    "IntrinsicRuntimeContractTests|CpdBrokerWorkspaceReuse.VulkanSubsampledStepsRunAndRestartEqualTheCpuSubsample|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.ReadyJobsHonorPriorityAndEqualPrioritySubmissionOrder|2"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce|3"
@@ -3055,7 +3089,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.KeypointVulkanComputePublishesAcrossDomains PointLBVHGpuSmoke.KeypointVulkanComputeRejectsStaleCancellationAndIgnoresHybridCapacity PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(DescriptorAnalysisPluginGpuSmoke.EightDomainsAgreeWithTheCpuKdTreeColdWarmAndAutomatic DescriptorAnalysisPluginGpuSmoke.StaleInputsACancelBetweenStagesAndRadiusOverflowWriteNothing DescriptorAnalysisPluginGpuSmoke.ALowestIdCapServesADenseRadius DescriptorAnalysisPluginGpuSmoke.AnUnloadDuringAChainEndsTheRunOnceAndAReloadRunsAgain PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(CoherentPointDriftPluginGpuSmoke.APausedRunShowsItsPreviewAndOnlyAcceptWritesIt PROPERTIES TIMEOUT 120)\n"
-        "  set_tests_properties(KernelDensityPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled KernelDensityPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster KernelDensityPluginGpuSmoke.TinyBandwidthsMatchTheCpuReference PointSpacingPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled PointSpacingPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster PointSpacingPluginGpuSmoke.TinySeparationsAndScalesMatchTheCpuReference PointSpacingPluginGpuSmoke.AnUnloadReleasesAWaitingPreviewWithoutWriting PointCloudEditingScalarAnalysisGpuSmoke.AcceptPublishesTheCpuReferenceAndAnAutoAcceptRunNeedsNoCaller PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(KernelDensityPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled KernelDensityPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster KernelDensityPluginGpuSmoke.TinyBandwidthsMatchTheCpuReference PointSpacingPluginGpuSmoke.EightDomainsAgreeWithTheCpuOctreeColdWarmAndScaled PointSpacingPluginGpuSmoke.AcceptDiscardStaleCancelAndACoincidentCluster PointSpacingPluginGpuSmoke.TinySeparationsAndScalesMatchTheCpuReference PointSpacingPluginGpuSmoke.AnUnloadReleasesAWaitingPreviewWithoutWriting PointCloudEditingScalarAnalysisGpuSmoke.AcceptPublishesTheCpuReferenceAndAnAutoAcceptRunNeedsNoCaller PointCloudEditingScalarAnalysisGpuSmoke.ARunControlAcceptAfterADetachPublishesNothing PointCloudEditingScalarAnalysisGpuSmoke.TheTemplatesOneShotRunsTheResidentProducerAndItsCpuCounterpart PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(DensityWeightsPluginGpuSmoke.EightDomainsEveryKernelAndModeAndAnAutomaticRadiusAgreeWithTheCpuKdTree DensityWeightsPluginGpuSmoke.AcceptDiscardStaleCancelAndARadiusOverflow DensityWeightsPluginGpuSmoke.TinySupportsAndOneSampleMatchTheCpuReference PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
         "if(DEFINED IntrinsicRuntimePointCloudConsolidationGpuParityTests_TESTS)\n"
@@ -3106,6 +3140,8 @@ if(Python3_Interpreter_FOUND)
     intrinsic_add_source_rules_test(RuntimeFrameLoopContract graphics integration runtime)
     intrinsic_add_source_rules_test(RuntimeEnginePrivateGlue contract runtime)
     intrinsic_add_source_rules_test(RuntimeEngineLayering contract runtime)
+    intrinsic_add_source_rules_test(RuntimeReuseDriftGuard contract runtime)
+    intrinsic_add_source_rules_test(SandboxEditorPresentation integration runtime)
 else()
     message(WARNING "Python3 not found: source-structure rule CTests are not registered (ci-docs still runs them).")
 endif()

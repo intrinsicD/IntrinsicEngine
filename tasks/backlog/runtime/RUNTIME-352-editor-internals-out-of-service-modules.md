@@ -20,8 +20,8 @@ contract_review: two service modules stop including editor headers directly and 
   - `Clustering/Runtime.ClusteringModule.cpp`: `Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp`,
     `Editor/internal/Runtime.EditorMutation.Internal.hpp`;
   - `PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp`:
-    `Editor/internal/Runtime.EditorPropertyHistory.hpp`, `Editor/internal/Runtime.EditorMutation.Internal.hpp`,
-    `Editor/internal/Runtime.EditorFramedGpuJob.hpp`.
+    `Editor/internal/Runtime.EditorPropertyHistory.hpp`, `Editor/internal/Runtime.EditorMutation.Internal.hpp`
+    (its framed-job include went with the framed job, RUNTIME-355 F3).
 - The removal goes through `Extrinsic.Runtime.OperationRuntime` (export what they need there), or
   with their migration onto the operation runtime (k-means and consolidation are in ADR 0031's
   operation table).

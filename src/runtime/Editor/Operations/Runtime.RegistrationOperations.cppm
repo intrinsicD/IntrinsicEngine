@@ -1,5 +1,6 @@
-// Point-set registration of named point bindings through shared processing commands:
-// iterative closest point (ICP) and Coherent Point Drift (CPD, RUNTIME-273).
+// Point-set registration of named point bindings through shared processing commands: iterative closest point (ICP)
+// and Coherent Point Drift (CPD, RUNTIME-273). Both run as step runs of the session's StepRunsService (one step: one
+// ICP or EM iteration) with the method config's shared execution options, and publish once, on Accept.
 module;
 #include <chrono>
 #include <cstddef>
@@ -50,6 +51,8 @@ export namespace Extrinsic::Runtime
         double FinalRMSE{0.0};
         bool Converged{false};
         std::size_t FinalInlierCount{0u};
+        // The step run (run_control, run_observe); 0 for an immediate or refused outcome.
+        std::uint64_t StepRun{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -91,22 +94,14 @@ export namespace Extrinsic::Runtime
     // deliberately narrower than the shared point-input catalog.
     [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
         const EditorProcessingCommands&, std::uint32_t stableId);
-    // UI-067: live view of a running ICP job. The caller creates it, passes it to the command,
-    // reads snapshots while the job runs and may cancel it; the worker publishes one trace row
-    // (and the current pose) per iteration.
-    struct EditorRegistrationTraceRow
-    {
-        std::uint32_t Iteration{0u};
-        double Seconds{0.0};          // since the solve began
-        double IterationSeconds{0.0};
-        double RMSE{0.0};             // inlier RMSE of the correspondences this iteration used
-        std::uint64_t InlierCount{0u};
-    };
+    // UI-067: the panel's view of an ICP run (main thread). The caller creates it and passes it to the command; the
+    // run fills in its step run, the pre-aligned source in world space, and the pose of each preview it shows (16
+    // floats per copy, at the run's preview_every/preview_interval_ms; none without a view). The trace is the step
+    // run's metric log: rmse, inliers, seconds since the first step and the step's seconds. Controls are the step
+    // run's (run_control).
     struct EditorRegistrationProgressSnapshot
     {
-        bool Running{false};
-        std::vector<EditorRegistrationTraceRow> Trace{};
-        // The (pre-aligned) source in world space and the current ICP pose applied to it.
+        std::uint64_t StepRun{0u};
         std::shared_ptr<const std::vector<glm::vec3>> SourceWorld{};
         glm::mat4 Pose{1.0f};
         std::uint64_t Revision{0u};
@@ -114,12 +109,15 @@ export namespace Extrinsic::Runtime
     struct EditorRegistrationProgress;
     using EditorRegistrationProgressHandle = std::shared_ptr<EditorRegistrationProgress>;
     [[nodiscard]] EditorRegistrationProgressHandle MakeEditorRegistrationProgress();
-    [[nodiscard]] EditorRegistrationProgressSnapshot SnapshotEditorRegistrationProgress(const EditorRegistrationProgressHandle&);
-    // Stops the job before its next iteration; it then publishes nothing.
-    void CancelEditorRegistration(const EditorRegistrationProgressHandle&);
+    [[nodiscard]] EditorRegistrationProgressSnapshot SnapshotEditorRegistrationProgress(
+        const EditorRegistrationProgressHandle&);
 
-    // Immediate outcomes return directly. Only a newly queued job delivers a
-    // terminal callback, while attached. Duplicate Pending requests add no callback.
+    // Starts a step run with the command's execution options (start ready or at once; automatic Accept never, at
+    // convergence, or at its end). A CPU run steps on a worker; a Vulkan run records its correspondence batches on the
+    // main thread. The source transform changes only on Accept, as one undoable entry after a full revalidation.
+    // Without a job lane the run computes and accepts at once (start=run, auto_accept=end only). Immediate outcomes
+    // return directly; a started run delivers one terminal result to `onComplete` (accepted, discarded, stale or
+    // failed), while attached. Duplicate Pending requests add no callback.
     [[nodiscard]] EditorRegistrationResult ApplyEditorRegistrationCommand(
         const EditorProcessingCommands&, const EditorRegistrationCommand&,
         std::function<void(EditorRegistrationResult)> onComplete = {},
@@ -133,10 +131,11 @@ export namespace Extrinsic::Runtime
         EditorRegistrationProgressHandle progress = {});
 
     // --- Coherent Point Drift (RUNTIME-273) -------------------------------------------
-    // A run captures both point sets in world space, iterates on a worker (all at once or
-    // step by step for inspection), streams a per-iteration trace and the moving source
-    // positions, and publishes only on Apply, as one undoable history entry after
-    // revalidating the inputs and entity transforms.
+    // A run captures both point sets in world space and is a step run of the session's StepRunsService: one step is
+    // one EM iteration (a worker job; with the Vulkan E-step a coroutine that parks while the device E-step is
+    // recorded on the main thread), controlled by run_control or the panel's step-run row. It streams a per-iteration
+    // trace and, at the run's preview cadence, the moving source positions, and publishes only on Accept, as one
+    // undoable history entry after revalidating the inputs and entity transforms.
     struct EditorCoherentPointDriftTrace
     {
         std::uint32_t Iteration{0u};
@@ -152,18 +151,6 @@ export namespace Extrinsic::Runtime
         double Seconds{0.0};               // UI-067: since the run's first step began
         double IterationSeconds{0.0};      // this iteration's wall time
     };
-
-    enum class EditorCoherentPointDriftPhase : std::uint8_t
-    {
-        Ready,     // captured, no iteration yet
-        Running,   // a step job is in flight
-        Paused,    // stepped, not finished; more steps or Apply
-        Finished,  // converged, sigma floor or iteration cap; Apply publishes
-        Failed,
-        Cancelled,
-        Applied,
-    };
-    [[nodiscard]] const char* ToString(EditorCoherentPointDriftPhase phase) noexcept;
 
     struct EditorCoherentPointDriftResult
     {
@@ -196,23 +183,26 @@ export namespace Extrinsic::Runtime
         std::string SubsampleBackendDiagnostic{};
         std::uint32_t KernelRank{0u}; // low-rank nonrigid eigenpairs
         double KernelApproximationError{0.0};
+        std::uint64_t StepRun{0u}; // the step run (run_control, run_observe); 0 for an immediate outcome
         std::string Message{};
 
         [[nodiscard]] bool Succeeded() const noexcept { return Status == EditorCommandStatus::Applied; }
     };
 
+    // A run's view (its phase is its step run's: StepRunsService::Observe(StepRun)). Result is Pending until the run
+    // ends, then the terminal result.
     struct EditorCoherentPointDriftSnapshot
     {
-        EditorCoherentPointDriftPhase Phase{EditorCoherentPointDriftPhase::Ready};
+        std::uint64_t StepRun{0u};
         EditorCoherentPointDriftResult Result{};
         std::vector<EditorCoherentPointDriftTrace> Trace{};
         // Shared and immutable, so a per-frame snapshot copies no points.
-        std::shared_ptr<const std::vector<glm::vec3>> SourcePreview{}; // current T(y), world space, capture order
+        std::shared_ptr<const std::vector<glm::vec3>> SourcePreview{}; // the shown T(y), world space, capture order
         std::shared_ptr<const std::vector<glm::vec3>> Target{};        // fixed points, world space
         // BCPD subsamples (UI-067): indices into SourcePreview and Target (null: none).
         std::shared_ptr<const std::vector<std::uint32_t>> SourceSamples{}, TargetSamples{};
         std::uint64_t Revision{0u};             // increments with every update (not with Stage)
-        // UI-067: the phase a Running step is in ("preparing", "building_kernel",
+        // UI-067: the stage a running iteration is in ("preparing", "building_kernel",
         // "expectation_step", ...) and when it began, for a live progress line.
         std::string Stage{};
         std::chrono::steady_clock::time_point StageStarted{};
@@ -225,29 +215,18 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] ActionReadiness PreviewEditorCoherentPointDriftCommand(
         const EditorProcessingCommands&, const CoherentPointDriftConfig&);
-    // Whether Step / Run to end and Apply apply to a run in `snapshot`'s phase, with the runtime's reason
-    // when they do not (the panel shows it as the disabled buttons' tooltip).
-    [[nodiscard]] ActionReadiness ResolveEditorCoherentPointDriftStepReadiness(const EditorCoherentPointDriftSnapshot&);
-    [[nodiscard]] ActionReadiness ResolveEditorCoherentPointDriftApplyReadiness(const EditorCoherentPointDriftSnapshot&);
     // Why the Vulkan E-step would run on the CPU here (empty when it can run on the device), so
     // the panel can say so before a run starts.
     [[nodiscard]] std::string CoherentPointDriftVulkanUnavailableReason(const EditorProcessingCommands&);
-    // Validates the config and captures both point sets; nothing iterates yet. On failure
-    // returns null and fills `failure`.
+    // Validates the config, captures both point sets and starts the step run with the config's execution options
+    // (start ready or at once; automatic Accept never, at convergence or at its end). Needs the job lane and the
+    // session's step runs; on failure returns null and fills `failure`.
     [[nodiscard]] EditorCoherentPointDriftRunHandle StartEditorCoherentPointDrift(
         const EditorProcessingCommands&, const CoherentPointDriftConfig&, EditorCoherentPointDriftResult& failure);
-    // Queues `iterations` EM iterations (0 = until the run ends) as one background job.
-    // Pending on success; rejected while a step is running or after the run ended.
-    [[nodiscard]] EditorCommandStatus StepEditorCoherentPointDrift(
-        const EditorProcessingCommands&, const EditorCoherentPointDriftRunHandle&, std::uint32_t iterations);
-    // Stops a running step after its current iteration; the run becomes Cancelled.
-    void CancelEditorCoherentPointDrift(const EditorCoherentPointDriftRunHandle&);
     [[nodiscard]] EditorCoherentPointDriftSnapshot SnapshotEditorCoherentPointDrift(const EditorCoherentPointDriftRunHandle&);
-    // Publishes the current estimate (Paused or Finished runs).
-    [[nodiscard]] EditorCoherentPointDriftResult ApplyEditorCoherentPointDrift(
-        const EditorProcessingCommands&, const EditorCoherentPointDriftRunHandle&);
-    // Start, run to the end and publish; onComplete receives the terminal result of a
-    // queued run (immediate outcomes return directly).
+    // The one-shot command: a step run that computes at once and accepts at its end, whatever the config's start and
+    // auto_accept; onComplete receives its terminal result. Without a job lane it iterates and publishes at once
+    // (the immediate outcome returns directly).
     [[nodiscard]] EditorCoherentPointDriftResult ApplyEditorCoherentPointDriftCommand(
         const EditorProcessingCommands&, const CoherentPointDriftConfig&,
         std::function<void(EditorCoherentPointDriftResult)> onComplete = {});

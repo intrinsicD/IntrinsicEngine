@@ -20,6 +20,7 @@ export import Extrinsic.Runtime.CurvatureSegmentationConfig;
 export import Extrinsic.Runtime.GeodesicsConfig;
 export import Extrinsic.Core.Error;
 export import Extrinsic.Runtime.ConfigFieldSpec;
+export import Extrinsic.Runtime.StepRunExecution;
 export import Geometry.Geodesic.Types;
 export import Geometry.Smoothing.Types;
 export import Geometry.HarmonicField.Types;
@@ -146,6 +147,17 @@ export namespace Extrinsic::Runtime
         // An empty name serializes as null; the binding is only resolved when per-row bounds are used.
         GeometryPropertyRef BoundRadii{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Double};
         PropertySmoothingBackend Backend{PropertySmoothingBackend::Cpu};
+        // ARCH-023: the shared execution options (preview_every, preview_interval_ms, preview_buffers, auto_accept, start; the
+        // logical cap is the method's own `iterations`, so IterationCap is not configured here: a run's cap is
+        // Filter.Iterations, or 1 for the variational fit, solved whole). One step is one explicit pass or one
+        // implicit time step over every channel. Vulkan previews through the output ring; the CPU run has no live
+        // preview and reports so. The batch command (ApplyEditorPropertySmoothingCommand) always runs at once and
+        // accepts at its end; an interactive start honours `start` and `auto_accept`.
+        StepRunExecution Execution{.IterationCap = 1u,
+            .PreviewEvery = 1u,
+            .PreviewIntervalMs = 33u,
+            .AutoAccept = StepRunAutoAccept::Never,
+            .Start = StepRunStart::Ready};
     };
     // Keeps an edited draft runnable: compares it with the draft before the edit and resolves the
     // conflicts the edit created in favor of the edited choice. A new input retargets the output
@@ -167,6 +179,10 @@ export namespace Extrinsic::Runtime
         // Actual backend: cpu_reference, cpu_sparse_cholesky, cpu_admm_sparse_cholesky, vulkan_compute, ...
         std::string BackendId{"cpu_reference"};
         std::string Message{};
+        // The run's step run (run_control, run_observe; a step is one pass or time step); 0: none (an inline CPU
+        // run without the step-run service or job lane, or a refusal).
+        std::uint64_t StepRun{};
+        std::uint32_t Steps{}; // logical steps of the published (or failed) result
         [[nodiscard]] bool Succeeded() const noexcept
         { return Status == EditorCommandStatus::Applied || Status == EditorCommandStatus::NoChange; }
     };
@@ -179,21 +195,23 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<PropertySmoothingConfig> GetEditorPropertySmoothingConfig(const EditorProcessingCommands&);
     [[nodiscard]] ActionReadiness PreviewEditorPropertySmoothingCommand(
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
-    // CPU runs publish synchronously. Vulkan returns Pending, runs as a GPU property
-    // transaction that accepts automatically when the device finishes (batch and agent
-    // callers), and delivers the published (or stale or failed) result to onComplete.
+    // The batch command (agent, scripts): runs at once and accepts at its end (start=run, auto_accept=end whatever
+    // the config says). With the session's step runs and job lane both backends return Pending and deliver the
+    // published (or stale, failed or discarded) result to onComplete: the CPU steps on a worker, Vulkan as a GPU
+    // property transaction. Without them the CPU publishes synchronously (no run controls) and Vulkan is refused.
     [[nodiscard]] EditorPropertySmoothingResult ApplyEditorPropertySmoothingCommand(
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
         std::function<void(EditorPropertySmoothingResult)> onComplete = {});
 
-    // Interactive Vulkan smoothing as a GPU property transaction (ADR 0030 decisions 5-7).
-    // The run reads its input from the property's canonical residency slot and writes the
-    // output property's ring; the renderer shows the ring front while the appearance selects
-    // that scalar. When the run finishes or is stopped it waits for the user: Accept reads the
-    // front back once, publishes it through the undoable smoothing transaction and binds the
-    // front as the canonical slot of the new CPU revision (the next run uploads nothing);
-    // Discard publishes nothing and releases the ring. A result whose inputs changed while it
-    // waits is stale: Accept is refused with the reason and only Discard remains.
+    // Interactive Vulkan smoothing as an owner-stepped GPU property transaction (ADR 0030 decisions 5-7,
+    // ARCH-023). The run reads its input from the property's canonical residency slot and writes the
+    // output property's ring; the renderer shows the ring front (the latest complete step live preview
+    // stored) while the appearance selects that scalar. When the run ends or is stopped it waits for
+    // its step run: Accept reads the front back once, publishes it through the undoable smoothing
+    // transaction and binds the front as the canonical slot of the new CPU revision (the next run
+    // uploads nothing); Discard publishes nothing and releases the ring. An input or output edited
+    // while it computes or waits discards it. A transaction made ready by the test seam (no step run)
+    // is accepted through AcceptEditorPropertySmoothing.
     struct EditorPropertySmoothingTransactionSnapshot
     {
         EditorGpuTransactionPhase Phase{EditorGpuTransactionPhase::Running};
@@ -215,16 +233,18 @@ export namespace Extrinsic::Runtime
     // The run's job state; the handle keeps it alive across frames.
     struct EditorPropertySmoothingTransaction;
     using EditorPropertySmoothingTransactionHandle = std::shared_ptr<EditorPropertySmoothingTransaction>;
-    // Validates and captures like the command, then queues the device run. Null with `failure`
-    // filled when the request is rejected (including while a result for the same output awaits
-    // Accept or Discard). An active job on the same output answers Pending with the shared
-    // "already has an active" message. Vulkan backend only.
-    [[nodiscard]] EditorPropertySmoothingTransactionHandle StartEditorPropertySmoothing(
-        const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
-        EditorPropertySmoothingResult& failure);
-    // Stops a running chunked solve after its current chunk (its latest preview becomes the
-    // result); an explicit filter, recorded as one submission, completes as usual.
-    void StopEditorPropertySmoothing(const EditorPropertySmoothingTransactionHandle&);
+    // The interactive start: validates and captures like the command, then starts the step run with the config's
+    // execution options (ready by default: nothing is computed until run or step n). Vulkan returns its
+    // transaction; the CPU (a worker step run) returns null with `result` Pending and its StepRun. Either way
+    // `result.StepRun` names the run the shared controls drive (Stop keeps the last complete step, Accept publishes
+    // it once, Restart starts again from the captured input) and onComplete receives the terminal result. Null with
+    // `result` filled when the request is rejected (including while a result for the same output awaits Accept or
+    // Discard); an active job on the same output answers Pending with the shared "already has an active" message.
+    [[nodiscard]] EditorPropertySmoothingTransactionHandle StartEditorPropertySmoothing(const EditorProcessingCommands&,
+        std::uint32_t stableEntityId,
+        const PropertySmoothingConfig&,
+        EditorPropertySmoothingResult& result,
+        std::function<void(EditorPropertySmoothingResult)> onComplete = {});
     [[nodiscard]] EditorPropertySmoothingTransactionSnapshot SnapshotEditorPropertySmoothing(
         const EditorProcessingCommands&, const EditorPropertySmoothingTransactionHandle&);
     // Pending when the readback was queued (onComplete then receives the published result);

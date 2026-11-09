@@ -26,6 +26,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -368,6 +369,37 @@ TEST(RuntimeConfigControl, BootOnlyEngineConfigDifferencesAreRejected)
     EXPECT_EQ(engine.GetEngineConfig().Window.Width,
               HeadlessConfig().Window.Width);
     EXPECT_FALSE(engine.GetEngineConfig().Render.EnableGpuProfiling);
+
+    engine.Shutdown();
+}
+
+// ARCH-023: the method buffer budget reaches the spatial cache's stats at boot and a later change is
+// rejected as boot-only, leaving the running budget unchanged.
+TEST(RuntimeConfigControl, MethodBufferBudgetIsBootOnlyAndReachesTheSpatialCache)
+{
+    CoreConfig::EngineConfig config = HeadlessConfig();
+    config.Render.GpuMethodBufferBudgetMegabytes = 3u;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();
+    auto* cache = engine.Services().Find<Runtime::SpatialIndexCache>();
+    auto* configControl = engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(cache, nullptr);
+    ASSERT_NE(configControl, nullptr);
+    EXPECT_EQ(cache->Stats().ScratchBudgetBytes, std::uint64_t{3} << 20u);
+
+    CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
+    candidate.Render.GpuMethodBufferBudgetMegabytes = 4u;
+    const CoreConfig::EngineConfigLoadResult preview =
+        configControl->PreviewEngineConfigControlDocument(CoreConfig::SerializeEngineConfig(candidate), "budget.json");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
+    const Runtime::RuntimeEngineConfigApplyResult apply =
+        configControl->ApplyEngineConfigHotSubset(preview, Runtime::RuntimeConfigControlSource::AgentCli);
+    EXPECT_EQ(apply.Status, Runtime::RuntimeEngineConfigApplyStatus::Rejected);
+    EXPECT_TRUE(ContainsField(apply.RejectedBootOnlyFields, "render.gpu_method_buffer_budget_megabytes"));
+    EXPECT_EQ(engine.GetEngineConfig().Render.GpuMethodBufferBudgetMegabytes, 3u);
+    EXPECT_EQ(cache->Stats().ScratchBudgetBytes, std::uint64_t{3} << 20u);
 
     engine.Shutdown();
 }

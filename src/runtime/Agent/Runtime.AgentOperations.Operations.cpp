@@ -47,6 +47,7 @@ import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -75,6 +76,7 @@ namespace Extrinsic::Runtime
             std::optional<std::uint32_t> Entity; // set for Argument rows
             bool Preview;
             const EditorWorkspaceSnapshotPreparedFrame& Prepared;
+            std::string_view Arguments; // the call's JSON text, for the shared execution reader
         };
         struct ConfiguredOperation
         {
@@ -85,12 +87,30 @@ namespace Extrinsic::Runtime
             std::function<AgentOperationOutcome(const OperationCall&)> Run;
             std::string Params{}; // rows without a section: "key=default [range], ..." of their `params` object
             std::string ParamsSchemaJson{}; // JSON Schema of that object
+            // ARCH-023: run_operation's wait false, for a row whose run is a step run: starts it with the section's
+            // execution options, each one the call names replacing it for this run only (RUNTIME-355), and answers at
+            // once with its run id (run). Empty: the row only waits.
+            std::function<AgentOperationOutcome(const OperationCall&)> Start{};
         };
 
         Json OperationResultJson(const char* name, Json result)
         {
             result["operation"] = name;
             return result;
+        }
+        // A started step run's answer: its result so far (Pending while it runs) with the run's id; an error once it
+        // was refused or ended unpublished.
+        template <class Result> AgentOperationOutcome StartedRun(const Result& r, const Json& text)
+        {
+            const bool going = r.Status == EditorCommandStatus::Pending && r.StepRun != 0u;
+            return {.IsError = !going && !r.Succeeded(),
+                .Text = Dump(text),
+                .ErrorCode =
+                    going || r.Succeeded() ? std::string{} : std::string{DebugNameForEditorCommandStatus(r.Status)}};
+        }
+        template <class Result> AgentOperationOutcome StartedRun(const char* name, const Result& r)
+        {
+            return StartedRun(r, OperationResultJson(name, ResultJson(r))); // ResultJson names the run
         }
         AgentOperationOutcome NoReadinessCheck(const char* name)
         {
@@ -103,6 +123,24 @@ namespace Extrinsic::Runtime
             return {.Status = EditorCommandStatus::InvalidProcessingParameters,
                     .Message = std::string("The ") + section + " section is unavailable or invalid."};
         }
+        AgentOperationOutcome InvalidParams(std::string message)
+        {
+            return {.IsError = true, .Text = std::move(message), .ErrorCode = "invalid_params"};
+        }
+
+        // ---- execution arguments (RUNTIME-355) -------------------------------------------
+        // A start (wait false) takes the shared execution rows its section binds through the start tools' reader
+        // (ReadStepRunExecutionArguments over a copy of the section's options): each one the call names replaces the
+        // section's for this run only. A waiting call runs at once and accepts at its end, so it refuses them.
+        AgentOperationOutcome WaitingExecutionRefused()
+        {
+            return InvalidParams("Execution arguments take effect only with wait false; a waiting call runs at "
+                                 "once and accepts at its end.");
+        }
+        // Property smoothing's reader limit: no cap row (as its panel's options), its cap being the section's
+        // iterations. The reader then reads the preview rows, auto_accept and start and refuses every max_iterations,
+        // which run_operation does not offer; these rows are the widest any run_operation start reads.
+        constexpr std::uint32_t kNoCapRow = 0u;
 
         // The entity comes from the section: get(commands) -> optional<Config>, preview(commands, config),
         // apply(commands, onComplete) -> Result.
@@ -124,6 +162,38 @@ namespace Extrinsic::Runtime
                         return FinishApply<Result>(call.Context, [&](auto onComplete) { return apply(commands, std::move(onComplete)); },
                                                    [name](const Result& r) { return OperationResultJson(name, ResultJson(r)); });
                     }};
+        }
+        // A config-sourced one-shot that also starts (wait false): start(commands, config) -> Result runs the section's
+        // config with the auto_accept and start the call names, if any. A one-shot is one step without live preview,
+        // so a preview row is refused rather than ignored.
+        template <class Result, class Frame, class Get, class Preview, class Apply, class Start>
+        ConfiguredOperation ConfigSourced(const char* name,
+            const char* family,
+            const char* section,
+            Frame frame,
+            Get get,
+            Preview preview,
+            Apply apply,
+            Start start)
+        {
+            auto op = ConfigSourced<Result>(name, family, section, frame, get, preview, apply);
+            op.Start = [=](const OperationCall& call) -> AgentOperationOutcome
+            {
+                if (call.Args.contains("preview_every") || call.Args.contains("preview_interval_ms") ||
+                    call.Args.contains("preview_buffers"))
+                    return InvalidParams(std::string("'") + name +
+                        "' is one step without live preview: its execution "
+                        "arguments are auto_accept and start.");
+                const auto commands = frame(*call.Context.Attachment).Commands;
+                auto config = get(commands);
+                if (!config)
+                    return StartedRun(name, MissingSection<Result>(section));
+                std::string refusal;
+                if (!ReadStepRunExecutionArguments(call.Arguments, 1u, config->Execution, refusal))
+                    return InvalidParams(std::move(refusal));
+                return StartedRun(name, start(commands, *config));
+            };
+            return op;
         }
         // The call names the entity; the settings come from the section. preview(commands, entity) answers
         // nullopt for a command without a readiness check; apply(commands, entity, onComplete) -> Result
@@ -349,10 +419,6 @@ namespace Extrinsic::Runtime
             }
             return Dump(schema);
         }
-        AgentOperationOutcome InvalidParams(std::string message)
-        {
-            return {.IsError = true, .Text = std::move(message), .ErrorCode = "invalid_params"};
-        }
 
         // The call names the entity; the settings are `params` over the command's own defaults.
         // `resolve(call, command)` may refine the command after the params applied (empty = fine).
@@ -413,6 +479,24 @@ namespace Extrinsic::Runtime
                     [](const auto& c, std::uint32_t id, const PropertySmoothingConfig& config, auto onComplete) {
                         return ApplyEditorPropertySmoothingCommand(c, id, config, std::move(onComplete));
                     }));
+                // The panel's interactive start; a Vulkan run's step run holds its transaction, so the handle may go.
+                // The call's preview rows, auto_accept and start replace the section's (its cap is the iterations).
+                ops.back().Start = [](const OperationCall& call) -> AgentOperationOutcome
+                {
+                    const auto commands = PrepareEditorMeshFieldFrame(*call.Context.Attachment).Commands;
+                    auto config = GetEditorPropertySmoothingConfig(commands);
+                    auto result = MissingSection<EditorPropertySmoothingResult>("sandbox.property_smoothing");
+                    std::string refusal;
+                    if (config && !ReadStepRunExecutionArguments(call.Arguments, kNoCapRow, config->Execution, refusal))
+                        return InvalidParams(std::move(refusal));
+                    if (config)
+                        (void)StartEditorPropertySmoothing(commands, *call.Entity, *config, result);
+                    auto text = OperationResultJson("property_smoothing", ResultJson(result));
+                    text["requested_backend"] =
+                        result.RequestedBackend == PropertySmoothingBackend::Vulkan ? "vulkan" : "cpu";
+                    // No actual backend: the solver is known only at publication.
+                    return StartedRun(result, text);
+                };
                 ops.push_back(EntityOverConfig<EditorLaplacianEigenbasisResult, LaplacianEigenbasisConfig>(
                     "spectral_modes", "mesh_field", "sandbox.laplacian_eigenbasis", &PrepareEditorMeshFieldFrame,
                     &GetEditorLaplacianEigenbasisConfig, &PreviewEditorLaplacianEigenbasisCommand,
@@ -458,21 +542,54 @@ namespace Extrinsic::Runtime
                     [](const auto& c, std::uint32_t id, auto) { return ApplyEditorConfiguredCurvatureSegmentationCommand(c, id); }));
                 // -- point families (entity from the section)
                 ops.push_back(ConfigSourced<EditorNormalEstimationResult>(
-                    "normal_estimation", "point", "sandbox.normal_estimation", &PrepareEditorNormalFrame,
-                    &GetEditorNormalEstimationConfig, &PreviewEditorNormalEstimationCommand,
-                    [](const auto& c, auto onComplete) { return ApplyEditorConfiguredNormalEstimation(c, std::move(onComplete)); }));
+                    "normal_estimation",
+                    "point",
+                    "sandbox.normal_estimation",
+                    &PrepareEditorNormalFrame,
+                    &GetEditorNormalEstimationConfig,
+                    &PreviewEditorNormalEstimationCommand,
+                    [](const auto& c, auto onComplete)
+                    {
+                        return ApplyEditorConfiguredNormalEstimation(c, std::move(onComplete));
+                    },
+                    [](const auto& c, const NormalEstimationConfig& config)
+                    {
+                        return StartEditorNormalEstimationRun(c, config);
+                    }));
                 ops.push_back(ConfigSourced<EditorOutlierAnalysisResult>(
-                    "outlier_analysis", "point", "sandbox.outlier_analysis", &PrepareEditorPointAnalysisFrame,
-                    &GetEditorOutlierAnalysisConfig, &PreviewEditorOutlierAnalysisCommand,
-                    [](const auto& c, auto onComplete) { return ApplyEditorConfiguredOutlierAnalysis(c, std::move(onComplete)); }));
+                    "outlier_analysis",
+                    "point",
+                    "sandbox.outlier_analysis",
+                    &PrepareEditorPointAnalysisFrame,
+                    &GetEditorOutlierAnalysisConfig,
+                    &PreviewEditorOutlierAnalysisCommand,
+                    [](const auto& c, auto onComplete)
+                    {
+                        return ApplyEditorConfiguredOutlierAnalysis(c, std::move(onComplete));
+                    },
+                    [](const auto& c, const OutlierAnalysisConfig& config)
+                    {
+                        return StartEditorOutlierAnalysisRun(c, config);
+                    }));
                 ops.push_back(ConfigSourced<EditorPointConstructionResult>(
-                    "point_construction", "point", "sandbox.point_construction", &PrepareEditorPointConstructionFrame,
+                    "point_construction",
+                    "point",
+                    "sandbox.point_construction",
+                    &PrepareEditorPointConstructionFrame,
                     &GetEditorPointConstructionConfig,
-                    [](const auto& c, const PointConstructionConfig& config) {
+                    [](const auto& c, const PointConstructionConfig& config)
+                    {
                         const auto readiness = PreviewEditorPointConstructionCommand(c, config);
                         return ActionReadiness{readiness.Ready, readiness.Diagnostic};
                     },
-                    [](const auto& c, auto onComplete) { return ApplyEditorConfiguredPointConstruction(c, std::move(onComplete)); }));
+                    [](const auto& c, auto onComplete)
+                    {
+                        return ApplyEditorConfiguredPointConstruction(c, std::move(onComplete));
+                    },
+                    [](const auto& c, const PointConstructionConfig& config)
+                    {
+                        return StartEditorPointConstructionRun(c, config);
+                    }));
                 // -- topology editing and ridges: explicit params over the command defaults
                 ops.push_back(ExplicitOperation<EditorMeshDenoiseResult, EditorMeshDenoiseCommand>(
                     "mesh_denoise",
@@ -683,9 +800,17 @@ namespace Extrinsic::Runtime
                             "' (config_apply first); do not pass entity.");
             if (op->Params.empty() && args->contains("params"))
                 return Fail("Operation '" + *name + "' takes no params; its settings come from " + op->Section + ".");
+            const bool wait = preview || args->value("wait", true);
+            if (wait && NamesStepRunExecutionArguments(arguments, kNoCapRow))
+                return WaitingExecutionRefused();
+            if (!wait && !op->Start)
+                return InvalidParams("wait false starts the step-run operations only (property_smoothing, "
+                                     "normal_estimation, outlier_analysis, point_construction); '" +
+                    *name + "' answers when done.");
             const auto prepared = PrepareSnapshot(context);
             if (!prepared) return Fail(kNoWorkspace);
-            return op->Run({context, *args, entity, preview, *prepared});
+            const OperationCall call{context, *args, entity, preview, *prepared, arguments};
+            return wait ? op->Run(call) : op->Start(call);
         }
 
         // ---- registration (ICP, Coherent Point Drift) --------------------------------------
@@ -697,11 +822,19 @@ namespace Extrinsic::Runtime
         }
         Json RegistrationJson(const EditorRegistrationResult& r)
         {
-            return {{"method", "icp"}, {"status", DebugNameForEditorCommandStatus(r.Status)},
-                    {"succeeded", r.Succeeded()}, {"message", r.Message},
-                    {"backend", ToString(r.ActualBackend)}, {"requested_backend", ToString(r.RequestedBackend)},
-                    {"iterations", r.IterationsPerformed}, {"converged", r.Converged}, {"rmse", r.FinalRMSE},
-                    {"inliers", r.FinalInlierCount}, {"source_points", r.SourcePointCount}, {"target_points", r.TargetPointCount}};
+            return {{"method", "icp"},
+                {"status", DebugNameForEditorCommandStatus(r.Status)},
+                {"succeeded", r.Succeeded()},
+                {"message", r.Message},
+                {"backend", ToString(r.ActualBackend)},
+                {"requested_backend", ToString(r.RequestedBackend)},
+                {"iterations", r.IterationsPerformed},
+                {"converged", r.Converged},
+                {"rmse", r.FinalRMSE},
+                {"inliers", r.FinalInlierCount},
+                {"source_points", r.SourcePointCount},
+                {"target_points", r.TargetPointCount},
+                {"run", r.StepRun}};
         }
         Json CoherentPointDriftJson(const EditorCoherentPointDriftResult& r)
         {
@@ -710,25 +843,82 @@ namespace Extrinsic::Runtime
             const auto named = [](const auto& names, auto value) {
                 return std::size_t(value) < names.size() ? std::string(names[std::size_t(value)]) : std::string("unknown");
             };
-            return {{"method", "cpd"}, {"status", DebugNameForEditorCommandStatus(r.Status)},
-                    {"succeeded", r.Succeeded()}, {"message", r.Message}, {"backend", r.Backend},
-                    {"variant", named(kVariants, r.Method)}, {"output", named(kOutputs, r.Output)}, {"termination", r.Termination},
-                    {"iterations", r.Iterations}, {"sigma2", r.Sigma2}, {"negative_log_likelihood", r.NegativeLogLikelihood},
-                    {"matched_weight", r.MatchedWeight}, {"mean_displacement", r.MeanDisplacement},
-                    {"transform", TransformJson(r.Transform)}, {"source_points", r.SourcePointCount},
-                    {"target_points", r.TargetPointCount}, {"e_step_error_bound", r.EStepErrorBound},
-                    {"e_step_sampled_error", r.EStepSampledError},
-                    {"e_step_fallbacks", r.EStepFallbacks}, {"e_step_device_iterations", r.EStepDeviceIterations},
-                    {"e_step_device_cpu_rows", r.EStepDeviceCpuRows}, {"gpu_diagnostic", r.GpuDiagnostic},
-                    {"subsample_requested_backend", r.SubsampleRequestedBackend},
-                    {"subsample_target_backend", r.SubsampleTargetBackend},
-                    {"subsample_source_backend", r.SubsampleSourceBackend},
-                    {"subsample_backend_diagnostic", r.SubsampleBackendDiagnostic},
-                    {"kernel_rank", r.KernelRank}, {"kernel_approximation_error", r.KernelApproximationError}};
+            return {{"method", "cpd"},
+                {"status", DebugNameForEditorCommandStatus(r.Status)},
+                {"succeeded", r.Succeeded()},
+                {"message", r.Message},
+                {"backend", r.Backend},
+                {"variant", named(kVariants, r.Method)},
+                {"output", named(kOutputs, r.Output)},
+                {"termination", r.Termination},
+                {"iterations", r.Iterations},
+                {"sigma2", r.Sigma2},
+                {"negative_log_likelihood", r.NegativeLogLikelihood},
+                {"matched_weight", r.MatchedWeight},
+                {"mean_displacement", r.MeanDisplacement},
+                {"transform", TransformJson(r.Transform)},
+                {"source_points", r.SourcePointCount},
+                {"target_points", r.TargetPointCount},
+                {"e_step_error_bound", r.EStepErrorBound},
+                {"e_step_sampled_error", r.EStepSampledError},
+                {"e_step_fallbacks", r.EStepFallbacks},
+                {"e_step_device_iterations", r.EStepDeviceIterations},
+                {"e_step_device_cpu_rows", r.EStepDeviceCpuRows},
+                {"gpu_diagnostic", r.GpuDiagnostic},
+                {"subsample_requested_backend", r.SubsampleRequestedBackend},
+                {"subsample_target_backend", r.SubsampleTargetBackend},
+                {"subsample_source_backend", r.SubsampleSourceBackend},
+                {"subsample_backend_diagnostic", r.SubsampleBackendDiagnostic},
+                {"kernel_rank", r.KernelRank},
+                {"kernel_approximation_error", r.KernelApproximationError},
+                {"run", r.StepRun}};
         }
-        // RUNTIME-274: the standalone sampling operation on the sandbox.point_sampling section.
-        AgentOperationOutcome RunPointSampling(const AgentOperationContext& context, bool preview)
+        Json PointSamplingJson(const EditorPointSamplingResult& r)
         {
+            return {{"status", DebugNameForEditorCommandStatus(r.Status)},
+                {"succeeded", r.Succeeded()},
+                {"message", r.Message},
+                {"method", r.Method},
+                {"input_points", r.InputCount},
+                {"samples", r.SampleCount},
+                {"output_entity", r.OutputEntityId},
+                {"milliseconds", r.Milliseconds},
+                {"distance_pairs", r.DistancePairs},
+                {"gpu_input_upload_bytes", r.GpuInputUploadBytes},
+                {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                {"requested_backend", r.RequestedBackend},
+                {"backend", r.Backend},
+                {"backend_diagnostic", r.BackendDiagnostic},
+                {"run", r.StepRun},
+                {"steps", r.Steps}};
+        }
+        Json KeypointsJson(const EditorKeypointAnalysisResult& r)
+        {
+            return {{"status", DebugNameForEditorCommandStatus(r.Status)},
+                {"succeeded", r.Succeeded()},
+                {"message", r.Message},
+                {"requested_backend", ToString(r.RequestedBackend)},
+                {"actual_backend", r.ActualBackend},
+                {"implementation_id", r.ImplementationId},
+                {"gpu_input_upload_bytes", r.GpuInputUploadBytes},
+                {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
+                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                {"gpu_submissions", r.GpuQueryBatches},
+                {"keypoints", r.KeypointCount},
+                {"run", r.StepRun}};
+        }
+        // RUNTIME-274: the standalone sampling operation on the sandbox.point_sampling section. wait false starts the
+        // panel's step run with the section's start and auto_accept, or the call's (its only execution arguments: the
+        // count is its cap and it has no live preview), and answers at once with its run.
+        AgentOperationOutcome RunPointSampling(
+            const AgentOperationContext& context, std::string_view arguments, bool preview)
+        {
+            const auto args = ParseObject(arguments);
+            const bool wait = !args || args->value("wait", true);
+            if (wait && NamesStepRunExecutionArguments(arguments, 1u))
+                return WaitingExecutionRefused();
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
             const auto config = GetEditorPointSamplingConfig(commands);
@@ -736,38 +926,54 @@ namespace Extrinsic::Runtime
                 return preview ? Ok(ReadinessJson(commands, {false, "The sandbox.point_sampling section is unavailable."}))
                                : Fail("The sandbox.point_sampling section is unavailable.");
             if (preview) return Ok(ReadinessJson(commands, PreviewEditorPointSamplingCommand(commands, *config)));
+            if (!wait)
+            {
+                auto request = *config;
+                std::string refusal;
+                if (!ReadStepRunExecutionArguments(arguments, 1u, request.Execution, refusal))
+                    return InvalidParams(std::move(refusal));
+                const auto started = StartEditorPointSampling(commands, request);
+                auto text = PointSamplingJson(started);
+                text["backend"] = nullptr; // decided at Accept (device order or CPU fallback), not at the start
+                return StartedRun(started, text);
+            }
             // A Vulkan run is queued and answers once it has published or failed.
             return FinishApply<EditorPointSamplingResult>(
                 context,
-                [&](auto onComplete) { return ApplyEditorPointSamplingCommand(commands, *config, std::move(onComplete)); },
-                [](const EditorPointSamplingResult& r) {
-                    return Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
-                                {"message", r.Message}, {"method", r.Method}, {"input_points", r.InputCount},
-                                {"samples", r.SampleCount}, {"output_entity", r.OutputEntityId},
-                                {"milliseconds", r.Milliseconds}, {"distance_pairs", r.DistancePairs},
-                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
-                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
-                                {"requested_backend", r.RequestedBackend}, {"backend", r.Backend},
-                                {"backend_diagnostic", r.BackendDiagnostic}};
-                });
+                [&](auto onComplete)
+                {
+                    return ApplyEditorPointSamplingCommand(commands, *config, std::move(onComplete));
+                },
+                &PointSamplingJson);
         }
 
-        AgentOperationOutcome RunKeypoints(const AgentOperationContext& context)
+        AgentOperationOutcome RunKeypoints(const AgentOperationContext& context, std::string_view arguments)
         {
+            const auto args = ParseObject(arguments);
+            const bool wait = !args || args->value("wait", true);
+            if (wait && NamesStepRunExecutionArguments(arguments, 1u))
+                return WaitingExecutionRefused();
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorPointAnalysisFrame(*context.Attachment).Commands;
+            if (!wait)
+            {
+                // A one-shot: the section's auto_accept and start, or the call's.
+                auto config = GetEditorKeypointAnalysisConfig(commands);
+                if (!config)
+                    return Fail("The sandbox.keypoint_analysis section is unavailable.");
+                std::string refusal;
+                if (!ReadStepRunExecutionArguments(arguments, 1u, config->Execution, refusal))
+                    return InvalidParams(std::move(refusal));
+                const auto started = StartEditorKeypointAnalysisRun(commands, *config);
+                return StartedRun(started, KeypointsJson(started));
+            }
             return FinishApply<EditorKeypointAnalysisResult>(
                 context,
-                [&](auto onComplete) { return ApplyEditorConfiguredKeypointAnalysis(commands, std::move(onComplete)); },
-                [](const EditorKeypointAnalysisResult& r) {
-                    return Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
-                                {"message", r.Message}, {"requested_backend", ToString(r.RequestedBackend)},
-                                {"actual_backend", r.ActualBackend}, {"implementation_id", r.ImplementationId},
-                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
-                                {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
-                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
-                                {"gpu_submissions", r.GpuQueryBatches}, {"keypoints", r.KeypointCount}};
-                });
+                [&](auto onComplete)
+                {
+                    return ApplyEditorConfiguredKeypointAnalysis(commands, std::move(onComplete));
+                },
+                &KeypointsJson);
         }
 
         AgentOperationOutcome PreviewKeypoints(const AgentOperationContext& context)
@@ -787,8 +993,11 @@ namespace Extrinsic::Runtime
             RunKMeans Request{};
             std::string Unavailable{}; // preview only: why the service or section cannot be used at all
         };
-        std::optional<KMeansCall> PrepareKMeansCall(const AgentOperationContext& context, std::string_view arguments,
-                                                    AgentOperationOutcome& failure, bool preview)
+        std::optional<KMeansCall> PrepareKMeansCall(const AgentOperationContext& context,
+            std::string_view arguments,
+            AgentOperationOutcome& failure,
+            bool preview,
+            bool batch = true)
         {
             const auto args = ParseObject(arguments);
             const auto entity = args ? UInt(*args, "entity") : std::nullopt;
@@ -813,7 +1022,23 @@ namespace Extrinsic::Runtime
             auto refs = config->Properties.value_or(MakeKMeansPropertyRefs(domain.value_or(GeometryElementDomain::Unknown)));
             if (const auto positions = String(*args, "positions")) refs.InputPositions.Name = *positions;
             call.Request = MakeConfiguredKMeansRequest(*entity, std::move(refs), *config);
-            call.Request.AutoAccept = true;
+            if (batch)
+            {
+                // The call answers with the accepted result: it runs at once and accepts at its end, whatever the
+                // section's start and auto_accept (start_kmeans starts a run as they say; run_control drives it).
+                call.Request.Parameters.Execution.Start = StepRunStart::Run;
+                call.Request.Parameters.Execution.AutoAccept = StepRunAutoAccept::End;
+                return call;
+            }
+            // start_kmeans: the section's execution options, each one the call names replacing it (the shared reader
+            // of the rows the dispatcher already checked).
+            std::string refusal;
+            if (!ReadStepRunExecutionArguments(
+                    arguments, kMaxKMeansIterations, call.Request.Parameters.Execution, refusal))
+            {
+                failure = Fail(std::move(refusal));
+                return std::nullopt;
+            }
             return call;
         }
         AgentOperationOutcome PreviewKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
@@ -833,22 +1058,88 @@ namespace Extrinsic::Runtime
             const auto& request = call->Request;
             return AwaitServiceRun<KMeansRunCompleted>(
                 frame.Clustering,
-                [](ClusteringService& service, auto onCompleted) { return service.SubscribeRunCompleted(std::move(onCompleted)); },
-                [&] {
+                [](ClusteringService& service, auto onCompleted)
+                {
+                    return service.SubscribeRunCompleted(std::move(onCompleted));
+                },
+                [&]
+                {
                     const auto submitted = SubmitKMeansRun(frame.Commands, frame.Clustering, request);
                     return ServiceSubmission{submitted.Correlation, submitted.Status == KMeansRunStatus::Queued, submitted.Message};
                 },
-                [](const KMeansRunCompleted& r) {
-                    return Json{{"status", ToString(r.Status)}, {"message", r.Message}, {"succeeded", r.Succeeded()},
-                                {"requested_backend", ToString(r.RequestedBackend)}, {"actual_backend", ToString(r.ActualBackend)},
-                                {"implementation_id", r.ImplementationId}, {"backend_diagnostic", r.BackendDiagnostic},
-                                {"fell_back_to_cpu", r.FellBackToCpu},
-                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
-                                {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
-                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
-                                {"gpu_submissions", r.GpuSubmissions}, {"gpu_previews", r.GpuPreviews},
-                                {"iterations", r.Iterations}, {"converged", r.Converged}, {"inertia", r.Inertia}};
+                [](const KMeansRunCompleted& r)
+                {
+                    return Json{{"status", ToString(r.Status)},
+                        {"message", r.Message},
+                        {"succeeded", r.Succeeded()},
+                        {"requested_backend", ToString(r.RequestedBackend)},
+                        {"actual_backend", ToString(r.ActualBackend)},
+                        {"implementation_id", r.ImplementationId},
+                        {"backend_diagnostic", r.BackendDiagnostic},
+                        {"fell_back_to_cpu", r.FellBackToCpu},
+                        {"gpu_input_upload_bytes", r.GpuInputUploadBytes},
+                        {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                        {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
+                        {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                        {"gpu_submissions", r.GpuSubmissions},
+                        {"gpu_previews", r.GpuPreviews},
+                        {"run", r.StepRun},
+                        {"iterations", r.Iterations},
+                        {"converged", r.Converged},
+                        {"inertia", r.Inertia}};
                 });
+        }
+
+        // A K-Means step run started without waiting for its end: answers its run id once the request started one
+        // (the next command drain), or the refusal's completion.
+        AgentOperationOutcome StartKMeansOperation(const AgentOperationContext& context, std::string_view arguments)
+        {
+            AgentOperationOutcome failure;
+            const auto call = PrepareKMeansCall(context, arguments, failure, false, false);
+            if (!call)
+                return failure;
+            const auto& frame = call->Frame;
+            auto run = std::make_shared<ServiceRun<KMeansRunCompleted, ClusteringService>>();
+            run->Owner = frame.Clustering;
+            run->Subscription = frame.Clustering->SubscribeRunCompleted(
+                [weak = std::weak_ptr<ServiceRun<KMeansRunCompleted, ClusteringService>>(run)](
+                    const KMeansRunCompleted& r)
+                {
+                    if (auto state = weak.lock(); state && state->Correlation == r.Correlation)
+                        state->Completed = r;
+                });
+            const auto submitted = SubmitKMeansRun(frame.Commands, frame.Clustering, call->Request);
+            run->Correlation = submitted.Correlation;
+            if (submitted.Status != KMeansRunStatus::Queued)
+            {
+                run->Release();
+                return Fail(submitted.Message);
+            }
+            AgentOperationOutcome outcome{};
+            outcome.Continuation = [run](const AgentOperationContext& current, AgentOperationOutcome& out)
+            {
+                if (!current.Attachment || !current.Attachment->IsAttached())
+                {
+                    run->Release();
+                    out = Fail(kNoWorkspace);
+                    return true;
+                }
+                // A run that already ended (auto_accept) still names its run; a refusal names none.
+                const auto id = run->Completed ? run->Completed->StepRun : run->Owner->StepRun(run->Correlation);
+                if (id == 0u && !run->Completed)
+                    return false;
+                run->Release();
+                if (id == 0u)
+                {
+                    out = Fail(run->Completed->Message);
+                    return true;
+                }
+                out = Ok(Json{{"run", id},
+                    {"correlation", run->Correlation.Value},
+                    {"status", run->Completed ? ToString(run->Completed->Status) : std::string_view{"started"}}});
+                return true;
+            };
+            return outcome;
         }
 
         struct ConsolidationCall
@@ -857,8 +1148,11 @@ namespace Extrinsic::Runtime
             PointCloudConsolidationRequest Request{};
             std::string Unavailable{}; // preview only: why the service or section cannot be used at all
         };
-        std::optional<ConsolidationCall> PrepareConsolidationCall(const AgentOperationContext& context, std::string_view arguments,
-                                                                  AgentOperationOutcome& failure, bool preview)
+        std::optional<ConsolidationCall> PrepareConsolidationCall(const AgentOperationContext& context,
+            std::string_view arguments,
+            AgentOperationOutcome& failure,
+            bool preview,
+            const bool batch = true)
         {
             const auto args = ParseObject(arguments);
             if (!args) { failure = Fail("Expected an object with entity and domain."); return std::nullopt; }
@@ -876,10 +1170,29 @@ namespace Extrinsic::Runtime
                 failure = Fail("Point-cloud consolidation is unavailable.");
                 return std::nullopt;
             }
-            call.Request = PointCloudConsolidationRequest{
-                .StableEntityId = *entity,
-                .Properties = MakePointCloudConsolidationPropertyRefs(*domain, String(*args, "positions").value_or(std::string{ECS::Components::GeometrySources::PropertyNames::kPosition})),
-                .Config = *config, .AutoAccept = true};
+            call.Request = PointCloudConsolidationRequest{.StableEntityId = *entity,
+                .Properties = MakePointCloudConsolidationPropertyRefs(*domain,
+                    String(*args, "positions")
+                        .value_or(std::string{ECS::Components::GeometrySources::PropertyNames::kPosition})),
+                .Config = *config};
+            if (batch)
+            {
+                // As run_kmeans: it answers with the accepted result, whatever the section's start and auto_accept.
+                call.Request.Config.Execution.Start = StepRunStart::Run;
+                call.Request.Config.Execution.AutoAccept = StepRunAutoAccept::End;
+            }
+            else
+            {
+                // start_point_cloud_consolidation: the section's execution options, each one the call names replacing
+                // it (the shared reader of the rows the dispatcher already checked).
+                std::string refusal;
+                if (!ReadStepRunExecutionArguments(
+                        arguments, kMaxPointCloudConsolidationIterations, call.Request.Config.Execution, refusal))
+                {
+                    failure = Fail(std::move(refusal));
+                    return std::nullopt;
+                }
+            }
             if (!IsValidPointCloudConsolidationPropertyRefs(call.Request.Properties))
             {
                 failure = Fail("Invalid point property domain or name.");
@@ -908,34 +1221,107 @@ namespace Extrinsic::Runtime
             auto& frame = call->Frame;
             return AwaitServiceRun<PointCloudConsolidationResult>(
                 frame.PointCloudConsolidation,
-                [](PointCloudConsolidationService& service, auto onCompleted) { return service.SubscribeCompleted(std::move(onCompleted)); },
-                [&] {
+                [](PointCloudConsolidationService& service, auto onCompleted)
+                {
+                    return service.SubscribeCompleted(std::move(onCompleted));
+                },
+                [&]
+                {
                     const auto submitted = SubmitEditorPointCloudConsolidation(frame.Commands, frame.PointCloudConsolidation, std::move(call->Request));
                     return ServiceSubmission{submitted.Correlation, submitted.Status == PointCloudConsolidationRunStatus::Queued,
                                              submitted.Message};
                 },
-                [](const PointCloudConsolidationResult& r) {
-                    return Json{{"status", ToString(r.Status)}, {"message", r.Message}, {"succeeded", r.Succeeded()},
-                                {"requested_backend", StableToken(r.RequestedBackend)}, {"actual_backend", StableToken(r.ActualBackend)},
-                                {"backend_diagnostic", r.BackendDiagnostic}, {"fell_back_to_cpu", r.FellBackToCpu},
-                                {"initial_sampling_requested_backend", r.InitialSamplingRequestedBackend},
-                                {"initial_sampling_backend", r.InitialSamplingBackend},
-                                {"initial_sampling_diagnostic", r.InitialSamplingDiagnostic},
-                                {"gpu_input_upload_bytes", r.GpuInputUploadBytes}, {"gpu_input_cache_hits", r.GpuInputCacheHits},
-                                {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
-                                {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
-                                {"gpu_submissions", r.GpuSubmissions}, {"gpu_previews", r.GpuPreviews},
-                                {"iterations", r.Iterations}};
+                [](const PointCloudConsolidationResult& r)
+                {
+                    return Json{{"status", ToString(r.Status)},
+                        {"message", r.Message},
+                        {"succeeded", r.Succeeded()},
+                        {"requested_backend", StableToken(r.RequestedBackend)},
+                        {"actual_backend", StableToken(r.ActualBackend)},
+                        {"backend_diagnostic", r.BackendDiagnostic},
+                        {"fell_back_to_cpu", r.FellBackToCpu},
+                        {"initial_sampling_requested_backend", r.InitialSamplingRequestedBackend},
+                        {"initial_sampling_backend", r.InitialSamplingBackend},
+                        {"initial_sampling_diagnostic", r.InitialSamplingDiagnostic},
+                        {"gpu_input_upload_bytes", r.GpuInputUploadBytes},
+                        {"gpu_input_cache_hits", r.GpuInputCacheHits},
+                        {"cpu_stage_upload_bytes", r.CpuStageUploadBytes},
+                        {"cpu_stage_readback_bytes", r.CpuStageReadbackBytes},
+                        {"gpu_submissions", r.GpuSubmissions},
+                        {"gpu_previews", r.GpuPreviews},
+                        {"run", r.StepRun},
+                        {"iterations", r.Iterations}};
                 });
         }
 
-        // Both methods run their configured section (config_apply first). A queued job
-        // answers once it has published or failed.
+        // A consolidation step run started without waiting for its end: answers its run id once the request started
+        // one (the next command drain), or the refusal's completion (as start_kmeans).
+        AgentOperationOutcome StartConsolidation(const AgentOperationContext& context, std::string_view arguments)
+        {
+            AgentOperationOutcome failure;
+            auto call = PrepareConsolidationCall(context, arguments, failure, false, false);
+            if (!call)
+                return failure;
+            auto& frame = call->Frame;
+            using Run = ServiceRun<PointCloudConsolidationResult, PointCloudConsolidationService>;
+            auto run = std::make_shared<Run>();
+            run->Owner = frame.PointCloudConsolidation;
+            run->Subscription = frame.PointCloudConsolidation->SubscribeCompleted(
+                [weak = std::weak_ptr<Run>(run)](const PointCloudConsolidationResult& r)
+                {
+                    if (auto state = weak.lock(); state && state->Correlation == r.Correlation)
+                        state->Completed = r;
+                });
+            const auto submitted = SubmitEditorPointCloudConsolidation(
+                frame.Commands, frame.PointCloudConsolidation, std::move(call->Request));
+            run->Correlation = submitted.Correlation;
+            if (submitted.Status != PointCloudConsolidationRunStatus::Queued)
+            {
+                run->Release();
+                return Fail(submitted.Message);
+            }
+            AgentOperationOutcome outcome{};
+            outcome.Continuation = [run](const AgentOperationContext& current, AgentOperationOutcome& out)
+            {
+                if (!current.Attachment || !current.Attachment->IsAttached())
+                {
+                    run->Release();
+                    out = Fail(kNoWorkspace);
+                    return true;
+                }
+                // A run that already ended (auto_accept) still names its run; a refusal names none.
+                const auto id = run->Completed ? run->Completed->StepRun : run->Owner->GpuRun(run->Correlation).StepRun;
+                if (id == 0u && !run->Completed)
+                    return false;
+                run->Release();
+                if (id == 0u)
+                {
+                    out = Fail(run->Completed->Message);
+                    return true;
+                }
+                out = Ok(Json{{"run", id},
+                    {"correlation", run->Correlation.Value},
+                    {"status", run->Completed ? ToString(run->Completed->Status) : std::string_view{"started"}}});
+                return true;
+            };
+            return outcome;
+        }
+
+        // Both methods run their configured section (config_apply first) as a step run that computes at once and
+        // accepts at its end, whatever the section's start and auto_accept; a queued run answers once it has
+        // published or failed. With wait false each method starts with the section's execution options instead, each
+        // one the call names replacing it within the method's own iteration limit, and answers at once with its run
+        // id (run), which run_control and run_observe drive.
         AgentOperationOutcome RunRegistration(const AgentOperationContext& context, std::string_view arguments, bool preview)
         {
             const auto args = ParseObject(arguments);
             const auto method = args ? String(*args, "method") : std::nullopt;
             if (!method || (*method != "icp" && *method != "cpd")) return Fail("Pass {\"method\": \"icp\" | \"cpd\"}.");
+            const bool wait = args->value("wait", true);
+            const std::uint32_t limit =
+                *method == "icp" ? kMaxRegistrationIterations : kMaxCoherentPointDriftIterations;
+            if (wait && NamesStepRunExecutionArguments(arguments, limit))
+                return WaitingExecutionRefused();
             if (!PrepareSnapshot(context)) return Fail(kNoWorkspace); // prepares the session frame the feature frames read
             const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
             if (*method == "icp")
@@ -948,8 +1334,25 @@ namespace Extrinsic::Runtime
                 {
                     return Ok(ReadinessJson(commands, PreviewEditorRegistrationCommand(commands, *config), {{"method", "icp"}}));
                 }
+                if (!wait)
+                {
+                    auto request = *config;
+                    std::string refusal;
+                    if (!ReadStepRunExecutionArguments(arguments, limit, request.Execution, refusal))
+                        return InvalidParams(std::move(refusal));
+                    const auto started = ApplyEditorRegistrationCommand(commands, request);
+                    return {.IsError = started.Status != EditorCommandStatus::Pending && !started.Succeeded(),
+                        .Text = Dump(RegistrationJson(started))};
+                }
+                auto batch = *config;
+                batch.Execution.Start = StepRunStart::Run;
+                batch.Execution.AutoAccept = StepRunAutoAccept::End;
                 return FinishApply<EditorRegistrationResult>(
-                    context, [&](auto onComplete) { return ApplyEditorConfiguredRegistrationCommand(commands, std::move(onComplete)); },
+                    context,
+                    [&](auto onComplete)
+                    {
+                        return ApplyEditorRegistrationCommand(commands, batch, std::move(onComplete));
+                    },
                     &RegistrationJson);
             }
             const auto config = GetEditorCoherentPointDriftConfig(commands);
@@ -959,6 +1362,18 @@ namespace Extrinsic::Runtime
             if (preview)
             {
                 return Ok(ReadinessJson(commands, PreviewEditorCoherentPointDriftCommand(commands, *config), {{"method", "cpd"}}));
+            }
+            if (!wait)
+            {
+                auto request = *config;
+                std::string refusal;
+                if (!ReadStepRunExecutionArguments(arguments, limit, request.Execution, refusal))
+                    return InvalidParams(std::move(refusal));
+                EditorCoherentPointDriftResult result;
+                const auto run = StartEditorCoherentPointDrift(commands, request, result);
+                if (run)
+                    result = SnapshotEditorCoherentPointDrift(run).Result;
+                return {.IsError = !run, .Text = Dump(CoherentPointDriftJson(result))};
             }
             return FinishApply<EditorCoherentPointDriftResult>(
                 context, [&](auto onComplete) { return ApplyEditorConfiguredCoherentPointDrift(commands, std::move(onComplete)); },
@@ -974,43 +1389,111 @@ namespace Extrinsic::Runtime
                              ToolSchema schema,
                              bool readOnly,
                              AgentOperationInvoker invoke,
-                             bool destructive = false,
-                             bool gpu = false)
+                             bool destructive = false)
         {
-            AddOperation(registry, name, title, std::move(description), std::move(schema), readOnly, std::move(invoke), destructive, gpu);
+            AddOperation(registry,
+                name,
+                title,
+                std::move(description),
+                std::move(schema),
+                readOnly,
+                std::move(invoke),
+                destructive);
         };
         // RUNTIME-337: declared arguments, except the configured families (allOf of if/then per operation).
         static constexpr std::array<std::string_view, 2> kRegistrationMethods{"icp", "cpd"};
         const ToolSchema none = ArgumentsSchema({});
-        const ToolSchema registration =
-            ArgumentsSchema({{.Spec = {.Name = "method",
-                                  .Type = ConfigFieldType::StringEnum,
-                                  .Description = "icp uses sandbox.registration, cpd uses "
-                                                 "sandbox.coherent_point_drift (config_apply first).",
-                                  .EnumValues = kRegistrationMethods},
-                .Required = true}});
-        add("preview_registration", "Preview registration",
-            "Whether the configured ICP or Coherent Point Drift registration can run, and why not.", registration, true,
-            [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, true); });
-        add("run_registration", "Run registration",
+        const AgentArgument registrationMethod{
+            .Spec = {.Name = "method",
+                .Type = ConfigFieldType::StringEnum,
+                .Description =
+                    "icp uses sandbox.registration, cpd uses sandbox.coherent_point_drift (config_apply first).",
+                .EnumValues = kRegistrationMethods},
+            .Required = true};
+        // RUNTIME-355: a start's execution arguments are the shared rows its section binds, with the method's own
+        // limit: ICP's and CPD's all five (CPD's limit narrows max_iterations), point sampling's and keypoint
+        // analysis' auto_accept and start. Rows 1-4 are every method's; only max_iterations carries a limit.
+        static constexpr auto kIcpExecution = StepRunExecutionFields(kMaxRegistrationIterations);
+        static constexpr auto kCpdExecution = StepRunExecutionFields(kMaxCoherentPointDriftIterations);
+        static constexpr auto kExecutionRows = StepRunExecutionFields(1u);
+        const AgentArgument startWait{
+            .Spec = {.Name = "wait",
+                .Type = ConfigFieldType::Bool,
+                .Description = "true (default): run at once, accept at the end and answer when done; "
+                               "execution arguments are refused. false: start the step run with the "
+                               "section's execution options, each one the call names replacing it for "
+                               "this run only, and answer at once with its run id (run)."},
+            .Default = true};
+        const Json cpdRows = Json::parse(ArgumentsSchema({}, std::span(kCpdExecution).first(1)).Text);
+        const std::array cpdLimit{ArgumentCase{.Argument = "method",
+            .Value = "cpd",
+            .Property = "max_iterations",
+            .Schema = cpdRows["properties"]["max_iterations"]}};
+        const ToolSchema registration = ArgumentsSchema({registrationMethod, startWait}, kIcpExecution, {}, cpdLimit);
+        add("preview_registration",
+            "Preview registration",
+            "Whether the configured ICP or Coherent Point Drift registration can run, and why not.",
+            ArgumentsSchema({registrationMethod}),
+            true,
+            [](const AgentOperationContext& c, std::string_view a)
+            {
+                return RunRegistration(c, a, true);
+            });
+        add("run_registration",
+            "Run registration",
             "Register the configured source entity onto the target with ICP or Coherent Point Drift and publish the "
-            "result (source transform, positions or a displacement property) as one undoable step; answers when done.",
-            registration, false, [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, false); },
-            false, true);
-        add("preview_point_sampling", "Preview point sampling",
-            "Whether the configured point sampling (sandbox.point_sampling) can run, and why not.", none, true,
-            [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, true); });
-        add("run_point_sampling", "Run point sampling",
+            "result (source transform, positions or a displacement property) as one undoable step. By default the step "
+            "run computes at once and accepts at its end whatever the section's start and auto_accept, and the call "
+            "answers when done, with its run id (run). wait false starts it with the section's execution options, "
+            "each of max_iterations (the method's own limit), preview_every, preview_interval_ms, preview_buffers, auto_accept and "
+            "start the call names replacing the section's for this run (ready: nothing computed yet), and answers at "
+            "once with its run id (run) for run_control and run_observe.",
+            registration,
+            false,
+            [](const AgentOperationContext& c, std::string_view a)
+            {
+                return RunRegistration(c, a, false);
+            });
+        add("preview_point_sampling",
+            "Preview point sampling",
+            "Whether the configured point sampling (sandbox.point_sampling) can run, and why not.",
+            none,
+            true,
+            [](const AgentOperationContext& c, std::string_view a)
+            {
+                return RunPointSampling(c, a, true);
+            });
+        // Their arguments are a one-shot's (the reader's cap 1): sampling's cap is its count, without live preview.
+        const ToolSchema startable = ArgumentsSchema({startWait}, std::span(kExecutionRows).subspan(3, 2));
+        add("run_point_sampling",
+            "Run point sampling",
             "Order the configured entity's points with the chosen sampling method (sandbox.point_sampling; config_apply "
-            "first) and publish rank/selection properties or a new point cloud as one undoable step.",
-            none, false, [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, false); },
-            false, true);
+            "first) and publish rank/selection properties or a new point cloud as one undoable step. By default runs "
+            "at once and accepts at its end whatever the section's start and auto_accept; reports its run id (run, for "
+            "run_observe) and steps (selected samples of exact farthest point, else 1). wait false starts with the "
+            "section's start and auto_accept, or the ones the call names (ready: nothing computed yet), and answers at "
+            "once with its run for run_control.",
+            startable,
+            false,
+            [](const AgentOperationContext& c, std::string_view a)
+            {
+                return RunPointSampling(c, a, false);
+            });
         add("preview_keypoint_analysis", "Preview keypoint analysis",
             "Whether the configured keypoint analysis (sandbox.keypoint_analysis) can run, and why not.", none, true,
             [](const AgentOperationContext& c, std::string_view) { return PreviewKeypoints(c); });
-        add("run_keypoint_analysis", "Run keypoint analysis",
-            "Run sandbox.keypoint_analysis; GPU score and mask auto-accept in one undoable entry. Reports backend and IO.",
-            none, false, [](const AgentOperationContext& c, std::string_view) { return RunKeypoints(c); }, false, true);
+        add("run_keypoint_analysis",
+            "Run keypoint analysis",
+            "Run sandbox.keypoint_analysis at once by default (one step, accepted at its end whatever the section's "
+            "start and auto_accept); GPU score and mask publish in one undoable entry. Reports backend, IO and the run "
+            "id (run). wait false starts with the section's start and auto_accept, or the ones the call names (ready: "
+            "nothing computed yet), and answers at once with its run for run_control.",
+            startable,
+            false,
+            [](const AgentOperationContext& c, std::string_view a)
+            {
+                return RunKeypoints(c, a);
+            });
         const AgentArgument positions{.Spec = {.Name = "positions",
                                           .Type = ConfigFieldType::String,
                                           .Description = "Name of the vec3 position property."}};
@@ -1024,17 +1507,54 @@ namespace Extrinsic::Runtime
             {EntityArgument(), DomainArgument("Element domain of the positions.", true), positionsDefault});
         add("preview_kmeans", "Preview K-Means",
             "Whether K-Means can run on an entity with sandbox.clustering, and why not.", kmeansSchema, true, PreviewKMeansOperation);
-        add("run_kmeans", "Run K-Means",
-            "Cluster a point property of an entity with sandbox.clustering (config_apply first); GPU results auto-accept "
-            "atomically. Reports backend and IO. The section's bound properties win over 'domain'.",
-            kmeansSchema, false, RunKMeansOperation, false, true);
+        add("run_kmeans",
+            "Run K-Means",
+            "Cluster a point property of an entity with sandbox.clustering (config_apply first); the call runs at once "
+            "and accepts at its end (GPU results atomically) whatever the section's start and auto_accept. Reports "
+            "backend, IO and the GPU run's id (run). The section's bound properties win over 'domain'.",
+            kmeansSchema,
+            false,
+            RunKMeansOperation);
+        static constexpr auto kKMeansExecutionFields = StepRunExecutionFields(kMaxKMeansIterations);
+        add("start_kmeans",
+            "Start a K-Means step run",
+            "Start K-Means on an entity with sandbox.clustering without waiting for its end: answers the step run's id "
+            "once started (CPU reference or Vulkan, one step one Lloyd iteration). The section's execution options "
+            "apply unless the call names max_iterations, preview_every, preview_interval_ms, preview_buffers, auto_accept or start "
+            "(ready: initialized, nothing computed); drive it with run_control and watch it with run_observe.",
+            ArgumentsSchema(
+                {EntityArgument(),
+                    DomainArgument("Element domain of the positions; needed only while sandbox.clustering binds no "
+                                   "properties."),
+                    positions},
+                kKMeansExecutionFields),
+            false,
+            StartKMeansOperation);
         add("preview_point_cloud_consolidation", "Preview point-cloud consolidation",
             "Whether consolidation can run on an entity's point property with sandbox.point_cloud_consolidation, and why not.",
             consolidationSchema, true, PreviewConsolidation);
-        add("run_point_cloud_consolidation", "Run point-cloud consolidation",
-            "Consolidate the named vec3 point property of an entity using sandbox.point_cloud_consolidation; GPU runs "
-            "auto-accept. Reports backend and IO.",
-            consolidationSchema, false, RunConsolidation, false, true);
+        add("run_point_cloud_consolidation",
+            "Run point-cloud consolidation",
+            "Consolidate the named vec3 point property of an entity using sandbox.point_cloud_consolidation; the call "
+            "runs at once and accepts at its end whatever the section's start and auto_accept. Reports backend, IO and "
+            "an in-place resident LOP run's id (run).",
+            consolidationSchema,
+            false,
+            RunConsolidation);
+        static constexpr auto kConsolidationExecutionFields =
+            StepRunExecutionFields(kMaxPointCloudConsolidationIterations);
+        add("start_point_cloud_consolidation",
+            "Start a point-cloud consolidation step run",
+            "Start consolidating the named vec3 point property of an entity with sandbox.point_cloud_consolidation "
+            "without waiting for its end: answers the step run's id once started (every backend; one step one "
+            "projection iteration). The section's execution options apply unless the call names max_iterations, "
+            "preview_every, preview_interval_ms, preview_buffers, auto_accept or start (ready: initialized, nothing computed); drive it "
+            "with run_control and watch it with run_observe.",
+            ArgumentsSchema(
+                {EntityArgument(), DomainArgument("Element domain of the positions.", true), positionsDefault},
+                kConsolidationExecutionFields),
+            false,
+            StartConsolidation);
         // Operation names in table order (`family` nullptr: every operation).
         const auto operationNames = [](const char* family)
         {
@@ -1058,11 +1578,16 @@ namespace Extrinsic::Runtime
             "Whether a mesh-field operation can run on an entity with the active settings, and why not. "
             "Alias of preview_operation limited to the mesh-field operations.", meshField, true,
             [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, true, "mesh_field"); });
-        add("run_mesh_operation", "Run mesh operation",
+        add("run_mesh_operation",
+            "Run mesh operation",
             "Run a mesh-field operation (property smoothing, spectral modes, harmonic field, scalar gradient) on an entity "
             "with the active config section; undoable like the panel button. Alias of run_operation limited to these.",
-            meshField, false, [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, false, "mesh_field"); },
-            false, true); // property smoothing may select a Vulkan backend that waits on readback
+            meshField,
+            false,
+            [](const AgentOperationContext& c, std::string_view a)
+            {
+                return RunConfiguredOperation(c, a, false, "mesh_field");
+            });
         // RUNTIME-342: per-operation `params` rules, each generated from the operation's field table.
         std::vector<ArgumentCase> paramsCases;
         for (const auto& op : ConfiguredOperations())
@@ -1071,38 +1596,62 @@ namespace Extrinsic::Runtime
                     .Value = op.Name,
                     .Property = "params",
                     .Schema = Json::parse(op.ParamsSchemaJson)});
-        const ToolSchema configuredSchema = ArgumentsSchema(
-            {{.Spec = {.Name = "operation",
-                  .Type = ConfigFieldType::StringEnum,
-                  .Description = "Operation; its settings come from its config section (config_apply first).",
-                  .EnumValues = kOperations},
-                 .Required = true},
-                EntityArgument(false,
-                    "Stable entity id from scene_entities; required for operations marked 'entity argument', refused "
-                    "for those whose section names the entity."),
-                {.Spec = {.Name = "params",
-                     .Type = ConfigFieldType::Object,
-                     .Description =
-                         "Explicit settings of the operations listed with 'params' (the schema per operation is "
-                         "in allOf, keys, defaults and ranges are in the description); omitted keys keep their "
-                         "defaults; enums take their name or integer code. Refused for operations that read a "
-                         "config section."}}},
-            {},
-            {},
-            paramsCases);
+        const AgentArgument operationArgument{.Spec = {.Name = "operation",
+                                                  .Type = ConfigFieldType::StringEnum,
+                                                  .Description = "Operation; its settings come from its config "
+                                                                 "section (config_apply first).",
+                                                  .EnumValues = kOperations},
+            .Required = true};
+        const AgentArgument operationEntity = EntityArgument(false,
+            "Stable entity id from scene_entities; required for operations marked 'entity argument', refused "
+            "for those whose section names the entity.");
+        const AgentArgument operationParams{
+            .Spec = {.Name = "params",
+                .Type = ConfigFieldType::Object,
+                .Description = "Explicit settings of the operations listed with 'params' (the schema per operation is "
+                               "in allOf, keys, defaults and ranges are in the description); omitted keys keep their "
+                               "defaults; enums take their name or integer code. Refused for operations that read a "
+                               "config section."}};
+        const AgentArgument operationWait{
+            .Spec = {.Name = "wait",
+                .Type = ConfigFieldType::Bool,
+                .Description =
+                    "true (default): run at once, accept at the end and answer when done; execution "
+                    "arguments are refused. false (property_smoothing, normal_estimation, outlier_analysis, "
+                    "point_construction): start the step run with the section's execution options, each one "
+                    "the call names replacing it for this run only (property_smoothing takes preview_every, "
+                    "preview_interval_ms, preview_buffers, auto_accept and start, the one-step rows auto_accept and start), "
+                    "and answer at once with run, the step run run_control and run_observe drive."},
+            .Default = true};
+        const ToolSchema configuredSchema =
+            ArgumentsSchema({operationArgument, operationEntity, operationParams}, {}, {}, paramsCases);
+        // Property smoothing's rows, the widest start of the table: no row binds a cap.
+        const ToolSchema runOperationSchema =
+            ArgumentsSchema({operationArgument, operationEntity, operationParams, operationWait},
+                std::span(kExecutionRows).subspan(1),
+                {},
+                paramsCases);
         add("preview_operation", "Preview operation",
             "Whether a configured editor operation can run with the active settings, and why not. Operations: " +
                 OperationSummary(nullptr) + ".",
             configuredSchema, true,
             [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, true, nullptr); });
-        add("run_operation", "Run operation",
+        add("run_operation",
+            "Run operation",
             "Run a configured editor operation (mesh-field operations, mesh curvature, geodesics, curvature segmentation, "
             "parameterization, scalar ridges, mesh denoise, remesh, subdivide and simplify, normal estimation, "
             "outlier analysis, point construction, "
             "progressive Poisson) with its config section or `params`; one undoable step like the panel button, answers when "
-            "done. Operations: " + OperationSummary(nullptr) + ".",
-            configuredSchema, false, [](const AgentOperationContext& c, std::string_view a) { return RunConfiguredOperation(c, a, false, nullptr); },
-            false, true); // several operations can select a Vulkan backend
+            "done; wait false starts property_smoothing, normal_estimation, outlier_analysis or point_construction "
+            "as a step run with the section's execution options, each one the call names replacing the section's "
+            "for this run, and answers at once with its run. Operations: " +
+                OperationSummary(nullptr) + ".",
+            runOperationSchema,
+            false,
+            [](const AgentOperationContext& c, std::string_view a)
+            {
+                return RunConfiguredOperation(c, a, false, nullptr);
+            });
     }
 }
 

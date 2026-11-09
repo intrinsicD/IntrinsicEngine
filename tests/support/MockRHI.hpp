@@ -2,6 +2,7 @@
 // graphics and runtime tests without creating a GPU device.
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <cstddef>
@@ -53,6 +54,7 @@ namespace Extrinsic::Tests
 
         bool AlwaysComplete = true;
         bool ReadbacksComplete = true; // valid readback tokens (issued elsewhere) report complete
+        std::vector<RHI::ReadbackToken> PendingReadbacks{}; // these stay incomplete regardless
         bool AcceptBufferUploads = false;
         bool FailTextureUploads = false;
         std::vector<RHI::TransferToken> Issued{};
@@ -89,7 +91,29 @@ namespace Extrinsic::Tests
 
         [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override
         {
-            return !token.IsValid() || ReadbacksComplete;
+            if (ReadbackComplete)
+                return ReadbackComplete(token);
+            return !token.IsValid() ||
+                (ReadbacksComplete && std::ranges::find(PendingReadbacks, token) == PendingReadbacks.end());
+        }
+
+        // ARCH-023 worker seam: a test's GPU model (unset: the defaults, which never block or take).
+        std::function<bool(RHI::ReadbackToken)> ReadbackComplete{};
+        std::function<RHI::ComputeWaitStatus(RHI::ReadbackToken, std::uint64_t)> ComputeWait{};
+        std::function<bool(RHI::ReadbackToken, std::span<std::byte>)> TakeReadback{};
+        std::function<void(RHI::ReadbackToken)> ReleaseReadbackHook{};
+        [[nodiscard]] RHI::ComputeWaitStatus WaitCompute(RHI::ReadbackToken token, std::uint64_t timeout) override
+        {
+            return ComputeWait ? ComputeWait(token, timeout) : ITransferQueue::WaitCompute(token, timeout);
+        }
+        [[nodiscard]] bool TakeCompletedReadback(RHI::ReadbackToken token, std::span<std::byte> destination) override
+        {
+            return TakeReadback && TakeReadback(token, destination);
+        }
+        void ReleaseReadback(RHI::ReadbackToken token) override
+        {
+            if (ReleaseReadbackHook)
+                ReleaseReadbackHook(token);
         }
 
         std::function<RHI::ReadbackToken(RHI::BufferHandle, std::uint64_t, std::uint64_t, RHI::ReadbackSink)> BufferDownload{};
@@ -99,6 +123,12 @@ namespace Extrinsic::Tests
             return BufferDownload ? BufferDownload(buffer, bytes, offset, std::move(sink)) : RHI::ReadbackToken{};
         }
         void CollectCompleted() override {}
+        // ARCH-023: the fence over compute-lane work a frame's retirement does not cover.
+        RHI::ReadbackToken ComputeFenceToken{};
+        [[nodiscard]] RHI::ReadbackToken ComputeFence() const noexcept override
+        {
+            return ComputeFenceToken;
+        }
 
     private:
         std::uint64_t m_Counter = 0;
@@ -428,6 +458,7 @@ namespace Extrinsic::Tests
         // ---- Counters ------------------------------------------------------
         int CreateBufferCount    = 0;
         int DestroyBufferCount   = 0;
+        std::vector<RHI::BufferHandle> DestroyedBuffers{};
         int CreateTextureCount   = 0;
         int DestroyTextureCount  = 0;
         int CreateSamplerCount   = 0;
@@ -448,6 +479,7 @@ namespace Extrinsic::Tests
         mutable RHI::FrameHandle LastBackbufferFrame{};
         std::vector<BufferWriteRecord> BufferWrites;
         std::vector<TextureWriteRecord> TextureWrites;
+        std::vector<RHI::BufferDesc> CreatedBufferDescs; // every CreateBuffer request, failed ones included
         std::vector<RHI::TextureDesc> CreatedTextureDescs;
         std::vector<RHI::TextureHandle> CreatedTextureHandles;
         std::vector<RHI::BufferDesc> CreatedPlacedBufferDescs;
@@ -480,10 +512,20 @@ namespace Extrinsic::Tests
         [[nodiscard]] bool SupportsShaderFloat64() const noexcept override { return ShaderFloat64; }
         std::function<RHI::ReadbackToken(std::function<RHI::BufferHandle(RHI::ICommandContext&)>,
                                         std::uint64_t, RHI::ReadbackSink)> ComputeReadback{};
+        // Each SubmitComputeReadback call's input order, in call order (the hook sees the call itself; workers may
+        // submit, so read it once they stopped).
+        std::mutex ComputeInputOrderMutex;
+        std::vector<RHI::ComputeInputOrder> ComputeInputOrders{};
         [[nodiscard]] RHI::ReadbackToken SubmitComputeReadback(
-            std::function<RHI::BufferHandle(RHI::ICommandContext&)> record, std::uint64_t bytes,
-            RHI::ReadbackSink sink) override
+            std::function<RHI::BufferHandle(RHI::ICommandContext&)> record,
+            std::uint64_t bytes,
+            RHI::ReadbackSink sink,
+            RHI::ComputeInputOrder order = RHI::ComputeInputOrder::AfterIssuedTransfers) override
         {
+            {
+                std::scoped_lock lock{ComputeInputOrderMutex};
+                ComputeInputOrders.push_back(order);
+            }
             return ComputeReadback ? ComputeReadback(std::move(record), bytes, std::move(sink)) : RHI::ReadbackToken{};
         }
 
@@ -562,6 +604,14 @@ namespace Extrinsic::Tests
         RHI::BufferHandle CreateBuffer(const RHI::BufferDesc&) override;
         void DestroyBuffer(RHI::BufferHandle handle) override;
         void WriteBuffer(RHI::BufferHandle handle, const void* src, std::uint64_t size, std::uint64_t offset) override;
+        // ARCH-023 worker host path: recorded under MappedWriteMutex (a worker may write while the test thread waits);
+        // AcceptMappedWrites=false models a backend without a persistent mapping; a null, invalid or destroyed handle
+        // and empty data are refused as the Vulkan backend refuses them.
+        bool AcceptMappedWrites = true;
+        std::mutex MappedWriteMutex;
+        std::vector<BufferWriteRecord> MappedWrites;
+        [[nodiscard]] bool WriteMappedBuffer(
+            RHI::BufferHandle handle, const void* src, std::uint64_t size, std::uint64_t offset = 0) override;
 
         // ReadBuffer copies only seeded bytes; missing handles leave the destination untouched.
         std::unordered_map<std::uint32_t, std::vector<std::byte>> BufferContents;
@@ -585,6 +635,19 @@ namespace Extrinsic::Tests
 
         [[nodiscard]] std::uint32_t GetFramesInFlight()    const override { return FramesInFlight; }
         [[nodiscard]] std::uint64_t GetGlobalFrameNumber() const override { return GlobalFrameNumber; }
+
+        // ARCH-024: a test's model of actual frame retirement (unset: the default frame-distance rule), and the
+        // device maintenance calls an owner made.
+        std::function<bool(std::uint64_t)> FrameRetired{};
+        int CollectCompletedResourcesCount = 0;
+        [[nodiscard]] bool IsFrameRetired(std::uint64_t frame) const override
+        {
+            return FrameRetired ? FrameRetired(frame) : RHI::IDevice::IsFrameRetired(frame);
+        }
+        void CollectCompletedResources() override
+        {
+            ++CollectCompletedResourcesCount;
+        }
 
         [[nodiscard]] RHI::ResourceMemoryRequirements GetBufferMemoryRequirements(
             const RHI::BufferDesc& desc) const noexcept override;

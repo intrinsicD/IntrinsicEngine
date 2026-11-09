@@ -13,6 +13,7 @@ module;
 export module Extrinsic.Runtime.PointSamplingConfig;
 export import Extrinsic.Runtime.ConfigFieldSpec;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+export import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Geometry.PointSampling;
@@ -96,6 +97,16 @@ export namespace Extrinsic::Runtime
         PointSamplingBackend Backend{PointSamplingBackend::Cpu};
         std::string RankName{"v:sample_rank"};         // float rank in the order, -1 when unranked
         std::string SelectedName{"v:sample_selected"}; // true for the first Count samples
+        // ARCH-023: the shared execution options auto_accept and start (codec rows of StepRunExecutionFields). One
+        // selected sample is one step of exact farthest-point sampling (CPU sieve and Vulkan); every other method
+        // is one step that orders whole. The cap is the count (Count, or every point), so IterationCap is not
+        // configured; sampling has no live preview (preview_every 0). The batch command always runs at once and
+        // accepts at its end; an interactive start honours `start` and `auto_accept`.
+        StepRunExecution Execution{.IterationCap = 1u,
+            .PreviewEvery = 0u,
+            .PreviewIntervalMs = 0u,
+            .AutoAccept = StepRunAutoAccept::Never,
+            .Start = StepRunStart::Ready};
     };
 
     [[nodiscard]] std::string SerializePointSamplingOperationConfig(const PointSamplingOperationConfig& config);

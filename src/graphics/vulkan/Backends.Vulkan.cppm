@@ -4,6 +4,7 @@ module;
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string_view>
@@ -21,6 +22,8 @@ import Extrinsic.RHI.QueueAffinity;
 // Re-exporting the partition keeps the public surface identical for
 // consumers that `import Extrinsic.Backends.Vulkan`.
 export import :OperationalStatus;
+// ARCH-023: transfer lane policy (handle-free).
+export import :TransferLanes;
 
 namespace Extrinsic::Backends::Vulkan
 {
@@ -170,6 +173,26 @@ namespace Extrinsic::Backends::Vulkan
         const RHI::IDevice* device,
         const RHI::ICommandContext* context) noexcept;
 
+    // Deterministic GPU-test seams: hold `queue` (the separate method queue, graphics, or a frame async-compute or
+    // transfer queue) behind a host-signaled semaphore. HoldVulkanQueue returns its release (empty without an
+    // operational device, for MethodCompute without a separate lane, or for a frame queue the device lacks or shares
+    // with graphics): call it once, on the device-owner thread, before the device shuts down; it signals,
+    // waits for the gate's own batch and reports success. WithVulkanQueueGate holds while invoking the callback,
+    // which must not wait for the held queue's work or destroy the device (false: callback not invoked).
+    // `device` must come from CreateVulkanDevice().
+    export [[nodiscard]] std::function<bool()> HoldVulkanQueue(RHI::IDevice* device, VulkanGatedQueue queue);
+    export [[nodiscard]] bool WithVulkanQueueGate(
+        RHI::IDevice* device, VulkanGatedQueue queue, const std::function<void()>& whilePending);
+    // Test seam: invokes the callback while this thread holds the frame queues' host lock (as a blocked present
+    // does). False (callback not invoked) when method compute shares that lock (it would deadlock this thread);
+    // TransferQueueDiagnostics::ComputeSharesFrameQueueLock reports the same.
+    export [[nodiscard]] bool WithVulkanFrameQueueLockHeld(
+        RHI::IDevice* device, const std::function<void()>& whileHeld);
+    // Owner-thread test seam: the next selected query reports device loss, or a host-memory error when false.
+    // `device` must come from CreateVulkanDevice(); loss remains latched through the ordinary device-loss path.
+    export [[nodiscard]] bool FailNextVulkanRetirementQuery(
+        RHI::IDevice* device, VulkanRetirementQuery query, bool deviceLost);
+
     // Factory — creates the Vulkan backend IDevice.
     // Call once during engine initialization; the returned device owns all
     // Vulkan state.  Destroy it before the window is destroyed.
@@ -212,6 +235,11 @@ namespace Extrinsic::Backends::Vulkan
         std::uint32_t PhysicalDeviceCount = 0;
         std::uint32_t GraphicsQueueFamily = 0;
         std::uint32_t AsyncComputeQueueFamily = 0;
+        std::uint32_t AsyncComputeQueueIndex = 0;
+        std::uint32_t MethodComputeQueueFamily = 0;
+        std::uint32_t MethodComputeQueueIndex = 0;
+        std::uint32_t GraphicsComputeQueueCount = 0;
+        std::uint32_t FrameComputeQueueCount = 0;
         std::uint32_t PresentQueueFamily = 0;
         std::uint32_t TransferQueueFamily = 0;
         std::uint32_t FrameCommandPoolCount = 0;
@@ -245,6 +273,7 @@ namespace Extrinsic::Backends::Vulkan
         bool TransferQueueFound = false;
         bool GraphicsQueueAcquired = false;
         bool AsyncComputeQueueAcquired = false;
+        bool MethodComputeQueueAcquired = false;
         bool PresentQueueAcquired = false;
         bool TransferQueueAcquired = false;
         bool MemoryAllocatorCreated = false;

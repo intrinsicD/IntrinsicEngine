@@ -1,4 +1,6 @@
-// Device scoring, atomic Accept and resident-input reuse, including a deleted row.
+// Device scoring, atomic Accept and resident-input reuse, including a deleted row; and (ARCH-023) the common one-shot
+// lifecycle of a ready start on the real outlier transaction.
+#include "OneShotLifecycleScript.hpp"
 #include "RuntimeTestModule.hpp"
 #include <algorithm>
 #include <chrono>
@@ -10,6 +12,7 @@
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
@@ -42,6 +45,10 @@ namespace
         entt::entity Entity{};
         int Step{},Method{};
         bool Done{},Boundary{};
+        // ARCH-023: a ready start driven by the common script, then compared with the CPU reference.
+        bool Scripted{};
+        Intrinsic::Tests::OneShotLifecycleScript Script{};
+        std::size_t UndoAtStart{};
         std::vector<float> SavedScores{};
         std::vector<std::uint32_t> SavedMask{};
         std::chrono::steady_clock::time_point Started{};
@@ -54,6 +61,13 @@ namespace
             Context.Device=&Kernel().GetDevice();Context.SpatialIndices=Kernel().Services().Find<R::SpatialIndexCache>();
             Context.CommandHistory=&History;
             Context.JobCommands.Submit=[this](R::JobDesc job,R::EditorJobIdentity){return Kernel().Jobs().Submit(std::move(job));};
+            // ARCH-023: a GPU transaction is a step run of the composed service, its holder cancelled like the run's jobs.
+            Context.StepRuns = Kernel().Services().Find<R::StepRunsService>();
+            Context.JobCommands.Cancel = [this](const R::JobToken token)
+            {
+                return Kernel().Jobs().Cancel(token) ? R::EditorJobCancelStatus::Requested
+                                                     : R::EditorJobCancelStatus::NotActive;
+            };
             Entity=Context.Scene->Create();Context.Scene->Raw().emplace<GS::Vertices>(Entity).Properties.Resize(67);
             auto positions=Rows().GetOrAdd<glm::vec3>("v:position");
             for(std::size_t i=0;i<64;++i)positions[i]={float(i%8)*0.25f,float(i/8)*0.25f,float(i%3)*0.03125f};
@@ -67,11 +81,25 @@ namespace
             Rows().GetOrAdd<std::uint32_t>("outlier_mask",0)[66]=7;
             Rows().GetOrAdd<std::uint32_t>("cpu_mask",0)[66]=7;
             Config.KNeighbors=8;Config.Radius=0.6f;Config.MinimumNeighbors=3;
+            const auto noDeviceWork = [this]
+            {
+                const auto s = R::SnapshotEditorOutlierAnalysis(Commands(), Run);
+                EXPECT_EQ(s.Phase, Phase::Running);
+                EXPECT_EQ(s.Result.GpuQueryBatches, 0u) << "nothing recorded while ready";
+            };
+            Script.OnReadyHeld = noDeviceWork;
+            Script.OnRestartedReady = noDeviceWork;
         }
         void Fail(const std::string& message){ADD_FAILURE()<<message;Kernel().RequestExit();}
         void Start()
         {
-            R::EditorOutlierAnalysisResult failure;Run=R::StartEditorOutlierAnalysisTransaction(Commands(),Config,failure);
+            R::EditorOutlierAnalysisResult failure;
+            UndoAtStart = History.UndoCount();
+            // The scripted run starts ready (the section's start row); the direct path waits for ReadyToAccept
+            // without Run or Step, so it starts the computation at once (the one-shot default is ready).
+            auto config = Config;
+            config.Execution.Start = Scripted ? R::StepRunStart::Ready : R::StepRunStart::Run;
+            Run = R::StartEditorOutlierAnalysisTransaction(Commands(), config, failure);
             if(!Run)Fail(failure.Message);
         }
         void Frame(double,double) override
@@ -101,6 +129,28 @@ namespace
             }
             const auto snapshot=R::SnapshotEditorOutlierAnalysis(Commands(),Run);
             if(snapshot.Phase==Phase::Failed||snapshot.Phase==Phase::Discarded){Fail(snapshot.Result.Message);return;}
+            if (Scripted)
+            {
+                if (!Script.Advance(*Context.StepRuns, snapshot.Result.StepRun))
+                    return;
+                const auto final = R::SnapshotEditorOutlierAnalysis(Commands(), Run);
+                if (final.Phase != Phase::Applied)
+                {
+                    Fail("the scripted run did not apply: " + final.Result.Message);
+                    return;
+                }
+                const auto& rows = std::as_const(Rows());
+                EXPECT_EQ(
+                    rows.Get<std::uint32_t>(Config.Mask.Name).Vector(), rows.Get<std::uint32_t>("cpu_mask").Vector());
+                const auto scores = rows.Get<float>(Config.Score.Name).Vector(),
+                           cpu = rows.Get<float>("cpu_score").Vector();
+                for (std::size_t i = 0; i < scores.size(); ++i)
+                    EXPECT_NEAR(scores[i], cpu[i], 2e-5) << i;
+                EXPECT_EQ(History.UndoCount(), UndoAtStart + 1u) << "one Accept, one undo entry";
+                Done = true;
+                Kernel().RequestExit();
+                return;
+            }
             if(Step==1){
                 if(snapshot.Phase!=Phase::ReadyToAccept)return;
                 Accepted.reset();
@@ -146,8 +196,43 @@ TEST(RUNTIME297OutlierResidency, ParityResidentSecondRunAndDiscard)
     auto config=R::CreateReferenceEngineConfig();config.Window.Width=128;config.Window.Height=128;
     config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
     auto app=std::make_unique<OutlierApp>();auto* run=app.get();
-    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<R::SpatialIndexCache>();engine.Initialize();
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
+    engine.Initialize();
     struct Shutdown { R::Engine& Engine;~Shutdown(){Engine.Shutdown();} } shutdown{engine};
     if(!engine.GetDevice().SupportsShaderFloat64())GTEST_SKIP()<<"Shader float64 unavailable";
     engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());ASSERT_TRUE(run->Done)<<"step "<<run->Step;
+}
+TEST(RUNTIME297OutlierResidency, AReadyStartFollowsTheCommonOneShotLifecycle)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    auto config = R::CreateReferenceEngineConfig();
+    config.Window.Width = 128;
+    config.Window.Height = 128;
+    config.Render.EnableValidation = true;
+    config.Render.EnableVSync = false;
+    config.ReferenceScene.Enabled = false;
+    auto app = std::make_unique<OutlierApp>();
+    auto* run = app.get();
+    run->Scripted = true;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<R::SpatialIndexCache>();
+    engine.EmplaceModule<R::StepRunsModule>();
+    engine.Initialize();
+    struct Shutdown
+    {
+        R::Engine& Engine;
+        ~Shutdown()
+        {
+            Engine.Shutdown();
+        }
+    } shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64())
+        GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_TRUE(run->Done) << "step " << run->Step;
+    EXPECT_EQ(run->Script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
 }

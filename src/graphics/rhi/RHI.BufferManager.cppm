@@ -1,6 +1,8 @@
-// Leased buffer ownership and views; device operations stay in the implementation.
+// Leased buffer ownership and views, with opt-in cached scratch leases under a byte budget.
 module;
 
+#include <algorithm>
+#include <bit>
 #include <cstdint>
 #include <memory>
 
@@ -12,6 +14,7 @@ import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.BufferView;
+import Extrinsic.RHI.TransferQueue;
 extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 // ============================================================
@@ -22,16 +25,15 @@ extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 // around a BufferHandle that calls Release() on destruction.
 //
 // Thread-safety contract:
-//   - Create() must be called on the render thread (it calls
-//     IDevice::CreateBuffer which may touch driver state).
-//   - Retain() / Release() are atomic (safe from any thread).
-//   - Release() reaching zero calls IDevice::DestroyBuffer —
-//     callers must ensure this happens on the render thread.
-//     The conventional pattern is to move the lease onto the
-//     render thread's deferred-destroy queue before the last
-//     reference is dropped.
-//   - View() / GetDesc() are read-only and lock-free after
-//     Create() has returned.
+//   - Create() / CreateScratch() / CollectScratch() / DrainScratch()
+//     must be called on the device-owner thread (they may call
+//     IDevice::CreateBuffer / DestroyBuffer).
+//   - Retain() / Release() / AcquireLease() / View() / GetDesc() take
+//     the manager mutex and are safe from any thread.
+//   - Release() reaching zero on a plain buffer calls
+//     IDevice::DestroyBuffer — callers must ensure this happens on the
+//     render thread. The last release of a scratch buffer only parks it
+//     (no device call) until DrainScratch() has run.
 //
 // Lifetime contract:
 //   Every BufferLease issued by this manager MUST be destroyed
@@ -61,11 +63,47 @@ extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 //
 //   // lease goes out of scope → refcount → 1.
 //   // lease2 goes out of scope → refcount → 0 → DestroyBuffer.
+//
+// Scratch leases (ARCH-023): CreateScratch() serves a request from a
+// power-of-two size class (at least MinScratchClassBytes) and the same
+// Usage/HostVisible/HostReadback. Its last release parks the buffer as
+// Returned; CollectScratch() stamps it Pending, and once the stamp is
+// retired (IDevice::IsFrameRetired and the compute lane, so without new
+// frames as well) it is Idle: reusable by the next
+// matching request, and the only state the LRU eviction may destroy.
+// Active, returned, pending and idle class bytes all count toward the
+// budget; a request that cannot fit even after evicting every idle
+// buffer is refused (ResourceBudgetExceeded) without any device call.
+// Reused contents are undefined. GetDesc()/View() report the requested
+// size; the class capacity is private to the cache.
 // ============================================================
 
 export namespace Extrinsic::RHI
 {
-    class BufferManager
+    // Proof that no submission made before the stamp still uses a released buffer that frames never record (method
+    // scratch, workspaces): its frame number retired (IDevice::IsFrameRetired: graphics-queue transfers, readbacks and
+    // graphics-lane compute) and the compute-lane fence then current completed. A stamp taken between frames does not
+    // wait for frames still in flight; a buffer a frame records needs that frame's own stamp.
+    struct RetirementStamp
+    {
+        std::uint64_t Frame{};
+        ReadbackToken ComputeFence{};
+    };
+    [[nodiscard]] RetirementStamp StampRetirement(IDevice& device);
+    [[nodiscard]] bool IsRetired(IDevice& device, const RetirementStamp& stamp);
+
+    // Physical bytes of the cached scratch states and allocation outcomes. Misses count device allocations a
+    // cache miss requested; refusals count requests the budget (or an overflowing size) rejected.
+    struct ScratchStats
+    {
+        std::uint64_t ActiveBytes{}, PendingBytes{}, IdleBytes{}, BudgetBytes{};
+        std::uint64_t Hits{}, Misses{}, Refusals{}, Evictions{};
+        // The last refused request's class bytes, and the active plus pending bytes it would have joined.
+        std::uint64_t LastRefusedBytes{}, LastRefusalCommittedBytes{};
+    };
+
+    // C++ language linkage, as IDevice's: consumers forward-declare it without importing this module.
+    extern "C++" class BufferManager
     {
     public:
         // Convenience alias — consumers spell out the full type once
@@ -74,6 +112,14 @@ export namespace Extrinsic::RHI
 
         // Sentinel for View() — means "from offset to end of buffer".
         static constexpr std::uint64_t WholeBuffer = ~std::uint64_t{0};
+
+        // Smallest scratch size class; requests above 2^63 bytes have no class (0).
+        static constexpr std::uint64_t MinScratchClassBytes = 64;
+        [[nodiscard]] static constexpr std::uint64_t ScratchClassBytes(const std::uint64_t requested) noexcept
+        {
+            return requested > (std::uint64_t{1} << 63u) ? 0u
+                                                         : std::bit_ceil(std::max(requested, MinScratchClassBytes));
+        }
 
         // -----------------------------------------------------------------
         // Lifecycle
@@ -94,11 +140,28 @@ export namespace Extrinsic::RHI
         ///   - OutOfDeviceMemory: IDevice::CreateBuffer returned an invalid handle.
         [[nodiscard]] Core::Expected<BufferLease> Create(const BufferDesc& desc);
 
+        /// A cached scratch lease (see the class comment); refcount 1. Errors: DeviceNotOperational,
+        /// OutOfRange (no size class), ResourceBudgetExceeded (no device call), OutOfDeviceMemory.
+        [[nodiscard]] Core::Expected<BufferLease> CreateScratch(const BufferDesc& desc);
+        /// Keeps `lease` when it is a buffer of `desc`'s memory class whose requested size covers
+        /// desc.SizeBytes; otherwise replaces it through CreateScratch (the old buffer is released).
+        /// False leaves `lease` empty.
+        [[nodiscard]] bool EnsureScratch(BufferLease& lease, const BufferDesc& desc);
+        /// Unlimited (all bits set) until set. Boot-time configuration; it never evicts by itself.
+        void SetScratchBudget(std::uint64_t bytes) noexcept;
+        /// Owner thread: stamps returned buffers with `returned` and makes pending buffers whose
+        /// stamp retired idle.
+        void CollectScratch(const RetirementStamp& returned);
+        /// Owner thread, once the device is idle (and in the destructor): destroys every returned,
+        /// pending and idle buffer; later scratch releases destroy their buffer directly.
+        void DrainScratch();
+        [[nodiscard]] ScratchStats GetScratchStats() const;
+
         // -----------------------------------------------------------------
         // LeasableManager concept requirements (called by Lease internals)
         // -----------------------------------------------------------------
-        void Retain(BufferHandle handle);   ///< Atomically increment refcount.
-        void Release(BufferHandle handle);  ///< Decrement; destroy at zero.
+        void Retain(BufferHandle handle);   ///< Increment refcount.
+        void Release(BufferHandle handle);  ///< Decrement; destroy (or park scratch) at zero.
 
         // -----------------------------------------------------------------
         // Secondary lease — called by Lease::Share()
@@ -119,8 +182,9 @@ export namespace Extrinsic::RHI
                                       std::uint64_t  offset = 0,
                                       std::uint64_t  size   = WholeBuffer) const noexcept;
 
-        /// Return the descriptor the buffer was created with, or nullptr
-        /// if the handle is invalid / already released.
+        /// Return the descriptor the buffer was created with (a scratch
+        /// buffer: as requested), or nullptr if the handle is invalid /
+        /// already released.
         [[nodiscard]] const BufferDesc* GetDesc(BufferHandle handle) const noexcept;
 
     private:

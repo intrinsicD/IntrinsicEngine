@@ -106,6 +106,35 @@ export namespace Geometry::KMeans
         CpuScratch* cpuScratch,
         const IterationObserver& onIteration = {});
 
+    // Cluster's Lloyd loop one iteration at a time (ARCH-023: a step run's logical step is one assign and update):
+    // BeginLloyd seeds the centroids as Cluster does, StepLloyd runs one iteration with Cluster's convergence rule,
+    // and FinishLloyd assigns the labels of the current centroids when the last update moved one. Begin, then at
+    // most MaxIterations steps until Converged, then Finish, equals Cluster for the same inputs. The state refers to
+    // `points` and `cpuScratch`, which must outlive it.
+    struct LloydState
+    {
+        std::span<const glm::vec3> Points{};
+        CpuScratch* Scratch{nullptr};
+        float ToleranceSquared{0.0f};
+        bool CentroidsMoved{false}; // the last update changed a centroid (Finish reassigns)
+        float MaxShiftSquared{0.0f}; // the last update's largest squared centroid shift
+        KMeansResult Result{};
+    };
+    enum class LloydStatus : uint8_t
+    {
+        Continue,
+        Converged,
+        Failed, // a non-finite point: Cluster returns nullopt
+    };
+    // nullopt where Cluster returns nullopt for these inputs before its first iteration.
+    [[nodiscard]] std::optional<LloydState> BeginLloyd(std::span<const glm::vec3> points,
+        std::span<const glm::vec3> initialCentroids,
+        const KMeansParams& params,
+        CpuScratch* cpuScratch);
+    [[nodiscard]] LloydStatus StepLloyd(LloydState& state);
+    // The result of the iterations so far (at least one): a copy of `state` to keep stepping, or a moved one.
+    [[nodiscard]] std::optional<KMeansResult> FinishLloyd(LloydState state);
+
     // `count` distinct indices of [0, n), drawn uniformly in order (a partial Fisher-Yates over a sparse swap map):
     // O(count) time and memory, whatever n. Requires count <= n. Random initialization takes its seeds from it.
     [[nodiscard]] std::vector<uint32_t> SampleDistinctIndices(uint32_t n, uint32_t count, uint32_t seed);

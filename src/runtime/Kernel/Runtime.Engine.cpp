@@ -118,7 +118,6 @@ namespace Extrinsic::Runtime
         WorldRegistry m_WorldRegistry{};
         ECS::Scene::Registry* m_Scene{};
         std::vector<FrameHookRecord> m_FrameHooks{};
-        bool m_HasIdleFrameHooks{false}; // set at registration; gates the minimized-frame work
         std::vector<ViewportInputHookRecord> m_ViewportInputHooks{};
         std::uint64_t m_NextHookRegistrationSequence{0u};
         Core::FrameClock m_FrameClock{};
@@ -240,7 +239,6 @@ namespace Extrinsic::Runtime
             });
 
         m_Impl->m_FrameHooks.clear();
-        m_Impl->m_HasIdleFrameHooks = false;
         m_Impl->m_ViewportInputHooks.clear();
         m_Impl->m_NextHookRegistrationSequence = 0u;
 
@@ -290,8 +288,6 @@ namespace Extrinsic::Runtime
                 m_Impl->m_ServiceRegistry,
                 [this, moduleName](FramePhase phase, RuntimeFrameHook hook)
                 {
-                    m_Impl->m_HasIdleFrameHooks =
-                        m_Impl->m_HasIdleFrameHooks || phase == FramePhase::Idle;
                     m_Impl->m_FrameHooks.push_back(
                         Impl::FrameHookRecord{
                             .ModuleName = moduleName,
@@ -711,15 +707,26 @@ namespace Extrinsic::Runtime
             RequestExitFromWindowClose("native-poll");
     }
 
+    void Engine::CollectGpuCompletions(RuntimeFramePacingDiagnostics& pacing)
+    {
+        const auto collectBegin = std::chrono::steady_clock::now();
+        m_Impl->m_Device->GetTransferQueue().CollectCompleted();
+        pacing.TransferCollectMicros = ElapsedMicros(collectBegin);
+        const auto drainBegin = std::chrono::steady_clock::now();
+        (void)m_Impl->m_JobService.DrainGpuQueueCompletedTransfers();
+        pacing.GpuTransferDrainMicros = ElapsedMicros(drainBegin);
+        m_Impl->m_Device->CollectCompletedResources();
+    }
+
     void Engine::RunMinimizedFrameWork(
         EditorInputCaptureSnapshot& editorCapture,
         RuntimeFramePacingDiagnostics& pacing)
     {
         if (!m_Impl->m_Scene)
             return;
-        // Minimized: no simulation, extraction or render, but modules that opted
-        // into FramePhase::Idle (the agent lane) keep being served. Same order as
-        // the full frame: drain, pump, hooks, completions, pump, reap. Mutually
+        // Minimized: no simulation, extraction or render; commands and jobs still
+        // progress without Idle hooks. Owner callbacks follow device completion.
+        // Same order as the full frame: drain, pump, hooks, completions, pump, reap. Mutually
         // exclusive with the full frame (RunFrame returns after this), so
         // DrainCompletions never runs twice per frame. No pre-render transform
         // flush, world maintenance or frame-index advance happens here.
@@ -731,6 +738,7 @@ namespace Extrinsic::Runtime
                                    });
         (void)m_Impl->m_KernelEvents.Pump();
         RunRuntimeModuleFrameHooks(FramePhase::Idle, 0.0, 0.0, editorCapture, pacing);
+        CollectGpuCompletions(pacing);
         (void)m_Impl->m_JobService.DrainCompletions(
             m_Impl->m_KernelEvents, kJobCompletionApplyBudgetPerFrame,
             kJobCompletionGateCheckBudgetPerFrame);
@@ -789,8 +797,7 @@ namespace Extrinsic::Runtime
         if (!platformContinueFrame)
         {
             m_Impl->m_FrameClock.Resample();
-            if (m_Impl->m_HasIdleFrameHooks)
-                RunMinimizedFrameWork(frameContext.EditorCapture, pacing);
+            RunMinimizedFrameWork(frameContext.EditorCapture, pacing);
             publishPacingSample();
             return;
         }
@@ -1049,6 +1056,7 @@ namespace Extrinsic::Runtime
         pacing.RenderBeginFrameMicros = ElapsedMicros(renderBeginFrameBegin);
         if (!pacing.RendererBeganFrame)
         {
+            CollectGpuCompletions(pacing);
             // BeginFrame failed before extraction ran, so no slot was acquired
             // (PooledFrontSlot stays kInvalidSlot) — nothing to release.
             pacing.RenderContractMicros = ElapsedMicros(renderContractBegin);

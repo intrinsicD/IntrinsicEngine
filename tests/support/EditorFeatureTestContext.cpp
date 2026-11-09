@@ -59,6 +59,7 @@ namespace Intrinsic::Tests
             .Scene = Scene,
             .World = World,
             .CommandHistory = CommandHistory,
+            .StepRuns = StepRuns,
             .Device = Device,
             .JobCommands = JobCommands,
             .EngineConfigControlState = EngineConfigControlState,

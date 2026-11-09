@@ -3259,7 +3259,7 @@ ctest --test-dir build/ci --output-on-failure -R '^(RuntimeModule|RuntimeKernelE
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests IntrinsicRuntimeClusteringServiceGpuSmokeTests IntrinsicRuntimePointCloudConsolidationGpuParityTests IntrinsicPointLBVHGpuTests -j4
-ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^(DefaultRecipeSurfaceGpuSmoke\.RecipeSelectorReachesOperationalVulkanCommandStream|RuntimeSandboxAcceptanceGpuSmoke\.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter|ClusteringServiceGpuSmoke\.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties|PointCloudConsolidationGpuParity\.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement|PointLBVHGpuSmoke\.FramedKNearestReusesBuffersAndRejectsStaleTarget)$' --no-tests=error --timeout 180 --parallel 1
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^(DefaultRecipeSurfaceGpuSmoke\.RecipeSelectorReachesOperationalVulkanCommandStream|RuntimeSandboxAcceptanceGpuSmoke\.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter|ClusteringServiceGpuSmoke\.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties|PointCloudConsolidationGpuParity\.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement|PointLBVHGpuSmoke\.SessionKNearestKeepsTiesAndRefusesStaleTarget)$' --no-tests=error --timeout 180 --parallel 1
 python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
 ```
 

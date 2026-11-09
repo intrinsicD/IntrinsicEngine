@@ -5,9 +5,11 @@ module;
 #include <span>
 #include <glm/vec3.hpp>
 module Extrinsic.Runtime.ClusteringModule:GpuBackend;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.GpuPropertyResidency;
 namespace Extrinsic::Runtime
 {
@@ -34,12 +36,17 @@ namespace Extrinsic::Runtime
     class KMeansGpuWorkspace
     {
     public:
-        explicit KMeansGpuWorkspace(RHI::IDevice&);
+        // Buffers are cached scratch leases of `scratch`, which must outlive the workspace.
+        KMeansGpuWorkspace(RHI::IDevice&, RHI::BufferManager& scratch);
         ~KMeansGpuWorkspace();
         // Reuses retained pipelines and any buffer with enough capacity. Call
         // only after every submission that recorded this workspace completed.
         bool Prepare(std::uint32_t count, std::span<const glm::vec3> seeds,
                      std::span<const std::uint32_t> slots);
+        // A restart of a prepared run (same count and slots): uploads `seeds` again through `transfer` and nothing
+        // else, so a worker may call it (no allocation). Call only after every submission that recorded this
+        // workspace completed; the next compute submission orders after the upload.
+        bool Reseed(RHI::ITransferQueue& transfer, std::span<const glm::vec3> seeds);
         RHI::BufferHandle Record(RHI::ICommandContext&, const Graphics::GpuPropertyView& input,
             const KMeansGpuPage&, const Graphics::GpuPropertyView& labels = {},
             const Graphics::GpuPropertyView& presentation = {});
@@ -48,9 +55,12 @@ namespace Extrinsic::Runtime
         [[nodiscard]] RHI::BufferHandle Distances() const;
         [[nodiscard]] RHI::BufferHandle Diagnostics() const;
         [[nodiscard]] std::uint64_t CpuUploadBytes() const;
-        // Device objects created by the last Prepare; zero when fully reused.
+        // Device objects created by the last Prepare; zero when fully reused (retained or scratch-cache hits).
         [[nodiscard]] std::uint32_t PreparedBufferCreations() const;
         [[nodiscard]] std::uint32_t PreparedPipelineCreations() const;
+        // Returns every buffer to the scratch cache, keeping the pipelines; Prepare reallocates.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

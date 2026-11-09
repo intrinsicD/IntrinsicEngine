@@ -12,6 +12,7 @@ This section defines how IntrinsicEngine benchmarks are authored, executed, vali
 - [Report template](report-template.md)
 - [Benchmark manifest schema](benchmark-manifest-schema.md)
 - [Benchmark result JSON schema](result-json-schema.md)
+- [Bounded method execution campaign](method-execution-campaign.md)
 
 ## Regression diagnostics
 

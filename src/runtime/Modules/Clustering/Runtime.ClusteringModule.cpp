@@ -27,6 +27,7 @@ import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.EditorWorkspaceSlot;
 
@@ -37,7 +38,6 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.TransferQueue;
@@ -101,11 +101,6 @@ namespace Extrinsic::Runtime
             KMeansSnapshot Snapshot{};
             KMeansRunCompleted Completion{};
             std::optional<GK::KMeansResult> Clustered{};
-        };
-
-        struct KMeansJobCompleted
-        {
-            KMeansJobResult Result{};
         };
 
         [[nodiscard]] const char* DomainName(
@@ -428,7 +423,7 @@ namespace Extrinsic::Runtime
 
             GK::KMeansParams params{};
             params.ClusterCount = command.Parameters.ClusterCount;
-            params.MaxIterations = command.Parameters.MaxIterations;
+            params.MaxIterations = command.Parameters.Execution.IterationCap;
             params.Seed = command.Parameters.Seed;
             params.Init = command.Parameters.Initialization ==
                     KMeansInitialization::Hierarchical
@@ -494,53 +489,6 @@ namespace Extrinsic::Runtime
             }
             result.Clustered = std::move(clustered);
             return result;
-        }
-
-        [[nodiscard]] KMeansJobResult RunKMeansWorker(
-            KMeansSnapshot snapshot,
-            const JobCancellation& cancellation)
-        {
-            if (cancellation.IsCancelled())
-            {
-                KMeansJobResult cancelled{};
-                cancelled.Snapshot = std::move(snapshot);
-                cancelled.Completion = MakeCompletion(
-                    cancelled.Snapshot.Command,
-                    cancelled.Snapshot.World,
-                    cancelled.Snapshot.Correlation,
-                    KMeansRunStatus::Cancelled,
-                    Core::ErrorCode::InvalidState,
-                    "K-Means CPU work was cancelled before execution.");
-                return cancelled;
-            }
-
-            std::optional<GK::KMeansResult> clustered = GK::Cluster(
-                std::span<const glm::vec3>{snapshot.Input->Points},
-                {},
-                snapshot.Params,
-                nullptr,
-                [&cancellation](const std::uint32_t completed, const std::uint32_t maxIterations)
-                {
-                    cancellation.ReportProgress(
-                        static_cast<float>(completed) / static_cast<float>(maxIterations));
-                });
-            if (!clustered.has_value())
-            {
-                KMeansJobResult failed{};
-                failed.Snapshot = std::move(snapshot);
-                failed.Completion = MakeCompletion(
-                    failed.Snapshot.Command,
-                    failed.Snapshot.World,
-                    failed.Snapshot.Correlation,
-                    KMeansRunStatus::GeometryProcessingFailed,
-                    Core::ErrorCode::Unknown,
-                    "Geometry.KMeans returned no result for the requested points.");
-                return failed;
-            }
-            return MakeCompletedResult(
-                std::move(snapshot),
-                std::move(*clustered),
-                ClusteringBackend::CpuReference);
         }
 
         void PublishCompletion(KernelEventBus* events,
@@ -811,22 +759,15 @@ namespace Extrinsic::Runtime
             return applied;
         }
 
-        void HandleJobCompletedEvent(
-            const KMeansJobCompleted& event,
+        // A CPU run's Accept: checks the world, entity, domain and exact source, then commits the labels with one undo
+        // entry and publishes the one completion (applied or why not). True when applied.
+        [[nodiscard]] bool PublishCpuResult(const KMeansJobResult& job,
             WorldRegistry* worlds,
             KernelEventBus* events,
             EditorCommandHistory* history,
             ClusteringModuleStats& stats)
         {
             stats.CompletionEvents += 1u;
-
-            const KMeansJobResult& job = event.Result;
-            if (!job.Completion.Succeeded())
-            {
-                stats.CommitsDropped += 1u;
-                PublishCompletion(events, job.Completion);
-                return;
-            }
 
             if (worlds == nullptr ||
                 !job.Snapshot.World.IsValid() ||
@@ -840,7 +781,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "K-Means result was dropped because its world is no longer active.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             ECS::Scene::Registry* scene = worlds->Get(job.Snapshot.World);
@@ -853,7 +794,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "Scene registry is unavailable for completed K-Means publication.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             entt::registry& raw = scene->Raw();
@@ -868,7 +809,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "K-Means target entity is stale or no longer live.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             GS::MutableSourceView view = GS::BuildMutableView(raw, entity);
@@ -883,7 +824,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "Completed K-Means job no longer matches a writable GeometrySources domain.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             Geometry::PropertySet* properties =
@@ -897,7 +838,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "Completed K-Means domain has no writable property set.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             PointInputCapture current;
@@ -914,7 +855,7 @@ namespace Extrinsic::Runtime
                 dropped.Message =
                     "K-Means result was dropped because source positions changed before commit.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             EditorCommandHistoryStatus commitStatus{};
@@ -956,7 +897,7 @@ namespace Extrinsic::Runtime
                 dropped.Message = "K-Means result publication failed during "
                                   "the editor mutation transaction.";
                 PublishCompletion(events, std::move(dropped));
-                return;
+                return false;
             }
 
             KMeansRunCompleted completed = job.Completion;
@@ -978,6 +919,7 @@ namespace Extrinsic::Runtime
                     .LabelCount = completed.LabelCount,
                 });
             }
+            return true;
         }
 
         void ReactToClusterLabelsChanged(
@@ -1007,57 +949,174 @@ namespace Extrinsic::Runtime
             stats.VisualizationRefreshReactions += 1u;
         }
 
-        [[nodiscard]] CommandOutcome SubmitCpuSnapshot(
-            JobService& jobs,
-            KernelEventBus* events,
-            KMeansSnapshot snapshot,
-            ClusteringModuleStats& stats)
+        // A CPU run's own data (ARCH-023 B8): the request's snapshot and its Lloyd state. Step (a worker) and Commit
+        // use the state, never at once; Valid and Discard read only the command and the revision watches.
+        struct KMeansCpuRun
         {
-            const RunKMeans command = snapshot.Command;
-            const WorldHandle world = snapshot.World;
-            const CommandCorrelationId correlation = snapshot.Correlation;
-            JobDesc job = MakeCpuJobDesc<KMeansJobResult>(
-                "Runtime.Clustering.KMeans.CPU",
-                world,
-                [snapshot = std::move(snapshot)](
-                    const JobCancellation& cancellation) mutable
-                {
-                    return RunKMeansWorker(
-                        std::move(snapshot), cancellation);
-                },
-                [](const KMeansJobResult& result)
-                {
-                    return KMeansJobCompleted{.Result = result};
-                });
-            job.FinalizeUnpublishedOnMainThread =
-                [events, command, world, correlation]() mutable
-                {
-                    KMeansRunCompleted cancelled = MakeCompletion(
-                        command,
-                        world,
-                        correlation,
-                        KMeansRunStatus::Cancelled,
-                        Core::ErrorCode::InvalidState,
-                        "K-Means work was cancelled before its result could be committed.");
-                    PublishCompletion(events, std::move(cancelled));
-                };
-            job.CorrelationId = correlation.Value;
-            const JobToken token = jobs.Submit(std::move(job));
-            if (!token.IsValid())
+            KMeansSnapshot Snapshot{};
+            std::function<bool()> Current{}; // world, attachment and the input, output and deletion revisions
+            std::optional<GK::LloydState> Lloyd{}; // seeded by the first step, on the worker; a restart drops it
+            std::atomic_bool Failed{false}; // a step found a non-finite point
+            bool Ended{false}; // its one completion went out
+            std::uint64_t Run{0u};
+        };
+
+        // What a CPU run reaches of its module: borrowed until the module's shutdown abandons the run.
+        struct KMeansCpuRunHost
+        {
+            KernelEventBus* Events{};
+            WorldRegistry* Worlds{};
+            EditorCommandHistory* History{};
+            ClusteringModuleStats* Stats{};
+            StepRunsService* Steps{};
+            std::vector<std::pair<CommandCorrelationId, std::uint64_t>>* Runs{};
+        };
+
+        // The CPU reference as a worker step run of Lloyd iterations (one step: one assign and update, as the Vulkan
+        // run counts them): ready or running by the request's start, its labels published once on Accept with one
+        // undo entry, nothing published on Discard; a restart seeds the same centroids again.
+        [[nodiscard]] CommandOutcome StartCpuRun(const KMeansCpuRunHost& host,
+            KMeansSnapshot snapshot,
+            const EditorJobCommandSurface& jobs,
+            std::function<bool()> current)
+        {
+            auto run = std::make_shared<KMeansCpuRun>();
+            run->Snapshot = std::move(snapshot);
+            run->Current = std::move(current);
+            const auto refuse = [&](std::string why)
             {
-                stats.JobSubmissionFailures += 1u;
-                KMeansRunCompleted rejected = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::GeometryProcessingFailed,
-                    Core::ErrorCode::InvalidState,
-                    "K-Means CPU job submission was rejected by JobService.");
-                PublishCompletion(events, std::move(rejected));
-                return CommandOutcome::Fail(
-                    "K-Means CPU job submission was rejected by JobService.");
+                host.Stats->JobSubmissionFailures += 1u;
+                const auto& s = run->Snapshot;
+                PublishCompletion(host.Events,
+                    MakeCompletion(s.Command,
+                        s.World,
+                        s.Correlation,
+                        KMeansRunStatus::ModuleUnavailable,
+                        Core::ErrorCode::InvalidState,
+                        why));
+                return CommandOutcome::Fail(std::move(why));
+            };
+            if (host.Steps == nullptr || !jobs.Available())
+                return refuse("K-Means needs the step-run service and editor jobs for its run controls.");
+            const RunKMeans& command = run->Snapshot.Command;
+            StepRunCallbacks callbacks{
+                .Step =
+                    [run](StepRunMetric& metric)
+                {
+                    if (!run->Lloyd)
+                        run->Lloyd = GK::BeginLloyd(run->Snapshot.Input->Points, {}, run->Snapshot.Params, nullptr);
+                    const auto status = run->Lloyd ? GK::StepLloyd(*run->Lloyd) : GK::LloydStatus::Failed;
+                    if (status == GK::LloydStatus::Failed)
+                    {
+                        run->Failed.store(true, std::memory_order_release);
+                        return StepOutcome::Failed;
+                    }
+                    metric.Values = {double(run->Lloyd->Result.Inertia), double(run->Lloyd->MaxShiftSquared), 0.0, 0.0};
+                    return status == GK::LloydStatus::Converged ? StepOutcome::Converged : StepOutcome::Continue;
+                },
+                .Valid =
+                    [run]
+                {
+                    return run->Current();
+                },
+                .Commit =
+                    [run, host](std::string& diagnostic)
+                {
+                    run->Ended = true;
+                    // Accept needs a step, so the state exists; the labels are those of the current centroids.
+                    std::optional<GK::KMeansResult> clustered =
+                        run->Lloyd ? GK::FinishLloyd(*run->Lloyd) : std::nullopt;
+                    if (!clustered)
+                    {
+                        diagnostic = "Geometry.KMeans returned no result for the requested points.";
+                        auto failed = MakeCompletion(run->Snapshot.Command,
+                            run->Snapshot.World,
+                            run->Snapshot.Correlation,
+                            KMeansRunStatus::GeometryProcessingFailed,
+                            Core::ErrorCode::Unknown,
+                            diagnostic);
+                        failed.StepRun = run->Run;
+                        PublishCompletion(host.Events, std::move(failed));
+                        return StepRunCommit::Refused;
+                    }
+                    KMeansJobResult job = MakeCompletedResult(
+                        std::move(run->Snapshot), std::move(*clustered), ClusteringBackend::CpuReference);
+                    job.Completion.StepRun = run->Run;
+                    if (PublishCpuResult(job, host.Worlds, host.Events, host.History, *host.Stats))
+                        return StepRunCommit::Committed;
+                    diagnostic = "K-Means labels were not published (stale source, world or output).";
+                    return StepRunCommit::Refused;
+                },
+                .Discard =
+                    [run, host]
+                {
+                    if (std::exchange(run->Ended, true))
+                        return;
+                    const auto& s = run->Snapshot;
+                    auto status = KMeansRunStatus::Cancelled;
+                    auto error = Core::ErrorCode::InvalidState;
+                    std::string message = "K-Means work was cancelled before its result could be committed.";
+                    if (run->Failed.load(std::memory_order_acquire))
+                    {
+                        status = KMeansRunStatus::GeometryProcessingFailed;
+                        error = Core::ErrorCode::Unknown;
+                        message = "Geometry.KMeans returned no result for the requested points.";
+                    }
+                    else if (host.Worlds == nullptr || !host.Worlds->Contains(s.World) ||
+                        host.Worlds->ActiveWorld() != s.World)
+                    {
+                        status = KMeansRunStatus::StaleWorld;
+                        message = "K-Means result was dropped because its world is no longer active.";
+                    }
+                    else if (!run->Current())
+                    {
+                        status = KMeansRunStatus::StaleSource;
+                        message = "K-Means result was dropped because source positions changed before commit.";
+                    }
+                    if (status != KMeansRunStatus::Cancelled)
+                        host.Stats->CommitsDropped += 1u;
+                    auto completion = MakeCompletion(s.Command, s.World, s.Correlation, status, error, message);
+                    completion.StepRun = run->Run;
+                    PublishCompletion(host.Events, std::move(completion));
+                },
+                // run_control restart (no step runs then): the next step seeds the same centroids again.
+                .Restart =
+                    [run](std::string&)
+                {
+                    run->Lloyd.reset();
+                    return true;
+                },
+            };
+            const EditorJobIdentity identity{.EntityId = command.StableEntityId,
+                .Scope = ToEditorJobScope(command.Properties.OutputLabels.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+                .OutputName = command.Properties.OutputLabels.Name,
+                .RequestedDomain = EditorJobDomain::Cpu};
+            std::string refusal;
+            const auto id = host.Steps->Start(
+                {.Label = "Runtime.Clustering.KMeans.CPU",
+                    .Owner = "Runtime.ClusteringModule",
+                    .Output = {.StableEntityId = command.StableEntityId, .Property = command.Properties.OutputLabels},
+                    .Execution = command.Parameters.Execution,
+                    .MetricNames = {"inertia", "max_shift_squared", "", ""}},
+                std::move(callbacks),
+                EditorStepRunJobs(jobs, identity, std::make_shared<JobToken>()),
+                refusal);
+            if (id == 0u)
+                return refuse("K-Means CPU step run was refused: " + refusal);
+            run->Run = id;
+            host.Stats->JobsSubmitted += 1u;
+            auto& runs = *host.Runs;
+            runs.emplace_back(run->Snapshot.Correlation, id);
+            // Every live run stays listed (shutdown abandons it); ended ones beyond 32 entries go, oldest first.
+            for (auto it = runs.begin(); runs.size() > 32u && it != runs.end();)
+            {
+                const auto observed = host.Steps->Observe(it->second);
+                if (!observed || IsTerminal(observed->Phase))
+                    it = runs.erase(it);
+                else
+                    ++it;
             }
-            stats.JobsSubmitted += 1u;
             return CommandOutcome::Ok();
         }
 
@@ -1076,14 +1135,16 @@ namespace Extrinsic::Runtime
             PublishCompletion(events, std::move(completed));
         }
 
-        [[nodiscard]] CommandOutcome HandleRunKMeansCommand(
-            CommandContext& context,
+        [[nodiscard]] CommandOutcome HandleRunKMeansCommand(CommandContext& context,
             const RunKMeans& command,
             ClusteringGpuState* gpuState,
-            SpatialIndexCache* spatialIndices, RHI::IDevice* device, EditorCommandHistory* history,
+            SpatialIndexCache* spatialIndices,
+            RHI::IDevice* device,
+            EditorCommandHistory* history,
             EditorWorkspaceSlot& workspace,
             KMeansCapturedInput& captures,
             ClusteringModuleStats& stats,
+            const KMeansCpuRunHost& cpu,
             bool* heldForSeeding = nullptr,
             const bool countCaptureReuse = true)
         {
@@ -1128,42 +1189,65 @@ namespace Extrinsic::Runtime
                 return CommandOutcome::Fail(failure.Message);
             }
 
+            EditorProcessingContext processing{};
+            processing.Scene = &context.ActiveWorld;
+            processing.World = world;
+            processing.CommandHistory = history;
+            processing.SpatialIndices = spatialIndices;
+            processing.Device = device;
+            processing.AttachmentActive =
+                [worlds = context.Worlds, world, scene = processing.Scene, attached = command.AttachmentActive]
+            {
+                return worlds && worlds->ActiveWorld() == world && worlds->Get(world) == scene &&
+                    (!attached || attached());
+            };
+            // Either run's jobs (the step run's holder and segments, a GPU run's Accept) are editor jobs of the
+            // workspace, rows of its Jobs window, carrying the request's correlation and label prefix.
+            const EditorJobCommandSurface editorJobs = workspace.JobCommands();
+            processing.JobCommands = editorJobs;
+            if (editorJobs.Submit)
+                processing.JobCommands.Submit = [submit = editorJobs.Submit,
+                                                    history,
+                                                    prefix = command.LabelPrefix,
+                                                    correlation = context.Correlation.Value](
+                                                    JobDesc desc, EditorJobIdentity identity)
+                {
+                    CarryEditorLabelPrefix(desc, history, prefix); // the run publishes after the call that queued it
+                    desc.CorrelationId = correlation;
+                    return submit(std::move(desc), std::move(identity));
+                };
+            const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);
+            const auto availability = BuildGeometryAvailability(processing.Scene->Raw(), entity);
+            std::vector<GeometryProcessingDetail::PointPropertyWatch> watches;
+            const auto watch = [&](const GeometryPropertyRef& ref)
+            {
+                watches.push_back(
+                    GeometryProcessingDetail::ObserveGeometryProperty(availability, ref.Domain, ref.Name));
+            };
+            watch(command.Properties.InputPositions);
+            watch(command.Properties.OutputLabels);
+            watch(command.Properties.OutputColors);
+            if (command.Properties.OutputScalarLabels)
+                watch(*command.Properties.OutputScalarLabels);
+            const auto deletion =
+                GeometryProcessingDetail::ResolvePointDeletionSource(command.Properties.InputPositions.Domain);
+            watches.push_back(
+                GeometryProcessingDetail::ObserveGeometryProperty(availability, deletion.Domain, deletion.Name));
+            // O(1) revision watches between steps or pages and at the Accept's first apply; the CPU Accept and undo and
+            // redo validate exactly (PublishCpuResult, CommitKMeansOutputs).
+            const auto current = [processing, entity, watches = std::move(watches)]
+            {
+                return processing.AttachmentActive() &&
+                    GeometryProcessingDetail::GeometryPropertiesCurrent(processing, entity, watches);
+            };
             if (command.Backend == ClusteringBackend::VulkanCompute)
             {
-                EditorProcessingContext processing{};
-                processing.Scene = &context.ActiveWorld; processing.World = world;
-                processing.CommandHistory = history; processing.SpatialIndices = spatialIndices; processing.Device = device;
-                processing.AttachmentActive = [worlds=context.Worlds,world,scene=processing.Scene,attached=command.AttachmentActive] {
-                    return worlds && worlds->ActiveWorld()==world && worlds->Get(world)==scene && (!attached || attached());
-                };
-                // The run's holder and its Accept are editor jobs of the workspace: rows of its Jobs window.
-                const EditorJobCommandSurface editorJobs = workspace.JobCommands();
-                processing.JobCommands = editorJobs;
-                processing.JobCommands.Submit = [submit=editorJobs.Submit,history,prefix=command.LabelPrefix,correlation=context.Correlation.Value](JobDesc desc, EditorJobIdentity identity) {
-                    CarryEditorLabelPrefix(desc, history, prefix); // the GPU transaction publishes after the call that queued it
-                    desc.CorrelationId = correlation;
-                    return submit(std::move(desc), std::move(identity));};
                 const auto captured = std::make_shared<KMeansSnapshot>();
-                const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);
-                const auto availability = BuildGeometryAvailability(processing.Scene->Raw(), entity);
-                std::vector<GeometryProcessingDetail::PointPropertyWatch> watches;
-                const auto watch = [&](const GeometryPropertyRef& ref) {
-                    watches.push_back(GeometryProcessingDetail::ObserveGeometryProperty(availability, ref.Domain, ref.Name));
-                };
-                watch(command.Properties.InputPositions); watch(command.Properties.OutputLabels); watch(command.Properties.OutputColors);
-                if (command.Properties.OutputScalarLabels) watch(*command.Properties.OutputScalarLabels);
-                const auto deletion = GeometryProcessingDetail::ResolvePointDeletionSource(command.Properties.InputPositions.Domain);
-                watches.push_back(GeometryProcessingDetail::ObserveGeometryProperty(availability, deletion.Domain, deletion.Name));
-                // O(1) revision watches between pages and at the Accept's first apply; undo and redo
-                // validate exactly (CommitKMeansOutputs).
-                const auto current = [processing, entity, watches=std::move(watches)] {
-                    return processing.AttachmentActive() && GeometryProcessingDetail::GeometryPropertiesCurrent(processing, entity, watches);
-                };
                 // Hierarchical seeds (O(N k)) come from a worker job: the request waits for them, as a replacing
                 // request waits for the run it replaces, unless the capture has them for these parameters (ARCH-022
                 // Q90). Random seeding is O(k) and stays in the start.
-                if (gpuState != nullptr && editorJobs.Available() && heldForSeeding != nullptr &&
-                    snapshot->Params.Init == GK::Initialization::Hierarchical)
+                if (device != nullptr && device->IsOperational() && gpuState != nullptr && editorJobs.Available() &&
+                    heldForSeeding != nullptr && snapshot->Params.Init == GK::Initialization::Hierarchical)
                 {
                     const auto clusters =
                         std::min(std::uint32_t(snapshot->Input->Points.size()), snapshot->Params.ClusterCount);
@@ -1235,11 +1319,7 @@ namespace Extrinsic::Runtime
                     : submission.Diagnostic +
                           " The CPU reference completed the request.";
             }
-            return SubmitCpuSnapshot(
-                *context.Jobs,
-                context.Events,
-                std::move(*snapshot),
-                stats);
+            return StartCpuRun(cpu, std::move(*snapshot), processing.JobCommands, current);
         }
     }
 
@@ -1264,6 +1344,13 @@ namespace Extrinsic::Runtime
         m_Service.m_GpuRun = [this](CommandCorrelationId id, KMeansGpuAction action) {
             return m_GpuState ? m_GpuState->GpuRun(id,action) : KMeansGpuObservation{};
         };
+        m_Service.m_StepRun = [this](const CommandCorrelationId id) -> std::uint64_t
+        {
+            for (const auto& [correlation, run] : m_CpuRuns)
+                if (correlation == id)
+                    return run;
+            return m_GpuState ? m_GpuState->GpuRun(id, KMeansGpuAction::Observe).StepRun : 0u;
+        };
         m_Service.m_GpuReadinessDiagnostic = [this](const RunKMeans& request, const EditorProcessingContext& context) {
             return m_GpuState ? m_GpuState->ReadinessDiagnostic(request, context) : std::string{};
         };
@@ -1281,11 +1368,7 @@ namespace Extrinsic::Runtime
             setup.Services().Find<Graphics::IRenderer>();
         if (m_Device != nullptr && renderer != nullptr)
         {
-            m_GpuState = std::make_unique<ClusteringGpuState>(
-                *m_Device,
-                renderer->GetBufferManager(),
-                m_Device->GetTransferQueue(),
-                m_Stats);
+            m_GpuState = std::make_unique<ClusteringGpuState>(*m_Device, m_Device->GetTransferQueue(), m_Stats);
             m_GpuParticipant = m_Jobs->RegisterGpuQueueParticipant(
                 GpuQueueParticipantDesc{
                     .DebugName = "Runtime.Clustering.KMeans",
@@ -1344,12 +1427,17 @@ namespace Extrinsic::Runtime
                     return CommandOutcome::Ok();
                 }
                 bool heldForSeeding = false;
-                const CommandOutcome outcome = HandleRunKMeansCommand(
-                    context,
+                const CommandOutcome outcome = HandleRunKMeansCommand(context,
                     command,
-                    m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-                    *m_Workspace, m_Captures->Last,
-                    m_Stats, &heldForSeeding);
+                    m_GpuState.get(),
+                    m_SpatialIndices,
+                    m_Device,
+                    m_History,
+                    *m_Workspace,
+                    m_Captures->Last,
+                    m_Stats,
+                    KMeansCpuRunHost{m_Events, m_Worlds, m_History, &m_Stats, m_StepRuns, &m_CpuRuns},
+                    &heldForSeeding);
                 if (heldForSeeding || (outcome.Status == CommandStatus::Completed && m_Held && m_Held->Seeding))
                 {
                     // The newest request waits or started; an older one still waiting for its seeds is replaced, as a
@@ -1363,18 +1451,6 @@ namespace Extrinsic::Runtime
                 }
                 return outcome;
             });
-
-        m_JobCompletedSubscription =
-            setup.Subscribe<KMeansJobCompleted>(
-                [this](const KMeansJobCompleted& event)
-                {
-                    HandleJobCompletedEvent(
-                        event,
-                        m_Worlds,
-                        m_Events,
-                        m_History,
-                        m_Stats);
-                });
 
         m_ClusterLabelsChangedSubscription =
             setup.Subscribe<ClusterLabelsChanged>(
@@ -1397,8 +1473,9 @@ namespace Extrinsic::Runtime
         m_History =
             setup.Services().Find<EditorCommandHistory>();
         m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
+        m_StepRuns = setup.Services().Find<StepRunsService>();
         if (m_GpuState != nullptr)
-            m_GpuState->UseStepRuns(setup.Services().Find<StepRunsService>());
+            m_GpuState->UseStepRuns(m_StepRuns);
         // A new, loaded or closed document replaces the registry in the same world; its capture goes with it.
         if (auto* documents = setup.Services().Find<SceneDocumentModule>();
             documents != nullptr && !m_Captures->Participant.IsValid())
@@ -1456,8 +1533,18 @@ namespace Extrinsic::Runtime
             .Jobs = m_Jobs, .Worlds = m_Worlds, .Correlation = held.Correlation};
         bool heldForSeeding = false;
         const auto accepted = m_Stats.GpuRequestsAccepted;
-        (void)HandleRunKMeansCommand(context, held.Command, m_GpuState.get(), m_SpatialIndices, m_Device, m_History,
-            *m_Workspace, m_Captures->Last, m_Stats, &heldForSeeding, !held.Seeding);
+        (void)HandleRunKMeansCommand(context,
+            held.Command,
+            m_GpuState.get(),
+            m_SpatialIndices,
+            m_Device,
+            m_History,
+            *m_Workspace,
+            m_Captures->Last,
+            m_Stats,
+            KMeansCpuRunHost{m_Events, m_Worlds, m_History, &m_Stats, m_StepRuns, &m_CpuRuns},
+            &heldForSeeding,
+            !held.Seeding);
         if (heldForSeeding)
         {
             held.Seeding = true;
@@ -1465,6 +1552,14 @@ namespace Extrinsic::Runtime
         }
         else if (held.Replacement && m_Stats.GpuRequestsAccepted != accepted)
             ++m_Stats.GpuReplacementsStarted;
+    }
+
+    void ClusteringModule::AbandonCpuRuns()
+    {
+        if (m_StepRuns != nullptr)
+            for (const auto& [correlation, run] : m_CpuRuns)
+                m_StepRuns->Driver(run).Abandon(); // a live one publishes its cancelled completion now
+        m_CpuRuns.clear();
     }
 
     void ClusteringModule::ReleaseCapture()
@@ -1479,7 +1574,9 @@ namespace Extrinsic::Runtime
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
         CancelHeld(KMeansRunStatus::Cancelled, "K-Means request cancelled: the clustering module shut down.");
+        AbandonCpuRuns();
         m_Service.m_GpuRun = {};
+        m_Service.m_StepRun = {};
         m_Service.m_GpuReadinessDiagnostic = {};
         if (m_Jobs != nullptr && m_Device != nullptr &&
             m_GpuParticipant.IsValid())
@@ -1497,13 +1594,10 @@ namespace Extrinsic::Runtime
         ReleaseCapture();
         m_Workspace->DetachOwn(); // after the GPU state's last transaction used its jobs
         m_Service.m_Workspace = nullptr;
-        if (m_JobCompletedSubscription.IsValid())
-            context.Events.Unsubscribe(m_JobCompletedSubscription);
         if (m_ClusterLabelsChangedSubscription.IsValid())
             context.Events.Unsubscribe(m_ClusterLabelsChangedSubscription);
         if (m_ActiveWorldChangedSubscription.IsValid())
             context.Events.Unsubscribe(m_ActiveWorldChangedSubscription);
-        m_JobCompletedSubscription = {};
         m_ClusterLabelsChangedSubscription = {};
         m_ActiveWorldChangedSubscription = {};
         m_Service.Bind(nullptr, nullptr, nullptr);
@@ -1512,6 +1606,7 @@ namespace Extrinsic::Runtime
         m_Worlds = nullptr;
         m_History = nullptr;
         m_Device = nullptr;
+        m_StepRuns = nullptr;
     }
     }
 

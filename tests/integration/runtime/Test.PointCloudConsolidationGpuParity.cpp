@@ -20,6 +20,8 @@
 
 #include <glm/glm.hpp>
 
+#include <functional>
+#include <thread>
 #include "RuntimeTestModule.hpp"
 #include "../../../src/runtime/Modules/PointCloudConsolidation/Runtime.LopPaging.TestSupport.hpp"
 
@@ -30,7 +32,10 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Glfw;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
@@ -42,12 +47,12 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.PointCloud.Consolidation;
@@ -56,6 +61,10 @@ import Geometry.HalfedgeMesh.IO;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshSoup;
 import Geometry.Properties;
+#include "HeldFramesProgress.hpp"
+#include "HeldStepRunProbe.hpp"
+
+#include "MinimizedGpuCompletions.hpp"
 
 namespace
 {
@@ -112,14 +121,16 @@ namespace
         const std::uint32_t seed)
     {
         return Runtime::PointCloudConsolidationConfig{
-            .Backend =
-                Runtime::PointCloudConsolidationBackend::VulkanCompute,
+            .Backend = Runtime::PointCloudConsolidationBackend::VulkanCompute,
             .Strategy = strategy,
-            .SupportRadiusMode = Runtime::
-                PointCloudConsolidationSupportRadiusMode::Manual,
+            .SupportRadiusMode = Runtime::PointCloudConsolidationSupportRadiusMode::Manual,
             .SupportRadius = supportRadius,
             .RepulsionWeight = 0.35,
-            .MaxIterations = 8u,
+            .Execution = {.IterationCap = 8u,
+                .PreviewEvery = 5u,
+                .PreviewIntervalMs = 0u,
+                .AutoAccept = Runtime::StepRunAutoAccept::End,
+                .Start = Runtime::StepRunStart::Run},
             .ConvergenceTolerance = 0.0,
             .TargetPointCount = targetPointCount,
             .Seed = seed,
@@ -157,7 +168,7 @@ namespace
         Consolidation::Params params{
             .SupportRadius = config.SupportRadius,
             .RepulsionWeight = config.RepulsionWeight,
-            .MaxIterations = config.MaxIterations,
+            .MaxIterations = config.Execution.IterationCap,
             .ConvergenceTolerance = config.ConvergenceTolerance,
             .TargetPointCount = config.TargetPointCount,
             .Seed = config.Seed,
@@ -430,6 +441,7 @@ namespace
                 Runtime::PointCloudConsolidationConfig config{};
                 config.Backend =
                     Runtime::PointCloudConsolidationBackend::VulkanCompute;
+                config.Execution.AutoAccept = Runtime::StepRunAutoAccept::End; // a batch run
                 Correlation = Service->Run(
                     Runtime::PointCloudConsolidationRequest{
                         .StableEntityId = Runtime::SelectionController::
@@ -554,6 +566,7 @@ TEST(PointCloudConsolidationGpuParity,
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.Initialize();
 
     const auto operationalInputs =
@@ -691,7 +704,10 @@ TEST(PointCloudConsolidationGpuParity,
         std::move(runtimeMesh.Mesh), input);
     PointCloudConsolidationGpuAutoMeshApp* appPtr = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    // The resident path reads its input through the cache's residency and leases its method scratch there.
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.Initialize();
 
     const auto operationalInputs =
@@ -749,8 +765,8 @@ TEST(PointCloudConsolidationGpuParity,
         appPtr->Output, appPtr->Input);
     EXPECT_GT(displacement.Rms, 0.0);
     EXPECT_GT(displacement.Linf, 0.0);
-    EXPECT_TRUE(appPtr->TaggedGpuDirty);
-    EXPECT_TRUE(appPtr->TaggedPositionDirty);
+    EXPECT_FALSE(appPtr->TaggedGpuDirty) << "Accept retains the already resident render front";
+    EXPECT_FALSE(appPtr->TaggedPositionDirty) << "accepted CPU rows need no redundant GPU upload";
     EXPECT_TRUE(appPtr->InitialResidencyCaptured);
     EXPECT_TRUE(appPtr->UpdatedResidencyObserved);
     EXPECT_TRUE(appPtr->DirtyTagsConsumed);
@@ -846,7 +862,11 @@ namespace
             c.WlopAnisotropic=Anisotropic;c.NormalSource=Runtime::PointCloudConsolidationNormalSource::RequireAuthored;
             c.ClopMixtureComponentCount=2;c.ClopMixtureMaxIterations=256;c.ClopMixtureRelativeTolerance=1e-5;
             c.SupportRadiusMode=Runtime::PointCloudConsolidationSupportRadiusMode::Manual;c.SupportRadius=.35;
-            c.RepulsionWeight=.2;c.MaxIterations=3;c.ConvergenceTolerance=0;c.GpuRadiusCapacity=64;
+            c.RepulsionWeight = .2;
+            c.Execution.IterationCap = 3;
+            c.ConvergenceTolerance = 0;
+            c.GpuRadiusCapacity = 64;
+            c.Execution.AutoAccept = Runtime::StepRunAutoAccept::End; // a batch run
             c.GpuQueryBatchSize=Strategy==Runtime::PointCloudConsolidationStrategy::Lop?64:17;
             return {Runtime::SelectionController::ToStableEntityId(Entities[d-1]),refs,c};
         }
@@ -901,20 +921,29 @@ namespace
                 UsesNormals()?480:300;
             if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(budget)){TimedOut=true;Kernel().RequestExit();return;}
             if(!Kernel().GetDevice().IsOperational())return;
-            if(Submitted && (Phase==3 || Phase==4) && !Mutated)
+            // ARCH-023: the hybrid run is a step run (worker steps, a holder job awaiting its pump); phases 3 and 4
+            // never auto-accept, so the probe acts deterministically on the computed but unpublished run.
+            if (Submitted && (Phase == 3 || Phase == 4) && !Mutated && Service->GpuRun(Correlation).ReadyToAccept)
             {
-                for(const auto& job:Kernel().Jobs().SnapshotAll())
-                    if(job.DebugName=="Consolidation Vulkan neighborhoods" && job.State==Runtime::JobState::AwaitingApply)
-                    {
-                        if(Phase==3)
+                ASSERT_TRUE(Results.empty()) << "the probe acts before any publication";
+                EXPECT_EQ(History->UndoCount(), 16u);
+                if (Phase == 3)
+                {
+                    auto sample = Props(8).Get<glm::vec3>("samples");
+                    BeforeSourceMutation = sample[0];
+                    sample[0].z += .01f;
+                    // Accept latches; the canonical Commit preflight must refuse the publication (StaleSource below).
+                    (void)Service->GpuRun(Correlation, Runtime::PointCloudConsolidationGpuAction::Accept);
+                    Mutated = true;
+                }
+                else
+                    for (const auto& job : Kernel().Jobs().SnapshotAll())
+                        if (job.CorrelationId == Correlation.Value && job.State == Runtime::JobState::AwaitingApply)
                         {
-                            auto sample=Props(8).Get<glm::vec3>("samples");
-                            BeforeSourceMutation=sample[0];
-                            sample[0].z+=.01f;
+                            EXPECT_TRUE(Kernel().Jobs().Cancel(job.Token)); // the run's holder: an editor cancel
+                            Mutated = true;
+                            break;
                         }
-                        else EXPECT_TRUE(Kernel().Jobs().Cancel(job.Token));
-                        Mutated=true;break;
-                    }
             }
             if(Submitted && Results.size()==Expected)
             {
@@ -1006,6 +1035,8 @@ namespace
                     BeforeFailure=Props(8).Get<glm::vec3>("projected").Vector();auto request=Request(8);
                     if(UsesNormals())BeforeFailureNormals=Props(8).Get<glm::vec3>("projected_normals").Vector();
                     if(Phase==2)request.Config.GpuRadiusCapacity=1;
+                    if (Phase == 3 || Phase == 4)
+                        request.Config.Execution.AutoAccept = Runtime::StepRunAutoAccept::Never;
                     if(Phase==5)
                     {
                         request.Config.TargetPointCount=Strategy==Runtime::PointCloudConsolidationStrategy::Ear?40:16;
@@ -1024,7 +1055,7 @@ namespace
                         ASSERT_FALSE(SpecialReference.Positions.empty())
                             <<"phase "<<Phase<<": "<<Consolidation::DebugName(SpecialReference.State);
                     }
-                    (void)Service->Run(request);
+                    Correlation = Service->Run(request);
                 }
             }
         }
@@ -1035,6 +1066,7 @@ namespace
         std::vector<ECS::EntityHandle> Entities;std::vector<Consolidation::Result> References;
         std::vector<Runtime::PointCloudConsolidationResult> Results;std::vector<glm::vec3> BeforeFailure,BeforeFailureNormals;
         glm::vec3 BeforeSourceMutation{};
+        Runtime::CommandCorrelationId Correlation{};
         std::vector<double> PhaseDurationsMs{};
         std::chrono::steady_clock::time_point Started{},PhaseStarted{};unsigned Phase{},Expected{};bool Submitted{},TimedOut{},Done{},Mutated{};double MaxError{},MaxNormalError{},WarmMs{};
     };
@@ -1046,7 +1078,10 @@ void RunProjectionLbvhCase(
     config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
     auto app=std::make_unique<LopLbvhApp>(strategy,anisotropic);auto* observed=app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
-    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
     const auto readiness=Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
     if(!readiness.LogicalDeviceReady || !readiness.SwapchainReady || !readiness.CommandSyncReady)
@@ -1145,7 +1180,8 @@ namespace
         Runtime::CommandCorrelationId Correlation{};
         Runtime::KernelEventSubscription Subscription{};
         unsigned Phase{}, Frames{};
-        bool PreviewReadbackQueued{}, RestoreReadbackQueued{};
+        Runtime::StepRunsService* Steps{};
+        bool PreviewStepped{}, PreviewReadbackQueued{}, RestoreReadbackQueued{};
         std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
         auto Id() const { return Runtime::SelectionController::ToStableEntityId(Entity); }
         auto Rows() const { return std::as_const(Scene->Raw().get<GS::Vertices>(Entity).Properties).Get<glm::vec3>("v:position").Vector(); }
@@ -1163,11 +1199,14 @@ namespace
                 }));
             EXPECT_TRUE(token.IsValid());
         }
-        void Start()
+        void Start(const Runtime::StepRunStart start)
         {
+            auto config = Config;
+            config.Execution.Start = start;
             Correlation = Service->Run({.StableEntityId = Id(),
-                .Properties = Runtime::MakePointCloudConsolidationPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint, "v:position"),
-                .Config = Config, .AutoAccept = false});
+                .Properties = Runtime::MakePointCloudConsolidationPropertyRefs(
+                    Runtime::GeometryElementDomain::PointCloudPoint, "v:position"),
+                .Config = std::move(config)}); // its execution options wait for Accept
         }
         void Resolve() override
         {
@@ -1175,6 +1214,8 @@ namespace
             Extraction = Kernel().Services().Find<Runtime::RenderExtractionCache>();
             Cache = Kernel().Services().Find<Runtime::SpatialIndexCache>();
             ASSERT_NE(Cache, nullptr);
+            Steps = Kernel().Services().Find<Runtime::StepRunsService>();
+            ASSERT_NE(Steps, nullptr);
             Scene = Kernel().Worlds().Get(Kernel().ActiveWorld());
             ASSERT_NE(Service, nullptr);
             ASSERT_NE(Extraction, nullptr);
@@ -1183,8 +1224,9 @@ namespace
             SetPositions(Scene->Raw().emplace<GS::Vertices>(Entity), Input);
             Scene->Raw().emplace<Extrinsic::ECS::Components::Transform::WorldMatrix>(Entity);
             Scene->Raw().emplace<Graphics::Components::RenderPoints>(Entity).Size = 5.0f;
-            Config.MaxIterations = 4u;
-            Config.GpuPreviewInterval = 2u;
+            Config.Execution.IterationCap = 4u;
+            Config.Execution.PreviewEvery = 2u;
+            Config.Execution.AutoAccept = Runtime::StepRunAutoAccept::Never; // this test accepts or discards
             Config.ConvergenceTolerance = 0.0;
             Subscription = Service->SubscribeCompleted([this](const auto& r) {
                 if (r.Correlation == Correlation) Results.push_back(r);
@@ -1194,14 +1236,24 @@ namespace
         {
             if (++Frames > 4000u || std::chrono::steady_clock::now() - Started > std::chrono::seconds(120)) { TimedOut = true; Kernel().RequestExit(); return; }
             if (!Service || !Extraction || !Scene || !Kernel().GetDevice().IsOperational()) return;
-            if (Phase == 0u) { Start(); Phase = 1u; }
+            if (Phase == 0u)
+            {
+                Start(Runtime::StepRunStart::Ready);
+                Phase = 1u;
+            }
             const auto observation = Service->GpuRun(Correlation);
+            std::string refusal;
+            // ARCH-023: worker steps pass iteration PreviewEvery without a frame in between, so the run steps
+            // exactly that far and rests there; the probe then reads a stable front and the run goes on to its cap.
+            if (Phase == 1u && !PreviewStepped && observation.StepRun != 0u &&
+                Steps->Control(
+                    observation.StepRun, Runtime::StepRunAction::Step, Config.Execution.PreviewEvery, refusal))
+                PreviewStepped = true;
             // Finalize advances Iterations before the copy's completion publishes
             // the back. Until then Front() can still return the resident input.
-            if (Phase == 1u && !PreviewReadbackQueued &&
-                observation.Previews > 0u &&
-                observation.Iterations == Config.GpuPreviewInterval &&
-                observation.Iterations < Config.MaxIterations && Extraction->ShowsUncommittedPositions(Id()))
+            if (Phase == 1u && PreviewStepped && !PreviewReadbackQueued && observation.Previews > 0u &&
+                observation.Iterations == Config.Execution.PreviewEvery &&
+                observation.Iterations < Config.Execution.IterationCap && Extraction->ShowsUncommittedPositions(Id()))
             {
                 auto* residency = Cache->PropertyResidency();
                 ASSERT_NE(residency, nullptr);
@@ -1219,8 +1271,10 @@ namespace
                 EXPECT_EQ(Rows(), Input) << "Preview cannot mutate the CPU property";
                 ReadRows(observed->Buffer, 0u, PreviewRows, front->Lease);
                 PreviewReadbackQueued = true;
+                EXPECT_TRUE(Steps->Control(observation.StepRun, Runtime::StepRunAction::Run, 1u, refusal)) << refusal;
             }
-            if (Phase == 1u && observation.ReadyToAccept && PreviewRows->has_value())
+            if (Phase == 1u && observation.ReadyToAccept && PreviewRows->has_value() &&
+                observation.Iterations == Config.Execution.IterationCap)
             {
                 PreviewObserved = true;
                 EXPECT_EQ(Rows(), Input);
@@ -1252,7 +1306,7 @@ namespace
                 {
                     EXPECT_EQ(RestoredRows->value(), Input) << "Discard must restore the renderer's position bytes";
                     DiscardRestored = true;
-                    Start();
+                    Start(Runtime::StepRunStart::Run);
                     Phase = 3u;
                 }
             }
@@ -1288,6 +1342,7 @@ TEST(PointCloudConsolidationGpuParity, ResidentLopPreviewDiscardAcceptParityAndR
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
     const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
@@ -1300,8 +1355,8 @@ TEST(PointCloudConsolidationGpuParity, ResidentLopPreviewDiscardAcceptParityAndR
     EXPECT_TRUE(view->DiscardRestored);
     ASSERT_TRUE(view->PreviewRows->has_value());
     ASSERT_TRUE(view->RestoredRows->has_value());
-    EXPECT_EQ(view->PreviewIteration, view->Config.GpuPreviewInterval);
-    EXPECT_LT(view->PreviewIteration, view->Config.MaxIterations);
+    EXPECT_EQ(view->PreviewIteration, view->Config.Execution.PreviewEvery);
+    EXPECT_LT(view->PreviewIteration, view->Config.Execution.IterationCap);
     auto previewParams = MakeCpuParams(view->Config);
     previewParams.MaxIterations = view->PreviewIteration;
     const auto intermediate = Consolidation::Consolidate(view->Input, previewParams);
@@ -1319,7 +1374,7 @@ TEST(PointCloudConsolidationGpuParity, ResidentLopPreviewDiscardAcceptParityAndR
     EXPECT_EQ(view->Results[0].Status, Runtime::PointCloudConsolidationRunStatus::Cancelled);
     ASSERT_TRUE(view->Results[1].Succeeded()) << view->Results[1].Message;
     EXPECT_EQ(view->Results[1].ActualBackend, Runtime::PointCloudConsolidationBackend::VulkanCompute);
-    EXPECT_GT(view->Results[1].GpuSubmissions, view->Config.MaxIterations);
+    EXPECT_GT(view->Results[1].GpuSubmissions, view->Config.Execution.IterationCap);
     EXPECT_EQ(view->Results[1].CpuStageReadbackBytes,
         64u * (2u + 2u * view->Results[1].Iterations));
     const auto reference = Consolidation::Consolidate(view->Input, MakeCpuParams(view->Config));
@@ -1345,7 +1400,7 @@ TEST(PointCloudConsolidationGpuParity, ResidentLopMultipleProjectionAndReducePag
     } restore;
     Runtime::LopPagingForTesting = {.PagePairs = 512u, .SubmissionPairs = 4096u, .ReduceRows = 32u};
     auto lop = MakeConfig(Runtime::PointCloudConsolidationStrategy::Lop, 0.5, 0u, 42u);
-    lop.MaxIterations = 2u;
+    lop.Execution.IterationCap = 2u;
     // The shared runtime validator bounds refinement rounds even for LOP.
     lop.NormalRefinementRounds = 1u;
     const std::array<ParityFixture, 2u> fixtures{{
@@ -1368,6 +1423,7 @@ TEST(PointCloudConsolidationGpuParity, ResidentLopMultipleProjectionAndReducePag
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.Initialize();
     const auto ready = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
     if (!ready.LogicalDeviceReady || !ready.SwapchainReady || !ready.CommandSyncReady)
@@ -1450,7 +1506,7 @@ namespace
             const std::size_t k = Results.size();
             auto config = MakeConfig(Runtime::PointCloudConsolidationStrategy::Lop, 0.35, 70u, 42u);
             config.Backend = Runtime::PointCloudConsolidationBackend::CpuReference;
-            config.MaxIterations = 3u;
+            config.Execution.IterationCap = 3u;
             config.InitialSampling.Method = Runtime::PointSamplingMethod::FarthestPoint;
             config.InitialBackend = k == 0u ? Runtime::PointSamplingBackend::Cpu : Runtime::PointSamplingBackend::Vulkan;
             Waiting = true;
@@ -1475,6 +1531,7 @@ TEST(PointCloudConsolidationGpuParity, VulkanOrderedInitialSamplesMatchTheCpuOrd
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::StepRunsModule>(); // every consolidation run is a step run
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
     if (!engine.GetDevice().SupportsShaderFloat64()) { engine.Shutdown(); GTEST_SKIP() << "Shader float64 unavailable"; }
@@ -1489,4 +1546,457 @@ TEST(PointCloudConsolidationGpuParity, VulkanOrderedInitialSamplesMatchTheCpuOrd
     // The device order equals the CPU order bitwise on the same rows, so the runs are identical.
     EXPECT_EQ(view->Rows(1), view->Rows(0));
     engine.Shutdown();
+}
+
+namespace
+{
+    // ARCH-023: one request run twice on equal copies of its input, in place: stepped (start=ready, Step(1) at every
+    // rest until its cap, then Accept) and batch (start=run, auto_accept=end). Records each result, each accepted
+    // output, what the ready run had done before its first step and the step count after each Step(1).
+    class StepEqualsRunApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        StepEqualsRunApp(Runtime::PointCloudConsolidationConfig config, std::vector<glm::vec3> input)
+            : Config(std::move(config)), Input(std::move(input))
+        {
+        }
+        void Resolve() override
+        {
+            Service = Kernel().Services().Find<Runtime::PointCloudConsolidationService>();
+            Steps = Kernel().Services().Find<Runtime::StepRunsService>();
+            Scene = Kernel().Worlds().Get(Kernel().ActiveWorld());
+            if (Service == nullptr || Steps == nullptr || Scene == nullptr)
+            {
+                Missing = true;
+                Kernel().RequestExit();
+                return;
+            }
+            for (auto& entity : Entities)
+            {
+                entity = Scene->Create();
+                SetPositions(Scene->Raw().emplace<GS::Vertices>(entity), Input);
+            }
+            Subscription = Service->SubscribeCompleted(
+                [this](const auto& result)
+                {
+                    for (std::size_t i = 0u; i < 2u; ++i)
+                        if (result.Correlation == Correlations[i])
+                        {
+                            Results[i] = result;
+                            Outputs[i] = std::as_const(Scene->Raw().get<GS::Vertices>(Entities[i]).Properties)
+                                             .Get<glm::vec3>(GS::PropertyNames::kPosition)
+                                             .Vector();
+                        }
+                });
+        }
+        void Frame(double, double) override
+        {
+            if (Minimized && !Kernel().GetWindow().IsMinimized())
+                return;
+            if (++Frames > 3'000u || std::chrono::steady_clock::now() - Started > std::chrono::seconds(50))
+            {
+                TimedOut = true;
+                Kernel().RequestExit();
+                return;
+            }
+            if (!Kernel().GetDevice().IsOperational())
+                return;
+            const auto start =
+                [this](const std::size_t i, const Runtime::StepRunStart mode, const Runtime::StepRunAutoAccept accept)
+            {
+                auto config = Config;
+                config.Execution.Start = mode;
+                config.Execution.AutoAccept = accept;
+                if (Minimized && i == 1u)
+                    config.Execution.PreviewEvery = 0u;
+                Correlations[i] =
+                    Service->Run({.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entities[i]),
+                        .Properties = Runtime::MakePointCloudConsolidationPropertyRefs(
+                            Runtime::GeometryElementDomain::PointCloudPoint, std::string{GS::PropertyNames::kPosition}),
+                        .Config = std::move(config)});
+            };
+            std::string refusal;
+            if (Phase == 0u)
+            {
+                start(0u, Runtime::StepRunStart::Ready, Runtime::StepRunAutoAccept::Never);
+                Phase = 1u;
+            }
+            else if (Phase == 1u)
+            {
+                if (Minimized)
+                    EXPECT_EQ(std::as_const(Scene->Raw().get<GS::Vertices>(Entities[0]).Properties)
+                                  .Get<glm::vec3>(GS::PropertyNames::kPosition)
+                                  .Vector(),
+                        Input);
+                const auto observation = Service->GpuRun(Correlations[0]);
+                if (observation.StepRun == 0u)
+                    return;
+                Run = observation.StepRun;
+                const auto run = Steps->Observe(Run);
+                if (!run || run->SegmentInFlight ||
+                    (run->Phase != Runtime::StepRunPhase::Ready && run->Phase != Runtime::StepRunPhase::Paused))
+                    return;
+                if (!ReadyObserved)
+                {
+                    ReadyObserved = true;
+                    ReadyPhase = run->Phase;
+                    ReadyIterations = observation.Iterations;
+                }
+                PreviewCopies = run->PreviewCopies;
+                if (run->ShownStep)
+                    ShownStep = *run->ShownStep;
+                if (run->End == Runtime::StepRunEnd::None)
+                {
+                    if (Minimized && run->Steps != 0u && run->ShownStep != run->Steps)
+                        return;
+                    if (StepCounts.size() == run->Steps &&
+                        Steps->Control(Run, Runtime::StepRunAction::Step, 1u, refusal))
+                        StepCounts.push_back(run->Steps + 1u);
+                    return;
+                }
+                StepsAtEnd = run->Steps;
+                (void)Steps->Control(Run, Runtime::StepRunAction::Accept, 1u, refusal);
+                Phase = 2u;
+            }
+            else if (Phase == 2u && Results[0])
+            {
+                start(1u, Runtime::StepRunStart::Run, Runtime::StepRunAutoAccept::End);
+                Phase = 3u;
+            }
+            else if (Phase == 3u && Results[1])
+                Kernel().RequestExit();
+        }
+        void Shutdown() override
+        {
+            if (Service != nullptr)
+                Service->Unsubscribe(Subscription);
+        }
+
+        Runtime::PointCloudConsolidationConfig Config{};
+        std::vector<glm::vec3> Input{};
+        std::array<std::optional<Runtime::PointCloudConsolidationResult>, 2u> Results{};
+        std::array<std::vector<glm::vec3>, 2u> Outputs{};
+        std::vector<std::uint32_t> StepCounts{};
+        std::uint64_t Run{};
+        std::uint32_t ReadyIterations{UINT32_MAX}, StepsAtEnd{};
+        Runtime::StepRunPhase ReadyPhase{Runtime::StepRunPhase::Failed};
+        bool Missing{}, TimedOut{}, ReadyObserved{}, Minimized{};
+        std::uint64_t PreviewCopies{};
+        std::uint32_t ShownStep{};
+
+    private:
+        Runtime::PointCloudConsolidationService* Service{};
+        Runtime::StepRunsService* Steps{};
+        ECS::Scene::Registry* Scene{};
+        std::array<ECS::EntityHandle, 2u> Entities{};
+        std::array<Runtime::CommandCorrelationId, 2u> Correlations{};
+        Runtime::KernelEventSubscription Subscription{};
+        unsigned Phase{}, Frames{};
+        std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
+    };
+
+    // Runs a consolidation app on the device; false (skipped) without an operational Vulkan device.
+    template <class App, class Check>
+    bool RunConsolidationApp(std::unique_ptr<App> app, Check&& check, bool minimized = false)
+    {
+        auto engineConfig = Runtime::CreateReferenceEngineConfig();
+        engineConfig.Window.Width = 64;
+        engineConfig.Window.Height = 64;
+        engineConfig.Render.EnableValidation = true;
+        engineConfig.Render.EnableVSync = false;
+        engineConfig.ReferenceScene.Enabled = false;
+        auto* observed = app.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(engineConfig, std::move(app));
+        engine.EmplaceModule<Runtime::SpatialIndexCache>();
+        engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+        engine.EmplaceModule<Runtime::StepRunsModule>();
+        engine.Initialize();
+        const auto readiness = Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+        if (!readiness.LogicalDeviceReady || !readiness.SwapchainReady || !readiness.CommandSyncReady)
+        {
+            engine.Shutdown();
+            return false;
+        }
+        const auto before = Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
+        if (minimized)
+            Intrinsic::Tests::RunWithMinimizedGpuCompletions(engine,
+                [&]
+                {
+                    observed->FrameForComposition(0.0, 0.0);
+                });
+        else
+            engine.Run();
+        check(*observed); // the engine owns the app and destroys it at shutdown
+        engine.Shutdown();
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot().VulkanValidationErrorCount,
+            before.VulkanValidationErrorCount);
+        return true;
+    }
+    // Runs StepEqualsRunApp on the device; false (skipped) without an operational Vulkan device.
+    template <class Check>
+    bool RunStepEqualsRun(Runtime::PointCloudConsolidationConfig config, std::vector<glm::vec3> input, Check&& check)
+    {
+        return RunConsolidationApp(
+            std::make_unique<StepEqualsRunApp>(std::move(config), std::move(input)), std::forward<Check>(check));
+    }
+
+    // ARCH-023: one ready run whose iterations are proven to progress with graphics held and no frame
+    // (HeldStepRunProbe), then discarded.
+    class HeldWithoutFramesApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        HeldWithoutFramesApp(Runtime::PointCloudConsolidationConfig config, std::vector<glm::vec3> input)
+            : Config(std::move(config)), Input(std::move(input))
+        {
+        }
+        void Resolve() override
+        {
+            Service = Kernel().Services().Find<Runtime::PointCloudConsolidationService>();
+            Steps = Kernel().Services().Find<Runtime::StepRunsService>();
+            Scene = Kernel().Worlds().Get(Kernel().ActiveWorld());
+            if (Service == nullptr || Steps == nullptr || Scene == nullptr)
+            {
+                Missing = true;
+                Kernel().RequestExit();
+                return;
+            }
+            Entity = Scene->Create();
+            SetPositions(Scene->Raw().emplace<GS::Vertices>(Entity), Input);
+        }
+        void Frame(double, double) override
+        {
+            if (++Frames > 3'000u || std::chrono::steady_clock::now() - Started > std::chrono::seconds(60))
+            {
+                TimedOut = true;
+                Kernel().RequestExit();
+                return;
+            }
+            if (!Kernel().GetDevice().IsOperational())
+                return;
+            if (!Correlation.Value)
+            {
+                auto config = Config;
+                config.Execution.Start = Runtime::StepRunStart::Ready;
+                config.Execution.AutoAccept = Runtime::StepRunAutoAccept::Never;
+                Correlation = Service->Run({.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entity),
+                    .Properties = Runtime::MakePointCloudConsolidationPropertyRefs(
+                        Runtime::GeometryElementDomain::PointCloudPoint, std::string{GS::PropertyNames::kPosition}),
+                    .Config = std::move(config)});
+                return;
+            }
+            if (!Probe.Run)
+                Probe.Run = Service->GpuRun(Correlation).StepRun;
+            if (!Probe.Frame(Kernel().GetDevice(), *Steps))
+                return;
+            std::string refusal;
+            (void)Steps->Control(Probe.Run, Runtime::StepRunAction::Discard, 1u, refusal);
+            Kernel().RequestExit();
+        }
+
+        Runtime::PointCloudConsolidationConfig Config{};
+        std::vector<glm::vec3> Input{};
+        Intrinsic::Tests::HeldStepRunProbe Probe{};
+        bool Missing{}, TimedOut{};
+
+    private:
+        Runtime::PointCloudConsolidationService* Service{};
+        Runtime::StepRunsService* Steps{};
+        ECS::Scene::Registry* Scene{};
+        ECS::EntityHandle Entity{};
+        Runtime::CommandCorrelationId Correlation{};
+        unsigned Frames{};
+        std::chrono::steady_clock::time_point Started{std::chrono::steady_clock::now()};
+    };
+
+    void ExpectStepEqualsRun(
+        const StepEqualsRunApp& app, const Runtime::PointCloudConsolidationBackend backend, const std::uint32_t cap)
+    {
+        ASSERT_FALSE(app.Missing);
+        ASSERT_FALSE(app.TimedOut);
+        EXPECT_EQ(app.ReadyPhase, Runtime::StepRunPhase::Ready) << "start=ready initializes and waits";
+        EXPECT_EQ(app.ReadyIterations, 0u) << "Init is not an iteration";
+        std::vector<std::uint32_t> expected(cap);
+        for (std::uint32_t k = 0u; k < cap; ++k)
+            expected[k] = k + 1u;
+        EXPECT_EQ(app.StepCounts, expected) << "every Step(1) is exactly one iteration";
+        EXPECT_EQ(app.StepsAtEnd, cap);
+        for (std::size_t i = 0u; i < 2u; ++i)
+        {
+            ASSERT_TRUE(app.Results[i].has_value());
+            ASSERT_TRUE(app.Results[i]->Succeeded()) << app.Results[i]->Message;
+            EXPECT_EQ(app.Results[i]->ActualBackend, backend);
+            EXPECT_EQ(app.Results[i]->Iterations, cap);
+            EXPECT_NE(app.Results[i]->StepRun, 0u);
+        }
+        EXPECT_EQ(app.Results[0]->StepRun, app.Run);
+        ASSERT_EQ(app.Outputs[0].size(), app.Input.size());
+        if (backend == Runtime::PointCloudConsolidationBackend::VulkanCompute)
+        {
+            // The resident grid's atomic scatter has the existing repeat-run tolerance (see the method contract).
+            const auto repeat = MeasurePositionError(app.Outputs[0], app.Outputs[1]);
+            EXPECT_LE(repeat.Rms, kRmsTolerance);
+            EXPECT_LE(repeat.Linf, kLinfTolerance);
+        }
+        else
+            EXPECT_EQ(app.Outputs[0], app.Outputs[1]) << "The ordered hybrid steps and Run give the same positions";
+    }
+}
+
+// ARCH-023 B5: the resident LOP and isotropic WLOP runs (in place, same cardinality) step one iteration per Step(1) on
+// the device, and Run is those same steps. Predictions per strategy: ready with 0 iterations before the first step,
+// step counts 1..5, stepped and batch output within the established GPU repeat tolerance and CPU parity tolerance, no
+// new validation error. Mutation: an iteration split across steps (or Init counted as one) changes the counts; a rest
+// that skips a logical iteration fails the exact counts. Atomic grid order is not a bitwise numerical contract.
+TEST(PointCloudConsolidationGpuParity, ResidentLopAndWlopStepOneRepeatedEqualsRun)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    for (const auto strategy :
+        {Runtime::PointCloudConsolidationStrategy::Lop, Runtime::PointCloudConsolidationStrategy::Wlop})
+    {
+        SCOPED_TRACE(static_cast<int>(strategy));
+        auto config = MakeConfig(strategy, 0.32, 0u, 1907u);
+        config.Execution.IterationCap = 5u;
+        config.Execution.PreviewEvery = 1u;
+        const auto input = MakePlane(16u, 12u, 1.3);
+        if (!RunStepEqualsRun(config,
+                input,
+                [&](const StepEqualsRunApp& app)
+                {
+                    ExpectStepEqualsRun(app, Runtime::PointCloudConsolidationBackend::VulkanCompute, 5u);
+                    const auto reference = Consolidation::Consolidate(input, MakeCpuParams(config));
+                    ASSERT_TRUE(reference.Succeeded() || reference.State == Consolidation::Status::NotConverged);
+                    const auto parity = MeasurePositionError(app.Outputs[0], reference.Positions);
+                    EXPECT_LE(parity.Rms, kRmsTolerance);
+                    EXPECT_LE(parity.Linf, kLinfTolerance);
+                }))
+            GTEST_SKIP() << "Vulkan bootstrap unavailable";
+    }
+}
+
+// ARCH-023 B7: the hybrid Vulkan LBVH run (device neighbourhood batches, CPU projection arithmetic on workers) is an
+// owner-driven step run: Init (source density, L2 initialization) before Ready, one complete projection iteration per
+// Step(1), Run the same steps. Predictions for LOP and isotropic WLOP: ready with 0 iterations, step counts 1..3, the
+// stepped and the batch output bitwise equal, non-zero query traffic counted, no new validation error.
+TEST(PointCloudConsolidationGpuParity, VulkanLbvhStepOneRepeatedEqualsRun)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    for (const auto strategy :
+        {Runtime::PointCloudConsolidationStrategy::Lop, Runtime::PointCloudConsolidationStrategy::Wlop})
+    {
+        SCOPED_TRACE(static_cast<int>(strategy));
+        auto config = MakeConfig(strategy, 0.32, 0u, 1908u);
+        config.Backend = Runtime::PointCloudConsolidationBackend::VulkanLBVH;
+        config.Execution.IterationCap = 3u;
+        config.Execution.PreviewEvery = 1u;
+        config.GpuQueryBatchSize = 64u;
+        config.GpuRadiusCapacity = 128u;
+        if (!RunStepEqualsRun(config,
+                MakePlane(12u, 10u, 1.2),
+                [&](const StepEqualsRunApp& app)
+                {
+                    ExpectStepEqualsRun(app, Runtime::PointCloudConsolidationBackend::VulkanLBVH, 3u);
+                    for (const auto& result : app.Results)
+                    {
+                        ASSERT_TRUE(result.has_value());
+                        EXPECT_GT(result->GpuQueryBatches, 0u);
+                        EXPECT_GT(result->CpuStageUploadBytes, 0u) << "hybrid traffic is counted";
+                        EXPECT_GT(result->CpuStageReadbackBytes, 0u);
+                    }
+                }))
+            GTEST_SKIP() << "Vulkan bootstrap unavailable";
+    }
+}
+
+// ARCH-023: resident LOP and isotropic WLOP, and the hybrid Vulkan LBVH backend, advance on their step run's worker with
+// graphics held and no frame: after Step(1) (the owner's Init) the method queue is held, Run queues the worker's next
+// page behind it, then graphics is gated, the method queue released, and three more iterations complete while the main
+// thread waits inside the gate. Predictions: Gated, Progressed, at least 3 iterations without frames, no new
+// validation error; shared hardware (no separate method queue) is reported, not claimed. Mutation: pacing the pages by
+// frame maintenance (an owner Advance, a CollectCompleted sink, a main-thread query batch) leaves 0 iterations.
+TEST(PointCloudConsolidationGpuParity, ResidentAndHybridRunsAdvanceWithGraphicsHeldAndNoFrames)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    struct Case
+    {
+        Runtime::PointCloudConsolidationStrategy Strategy;
+        Runtime::PointCloudConsolidationBackend Backend;
+    };
+    for (const auto c :
+        {Case{Runtime::PointCloudConsolidationStrategy::Lop, Runtime::PointCloudConsolidationBackend::VulkanCompute},
+            Case{
+                Runtime::PointCloudConsolidationStrategy::Wlop, Runtime::PointCloudConsolidationBackend::VulkanCompute},
+            Case{Runtime::PointCloudConsolidationStrategy::Lop, Runtime::PointCloudConsolidationBackend::VulkanLBVH}})
+    {
+        SCOPED_TRACE(static_cast<int>(c.Strategy) * 10 + static_cast<int>(c.Backend));
+        auto config = MakeConfig(c.Strategy, 0.32, 0u, 1911u);
+        config.Backend = c.Backend;
+        config.Execution.IterationCap = 8u;
+        config.Execution.PreviewEvery = 0u;
+        config.ConvergenceTolerance = 0.0; // the cap ends the run: no early convergence within the held steps
+        config.GpuQueryBatchSize = 64u;
+        config.GpuRadiusCapacity = 128u;
+        bool shared = false;
+        if (!RunConsolidationApp(std::make_unique<HeldWithoutFramesApp>(config, MakePlane(14u, 10u, 1.2)),
+                [&](const HeldWithoutFramesApp& app)
+                {
+                    ASSERT_FALSE(app.Missing);
+                    ASSERT_FALSE(app.TimedOut);
+                    ASSERT_TRUE(app.Probe.Done);
+                    if (!app.Probe.SeparateQueue)
+                    {
+                        shared = true;
+                        return;
+                    }
+                    EXPECT_TRUE(app.Probe.Gated);
+                    EXPECT_TRUE(app.Probe.Progressed);
+                    EXPECT_EQ(app.Probe.StepsBefore, 1u) << "Step(1) is exactly one iteration";
+                    EXPECT_GE(app.Probe.StepsWithoutFrames, 3u);
+                }))
+            GTEST_SKIP() << "Vulkan bootstrap unavailable";
+        if (shared)
+            GTEST_SKIP() << "No separate method compute queue: no-frame progress cannot be separated from graphics.";
+    }
+}
+
+// ARCH-024: simulated minimization; real device work and owner completion run through Engine::Run.
+TEST(PointCloudConsolidationGpuParity, MinimizedResidentInitPreviewsAndAcceptEqualPreviewOff)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+        GTEST_SKIP() << "GLFW unavailable";
+    bool ran = false;
+    for (const std::uint32_t buffers : {2u, 3u})
+    {
+        SCOPED_TRACE(buffers);
+        auto config = MakeConfig(Runtime::PointCloudConsolidationStrategy::Lop, 0.32, 0u, 1907u);
+        config.InitialSampling.Method = Runtime::PointSamplingMethod::FarthestPoint;
+        config.InitialBackend = Runtime::PointSamplingBackend::Vulkan;
+        config.Execution.IterationCap = 5u;
+        config.Execution.PreviewEvery = 1u;
+        config.Execution.PreviewIntervalMs = 0u;
+        config.Execution.PreviewBuffers = buffers;
+        auto app = std::make_unique<StepEqualsRunApp>(config, MakePlane(16u, 12u, 1.3));
+        app->Minimized = true;
+        const bool available = RunConsolidationApp(
+            std::move(app),
+            [&](const StepEqualsRunApp& completed)
+            {
+                ExpectStepEqualsRun(completed, Runtime::PointCloudConsolidationBackend::VulkanCompute, 5u);
+                for (const auto& result : completed.Results)
+                {
+                    ASSERT_TRUE(result);
+                    EXPECT_EQ(result->InitialSamplingBackend, "gpu_vulkan_compute")
+                        << result->InitialSamplingDiagnostic;
+                }
+                EXPECT_GE(completed.PreviewCopies, 4u);
+                EXPECT_GE(completed.ShownStep, 4u);
+            },
+            true);
+        if (!ran && !available)
+            GTEST_SKIP() << "Vulkan bootstrap unavailable";
+        ASSERT_TRUE(available);
+        ran = true;
+    }
 }

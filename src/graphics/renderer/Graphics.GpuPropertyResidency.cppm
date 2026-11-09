@@ -3,7 +3,7 @@
 // revision: uploaded once when a GPU user first needs that revision, shared while it holds) and,
 // while a method writes the property, a ring of output slots (a back slot being written and a
 // front that the renderer observes). Buffers are device-local; a slot is rewritten only after
-// every recorded completion (frames in flight, transfer and readback tokens) and never while
+// every recorded completion (frames in flight, transfer, readback and compute-submission tokens) and never while
 // it is leased or front. Canonical slots are a cache: idle slots and, over a byte budget, the
 // least recently used ones are evicted and re-uploaded on their next use. Render buffers are
 // never a source: data flows CPU -> residency -> render.
@@ -154,9 +154,9 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] bool HasRing(const GpuPropertyKey& key) const;
 
         // ---- completions and use -------------------------------------------------------
-        // Commands recorded in `frame` read or write the slot: it is reusable once
-        // GetGlobalFrameNumber() - frame > GetFramesInFlight() (the frame's fence is waited
-        // one BeginFrame after the counter reaches the distance).
+        // Work stamped with `frame` (a GetGlobalFrameNumber() value) reads or writes the slot: it is
+        // reusable once IDevice::IsFrameRetired(frame), without further frames when the device
+        // proves it. Each stamp is kept until its own frame retires; acquisitions stamp the same way.
         void NoteUse(RHI::BufferHandle slot, std::uint64_t frame);
         // Transfers into / readbacks from the slot: reusable once the token IsComplete. A
         // readback also counts `bytes` towards the readback counters.
@@ -165,6 +165,13 @@ export namespace Extrinsic::Graphics
         // The renderer shows the key's observed slot (Front) this frame: a use for eviction
         // and a frame-in-flight completion on that slot.
         void MarkObserved(const GpuPropertyKey& key);
+        // One submission outside the frame (IDevice::SubmitComputeReadback), whose retirement
+        // frames do not prove: every slot NoteUse'd or acquired between Begin and End is also
+        // reusable only once End's token IsComplete. An invalid token (nothing was submitted)
+        // stamps nothing; the frame uses stay. A safety completion, not a transfer: no readback
+        // counters change. Not nestable; device-owner thread only.
+        void BeginSubmission();
+        void EndSubmission(RHI::ReadbackToken token);
 
         // ---- maintenance ---------------------------------------------------------------
         // Once per frame: frees released slots whose completions are done, then evicts idle

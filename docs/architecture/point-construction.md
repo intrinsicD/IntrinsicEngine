@@ -10,8 +10,8 @@ operations create a separate mesh or graph; they preserve the source geometry.
 `intrinsic.runtime.sandbox.point_construction`. The editor, config documents
 and programmatic callers share validation and the configured command path:
 `ApplyEditorPointConstructionConfig`, `GetEditorPointConstructionConfig`,
-`PreviewEditorPointConstructionCommand`, and
-`ApplyEditorConfiguredPointConstruction`.
+`PreviewEditorPointConstructionCommand`, `ApplyEditorConfiguredPointConstruction`
+(the batch) and `StartEditorConfiguredPointConstruction` (the interactive start).
 
 | Control | Meaning |
 | --- | --- |
@@ -25,6 +25,7 @@ and programmatic callers share validation and the configured command path:
 | `normal_agreement_power`, `kernel_sigma_scale` | Existing weighted tangent-plane field controls. |
 | `mutual`, `min_distance_epsilon` | Graph reciprocity and near-duplicate filtering. |
 | `gpu_query_batch_size` | Bounded query chunk size, also used to bound CPU temporary rows. |
+| `auto_accept`, `start` | The shared one-shot execution rows (ARCH-023): by default `ready` and `never`, so an interactive start computes nothing until Run or Step and creates the entity only at Accept. |
 
 The runtime owns composition in `Runtime.PointConstructionOperations`.
 `Geometry.SurfaceReconstruction` owns preparation, signed-distance reduction
@@ -41,16 +42,36 @@ cached index. Reconstruction consumes bounded query chunks into one scalar
 grid, rather than retaining a grid-by-k neighbor matrix. Graph candidate
 storage has a separate 2^24-entry limit.
 
-Vulkan is asynchronous and uses the existing framed query queues. The job chain
-prepares samples/grid, waits for complete neighborhoods, then extracts the
-geometry on CPU. No synchronous GPU fence or separate spatial service is added.
-Cancellation, stale inputs, incomplete rows and unavailable GPU execution
-create no entity. Requested and actual backend names are reported separately;
-CPU normal initialization, field arithmetic, graph assembly, Marching Cubes,
-normals and UV materialization remain CPU work.
+Every backend runs as a one-shot step run of the session's step-run service
+(ARCH-023, `MeshSupport::StartOneShotCpuRun`). Its one logical step, on a
+worker, prepares the samples or grid, computes every query page and builds the
+mesh or graph; Accept (automatic for the batch `Apply`, else the panel's row or
+`run_control`) creates the entity as one undo entry. Discard, cancellation,
+stale inputs, incomplete rows and unavailable GPU execution create no entity;
+Restart computes again from the same capture. Without the step-run service only
+a CPU batch runs, as one queued job (or inline without a job lane); Vulkan is
+refused there.
 
-GPU batch latency measures elapsed time from queue submission through readback,
-row validation and reduction, including intervening frame waits. It is not a GPU
+Vulkan LBVH is a hybrid: before the start the main thread acquires the cached
+index without a CPU hierarchy and prepares one kNN query session
+(`SpatialIndexCache::PrepareQuerySession`, `Uploads`) whose row count is one
+fixed page (`gpu_query_batch_size`; a graph's page holds at most its samples).
+On the worker each page's queries (the grid vertices or the samples) are
+checked (normal-or-zero components within 1e18), written into that page's
+prefix, queried as its active rows only and decoded by the existing row
+decoder (full width, original source slots, CPU float distance/source-ID
+order). No frame is involved and the pages allocate nothing; the run's discard
+stops it at the next page boundary or a waiting page. Requested and actual
+backend names are reported separately; CPU normal initialization, field
+arithmetic, graph assembly, Marching Cubes, normals and UV materialization
+remain CPU work.
+
+`GpuQueryBatches` counts the step's consumed pages. `CpuStageUploadBytes` and
+`CpuStageReadbackBytes` report the step's hybrid traffic: every page writes the
+session's full fixed page of 12-byte rows (an unused tail included), excluding
+the zero rows written when the session was prepared, and reads back its packed
+rows; a restart counts afresh. GPU batch latency measures elapsed time from a
+page's upload through readback, row validation and reduction. It is not a GPU
 timestamp. CPU time includes reduction, so these two diagnostics overlap and
 must not be added to estimate total operation time. The smoke harness measures
 request-to-publication wall time separately.

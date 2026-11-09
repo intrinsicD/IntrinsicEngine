@@ -165,14 +165,16 @@ namespace
         const std::uint32_t seed)
     {
         return Runtime::PointCloudConsolidationConfig{
-            .Backend =
-                Runtime::PointCloudConsolidationBackend::VulkanCompute,
+            .Backend = Runtime::PointCloudConsolidationBackend::VulkanCompute,
             .Strategy = strategy,
-            .SupportRadiusMode = Runtime::
-                PointCloudConsolidationSupportRadiusMode::Manual,
+            .SupportRadiusMode = Runtime::PointCloudConsolidationSupportRadiusMode::Manual,
             .SupportRadius = supportRadius,
             .RepulsionWeight = 0.35,
-            .MaxIterations = 8u,
+            .Execution = {.IterationCap = 8u,
+                .PreviewEvery = 5u,
+                .PreviewIntervalMs = 0u,
+                .AutoAccept = Runtime::StepRunAutoAccept::End,
+                .Start = Runtime::StepRunStart::Run},
             .ConvergenceTolerance = 0.0,
             .TargetPointCount = targetPointCount,
             .Seed = seed,
@@ -210,7 +212,7 @@ namespace
         Consolidation::Params params{
             .SupportRadius = config.SupportRadius,
             .RepulsionWeight = config.RepulsionWeight,
-            .MaxIterations = config.MaxIterations,
+            .MaxIterations = config.Execution.IterationCap,
             .ConvergenceTolerance = config.ConvergenceTolerance,
             .TargetPointCount = config.TargetPointCount,
             .Seed = config.Seed,

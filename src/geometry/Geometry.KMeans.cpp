@@ -11,6 +11,7 @@ module;
 #include <random>
 #include <span>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <glm/geometric.hpp>
@@ -236,42 +237,23 @@ namespace Geometry::KMeans
         return Cluster(points, {}, params, nullptr);
     }
 
-    std::optional<KMeansResult> Cluster(std::span<const glm::vec3> points,
-                                  std::span<const glm::vec3> initialCentroids,
-                                  const KMeansParams& params,
-                                  CpuScratch* cpuScratch,
-                                  const IterationObserver& onIteration)
+    namespace
     {
-        if (points.empty() || params.ClusterCount == 0 || params.MaxIterations == 0)
-            return std::nullopt;
-
-        const uint32_t k = std::min<uint32_t>(params.ClusterCount, static_cast<uint32_t>(points.size()));
-        if (k == 0)
-            return std::nullopt;
-
-        KMeansResult result{};
-        result.RequestedBackend = params.Compute;
-        result.ActualBackend = Backend::CPU;
-        result.FellBackToCPU = params.Compute != Backend::CPU;
-        result.Labels.assign(points.size(), 0u);
-        result.SquaredDistances.assign(points.size(), 0.0f);
-        result.Centroids = BuildInitialCentroids(points, initialCentroids, params, k);
-        if (result.Centroids.size() != k)
-            return std::nullopt;
-
-        std::vector<glm::dvec3> sums(k, glm::dvec3(0.0));
-        std::vector<uint32_t> counts(k, 0u);
-
-        auto assign = [&](bool accumulate) -> std::optional<bool>
+        // One assignment pass over the current centroids: labels, distances, inertia and the farthest sample, and
+        // with `sums`/`counts` the update's accumulators. Whether a label changed; nullopt for a non-finite point.
+        [[nodiscard]] std::optional<bool> AssignLloyd(
+            LloydState& state, std::vector<glm::dvec3>* sums, std::vector<uint32_t>* counts)
         {
-            static_cast<void>(RebuildCentroidTree(result.Centroids, cpuScratch));
+            KMeansResult& result = state.Result;
+            static_cast<void>(RebuildCentroidTree(result.Centroids, state.Scratch));
             result.Inertia = 0.0f;
             float maxDistance = -1.0f;
             bool changed = false;
-            for (std::size_t i = 0; i < points.size(); ++i)
+            for (std::size_t i = 0; i < state.Points.size(); ++i)
             {
-                const auto assignment = FindNearestCentroid(points[i], result.Centroids, cpuScratch);
-                if (!assignment) return std::nullopt;
+                const auto assignment = FindNearestCentroid(state.Points[i], result.Centroids, state.Scratch);
+                if (!assignment)
+                    return std::nullopt;
                 const auto [cluster, distance] = *assignment;
                 changed |= result.Labels[i] != cluster;
                 result.Labels[i] = cluster;
@@ -282,57 +264,110 @@ namespace Geometry::KMeans
                     maxDistance = distance;
                     result.MaxDistanceIndex = static_cast<uint32_t>(i);
                 }
-                if (accumulate)
+                if (sums != nullptr)
                 {
-                    sums[cluster] += glm::dvec3(points[i]);
-                    ++counts[cluster];
+                    (*sums)[cluster] += glm::dvec3(state.Points[i]);
+                    ++(*counts)[cluster];
                 }
             }
             return changed;
-        };
+        }
+    }
 
-        const float tol2 = params.ConvergenceTolerance * params.ConvergenceTolerance;
-        bool finalCentroidsChanged = false;
-        for (uint32_t iter = 0; iter < params.MaxIterations; ++iter)
+    std::optional<LloydState> BeginLloyd(std::span<const glm::vec3> points,
+        std::span<const glm::vec3> initialCentroids,
+        const KMeansParams& params,
+        CpuScratch* cpuScratch)
+    {
+        if (points.empty() || params.ClusterCount == 0 || params.MaxIterations == 0)
+            return std::nullopt;
+
+        const uint32_t k = std::min<uint32_t>(params.ClusterCount, static_cast<uint32_t>(points.size()));
+        if (k == 0)
+            return std::nullopt;
+
+        LloydState state{.Points = points,
+            .Scratch = cpuScratch,
+            .ToleranceSquared = params.ConvergenceTolerance * params.ConvergenceTolerance};
+        KMeansResult& result = state.Result;
+        result.RequestedBackend = params.Compute;
+        result.ActualBackend = Backend::CPU;
+        result.FellBackToCPU = params.Compute != Backend::CPU;
+        result.Labels.assign(points.size(), 0u);
+        result.SquaredDistances.assign(points.size(), 0.0f);
+        result.Centroids = BuildInitialCentroids(points, initialCentroids, params, k);
+        if (result.Centroids.size() != k)
+            return std::nullopt;
+        return state;
+    }
+
+    LloydStatus StepLloyd(LloydState& state)
+    {
+        KMeansResult& result = state.Result;
+        const auto k = static_cast<uint32_t>(result.Centroids.size());
+        std::vector<glm::dvec3> sums(k, glm::dvec3(0.0));
+        std::vector<uint32_t> counts(k, 0u);
+        const auto changed = AssignLloyd(state, &sums, &counts);
+        if (!changed)
+            return LloydStatus::Failed;
+        const bool anyLabelChanged = result.Iterations == 0 || *changed;
+
+        float maxShift = 0.0f;
+        state.CentroidsMoved = false;
+        for (uint32_t c = 0; c < k; ++c)
         {
-            std::fill(sums.begin(), sums.end(), glm::dvec3(0.0));
-            std::fill(counts.begin(), counts.end(), 0u);
-            const auto changed = assign(true);
-            if (!changed) return std::nullopt;
-            const bool anyLabelChanged = iter == 0 || *changed;
-
-            float maxShift = 0.0f;
-            finalCentroidsChanged = false;
-            for (uint32_t c = 0; c < k; ++c)
+            glm::vec3 nextCentroid = result.Centroids[c];
+            if (counts[c] > 0)
             {
-                glm::vec3 nextCentroid = result.Centroids[c];
-                if (counts[c] > 0)
-                {
-                    nextCentroid = glm::vec3(sums[c] / static_cast<double>(counts[c]));
-                }
-                else
-                {
-                    nextCentroid = points[result.MaxDistanceIndex];
-                }
-
-                finalCentroidsChanged |= result.Centroids[c] != nextCentroid;
-                maxShift = std::max(maxShift, SquaredDistance(result.Centroids[c], nextCentroid));
-                result.Centroids[c] = nextCentroid;
+                nextCentroid = glm::vec3(sums[c] / static_cast<double>(counts[c]));
+            }
+            else
+            {
+                nextCentroid = state.Points[result.MaxDistanceIndex];
             }
 
-            result.Iterations = iter + 1;
-            if (onIteration)
-                onIteration(iter + 1, params.MaxIterations);
-
-            if (!anyLabelChanged || maxShift <= tol2)
-            {
-                result.Converged = true;
-                break;
-            }
+            state.CentroidsMoved |= result.Centroids[c] != nextCentroid;
+            maxShift = std::max(maxShift, SquaredDistance(result.Centroids[c], nextCentroid));
+            result.Centroids[c] = nextCentroid;
         }
 
-        if (finalCentroidsChanged && !assign(false)) return std::nullopt;
-        return result;
+        ++result.Iterations;
+        state.MaxShiftSquared = maxShift;
+        if (!anyLabelChanged || maxShift <= state.ToleranceSquared)
+        {
+            result.Converged = true;
+            return LloydStatus::Converged;
+        }
+        return LloydStatus::Continue;
+    }
+
+    std::optional<KMeansResult> FinishLloyd(LloydState state)
+    {
+        if (state.CentroidsMoved && !AssignLloyd(state, nullptr, nullptr))
+            return std::nullopt;
+        return std::move(state.Result);
+    }
+
+    std::optional<KMeansResult> Cluster(std::span<const glm::vec3> points,
+        std::span<const glm::vec3> initialCentroids,
+        const KMeansParams& params,
+        CpuScratch* cpuScratch,
+        const IterationObserver& onIteration)
+    {
+        std::optional<LloydState> state = BeginLloyd(points, initialCentroids, params, cpuScratch);
+        if (!state)
+            return std::nullopt;
+        for (uint32_t iter = 0; iter < params.MaxIterations; ++iter)
+        {
+            const LloydStatus status = StepLloyd(*state);
+            if (status == LloydStatus::Failed)
+                return std::nullopt;
+            if (onIteration)
+                onIteration(iter + 1, params.MaxIterations);
+            if (status == LloydStatus::Converged)
+                break;
+        }
+        return FinishLloyd(std::move(*state));
     }
 
     std::vector<glm::vec3> BuildInitialCentroids(

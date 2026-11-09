@@ -225,9 +225,23 @@ namespace Extrinsic::RHI
         [[nodiscard]] virtual BufferHandle  CreateBuffer(const BufferDesc& desc)  = 0;
         virtual void                        DestroyBuffer(BufferHandle handle)    = 0;
 
-        /// Upload CPU data into the buffer.  offset + size must fit within SizeBytes.
+        /// Upload CPU data into the buffer. offset + size must fit within SizeBytes.
+        /// The caller owns the written range: no pending GPU work may still read or write it.
         virtual void WriteBuffer(BufferHandle handle, const void* data,
                                  std::uint64_t size, std::uint64_t offset = 0)    = 0;
+
+        /// ARCH-023, any thread (a method worker): copies `size` bytes into a host-visible buffer's persistent
+        /// mapping at `offset` (flushing non-coherent memory). No GPU work, queue, lock shared with frames, or
+        /// staging: it never waits for rendering and allocates nothing. The caller owns the range (no submitted
+        /// work still reads or writes it) and the buffer's lifetime; a later compute submission sees the bytes
+        /// (vkQueueSubmit makes host writes available). False, writing nothing, for no data, an invalid or
+        /// destroyed handle, a buffer that is not host-visible, a range outside it, or a lost device. The default
+        /// (backends without a persistent mapping) refuses, so callers report the path as unsupported.
+        [[nodiscard]] virtual bool WriteMappedBuffer(
+            BufferHandle /*handle*/, const void* /*data*/, std::uint64_t /*size*/, std::uint64_t /*offset*/ = 0)
+        {
+            return false;
+        }
 
         /// GRAPHICS-033D — read back CPU-visible bytes from a buffer. Used by
         /// the opt-in `gpu;vulkan` visible-triangle smoke (and the canonical
@@ -287,16 +301,39 @@ namespace Extrinsic::RHI
         // GRAPHICS-150: low-latency compute outside the frame. Records `record` into a command
         // buffer of its own, copies `readbackBytes` of the buffer it returns (created with
         // TransferSrc) and submits at once; the transfer queue's CollectCompleted delivers the
-        // bytes to `sink` as soon as the GPU finished, with no frames-in-flight wait. The work
-        // is ordered after every frame already submitted. Device-owner thread only; buffers the
-        // recorder uses must stay alive, and unwritten, until the sink ran. Zero bytes requests
+        // bytes to `sink` as soon as the GPU finished, with no frames-in-flight wait. ARCH-023:
+        // `order` (ComputeInputOrder) says which producers it waits for besides the earlier work
+        // of its own lane. It waits for no frame directly (data a frame produces does not feed
+        // method compute), but the default order's graphics-lane transfer ticket also covers the
+        // earlier graphics-queue work, frames and their swapchain waits included (see
+        // ComputeInputOrder). It runs on the
+        // async compute queue where one exists (GetTransferQueue().GetDiagnostics().ComputeLane
+        // reports the actual lane), so a frame's retirement does not prove it finished; the
+        // token, ComputeFence() or the sink do. Recorders touch buffers only (images stay owned
+        // by the graphics family). Later frames see its writes once the sink ran (published).
+        // Sinks run in completion order per token (each lane's own FIFO), not in one global FIFO
+        // across lanes: a compute-lane sink may run before an earlier frame readback's. An owner
+        // that needs an order across lanes waits on the token it depends on.
+        // Any thread (a method's worker step records here; `record` runs on the caller): the
+        // recorder may only record commands and read immutable views, handles and pipelines;
+        // no resource creation or destruction, and no transfer-queue upload, download or other
+        // queue submission (the backend refuses, rather than deadlocks on the lock the recording
+        // holds, a nested SubmitComputeReadback on the same lane and, on the graphics lane, uploads,
+        // downloads and one-shot submissions; anything else is still the caller's contract). Host preparation (buffers, residency acquisition and its
+        // uploads, host writes) happens before the call. The worker waits with ITransferQueue::WaitCompute
+        // and, with a ReadbackSink::Pull() sink, takes its bytes with TakeCompletedReadback (or
+        // gives them up with ReleaseReadback); any other sink runs on the render thread from
+        // CollectCompleted. Buffers the recorder uses must stay alive, and unwritten, until the
+        // sink ran or the pulled bytes were taken. Zero bytes requests
         // completion only: no copy or staging allocation; the sink receives an empty span.
         // The recorder must still return a valid buffer to indicate successful recording. An invalid token
         // (the default: unsupported, or the recorder returned no buffer) means nothing was
         // submitted. A stateful recorder may fall back to a frame only if it was not invoked.
         [[nodiscard]] virtual ReadbackToken SubmitComputeReadback(
-            std::function<BufferHandle(ICommandContext&)> /*record*/, std::uint64_t /*readbackBytes*/,
-            ReadbackSink /*sink*/)
+            std::function<BufferHandle(ICommandContext&)> /*record*/,
+            std::uint64_t /*readbackBytes*/,
+            ReadbackSink /*sink*/,
+            ComputeInputOrder /*order*/ = ComputeInputOrder::AfterIssuedTransfers)
         {
             return {};
         }
@@ -315,6 +352,29 @@ namespace Extrinsic::RHI
         // ---- Frame utilities -----------------------------------------
         [[nodiscard]] virtual std::uint32_t GetFramesInFlight()    const = 0;
         [[nodiscard]] virtual std::uint64_t GetGlobalFrameNumber() const = 0;
+
+        // ---- Actual retirement (ARCH-024) ------------------------------
+        /// Device-owner thread, nonblocking: whether the GPU work a use stamped with `frameNumber` (the
+        /// GetGlobalFrameNumber() value read at the use) may name has finished. A number a submitted frame carries
+        /// (below GetGlobalFrameNumber()) retires once every frame up to it finished on every queue it used, which
+        /// also covers each earlier graphics-queue submission. A number no frame was submitted with yet retires
+        /// while no frame is being recorded (between a successful BeginFrame and its EndFrame) and every
+        /// graphics-queue submission so far finished; it does not wait for earlier frames still in flight, so an
+        /// owner keeps an earlier frame's stamp beside a later one instead of overwriting it. Neither covers the
+        /// compute lane (ITransferQueue::ComputeFence and tokens do). The default is the frame-distance rule: frame
+        /// N's fences are waited by BeginFrame(N + GetFramesInFlight()), one frame after the counter reaches that
+        /// distance, so a device that cannot tell never claims completion.
+        [[nodiscard]] virtual bool IsFrameRetired(std::uint64_t frameNumber) const
+        {
+            const std::uint64_t current = GetGlobalFrameNumber();
+            return !IsDeviceLost() && current > frameNumber && current - frameNumber > GetFramesInFlight();
+        }
+        /// Device-owner thread, nonblocking (no wait, no frame-counter change): releases deferred destructions and
+        /// handle slots once every frame up to their destruction finished (and, after the last submitted frame, no
+        /// frame records and the graphics queue is idle), which BeginFrame otherwise does after its fence wait. For
+        /// owner calls where no frame begins (minimized, BeginFrame refused), after the transfer queue's
+        /// CollectCompleted. Frees nothing on a lost device. The default does nothing.
+        virtual void CollectCompletedResources() {}
 
         // ---- Queue submit planning -----------------------------------
         // Backend-neutral queue seam used by the renderer's multi-queue

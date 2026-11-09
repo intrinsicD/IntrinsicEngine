@@ -282,6 +282,12 @@ export namespace Extrinsic::Graphics
         RHI::BufferHandle Scratch{};
         std::uint32_t ElementCount = 0u;
         PrefixScanMode Mode = PrefixScanMode::Exclusive;
+        // ARCH-023: Input's, Output's (and Scratch's, when one is needed) base addresses, resolved by the owner.
+        // Nonzero InputAddress records without any device call (no readiness query, no scratch lease: Scratch must
+        // be given), so a method worker records the scan.
+        std::uint64_t InputAddress = 0u;
+        std::uint64_t OutputAddress = 0u;
+        std::uint64_t ScratchAddress = 0u;
     };
 
     struct GpuStreamCompactionRecordDesc
@@ -329,6 +335,11 @@ export namespace Extrinsic::Graphics
         std::uint32_t ElementCount = 0u;
         std::uint32_t KeyWords = 1u;
         std::uint32_t KeyBits = 32u;
+        // ARCH-023: Elements' base address (and Scratch's, when one is needed), resolved by the owner. Nonzero
+        // ElementsAddress records without any device call (no readiness query, no scratch lease: Scratch must be
+        // given), so a method worker records the sort.
+        std::uint64_t ElementsAddress = 0u;
+        std::uint64_t ScratchAddress = 0u;
     };
 
     struct GpuParallelPrimitiveRecordResult

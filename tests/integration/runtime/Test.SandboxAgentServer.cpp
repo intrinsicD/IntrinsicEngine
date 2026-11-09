@@ -34,6 +34,7 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.LocalSocket;
 import Extrinsic.Runtime.AgentServer;
+import Extrinsic.Runtime.AgentOperations;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -201,13 +202,17 @@ namespace
             if (withCamera) Engine->EmplaceModule<R::CameraModule>();
             Engine->EmplaceModule<R::SpatialIndexCache>();
             Engine->EmplaceModule<R::ClusteringModule>();
-            Engine->EmplaceModule<R::StepRunsModule>(); // a GPU K-Means run is a step run
+            auto& stepRuns = Engine->EmplaceModule<R::StepRunsModule>();
             Engine->EmplaceModule<R::PointCloudConsolidationModule>();
             Engine->EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
-            Server = &Engine->EmplaceModule<R::AgentServerModule>(
-                R::AgentServerOptions{.SocketPath = SocketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()},
-                                      .MaxMessageBytes = maxMessageBytes,
-                                      .ProgressInterval = progressInterval});
+            Server = &Engine->EmplaceModule<R::AgentServerModule>(R::AgentServerOptions{.SocketPath = SocketPath,
+                .AllowedRoots = {std::filesystem::temp_directory_path().string()},
+                .MaxMessageBytes = maxMessageBytes,
+                .ProgressInterval = progressInterval,
+                .RegisterExtraOperations = [runs = &stepRuns.Service()](R::AgentOperationRegistry& registry)
+                {
+                    runs->RegisterOperations(registry);
+                }});
             if (minimized) Engine->EmplaceModule<IdleExit>(Done, *Engine);
             Engine->Initialize();
         }
@@ -613,6 +618,7 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     engine.EmplaceModule<R::SceneInteractionModule>();
     engine.EmplaceModule<R::SceneDocumentModule>();
     engine.EmplaceModule<R::AsyncWorkModule>();
+    engine.EmplaceModule<R::StepRunsModule>();
     engine.EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
     auto* server = &engine.EmplaceModule<R::AgentServerModule>(
         R::AgentServerOptions{.SocketPath = socketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()}});
@@ -780,6 +786,7 @@ TEST(SandboxAgentServer, ProgressAndCancelOverTheSocket)
     engine.EmplaceModule<R::SceneInteractionModule>();
     engine.EmplaceModule<R::SceneDocumentModule>();
     engine.EmplaceModule<R::AsyncWorkModule>();
+    engine.EmplaceModule<R::StepRunsModule>();
     engine.EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
     auto* server = &engine.EmplaceModule<R::AgentServerModule>(
         R::AgentServerOptions{.SocketPath = socketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()},
@@ -937,6 +944,7 @@ TEST(SandboxAgentServer, MinimizedSandboxStillServesCallsAndCapturesFailFast)
     engine.EmplaceModule<R::SceneInteractionModule>();
     engine.EmplaceModule<R::SceneDocumentModule>();
     engine.EmplaceModule<R::AsyncWorkModule>();
+    engine.EmplaceModule<R::StepRunsModule>();
     engine.EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
     auto* server = &engine.EmplaceModule<R::AgentServerModule>(
         R::AgentServerOptions{.SocketPath = socketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()}});
@@ -996,6 +1004,7 @@ TEST(SandboxAgentServer, ConnectionWindowShowsTheClientAndDisconnectsIt)
     engine.EmplaceModule<R::EngineConfigControl>(std::move(sections));
     engine.EmplaceModule<R::SceneInteractionModule>();
     engine.EmplaceModule<R::AsyncWorkModule>();
+    engine.EmplaceModule<R::StepRunsModule>();
     engine.EmplaceModule<R::EditorUiModule>();
     auto* server = &engine.EmplaceModule<R::AgentServerModule>(R::AgentServerOptions{.SocketPath = socketPath, .ReadOnly = true});
     engine.Initialize();
@@ -1207,6 +1216,317 @@ TEST(SandboxAgentServer, DuplicateRunEndsWithResultUnavailable)
         };
         rig.Check(unavailable(b) && !unavailable(a), "the duplicate ends with result_unavailable: " + a.dump().substr(0, 200) + " | " + b.dump().substr(0, 300));
     }, std::chrono::seconds(60));
+}
+
+// ARCH-023: an agent's nonwaiting starts answer the step run's id before the run ends. run_operation with wait false
+// starts outlier_analysis (CPU) with the section's start ready: the answer names the run, nothing is computed or
+// written; run_control steps and accepts it into one undo entry. start_point_cloud_consolidation answers its run once
+// the command drain started it, ready, and a discard ends it without writing. Other rows refuse wait false.
+TEST(SandboxAgentServer, NonwaitingStartsAnswerTheirRunBeforeItEnds)
+{
+    AgentRig rig("onestart");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto cloud = rig.AddCloud(64, true);
+    const auto target = rig.AddCloud(64);
+    rig.Run(
+        [&](Client& c)
+        {
+            const auto hasProperty = [&](const char* name)
+            {
+                for (const auto& row : c.Tool("entity_properties", {{"entity", cloud}})["properties"])
+                    if (row["name"] == name)
+                        return true;
+                return false;
+            };
+            const auto observe = [&](const Json& run)
+            {
+                return c.Tool("run_observe", {{"run", run}});
+            };
+            // Frames until the run's observation satisfies `done` (the client thread polls; the engine runs).
+            const auto until = [&](const Json& run, const std::function<bool(const Json&)>& done)
+            {
+                Json o;
+                for (int attempt = 0; attempt < 500; ++attempt)
+                {
+                    o = observe(run);
+                    if (done(o))
+                        return o;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+                return o;
+            };
+            bool isError = true;
+            const auto configured = c.Tool("config_apply",
+                {{"section", "sandbox.outlier_analysis"}, {"payload", {{"entity", cloud}, {"start", "ready"}}}},
+                &isError);
+            rig.Check(!isError && configured["applied"] == true, "outlier config_apply: " + configured.dump());
+            Json preview;
+            for (int attempt = 0; attempt < 200 && preview["enabled"] != true; ++attempt)
+            {
+                preview = c.Tool("preview_operation", {{"operation", "outlier_analysis"}}, &isError);
+                if (isError)
+                    break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            rig.Check(preview["enabled"] == true, "outlier preview: " + preview.dump());
+            const auto started =
+                c.Tool("run_operation", {{"operation", "outlier_analysis"}, {"wait", false}}, &isError);
+            rig.Check(!isError && started["status"] == "Pending" && started["run"].is_number_unsigned() &&
+                    started["run"] != 0,
+                "wait false answers the run at once: " + started.dump());
+            const auto run = started["run"];
+            const auto ready = until(run,
+                [](const Json& o)
+                {
+                    return o.value("phase", "") == "ready";
+                });
+            rig.Check(
+                ready["phase"] == "ready" && ready["steps"] == 0, "the run waits, nothing computed: " + ready.dump());
+            rig.Check(!hasProperty("outlier_score"), "nothing published before Accept");
+            c.Tool("run_control", {{"run", run}, {"action", "step"}}, &isError);
+            rig.Check(!isError, "run_control step");
+            const auto stepped = until(run,
+                [](const Json& o)
+                {
+                    return o.value("end", "") == "converged" && o.value("computing", true) == false;
+                });
+            rig.Check(stepped["steps"] == 1, "step 1 is the one step: " + stepped.dump());
+            rig.Check(!hasProperty("outlier_score"), "nothing published before Accept");
+            c.Tool("run_control", {{"run", run}, {"action", "accept"}}, &isError);
+            rig.Check(!isError, "run_control accept");
+            const auto committed = until(run,
+                [](const Json& o)
+                {
+                    return o.value("phase", "") == "committed";
+                });
+            rig.Check(committed["phase"] == "committed", "accepted: " + committed.dump());
+            rig.Check(hasProperty("outlier_score") && hasProperty("outlier_mask"), "Accept published both columns");
+            rig.Check(c.Tool("history")["undo_count"] == 1, "one undo entry");
+            const auto refused = c.Tool("run_operation", {{"operation", "mesh_curvature"}, {"wait", false}}, &isError);
+            rig.Check(isError, "a row without a step run refuses wait false: " + refused.dump());
+            // Point construction (CPU graph) starts the same way; a discard creates nothing.
+            const auto construction = c.Tool("config_apply",
+                {{"section", "sandbox.point_construction"},
+                    {"payload", {{"entity", target}, {"method", "knn_graph"}, {"start", "ready"}}}},
+                &isError);
+            rig.Check(!isError && construction["applied"] == true, "construction config_apply: " + construction.dump());
+            const auto constructing =
+                c.Tool("run_operation", {{"operation", "point_construction"}, {"wait", false}}, &isError);
+            rig.Check(!isError && constructing["status"] == "Pending" && constructing["run"].is_number_unsigned() &&
+                    constructing["run"] != 0,
+                "construction wait false answers the run at once: " + constructing.dump());
+            const auto constructionReady = until(constructing["run"],
+                [](const Json& o)
+                {
+                    return o.value("phase", "") == "ready";
+                });
+            rig.Check(constructionReady["steps"] == 0,
+                "the construction waits, nothing computed: " + constructionReady.dump());
+            c.Tool("run_control", {{"run", constructing["run"]}, {"action", "discard"}}, &isError);
+            rig.Check(!isError, "run_control discard");
+            const auto constructionDiscarded = until(constructing["run"],
+                [](const Json& o)
+                {
+                    return o.value("phase", "") == "discarded";
+                });
+            rig.Check(constructionDiscarded["phase"] == "discarded", "discarded: " + constructionDiscarded.dump());
+            rig.Check(c.Tool("history")["undo_count"] == 1, "a discarded construction records nothing");
+
+            Json consolidation;
+            for (int attempt = 0; attempt < 200; ++attempt)
+            {
+                consolidation = c.Tool(
+                    "preview_point_cloud_consolidation", {{"entity", cloud}, {"domain", "PointCloudPoint"}}, &isError);
+                if (isError || consolidation["pending"] == false)
+                    break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            rig.Check(consolidation["enabled"] == true, "consolidation preview: " + consolidation.dump());
+            const auto undoBefore = c.Tool("history")["undo_count"];
+            const auto consolidating = c.Tool("start_point_cloud_consolidation",
+                {{"entity", cloud}, {"domain", "PointCloudPoint"}, {"start", "ready"}},
+                &isError);
+            rig.Check(!isError && consolidating["run"].is_number_unsigned() && consolidating["run"] != 0,
+                "start_point_cloud_consolidation answers its run: " + consolidating.dump());
+            const auto consolidationRun = consolidating["run"];
+            const auto waiting = until(consolidationRun,
+                [](const Json& o)
+                {
+                    return o.value("phase", "") == "ready";
+                });
+            rig.Check(
+                waiting["phase"] == "ready" && waiting["steps"] == 0, "the consolidation run waits: " + waiting.dump());
+            c.Tool("run_control", {{"run", consolidationRun}, {"action", "discard"}}, &isError);
+            rig.Check(!isError, "run_control discard");
+            const auto discarded = until(consolidationRun,
+                [](const Json& o)
+                {
+                    return o.value("phase", "") == "discarded";
+                });
+            rig.Check(discarded["phase"] == "discarded", "discarded: " + discarded.dump());
+            rig.Check(c.Tool("history")["undo_count"] == undoBefore, "a discard writes nothing");
+            for (const auto method : {"icp", "cpd"})
+            {
+                const bool cpd = std::string_view{method} == "cpd";
+                const auto config = c.Tool("config_apply",
+                    {{"section", cpd ? "sandbox.coherent_point_drift" : "sandbox.registration"},
+                        {"payload",
+                            {{cpd ? "source" : "source_entity", cloud},
+                                {cpd ? "target" : "target_entity", target},
+                                {"start", "ready"},
+                                {"auto_accept", "never"}}}},
+                    &isError);
+                rig.Check(!isError && config["applied"] == true, "registration config: " + config.dump());
+                const auto registration = c.Tool("run_registration", {{"method", method}, {"wait", false}}, &isError);
+                rig.Check(!isError && registration["run"].is_number_unsigned() && registration["run"] != 0,
+                    "nonwaiting registration answers its run: " + registration.dump());
+                const auto registrationId = registration["run"];
+                const auto readyRegistration = until(registrationId,
+                    [](const Json& o)
+                    {
+                        return o.value("phase", "") == "ready";
+                    });
+                rig.Check(readyRegistration["steps"] == 0 && readyRegistration["phase"] == "ready",
+                    "configured ready is unchanged: " + readyRegistration.dump());
+                c.Tool("run_control", {{"run", registrationId}, {"action", "discard"}}, &isError);
+                rig.Check(!isError, "registration discard");
+                const auto discardedRegistration = until(registrationId,
+                    [](const Json& o)
+                    {
+                        return o.value("phase", "") == "discarded";
+                    });
+                rig.Check(discardedRegistration["phase"] == "discarded", "registration discarded");
+                rig.Check(c.Tool("history")["undo_count"] == undoBefore, "registration discard writes nothing");
+            }
+        },
+        std::chrono::seconds(60));
+}
+
+// ARCH-023 (review R2): the agent starts property smoothing (run_operation wait false), point sampling and keypoint
+// analysis (their tools' wait false) like their panels do: the section's start ready answers the run at once with
+// the requested and actual backend, nothing computed or written; run_control steps once and accepts into one undo
+// entry.
+TEST(SandboxAgentServer, NonwaitingSmoothingSamplingAndKeypointStartsWaitReady)
+{
+    AgentRig rig("readystarts");
+    ASSERT_TRUE(rig.Server->Status().Listening) << rig.Server->Status().LastError;
+    const auto grid = rig.AddGrid();
+    const auto cloud = rig.AddCloud(64);
+    rig.Run(
+        [&](Client& c)
+        {
+            const auto hasProperty = [&](std::uint32_t entity, const char* name)
+            {
+                for (const auto& row : c.Tool("entity_properties", {{"entity", entity}})["properties"])
+                    if (row["name"] == name)
+                        return true;
+                return false;
+            };
+            const auto until = [&](const Json& run, const std::function<bool(const Json&)>& done)
+            {
+                Json o;
+                for (int attempt = 0; attempt < 500; ++attempt)
+                {
+                    o = c.Tool("run_observe", {{"run", run}});
+                    if (done(o))
+                        return o;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+                return o;
+            };
+            bool isError = true;
+            const auto configure = [&](const char* section, const Json& payload)
+            {
+                const auto applied = c.Tool("config_apply", {{"section", section}, {"payload", payload}}, &isError);
+                rig.Check(!isError && applied["applied"] == true, std::string(section) + ": " + applied.dump());
+            };
+            const auto previewed = [&](const char* tool, const Json& arguments)
+            {
+                Json preview;
+                for (int attempt = 0; attempt < 200 && preview["enabled"] != true; ++attempt)
+                {
+                    preview = c.Tool(tool, arguments, &isError);
+                    if (isError)
+                        break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+                rig.Check(preview["enabled"] == true, std::string(tool) + ": " + preview.dump());
+            };
+            // The started answer, then ready (0 steps, no output), step 1, Accept: one undo entry with the output.
+            const auto drive =
+                [&](const std::string& what, const Json& started, std::uint32_t entity, const char* output)
+            {
+                const auto undoBefore = c.Tool("history")["undo_count"].get<int>();
+                const bool admitted = !isError && started.is_object() && started.value("status", "") == "Pending" &&
+                    started.contains("run") && started["run"].is_number_unsigned() && started["run"] != 0;
+                rig.Check(admitted, what + " answers its run at once: " + started.dump());
+                if (!admitted)
+                    return;
+                const auto run = started["run"];
+                const auto ready = until(run,
+                    [](const Json& o)
+                    {
+                        return o.value("phase", "") == "ready";
+                    });
+                rig.Check(ready["phase"] == "ready" && ready["steps"] == 0 && ready["execution"]["start"] == "ready",
+                    what + " waits ready, nothing computed: " + ready.dump());
+                rig.Check(!hasProperty(entity, output), what + ": nothing published before Accept");
+                c.Tool("run_control", {{"run", run}, {"action", "step"}}, &isError);
+                rig.Check(!isError, what + " run_control step");
+                const auto stepped = until(run,
+                    [](const Json& o)
+                    {
+                        return o.value("steps", 0) >= 1 && o.value("computing", true) == false;
+                    });
+                rig.Check(stepped["steps"] == 1, what + " stepped once: " + stepped.dump());
+                rig.Check(!hasProperty(entity, output), what + ": a step publishes nothing");
+                c.Tool("run_control", {{"run", run}, {"action", "accept"}}, &isError);
+                rig.Check(!isError, what + " run_control accept");
+                const auto committed = until(run,
+                    [](const Json& o)
+                    {
+                        return o.value("phase", "") == "committed";
+                    });
+                rig.Check(committed["phase"] == "committed", what + " accepted: " + committed.dump());
+                rig.Check(hasProperty(entity, output), what + ": Accept published its output");
+                rig.Check(c.Tool("history")["undo_count"] == undoBefore + 1, what + ": one undo entry");
+            };
+
+            R::PropertySmoothingConfig smoothing;
+            smoothing.Input = {R::GeometryElementDomain::MeshVertex, "height", Geometry::PropertyValueKind::Double};
+            smoothing.Output = {
+                R::GeometryElementDomain::MeshVertex, "height_smooth", Geometry::PropertyValueKind::Double};
+            smoothing.Filter.Iterations = 3u;
+            configure("sandbox.property_smoothing", Json::parse(R::SerializePropertySmoothingConfig(smoothing)));
+            previewed("preview_operation", {{"operation", "property_smoothing"}, {"entity", grid}});
+            const auto smoothed = c.Tool(
+                "run_operation", {{"operation", "property_smoothing"}, {"entity", grid}, {"wait", false}}, &isError);
+            // The actual backend is known only at publication: a start reports none (absent or null).
+            const auto noActualBackend = [](const Json& started)
+            {
+                return !started.contains("backend") || started.at("backend").is_null();
+            };
+            rig.Check(
+                smoothed.is_object() && smoothed.value("requested_backend", "") == "cpu" && noActualBackend(smoothed),
+                "smoothing reports the requested backend and no actual one yet: " + smoothed.dump());
+            drive("property_smoothing", smoothed, grid, "height_smooth");
+
+            configure("sandbox.point_sampling", {{"source", cloud}, {"count", 8}, {"start", "ready"}});
+            previewed("preview_point_sampling", Json::object());
+            const auto sampled = c.Tool("run_point_sampling", {{"wait", false}}, &isError);
+            rig.Check(sampled.is_object() && sampled.value("requested_backend", "") == "cpu_reference" &&
+                    noActualBackend(sampled),
+                "sampling reports the requested backend and no actual one yet: " + sampled.dump());
+            drive("point_sampling", sampled, cloud, "v:sample_rank");
+
+            configure("sandbox.keypoint_analysis", {{"entity", cloud}, {"start", "ready"}});
+            previewed("preview_keypoint_analysis", Json::object());
+            const auto keypoints = c.Tool("run_keypoint_analysis", {{"wait", false}}, &isError);
+            rig.Check(keypoints.is_object() && keypoints.value("requested_backend", "") == "cpu_kdtree",
+                "keypoints report the requested backend: " + keypoints.dump());
+            drive("keypoint_analysis", keypoints, cloud, "keypoint_mask");
+        },
+        std::chrono::seconds(60));
 }
 
 // RUNTIME-312 slice 7: run_operation on a config-sourced operation, end to end: config, preview,

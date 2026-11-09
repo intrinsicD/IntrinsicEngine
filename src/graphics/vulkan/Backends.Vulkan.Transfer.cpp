@@ -35,96 +35,167 @@ namespace Extrinsic::Backends::Vulkan
 // =============================================================================
 
 VulkanTransferQueue::VulkanTransferQueue(const Config& cfg)
-    : m_Device(cfg.Device), m_Vma(cfg.Vma), m_Queue(cfg.Queue),
-      m_QueueFamily(cfg.QueueFamily),
-      m_QueueSubmitMutex(cfg.QueueSubmitMutex)
+    : m_Device(cfg.Device), m_Vma(cfg.Vma),
+      m_ComputeResolution(ResolveMethodComputeLane(cfg.ComputeQueue != VK_NULL_HANDLE, cfg.ForceGraphicsCompute))
 {
-    if (m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || m_Queue == VK_NULL_HANDLE)
+    LaneFor(TransferLane::Graphics).Queue = cfg.Queue;
+    LaneFor(TransferLane::Graphics).Family = cfg.QueueFamily;
+    LaneFor(TransferLane::Graphics).QueueMutex = cfg.QueueSubmitMutex;
+    LaneFor(TransferLane::Compute).QueueMutex = cfg.ComputeQueueSubmitMutex;
+    if (m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || cfg.Queue == VK_NULL_HANDLE)
     {
         Core::Log::Error("[VulkanTransferQueue] Cannot create transfer queue without valid device/VMA/queue handles");
         return;
     }
 
-    // Timeline semaphore.
-    VkSemaphoreTypeCreateInfo typeCI{};
-    typeCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-    typeCI.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-    typeCI.initialValue  = 0;
-    VkSemaphoreCreateInfo semCI{};
-    semCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    semCI.pNext = &typeCI;
-    VkResult result = vkCreateSemaphore(m_Device, &semCI, nullptr, &m_Timeline);
-    if (result != VK_SUCCESS || m_Timeline == VK_NULL_HANDLE)
+    const auto createLane = [this](Lane& lane, const VkQueue queue, const uint32_t family) -> bool
     {
-        Core::Log::Error("[VulkanTransferQueue] vkCreateSemaphore failed; transfer service unavailable");
-        m_Timeline = VK_NULL_HANDLE;
+        lane.Queue = queue;
+        lane.Family = family;
+        VkSemaphoreTypeCreateInfo typeCI{};
+        typeCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+        typeCI.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+        typeCI.initialValue = 0;
+        VkSemaphoreCreateInfo semCI{};
+        semCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        semCI.pNext = &typeCI;
+        if (vkCreateSemaphore(m_Device, &semCI, nullptr, &lane.Timeline) != VK_SUCCESS)
+            lane.Timeline = VK_NULL_HANDLE;
+        VkCommandPoolCreateInfo poolCI{};
+        poolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolCI.queueFamilyIndex = family;
+        poolCI.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        if (lane.Timeline != VK_NULL_HANDLE &&
+            vkCreateCommandPool(m_Device, &poolCI, nullptr, &lane.Pool) != VK_SUCCESS)
+            lane.Pool = VK_NULL_HANDLE;
+        return lane.Timeline != VK_NULL_HANDLE && lane.Pool != VK_NULL_HANDLE;
+    };
+    const auto destroyLane = [this](Lane& lane)
+    {
+        if (lane.Pool != VK_NULL_HANDLE)
+            vkDestroyCommandPool(m_Device, lane.Pool, nullptr);
+        if (lane.Timeline != VK_NULL_HANDLE)
+            vkDestroySemaphore(m_Device, lane.Timeline, nullptr);
+        lane.Queue = VK_NULL_HANDLE;
+        lane.Pool = VK_NULL_HANDLE;
+        lane.Timeline = VK_NULL_HANDLE;
+    };
+    const auto destroyLanes = [&]
+    {
+        for (Lane& lane : m_Lanes)
+            destroyLane(lane);
+    };
+
+    if (!createLane(LaneFor(TransferLane::Graphics), cfg.Queue, cfg.QueueFamily))
+    {
+        Core::Log::Error("[VulkanTransferQueue] timeline/command pool creation failed; transfer service unavailable");
+        destroyLanes();
         return;
+    }
+    // A compute lane that cannot be created demotes method compute to graphics, reported as such.
+    if (m_ComputeResolution.Resolved == RHI::QueueAffinity::AsyncCompute &&
+        !createLane(LaneFor(TransferLane::Compute), cfg.ComputeQueue, cfg.ComputeQueueFamily))
+    {
+        Core::Log::Warn(
+            "[VulkanTransferQueue] compute lane timeline/command pool creation failed; method compute runs on graphics");
+        destroyLane(LaneFor(TransferLane::Compute));
+        m_ComputeResolution.Resolved = RHI::QueueAffinity::Graphics;
+        m_ComputeResolution.Demoted = true;
     }
 
-    // Command pool for transfer commands.
-    VkCommandPoolCreateInfo poolCI{};
-    poolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolCI.queueFamilyIndex = m_QueueFamily;
-    poolCI.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT
-                            | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    result = vkCreateCommandPool(m_Device, &poolCI, nullptr, &m_CmdPool);
-    if (result != VK_SUCCESS || m_CmdPool == VK_NULL_HANDLE)
-    {
-        Core::Log::Error("[VulkanTransferQueue] vkCreateCommandPool failed; transfer service unavailable");
-        vkDestroySemaphore(m_Device, m_Timeline, nullptr);
-        m_Timeline = VK_NULL_HANDLE;
-        m_CmdPool = VK_NULL_HANDLE;
-        return;
-    }
+    m_ComputeSharesFrameComputeQueue =
+        (m_ComputeResolution.Resolved == RHI::QueueAffinity::AsyncCompute ? cfg.ComputeQueue : cfg.Queue) ==
+        cfg.FrameComputeQueue;
+    m_ComputeSharesFrameQueueLock = m_ComputeResolution.Resolved != RHI::QueueAffinity::AsyncCompute ||
+        (cfg.ComputeQueueSubmitMutex != nullptr && cfg.ComputeQueueSubmitMutex == cfg.QueueSubmitMutex);
+    Core::Log::Info(
+        "[VulkanTransferQueue] Method compute: {}, shares frame-compute queue: {}, shares frame queue lock: {}",
+        m_ComputeResolution.Resolved == RHI::QueueAffinity::AsyncCompute ? "compute lane" : "graphics lane",
+        m_ComputeSharesFrameComputeQueue,
+        m_ComputeSharesFrameQueueLock);
 
     m_Belt = std::make_unique<StagingBelt>(m_Device, m_Vma, cfg.StagingCapacity);
     if (!m_Belt || !m_Belt->IsValid())
     {
         Core::Log::Error("[VulkanTransferQueue] Staging belt creation failed; transfer service unavailable");
         m_Belt.reset();
-        vkDestroyCommandPool(m_Device, m_CmdPool, nullptr);
-        vkDestroySemaphore(m_Device, m_Timeline, nullptr);
-        m_CmdPool = VK_NULL_HANDLE;
-        m_Timeline = VK_NULL_HANDLE;
+        destroyLanes();
     }
 }
 
 VulkanTransferQueue::~VulkanTransferQueue()
 {
-    if (m_Queue != VK_NULL_HANDLE)
+    // Both lanes go idle before their command buffers, slots and timelines are released (each under its own
+    // VkQueue's lock).
+    for (const Lane& lane : m_Lanes)
     {
-        if (m_QueueSubmitMutex != nullptr)
-        {
-            std::scoped_lock queueLock{*m_QueueSubmitMutex};
-            (void)vkQueueWaitIdle(m_Queue);
-        }
-        else
-        {
-            (void)vkQueueWaitIdle(m_Queue);
-        }
+        if (lane.Queue == VK_NULL_HANDLE || lane.Timeline == VK_NULL_HANDLE)
+            continue;
+        std::unique_lock<std::mutex> queueLock;
+        if (lane.QueueMutex != nullptr)
+            queueLock = std::unique_lock{*lane.QueueMutex};
+        (void)vkQueueWaitIdle(lane.Queue);
     }
-    RetireCompletedCommandBuffers(std::numeric_limits<std::uint64_t>::max());
+    RetireCompletedCommandBuffers(TransferLane::Graphics, std::numeric_limits<std::uint64_t>::max());
+    RetireCompletedCommandBuffers(TransferLane::Compute, std::numeric_limits<std::uint64_t>::max());
     DestroyReadbackSlots();
-    if (m_CmdPool   != VK_NULL_HANDLE) vkDestroyCommandPool(m_Device, m_CmdPool, nullptr);
-    if (m_Timeline  != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, m_Timeline, nullptr);
+    for (Lane& lane : m_Lanes)
+    {
+        if (lane.Pool != VK_NULL_HANDLE)
+            vkDestroyCommandPool(m_Device, lane.Pool, nullptr);
+        if (lane.Timeline != VK_NULL_HANDLE)
+            vkDestroySemaphore(m_Device, lane.Timeline, nullptr);
+    }
 }
 
 bool VulkanTransferQueue::IsValid() const noexcept
 {
-    return m_Device != VK_NULL_HANDLE && m_Vma != VK_NULL_HANDLE && m_Queue != VK_NULL_HANDLE &&
-           m_Timeline != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE && m_Belt && m_Belt->IsValid();
+    const Lane& graphics = LaneFor(TransferLane::Graphics);
+    const Lane& compute = LaneFor(TransferLane::Compute);
+    const bool computeReady = m_ComputeResolution.Resolved != RHI::QueueAffinity::AsyncCompute ||
+        (compute.Timeline != VK_NULL_HANDLE && compute.Pool != VK_NULL_HANDLE);
+    return m_Device != VK_NULL_HANDLE && m_Vma != VK_NULL_HANDLE && graphics.Queue != VK_NULL_HANDLE &&
+        graphics.Timeline != VK_NULL_HANDLE && graphics.Pool != VK_NULL_HANDLE && computeReady && m_Belt &&
+        m_Belt->IsValid();
+}
+
+TransferLane VulkanTransferQueue::ComputeLane() const noexcept
+{
+    return m_ComputeResolution.Resolved == RHI::QueueAffinity::AsyncCompute ? TransferLane::Compute
+                                                                            : TransferLane::Graphics;
 }
 
 uint64_t VulkanTransferQueue::QueryCompletedValue() const
 {
+    return QueryLaneCompletedValue(TransferLane::Graphics);
+}
+
+uint64_t VulkanTransferQueue::QueryLaneCompletedValue(const TransferLane laneId, VkResult* status) const
+{
+    if (status)
+        *status = VK_ERROR_INITIALIZATION_FAILED;
+    if (Lost())
+    {
+        if (status)
+            *status = VK_ERROR_DEVICE_LOST;
+        return 0;
+    }
     if (!IsValid())
     {
         Core::Log::Warn("[VulkanTransferQueue] QueryCompletedValue on invalid transfer service; returning zero");
         return 0;
     }
-
+    const Lane& lane = LaneFor(laneId);
+    if (lane.Timeline == VK_NULL_HANDLE)
+        return 0;
     uint64_t val = 0;
-    const VkResult result = vkGetSemaphoreCounterValue(m_Device, m_Timeline, &val);
+    VkResult result = laneId == TransferLane::Graphics ? m_NextGraphicsQueryResult.exchange(VK_SUCCESS) : VK_SUCCESS;
+    if (result == VK_SUCCESS)
+        result = vkGetSemaphoreCounterValue(m_Device, lane.Timeline, &val);
+    if (result == VK_ERROR_DEVICE_LOST)
+        MarkLost();
+    if (status)
+        *status = result;
     if (result != VK_SUCCESS)
     {
         Core::Log::Warn("[VulkanTransferQueue] vkGetSemaphoreCounterValue failed; returning zero");
@@ -133,9 +204,9 @@ uint64_t VulkanTransferQueue::QueryCompletedValue() const
     return val;
 }
 
-VkCommandBuffer VulkanTransferQueue::Allocate()
+VkCommandBuffer VulkanTransferQueue::Allocate(const TransferLane laneId)
 {
-    if (!IsValid())
+    if (!IsValid() || LaneFor(laneId).Pool == VK_NULL_HANDLE)
     {
         Core::Log::Warn("[VulkanTransferQueue] Cannot begin transfer command buffer; service is invalid");
         return VK_NULL_HANDLE;
@@ -143,22 +214,25 @@ VkCommandBuffer VulkanTransferQueue::Allocate()
 
     VkCommandBufferAllocateInfo allocCI{};
     allocCI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocCI.commandPool        = m_CmdPool;
+    allocCI.commandPool = LaneFor(laneId).Pool;
     allocCI.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocCI.commandBufferCount = 1;
     VkCommandBuffer cmd = VK_NULL_HANDLE;
-    VkResult result;
-    {
-        // Retirement frees into the same pool under m_Mutex; pool access must be serialized.
-        std::scoped_lock lock{m_Mutex};
-        result = vkAllocateCommandBuffers(m_Device, &allocCI, &cmd);
-    }
+    // The caller holds the lane's Record mutex: retirement frees into this pool under it.
+    const VkResult result = vkAllocateCommandBuffers(m_Device, &allocCI, &cmd);
     if (result != VK_SUCCESS || cmd == VK_NULL_HANDLE)
     {
         Core::Log::Error("[VulkanTransferQueue] vkAllocateCommandBuffers failed; upload skipped");
         return VK_NULL_HANDLE;
     }
     return cmd;
+}
+
+void VulkanTransferQueue::FreeCommandBuffer(const TransferLane laneId, VkCommandBuffer cmd)
+{
+    if (cmd == VK_NULL_HANDLE || m_Device == VK_NULL_HANDLE || LaneFor(laneId).Pool == VK_NULL_HANDLE)
+        return;
+    vkFreeCommandBuffers(m_Device, LaneFor(laneId).Pool, 1u, &cmd); // under the lane's Record mutex
 }
 
 VkCommandBuffer VulkanTransferQueue::Begin()
@@ -173,50 +247,198 @@ VkCommandBuffer VulkanTransferQueue::Begin()
     if (vkBeginCommandBuffer(cmd, &beginCI) != VK_SUCCESS)
     {
         Core::Log::Error("[VulkanTransferQueue] vkBeginCommandBuffer failed; upload skipped");
-        std::scoped_lock lock{m_Mutex};
-        vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
+        FreeCommandBuffer(TransferLane::Graphics, cmd);
         return VK_NULL_HANDLE;
     }
     return cmd;
 }
 
 bool VulkanTransferQueue::FinishCommandBuffer(
-    VkCommandBuffer cmd, const std::string_view operation)
+    VkCommandBuffer cmd, const std::string_view operation, const TransferLane lane)
 {
     if (!IsValid() || cmd == VK_NULL_HANDLE)
     {
         Core::Log::Warn("[VulkanTransferQueue] Cannot submit {} command buffer; service or command buffer is invalid",
                        operation == "upload" ? std::string_view{"transfer"} : operation);
-        if (cmd != VK_NULL_HANDLE && m_Device != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE)
-        {
-            std::scoped_lock lock{m_Mutex};
-            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
-        }
+        FreeCommandBuffer(lane, cmd);
         return false;
     }
 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
     {
         Core::Log::Error("[VulkanTransferQueue] vkEndCommandBuffer failed; {} skipped", operation);
-        std::scoped_lock lock{m_Mutex};
-        vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        FreeCommandBuffer(lane, cmd);
         return false;
     }
     return true;
 }
 
-uint64_t VulkanTransferQueue::SubmitTimelineLocked(
-    VkCommandBuffer cmd, const std::string_view operation)
+VkSemaphoreSubmitInfo VulkanTransferQueue::PublishedComputeWait() const noexcept
 {
+    VkSemaphoreSubmitInfo wait{};
+    wait.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    const uint64_t published = m_PublishedComputeValue.load(std::memory_order_acquire);
+    const Lane& compute = LaneFor(TransferLane::Compute);
+    if (published == 0u || compute.Timeline == VK_NULL_HANDLE)
+        return wait;
+    wait.semaphore = compute.Timeline;
+    wait.value = published;
+    wait.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    return wait;
+}
+
+void VulkanTransferQueue::NoteComputeVisibilityWait() noexcept
+{
+    m_ComputeVisibilityWaits.fetch_add(1u, std::memory_order_relaxed);
+}
+
+RHI::ReadbackToken VulkanTransferQueue::ComputeFence() const noexcept
+{
+    // The last accepted ticket: a reserved one may still be refused and handed back, and would then never signal.
+    const uint64_t submitted = LaneFor(TransferLane::Compute).SubmittedTicket.load(std::memory_order_acquire);
+    return submitted == 0u ? RHI::ReadbackToken{}
+                           : RHI::ReadbackToken{EncodeLaneTicket(TransferLane::Compute, submitted)};
+}
+
+namespace
+{
+    // The queue and lane whose SubmitComputeReadback recorder this thread runs (RecorderScope), else null.
+    thread_local const VulkanTransferQueue* t_Recorder = nullptr;
+    thread_local TransferLane t_RecorderLane = TransferLane::Graphics;
+}
+
+VulkanTransferQueue::RecorderScope::RecorderScope(
+    const VulkanTransferQueue& recording, const TransferLane lane) noexcept
+    : m_PreviousQueue(t_Recorder), m_PreviousLane(t_RecorderLane)
+{
+    t_Recorder = &recording;
+    t_RecorderLane = lane;
+}
+
+VulkanTransferQueue::RecorderScope::~RecorderScope()
+{
+    t_Recorder = m_PreviousQueue;
+    t_RecorderLane = m_PreviousLane;
+}
+
+bool VulkanTransferQueue::RefuseInsideRecorder(const TransferLane lane, const std::string_view operation) const
+{
+    if (t_Recorder != this || t_RecorderLane != lane)
+        return false;
+    Core::Log::Error("[VulkanTransferQueue] {} refused inside a {}-lane compute recorder (it holds the lane's lock); "
+                     "prepare host work before IDevice::SubmitComputeReadback",
+        operation,
+        lane == TransferLane::Graphics ? "graphics" : "compute");
+    return true;
+}
+
+bool VulkanTransferQueue::ComputeLive() const noexcept
+{
+    return !m_Lost.load(std::memory_order_acquire) && IsValid();
+}
+
+void VulkanTransferQueue::MarkLost() const noexcept
+{
+    m_Lost.store(true, std::memory_order_release);
+}
+
+RHI::ComputeWaitStatus VulkanTransferQueue::WaitCompute(
+    const RHI::ReadbackToken token, const uint64_t timeoutNanoseconds)
+{
+    if (!token.IsValid())
+        return RHI::ComputeWaitStatus::Complete;
+    const Lane& lane = LaneFor(LaneOfTicket(token.Value));
+    if (!ComputeLive() || lane.Timeline == VK_NULL_HANDLE)
+        return RHI::ComputeWaitStatus::Failed;
+    const uint64_t value = LaneTicketValue(token.Value);
+    VkSemaphoreWaitInfo wait{};
+    wait.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+    wait.semaphoreCount = 1u;
+    wait.pSemaphores = &lane.Timeline;
+    wait.pValues = &value;
+    // Semaphores need no host synchronization for waits; the caller's own submission is the only work awaited.
+    const VkResult result = vkWaitSemaphores(m_Device, &wait, timeoutNanoseconds);
+    if (result == VK_SUCCESS)
+        return RHI::ComputeWaitStatus::Complete;
+    if (result == VK_TIMEOUT)
+        return RHI::ComputeWaitStatus::Pending;
+    // Lost (or out of memory): the value may never be signaled; the device notes its loss on its own thread.
+    MarkLost();
+    return RHI::ComputeWaitStatus::Failed;
+}
+
+void VulkanTransferQueue::FreeSlotLocked(const PendingReadback& entry)
+{
+    if (entry.SlotIndex >= m_ReadbackSlots.size())
+        return;
+    ReadbackSlot& slot = m_ReadbackSlots[entry.SlotIndex];
+    slot.InUse = false;
+    slot.RetireValue = entry.Token.Value;
+}
+
+bool VulkanTransferQueue::TakeCompletedReadback(const RHI::ReadbackToken token, const std::span<std::byte> destination)
+{
+    if (!token.IsValid() || !IsValid())
+        return false;
+    const TransferLane lane = LaneOfTicket(token.Value);
+    const uint64_t done = QueryLaneCompletedValue(lane);
+    {
+        std::scoped_lock lock{m_Mutex};
+        const auto it = std::ranges::find(m_PendingReadbacks, token, &PendingReadback::Token);
+        // Only a pulled readback: CollectCompleted never delivers or drops it, so the bytes are still here.
+        if (it == m_PendingReadbacks.end() || !it->Sink.Pulled || it->Released ||
+            it->SizeBytes != destination.size_bytes() || LaneTicketValue(token.Value) > done)
+            return false;
+        if (it->SizeBytes != 0u)
+        {
+            if (it->SlotIndex >= m_ReadbackSlots.size() || m_ReadbackSlots[it->SlotIndex].MappedPtr == nullptr)
+                return false;
+            ReadbackSlot& slot = m_ReadbackSlots[it->SlotIndex];
+            if (slot.Allocation != VK_NULL_HANDLE)
+                (void)vmaInvalidateAllocation(m_Vma, slot.Allocation, 0, it->SizeBytes);
+            std::memcpy(destination.data(), slot.MappedPtr, destination.size_bytes());
+            m_DownloadsCompleted.fetch_add(1u, std::memory_order_relaxed);
+        }
+        FreeSlotLocked(*it);
+        m_PendingReadbacks.erase(it); // its record goes now; CollectCompleted's watermark no longer waits for it
+    }
+    // The taker's own retirement: the lane's completed command buffers return to its pool without a frame.
+    RetireCompletedCommandBuffers(lane, done);
+    return true;
+}
+
+void VulkanTransferQueue::ReleaseReadback(const RHI::ReadbackToken token)
+{
+    if (!token.IsValid() || !IsValid())
+        return;
+    const TransferLane lane = LaneOfTicket(token.Value);
+    const uint64_t done = QueryLaneCompletedValue(lane);
+    {
+        std::scoped_lock lock{m_Mutex};
+        const auto it = std::ranges::find(m_PendingReadbacks, token, &PendingReadback::Token);
+        if (it == m_PendingReadbacks.end() || !it->Sink.Pulled)
+            return;
+        it->Released = true;
+        if (LaneTicketValue(token.Value) > done)
+            return; // still on the device: freed by a later Take, Release or CollectCompleted
+        FreeSlotLocked(*it);
+        m_PendingReadbacks.erase(it);
+    }
+    RetireCompletedCommandBuffers(lane, done);
+}
+
+uint64_t VulkanTransferQueue::SubmitTimelineLocked(
+    VkCommandBuffer cmd, const std::string_view operation, const TransferLane laneId)
+{
+    Lane& lane = LaneFor(laneId);
+    const Lane& graphics = LaneFor(TransferLane::Graphics);
     VkCommandBufferSubmitInfo cmdInfo{};
     cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     cmdInfo.commandBuffer = cmd;
 
-    const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
     VkSemaphoreSubmitInfo sigInfo{};
     sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    sigInfo.semaphore = m_Timeline;
-    sigInfo.value = ticket;
+    sigInfo.semaphore = lane.Timeline;
     // All commands: a completion-only compute submission records no transfer, so a
     // transfer-stage signal would not cover its dispatches.
     sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
@@ -228,36 +450,111 @@ uint64_t VulkanTransferQueue::SubmitTimelineLocked(
     submit.signalSemaphoreInfoCount = 1;
     submit.pSignalSemaphoreInfos = &sigInfo;
 
-    VkResult result;
-    if (m_QueueSubmitMutex != nullptr)
+    // Graphics lane: acquire the completed compute results (already signaled; ordering only). Compute lane: wait
+    // on the graphics lane's last submitted ticket. Every graphics-queue producer of method input draws one: the
+    // residency's uploads, a method's private uploads (seeds, slot maps), CPU-uploaded ring fronts, downloads and the
+    // device's one-shot uploads; frames do not produce method input (see the RHI contract). A producer whose token
+    // the caller holds was submitted before this call, so its ticket is covered; an already signaled value costs
+    // nothing, and no graphics-queue submission or lock is needed here. A LaneOrderOnly submission (a prepared
+    // worker page, RHI::ComputeInputOrder) waits for nothing: its inputs precede an earlier compute-lane submission
+    // that carried this wait, and a semaphore wait also orders every later submission of its queue.
+    VkSemaphoreSubmitInfo waitInfo =
+        laneId == TransferLane::Graphics ? PublishedComputeWait() : VkSemaphoreSubmitInfo{};
+    if (laneId == TransferLane::Compute && !std::exchange(lane.LaneOrderOnly, false))
     {
-        std::scoped_lock queueLock{*m_QueueSubmitMutex};
-        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        const uint64_t issued = graphics.SubmittedTicket.load(std::memory_order_acquire);
+        if (issued != 0u && graphics.Timeline != VK_NULL_HANDLE)
+        {
+            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            waitInfo.semaphore = graphics.Timeline;
+            waitInfo.value = issued;
+            waitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        }
     }
-    else
+    if (waitInfo.semaphore != VK_NULL_HANDLE)
     {
-        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        submit.waitSemaphoreInfoCount = 1u;
+        submit.pWaitSemaphoreInfos = &waitInfo;
+    }
+
+    uint64_t ticket = 0u;
+    VkResult result;
+    {
+        // Only this lane's VkQueue lock: a separate method queue never waits for a present or frame submission.
+        std::unique_lock<std::mutex> queueLock;
+        if (lane.QueueMutex != nullptr)
+            queueLock = std::unique_lock{*lane.QueueMutex};
+        // Tickets are drawn under the lane's Record mutex, so each timeline is signaled in increasing order; a
+        // refused submission hands its ticket back, so fences never name a value that is never signaled.
+        ticket = lane.NextTicket.fetch_add(1, std::memory_order_acq_rel);
+        sigInfo.value = ticket;
+        result = vkQueueSubmit2(lane.Queue, 1, &submit, VK_NULL_HANDLE);
+        if (result != VK_SUCCESS)
+            lane.NextTicket.store(ticket, std::memory_order_release);
+        else
+            lane.SubmittedTicket.store(ticket, std::memory_order_release);
     }
     if (result != VK_SUCCESS)
     {
+        if (result == VK_ERROR_DEVICE_LOST)
+            MarkLost();
         Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; {} skipped", operation);
-        vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        vkFreeCommandBuffers(m_Device, lane.Pool, 1u, &cmd);
         return 0u;
     }
-    m_InFlightCommandBuffers.push_back(RetiredCommandBuffer{
-        .CommandBuffer = cmd, .RetireValue = ticket});
+    // Handoff counters are read back from the batch actually submitted, so a dropped wait drops its count.
+    const bool submittedWait = submit.waitSemaphoreInfoCount == 1u && submit.pWaitSemaphoreInfos != nullptr;
+    if (laneId == TransferLane::Compute)
+    {
+        m_ComputeSubmissions.fetch_add(1u, std::memory_order_relaxed);
+        if (submittedWait && submit.pWaitSemaphoreInfos->semaphore == graphics.Timeline)
+            m_ComputeGraphicsWaits.fetch_add(1u, std::memory_order_relaxed);
+    }
+    else if (submittedWait && submit.pWaitSemaphoreInfos->semaphore == LaneFor(TransferLane::Compute).Timeline)
+    {
+        NoteComputeVisibilityWait();
+    }
+    std::scoped_lock lock{m_Mutex};
+    lane.InFlight.push_back(RetiredCommandBuffer{.CommandBuffer = cmd, .RetireValue = ticket});
     return ticket;
+}
+
+VkResult VulkanTransferQueue::SubmitGraphicsTicketed(const VkSubmitInfo2& submit, const VkFence fence)
+{
+    Lane& graphics = LaneFor(TransferLane::Graphics);
+    if (!IsValid())
+        return VK_ERROR_INITIALIZATION_FAILED;
+    VkSemaphoreSubmitInfo signal{};
+    signal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    signal.semaphore = graphics.Timeline;
+    signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkSubmitInfo2 ticketed = submit;
+    ticketed.signalSemaphoreInfoCount = 1u;
+    ticketed.pSignalSemaphoreInfos = &signal;
+    if (RefuseInsideGraphicsRecorder("A device one-shot submission"))
+        return VK_ERROR_INITIALIZATION_FAILED;
+    std::scoped_lock record{graphics.Record};
+    std::unique_lock<std::mutex> queueLock;
+    if (graphics.QueueMutex != nullptr)
+        queueLock = std::unique_lock{*graphics.QueueMutex};
+    signal.value = graphics.NextTicket.fetch_add(1, std::memory_order_acq_rel);
+    const VkResult result = vkQueueSubmit2(graphics.Queue, 1u, &ticketed, fence);
+    if (result != VK_SUCCESS)
+        graphics.NextTicket.store(signal.value, std::memory_order_release);
+    else
+        graphics.SubmittedTicket.store(signal.value, std::memory_order_release);
+    return result;
 }
 
 RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
 {
+    // The caller staged under the graphics lane's Record mutex and still holds it.
     if (!FinishCommandBuffer(cmd, "upload"))
     {
         m_Belt->CancelPending();
         return {};
     }
 
-    std::scoped_lock lock{m_Mutex};
     const uint64_t ticket = SubmitTimelineLocked(cmd, "upload");
     if (ticket == 0u)
     {
@@ -268,10 +565,8 @@ RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
     return RHI::TransferToken{ticket};
 }
 
-RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
-                                                       size_t slotIndex,
-                                                       uint64_t sizeBytes,
-                                                       RHI::ReadbackSink sink)
+RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(
+    VkCommandBuffer cmd, size_t slotIndex, uint64_t sizeBytes, RHI::ReadbackSink sink, const TransferLane lane)
 {
     // The copy into the slot is made visible to the host before the CPU reads it at collection: the timeline wait
     // orders the device's work, a host-read barrier the memory (both buffer and texture downloads end here).
@@ -297,18 +592,23 @@ RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
             hostBarrier = true;
         }
     }
-    if (!FinishCommandBuffer(cmd, "readback"))
+    if (!FinishCommandBuffer(cmd, "readback", lane))
         return {};
 
-    std::scoped_lock lock{m_Mutex};
-    const uint64_t ticket = SubmitTimelineLocked(cmd, "readback");
+    // The caller holds the lane's Record mutex, so this lane's pending readbacks are pushed in ticket order.
+    const uint64_t ticket = SubmitTimelineLocked(cmd, "readback", lane);
     if (ticket == 0u)
         return {};
+    std::scoped_lock lock{m_Mutex};
     if (hostBarrier)
+    {
         m_ReadbackHostBarriers.fetch_add(1u, std::memory_order_relaxed);
-    const RHI::ReadbackToken token{ticket};
+        if (lane == TransferLane::Compute)
+            m_ComputeHostBarriers.fetch_add(1u, std::memory_order_relaxed);
+    }
+    const RHI::ReadbackToken token{EncodeLaneTicket(lane, ticket)};
     if (slotIndex < m_ReadbackSlots.size())
-        m_ReadbackSlots[slotIndex].RetireValue = ticket;
+        m_ReadbackSlots[slotIndex].RetireValue = token.Value;
     m_PendingReadbacks.push_back(PendingReadback{
         .Token = token,
         .SlotIndex = slotIndex,
@@ -318,23 +618,24 @@ RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
     return token;
 }
 
-void VulkanTransferQueue::RetireCompletedCommandBuffers(const uint64_t completedValue)
+void VulkanTransferQueue::RetireCompletedCommandBuffers(const TransferLane laneId, const uint64_t completedValue)
 {
-    if (m_Device == VK_NULL_HANDLE || m_CmdPool == VK_NULL_HANDLE)
-        return;
+    Lane& lane = LaneFor(laneId);
+    if (m_Device == VK_NULL_HANDLE || lane.Pool == VK_NULL_HANDLE ||
+        (laneId == TransferLane::Graphics && RefuseInsideGraphicsRecorder("Command buffer retirement")))
+        return; // a later retirement frees them
 
-    std::scoped_lock lock{m_Mutex};
-    while (!m_InFlightCommandBuffers.empty() &&
-           m_InFlightCommandBuffers.front().RetireValue <= completedValue)
+    std::scoped_lock lock{lane.Record, m_Mutex}; // the pool, then the list
+    while (!lane.InFlight.empty() && lane.InFlight.front().RetireValue <= completedValue)
     {
-        const VkCommandBuffer cmd = m_InFlightCommandBuffers.front().CommandBuffer;
+        const VkCommandBuffer cmd = lane.InFlight.front().CommandBuffer;
         if (cmd != VK_NULL_HANDLE)
-            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
-        m_InFlightCommandBuffers.pop_front();
+            vkFreeCommandBuffers(m_Device, lane.Pool, 1u, &cmd);
+        lane.InFlight.pop_front();
     }
 }
 
-size_t VulkanTransferQueue::AcquireReadbackSlot(uint64_t sizeBytes)
+size_t VulkanTransferQueue::AcquireReadbackSlot(uint64_t sizeBytes, const TransferLane lane)
 {
     if (sizeBytes == 0u || sizeBytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
         return std::numeric_limits<size_t>::max();
@@ -343,7 +644,7 @@ size_t VulkanTransferQueue::AcquireReadbackSlot(uint64_t sizeBytes)
     for (size_t index = 0; index < m_ReadbackSlots.size(); ++index)
     {
         ReadbackSlot& slot = m_ReadbackSlots[index];
-        if (!slot.InUse && slot.Buffer != VK_NULL_HANDLE && slot.SizeBytes >= sizeBytes)
+        if (!slot.InUse && slot.Lane == lane && slot.Buffer != VK_NULL_HANDLE && slot.SizeBytes >= sizeBytes)
         {
             slot.InUse = true;
             slot.RetireValue = 0u;
@@ -383,6 +684,7 @@ size_t VulkanTransferQueue::AcquireReadbackSlot(uint64_t sizeBytes)
 
     slot.MappedPtr = info.pMappedData;
     slot.SizeBytes = sizeBytes;
+    slot.Lane = lane;
     slot.InUse = true;
     if (IsUncachedHostReadback(m_Vma, slot.Allocation))
         m_ReadbackSlotsUncached.fetch_add(1u, std::memory_order_relaxed);
@@ -411,7 +713,7 @@ void VulkanTransferQueue::ReleaseReadbackSlot(size_t slotIndex, uint64_t retireV
     slot.RetireValue = retireValue;
 }
 
-void VulkanTransferQueue::DrainCompletedReadbacks(uint64_t completedValue)
+void VulkanTransferQueue::DrainCompletedReadbacks(const std::array<uint64_t, 2>& completedValues)
 {
     struct ReadyReadback
     {
@@ -421,13 +723,29 @@ void VulkanTransferQueue::DrainCompletedReadbacks(uint64_t completedValue)
     };
 
     std::vector<ReadyReadback> ready;
+    std::array<uint64_t, 2> watermark = completedValues;
     {
         std::scoped_lock lock{m_Mutex};
         auto it = m_PendingReadbacks.begin();
         while (it != m_PendingReadbacks.end())
         {
-            if (!it->Token.IsValid() || it->Token.Value > completedValue)
+            const bool complete = it->Token.IsValid() && IsLaneTicketComplete(it->Token.Value, completedValues);
+            // A pulled readback belongs to its submitter until it takes or releases it: never delivered or dropped
+            // here; a released one is freed once complete, without a callback.
+            if (complete && it->Sink.Pulled && it->Released)
             {
+                FreeSlotLocked(*it);
+                it = m_PendingReadbacks.erase(it);
+                continue;
+            }
+            if (!complete || it->Sink.Pulled)
+            {
+                // Lane FIFO: no later token of this lane reports complete before this one is resolved.
+                if (it->Token.IsValid())
+                {
+                    auto& bound = watermark[static_cast<size_t>(LaneOfTicket(it->Token.Value))];
+                    bound = std::min(bound, LaneTicketValue(it->Token.Value) - 1u);
+                }
                 ++it;
                 continue;
             }
@@ -448,9 +766,8 @@ void VulkanTransferQueue::DrainCompletedReadbacks(uint64_t completedValue)
                 }
                 if (slot.MappedPtr != nullptr && !bytes.empty())
                     std::memcpy(bytes.data(), slot.MappedPtr, bytes.size());
-                slot.InUse = false;
-                slot.RetireValue = it->Token.Value;
             }
+            FreeSlotLocked(*it);
 
             ready.push_back(ReadyReadback{
                 .Token = it->Token,
@@ -464,15 +781,19 @@ void VulkanTransferQueue::DrainCompletedReadbacks(uint64_t completedValue)
     for (ReadyReadback& readback : ready)
     {
         readback.Sink.Deliver(std::span<const std::byte>{readback.Bytes});
-        uint64_t completed = m_CompletedReadbackTicket.load(std::memory_order_acquire);
-        while (completed < readback.Token.Value &&
-               !m_CompletedReadbackTicket.compare_exchange_weak(completed,
-                                                                 readback.Token.Value,
-                                                                 std::memory_order_release,
-                                                                 std::memory_order_acquire))
+        if (!readback.Bytes.empty())
+            m_DownloadsCompleted.fetch_add(1u, std::memory_order_relaxed);
+    }
+    // After the sinks ran: each lane's readback tokens up to its first unresolved entry (and the device's value).
+    for (const TransferLane lane : {TransferLane::Graphics, TransferLane::Compute})
+    {
+        std::atomic<uint64_t>& delivered = LaneFor(lane).CompletedReadbackTicket;
+        const uint64_t value = watermark[static_cast<size_t>(lane)];
+        uint64_t completed = delivered.load(std::memory_order_acquire);
+        while (completed < value &&
+            !delivered.compare_exchange_weak(completed, value, std::memory_order_release, std::memory_order_acquire))
         {
         }
-        if (!readback.Bytes.empty()) m_DownloadsCompleted.fetch_add(1u, std::memory_order_relaxed);
     }
 }
 
@@ -495,6 +816,8 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
                                                       uint64_t offset)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadBufferRaw", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadBufferRaw")};
+    if (RefuseInsideGraphicsRecorder("UploadBuffer"))
+        return {};
     if (!IsValid())
     {
         Core::Log::Warn("[VulkanTransferQueue] UploadBuffer rejected; transfer service is invalid");
@@ -523,7 +846,7 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
         return {};
     }
 
-    std::scoped_lock uploadLock{m_UploadMutex};
+    std::scoped_lock uploadLock{LaneFor(TransferLane::Graphics).Record};
     auto staging = m_Belt->Allocate(static_cast<size_t>(size), 4);
     if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
     {
@@ -583,6 +906,8 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
                                                        uint32_t arrayLayer)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadTexture", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadTexture")};
+    if (RefuseInsideGraphicsRecorder("UploadTexture"))
+        return {};
     if (!IsValid())
     {
         Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; transfer service is invalid");
@@ -627,7 +952,7 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
                        expectedSize, dataSizeBytes);
         return {};
     }
-    std::scoped_lock uploadLock{m_UploadMutex};
+    std::scoped_lock uploadLock{LaneFor(TransferLane::Graphics).Record};
     auto staging = m_Belt->Allocate(static_cast<size_t>(dataSizeBytes),
                                    RHI::RequiredBufferOffsetAlignment(img->RhiFormat));
     if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
@@ -687,6 +1012,8 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
                                                                std::span<const std::byte> src)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadTextureFullChain", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadTextureFullChain")};
+    if (RefuseInsideGraphicsRecorder("UploadTextureFullChain"))
+        return {};
     if (!IsValid())
     {
         Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; transfer service is invalid");
@@ -761,7 +1088,7 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
     }
 
     const std::uint32_t offsetAlignment = RHI::RequiredBufferOffsetAlignment(desc.Fmt);
-    std::scoped_lock uploadLock{m_UploadMutex};
+    std::scoped_lock uploadLock{LaneFor(TransferLane::Graphics).Record};
     auto staging = m_Belt->Allocate(static_cast<std::size_t>(layout.TotalBytes), offsetAlignment);
     if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
     {
@@ -849,7 +1176,7 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
 }
 
 std::optional<VulkanTransferQueue::DownloadSource> VulkanTransferQueue::PrepareDownload(
-    RHI::BufferHandle src, uint64_t size, uint64_t offset, const RHI::ReadbackSink& sink)
+    RHI::BufferHandle src, uint64_t size, uint64_t offset, const RHI::ReadbackSink& sink, const TransferLane lane)
 {
     const auto refuse = [&](std::string_view reason) -> std::optional<DownloadSource> {
         Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; {}", reason);
@@ -885,15 +1212,15 @@ std::optional<VulkanTransferQueue::DownloadSource> VulkanTransferQueue::PrepareD
     if (range->SizeBytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
         return refuse("requested readback is too large for this host");
 
-    const size_t slotIndex = AcquireReadbackSlot(range->SizeBytes);
+    const size_t slotIndex = AcquireReadbackSlot(range->SizeBytes, lane);
     if (slotIndex == std::numeric_limits<size_t>::max())
         return refuse("readback staging allocation failed");
     return DownloadSource{.Buffer = buf->Buffer, .Offset = range->OffsetBytes, .Size = range->SizeBytes,
                           .SlotIndex = slotIndex};
 }
 
-RHI::ReadbackToken VulkanTransferQueue::RecordAndSubmitDownload(VkCommandBuffer cmd, const DownloadSource& source,
-                                                                RHI::ReadbackSink sink)
+RHI::ReadbackToken VulkanTransferQueue::RecordAndSubmitDownload(
+    VkCommandBuffer cmd, const DownloadSource& source, RHI::ReadbackSink sink, const TransferLane lane)
 {
     VkBufferMemoryBarrier2 beforeCopy{};
     beforeCopy.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -922,14 +1249,14 @@ RHI::ReadbackToken VulkanTransferQueue::RecordAndSubmitDownload(VkCommandBuffer 
             Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback staging slot became invalid");
             if (source.SlotIndex < m_ReadbackSlots.size())
                 m_ReadbackSlots[source.SlotIndex].InUse = false;
-            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+            vkFreeCommandBuffers(m_Device, LaneFor(lane).Pool, 1u, &cmd);
             m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
             return {};
         }
         vkCmdCopyBuffer(cmd, source.Buffer, m_ReadbackSlots[source.SlotIndex].Buffer, 1u, &copy);
     }
 
-    const RHI::ReadbackToken token = SubmitReadback(cmd, source.SlotIndex, source.Size, std::move(sink));
+    const RHI::ReadbackToken token = SubmitReadback(cmd, source.SlotIndex, source.Size, std::move(sink), lane);
     if (!token.IsValid())
     {
         ReleaseReadbackSlot(source.SlotIndex, 0u);
@@ -948,9 +1275,15 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
                                                        RHI::ReadbackSink sink)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::DownloadBuffer", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::DownloadBuffer")};
+    if (RefuseInsideGraphicsRecorder("DownloadBuffer"))
+    {
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
     const auto source = PrepareDownload(src, size, offset, sink);
     if (!source)
         return {};
+    std::scoped_lock record{LaneFor(TransferLane::Graphics).Record};
     VkCommandBuffer cmd = Begin();
     if (cmd == VK_NULL_HANDLE)
     {
@@ -961,20 +1294,19 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
     return RecordAndSubmitDownload(cmd, *source, std::move(sink));
 }
 
-RHI::ReadbackToken VulkanTransferQueue::SubmitRecordedDownload(VkCommandBuffer cmd, RHI::BufferHandle src,
-                                                               uint64_t size, RHI::ReadbackSink sink)
+RHI::ReadbackToken VulkanTransferQueue::SubmitRecordedDownload(
+    VkCommandBuffer cmd, RHI::BufferHandle src, uint64_t size, RHI::ReadbackSink sink, const TransferLane lane)
 {
     // Completion-only compute shares the timeline/sink lifecycle, without a staging slot.
     if (src.IsValid() && size == 0u && sink.IsValidForSize(0u))
-        return SubmitReadback(cmd, std::numeric_limits<size_t>::max(), 0u, std::move(sink));
-    const auto source = src.IsValid() ? PrepareDownload(src, size, 0u, sink) : std::nullopt;
+        return SubmitReadback(cmd, std::numeric_limits<size_t>::max(), 0u, std::move(sink), lane);
+    const auto source = src.IsValid() ? PrepareDownload(src, size, 0u, sink, lane) : std::nullopt;
     if (!source)
     {
-        std::scoped_lock lock{m_Mutex};
-        vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        FreeCommandBuffer(lane, cmd);
         return {};
     }
-    return RecordAndSubmitDownload(cmd, *source, std::move(sink));
+    return RecordAndSubmitDownload(cmd, *source, std::move(sink), lane);
 }
 
 RHI::ReadbackToken VulkanTransferQueue::DownloadTexture(RHI::TextureHandle src,
@@ -984,6 +1316,11 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadTexture(RHI::TextureHandle src,
                                                         RHI::ReadbackSink sink)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::DownloadTexture", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::DownloadTexture")};
+    if (RefuseInsideGraphicsRecorder("DownloadTexture"))
+    {
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
     const auto drop = [this](const char* message) -> RHI::ReadbackToken
     {
         Core::Log::Warn("{}", message);
@@ -1051,6 +1388,7 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadTexture(RHI::TextureHandle src,
     if (slotIndex == std::numeric_limits<size_t>::max())
         return drop("[VulkanTransferQueue] DownloadTexture rejected; readback staging allocation failed");
 
+    std::scoped_lock record{LaneFor(TransferLane::Graphics).Record};
     VkCommandBuffer cmd = Begin();
     if (cmd == VK_NULL_HANDLE)
     {
@@ -1097,7 +1435,7 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadTexture(RHI::TextureHandle src,
             Core::Log::Warn("[VulkanTransferQueue] DownloadTexture rejected; readback staging slot became invalid");
             if (slotIndex < m_ReadbackSlots.size())
                 m_ReadbackSlots[slotIndex].InUse = false;
-            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+            vkFreeCommandBuffers(m_Device, LaneFor(TransferLane::Graphics).Pool, 1u, &cmd);
             m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
             return {};
         }
@@ -1136,9 +1474,10 @@ bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const
 
 bool VulkanTransferQueue::IsComplete(RHI::ReadbackToken token) const
 {
-    if (!token.IsValid())
-        return true;
-    return token.Value <= m_CompletedReadbackTicket.load(std::memory_order_acquire);
+    // A readback token completes when its sink ran (CollectCompleted); judged against its own lane.
+    return IsLaneTicketComplete(token.Value,
+        {LaneFor(TransferLane::Graphics).CompletedReadbackTicket.load(std::memory_order_acquire),
+            LaneFor(TransferLane::Compute).CompletedReadbackTicket.load(std::memory_order_acquire)});
 }
 
 void VulkanTransferQueue::CollectCompleted()
@@ -1151,8 +1490,17 @@ void VulkanTransferQueue::CollectCompleted()
     }
 
     const uint64_t done = QueryCompletedValue();
-    RetireCompletedCommandBuffers(done);
-    DrainCompletedReadbacks(done);
+    const uint64_t computeDone = QueryLaneCompletedValue(TransferLane::Compute);
+    RetireCompletedCommandBuffers(TransferLane::Graphics, done);
+    RetireCompletedCommandBuffers(TransferLane::Compute, computeDone);
+    // Publish before delivery: a sink may immediately submit a graphics consumer of its completed result.
+    uint64_t published = m_PublishedComputeValue.load(std::memory_order_relaxed);
+    while (published < computeDone &&
+        !m_PublishedComputeValue.compare_exchange_weak(
+            published, computeDone, std::memory_order_release, std::memory_order_relaxed))
+    {
+    }
+    DrainCompletedReadbacks({done, computeDone});
     m_Belt->GarbageCollect(done);
 }
 
@@ -1166,6 +1514,13 @@ RHI::TransferQueueDiagnostics VulkanTransferQueue::GetDiagnostics() const noexce
         .ReadbackRingHighWaterBytes = m_ReadbackRingHighWaterBytes.load(std::memory_order_relaxed),
         .ReadbackSlotsUncached = m_ReadbackSlotsUncached.load(std::memory_order_relaxed),
         .ReadbackHostBarriers = m_ReadbackHostBarriers.load(std::memory_order_relaxed),
+        .ComputeLane = m_ComputeResolution,
+        .ComputeSharesFrameComputeQueue = m_ComputeSharesFrameComputeQueue,
+        .ComputeSharesFrameQueueLock = m_ComputeSharesFrameQueueLock,
+        .ComputeSubmissions = m_ComputeSubmissions.load(std::memory_order_relaxed),
+        .ComputeGraphicsWaits = m_ComputeGraphicsWaits.load(std::memory_order_relaxed),
+        .ComputeHostBarriers = m_ComputeHostBarriers.load(std::memory_order_relaxed),
+        .ComputeVisibilityWaits = m_ComputeVisibilityWaits.load(std::memory_order_relaxed),
     };
 }
 

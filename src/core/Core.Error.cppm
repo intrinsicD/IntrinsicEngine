@@ -9,8 +9,7 @@ export module Extrinsic.Core.Error;
 
 namespace Extrinsic::Core
 {
-    export enum class ErrorCode : std::uint32_t
-    {
+    export enum class ErrorCode : std::uint32_t {
         Success = 0,
 
         // Resource errors (100-199)
@@ -18,6 +17,7 @@ namespace Extrinsic::Core
         ResourceNotFound = 101,
         ResourceBusy = 102,
         ResourceCorrupted = 103,
+        ResourceBudgetExceeded = 104, // a configured resource budget refused the allocation
 
         // I/O errors (200-299)
         FileNotFound = 200,
@@ -74,6 +74,7 @@ namespace Extrinsic::Core::Error
         case ErrorCode::ResourceNotFound: return "ResourceNotFound";
         case ErrorCode::ResourceBusy: return "ResourceBusy";
         case ErrorCode::ResourceCorrupted: return "ResourceCorrupted";
+        case ErrorCode::ResourceBudgetExceeded:  return "ResourceBudgetExceeded";
         case ErrorCode::FileNotFound: return "FileNotFound";
         case ErrorCode::FileReadError: return "FileReadError";
         case ErrorCode::FileWriteError: return "FileWriteError";

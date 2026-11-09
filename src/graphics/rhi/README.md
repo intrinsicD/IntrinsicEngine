@@ -147,6 +147,52 @@ device dependency.
   Bytes are delivered from `CollectCompleted()` through `ReadbackSink`
   (fixed-size destination span and/or drain-time callback). Null/fallback
   backends fail closed with invalid tokens and dropped-readback diagnostics.
+- ARCH-023: `IDevice::SubmitComputeReadback(record, bytes, sink, order)` may be
+  called from a method worker. `record` only records commands: buffers, residency
+  acquisition (and its uploads) and host writes happen before the call. `order`
+  (`ComputeInputOrder`) names the dependency: `AfterIssuedTransfers` (default; every
+  owner submission and the first submission of a run) also waits for every
+  transfer-queue transfer issued before the call; `LaneOrderOnly` (a worker page
+  after its run's prepared first submission) follows only the lane's earlier work,
+  so preview and renderer uploads issued later do not hold it; it is valid only for
+  prepared inputs. Neither waits for a frame directly, but the default order's
+  graphics ticket covers every earlier graphics-queue batch (frames and swapchain
+  waits included), and where the method lane shares a queue with frames, queue
+  order applies to both.
+  That worker waits for its own token with `ITransferQueue::WaitCompute` (bounded;
+  `ComputeWaitStatus` Complete, Pending or Failed). A readback submitted with
+  `ReadbackSink::Pull()` belongs to its submitter: `CollectCompleted()` never
+  delivers, copies or drops it. The worker takes its bytes with
+  `TakeCompletedReadback` (exactly once; slot, record and the lane's completed
+  command buffers are released without a frame) or gives them up with
+  `ReleaseReadback` (freed once the device finished, no callback). Readback
+  `IsComplete` never reports a later token of a lane complete over an earlier
+  untaken or undelivered one. Ordinary sinks still run only from
+  `CollectCompleted()`. The defaults never block: `WaitCompute` answers from
+  `IsComplete`, `TakeCompletedReadback` takes nothing, and `ReleaseReadback` does
+  nothing.
+- ARCH-023 worker uploads: `IDevice::WriteMappedBuffer(buffer, data, size,
+  offset)` may be called from a method worker. It copies into a host-visible
+  buffer's persistent mapping (flushing non-coherent memory), with no queue, no
+  lock shared with frames and no staging allocation, and refuses (false, nothing
+  written) no data, an invalid or destroyed handle, a buffer without a mapping, a
+  range outside the buffer or a lost device. The default refuses, so a backend
+  without a mapping reports the path unsupported. The caller owns the range: no
+  submitted work may still read it (wait for your own token first). The bytes reach
+  device-local rows through `CopyBuffer` in the worker's next
+  `SubmitComputeReadback` on the method lane, never through the graphics-lane
+  `ITransferQueue::UploadBuffer`, whose staging only `CollectCompleted()` retires.
+- ARCH-024 actual retirement: `IDevice::IsFrameRetired(n)` answers, on the owner
+  thread and without blocking, whether work stamped with frame number `n` (the
+  `GetGlobalFrameNumber()` value at the use) finished. A submitted number needs
+  every frame up to it finished on every queue; an unsubmitted one needs no
+  recording frame and an idle graphics queue, so it does not wait for earlier
+  frames: owners keep each stamp instead of overwriting an earlier one
+  (`GpuPropertyResidency` keeps a list, `RetirementStamp` serves only buffers
+  frames never use). `CollectCompletedResources()` releases deferred destructions
+  and handle slots the same way where no frame begins. The defaults keep the
+  frame-distance rule and do nothing, so an unknown device never claims
+  completion.
 - `ITransferQueue::DownloadTexture(TextureHandle, TextureLayout, mip, layer,
   ReadbackSink)` is the GRAPHICS-097 texture readback seam over the same
   readback token/sink/drain contract. Callers must transition the source

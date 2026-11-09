@@ -1,6 +1,7 @@
 // Shared editor-job fixture; link SandboxEditorJobHarness.cpp for runtime contract tests.
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <optional>
@@ -16,6 +17,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.StepRuns;
 
 namespace Extrinsic::Tests
 {
@@ -28,7 +30,18 @@ namespace Extrinsic::Tests
         [[nodiscard]] Runtime::JobService& Jobs() noexcept { return m_Jobs; }
         [[nodiscard]] Runtime::KernelEventBus& Events() noexcept { return m_Events; }
 
-        void Attach(auto& context) { AttachCommands(context.JobCommands); }
+        // The job surface and, for an editor processing context, the session's step runs (ARCH-023: a GPU
+        // transaction is refused without them, as in the Sandbox).
+        void Attach(auto& context)
+        {
+            AttachCommands(context.JobCommands);
+            if constexpr (requires { context.StepRuns; })
+                context.StepRuns = &m_StepRuns;
+        }
+        [[nodiscard]] Runtime::StepRunsService& StepRuns() noexcept
+        {
+            return m_StepRuns;
+        }
 
         // The scene epoch `Progress` and `SceneEpoch` answer (the session bumps it on scene replacement).
         void SetSceneEpoch(std::uint64_t epoch) noexcept { m_SceneEpoch = epoch; }
@@ -36,6 +49,9 @@ namespace Extrinsic::Tests
         [[nodiscard]] Runtime::EditorJobQueueSnapshot Snapshot() const;
         [[nodiscard]] bool DrainUntilTerminal(
             std::chrono::milliseconds timeout = std::chrono::seconds{5});
+        // One frame of the lane: the workers finish what they run, then the completions and gates drain once (a
+        // step run's holder pumps its run there), for a test that drives a run frame by frame.
+        void Pump();
 
     private:
         void AttachCommands(Runtime::EditorJobCommandSurface&);
@@ -50,6 +66,8 @@ namespace Extrinsic::Tests
             SchedulerScope& operator=(const SchedulerScope&) = delete;
         };
 
+        // Declared first: destroyed after the jobs whose finalizers may still report to it.
+        Runtime::StepRunsService m_StepRuns{};
         Runtime::JobService m_Jobs{};
         Runtime::KernelEventBus m_Events{};
         Runtime::EditorJobIdentityIndex m_Identities{};
@@ -108,8 +126,28 @@ namespace Extrinsic::Tests
 
         ASSERT_TRUE(jobs.DrainUntilTerminal());
         const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
-        ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].State, expected);
+        bool stepRun = false;
+        if constexpr (requires { pending.StepRun; })
+            stepRun = pending.StepRun != 0u;
+        ASSERT_FALSE(done.Entries.empty());
+        if (!stepRun)
+            ASSERT_EQ(done.Entries.size(), 1u);
+        for (const auto& job : done.Entries)
+        {
+            EXPECT_EQ(Runtime::EditorJobRunOf(job.Token, job.Identity), queued.Entries[0].Token);
+            EXPECT_FALSE(Runtime::IsActiveEditorJobState(job.State));
+        }
+        // StepRuns cancels its holder when Valid rejects captures; the delivered result retains the stale reason.
+        const auto holderState =
+            stepRun && expected == Runtime::JobState::StaleDiscarded ? Runtime::JobState::Cancelled : expected;
+        const auto holder = std::find_if(done.Entries.begin(),
+            done.Entries.end(),
+            [&](const auto& job)
+            {
+                return job.Token == queued.Entries[0].Token;
+            });
+        ASSERT_NE(holder, done.Entries.end());
+        EXPECT_EQ(holder->State, holderState);
         ASSERT_TRUE(delivered.has_value()) << "a queued job owes exactly one terminal result";
         EXPECT_EQ(deliveries, 1u);
         if (expected == Runtime::JobState::Published)

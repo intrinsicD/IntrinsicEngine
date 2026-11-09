@@ -13,6 +13,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+export import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Runtime.WorldHandle;
 export namespace Extrinsic::Runtime
 {
@@ -32,14 +33,23 @@ export namespace Extrinsic::Runtime
         Hierarchical,
     };
 
+    // The Lloyd iteration cap of the config and panel (a request admits any positive cap).
+    inline constexpr std::uint32_t kMaxKMeansIterations = 4096u;
+
     struct KMeansParameters
     {
         std::uint32_t ClusterCount{8u};
-        std::uint32_t MaxIterations{32u};
         std::uint32_t Seed{42u};
-        std::uint32_t GpuPreviewInterval{5u};
         KMeansInitialization Initialization{
             KMeansInitialization::Hierarchical};
+        // ARCH-023: the shared execution options. One step is one Lloyd iteration (assign, then update) on both
+        // backends, each a step run with the same start, cap, Accept and restart; the CPU reference shows no live
+        // preview (its labels appear at Accept), the Vulkan run previews at the cadence.
+        StepRunExecution Execution{.IterationCap = 32u,
+            .PreviewEvery = 5u,
+            .PreviewIntervalMs = 0u,
+            .AutoAccept = StepRunAutoAccept::Never,
+            .Start = StepRunStart::Run};
     };
 
     struct KMeansPropertyRefs
@@ -102,7 +112,6 @@ export namespace Extrinsic::Runtime
         KMeansPropertyRefs Properties{};
         KMeansParameters Parameters{};
         ClusteringBackend Backend{ClusteringBackend::CpuReference};
-        bool AutoAccept{true};
         // A preview's newest parameters (a slider): a GPU request that replaces the GPU run on the same output instead
         // of being refused while it runs. That run is discarded (while it is being accepted it finishes first) and
         // this request starts once it settled, with fresh captures; a newer replacing request that arrives first
@@ -137,6 +146,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t GpuSubmissions{}, GpuPreviews{};
         // Workspace buffers/pipelines created at admission; a retained idle workspace reports zero.
         std::uint32_t GpuWorkspaceBuffersCreated{}, GpuWorkspacePipelinesCreated{};
+        std::uint64_t StepRun{}; // the run's step run (run_control, run_observe); 0: it never started
         std::vector<glm::vec3> Centroids{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
@@ -233,6 +243,9 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] ClusteringModuleStats Stats() const noexcept;
         [[nodiscard]] KMeansGpuObservation GpuRun(CommandCorrelationId, KMeansGpuAction = KMeansGpuAction::Observe);
+        // The step run of the request's run, CPU or Vulkan (run_control, run_observe, the panel's controls); 0 before
+        // the request started a run, after it was refused, or once newer runs replaced it in the module's short list.
+        [[nodiscard]] std::uint64_t StepRun(CommandCorrelationId) const;
         // Read-only admission reason shared with GPU submission; empty preserves CPU fallback paths.
         [[nodiscard]] std::string GpuReadinessDiagnostic(const Runtime::RunKMeans&, const EditorProcessingContext&) const;
         // The app's editor workspace (the Sandbox shell's) while it lends one: a GPU run and its Accept are rows of
@@ -248,6 +261,7 @@ export namespace Extrinsic::Runtime
                   const ClusteringModuleStats* stats) noexcept;
 
         std::function<KMeansGpuObservation(CommandCorrelationId, KMeansGpuAction)> m_GpuRun{};
+        std::function<std::uint64_t(CommandCorrelationId)> m_StepRun{};
         std::function<std::string(const Runtime::RunKMeans&, const EditorProcessingContext&)> m_GpuReadinessDiagnostic{};
         // The module's slot of the workspace its GPU runs queue their editor jobs in (the lent one, else its own).
         EditorWorkspaceSlot* m_Workspace{};

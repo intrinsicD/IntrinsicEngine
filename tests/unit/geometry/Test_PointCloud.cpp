@@ -769,6 +769,105 @@ TEST(PointCloud_KMeans, IterationObserverSeesEveryCompletedIterationAndDoesNotCh
     EXPECT_EQ(observed->Centroids, plain->Centroids);
 }
 
+// ARCH-023: the Lloyd step API (a step run's logical step), against values worked by hand (all but 5/3 exact in
+// float). Hierarchical seeds of {0, 1, 4, 6} are the mean 2.75 and the farthest sample 6. Step 1 assigns [0,0,0,1]
+// (inertia 7.5625 + 3.0625 + 1.5625 + 0) and moves the first centroid to 5/3; step 2 assigns [0,0,1,1] and moves them
+// to 0.5 and 5; step 3 changes no label and converges. Finishing after step 1 (a stopped run's partial result)
+// reassigns for the moved centroids ([0,0,1,1]) without changing the state that keeps stepping.
+TEST(PointCloud_KMeans, LloydStepsMatchTheHandWorkedIterationsAndAStoppedPartialResult)
+{
+    namespace GK = Geometry::KMeans;
+    const std::vector<glm::vec3> points{{0, 0, 0}, {1, 0, 0}, {4, 0, 0}, {6, 0, 0}};
+    GK::KMeansParams params{};
+    params.ClusterCount = 2u;
+    params.MaxIterations = 8u;
+    params.Init = GK::Initialization::Hierarchical;
+
+    auto state = GK::BeginLloyd(points, {}, params, nullptr);
+    ASSERT_TRUE(state.has_value());
+    ASSERT_EQ(state->Result.Centroids.size(), 2u);
+    EXPECT_EQ(state->Result.Centroids[0], glm::vec3(2.75f, 0, 0));
+    EXPECT_EQ(state->Result.Centroids[1], glm::vec3(6, 0, 0));
+    EXPECT_EQ(state->Result.Iterations, 0u) << "Begin does no iteration";
+
+    ASSERT_EQ(GK::StepLloyd(*state), GK::LloydStatus::Continue);
+    EXPECT_EQ(state->Result.Iterations, 1u);
+    EXPECT_EQ(state->Result.Labels, (std::vector<std::uint32_t>{0u, 0u, 0u, 1u}));
+    EXPECT_EQ(state->Result.Inertia, 12.1875f) << "the assignment's inertia, before the update";
+    EXPECT_NEAR(state->MaxShiftSquared, (2.75f - 5.f / 3.f) * (2.75f - 5.f / 3.f), 1e-6f);
+    EXPECT_TRUE(state->CentroidsMoved);
+    EXPECT_FLOAT_EQ(state->Result.Centroids[0].x, 5.f / 3.f);
+    EXPECT_EQ(state->Result.Centroids[1], glm::vec3(6, 0, 0));
+
+    const auto partial = GK::FinishLloyd(*state); // a copy: the run may still step on
+    ASSERT_TRUE(partial.has_value());
+    EXPECT_EQ(partial->Iterations, 1u);
+    EXPECT_FALSE(partial->Converged);
+    EXPECT_EQ(partial->Labels, (std::vector<std::uint32_t>{0u, 0u, 1u, 1u})) << "the labels of the moved centroids";
+    EXPECT_NEAR(partial->Inertia, 25.f / 9.f + 4.f / 9.f + 4.f, 1e-5f);
+    params.MaxIterations = 1u;
+    const auto capped = GK::Cluster(points, params);
+    ASSERT_TRUE(capped.has_value());
+    EXPECT_EQ(capped->Labels, partial->Labels);
+    EXPECT_EQ(capped->Centroids, partial->Centroids);
+    EXPECT_EQ(capped->Inertia, partial->Inertia);
+    EXPECT_EQ(state->Result.Labels, (std::vector<std::uint32_t>{0u, 0u, 0u, 1u}))
+        << "finishing a copy left the stepping state as it was";
+
+    ASSERT_EQ(GK::StepLloyd(*state), GK::LloydStatus::Continue);
+    EXPECT_EQ(state->Result.Labels, (std::vector<std::uint32_t>{0u, 0u, 1u, 1u}));
+    EXPECT_EQ(state->Result.Centroids[0], glm::vec3(0.5f, 0, 0));
+    EXPECT_EQ(state->Result.Centroids[1], glm::vec3(5, 0, 0));
+    ASSERT_EQ(GK::StepLloyd(*state), GK::LloydStatus::Converged);
+    EXPECT_EQ(state->Result.Iterations, 3u);
+    EXPECT_FALSE(state->CentroidsMoved);
+    EXPECT_EQ(state->MaxShiftSquared, 0.0f);
+    const auto finished = GK::FinishLloyd(std::move(*state));
+    ASSERT_TRUE(finished.has_value());
+    EXPECT_TRUE(finished->Converged);
+    EXPECT_EQ(finished->Inertia, 2.5f);
+    params.MaxIterations = 8u;
+    const auto whole = GK::Cluster(points, params);
+    ASSERT_TRUE(whole.has_value());
+    EXPECT_EQ(whole->Iterations, 3u);
+    EXPECT_TRUE(whole->Converged);
+    EXPECT_EQ(whole->Labels, finished->Labels);
+    EXPECT_EQ(whole->Centroids, finished->Centroids);
+    EXPECT_EQ(whole->Inertia, finished->Inertia);
+}
+
+// The step API keeps Cluster's empty-cluster and failure behaviour: an empty cluster takes the farthest sample, and a
+// non-finite sample fails the first step where Cluster returns nothing.
+TEST(PointCloud_KMeans, LloydStepsKeepEmptyClusterReseedingAndNonFiniteFailure)
+{
+    namespace GK = Geometry::KMeans;
+    // Two seeds on one spot: the second centroid gets no sample in step 1 and moves to the farthest one (index 3).
+    const std::vector<glm::vec3> points{{0, 0, 0}, {0, 0, 0}, {1, 0, 0}, {5, 0, 0}};
+    const std::array<glm::vec3, 2> seeds{glm::vec3{0, 0, 0}, glm::vec3{0, 0, 0}};
+    GK::KMeansParams params{};
+    params.ClusterCount = 2u;
+    params.MaxIterations = 8u;
+    auto state = GK::BeginLloyd(points, seeds, params, nullptr);
+    ASSERT_TRUE(state.has_value());
+    ASSERT_EQ(GK::StepLloyd(*state), GK::LloydStatus::Continue);
+    EXPECT_EQ(state->Result.Centroids[1], points[3]) << "the empty cluster takes the farthest sample";
+    std::uint32_t steps = 1u;
+    while (steps < params.MaxIterations && GK::StepLloyd(*state) == GK::LloydStatus::Continue)
+        ++steps;
+    const auto stepped = GK::FinishLloyd(std::move(*state));
+    const auto whole = GK::Cluster(points, seeds, params, nullptr);
+    ASSERT_TRUE(stepped && whole);
+    EXPECT_EQ(stepped->Labels, whole->Labels);
+    EXPECT_EQ(stepped->Centroids, whole->Centroids);
+    EXPECT_EQ(stepped->Iterations, whole->Iterations);
+
+    const std::vector<glm::vec3> invalid{{0, 0, 0}, {std::numeric_limits<float>::quiet_NaN(), 0, 0}, {1, 0, 0}};
+    auto failing = GK::BeginLloyd(invalid, {}, params, nullptr);
+    ASSERT_TRUE(failing.has_value());
+    EXPECT_EQ(GK::StepLloyd(*failing), GK::LloydStatus::Failed);
+    EXPECT_FALSE(GK::Cluster(invalid, params).has_value());
+}
+
 TEST(PointCloud_KMeans, CpuEntryReportsGpuRequestAsCpuFallback)
 {
     const std::vector<glm::vec3> points{

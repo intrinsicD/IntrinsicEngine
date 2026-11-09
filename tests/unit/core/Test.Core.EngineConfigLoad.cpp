@@ -244,6 +244,8 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     config.Render.SynchronousExtraction = false;
     config.Render.GpuPropertyIdleEvictSeconds = 120u;
     config.Render.GpuPropertyBudgetMegabytes = 64u;
+    config.Render.GpuMethodBufferBudgetMegabytes = 2048u;
+    config.Render.MethodComputeOnGraphicsQueue = true;
     config.Simulation.WorkerThreadCount = 4u;
     config.ReferenceScene.Enabled = true;
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
@@ -271,12 +273,14 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 22u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 24u);
+    EXPECT_TRUE(preview.Preview.Config.Render.MethodComputeOnGraphicsQueue);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Generic Section Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Render.FramesInFlight, 3u);
     EXPECT_EQ(preview.Preview.Config.Render.GpuPropertyIdleEvictSeconds, 120u);
     EXPECT_EQ(preview.Preview.Config.Render.GpuPropertyBudgetMegabytes, 64u);
+    EXPECT_EQ(preview.Preview.Config.Render.GpuMethodBufferBudgetMegabytes, 2048u);
     EXPECT_TRUE(preview.Preview.Config.Render.EnableGpuProfiling);
     EXPECT_EQ(
         preview.Preview.Config.Render.DefaultRecipeConfigPath,
@@ -297,6 +301,60 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     ASSERT_EQ(loaded.State, EngineConfigState::Valid);
     EXPECT_EQ(loaded.SchemaVersion, kEngineConfigSchemaVersion);
     EXPECT_EQ(RequireSection(loaded.Preview.Config).PayloadJson, kFakeChangedPayload);
+}
+
+// ARCH-023: the method-compute queue override defaults to the async compute queue and accepts only a boolean.
+TEST(CoreEngineConfigLoad, MethodComputeGraphicsQueueIsValidatedBoolean)
+{
+    EXPECT_FALSE(EngineConfig{}.Render.MethodComputeOnGraphicsQueue);
+    const EngineConfigLoadResult accepted = PreviewEngineConfig(
+        R"json({"schema": "intrinsic.core.engine-config", "version": 1,
+                "render": {"method_compute_graphics_queue": true}})json");
+    ASSERT_EQ(accepted.State, EngineConfigState::Valid);
+    EXPECT_TRUE(accepted.Preview.Config.Render.MethodComputeOnGraphicsQueue);
+    EXPECT_EQ(accepted.Preview.ParsedFieldCount, 1u);
+
+    const EngineConfigLoadResult rejected = PreviewEngineConfig(
+        R"json({"schema": "intrinsic.core.engine-config", "version": 1,
+                "render": {"method_compute_graphics_queue": "graphics"}})json");
+    bool reported = false;
+    for (const EngineConfigDiagnostic& diagnostic : rejected.Diagnostics)
+        reported |= diagnostic.Code == EngineConfigDiagnosticCode::InvalidValue &&
+            diagnostic.Subject.find("method_compute_graphics_queue") != std::string::npos;
+    EXPECT_TRUE(reported) << "a non-boolean value is reported, not silently accepted";
+    EXPECT_FALSE(rejected.Preview.Config.Render.MethodComputeOnGraphicsQueue);
+    EXPECT_EQ(rejected.Preview.ParsedFieldCount, 0u);
+}
+
+// ARCH-023: the method buffer budget defaults to 1024 MiB and accepts 1..1048576; 0 (which would refuse
+// every run) and values above the range keep the default with a diagnostic.
+TEST(CoreEngineConfigLoad, MethodBufferBudgetIsValidatedRange)
+{
+    EXPECT_EQ(EngineConfig{}.Render.GpuMethodBufferBudgetMegabytes, 1024u);
+    const auto preview = [](const char* value)
+    {
+        return PreviewEngineConfig(std::string(R"json({"schema": "intrinsic.core.engine-config", "version": 1,
+                "render": {"gpu_method_buffer_budget_megabytes": )json") +
+            value + "}}");
+    };
+    for (const char* accepted : {"1", "1048576"})
+    {
+        const auto result = preview(accepted);
+        ASSERT_EQ(result.State, EngineConfigState::Valid) << accepted;
+        EXPECT_EQ(result.Preview.Config.Render.GpuMethodBufferBudgetMegabytes, std::uint32_t(std::stoul(accepted)));
+        EXPECT_EQ(result.Preview.ParsedFieldCount, 1u);
+    }
+    for (const char* rejected : {"0", "1048577", "\"large\""})
+    {
+        const auto result = preview(rejected);
+        bool reported = false;
+        for (const EngineConfigDiagnostic& diagnostic : result.Diagnostics)
+            reported |= diagnostic.Code == EngineConfigDiagnosticCode::InvalidValue &&
+                diagnostic.Subject.find("gpu_method_buffer_budget_megabytes") != std::string::npos;
+        EXPECT_TRUE(reported) << rejected;
+        EXPECT_EQ(result.Preview.Config.Render.GpuMethodBufferBudgetMegabytes, 1024u) << rejected;
+        EXPECT_EQ(result.Preview.ParsedFieldCount, 0u) << rejected;
+    }
 }
 
 TEST(CoreEngineConfigLoad, GpuProfilingDefaultsFalseWhenOmitted)

@@ -9,7 +9,9 @@ void main()
     if (pc.StateBDA == uint64_t(0)) return;
     LopGpuStateRef state = LopGpuStateRef(pc.StateBDA);
     const bool source = pc.PassMode == LOP_GPU_MODE_SOURCE;
-    const uint index = gl_GlobalInvocationID.x;
+    // A page of PageCount rows from Reserved0 (PageCount 0: every row).
+    if (pc.PageCount != 0u && gl_GlobalInvocationID.x >= pc.PageCount) return;
+    const uint index = pc.Reserved0 + gl_GlobalInvocationID.x;
     const uint pointCount = source ? pc.SourceCount : pc.TargetCount;
     if (index >= pointCount) return;
     LopGpuDiagnosticsRef diagnostics =

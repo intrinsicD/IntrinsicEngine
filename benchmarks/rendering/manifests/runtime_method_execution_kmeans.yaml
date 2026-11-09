@@ -1,0 +1,25 @@
+benchmark_id: runtime.method_execution.kmeans
+method: runtime.method_execution.kmeans
+dataset: builtin.seeded_seven_clusters
+params:
+  intent: performance
+  runner: IntrinsicMethodExecutionMeasurement
+  seeds: [11, 23, 37, 53, 71]
+  point_counts: [100000, 1000000]
+  queues: [graphics, separate]
+  previews: ['off', double, triple]
+  clusters: 7
+  initialization: Random
+  maximum_iterations: 20
+  warmup_iterations: 1
+  measured_iterations: 3
+  repeat_policy: fresh_logical_runs_retaining_input_identity
+  independent_units: seeds
+  process_timeout_seconds: 20
+  rendered_load: reference_triangle_640x480_no_vsync
+  quality: exact_labels_iterations_convergence_centroids_1e-5_inertia_1e-4_relative_floor1
+  memory_scope: readback_ring_staging_high_water_bytes_not_total_device_memory
+metrics: [runtime_ms, throughput_items_per_sec, memory_peak_bytes, quality_error_linf, sample_count, avgFrameTimeMs, p99FrameTimeMs, totalFrames]
+thresholds:
+  quality_error_linf_max: 1.0e-5
+  sample_count_min: 60

@@ -5,7 +5,9 @@
 // the CPU rows equal the CPU reference within the parity bound (double kernels in the
 // reference's summation order; float rounding of the normalized result). A second run on the
 // same revisions uploads zero bytes (positions, the accepted output and the bundle are
-// resident); Discard keeps the CPU normals; undo restores them.
+// resident); Discard keeps the CPU normals; undo restores them. ARCH-023: the mesh branch's own Prepare and Step
+// (vertex and face normals) also run the common one-shot script on the device.
+#include "OneShotLifecycleScript.hpp"
 #include "RuntimeTestModule.hpp"
 #include <algorithm>
 #include <chrono>
@@ -23,6 +25,7 @@
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+import Extrinsic.Runtime.StepRuns;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
@@ -85,6 +88,13 @@ namespace
             Context.JobCommands.Submit = [this](Runtime::JobDesc desc, Runtime::EditorJobIdentity) {
                 return Kernel().Jobs().Submit(std::move(desc));
             };
+            // ARCH-023: a GPU transaction is a step run of the composed service, its holder cancelled like the run's jobs.
+            Context.StepRuns = Kernel().Services().Find<Runtime::StepRunsService>();
+            Context.JobCommands.Cancel = [this](const Runtime::JobToken token)
+            {
+                return Kernel().Jobs().Cancel(token) ? Runtime::EditorJobCancelStatus::Requested
+                                                     : Runtime::EditorJobCancelStatus::NotActive;
+            };
             // The CPU reference publishes synchronously through a context without jobs.
             CpuContext = Context;
             CpuContext.JobCommands = {};
@@ -125,6 +135,9 @@ namespace
             Config.Positions = {Domain::MeshVertex, "v:position", K::Vec3};
             Config.Output = {Domain::MeshVertex, "v:normal", K::Vec3};
             Config.Weighting = Weighting::AreaWeighted;
+            // Every transaction here waits for ReadyToAccept without Run or Step: start computing at once (the
+            // one-shot default is ready). The CPU references publish through Apply, a batch either way.
+            Config.Execution.Start = Runtime::StepRunStart::Run;
         }
 
         static constexpr std::size_t kDeletedVertex = 40, kDeletedFace = 7;
@@ -231,11 +244,114 @@ namespace
             Kernel().RequestExit();
         }
 
+        // ARCH-023 (review R6): a run started ready (the section's start row) for `config`; the script's ready and
+        // restarted-ready evidence: nothing recorded or published.
+        bool StartScripted(Runtime::NormalEstimationConfig config,
+            Intrinsic::Tests::OneShotLifecycleScript& script,
+            const bool face,
+            const char* what)
+        {
+            config.Execution.Start = Runtime::StepRunStart::Ready;
+            Runtime::EditorNormalEstimationResult failure;
+            Run = Runtime::StartEditorNormalEstimationTransaction(Commands(), config, failure);
+            if (!Run)
+            {
+                Fail(std::string{what} + " start rejected: " + failure.Message);
+                return false;
+            }
+            const auto output = config.Output.Name;
+            const auto unpublished = [this, face, output]
+            {
+                EXPECT_FALSE(std::as_const(face ? Faces() : Vertices()).Exists(output))
+                    << "nothing published before Accept";
+            };
+            const auto idle = [this, unpublished]
+            {
+                const auto s = Snapshot();
+                EXPECT_EQ(s.Phase, Phase::Running);
+                EXPECT_FALSE(s.DeviceWorkQueued) << "nothing recorded while ready";
+                EXPECT_EQ(s.Previews, 0u);
+                unpublished();
+            };
+            script.OnReadyHeld = idle;
+            script.OnRestartedReady = idle;
+            script.OnFirstResult = unpublished;
+            script.OnRestartedResult = unpublished;
+            UndoBefore = History.UndoCount();
+            return true;
+        }
+        // One frame of `script`; true once it ended with the run applied as one undo entry.
+        bool AdvanceScripted(Intrinsic::Tests::OneShotLifecycleScript& script, const char* what)
+        {
+            const auto s = Snapshot();
+            if (s.Phase == Phase::Failed || s.Phase == Phase::Discarded)
+            {
+                Fail(std::string{what} + ": " + s.Result.Message);
+                return false;
+            }
+            if (!script.Advance(*Context.StepRuns, s.Result.StepRun))
+                return false;
+            EXPECT_EQ(script.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
+            if (Snapshot().Phase != Phase::Applied)
+            {
+                Fail(std::string{what} + " did not apply: " + Snapshot().Result.Message);
+                return false;
+            }
+            EXPECT_EQ(History.UndoCount(), UndoBefore + 1u) << what << ": one Accept, one undo entry";
+            return true;
+        }
+        void ScriptedFrame()
+        {
+            switch (Step)
+            {
+            case 0: // The CPU references (synchronous), then the scripted vertex run (area weighting).
+            {
+                if (OperationalFrames < 6)
+                    return;
+                if (!Reference(Weighting::AreaWeighted, "cpu_area", CpuArea))
+                    return;
+                auto face = FaceConfig("cpu_face");
+                face.Backend = Runtime::NormalEstimationBackend::CpuKDTree;
+                CpuFace = Runtime::ApplyEditorNormalEstimationCommand(
+                    Runtime::BindEditorProcessingCommands(CpuContext), face);
+                if (!CpuFace.Succeeded())
+                    return Fail("CPU face reference failed: " + CpuFace.Message);
+                if (StartScripted(Config, VertexScript, false, "scripted vertex run"))
+                    ++Step;
+                return;
+            }
+            case 1:
+            {
+                if (!AdvanceScripted(VertexScript, "scripted vertex run"))
+                    return;
+                ExpectParity(Normals(), Normals("cpu_area"), "scripted_vertex_area");
+                ExpectCounts(Snapshot().Result, CpuArea, "scripted vertex run");
+                if (StartScripted(FaceConfig(), FaceScript, true, "scripted face run"))
+                    ++Step;
+                return;
+            }
+            case 2:
+            {
+                if (!AdvanceScripted(FaceScript, "scripted face run"))
+                    return;
+                EXPECT_EQ(Snapshot().Result.ActualBackend, "vulkan_mesh_face_normals");
+                ExpectParity(FaceNormals(), FaceNormals("cpu_face"), "scripted_face", kDeletedFace);
+                ExpectCounts(Snapshot().Result, CpuFace, "scripted face run");
+                Done = true;
+                Kernel().RequestExit();
+                return;
+            }
+            default: return;
+            }
+        }
+
         void Frame(double, double) override
         {
             if (std::chrono::steady_clock::now() - Started > std::chrono::seconds(150)) { TimedOut = true; return Fail("RUNTIME-296 smoke timeout at step " + std::to_string(Step)); }
             if (!Kernel().GetDevice().IsOperational() || !Context.SpatialIndices) return;
             ++OperationalFrames;
+            if (Scripted)
+                return ScriptedFrame();
             switch (Step)
             {
             case 0: // The CPU references, then run 1 (area weighting) on the device.
@@ -425,6 +541,9 @@ namespace
         std::size_t OperationalFrames{};
         int Step{};
         bool Done{}, TimedOut{};
+        bool Scripted{}; // ARCH-023: run the common one-shot script instead of the residency scenario
+        Intrinsic::Tests::OneShotLifecycleScript VertexScript{}, FaceScript{};
+        std::size_t UndoBefore{};
     };
 
     bool Prepare(Extrinsic::Core::Config::EngineConfig& config)
@@ -447,6 +566,7 @@ TEST(RUNTIME296VertexNormalsResidency, AcceptMatchesTheCpuReferenceAndASecondRun
     auto* run = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>();
     engine.Initialize();
     Shutdown shutdown{engine};
     if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
@@ -454,4 +574,30 @@ TEST(RUNTIME296VertexNormalsResidency, AcceptMatchesTheCpuReferenceAndASecondRun
     ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut);
     ASSERT_TRUE(run->Done) << "the scenario stopped at step " << run->Step;
+}
+
+// ARCH-023 (review R6): the mesh branch has its own Prepare and Step, which the point-normal scripts do not cover. Vertex
+// normals (area weighting) and face normals each start ready and run the common one-shot script on the device (ready
+// records nothing, Step 1, Stop, Restart, Run, one Accept); each accepted result matches its CPU reference.
+TEST(RUNTIME296VertexNormalsResidency, VertexAndFaceNormalsRunTheCommonOneShotScript)
+{
+    Extrinsic::Core::Config::EngineConfig config;
+    if (!Prepare(config))
+        GTEST_SKIP() << "GLFW unavailable";
+    auto app = std::make_unique<NormalsApp>();
+    auto* run = app.get();
+    run->Scripted = true;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::StepRunsModule>();
+    engine.Initialize();
+    Shutdown shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64())
+        GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut);
+    ASSERT_TRUE(run->Done) << "the scenario stopped at step " << run->Step;
+    EXPECT_EQ(run->VertexScript.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
+    EXPECT_EQ(run->FaceScript.Current, Intrinsic::Tests::OneShotLifecycleScript::Stage::Done);
 }

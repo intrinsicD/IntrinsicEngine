@@ -64,9 +64,10 @@ namespace
     DW::Config Settings(const entt::entity entity, const D domain)
     {
         return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
-                .Positions = {.Domain = domain, .Name = "samples", .ValueKind = K::Vec3},
-                .Weights = {.Domain = domain, .Name = "weights", .ValueKind = K::Float},
-                .SupportRadius = 2};
+            .Positions = {.Domain = domain, .Name = "samples", .ValueKind = K::Vec3},
+            .Weights = {.Domain = domain, .Name = "weights", .ValueKind = K::Float},
+            .SupportRadius = 2,
+            .Execution = R::kOneShotBatchExecution}; // a batch: computes at once, accepts at its end
     }
 
     const char* DeletedName(const D d)
@@ -104,10 +105,11 @@ TEST(DensityWeightsPlugin, TheSectionKeepsItsNamePayloadBoundsAndTexts)
     EXPECT_EQ(DW::kSectionName, "sandbox.density_weights");
     EXPECT_EQ(DW::kSectionSchemaId, "intrinsic.runtime.sandbox.density_weights");
     EXPECT_EQ(Json::parse(R::SerializeDerivedSection<DW::kSection>({})),
-              Json::parse(R"({"backend":"cpu_kdtree","entity":0,"gpu_query_batch_size":4096,"gpu_radius_capacity":256,
+        Json::parse(
+            R"({"auto_accept":"never","start":"ready","backend":"cpu_kdtree","entity":0,"gpu_query_batch_size":4096,"gpu_radius_capacity":256,
                   "kernel":"theta_lop","mode":"direct","positions":{"domain":"Unknown","kind":"vec3","name":"v:position"},
                   "support_radius":0.0,"weights":{"domain":"Unknown","kind":"float","name":"density_weight"}})"))
-        << "the payload the removed engine codec wrote";
+        << "the section payload including its shared execution options";
     for (const auto* payload : {R"({"backend":"vulkan"})", R"({"support_radius":-1})", R"({"support_radius":1e100})",
                                 R"({"kernel":"unknown"})", R"({"mode":"unknown"})", R"({"gpu_query_batch_size":0})",
                                 R"({"gpu_radius_capacity":0})", R"({"gpu_radius_capacity":1025})", R"({"unknown":1})"})
@@ -206,7 +208,7 @@ TEST(DensityWeightsPlugin, EveryDomainKernelAndModeKeepsDeletedRowsAndTheBackend
                 EXPECT_EQ(harness.Settled(config), "");
                 const auto catalog = harness.Editing().InputCatalog(config.StableEntityId, 1u);
                 EXPECT_TRUE(std::ranges::any_of(catalog.Entries, [&](const auto& e) { return e.Ref == config.Positions; }));
-                const auto reference = harness.Wait(*DW::Start(config, false));
+                const auto reference = harness.Wait(*DW::Start(config));
                 ASSERT_EQ(reference.Status, "applied") << reference.Message;
                 EXPECT_EQ(reference.ActualBackend, "cpu_kdtree");
                 const auto expected = std::as_const(props).Get<float>("weights").Vector();
@@ -220,13 +222,13 @@ TEST(DensityWeightsPlugin, EveryDomainKernelAndModeKeepsDeletedRowsAndTheBackend
                 ASSERT_TRUE(harness.History().Redo().Succeeded());
                 EXPECT_EQ(std::as_const(props).Get<float>("keep")[0], 99);
                 config.Backend = B::CpuLBVH;
-                const auto indexed = harness.Wait(*DW::Start(config, false));
+                const auto indexed = harness.Wait(*DW::Start(config));
                 ASSERT_EQ(indexed.Status, "applied") << indexed.Message;
                 EXPECT_EQ(indexed.ActualBackend, "cpu_lbvh");
                 EXPECT_EQ(indexed.WrittenCount, reference.WrittenCount);
                 EXPECT_EQ(indexed.Diagnostics.NeighborContributionCount, reference.Diagnostics.NeighborContributionCount);
                 EXPECT_EQ(std::as_const(props).Get<float>("weights").Vector(), expected);
-                EXPECT_TRUE(harness.Wait(*DW::Start(config, false)).IndexReused);
+                EXPECT_TRUE(harness.Wait(*DW::Start(config)).IndexReused);
             }
 }
 
@@ -262,7 +264,7 @@ TEST(DensityWeightsPlugin, TheAutomaticSupportRadiusIsScaleInvariantOnMeshGraphA
                     config.Backend = backend;
                     config.Kernel = Kernels::KernelType(kernel);
                     EXPECT_EQ(harness.Settled(config), "");
-                    const auto result = harness.Wait(*DW::Start(config, false));
+                    const auto result = harness.Wait(*DW::Start(config));
                     ASSERT_EQ(result.Status, "applied") << result.Message;
                     ASSERT_GT(result.SupportRadius, 0);
                     EXPECT_GE(double(result.QueryRadius), result.SupportRadius);
@@ -275,13 +277,13 @@ TEST(DensityWeightsPlugin, TheAutomaticSupportRadiusIsScaleInvariantOnMeshGraphA
                     auto manual = config;
                     manual.SupportRadius = result.SupportRadius;
                     manual.Weights.Name = "manual";
-                    ASSERT_EQ(harness.Wait(*DW::Start(manual, false)).Status, "applied");
+                    ASSERT_EQ(harness.Wait(*DW::Start(manual)).Status, "applied");
                     const auto again = std::as_const(props).Get<float>("manual").Vector();
                     EXPECT_EQ(std::vector<float>(again.begin(), again.begin() + base.size()), weights[scaled]);
                     // An automatic radius that exceeds the candidate budget fails instead of guessing.
                     auto tight = config;
                     tight.GpuRadiusCapacity = 1;
-                    const auto refused = harness.Wait(*DW::Start(tight, false));
+                    const auto refused = harness.Wait(*DW::Start(tight));
                     EXPECT_EQ(refused.Status, "invalid"); // as on Vulkan
                     EXPECT_NE(refused.Message.find("Automatic support radius"), std::string::npos) << refused.Message;
                     EXPECT_EQ(std::as_const(props).Get<float>("weights").Vector(), all);
@@ -310,7 +312,7 @@ TEST(DensityWeightsPlugin, AChangedInputOrOutputOrACancelEndsTheRunWithoutAWrite
         auto& scene = harness.Scene();
         const auto entity = Make(scene, D::MeshVertex);
         auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-        const auto run = DW::Start(Settings(entity, D::MeshVertex), false);
+        const auto run = DW::Start(Settings(entity, D::MeshVertex));
         ASSERT_FALSE(run->Final) << run->Final->Message;
         EXPECT_EQ(run->Pending.Message, "Density weights queued.") << "the removed operation's text";
         switch (change)
@@ -343,7 +345,7 @@ TEST(DensityWeightsPlugin, OneSampleAndTheBackendPreflightPreserveOutputs)
     for (const auto backend : {B::CpuKDTree, B::CpuLBVH})
     {
         config.Backend = backend;
-        ASSERT_EQ(harness.Wait(*DW::Start(config, false)).Status, "applied") << DW::ToString(backend);
+        ASSERT_EQ(harness.Wait(*DW::Start(config)).Status, "applied") << DW::ToString(backend);
         EXPECT_EQ(std::as_const(props).Get<float>("weights")[0], 1);
         ASSERT_TRUE(harness.History().Undo().Succeeded());
         EXPECT_FALSE(props.Exists("weights"));
@@ -371,7 +373,7 @@ TEST(DensityWeightsPlugin, OneSampleAndTheBackendPreflightPreserveOutputs)
     }
     config.Backend = B::CpuKDTree;
     props.Get<glm::vec3>("samples")[0] = {std::numeric_limits<float>::quiet_NaN(), 0, 0};
-    EXPECT_NE(harness.Wait(*DW::Start(config, false)).Status, "applied");
+    EXPECT_NE(harness.Wait(*DW::Start(config)).Status, "applied");
     EXPECT_EQ(std::as_const(props).Get<float>("weights")[0], 77);
     props.Get<bool>("v:deleted")[0] = true;
     EXPECT_EQ(harness.Settled(config), "Density weights require at least one live sample.");
@@ -415,7 +417,7 @@ TEST(DensityWeightsPlugin, TheVulkanBackendAnswersTheGpuAdmissionThroughBothTool
         {
             auto cpu = wide;
             cpu.Backend = backend;
-            EXPECT_EQ(harness.Wait(*DW::Start(cpu, false)).Status, "applied") << DW::ToString(backend);
+            EXPECT_EQ(harness.Wait(*DW::Start(cpu)).Status, "applied") << DW::ToString(backend);
         }
     }
 }
@@ -433,11 +435,11 @@ TEST(DensityWeightsPlugin, VulkanRefusesBeforeTheAutomaticRadiusIsDerived)
     config.SupportRadius = 0;
     config.Backend = B::VulkanLBVH;
     EXPECT_EQ(harness.Settled(config), kDevice) << "the readiness never derives the radius";
-    const auto gpu = DW::Start(config, true);
+    const auto gpu = DW::Start(config);
     ASSERT_TRUE(gpu->Final);
     EXPECT_EQ(gpu->Final->Message, kDevice);
     config.Backend = B::CpuKDTree;
-    const auto cpu = harness.Wait(*DW::Start(config, false));
+    const auto cpu = harness.Wait(*DW::Start(config));
     EXPECT_EQ(cpu.Status, "invalid");
     EXPECT_NE(cpu.Message.find("Automatic support radius"), std::string::npos) << cpu.Message;
 }
@@ -466,7 +468,7 @@ TEST(DensityWeightsPlugin, PublicationUndoAndRedoKeepTheGeometryAndAReplacedStor
             return changed;
         };
         clear();
-        ASSERT_EQ(harness.Wait(*DW::Start(Settings(entity, D::PointCloudPoint), false)).Status, "applied");
+        ASSERT_EQ(harness.Wait(*DW::Start(Settings(entity, D::PointCloudPoint))).Status, "applied");
         EXPECT_TRUE(advanced());
         EXPECT_TRUE(clean());
         const auto computed = std::as_const(props).Get<float>("weights").Vector();
@@ -514,13 +516,13 @@ TEST(DensityWeightsPlugin, ScalarStoragePublishesWithCheckedConversionAndExactUn
         config.Weights.ValueKind = kind;
         // Samples farther apart than the support each weigh exactly 1, which every storage holds; neighbours do not.
         config.SupportRadius = .5;
-        const auto isolated = harness.Wait(*DW::Start(config, false));
+        const auto isolated = harness.Wait(*DW::Start(config));
         ASSERT_EQ(isolated.Status, "applied") << isolated.Message;
         EXPECT_EQ(R::DetectGeometryPropertyValueKind(props, "weights"), kind);
         EXPECT_EQ(harness.History().Undo().Status, R::EditorCommandHistoryStatus::Undone);
         EXPECT_FALSE(props.Exists("weights"));
         config.SupportRadius = 2;
-        const auto close = harness.Wait(*DW::Start(config, false));
+        const auto close = harness.Wait(*DW::Start(config));
         EXPECT_EQ(close.Status, kind == K::Double ? "applied" : "invalid") << close.Message;
         if (kind != K::Double)
         {
@@ -540,11 +542,11 @@ TEST(DensityWeightsPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessi
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
     const auto config = Settings(entity, D::MeshVertex);
-    const auto first = DW::Start(config, false);
+    const auto first = DW::Start(config);
     ASSERT_FALSE(first->Final);
     EXPECT_EQ(DW::Latest(), first) << "a started run is the latest at once";
     ASSERT_EQ(DW::Active().size(), 1u);
-    const auto busy = DW::Start(config, false);
+    const auto busy = DW::Start(config);
     ASSERT_TRUE(busy->Final);
     EXPECT_EQ(busy->Final->Status, "busy") << busy->Final->Message;
     EXPECT_EQ(DW::Latest(), first) << "a busy refusal answers for the other run";
@@ -552,7 +554,7 @@ TEST(DensityWeightsPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessi
     EXPECT_TRUE(DW::Active().empty());
     auto missing = config;
     missing.StableEntityId = 0xFFFFFFF0u;
-    const auto refused = DW::Start(missing, false);
+    const auto refused = DW::Start(missing);
     ASSERT_TRUE(refused->Final);
     EXPECT_EQ(refused->Final->Status, "invalid");
     EXPECT_EQ(refused->Final->Message, "Density-weight target entity is stale or missing.");
@@ -564,7 +566,7 @@ TEST(DensityWeightsPlugin, TheLatestRunIsKeptWhoeverStartedItAndEndsWithItsSessi
 
     auto other = config;
     other.Weights.Name = "weights_of_the_old_session";
-    const auto outlived = DW::Start(other, false);
+    const auto outlived = DW::Start(other);
     ASSERT_FALSE(outlived->Final);
     const auto undo = harness.History().UndoCount();
     harness.Shell.Detach();
@@ -583,7 +585,7 @@ TEST(DensityWeightsPlugin, TheJobsWindowCancelsARun)
     auto& scene = harness.Scene();
     const auto entity = Make(scene, D::MeshVertex);
     auto& props = PointDomainProperties(scene, entity, D::MeshVertex);
-    const auto run = DW::Start(Settings(entity, D::MeshVertex), false);
+    const auto run = DW::Start(Settings(entity, D::MeshVertex));
     ASSERT_FALSE(run->Final);
     const auto jobs = harness.Jobs();
     const auto row = std::ranges::find_if(jobs, [](const auto& job) { return job.Name == "Density weights"; });
@@ -616,7 +618,7 @@ TEST(DensityWeightsPlugin, CpuOutputsAreBitwiseTheGeometryFunctions)
                 config.SupportRadius = radius;
                 config.Kernel = Kernels::KernelType(kernel);
                 config.Mode = Kernels::DensityWeightMode(kernel % 2);
-                const auto result = harness.Wait(*DW::Start(config, false));
+                const auto result = harness.Wait(*DW::Start(config));
                 ASSERT_EQ(result.Status, "applied") << result.Message;
                 const auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
                 const auto [live, slots] = Live(props);

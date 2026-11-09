@@ -1337,7 +1337,30 @@
   },
   "run_keypoint_analysis": {
     "additionalProperties": false,
-    "properties": {},
+    "properties": {
+      "auto_accept": {
+        "description": "never: wait for Accept; converged: accept at convergence; end: accept at convergence or the iteration cap. A stopped run always waits.",
+        "enum": [
+          "never",
+          "converged",
+          "end"
+        ],
+        "type": "string"
+      },
+      "start": {
+        "description": "run: compute at once; ready: initialize only, then run or step n.",
+        "enum": [
+          "ready",
+          "run"
+        ],
+        "type": "string"
+      },
+      "wait": {
+        "default": true,
+        "description": "true (default): run at once, accept at the end and answer when done; execution arguments are refused. false: start the step run with the section's execution options, each one the call names replacing it for this run only, and answer at once with its run id (run).",
+        "type": "boolean"
+      }
+    },
     "required": [],
     "type": "object"
   },
@@ -1870,6 +1893,15 @@
       }
     ],
     "properties": {
+      "auto_accept": {
+        "description": "never: wait for Accept; converged: accept at convergence; end: accept at convergence or the iteration cap. A stopped run always waits.",
+        "enum": [
+          "never",
+          "converged",
+          "end"
+        ],
+        "type": "string"
+      },
       "entity": {
         "description": "Stable entity id from scene_entities; required for operations marked 'entity argument', refused for those whose section names the entity.",
         "maximum": 4294967295,
@@ -1902,6 +1934,37 @@
       "params": {
         "description": "Explicit settings of the operations listed with 'params' (the schema per operation is in allOf, keys, defaults and ranges are in the description); omitted keys keep their defaults; enums take their name or integer code. Refused for operations that read a config section.",
         "type": "object"
+      },
+      "preview_buffers": {
+        "description": "Device live-preview ring slots: 2 (double) or 3 (triple); CPU-only previews use no device ring.",
+        "maximum": 3,
+        "minimum": 2,
+        "type": "integer"
+      },
+      "preview_every": {
+        "description": "Iterations between live previews; 0 turns live preview off (the result is unchanged).",
+        "maximum": 1000000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "preview_interval_ms": {
+        "description": "Least time between live previews in milliseconds; 0: no time limit.",
+        "maximum": 60000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "start": {
+        "description": "run: compute at once; ready: initialize only, then run or step n.",
+        "enum": [
+          "ready",
+          "run"
+        ],
+        "type": "string"
+      },
+      "wait": {
+        "default": true,
+        "description": "true (default): run at once, accept at the end and answer when done; execution arguments are refused. false (property_smoothing, normal_estimation, outlier_analysis, point_construction): start the step run with the section's execution options, each one the call names replacing it for this run only (property_smoothing takes preview_every, preview_interval_ms, preview_buffers, auto_accept and start, the one-step rows auto_accept and start), and answer at once with run, the step run run_control and run_observe drive.",
+        "type": "boolean"
       }
     },
     "required": [
@@ -1946,13 +2009,75 @@
   },
   "run_point_sampling": {
     "additionalProperties": false,
-    "properties": {},
+    "properties": {
+      "auto_accept": {
+        "description": "never: wait for Accept; converged: accept at convergence; end: accept at convergence or the iteration cap. A stopped run always waits.",
+        "enum": [
+          "never",
+          "converged",
+          "end"
+        ],
+        "type": "string"
+      },
+      "start": {
+        "description": "run: compute at once; ready: initialize only, then run or step n.",
+        "enum": [
+          "ready",
+          "run"
+        ],
+        "type": "string"
+      },
+      "wait": {
+        "default": true,
+        "description": "true (default): run at once, accept at the end and answer when done; execution arguments are refused. false: start the step run with the section's execution options, each one the call names replacing it for this run only, and answer at once with its run id (run).",
+        "type": "boolean"
+      }
+    },
     "required": [],
     "type": "object"
   },
   "run_registration": {
     "additionalProperties": false,
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "method": {
+              "const": "cpd"
+            }
+          },
+          "required": [
+            "method"
+          ]
+        },
+        "then": {
+          "properties": {
+            "max_iterations": {
+              "description": "Logical iteration cap: one step is one iteration.",
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        }
+      }
+    ],
     "properties": {
+      "auto_accept": {
+        "description": "never: wait for Accept; converged: accept at convergence; end: accept at convergence or the iteration cap. A stopped run always waits.",
+        "enum": [
+          "never",
+          "converged",
+          "end"
+        ],
+        "type": "string"
+      },
+      "max_iterations": {
+        "description": "Logical iteration cap: one step is one iteration.",
+        "maximum": 100000,
+        "minimum": 1,
+        "type": "integer"
+      },
       "method": {
         "description": "icp uses sandbox.registration, cpd uses sandbox.coherent_point_drift (config_apply first).",
         "enum": [
@@ -1960,6 +2085,37 @@
           "cpd"
         ],
         "type": "string"
+      },
+      "preview_buffers": {
+        "description": "Device live-preview ring slots: 2 (double) or 3 (triple); CPU-only previews use no device ring.",
+        "maximum": 3,
+        "minimum": 2,
+        "type": "integer"
+      },
+      "preview_every": {
+        "description": "Iterations between live previews; 0 turns live preview off (the result is unchanged).",
+        "maximum": 1000000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "preview_interval_ms": {
+        "description": "Least time between live previews in milliseconds; 0: no time limit.",
+        "maximum": 60000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "start": {
+        "description": "run: compute at once; ready: initialize only, then run or step n.",
+        "enum": [
+          "ready",
+          "run"
+        ],
+        "type": "string"
+      },
+      "wait": {
+        "default": true,
+        "description": "true (default): run at once, accept at the end and answer when done; execution arguments are refused. false: start the step run with the section's execution options, each one the call names replacing it for this run only, and answer at once with its run id (run).",
+        "type": "boolean"
       }
     },
     "required": [
@@ -2144,6 +2300,156 @@
     "required": [
       "entity",
       "name"
+    ],
+    "type": "object"
+  },
+  "start_kmeans": {
+    "additionalProperties": false,
+    "properties": {
+      "auto_accept": {
+        "description": "never: wait for Accept; converged: accept at convergence; end: accept at convergence or the iteration cap. A stopped run always waits.",
+        "enum": [
+          "never",
+          "converged",
+          "end"
+        ],
+        "type": "string"
+      },
+      "domain": {
+        "description": "Element domain of the positions; needed only while sandbox.clustering binds no properties.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "max_iterations": {
+        "description": "Logical iteration cap: one step is one iteration.",
+        "maximum": 4096,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "positions": {
+        "description": "Name of the vec3 position property.",
+        "type": "string"
+      },
+      "preview_buffers": {
+        "description": "Device live-preview ring slots: 2 (double) or 3 (triple); CPU-only previews use no device ring.",
+        "maximum": 3,
+        "minimum": 2,
+        "type": "integer"
+      },
+      "preview_every": {
+        "description": "Iterations between live previews; 0 turns live preview off (the result is unchanged).",
+        "maximum": 1000000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "preview_interval_ms": {
+        "description": "Least time between live previews in milliseconds; 0: no time limit.",
+        "maximum": 60000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "start": {
+        "description": "run: compute at once; ready: initialize only, then run or step n.",
+        "enum": [
+          "ready",
+          "run"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity"
+    ],
+    "type": "object"
+  },
+  "start_point_cloud_consolidation": {
+    "additionalProperties": false,
+    "properties": {
+      "auto_accept": {
+        "description": "never: wait for Accept; converged: accept at convergence; end: accept at convergence or the iteration cap. A stopped run always waits.",
+        "enum": [
+          "never",
+          "converged",
+          "end"
+        ],
+        "type": "string"
+      },
+      "domain": {
+        "description": "Element domain of the positions.",
+        "enum": [
+          "MeshVertex",
+          "MeshEdge",
+          "MeshHalfedge",
+          "MeshFace",
+          "GraphNode",
+          "GraphHalfedge",
+          "GraphEdge",
+          "PointCloudPoint"
+        ],
+        "type": "string"
+      },
+      "entity": {
+        "description": "Stable entity id from scene_entities.",
+        "maximum": 4294967295,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "max_iterations": {
+        "description": "Logical iteration cap: one step is one iteration.",
+        "maximum": 4096,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "positions": {
+        "default": "v:position",
+        "description": "Name of the vec3 position property.",
+        "type": "string"
+      },
+      "preview_buffers": {
+        "description": "Device live-preview ring slots: 2 (double) or 3 (triple); CPU-only previews use no device ring.",
+        "maximum": 3,
+        "minimum": 2,
+        "type": "integer"
+      },
+      "preview_every": {
+        "description": "Iterations between live previews; 0 turns live preview off (the result is unchanged).",
+        "maximum": 1000000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "preview_interval_ms": {
+        "description": "Least time between live previews in milliseconds; 0: no time limit.",
+        "maximum": 60000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "start": {
+        "description": "run: compute at once; ready: initialize only, then run or step n.",
+        "enum": [
+          "ready",
+          "run"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "entity",
+      "domain"
     ],
     "type": "object"
   },

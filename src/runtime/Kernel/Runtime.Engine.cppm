@@ -184,7 +184,8 @@ namespace Extrinsic::Runtime
             double alpha,
             EditorInputCaptureSnapshot& editorCapture,
             RuntimeFramePacingDiagnostics& pacing);
-        // Minimized frame: only runs when a module registered an Idle hook.
+        void CollectGpuCompletions(RuntimeFramePacingDiagnostics& pacing);
+        // Minimized frames still serve commands and jobs, with or without Idle hooks.
         void RunMinimizedFrameWork(
             EditorInputCaptureSnapshot& editorCapture,
             RuntimeFramePacingDiagnostics& pacing);

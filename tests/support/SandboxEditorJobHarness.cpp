@@ -68,16 +68,24 @@ namespace Extrinsic::Tests
             return rows;
         };
         commands.Stats = [this] { return m_Jobs.Stats(); };
-        commands.Cancel = [this](const Runtime::JobToken token)
+        const auto cancel = [this](const Runtime::JobToken token, const bool request)
         {
             if (!m_Identities.contains(token))
                 return Runtime::EditorJobCancelStatus::NotEditorJob;
             if (!m_Jobs.Cancel(token))
                 return Runtime::EditorJobCancelStatus::NotActive;
             const Runtime::EditorJobIdentity& identity = m_Identities.at(token);
-            if (!identity.Auxiliary)
+            if (request && !identity.Auxiliary)
                 m_CancelledRuns.push_back(identity.Run.IsValid() ? identity.Run : token);
             return Runtime::EditorJobCancelStatus::Requested;
+        };
+        commands.Cancel = [cancel](const Runtime::JobToken token)
+        {
+            return cancel(token, true);
+        };
+        commands.Retire = [cancel](const Runtime::JobToken token)
+        {
+            return cancel(token, false);
         };
         commands.RunCancelRequested = [this](const Runtime::JobToken run)
         {
@@ -115,6 +123,13 @@ namespace Extrinsic::Tests
                 job, identity != m_Identities.end() ? identity->second : Runtime::EditorJobIdentity{}, m_Outcomes));
         }
         return snapshot;
+    }
+
+    void EditorJobHarness::Pump()
+    {
+        if (Core::Tasks::Scheduler::IsInitialized())
+            Core::Tasks::Scheduler::WaitForAll();
+        (void)m_Jobs.DrainCompletions(m_Events);
     }
 
     bool EditorJobHarness::DrainUntilTerminal(const std::chrono::milliseconds timeout)

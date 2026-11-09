@@ -563,7 +563,7 @@ TEST(PointCloudEditing, AScalarAnalysisIsAdmittedAsTheOperationRuntimeAdmitsIt)
     const auto refused = [&](const R::ScalarAnalysisRequest& request)
     {
         R::ScalarAnalysisRefusal refusal;
-        EXPECT_FALSE(harness.Editing().StartScalarAnalysis(request, true, refusal));
+        EXPECT_FALSE(harness.Editing().StartScalarAnalysis(request, R::kOneShotBatchExecution, refusal));
         EXPECT_FALSE(refusal.Busy);
         return refusal.Message;
     };

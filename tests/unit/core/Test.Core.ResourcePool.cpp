@@ -129,6 +129,38 @@ TEST(CoreResourcePool, DefaultRetirementFramesHonorsBoundary)
     EXPECT_EQ(reused.Index, retiredIndex);
 }
 
+// ARCH-024: an owner that proves completion without counting frames reclaims by kill frame. Predictions, before any
+// run: the predicate is asked each pending kill frame in order, only the accepted slot returns (its index reused with a
+// new generation) and the other stays pending until accepted later. Mutation: reclaiming every pending kill regardless
+// of the predicate hands out the held slot's index to `fresh`.
+TEST(CoreResourcePool, PredicateReclaimsOnlyTheKillFramesItReportsRetired)
+{
+    DefaultPool pool;
+    const auto retired = pool.Emplace(1, "retired");
+    const auto held = pool.Emplace(2, "held");
+    pool.Remove(retired, 4);
+    pool.Remove(held, 9);
+    std::vector<std::uint64_t> asked;
+    pool.ProcessDeletions(
+        [&](const std::uint64_t killFrame)
+        {
+            asked.push_back(killFrame);
+            return killFrame < 5u;
+        });
+    EXPECT_EQ(asked, (std::vector<std::uint64_t>{4u, 9u}));
+    const auto reused = pool.Emplace(3, "reused");
+    EXPECT_EQ(reused.Index, retired.Index);
+    EXPECT_NE(reused.Generation, retired.Generation);
+    const auto fresh = pool.Emplace(4, "fresh");
+    EXPECT_NE(fresh.Index, held.Index) << "the unproven kill stays pending";
+    pool.ProcessDeletions(
+        [](std::uint64_t)
+        {
+            return true;
+        });
+    EXPECT_EQ(pool.Emplace(5, "later").Index, held.Index);
+}
+
 TEST(CoreResourcePool, CapacityTracksAllocatedSlotsAndClearResetsIt)
 {
     ImmediatePool pool;

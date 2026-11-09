@@ -3,10 +3,13 @@
 // over a private workspace that uploads its own copy (the previous path); later queries of the
 // same revision upload nothing, and a new revision uploads once.
 #include "RuntimeTestModule.hpp"
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <random>
+#include <string>
+#include <utility>
 #include <vector>
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
@@ -67,33 +70,23 @@ namespace
                 Kernel().RequestExit();
                 return;
             }
-            if (!Kernel().GetDevice().IsOperational() || Cache == nullptr) return;
-            if (Batch && (Batch->State == Runtime::SpatialQueryState::Queued ||
-                          Batch->State == Runtime::SpatialQueryState::Submitted))
+            if (!Kernel().GetDevice().IsOperational() || Cache == nullptr)
                 return;
-            if (Batch && Batch->State == Runtime::SpatialQueryState::Failed)
-            {
-                ADD_FAILURE() << "phase " << Phase << ": " << Batch->Diagnostic;
-                Kernel().RequestExit();
-                return;
-            }
-            if (Batch) Results.push_back(*Batch);
-            Batch.reset();
             const auto stats = [&] { return Cache->PropertyResidency() ? Cache->PropertyResidency()->Stats()
                                                                         : Extrinsic::Graphics::GpuPropertyResidencyStats{}; };
             switch (Phase++)
             {
             case 0: // property-space index: canonical slot
                 Handle = Cache->Acquire(Kernel().ActiveWorld(), Entity, kRef).Handle;
-                Batch = Cache->QueueGpuKNearest(Handle, Queries, 8u);
+                Query(Handle);
                 return;
             case 1: // the same queries over a private workspace (own upload, the previous path)
                 UploadsAfterFirst = stats().Uploads;
                 Private = Cache->CreateWorkspace(Points);
-                Batch = Cache->QueueGpuKNearest(Private.Handle, Queries, 8u);
+                Query(Private.Handle);
                 return;
             case 2: // the same revision again: no upload
-                Batch = Cache->QueueGpuKNearest(Handle, Queries, 8u);
+                Query(Handle);
                 return;
             case 3: // a new revision: one more upload
             {
@@ -102,7 +95,7 @@ namespace
                 auto positions = scene.Raw().get<GS::Vertices>(Entity).Properties.GetOrAdd<glm::vec3>("v:position");
                 for (std::size_t i = 0; i < Points.size(); ++i) positions[i] = Points[i] + glm::vec3(0.25f, 0.0f, 0.0f);
                 Handle = Cache->Acquire(Kernel().ActiveWorld(), Entity, kRef).Handle;
-                Batch = Cache->QueueGpuKNearest(Handle, Queries, 8u);
+                Query(Handle);
                 return;
             }
             default:
@@ -113,6 +106,25 @@ namespace
             }
         }
 
+        // Every query's 8 nearest rows over `target` in one page of a prepared session; the page waits for itself.
+        void Query(const Runtime::SpatialIndexHandle target)
+        {
+            std::string why;
+            const auto session = Cache->PrepareQuerySession(
+                target, {.Capacity = 8u, .PageQueries = std::uint32_t(Queries.size()), .Queries = Queries}, why);
+            const std::atomic<bool> abort{false};
+            Runtime::SpatialNearestBatch page;
+            if (session &&
+                session->Query(0u, std::uint32_t(Queries.size()), -1.f, nullptr, abort, page) ==
+                    Runtime::SpatialPageStatus::Ready)
+            {
+                Results.push_back(std::move(page));
+                return;
+            }
+            ADD_FAILURE() << "phase " << Phase - 1 << ": " << (session ? page.Diagnostic : why);
+            Kernel().RequestExit();
+        }
+
         void Shutdown() override { Private = {}; }
 
         Runtime::SpatialIndexCache* Cache{};
@@ -120,7 +132,6 @@ namespace
         Runtime::SpatialIndexHandle Handle{};
         Runtime::SpatialIndexWorkspace Private{};
         std::vector<glm::vec3> Points{}, Queries{};
-        std::shared_ptr<Runtime::SpatialNearestBatch> Batch{};
         std::vector<Runtime::SpatialNearestBatch> Results{};
         std::uint64_t UploadsAfterFirst{}, UploadsAfterRepeat{}, UploadsAfterRevision{};
         Extrinsic::Graphics::GpuPropertyResidencyStats Final{};

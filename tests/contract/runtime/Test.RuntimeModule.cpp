@@ -8,6 +8,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "RuntimeTestModule.hpp"
@@ -15,6 +16,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Tasks;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -713,12 +715,73 @@ TEST(RuntimeModule, IdleHooksRunOnMinimizedFramesAndUiHooksDoNot)
     Runtime::Engine engine(NullWindowHeadlessConfig());
     engine.AddModule(std::make_unique<IdleProbeModule>(state, engine));
     engine.Initialize();
+    int drains = 0;
+    const auto participant = engine.Jobs().RegisterGpuQueueParticipant({.DebugName = "idle completion probe",
+        .DrainCompletedTransfers = [&]
+        {
+            ++drains;
+        }});
     engine.Run();
+    EXPECT_EQ(drains, 4); // one full frame and three minimized frames
+    engine.Jobs().UnregisterGpuQueueParticipant(participant);
     engine.Shutdown();
     EXPECT_EQ(state.UiBuildFrames, 1) << "minimized frames skip UiBuild";
     EXPECT_EQ(state.UiEndFrames, 1);
     EXPECT_EQ(state.IdleFrames, 3);
     EXPECT_EQ(state.IdleFramesAtCommand, 1) << "a command enqueued by an Idle hook is drained by the next minimized frame";
+}
+
+TEST(RuntimeModule, MinimizedFramesDrainGpuAndJobCompletionsWithoutIdleHooks)
+{
+    Runtime::Engine engine(NullWindowHeadlessConfig());
+    engine.Initialize();
+    auto& window = static_cast<Extrinsic::Platform::Backends::Null::NullWindow&>(engine.GetWindow());
+    int polls = 0, drains = 0, publications = 0;
+    // Bound the loop through window polling, independent of the completion path under test.
+    window.Listen(
+        [&](const Extrinsic::Platform::Event& event)
+        {
+            if (!std::holds_alternative<Extrinsic::Platform::CursorEvent>(event))
+                return;
+            if (++polls == 3)
+                window.QueueClose();
+            else
+                window.QueueCursor(polls, 0);
+        });
+    window.QueueResize(0, 0);
+    window.QueueCursor(0, 0);
+    const auto participant = engine.Jobs().RegisterGpuQueueParticipant({.DebugName = "minimized completion probe",
+        .DrainCompletedTransfers = [&]
+        {
+            ++drains;
+        }});
+    const auto job = engine.Jobs().Submit({.DebugName = "await GPU completion",
+        .Work =
+            [](const Runtime::JobCancellation&)
+        {
+            return Runtime::JobResultEnvelope::Make(true);
+        },
+        .IsReadyToApply =
+            [&]
+        {
+            return drains > 0;
+        },
+        .PublishCompletion =
+            [&](Runtime::KernelEventBus&, const Runtime::JobResultEnvelope&)
+        {
+            ++publications;
+            return true;
+        }});
+    ASSERT_TRUE(job.IsValid());
+    Core::Tasks::Scheduler::WaitForAll();
+    const auto frame = engine.GetDevice().GetGlobalFrameNumber();
+    engine.Run();
+    EXPECT_EQ(polls, 3);
+    EXPECT_EQ(drains, 2); // the third poll closes the window before another minimized frame
+    EXPECT_EQ(publications, 1);
+    EXPECT_EQ(engine.GetDevice().GetGlobalFrameNumber(), frame);
+    engine.Jobs().UnregisterGpuQueueParticipant(participant);
+    engine.Shutdown();
 }
 
 TEST(RuntimeModule, WindowEventsAreDiscardedWithoutEditorUi)

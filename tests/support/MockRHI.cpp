@@ -429,9 +429,10 @@ namespace Extrinsic::Tests
         return CommandContext;
     }
 
-    RHI::BufferHandle MockDevice::CreateBuffer(const RHI::BufferDesc&)
+    RHI::BufferHandle MockDevice::CreateBuffer(const RHI::BufferDesc& desc)
     {
         ++CreateBufferCount;
+        CreatedBufferDescs.push_back(desc);
         if (FailNextBufferCreate) { FailNextBufferCreate = false; return {}; }
         if (FailBufferCreateCall > 0 && CreateBufferCount == FailBufferCreateCall) return {};
         return RHI::BufferHandle{m_NextBuffer++, 1u};
@@ -440,6 +441,7 @@ namespace Extrinsic::Tests
     void MockDevice::DestroyBuffer(RHI::BufferHandle handle)
     {
         ++DestroyBufferCount;
+        DestroyedBuffers.push_back(handle);
         BufferPlacements.erase(handle.Index);
     }
 
@@ -454,6 +456,22 @@ namespace Extrinsic::Tests
             std::memcpy(rec.Data.data(), src, static_cast<std::size_t>(size));
         }
         BufferWrites.push_back(std::move(rec));
+    }
+
+    bool MockDevice::WriteMappedBuffer(
+        RHI::BufferHandle handle, const void* src, std::uint64_t size, std::uint64_t offset)
+    {
+        std::scoped_lock lock{MappedWriteMutex};
+        if (!AcceptMappedWrites || src == nullptr || size == 0u || !handle.IsValid() ||
+            std::ranges::find(DestroyedBuffers, handle) != DestroyedBuffers.end())
+            return false;
+        BufferWriteRecord rec;
+        rec.Handle = handle;
+        rec.Offset = offset;
+        rec.Data.resize(static_cast<std::size_t>(size));
+        std::memcpy(rec.Data.data(), src, static_cast<std::size_t>(size));
+        MappedWrites.push_back(std::move(rec));
+        return true;
     }
 
     void MockDevice::ReadBuffer(RHI::BufferHandle handle, void* data, std::uint64_t size, std::uint64_t offset)

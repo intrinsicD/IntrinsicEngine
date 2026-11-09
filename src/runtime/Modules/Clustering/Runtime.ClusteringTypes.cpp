@@ -5,12 +5,15 @@ module;
 #include <string_view>
 #include <string>
 #include <optional>
+#include <cstdint>
+#include <limits>
 #include <entt/entity/registry.hpp>
 #include <glm/vec3.hpp>
 module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorWorkspaceSlot;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.ECS.Components.GeometrySources;
 namespace Extrinsic::Runtime
 {
@@ -79,6 +82,11 @@ namespace Extrinsic::Runtime
     KMeansGpuObservation ClusteringService::GpuRun(CommandCorrelationId id, KMeansGpuAction action)
     { return m_GpuRun ? m_GpuRun(id, action) : KMeansGpuObservation{}; }
 
+    std::uint64_t ClusteringService::StepRun(const CommandCorrelationId id) const
+    {
+        return m_StepRun ? m_StepRun(id) : 0u;
+    }
+
     std::string ClusteringService::GpuReadinessDiagnostic(const Runtime::RunKMeans& request, const EditorProcessingContext& context) const
     { return m_GpuReadinessDiagnostic ? m_GpuReadinessDiagnostic(request, context) : std::string{}; }
 
@@ -123,11 +131,12 @@ namespace Extrinsic::Runtime
         if (registry == nullptr)
             return reject(KMeansRunStatus::MissingScene, Core::ErrorCode::InvalidState,
                 "Active world is unavailable for K-Means.");
-        if (!IsValidKMeansPropertyBindings(command.Properties) ||
-            command.Parameters.ClusterCount == 0u || command.Parameters.ClusterCount > 1024u || command.Parameters.MaxIterations == 0u ||
-            command.Parameters.GpuPreviewInterval == 0u || command.Parameters.GpuPreviewInterval > 1000000u ||
+        if (!IsValidKMeansPropertyBindings(command.Properties) || command.Parameters.ClusterCount == 0u ||
+            command.Parameters.ClusterCount > 1024u ||
+            !StepRunExecutionRefusal(command.Parameters.Execution, std::numeric_limits<std::uint32_t>::max()).empty() ||
             command.Backend == ClusteringBackend::None)
-            return reject(KMeansRunStatus::InvalidProcessingParameters, Core::ErrorCode::InvalidArgument,
+            return reject(KMeansRunStatus::InvalidProcessingParameters,
+                Core::ErrorCode::InvalidArgument,
                 "K-Means requires one supported input/output property domain, vec3 positions, scalar label storage, vec4 colors, distinct property names, a concrete backend, and positive cluster and iteration counts.");
 
         const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);

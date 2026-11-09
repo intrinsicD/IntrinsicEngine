@@ -11,6 +11,7 @@
 #include <utility>
 
 import Extrinsic.Runtime.ConfigFieldSpec;
+import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
@@ -29,19 +30,56 @@ namespace Extrinsic::Runtime
         constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
         constexpr std::string_view kKeypointAnalysisBackend[]{"cpu_kdtree", "cpu_lbvh", "vulkan_lbvh", "vulkan_compute"};
         constexpr std::string_view kKeypointAnalysisBackendNames[]{"CPU KD-tree", "CPU LBVH (cached)", "Vulkan LBVH neighborhoods", "Vulkan"};
+        // ARCH-023: the shared rows a one-shot honours (auto_accept, start), keypoints' and construction's.
+        constexpr auto kOneShotExecutionFields = StepRunExecutionFields(1u);
         constexpr ConfigFieldSpec kKeypointAnalysisFields[]{
             {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
             {.Name = "minimum_neighbors", .Type = ConfigFieldType::UInt, .Description = "Minimum neighbors."},
-            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
-            {.Name = "gpu_radius_capacity", .Type = ConfigFieldType::UInt, .Description = "Gpu radius capacity.", .Min = 1, .Max = 1024},
-            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kKeypointAnalysisBackendNames, .EnumValues = kKeypointAnalysisBackend},
-            {.Name = "salient_radius", .Type = ConfigFieldType::Float, .Description = "Zero selects an automatic radius; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "nonmax_radius", .Type = ConfigFieldType::Float, .Description = "Zero selects an automatic radius; positive values must remain positive in float storage.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "gpu_query_batch_size",
+                .Type = ConfigFieldType::UInt,
+                .Description = "Gpu query batch size.",
+                .Min = 1,
+                .Max = 16384},
+            {.Name = "gpu_radius_capacity",
+                .Type = ConfigFieldType::UInt,
+                .Description = "Gpu radius capacity.",
+                .Min = 1,
+                .Max = 1024},
+            {.Name = "backend",
+                .Type = ConfigFieldType::StringEnum,
+                .Description = "Backend.",
+                .EnumNames = kKeypointAnalysisBackendNames,
+                .EnumValues = kKeypointAnalysisBackend},
+            {.Name = "salient_radius",
+                .Type = ConfigFieldType::Float,
+                .Description =
+                    "Zero selects an automatic radius; positive values must remain positive in float storage.",
+                .Min = 0,
+                .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "nonmax_radius",
+                .Type = ConfigFieldType::Float,
+                .Description =
+                    "Zero selects an automatic radius; positive values must remain positive in float storage.",
+                .Min = 0,
+                .Max = double(std::numeric_limits<float>::max())},
             {.Name = "gamma21", .Type = ConfigFieldType::Float, .Description = "Gamma21.", .Min = 0, .Max = 1},
             {.Name = "gamma32", .Type = ConfigFieldType::Float, .Description = "Gamma32.", .Min = 0, .Max = 1},
-            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions, mask and score must have distinct names on the same element domain.", .RefKinds = kVec3Kind},
-            {.Name = "mask", .Type = ConfigFieldType::PropertyRef, .Description = "Mask.", .RefKinds = kUInt32Kind, .AnyScalar = true},
-            {.Name = "score", .Type = ConfigFieldType::PropertyRef, .Description = "Score.", .RefKinds = kFloatKind, .AnyScalar = true},
+            {.Name = "positions",
+                .Type = ConfigFieldType::PropertyRef,
+                .Description = "Positions, mask and score must have distinct names on the same element domain.",
+                .RefKinds = kVec3Kind},
+            {.Name = "mask",
+                .Type = ConfigFieldType::PropertyRef,
+                .Description = "Mask.",
+                .RefKinds = kUInt32Kind,
+                .AnyScalar = true},
+            {.Name = "score",
+                .Type = ConfigFieldType::PropertyRef,
+                .Description = "Score.",
+                .RefKinds = kFloatKind,
+                .AnyScalar = true},
+            kOneShotExecutionFields[3],
+            kOneShotExecutionFields[4],
         };
         constexpr std::string_view kPointConstructionBackend[]{"cpu_reference", "cpu_lbvh", "vulkan_lbvh"};
         constexpr std::string_view kPointConstructionMethod[]{"hoppe", "knn_graph"};
@@ -50,22 +88,69 @@ namespace Extrinsic::Runtime
             {.Name = "entity", .Type = ConfigFieldType::UInt, .Description = "Entity."},
             {.Name = "resolution", .Type = ConfigFieldType::UInt, .Description = "Resolution.", .Min = 1, .Max = 512},
             {.Name = "k_neighbors", .Type = ConfigFieldType::UInt, .Description = "K neighbors.", .Min = 1, .Max = 63},
-            {.Name = "normal_k_neighbors", .Type = ConfigFieldType::UInt, .Description = "Normal k neighbors.", .Min = 3, .Max = 1024},
-            {.Name = "gpu_query_batch_size", .Type = ConfigFieldType::UInt, .Description = "Gpu query batch size.", .Min = 1, .Max = 16384},
-            {.Name = "max_grid_vertices", .Type = ConfigFieldType::UInt, .Description = "Max grid vertices.", .Min = 8, .Max = 16777216},
-            {.Name = "backend", .Type = ConfigFieldType::StringEnum, .Description = "Backend.", .EnumNames = kPointConstructionBackendNames, .EnumValues = kPointConstructionBackend},
-            {.Name = "method", .Type = ConfigFieldType::StringEnum, .Description = "Method.", .EnumValues = kPointConstructionMethod},
+            {.Name = "normal_k_neighbors",
+                .Type = ConfigFieldType::UInt,
+                .Description = "Normal k neighbors.",
+                .Min = 3,
+                .Max = 1024},
+            {.Name = "gpu_query_batch_size",
+                .Type = ConfigFieldType::UInt,
+                .Description = "Gpu query batch size.",
+                .Min = 1,
+                .Max = 16384},
+            {.Name = "max_grid_vertices",
+                .Type = ConfigFieldType::UInt,
+                .Description = "Max grid vertices.",
+                .Min = 8,
+                .Max = 16777216},
+            {.Name = "backend",
+                .Type = ConfigFieldType::StringEnum,
+                .Description = "Backend.",
+                .EnumNames = kPointConstructionBackendNames,
+                .EnumValues = kPointConstructionBackend},
+            {.Name = "method",
+                .Type = ConfigFieldType::StringEnum,
+                .Description = "Method.",
+                .EnumValues = kPointConstructionMethod},
             {.Name = "estimate_normals", .Type = ConfigFieldType::Bool, .Description = "Estimate normals."},
             {.Name = "mutual", .Type = ConfigFieldType::Bool, .Description = "Mutual."},
-            {.Name = "output_name", .Type = ConfigFieldType::String, .Description = "Output entity name containing 1..256 bytes.", .NonEmpty = true},
-            {.Name = "bounding_box_padding", .Type = ConfigFieldType::Float, .Description = "Bounding box padding.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "normal_agreement_power", .Type = ConfigFieldType::Float, .Description = "Normal agreement power.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "kernel_sigma_scale", .Type = ConfigFieldType::Float, .Description = "Must be strictly positive after conversion to float; zero and positive values that underflow are rejected.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "min_distance_epsilon", .Type = ConfigFieldType::Float, .Description = "Min distance epsilon.", .Min = 0, .Max = double(std::numeric_limits<float>::max())},
-            {.Name = "positions", .Type = ConfigFieldType::PropertyRef, .Description = "Positions.", .RefKinds = kVec3Kind},
-            {.Name = "normals", .Type = ConfigFieldType::PropertyRef, .Description = "For Hoppe with estimate_normals disabled, supplied normals must share the position domain.", .RefKinds = kVec3Kind},
+            {.Name = "output_name",
+                .Type = ConfigFieldType::String,
+                .Description = "Output entity name containing 1..256 bytes.",
+                .NonEmpty = true},
+            {.Name = "bounding_box_padding",
+                .Type = ConfigFieldType::Float,
+                .Description = "Bounding box padding.",
+                .Min = 0,
+                .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "normal_agreement_power",
+                .Type = ConfigFieldType::Float,
+                .Description = "Normal agreement power.",
+                .Min = 0,
+                .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "kernel_sigma_scale",
+                .Type = ConfigFieldType::Float,
+                .Description =
+                    "Must be strictly positive after conversion to float; zero and positive values that underflow are rejected.",
+                .Min = 0,
+                .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "min_distance_epsilon",
+                .Type = ConfigFieldType::Float,
+                .Description = "Min distance epsilon.",
+                .Min = 0,
+                .Max = double(std::numeric_limits<float>::max())},
+            {.Name = "positions",
+                .Type = ConfigFieldType::PropertyRef,
+                .Description = "Positions.",
+                .RefKinds = kVec3Kind},
+            {.Name = "normals",
+                .Type = ConfigFieldType::PropertyRef,
+                .Description =
+                    "For Hoppe with estimate_normals disabled, supplied normals must share the position domain.",
+                .RefKinds = kVec3Kind},
+            kOneShotExecutionFields[3],
+            kOneShotExecutionFields[4],
         };
-
     }
 }
 
@@ -82,6 +167,10 @@ namespace Extrinsic::Runtime
             c.MinimumNeighbors=data.at("minimum_neighbors");c.GpuQueryBatchSize=data.at("gpu_query_batch_size");
             c.GpuRadiusCapacity=data.at("gpu_radius_capacity");c.SalientRadius=data.at("salient_radius");
             c.NonMaxRadius=data.at("nonmax_radius");c.Gamma21=data.at("gamma21");c.Gamma32=data.at("gamma32");
+            // Validated tokens (the field table checked them).
+            c.Execution.AutoAccept =
+                ParseStepRunAutoAccept(data.at("auto_accept").get<std::string>()).value_or(StepRunAutoAccept::Never);
+            c.Execution.Start = ParseStepRunStart(data.at("start").get<std::string>()).value_or(StepRunStart::Ready);
             return c;
         }
     }
@@ -94,11 +183,20 @@ namespace Extrinsic::Runtime
 
     std::string SerializeKeypointAnalysisConfig(const KeypointAnalysisConfig& c)
     {
-        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
-            {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"mask",ConfigDetail::EncodePointPropertyRef(c.Mask)},{"score",ConfigDetail::EncodePointPropertyRef(c.Score)},
-            {"minimum_neighbors",c.MinimumNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-            {"gpu_radius_capacity",c.GpuRadiusCapacity},{"salient_radius",c.SalientRadius},
-            {"nonmax_radius",c.NonMaxRadius},{"gamma21",c.Gamma21},{"gamma32",c.Gamma32}});
+        return ConfigDetail::SerializeConfigJson(Json{{"entity", c.StableEntityId},
+            {"backend", ToString(c.Backend)},
+            {"positions", ConfigDetail::EncodePointPropertyRef(c.Positions)},
+            {"mask", ConfigDetail::EncodePointPropertyRef(c.Mask)},
+            {"score", ConfigDetail::EncodePointPropertyRef(c.Score)},
+            {"minimum_neighbors", c.MinimumNeighbors},
+            {"gpu_query_batch_size", c.GpuQueryBatchSize},
+            {"gpu_radius_capacity", c.GpuRadiusCapacity},
+            {"salient_radius", c.SalientRadius},
+            {"nonmax_radius", c.NonMaxRadius},
+            {"gamma21", c.Gamma21},
+            {"gamma32", c.Gamma32},
+            {"auto_accept", std::string{ToString(c.Execution.AutoAccept)}},
+            {"start", std::string{ToString(c.Execution.Start)}}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateKeypointAnalysisConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)
@@ -115,6 +213,9 @@ namespace Extrinsic::Runtime
             return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
         if(!ConfigDetail::IsConfigFieldToken(kKeypointAnalysisFields, "backend", data["backend"]))
             return RejectConfigSection(subject, "Unknown keypoint backend.");
+        for (auto key : {"auto_accept", "start"})
+            if (!ConfigDetail::IsConfigFieldToken(kKeypointAnalysisFields, key, data[key]))
+                return RejectConfigSection(subject, std::string("Unknown keypoint ") + key + " value.");
         for(auto key:{"salient_radius","nonmax_radius"})
             if(!data[key].is_number() || !ConfigDetail::InConfigFieldRange(kKeypointAnalysisFields, key, data[key].get<double>()) ||
                (data[key]>0 && data[key].get<float>()==0))
@@ -175,6 +276,10 @@ namespace Extrinsic::Runtime
             c.NormalAgreementPower = data.at("normal_agreement_power");
             c.KernelSigmaScale = data.at("kernel_sigma_scale");
             c.MinDistanceEpsilon = data.at("min_distance_epsilon");
+            // Validated tokens (the field table checked them).
+            c.Execution.AutoAccept =
+                ParseStepRunAutoAccept(data.at("auto_accept").get<std::string>()).value_or(StepRunAutoAccept::Never);
+            c.Execution.Start = ParseStepRunStart(data.at("start").get<std::string>()).value_or(StepRunStart::Ready);
             return c;
         }
     } // namespace
@@ -205,22 +310,24 @@ namespace Extrinsic::Runtime
     std::string SerializePointConstructionConfig(const PointConstructionConfig& c)
     {
         return ConfigDetail::SerializeConfigJson(Json{{"entity", c.StableEntityId},
-                    {"method", ToString(c.Method)},
-                    {"backend", ToString(c.Backend)},
-                    {"positions", ConfigDetail::EncodeVec3PointPropertyRef(c.Positions)},
-                    {"normals", ConfigDetail::EncodeVec3PointPropertyRef(c.Normals)},
-                    {"output_name", c.OutputName},
-                    {"estimate_normals", c.EstimateNormals},
-                    {"mutual", c.Mutual},
-                    {"resolution", c.Resolution},
-                    {"k_neighbors", c.KNeighbors},
-                    {"normal_k_neighbors", c.NormalKNeighbors},
-                    {"gpu_query_batch_size", c.GpuQueryBatchSize},
-                    {"max_grid_vertices", c.MaxGridVertices},
-                    {"bounding_box_padding", c.BoundingBoxPadding},
-                    {"normal_agreement_power", c.NormalAgreementPower},
-                    {"kernel_sigma_scale", c.KernelSigmaScale},
-                    {"min_distance_epsilon", c.MinDistanceEpsilon}});
+            {"method", ToString(c.Method)},
+            {"backend", ToString(c.Backend)},
+            {"positions", ConfigDetail::EncodeVec3PointPropertyRef(c.Positions)},
+            {"normals", ConfigDetail::EncodeVec3PointPropertyRef(c.Normals)},
+            {"output_name", c.OutputName},
+            {"estimate_normals", c.EstimateNormals},
+            {"mutual", c.Mutual},
+            {"resolution", c.Resolution},
+            {"k_neighbors", c.KNeighbors},
+            {"normal_k_neighbors", c.NormalKNeighbors},
+            {"gpu_query_batch_size", c.GpuQueryBatchSize},
+            {"max_grid_vertices", c.MaxGridVertices},
+            {"bounding_box_padding", c.BoundingBoxPadding},
+            {"normal_agreement_power", c.NormalAgreementPower},
+            {"kernel_sigma_scale", c.KernelSigmaScale},
+            {"min_distance_epsilon", c.MinDistanceEpsilon},
+            {"auto_accept", std::string{ToString(c.Execution.AutoAccept)}},
+            {"start", std::string{ToString(c.Execution.Start)}}});
     }
     Core::Config::EngineConfigSectionValidationResult
     ValidatePointConstructionConfigSection(std::string_view payload, std::string_view,
@@ -242,6 +349,9 @@ namespace Extrinsic::Runtime
             return RejectConfigSection(subject, "Unknown construction backend.");
         if (!ConfigDetail::IsConfigFieldToken(kPointConstructionFields, "method", data["method"]))
             return RejectConfigSection(subject, "Unknown construction method.");
+        for (auto key : {"auto_accept", "start"})
+            if (!ConfigDetail::IsConfigFieldToken(kPointConstructionFields, key, data[key]))
+                return RejectConfigSection(subject, std::string("Unknown construction ") + key + " value.");
         if (!data["estimate_normals"].is_boolean() || !data["mutual"].is_boolean())
             return RejectConfigSection(subject, "Construction switches must be boolean.");
         if (!data["output_name"].is_string() || data["output_name"].get<std::string>().empty() ||

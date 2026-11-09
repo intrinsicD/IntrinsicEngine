@@ -18,14 +18,6 @@ const uint LOP_GPU_COUNTER_DENSITY = 0u;
 const uint LOP_GPU_COUNTER_ATTRACTION = 1u;
 const uint LOP_GPU_COUNTER_REPULSION = 2u;
 
-layout(buffer_reference, scalar) readonly buffer LopVec4ArrayRO
-{
-    vec4 Values[];
-};
-layout(buffer_reference, scalar) buffer LopVec4Array
-{
-    vec4 Values[];
-};
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer LopVec3ArrayRO
 {
     vec3 Values[];
@@ -116,18 +108,14 @@ layout(push_constant, scalar) uniform LopGpuPush
     uint Reserved1;
 } pc;
 
-// LOP uses canonical float3 rows; the other strategies retain their packed workspace.
+// Every strategy reads and writes canonical float3 rows (the resident property layout).
 vec3 LopLoadPosition(uint64_t address, uint row)
 {
-    if (pc.Strategy == LOP_GPU_STRATEGY_LOP)
-        return LopVec3ArrayRO(address).Values[row];
-    return LopVec4ArrayRO(address).Values[row].xyz;
+    return LopVec3ArrayRO(address).Values[row];
 }
 void LopStorePosition(uint64_t address, uint row, vec3 value)
 {
-    if (pc.Strategy == LOP_GPU_STRATEGY_LOP)
-        LopVec3Array(address).Values[row] = value;
-    else LopVec4Array(address).Values[row] = vec4(value, 1.0);
+    LopVec3Array(address).Values[row] = value;
 }
 
 bool LopFinite(const vec3 value)

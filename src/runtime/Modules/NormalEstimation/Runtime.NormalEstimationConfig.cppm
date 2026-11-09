@@ -1,4 +1,5 @@
-// Persisted normal method, canonical bindings and numerical controls for UI and agents.
+// Persisted normal method, canonical bindings, numerical controls and the one-shot run options (auto_accept, start)
+// for UI and agents.
 module;
 #include <cstdint>
 #include <optional>
@@ -9,6 +10,7 @@ module;
 export module Extrinsic.Runtime.NormalEstimationConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.NormalEstimation.Types;
+export import Extrinsic.Runtime.StepRunExecution;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -59,6 +61,10 @@ export namespace Extrinsic::Runtime
         Geometry::HalfedgeMesh::VertexNormals::AveragingMode Weighting{
             Geometry::HalfedgeMesh::VertexNormals::AveragingMode::AreaWeighted};
         bool OrientTowardFallback{true};
+        // ARCH-023: the one-shot options of an interactive or agent start (rows auto_accept and start; one step, no
+        // live preview): by default every one-shot's, ready and waiting for Accept. A batch (Apply, a waiting agent
+        // call) runs at once and accepts at its end whatever they say.
+        StepRunExecution Execution{kOneShotStepRunExecution};
     };
     extern "C++" [[nodiscard]] std::string SerializeNormalEstimationConfig(const NormalEstimationConfig &config);
     extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateNormalEstimationConfigSection(

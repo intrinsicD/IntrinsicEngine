@@ -1,6 +1,8 @@
 module;
+#include <atomic>
 #include <functional>
 #include <cstring>
+#include <mutex>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -24,6 +26,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Private.WorkspaceLease;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
@@ -39,11 +42,14 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRunExecution;
+import Extrinsic.Runtime.StepRuns; // the worker-step hooks of Runtime.GpuTransactionLifecycle.hpp
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.TransferQueue;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -53,8 +59,12 @@ import Extrinsic.RHI.CommandContext;
 
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 #include "Editor/Operations/Runtime.GpuTransactionLifecycle.hpp"
+#include "Services/Runtime.WorkerGpuPages.hpp"
 namespace Extrinsic::Runtime
 {
+    template std::shared_ptr<Graphics::PointScalarWorkspace>
+    SpatialIndexCache::LeaseGpuWorkspace<Graphics::PointScalarWorkspace>();
+
     namespace GP = GeometryProcessingDetail;
     // The typed scalar transaction on the shared Run/Accept lifecycle. Rings: the typed output
     // (read back on Accept), the companion field (publication mode, read back) and the float
@@ -73,10 +83,26 @@ namespace Extrinsic::Runtime
         std::shared_ptr<Graphics::PointScalarWorkspace> Workspace{};
         SpatialIndexHandle Index{};
         EditorPointScalarTransactionSnapshot Result{};
+        EditorPointScalarTransactionSnapshot Initial{}; // Result as queued: a restart's new generation begins here
         std::function<void(EditorPointScalarTransactionSnapshot)> Sink{};
         // RUNTIME-348: the operation runtime's retention, called before the sink at the one terminal
         // delivery; Accept may replace the sink, never this.
         std::function<void(EditorPointScalarTransactionSnapshot)> Retain{};
+        // ARCH-023: a publication transaction's own producer (SubmitEditorPointScalarRun) and its one step: Observed
+        // once the owner took the step's outcome (ProducerFailure: why it failed).
+        std::optional<EditorPointScalarProducer> Producer{};
+        bool ProducerObserved{};
+        std::string ProducerFailure{};
+        // ARCH-023, the kernel's worker step: the retained index view (Init), and what the worker records with (its
+        // own workspace reference, the views without their leases) and writes (the statistics it pulled).
+        std::shared_ptr<SpatialGpuIndexLease> IndexView{};
+        struct WorkerView
+        {
+            std::shared_ptr<Graphics::PointScalarWorkspace> Workspace{};
+            std::shared_ptr<SpatialGpuIndexLease> Index{};
+            Graphics::PointScalarResidentIo Io{};
+            Graphics::PointScalarGpuStats Stats{};
+        } Worker{};
     };
     namespace
     {
@@ -121,65 +147,85 @@ namespace Extrinsic::Runtime
                        w->Core, kTyped, w->Entity, w->Capture->Output, std::uint32_t(w->Capture->SlotCount), 3) ==
                 GP::GpuRingAcquisition::Ready;
         }
-        bool Poll(const Run& w)
+        // A view for a worker's recording: the handles and addresses, not the lease (the owner keeps that).
+        Graphics::GpuPropertyView Stripped(Graphics::GpuPropertyView view)
+        {
+            view.Lease.reset();
+            return view;
+        }
+        // The Init (main thread, once the run computes): the canonical inputs and the output's write slot, the
+        // workspace sized for this capture, and the retained index view; then the immutable recording view.
+        GP::GpuTransactionPrepare Prepare(const Run& w, std::string& why)
         {
             auto& t = w->Core;
-            if (!t.Gpu)
+            if (!Acquire(w))
             {
-                if (!Acquire(w))
-                {
-                    if (!GP::GpuTransactionDeferralsExhausted(t))
-                        return false;
-                    Fail(w, "Scalar residency refused an input or output slot.");
-                    return true;
-                }
-                w->Workspace = t.Context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointScalarWorkspace>();
-                if (!w->Workspace)
-                {
-                    Fail(w, "Scalar device workspace unavailable.");
-                    return true;
-                }
-                t.Gpu = t.Context.SpatialIndices->QueueGpuCompute(
-                    w->Index,
-                    sizeof(Graphics::PointScalarGpuStats),
-                    // The recorder owns its workspace lease; the cache keeps it until the readback is safe.
-                    [w, workspace = w->Workspace](
-                        RHI::ICommandContext& cmd, const SpatialGpuIndexView& index) -> RHI::BufferHandle
-                    {
-                        const auto& back = Typed(w).Back;
-                        if (!Current(w) || !w->Input || !back)
-                            return {};
-                        const auto frame = w->Core.Context.Device->GetGlobalFrameNumber();
-                        auto& residency = *w->Core.Residency;
-                        residency.NoteUse(w->Input->Buffer, frame);
-                        residency.NoteUse(back->Buffer, frame);
-                        if (w->Base)
-                            residency.NoteUse(w->Base->Buffer, frame);
-                        return workspace->Record(cmd,
-                            w->Params,
-                            {.Positions = *w->Input,
-                                .Output = *back,
-                                .Base = w->Base.value_or(Graphics::GpuPropertyView{}),
-                                .Nodes = index.NodesBDA,
-                                .LiveSlots = index.OriginalSlotsBDA,
-                                .LiveCount = index.Count});
-                    },
-                    SpatialGpuLatency::Immediate);
-                w->Result.GpuQueryBatches = 1;
+                if (!GP::GpuTransactionDeferralsExhausted(t))
+                    return GP::GpuTransactionPrepare::Pending;
+                why = "Scalar residency refused an input or output slot.";
+                return GP::GpuTransactionPrepare::Failed;
             }
-            return t.Gpu->State == SpatialQueryState::Ready || t.Gpu->State == SpatialQueryState::Failed;
+            if (!w->Workspace)
+                w->Workspace = t.Context.SpatialIndices->LeaseGpuWorkspace<Graphics::PointScalarWorkspace>();
+            if (!w->IndexView)
+                w->IndexView = t.Context.SpatialIndices->PrepareGpuIndex(w->Index, why);
+            if (!w->IndexView)
+                return GP::GpuTransactionPrepare::Failed;
+            const auto& index = w->IndexView->View();
+            const auto refusals = t.Context.SpatialIndices->Stats().ScratchRefusals;
+            if (!w->Workspace || !w->Workspace->Prepare(w->Params, index.Count))
+            {
+                // A method budget refusal says so (bytes and the config key); else the generic reason.
+                why =
+                    t.Context.SpatialIndices->MethodScratchDiagnostic(refusals, "Scalar device workspace unavailable.");
+                return GP::GpuTransactionPrepare::Failed;
+            }
+            w->Worker.Workspace = w->Workspace;
+            w->Worker.Index = w->IndexView;
+            w->Worker.Io = {.Positions = Stripped(*w->Input),
+                .Output = Stripped(*Typed(w).Back),
+                .Base = w->Base ? Stripped(*w->Base) : Graphics::GpuPropertyView{},
+                .Nodes = index.NodesBDA,
+                .LiveSlots = index.OriginalSlotsBDA,
+                .LiveCount = index.Count};
+            w->Result.GpuQueryBatches = 1;
+            return GP::GpuTransactionPrepare::Ready;
+        }
+        // The step run's Step, on a worker: the kernel's one page against the retained index, its statistics pulled.
+        StepOutcome Step(EditorPointScalarTransaction& w)
+        {
+            auto& worker = w.Worker;
+            switch (w.Core.Pages->Run(
+                [&](RHI::ICommandContext& cmd)
+                {
+                    for (const auto buffer : worker.Index->Barriers())
+                        cmd.BufferBarrier(buffer,
+                            RHI::MemoryAccess::ShaderWrite | RHI::MemoryAccess::TransferWrite,
+                            RHI::MemoryAccess::ShaderRead);
+                    return worker.Workspace->Record(cmd, w.Params, worker.Io);
+                },
+                std::as_writable_bytes(std::span{&worker.Stats, 1u})))
+            {
+            case WorkerGpuPageStatus::Complete: return StepOutcome::Converged;
+            case WorkerGpuPageStatus::Aborted:  return StepOutcome::Failed;
+            case WorkerGpuPageStatus::Refused:
+                w.Core.WorkerFailure = "Scalar compute failed.";
+                return StepOutcome::Failed;
+            case WorkerGpuPageStatus::Failed:
+            case WorkerGpuPageStatus::TimedOut: break;
+            }
+            w.Core.WorkerFailure = "Scalar compute did not complete: the device was lost.";
+            return StepOutcome::Failed;
+        }
+        // The owner's side: ready once the step completed (its statistics are written).
+        bool Poll(const Run& w)
+        {
+            return GP::GpuTransactionStepCompleted(w->Core);
         }
         void CompleteRun(const Run& w)
         {
             auto& t = w->Core;
-            if (!t.Gpu || t.Gpu->State != SpatialQueryState::Ready ||
-                t.Gpu->Data.size() != sizeof(Graphics::PointScalarGpuStats))
-            {
-                Fail(w, t.Gpu ? t.Gpu->Diagnostic : "Scalar compute failed.");
-                return;
-            }
-            std::memcpy(&w->Result.Statistics, t.Gpu->Data.data(), sizeof(Graphics::PointScalarGpuStats));
-            w->Workspace.reset();
+            w->Result.Statistics = w->Worker.Stats; // the step's pulled statistics (no step runs now)
             if (const auto& s = w->Result.Statistics; s.Invalid)
             {
                 const auto& p = w->Params;
@@ -204,8 +250,8 @@ namespace Extrinsic::Runtime
                 Fail(w, "Scalar ring publication failed.");
                 return;
             }
-            w->Input.reset();
-            w->Base.reset();
+            // The input views and the workspace stay until Accept, Discard or the run's end (Release), so a restart
+            // records again without resolving or leasing anything.
             w->Result.Message = "GPU scalar awaits Accept or Discard.";
             GP::ReadyGpuTransaction(t);
         }
@@ -348,17 +394,49 @@ namespace Extrinsic::Runtime
                 {
                     CompleteAccept(self());
                 },
+                // A restart records the kernel again from the capture: the inputs, workspace and index view stay (the
+                // capture is current); the Init acquires a fresh write slot; statistics start over.
+                .Restart =
+                    [raw](std::string&)
+                {
+                    raw->Result = raw->Initial;
+                    raw->Worker.Stats = {};
+                    return true;
+                },
+                .Prepare =
+                    [self](std::string& diagnostic)
+                {
+                    return Prepare(self(), diagnostic);
+                },
+                .Step =
+                    [raw](StepRunMetric&)
+                {
+                    return Step(*raw);
+                },
+                .Uses =
+                    [raw](std::vector<RHI::BufferHandle>& buffers)
+                {
+                    for (const auto* view : {&raw->Input, &raw->Base})
+                        if (*view)
+                            buffers.push_back((*view)->Buffer);
+                },
+                // No step runs any more (the core waits for that): the worker's references go with the owner's.
                 .Release =
                     [raw]
                 {
                     raw->Input.reset();
                     raw->Base.reset();
                     raw->Workspace.reset();
+                    raw->IndexView.reset();
+                    raw->Worker = {};
+                    if (raw->Producer && raw->Producer->Release)
+                        raw->Producer->Release();
                 },
                 .Deliver =
                     [raw](EditorCommandStatus status, std::string message)
                 {
                     raw->Result.Phase = raw->Core.Phase;
+                    raw->Result.StepRun = raw->Core.StepRun;
                     raw->Result.Status = status;
                     raw->Result.Message = std::move(message);
                     if (auto retain = std::move(raw->Retain))
@@ -368,10 +446,44 @@ namespace Extrinsic::Runtime
                 }};
             return w;
         }
+        // The producer's owner side (after its Init): once its worker step completed, the outcome (its preview
+        // publication, or why it failed) is taken once, in the drain its step run comes to rest, so a resting run
+        // already shows its result; the Run job then waits for the step run's Commit (the output stays admitted).
+        bool PollProducer(const Run& w)
+        {
+            auto& t = w->Core;
+            if (!GP::GpuTransactionStepCompleted(t))
+                return false;
+            if (!w->ProducerObserved)
+            {
+                w->ProducerObserved = true;
+                w->ProducerFailure = w->Producer->Outcome();
+                if (!w->ProducerFailure.empty())
+                    return true;
+            }
+            return !w->ProducerFailure.empty() || t.CommitWanted;
+        }
+        // The producer's step, on a worker: every page through the transaction's page gate.
+        StepOutcome ProducerStep(EditorPointScalarTransaction& w)
+        {
+            const EditorPointScalarPage page =
+                [&w](const std::function<RHI::BufferHandle(RHI::ICommandContext&)>& record,
+                    const std::span<std::byte> out)
+            {
+                return w.Core.Pages->Run(record, out) == WorkerGpuPageStatus::Complete;
+            };
+            auto failure = w.Producer->Step(page);
+            if (failure.empty())
+                return StepOutcome::Converged;
+            if (!w.Core.Pages->Aborted()) // abandoned: the owner ended the run, there is nothing to report
+                w.Core.WorkerFailure = std::move(failure);
+            return StepOutcome::Failed;
+        }
         EditorPointScalarTransactionSnapshot Snapshot(const Run& w)
         {
             auto s = w->Result;
             s.Phase = w->Core.Phase;
+            s.StepRun = w->Core.StepRun;
             return s;
         }
         EditorPointScalarTransactionSnapshot Accept(
@@ -435,10 +547,11 @@ namespace Extrinsic::Runtime
                 std::string_view jobLabel,
                 EditorPointScalarTransactionSnapshot& result,
                 std::function<void(EditorPointScalarTransactionSnapshot)> sink,
-                bool automatic,
+                const StepRunExecution& execution,
                 Graphics::GpuPropertyResidency* testResidency,
                 const EditorPointScalarTransactionSnapshot& testResult,
-                std::function<void(EditorPointScalarTransactionSnapshot)> retain)
+                std::function<void(EditorPointScalarTransactionSnapshot)> retain,
+                std::string owner)
             {
                 auto* residency = testResidency
                     ? testResidency
@@ -459,8 +572,9 @@ namespace Extrinsic::Runtime
                 w->Retain = std::move(retain);
                 w->Params = params;
                 w->Label = std::move(label);
-                t.AutoAccept = automatic;
+                t.Execution = OneShotExecution(execution);
                 t.JobLabel = std::string(jobLabel);
+                t.Owner = std::move(owner);
                 t.Rings[kTyped] = {.Key = MakeGpuPropertyKey(ctx.World, entity, w->Capture->Output), .ReadBack = true};
                 t.RingCount = 1;
                 t.Identity = {.EntityId = stableId,
@@ -510,10 +624,13 @@ namespace Extrinsic::Runtime
                         w->Index,
                         snapshot,
                         reused,
-                        why) != PointIndexState::Ready)
+                        why,
+                        false) != PointIndexState::Ready)
                     return refuse(why);
                 w->Result.IndexReused = reused;
                 w->Result.Message = "Device scalar analysis queued.";
+                w->Initial = w->Result;
+                t.Pages = std::make_shared<WorkerGpuPages>(*ctx.Device); // the kernel's page runs on the step's worker
                 w->Sink = GuardEditorProcessingResult(ctx, std::move(sink));
                 if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), "Device point scalar").IsValid())
                 {
@@ -533,6 +650,87 @@ namespace Extrinsic::Runtime
         if (run)
             run->Core.Identity = std::move(identity);
     }
+    bool SubmitEditorPointScalarRun(const EditorPointScalarTransactionHandle& w,
+        EditorJobIdentity identity,
+        StepRunExecution execution,
+        EditorPointScalarProducer producer,
+        std::string debugName,
+        std::string& refusal)
+    {
+        if (!w || !w->Publication || !producer.Prepare || !producer.Step || !producer.Outcome || !producer.Reset)
+        {
+            refusal = "A scalar producer needs a publication transaction and every callable.";
+            return false;
+        }
+        auto& t = w->Core;
+        if (!t.Context.StepRuns)
+        {
+            // Closed without delivery (the caller reports the refusal); the reserved rings go.
+            refusal = t.JobLabel + " needs the step-run service for its run controls; none is composed.";
+            t.Delivered = true;
+            GP::FailGpuTransaction(t, {});
+            return false;
+        }
+        w->Producer = std::move(producer);
+        auto* raw = w.get();
+        const auto self = [raw]
+        {
+            return raw->shared_from_this();
+        };
+        t.Hooks.Poll = [self]
+        {
+            return PollProducer(self());
+        };
+        t.Hooks.CompleteRun = [raw]
+        {
+            if (!raw->ProducerFailure.empty())
+                GP::FailGpuTransaction(raw->Core, raw->ProducerFailure);
+            else
+                GP::ReadyGpuTransaction(raw->Core);
+        };
+        t.Hooks.Restart = [raw](std::string& diagnostic)
+        {
+            if (!raw->ProducerFailure.empty())
+            {
+                diagnostic = raw->ProducerFailure;
+                return false;
+            }
+            raw->Producer->Reset();
+            GP::RestartGpuTransactionRings(raw->Core);
+            raw->ProducerObserved = false;
+            return true;
+        };
+        // ARCH-023: the producer's Init on the owner, its one step on the step run's worker.
+        t.Hooks.Prepare = [raw](std::string& diagnostic)
+        {
+            if (raw->Producer->Prepare())
+                return GP::GpuTransactionPrepare::Ready;
+            diagnostic = raw->Producer->Outcome();
+            if (diagnostic.empty())
+                diagnostic = "The scalar producer could not start.";
+            return GP::GpuTransactionPrepare::Failed;
+        };
+        t.Hooks.Step = [raw](StepRunMetric&)
+        {
+            return ProducerStep(*raw);
+        };
+        t.Hooks.Uses = [raw](std::vector<RHI::BufferHandle>& buffers)
+        {
+            if (raw->Producer->Uses)
+                raw->Producer->Uses(buffers);
+        };
+        t.Identity = std::move(identity);
+        t.Pages = std::make_shared<WorkerGpuPages>(*t.Context.Device);
+        // A one-shot (the producer's traversal): the core keeps the caller's start and auto_accept, one step, no live
+        // preview.
+        t.Execution = execution;
+        if (!GP::SubmitGpuTransactionRun(GP::GpuTransactionOf(w), std::move(debugName)).IsValid())
+        {
+            refusal = GP::MeshSupport::QueuedJobRejectedMessage(t.JobLabel);
+            return false;
+        }
+        return true;
+    }
     EditorPointScalarTransactionHandle BeginEditorPointScalarPublication(const EditorProcessingCommands& commands,
         EditorPointScalarPublication publication,
         EditorPointScalarTransactionSnapshot& result,
@@ -547,6 +745,8 @@ namespace Extrinsic::Runtime
                 .Message = why};
             return {};
         };
+        if (publication.PreviewBuffers < 2u || publication.PreviewBuffers > 3u)
+            return refuse("preview_buffers must be 2 or 3.");
         if (!residency || !publication.Current || (!publication.Companion && !publication.Publish) ||
             (publication.Companion && !publication.PublishPair) || !publication.Count ||
             !context.JobCommands.Available() || GeometryPropertyComponentCount(publication.Output.ValueKind) != 1 ||
@@ -577,8 +777,8 @@ namespace Extrinsic::Runtime
             GP::FailGpuTransaction(t, {});
             return refuse(why);
         };
-        typed.Back =
-            AcquireGpuPropertyOutput(*residency, context.World, w->Entity, publication.Output, publication.Count, 3);
+        typed.Back = AcquireGpuPropertyOutput(
+            *residency, context.World, w->Entity, publication.Output, publication.Count, publication.PreviewBuffers);
         typed.Generation = residency->RingGeneration(typed.Key);
         if (!typed.Back)
             return rollback("Typed scalar output reservation failed.");
@@ -589,7 +789,7 @@ namespace Extrinsic::Runtime
                 w->Entity,
                 GpuPropertyPresentationRef(publication.Output),
                 publication.Count,
-                3);
+                publication.PreviewBuffers);
             presentation.Generation = residency->RingGeneration(presentation.Key);
             if (!view)
                 return rollback("Scalar presentation reservation failed.");
@@ -599,8 +799,12 @@ namespace Extrinsic::Runtime
             companion = {.Key = MakeGpuPropertyKey(context.World, w->Entity, *publication.Companion), .ReadBack = true};
             if (residency->HasRing(companion.Key))
                 return rollback("Companion output awaits Accept or Discard.");
-            companion.Back = AcquireGpuPropertyOutput(
-                *residency, context.World, w->Entity, *publication.Companion, publication.Count, 3);
+            companion.Back = AcquireGpuPropertyOutput(*residency,
+                context.World,
+                w->Entity,
+                *publication.Companion,
+                publication.Count,
+                publication.PreviewBuffers);
             companion.Generation = residency->RingGeneration(companion.Key);
             if (!companion.Back)
                 return rollback("Companion output reservation failed.");
@@ -620,14 +824,19 @@ namespace Extrinsic::Runtime
         auto& t = w->Core;
         auto& residency = *t.Residency;
         Typed(w).Back.reset(); // Drop the admission lease before selecting a preview back.
-        auto typed = AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, p.Output, p.Count, 3);
+        auto typed =
+            AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, p.Output, p.Count, p.PreviewBuffers);
         if (!typed)
             return std::nullopt;
         Typed(w).Generation = residency.RingGeneration(Typed(w).Key);
         auto presentation = p.Output.ValueKind == Geometry::PropertyValueKind::Float
             ? typed
-            : AcquireGpuPropertyOutput(
-                  residency, t.Context.World, w->Entity, GpuPropertyPresentationRef(p.Output), p.Count, 3);
+            : AcquireGpuPropertyOutput(residency,
+                  t.Context.World,
+                  w->Entity,
+                  GpuPropertyPresentationRef(p.Output),
+                  p.Count,
+                  p.PreviewBuffers);
         if (!presentation)
             return std::nullopt;
         if (p.Output.ValueKind != Geometry::PropertyValueKind::Float)
@@ -636,9 +845,11 @@ namespace Extrinsic::Runtime
         if (p.Companion)
         {
             t.Rings[kCompanion].Back.reset();
-            companion = AcquireGpuPropertyOutput(residency, t.Context.World, w->Entity, *p.Companion, p.Count, 3);
+            companion = AcquireGpuPropertyOutput(
+                residency, t.Context.World, w->Entity, *p.Companion, p.Count, p.PreviewBuffers);
             if (!companion)
                 return std::nullopt;
+            t.Rings[kCompanion].Generation = residency.RingGeneration(t.Rings[kCompanion].Key); // renewed on restart
         }
         return EditorPointScalarBack{*typed, *presentation, companion.value_or(Graphics::GpuPropertyView{})};
     }
@@ -726,8 +937,19 @@ namespace Extrinsic::Runtime
         else if (!GP::AdmitPointScalarGpu(ctx, *capture, params, reason))
             return refuse(std::move(reason));
         EditorPointScalarTransactionSnapshot state;
-        auto run = GP::StartPointScalarGpu(ctx, capture, *entity, stableEntityId, positions, params,
-            "Estimate density weights", "Density weights", state, {}, false, testResidency, diagnostics);
+        auto run = GP::StartPointScalarGpu(ctx,
+            capture,
+            *entity,
+            stableEntityId,
+            positions,
+            params,
+            "Estimate density weights",
+            "Density weights",
+            state,
+            {},
+            kOneShotStepRunExecution,
+            testResidency,
+            diagnostics);
         if (!run && refused)
             *refused = std::move(state);
         return run;

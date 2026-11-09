@@ -55,6 +55,7 @@ import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.StepRunControls;
 
 #include "Sandbox.PanelSupport.hpp"
 
@@ -2737,6 +2738,16 @@ namespace Extrinsic::Sandbox::Editor
 
     GpuTransactionRowAction DrawGpuTransactionControls(const GpuTransactionRowView& view, const char* const idSuffix)
     {
+        if (view.StepRuns != nullptr && view.StepRun != 0u)
+        {
+            // The row's Step count and last refusal per panel (main thread).
+            static std::unordered_map<std::string, Runtime::StepRunControlsState> rows;
+            const auto issued = Runtime::DrawStepRunControls(*view.StepRuns, view.StepRun, idSuffix, rows[idSuffix]);
+            if (view.Io)
+                ImGui::TextUnformatted(FormatGpuTransactionIo(*view.Io).c_str());
+            return issued == Runtime::StepRunAction::Discard ? GpuTransactionRowAction::Discard
+                                                             : GpuTransactionRowAction::None;
+        }
         const auto state = ResolveGpuTransactionRowState(view);
         const auto id = [&](const char* label) { return std::string(label) + "##" + idSuffix; };
         GpuTransactionRowAction action = GpuTransactionRowAction::None;

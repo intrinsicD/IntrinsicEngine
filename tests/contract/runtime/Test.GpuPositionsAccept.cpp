@@ -2,9 +2,12 @@
 // ring publishes every row through one undoable history entry guarded by the captured
 // watches, binds the front as the canonical slot of the new revision, and refuses a stale
 // run; undo and redo restore the rows through the ordinary upload path (dirty positions).
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
+#include <thread>
 #include <memory>
 #include <optional>
 #include <string>
@@ -32,6 +35,8 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.GpuPropertyResidency;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRuns;
 import Geometry.Properties;
 namespace R = Extrinsic::Runtime;
 namespace G = Extrinsic::Graphics;
@@ -72,7 +77,7 @@ namespace
         R::EditorGpuPositionRunHandle Ready()
         {
             std::string why;
-            auto run = R::BeginEditorGpuPositionRun(Commands(), Id(), Positions, Residency, why);
+            auto run = R::BeginEditorGpuPositionRun(Commands(), Id(), Positions, Residency, why, 2u);
             EXPECT_TRUE(run) << why;
             if (!run) return {};
             EXPECT_TRUE(R::EditorGpuPositionRunFirstBack(run).has_value()) << "Begin acquired the ring's first write slot";
@@ -94,6 +99,36 @@ namespace
         }
         void ClearDirty() { Scene.Raw().remove<D::DirtyVertexPositions, D::GpuDirty>(Entity); }
     };
+}
+
+TEST(GpuPositionsAccept, RequestedPreviewDepthBoundsTheLeasedRing)
+{
+    for (const std::uint32_t depth : {2u, 3u})
+    {
+        Harness h;
+        std::string why;
+        auto run = R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, depth);
+        ASSERT_TRUE(run) << why;
+        auto first = R::EditorGpuPositionRunFirstBack(run);
+        ASSERT_TRUE(first);
+        std::vector<G::GpuPropertyView> held{*first};
+        for (std::uint32_t slot = 1u; slot < depth; ++slot)
+        {
+            auto next = h.Residency.AcquireBack(h.Key(), first->Layout, depth);
+            ASSERT_TRUE(next) << "slot " << slot << " of " << depth;
+            held.push_back(*next);
+        }
+        EXPECT_FALSE(h.Residency.AcquireBack(h.Key(), first->Layout, depth));
+        R::DiscardEditorGpuPositionRun(h.Commands(), run, h.Residency);
+    }
+    Harness h;
+    std::string why;
+    for (const std::uint32_t invalid : {0u, 1u, 4u})
+    {
+        EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, invalid));
+        EXPECT_FALSE(h.Residency.HasRing(h.Key()));
+        EXPECT_EQ(h.Residency.Stats().Slots, 0u);
+    }
 }
 
 TEST(GpuPositionsAccept, AcceptPublishesEveryRowUndoablyAndBindsTheFrontAsTheCanonicalRevision)
@@ -619,7 +654,7 @@ TEST(GpuPositionsAccept, DiscardOfATerminalRunLeavesALaterRunsRingAlone)
     const auto a = h.Ready();
     ASSERT_TRUE(a);
     std::string why;
-    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why))
+    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, 2u))
         << "a second run cannot begin while a ring waits";
     EXPECT_NE(why.find("awaits Accept or Discard"), std::string::npos) << why;
     std::optional<R::EditorGpuPositionAcceptResult> delivered;
@@ -658,11 +693,11 @@ TEST(GpuPositionsAccept, ABeginRefusedByTheDeviceLeavesNoRingBehind)
     Harness h;
     std::string why;
     h.Device.FailNextBufferCreate = true;
-    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why));
+    EXPECT_FALSE(R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, 2u));
     EXPECT_NE(why.find("refused a write slot"), std::string::npos) << why;
     EXPECT_FALSE(h.Residency.HasRing(h.Key()));
     why.clear();
-    const auto run = R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why);
+    const auto run = R::BeginEditorGpuPositionRun(h.Commands(), h.Id(), h.Positions, h.Residency, why, 2u);
     ASSERT_TRUE(run) << why;
     EXPECT_TRUE(h.Residency.HasRing(h.Key()));
     R::DiscardEditorGpuPositionRun(h.Commands(), run, h.Residency);
@@ -746,4 +781,160 @@ TEST(GpuPositionsAccept, ReentrantDiscardDuringAcceptStillDeliversAppliedOnce)
     EXPECT_EQ(results.front().Status, R::EditorCommandStatus::Applied) << results.front().Message;
     EXPECT_EQ(second, 0u);
     EXPECT_EQ(h.Rows(), front);
+}
+
+// ARCH-023 H3: the producer's step run (resident LOP binds its StepRunDriver::Publishing through Accept's `publishing`)
+// decides at the real publication boundary, after the readback and before any row is written. A discard issued before
+// the publication wins whichever drains first, the Accept job's publication or the run's holder pump: nothing is
+// written, no undo entry, one non-applied delivery, the run Discarded. A discard from a history observer during the
+// publication is refused: the rows are written once, one undo entry, Applied, the run Committed. Predictions as
+// asserted. Mutation: dropping the `Hooks.Publishing` check in the Accept job's publication makes PublicationFirst
+// write the rows (and leave the run Discarded with an undo entry).
+TEST(GpuPositionsAccept, TheProducersStepRunDecidesAtThePublicationBoundary)
+{
+    enum class Order
+    {
+        PublicationFirst,
+        PumpFirst,
+        DiscardDuringPublication
+    };
+    for (const Order order : {Order::PublicationFirst, Order::PumpFirst, Order::DiscardDuringPublication})
+    {
+        SCOPED_TRACE(int(order));
+        Harness h;
+        // The producer run's holder lives on its own job lane, drained only where the order says.
+        R::JobService lane;
+        R::KernelEventBus events;
+        const auto drainLane = [&](const std::function<bool()>& done)
+        {
+            const auto until = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+            while (!done() && std::chrono::steady_clock::now() < until)
+            {
+                (void)lane.DrainCompletions(events);
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            }
+            return done();
+        };
+        const R::StepRunJobs jobs{.Submit =
+                                      [&lane](R::PluginJob job, std::string*)
+            {
+                auto held = std::make_shared<R::PluginJob>(std::move(job));
+                R::JobDesc desc{};
+                desc.DebugName = held->Label;
+                desc.Work = [held](const R::JobCancellation& cancellation)
+                {
+                    held->Work(
+                        [&cancellation]
+                        {
+                            return cancellation.IsCancelled();
+                        });
+                    return R::JobResultEnvelope::Make(true);
+                };
+                if (held->IsReadyToApply)
+                    desc.IsReadyToApply = [held]
+                    {
+                        return held->IsReadyToApply();
+                    };
+                desc.PublishCompletion = [held](R::KernelEventBus&, const R::JobResultEnvelope&)
+                {
+                    return held->Completion(true);
+                };
+                desc.FinalizeUnpublishedOnMainThread = [held]
+                {
+                    (void)held->Completion(false);
+                };
+                return R::PluginJobHandle{lane.Submit(std::move(desc))};
+            },
+            .Cancel =
+                [&lane](const R::PluginJobHandle job)
+            {
+                return lane.Cancel(job.Token);
+            }};
+        auto& runs = h.Jobs.StepRuns();
+        std::uint64_t id = 0u;
+        std::string refusal;
+        bool refusedDuringPublication = false;
+        R::EditorGpuPositionRunHandle run;
+        if (order == Order::DiscardDuringPublication) // a history observer of the publication (copied at Begin)
+            h.Context.InvalidateWorkspaceSnapshotCache = [&]
+            {
+                std::string why;
+                refusedDuringPublication = !runs.Control(id, R::StepRunAction::Discard, 1u, why);
+            };
+        run = h.Ready();
+        ASSERT_TRUE(run);
+        id = runs.Start({.Label = "producer", .Execution = {.Start = R::StepRunStart::Run}},
+            {.Commit =
+                    [](std::string&)
+                {
+                    return R::StepRunCommit::Pending;
+                },
+                .Discard =
+                    [&]
+                {
+                    R::DiscardEditorGpuPositionRun(h.Commands(), run, h.Residency);
+                }},
+            jobs,
+            refusal);
+        ASSERT_NE(id, 0u) << refusal;
+        auto driver = runs.Driver(id);
+        driver.Recording(true);
+        (void)driver.Stepped({}, R::StepOutcome::Converged);
+        driver.Recording(false);
+        ASSERT_TRUE(driver.Committing()) << "the producer's Accept is its run's one Commit";
+        const auto before = h.Rows();
+        const auto front = h.Shifted({1.f, 2.f, 3.f});
+        const auto undo = h.History.UndoCount();
+        std::vector<R::EditorGpuPositionAcceptResult> results;
+        ASSERT_EQ(R::AcceptEditorGpuPositionRun(
+                      h.Commands(),
+                      run,
+                      h.Residency,
+                      "Move points (GPU)",
+                      [&](R::EditorGpuPositionAcceptResult result)
+                      {
+                          results.push_back(result);
+                          // As LOP's Tell: the publication's end answers the run's pending Commit.
+                          driver.CommitFinished(result.Status == R::EditorCommandStatus::Applied, result.Message);
+                      },
+                      front,
+                      [driver]() mutable
+                      {
+                          return driver.Publishing();
+                      })
+                      .Status,
+            R::EditorCommandStatus::Pending);
+        if (order != Order::DiscardDuringPublication)
+            ASSERT_TRUE(runs.Control(id, R::StepRunAction::Discard, 1u, refusal)) << "a discard still wins before it";
+        if (order == Order::PumpFirst)
+            ASSERT_TRUE(drainLane(
+                [&]
+                {
+                    return results.size() == 1u;
+                }))
+                << "the pump discards the transaction first";
+        ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+        ASSERT_TRUE(drainLane(
+            [&]
+            {
+                return R::IsTerminal(runs.Observe(id)->Phase);
+            }));
+        ASSERT_EQ(results.size(), 1u) << "delivered once";
+        if (order == Order::DiscardDuringPublication)
+        {
+            EXPECT_TRUE(refusedDuringPublication) << "the publication decides once it started";
+            EXPECT_EQ(results.front().Status, R::EditorCommandStatus::Applied) << results.front().Message;
+            EXPECT_EQ(h.Rows(), front);
+            EXPECT_EQ(h.History.UndoCount(), undo + 1u) << "one undo entry";
+            EXPECT_EQ(runs.Observe(id)->Phase, R::StepRunPhase::Committed);
+        }
+        else
+        {
+            EXPECT_NE(results.front().Status, R::EditorCommandStatus::Applied) << results.front().Message;
+            EXPECT_EQ(h.Rows(), before) << "nothing written";
+            EXPECT_EQ(h.History.UndoCount(), undo);
+            EXPECT_EQ(runs.Observe(id)->Phase, R::StepRunPhase::Discarded);
+        }
+        lane.CancelAndDrain();
+    }
 }

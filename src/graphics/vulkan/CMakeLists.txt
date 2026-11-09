@@ -15,6 +15,7 @@ target_sources(${target_name}
         Backends.Vulkan.Swapchain.cppm
         Backends.Vulkan.Sync.cppm
         Backends.Vulkan.Transfer.cppm
+        Backends.Vulkan.TransferLanes.cppm
         PRIVATE
         Backends.Vulkan.Mappings.cpp        # §2  RHI enum → VkEnum tables
         Backends.Vulkan.DiagnosticsLogging.cpp # §3  Vulkan check macro logging bridge

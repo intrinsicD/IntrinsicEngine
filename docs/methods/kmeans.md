@@ -56,16 +56,22 @@ CPU seeding remains synchronous. Random seeding draws K distinct points in O(K)
 representability and successful storage allocation. Every submission completes
 before the next one. Internal test knobs force smaller pair budgets.
 
-The service retains the last run's workspace buffers and three pipelines while
-idle and reuses any buffer whose capacity suffices. A workspace returns to the
-pool only when its last submission completed; a run finished with a submission
-still in flight, or a failed recording, does not return it. Results report
-the buffers and pipelines created at admission.
+The service retains the last run's workspace and its three pipelines while idle.
+Its buffers are method scratch leases (`SpatialIndexCache::MethodScratch()`): the
+idle workspace returns them to the cache, and the next run takes retired buffers of
+a sufficient size class from there. A workspace becomes idle only when its last
+submission completed; a run finished with a submission still in flight, or a failed
+recording, does not return it. A budget refusal at admission fails the request with
+its byte counts (no CPU fallback). Results report the device buffers and pipelines
+created at admission.
 
 The integer label ring and float presentation ring are reserved together at
 admission, and publish only after all
-preview writes complete. `sandbox.clustering.gpu_preview_interval` defaults to
-5, is validated in [1, 1000000], and round-trips through configuration. Final
+preview writes complete. The shared execution options of `sandbox.clustering`
+(`max_iterations` 32 in [1, 4096], `preview_every` 5 in [0, 1000000] with 0: no live
+preview and the labels unchanged, `preview_interval_ms` 0, `auto_accept` never,
+`start` run) are validated and round-trip through configuration and apply to both
+backends; the CPU reference shows no live preview. Final
 and stopped results publish even between intervals. The scalar colormap observes
 the float front under the label property's name; Show selects that property.
 
@@ -78,18 +84,46 @@ Accept lifecycle. The existing clustering publication writes labels, colors,
 and optional scalar labels in one undoable entry, in place after all checks: other
 properties keep their revisions, and the renderer is told only that the colors
 changed (`DirtyVertexColors`). Accept refuses stale inputs or outputs. Stop finishes the current iteration; Discard and detach leave CPU
-outputs unchanged. Batch requests and `run_kmeans` agent commands auto-accept at
-convergence or the iteration cap, never after Stop; refused stale Accept
+outputs unchanged. Requests with `auto_accept` end and `run_kmeans` agent commands accept at
+convergence or the iteration cap, never after Stop (a stopped run waits for Accept or Discard); refused stale Accept
 finishes with StaleSource. A terminal preview fails with a reason after 600
 busy-ring retries. Failed recordings retain resources until device-idle shutdown.
-The panel exposes Stop, Accept, Discard, backend identity and IO counters.
+The panel draws the shared step-run row (Run, Pause, Step n, Stop, Restart, Accept, Discard)
+and the execution options, backend identity and IO counters. Restart (`run_control`
+restart) prepares the workspace from the initial centroids again and begins a new
+generation, also after the final labels were prepared and before Accept: the same
+workspace and transaction compute again and their waiting labels are replaced.
 
-A GPU run is a step run (ARCH-022 S3c; `Runtime.StepRuns`, owner-driven): it counts
-each iteration at its Update boundary, where it may continue, pause (`run_control`
-pause or step n), stop or be accepted. A paused run rests at that boundary, with
-that boundary's preview recorded alone and nothing else recorded; it resumes
-from the same state, so any step sequence gives the uninterrupted run's labels and
-bitwise centroids (Vulkan smoke). Accept from a rest counts no iteration: it
+A CPU run is a worker step run of the same logical iteration (ARCH-023 B8):
+`Geometry.KMeans` exposes Cluster's loop as `BeginLloyd` (the seeds), `StepLloyd`
+(one assign and update with the same ties, empty-cluster reseed and convergence rule)
+and `FinishLloyd` (the labels of the current centroids when the last update moved one);
+`Cluster` is Begin, at most MaxIterations steps and Finish, so any step sequence equals
+it. The first step seeds on the worker, ready does no work, Stop keeps the partial result
+(Accept publishes `FinishLloyd` of that state), Restart seeds again, and Accept runs the
+exact source check and the one undoable publication on the main thread. The run reaches
+no live preview, records each step's inertia and squared maximum shift as the Vulkan run
+does, and is an editor job of the workspace (its Jobs row carries the request's
+correlation). A composition needs `StepRunsModule` and editor jobs (`AsyncWorkModule`);
+without them a CPU request completes ModuleUnavailable. Every completion names its run
+(`StepRun`), and `ClusteringService::StepRun(correlation)` names a started request's run
+for the panel and agents. `run_kmeans` runs and accepts at its end whatever the section
+says; `start_kmeans` starts a run with the section's execution options (or the ones it
+names, `start` ready included) and answers its run id for `run_control`.
+
+A GPU run is a worker step run (ARCH-023; `Runtime.StepRuns`): one step is one Lloyd
+iteration, its bounded pages (unchanged shape and order) recorded, submitted and waited
+for on the step's worker, which pulls only each page's few-byte diagnostics; no
+frame, drain or present paces it (Vulkan smoke: three iterations with graphics held and
+the main thread blocked). Each iteration ends at its Update boundary, where the run may
+continue, pause (`run_control` pause or step n), stop or be accepted. A paused run rests
+at that boundary; it resumes from the same state, so any step sequence gives the
+uninterrupted run's labels and bitwise centroids (Vulkan smoke). A live preview is its
+own submission into a ring slot the main thread offered (`StepPreviewMailbox`); with no
+free slot the copy is skipped, never waited for, and it is published once its fence
+completed. The main thread keeps live ECS, residency, publication, the terminal labels
+and Accept; a Restart re-uploads the initial centroids on the next step, after the older
+pages completed. Accept from a rest counts no iteration: it
 assigns labels for the current centroids (when the last update moved one), records
 the terminal preview and reads the labels back. Its holder and its Accept stage are
 editor jobs of the workspace the Sandbox shell lends (rows of the Jobs window; a

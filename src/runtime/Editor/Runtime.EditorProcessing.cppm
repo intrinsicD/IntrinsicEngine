@@ -23,6 +23,7 @@ extern "C++" {
     namespace Extrinsic::Runtime {
         class SpatialIndexCache;
         class SelectionController;
+        class StepRunsService;
         struct EditorProcessingCommandsAccess;
         struct EditorPointInputReadinessState;
     }
@@ -39,6 +40,9 @@ export namespace Extrinsic::Runtime
             WorldHandle World{DefaultWorldHandle};
             EditorCommandHistory* CommandHistory{};
             SpatialIndexCache* SpatialIndices{};
+            // ARCH-023: the run controls of GPU transactions with a Run job (run_control, run_observe); none: the
+            // transaction's own Accept and Discard only.
+            StepRunsService* StepRuns{};
             // Borrowed render device. Operations that offer a GPU backend gate on
             // IsOperational() and fall back to CPU; a null device is not an error.
             RHI::IDevice* Device{};
@@ -132,6 +136,9 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&, const EditorOperationRunKey& key);
     // `EditorJobCommandSurface::SceneEpoch`; 0 for an unbound or stale handle.
     [[nodiscard]] std::uint64_t GetEditorSceneEpoch(const EditorProcessingCommands&);
+    // ARCH-023: the session's step runs (the run controls panels draw with DrawStepRunControls); null for an unbound
+    // handle or a session composed without them.
+    [[nodiscard]] StepRunsService* GetEditorStepRuns(const EditorProcessingCommands&) noexcept;
     // Every editor-owned job (`EditorJobCommandSurface::SnapshotAll`); empty for an
     // unbound or stale handle.
     [[nodiscard]] std::vector<EditorJobRecord> GetEditorJobs(const EditorProcessingCommands&);

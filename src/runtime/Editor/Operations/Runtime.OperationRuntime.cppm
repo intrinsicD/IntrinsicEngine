@@ -8,6 +8,7 @@
 // operation module instantiates the runtime; those a custom definition calls itself are exported by
 // name in OperationSupport (RUNTIME-354), and no others.
 module;
+#include <atomic>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -43,6 +44,9 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.StepRunExecution;
+import Extrinsic.Runtime.StepRuns; // the worker-step hooks of Runtime.GpuTransactionLifecycle.hpp
+import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldHandle;
@@ -52,6 +56,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.OneShotCpuRun.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
@@ -232,12 +237,15 @@ export extern "C++"
             // sink); otherwise one queued run per output (a duplicate answers
             // Pending for the active run and is not stored): its Pending answer is stored, stage 6 refuses a
             // cancelled, abandoned or stale run, and the terminal result is stored before the sink receives it.
+            // With the session's step runs the run is a one-shot step run with `execution`; without them only a batch
+            // (computing at once, accepted at its end) runs, as one queued job.
             template <class Work>
             static Result RunOnCpu(const EditorProcessingContext& context,
                 std::uint64_t invocation,
                 const std::shared_ptr<Work>& w,
                 const GeometryPropertyRef& output,
-                std::function<void(Result)> onComplete)
+                std::function<void(Result)> onComplete,
+                const StepRunExecution& execution)
             {
                 if (w->Config.Backend != Traits::Reference)
                 {
@@ -267,6 +275,16 @@ export extern "C++"
                             EditorCommandStatus::StaleEntity,
                             Traits::Words().IndexMismatch);
                 }
+                const std::string& label = Traits::Words().JobLabel;
+                const bool batch =
+                    execution.Start == StepRunStart::Run && execution.AutoAccept != StepRunAutoAccept::Never;
+                if (!batch && (!context.StepRuns || !context.JobCommands.Available()))
+                    return Report(context,
+                        invocation,
+                        w,
+                        w->Config,
+                        EditorCommandStatus::InvalidProcessingParameters,
+                        label + " needs the step-run service and a job lane for its run controls; none is composed.");
                 if (!context.JobCommands.Available())
                 {
                     Shape::Execute(*w);
@@ -277,7 +295,6 @@ export extern "C++"
                     .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                     .OutputName = output.Name,
                     .RequestedDomain = EditorJobDomainOfBackend(ToString(w->Config.Backend))};
-                const std::string& label = Traits::Words().JobLabel;
                 if (auto busy = MeshSupport::ActiveOutputJobRefusal(context, identity, label))
                 {
                     auto result = w->Result;
@@ -296,6 +313,30 @@ export extern "C++"
                     },
                     std::move(queued),
                     label};
+                // ARCH-023: stages 5-7 as a one-shot worker step run (OneShotCpuRun.hpp).
+                if (context.StepRuns)
+                    return KeepOperationResult<Op>(context,
+                        invocation,
+                        MeshSupport::StartOneShotCpuRun<Work, Result>(
+                            context,
+                            {.Label = label,
+                                .Owner = std::string{Def::Noun},
+                                .Identity = identity,
+                                .Execution = execution},
+                            w,
+                            [](Work& work)
+                            {
+                                Shape::Execute(work);
+                            },
+                            [context](const Work& work)
+                            {
+                                return Shape::Current(context, work);
+                            },
+                            [context](const std::shared_ptr<Work>& work)
+                            {
+                                return Publish(context, work);
+                            },
+                            delivery));
                 JobDesc desc{.DebugName = Traits::Words().JobName,
                     .Scope = context.World,
                     .Work = [w](const JobCancellation&) -> JobResultEnvelope
@@ -481,18 +522,70 @@ export extern "C++"
                 {
                     auto result = w->Result;
                     bool busy = false;
-                    (void)Def::StartGpu(
-                        context, w, result, std::move(onComplete), true, Base::Retainer(context, invocation), busy);
+                    (void)Def::StartGpu(context,
+                        w,
+                        result,
+                        std::move(onComplete),
+                        kOneShotBatchExecution,
+                        Base::Retainer(context, invocation),
+                        busy);
                     if (!busy)
                         (void)KeepOperationResult<Op>(context, invocation, result);
                     return result;
                 }
-                return Base::RunOnCpu(context, invocation, w, *Def::Outputs(w->Config)[0], std::move(onComplete));
+                return Base::RunOnCpu(
+                    context, invocation, w, *Def::Outputs(w->Config)[0], std::move(onComplete), kOneShotBatchExecution);
+            }
+
+            // ARCH-023: an interactive or agent start with `config.Execution` (its auto_accept and start): the CPU
+            // backends as RunOnCpu's one-shot step run, Vulkan as the definition's transaction (whose step run keeps it
+            // until it ends, so no caller need hold it), the immediate mode as Apply's. Its answer carries the step
+            // run (Result.StepRun; 0 when refused or immediate); `onComplete` gets the terminal result as Apply's does.
+            static Result StartRun(
+                const EditorProcessingCommands& commands, const Params& config, std::function<void(Result)> onComplete)
+            {
+                const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+                const auto& execution = config.Execution;
+                if (Def::Immediate(config))
+                    return Apply(commands, config, std::move(onComplete));
+                std::string diagnostic;
+                const std::uint64_t invocation = BeginOperationRun(context);
+                auto w = Capture(context, config, diagnostic);
+                if (!w)
+                    return Base::Report(context,
+                        invocation,
+                        w,
+                        config,
+                        EditorCommandStatus::InvalidProcessingParameters,
+                        std::move(diagnostic));
+                if (w->Config.Backend == Backend::VulkanLBVH)
+                {
+                    auto result = w->Result;
+                    bool busy = false;
+                    const auto run = Def::StartGpu(context,
+                        w,
+                        result,
+                        std::move(onComplete),
+                        execution,
+                        Base::Retainer(context, invocation),
+                        busy);
+                    if (run)
+                        result.StepRun = run->Core.StepRun;
+                    if (!busy)
+                        (void)KeepOperationResult<Op>(context, invocation, result);
+                    return result;
+                }
+                return Base::RunOnCpu(
+                    context, invocation, w, *Def::Outputs(w->Config)[0], std::move(onComplete), execution);
             }
 
             // A GPU transaction the caller drives: `result` holds the request; a refusal keeps it with the
-            // reason and is stored, as is a start no other run answers for.
-            static auto StartTransaction(const EditorProcessingCommands& commands, const Params& config, Result& result)
+            // reason and is stored, as is a start no other run answers for. The caller's execution policy
+            // passes through unchanged; the core normalizes only the one-shot cap and preview cadence.
+            static auto StartTransaction(const EditorProcessingCommands& commands,
+                const Params& config,
+                Result& result,
+                const StepRunExecution& execution)
             {
                 const auto& ctx = EditorProcessingCommandsAccess::Resolve(commands);
                 const std::uint64_t invocation = BeginOperationRun(ctx);
@@ -503,10 +596,10 @@ export extern "C++"
                     result.Status = EditorCommandStatus::InvalidProcessingParameters;
                     result.Message = std::move(why);
                     (void)KeepOperationResult<Op>(ctx, invocation, result);
-                    return decltype(Def::StartGpu(ctx, w, result, {}, false, {}, std::declval<bool&>())){};
+                    return decltype(Def::StartGpu(ctx, w, result, {}, execution, {}, std::declval<bool&>())){};
                 }
                 bool busy = false;
-                auto run = Def::StartGpu(ctx, w, result, {}, false, Base::Retainer(ctx, invocation), busy);
+                auto run = Def::StartGpu(ctx, w, result, {}, execution, Base::Retainer(ctx, invocation), busy);
                 if (!busy)
                     (void)KeepOperationResult<Op>(ctx, invocation, result);
                 return run;
@@ -589,6 +682,10 @@ export extern "C++"
             using GeometryProcessingDetail::GpuTransactionCurrent;
             using GeometryProcessingDetail::GpuTransactionDeferralsExhausted;
             using GeometryProcessingDetail::GpuTransactionOf;
+            // ARCH-023: a worker-stepped transaction's Init answer and its owner-side checks.
+            using GeometryProcessingDetail::GpuTransactionPrepare;
+            using GeometryProcessingDetail::GpuTransactionStepCompleted;
+            using GeometryProcessingDetail::GpuTransactionWorkerBusy;
             using GeometryProcessingDetail::GpuTransactionStartRefusal;
             using GeometryProcessingDetail::ReadyGpuTransaction;
             using GeometryProcessingDetail::SubmitGpuTransactionRun;

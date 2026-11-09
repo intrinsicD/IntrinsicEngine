@@ -1,8 +1,10 @@
 // ARCH-022: kernel density as a plugin. For each live point it writes a Gaussian kernel density estimate over its
 // nearest candidates (bandwidth given or from the nearest-other spacing) into a scalar output, with one undo entry;
 // on CPU octree or CPU LBVH neighbourhoods (any scalar storage, checked conversion), or on the GPU (Vulkan LBVH, float
-// storage) with a preview that waits for Accept or Discard. The plugin owns its config section, its MCP tools and its
-// window; the point-cloud editing service does the capture, the GPU run and the publication.
+// storage) with a preview that waits for Accept or Discard. ARCH-023: every backend runs as a one-shot step run (the
+// whole estimate is its one step) with the host's run controls and the section's auto_accept and start. The plugin
+// owns its config section, its MCP tools and its window; the point-cloud editing service does the capture, the runs
+// and the publication.
 module;
 
 #include <array>
@@ -43,45 +45,52 @@ export namespace Intrinsic::Plugins::KernelDensity
                                        .ValueKind = Geometry::PropertyValueKind::Float};
         std::uint32_t KNeighbors{15}, GpuQueryBatchSize{4096};
         float Bandwidth{0}; // 0: from the nearest-other spacing
+        // The one-shot options (rows auto_accept and start; one step, no live preview), by default every one-shot's
+        // interactive start: ready (nothing computed before run or step), waiting for Accept.
+        R::StepRunExecution Execution{R::kOneShotStepRunExecution};
     };
 
     inline constexpr Geometry::PropertyValueKind kFloatKind[]{Geometry::PropertyValueKind::Float};
     inline constexpr Geometry::PropertyValueKind kVec3Kind[]{Geometry::PropertyValueKind::Vec3};
     inline constexpr std::string_view kBackendTokens[]{"cpu_octree", "cpu_lbvh", "vulkan_lbvh"};
     inline constexpr std::string_view kBackendNames[]{"CPU octree", "CPU LBVH (cached)", "Vulkan LBVH"};
+    inline constexpr auto kExecutionRows = R::BindStepRunExecution<&Config::Execution>(1u);
     inline constexpr std::array kRows{
-        R::Bind<&Config::StableEntityId>({.Name = "entity", .Type = R::ConfigFieldType::UInt, .Description = "Entity."}),
+        R::Bind<&Config::StableEntityId>(
+            {.Name = "entity", .Type = R::ConfigFieldType::UInt, .Description = "Entity."}),
         R::Bind<&Config::KNeighbors>(
             {.Name = "k_neighbors", .Type = R::ConfigFieldType::UInt, .Description = "K neighbors."}),
         R::Bind<&Config::GpuQueryBatchSize>({.Name = "gpu_query_batch_size",
-                                             .Type = R::ConfigFieldType::UInt,
-                                             .Description = "Gpu query batch size.",
-                                             .Min = 1,
-                                             .Max = 16384,
-                                             .Refusal = "GPU query batch size must be 1..16384."}),
+            .Type = R::ConfigFieldType::UInt,
+            .Description = "Gpu query batch size.",
+            .Min = 1,
+            .Max = 16384,
+            .Refusal = "GPU query batch size must be 1..16384."}),
         R::Bind<&Config::Backend>({.Name = "backend",
-                                   .Type = R::ConfigFieldType::StringEnum,
-                                   .Description = "Backend.",
-                                   .EnumNames = kBackendNames,
-                                   .EnumValues = kBackendTokens,
-                                   .Refusal = "Unknown density backend."}),
+            .Type = R::ConfigFieldType::StringEnum,
+            .Description = "Backend.",
+            .EnumNames = kBackendNames,
+            .EnumValues = kBackendTokens,
+            .Refusal = "Unknown density backend."}),
         R::Bind<&Config::Bandwidth>({.Name = "bandwidth",
-                                     .Type = R::ConfigFieldType::Float,
-                                     .Description = "Zero selects automatic bandwidth; positive values must remain "
-                                                    "positive in float storage.",
-                                     .Min = 0,
-                                     .Max = double(std::numeric_limits<float>::max()),
-                                     .Refusal = "Positive bandwidth must remain positive in float storage."}),
+            .Type = R::ConfigFieldType::Float,
+            .Description = "Zero selects automatic bandwidth; positive values must remain "
+                           "positive in float storage.",
+            .Min = 0,
+            .Max = double(std::numeric_limits<float>::max()),
+            .Refusal = "Positive bandwidth must remain positive in float storage."}),
         R::Bind<&Config::Positions>({.Name = "positions",
-                                     .Type = R::ConfigFieldType::PropertyRef,
-                                     .Description = "Position and density bindings must have distinct names on the "
-                                                    "same element domain.",
-                                     .RefKinds = kVec3Kind}),
+            .Type = R::ConfigFieldType::PropertyRef,
+            .Description = "Position and density bindings must have distinct names on the "
+                           "same element domain.",
+            .RefKinds = kVec3Kind}),
         R::Bind<&Config::Density>({.Name = "density",
-                                 .Type = R::ConfigFieldType::PropertyRef,
-                                 .Description = "Density.",
-                                 .RefKinds = kFloatKind,
-                                 .AnyScalar = true}),
+            .Type = R::ConfigFieldType::PropertyRef,
+            .Description = "Density.",
+            .RefKinds = kFloatKind,
+            .AnyScalar = true}),
+        kExecutionRows[3], // auto_accept
+        kExecutionRows[4], // start
     };
     inline constexpr auto kFields = R::SpecsOf(kRows);
     inline constexpr R::DerivedConfigSection<Config> kSection{
@@ -113,21 +122,26 @@ export namespace Intrinsic::Plugins::KernelDensity
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double CpuComputeMilliseconds{};
+        std::uint64_t StepRun{}; // the run's step run (run_control, run_observe); 0: it never started
     };
 
-    // A run, shared by the window and a waiting MCP call. A Vulkan run is the service's GPU run (`Analysis`); its
-    // state reaches `Final` through Refresh. `Session` is the editor session it belongs to.
+    // A run, shared by the window and a waiting MCP call. A Vulkan run is the service's GPU run (`Analysis`), whose
+    // state reaches `Final` through Refresh; a CPU run is the service's ScalarCpuRun (`Pending.StepRun`, `Handle` its
+    // holder job), which sets `Final` itself. `Session` is the editor session it belongs to; `Row` the window's
+    // run-control row state.
     struct Run : R::PluginRun<Result>
     {
         R::ScalarAnalysis Analysis{};
         R::PointSession Session{};
+        R::StepRunControlsState Row{};
     };
 
     // Readiness: empty when a run can start, else why not (copies no values).
     [[nodiscard]] std::string Preview(const Config& config);
-    // Starts a run (main thread). An immediate failure sets `Final` at once. A Vulkan run waits for Accept or Discard
-    // unless `autoAccept`.
-    [[nodiscard]] std::shared_ptr<Run> Start(const Config& config, bool autoAccept);
+    // Starts a one-shot step run with `config.Execution` (main thread): ready (nothing computed before run or step),
+    // or computing at once; then it waits for Accept or Discard unless auto_accept. An immediate failure sets `Final`
+    // at once.
+    [[nodiscard]] std::shared_ptr<Run> Start(const Config& config);
     // Main thread: folds a Vulkan run's state into `Pending`, and into `Final` once it ended.
     void Refresh(Run& run);
     void Accept(Run& run);

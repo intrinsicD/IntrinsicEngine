@@ -13,7 +13,15 @@ module;
 export module Extrinsic.Graphics.VertexNormals;
 import Extrinsic.RHI.Handles;
 
-extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+extern "C++"
+{
+    namespace Extrinsic::RHI
+    {
+        class IDevice;
+        class ICommandContext;
+        class BufferManager;
+    }
+}
 
 export namespace Extrinsic::Graphics
 {
@@ -107,7 +115,8 @@ export namespace Extrinsic::Graphics
     class VertexNormalsWorkspace
     {
     public:
-        explicit VertexNormalsWorkspace(RHI::IDevice& device);
+        // Scratch buffers are cached leases of `scratch`, which must outlive the workspace.
+        VertexNormalsWorkspace(RHI::IDevice& device, RHI::BufferManager& scratch);
         ~VertexNormalsWorkspace();
         static constexpr std::uint64_t StatsReadbackBytes = 3u * sizeof(std::uint32_t);
         // Records both passes and returns the stats buffer (StatsReadbackBytes, transfer-
@@ -116,6 +125,13 @@ export namespace Extrinsic::Graphics
         // the submission completed.
         [[nodiscard]] RHI::BufferHandle Record(RHI::ICommandContext& commands, const VertexNormalsGpuParams& params,
                                                const VertexNormalsResidentIo& io);
+        // ARCH-023, device-owner thread (a run's Init): checks the device, creates the pipeline and sizes the scratch for
+        // `layout`, resolving their addresses, so a Record of that layout then makes no device call (a method worker
+        // records it).
+        [[nodiscard]] bool Prepare(const VertexNormalsTopologyLayout& layout);
+        // Returns every scratch buffer to its cache, keeping the pipeline; the next Record reallocates.
+        void ReleaseScratch();
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

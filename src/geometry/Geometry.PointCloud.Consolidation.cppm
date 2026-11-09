@@ -234,6 +234,13 @@ export namespace Geometry::PointCloud::Consolidation
         [[nodiscard]] bool NeedsRepulsion() const noexcept;
         // WLOP/EAR moving rows must include self for shared density/refinement.
         [[nodiscard]] bool IncludesSelf() const noexcept;
+        // The work so far (iterations, displacements, contribution counts), the projected normals that
+        // anisotropic strategies refine, and the state (Success until a failure or the terminal Advance): with
+        // Positions() a caller stopped between Advances reads its partial result. After a terminal Advance
+        // Positions() and Normals() are the result's until TakeResult.
+        [[nodiscard]] const Diagnostics& CurrentDiagnostics() const noexcept;
+        [[nodiscard]] std::span<const glm::vec3> Normals() const noexcept;
+        [[nodiscard]] Status State() const noexcept;
 
         // SourceDensity takes source-to-source rows including self. Otherwise
         // sourceRows address source points for Positions(); projectedRows address

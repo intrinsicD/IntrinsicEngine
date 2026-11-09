@@ -23,6 +23,7 @@ TEST(CoreError, ErrorCodeToStringCoversAllCodes)
     // Spot-check representative codes from each category.
     EXPECT_EQ(Error::ToString(ErrorCode::Success), "Success");
     EXPECT_EQ(Error::ToString(ErrorCode::OutOfMemory), "OutOfMemory");
+    EXPECT_EQ(Error::ToString(ErrorCode::ResourceBudgetExceeded), "ResourceBudgetExceeded");
     EXPECT_EQ(Error::ToString(ErrorCode::FileNotFound), "FileNotFound");
     EXPECT_EQ(Error::ToString(ErrorCode::InvalidArgument), "InvalidArgument");
     EXPECT_EQ(Error::ToString(ErrorCode::UnsupportedFormat), "UnsupportedFormat");
@@ -132,7 +133,7 @@ TEST(CoreError, ErrorCodeCategories)
 {
     // Resource errors: 100-199
     EXPECT_GE(static_cast<uint32_t>(ErrorCode::OutOfMemory), 100u);
-    EXPECT_LT(static_cast<uint32_t>(ErrorCode::ResourceCorrupted), 200u);
+    EXPECT_LT(static_cast<uint32_t>(ErrorCode::ResourceBudgetExceeded), 200u);
 
     // I/O errors: 200-299
     EXPECT_GE(static_cast<uint32_t>(ErrorCode::FileNotFound), 200u);

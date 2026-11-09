@@ -16,6 +16,7 @@ import Extrinsic.Graphics.PointNormals;
 import Extrinsic.Graphics.PointScalarAnalysis;
 import Extrinsic.Graphics.OutlierAnalysis;
 import Extrinsic.Graphics.GpuPropertyResidency;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Handles;
 namespace G = Extrinsic::Graphics;
 
@@ -33,7 +34,8 @@ TEST(VertexNormalsWorkspace, PassesLargerThanOneDispatchAreChunkedWithABaseIndex
     Extrinsic::Tests::MockDevice device;
     device.ShaderFloat64 = true;
     Extrinsic::Tests::MockCommandContext commands;
-    G::VertexNormalsWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::VertexNormalsWorkspace workspace(device, scratch);
     const auto buffer = [&](const char* name) {
         const auto handle = device.CreateBuffer({.SizeBytes = 64u, .Usage = Extrinsic::RHI::BufferUsage::Storage, .DebugName = name});
         return G::VertexNormalsResidentView{.Buffer = handle, .Address = device.GetBufferDeviceAddress(handle)};
@@ -105,7 +107,8 @@ TEST(VertexNormalsWorkspace, BundlesAndLayoutsBeyondTheIndexLimitsAreRefusedBefo
     Extrinsic::Tests::MockDevice device;
     device.ShaderFloat64 = true;
     Extrinsic::Tests::MockCommandContext commands;
-    G::VertexNormalsWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::VertexNormalsWorkspace workspace(device, scratch);
     const auto handle = device.CreateBuffer({.SizeBytes = 64u, .Usage = Extrinsic::RHI::BufferUsage::Storage});
     const G::VertexNormalsResidentView view{.Buffer = handle, .Address = device.GetBufferDeviceAddress(handle)};
     auto layout = packed;
@@ -120,7 +123,8 @@ TEST(PointNormalsWorkspace, RadiusPagesBoundWorkAndKeepOutputAndStatsAcrossSubmi
     Extrinsic::Tests::MockDevice device;
     device.ShaderFloat64 = true;
     Extrinsic::Tests::MockCommandContext commands;
-    G::PointNormalsWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PointNormalsWorkspace workspace(device, scratch);
     const auto buffer = device.CreateBuffer({.SizeBytes = 1026u * 12u, .Usage = Extrinsic::RHI::BufferUsage::Storage});
     const G::GpuPropertyView view{.Buffer = buffer, .Address = device.GetBufferDeviceAddress(buffer), .Bytes = 1026u * 12u};
     const G::PointNormalsResidentIo io{.Positions = view, .Output = view, .Nodes = 16, .LiveSlots = 32, .LiveCount = 1026};
@@ -158,7 +162,8 @@ TEST(PointNormalsWorkspace, InputBeyondTheLbvhLimitIsRefusedBeforeRecording)
     Extrinsic::Tests::MockDevice device;
     device.ShaderFloat64 = true;
     Extrinsic::Tests::MockCommandContext commands;
-    G::PointNormalsWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PointNormalsWorkspace workspace(device, scratch);
     for (auto count : {(1u << 20) + 1u, 1u << 21})
     {
         const G::PointNormalsResidentIo io{.Positions = {.Address = 8}, .Output = {.Address = 16},
@@ -193,7 +198,8 @@ TEST(PointScalarWorkspace, WarmRunsKeepPipelineAndScratchAndGrowOnlyUndersizedBu
     Extrinsic::Tests::MockDevice device;
     device.ShaderFloat64 = true;
     Extrinsic::Tests::MockCommandContext commands;
-    G::PointScalarWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PointScalarWorkspace workspace(device, scratch);
     const auto view = ResidentView(device, 4096u);
     const auto io = [&](std::uint32_t count) {
         return G::PointScalarResidentIo{.Positions = view, .Output = view, .Nodes = 16, .LiveSlots = 32, .LiveCount = count};
@@ -223,14 +229,18 @@ TEST(PointScalarWorkspace, WarmRunsKeepPipelineAndScratchAndGrowOnlyUndersizedBu
     EXPECT_EQ(PushField<std::uint32_t>(commands, 64), 10u); // Count
     EXPECT_EQ(PushField<std::uint32_t>(commands, 68), 3u);  // Width
     EXPECT_EQ(PushField<std::uint32_t>(commands, 72), 0u);  // Method
-    // A wider neighborhood replaces only the neighbor scratch.
+    // A wider neighborhood replaces only the neighbor scratch; the old one returns to the cache.
     EXPECT_EQ(workspace.Record(commands, {.Method = 1, .K = 8}, io(100)), stats);
     EXPECT_EQ(device.CreateBufferCount - buffers, 4);
-    EXPECT_EQ(device.DestroyBufferCount, 1);
+    EXPECT_EQ(device.DestroyBufferCount, 0);
+    EXPECT_EQ(scratch.GetScratchStats().PendingBytes, Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 5u * 8u));
     // More rows replace both row-sized buffers, never the stats.
     EXPECT_EQ(workspace.Record(commands, {.Method = 1, .K = 8}, io(200)), stats);
     EXPECT_EQ(device.CreateBufferCount - buffers, 6);
-    EXPECT_EQ(device.DestroyBufferCount, 3);
+    EXPECT_EQ(scratch.GetScratchStats().PendingBytes,
+        Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 5u * 8u) +
+            Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 9u * 8u) +
+            Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 16u));
     // A failed growth refuses before recording; the next run allocates it.
     const auto dispatches = commands.DispatchRecords.size();
     device.FailNextBufferCreate = true;
@@ -245,7 +255,8 @@ TEST(OutlierWorkspace, WarmRunsKeepPipelineAndScratchAndGrowOnlyUndersizedBuffer
     Extrinsic::Tests::MockDevice device;
     device.ShaderFloat64 = true;
     Extrinsic::Tests::MockCommandContext commands;
-    G::OutlierWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::OutlierWorkspace workspace(device, scratch);
     const auto io = [&](std::uint32_t count) {
         const auto view = ResidentView(device, count);
         return G::OutlierResidentIo{.Positions = view, .Score = view, .Mask = view, .Presentation = view,
@@ -267,10 +278,14 @@ TEST(OutlierWorkspace, WarmRunsKeepPipelineAndScratchAndGrowOnlyUndersizedBuffer
     // A wider neighborhood replaces only the neighbor scratch; more slots also the means.
     EXPECT_EQ(workspace.Record(commands, {.Method = 2, .K = 16}, small), stats);
     EXPECT_EQ(device.CreateBufferCount - buffers, 4);
-    EXPECT_EQ(device.DestroyBufferCount, 1);
+    EXPECT_EQ(device.DestroyBufferCount, 0);
+    EXPECT_EQ(scratch.GetScratchStats().PendingBytes, Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 5u * 8u));
     EXPECT_EQ(workspace.Record(commands, {.Method = 2, .K = 16}, large), stats);
     EXPECT_EQ(device.CreateBufferCount - buffers, 6);
-    EXPECT_EQ(device.DestroyBufferCount, 3);
+    EXPECT_EQ(scratch.GetScratchStats().PendingBytes,
+        Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 5u * 8u) +
+            Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 17u * 8u) +
+            Extrinsic::RHI::BufferManager::ScratchClassBytes(100u * 16u));
     EXPECT_EQ(device.CreatePipelineCount, 1);
 }
 
@@ -279,7 +294,8 @@ TEST(PointNormalsWorkspace, NewRunAfterCompletionReusesScratchAndRefusesOversize
     Extrinsic::Tests::MockDevice device;
     device.ShaderFloat64 = true;
     Extrinsic::Tests::MockCommandContext commands;
-    G::PointNormalsWorkspace workspace(device);
+    Extrinsic::RHI::BufferManager scratch{device};
+    G::PointNormalsWorkspace workspace(device, scratch);
     const auto view = ResidentView(device, 2048u);
     const auto io = [&](std::uint32_t count) {
         return G::PointNormalsResidentIo{.Positions = view, .Output = view, .Nodes = 16, .LiveSlots = 32, .LiveCount = count};
@@ -303,6 +319,7 @@ TEST(PointNormalsWorkspace, NewRunAfterCompletionReusesScratchAndRefusesOversize
     // A larger run replaces only the neighbor scratch.
     EXPECT_EQ(workspace.Record(commands, {.K = 31, .BatchSize = 64}, io(128)), stats);
     EXPECT_EQ(device.CreateBufferCount - buffers, 3);
-    EXPECT_EQ(device.DestroyBufferCount, 1);
+    EXPECT_EQ(device.DestroyBufferCount, 0);
+    EXPECT_EQ(scratch.GetScratchStats().PendingBytes, Extrinsic::RHI::BufferManager::ScratchClassBytes(64u * 16u * 8u));
     EXPECT_EQ(device.CreatePipelineCount, 1);
 }

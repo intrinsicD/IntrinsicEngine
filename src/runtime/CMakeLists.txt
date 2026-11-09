@@ -78,7 +78,9 @@ target_sources(${target_name}
         Services/Runtime.PluginHost.cppm
         Services/Runtime.PluginSections.cppm
         Services/Runtime.PointCloudEditing.cppm
+        Services/Runtime.StepRunExecution.cppm
         Services/Runtime.StepRuns.cppm
+        Services/Runtime.StepRunControls.cppm
         Kernel/Runtime.Engine.cppm
         Config/Runtime.EngineConfigBoot.cppm
         Config/Runtime.EngineConfigControl.cppm
@@ -121,6 +123,9 @@ target_sources(${target_name}
         GeometryIntegration/Runtime.VertexChannelBindings.cppm
         GeometryIntegration/Runtime.VertexChannelStreams.cppm
         Visualization/Runtime.VisualizationRecipes.cppm
+        PRIVATE
+        FILE_SET workspace_lease_impl TYPE CXX_MODULES FILES
+        GeometryIntegration/Runtime.SpatialIndexCache.Workspaces.cppm
         PRIVATE
         FILE_SET editor_feature_impl TYPE CXX_MODULES FILES
         Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
@@ -272,7 +277,9 @@ target_sources(${target_name}
         Services/Runtime.EditorWorkspaceSlot.cpp
         Services/Runtime.PluginHost.cpp
         Services/Runtime.PointCloudEditing.cpp
+        Services/Runtime.StepRunExecution.cpp
         Services/Runtime.StepRuns.cpp
+        Services/Runtime.StepRunControls.cpp
         Kernel/Runtime.InputActions.cpp
         Kernel/Runtime.KernelEvents.cpp
         Kernel/Runtime.Module.cpp
